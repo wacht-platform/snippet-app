@@ -1079,7 +1079,7 @@ class _SidebarState extends State<_Sidebar> {
                       child: Padding(
                         padding: const EdgeInsets.all(4),
                         child: Icon(Icons.filter_list_rounded,
-                            size: 20,
+                            size: 24,
                             color: _filter != 'all'
                                 ? AppColors.accent
                                 : AppColors.fg3),
@@ -1177,7 +1177,7 @@ class _SidebarState extends State<_Sidebar> {
     final a = widget.active;
     return Container(
       padding: EdgeInsets.fromLTRB(
-          12, 8, 12, kMobile ? 20 : 8), // safe-area-ish bottom padding
+          20, 8, 20, 10 + MediaQuery.of(context).padding.bottom), // safe-area-ish bottom padding
       decoration: BoxDecoration(
         color: AppColors.bg,
         border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),

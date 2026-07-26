@@ -262,6 +262,32 @@ final _lightPreset = _light(
   warn: const Color(0xFFD97706),
 );
 
+// Rosé Pine — moody dark blue-purple with soft rose accents. Cozy, elegant, low-strain.
+final _rosePine = _dark(
+  name: 'rose-pine',
+  label: 'Rosé Pine',
+  accent: const Color(0xFFEB6F92),   // love (rose)
+  text: const Color(0xFFE0DEF4),     // text
+  muted: const Color(0xFF908CAA),    // subtle
+  faint: const Color(0xFF6E6A86),    // muted
+  success: const Color(0xFF9CCFD8),  // foam
+  danger: const Color(0xFFEB6F92),   // love
+  warn: const Color(0xFFF6C177),     // gold
+);
+
+// Everforest Dark — earthy green-gray warmth. Calm, natural, easy on the eyes.
+final _everforest = _dark(
+  name: 'everforest',
+  label: 'Everforest',
+  accent: const Color(0xFFA7C080),   // green
+  text: const Color(0xFFD3C6AA),     // fg
+  muted: const Color(0xFF8A9B8E),    // grey1
+  faint: const Color(0xFF56635F),    // grey2
+  success: const Color(0xFFA7C080),  // green
+  danger: const Color(0xFFE67E80),   // red
+  warn: const Color(0xFFDBBC7F),     // orange
+);
+
 // Pure black AMOLED theme — deepest blacks, no surface elevation.
 final _amoled = _dark(
   name: 'amoled',
@@ -281,6 +307,8 @@ List<ThemePreset> get allPresets => [
       _terminalInk,
       _nord,
       _dracula,
+      _rosePine,
+      _everforest,
       _lightPreset,
     ];
 

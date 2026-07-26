@@ -85,6 +85,7 @@ class _SessionScreenState extends State<SessionScreen>
   bool _isRecording = false;
   bool _isPlayingRecording = false;
   bool _sendingAudio = false;
+  bool _sendingMessage = false;
   String? _recordingPath;
   Duration _recordingElapsed = Duration.zero;
   Duration _playbackPosition = Duration.zero;
@@ -93,6 +94,9 @@ class _SessionScreenState extends State<SessionScreen>
   // Held while status == running — not sent until the run ends (TUI/desktop parity).
   // Cancel drops locally only; these never hit the daemon's pending_inputs.
   final List<String> _queued = [];
+  // Queue nonces at the moment the user queues a message, so every later
+  // delivery path (flush, steer, dispose) remains idempotent across reconnects.
+  final List<String> _queuedNonce = [];
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
   final List<String> _pending = [];
@@ -208,8 +212,12 @@ class _SessionScreenState extends State<SessionScreen>
   // resend so the approval bar can't hang at "Sending…".
   void _sendDecision(Map<String, dynamic> m) {
     final k = m['kind'];
+    final outbound = Map<String, dynamic>.from(m);
     if (k == 'approve' || k == 'approve_all' || k == 'deny' || k == 'answer') {
-      _pendingDecision = m;
+      // Decisions can be retried across reconnects too; give the retry the same
+      // idempotency key instead of sending an untracked frame.
+      outbound['nonce'] ??= _nextNonce();
+      _pendingDecision = outbound;
       _decisionTimer?.cancel();
       _decisionTimer = Timer(const Duration(seconds: 6), () {
         if (!mounted || _closed || _pendingDecision == null) return;
@@ -219,7 +227,7 @@ class _SessionScreenState extends State<SessionScreen>
         }
       });
     }
-    _send(m);
+    _send(outbound);
   }
 
   late String _title;
@@ -398,13 +406,17 @@ class _SessionScreenState extends State<SessionScreen>
               next.status != 'running' &&
               next.status != 'waiting_for_input' &&
               _queued.isNotEmpty) {
-            for (final m in _queued) {
-              final nonce = _nextNonce();
+            for (var i = 0; i < _queued.length; i++) {
+              final m = _queued[i];
+              final nonce = i < _queuedNonce.length
+                  ? _queuedNonce[i]
+                  : _nextNonce();
               _send({'kind': 'user_message', 'value': m, 'nonce': nonce}, tracked: true);
               _pending.add(m);
               _pendingNonce.add(nonce);
             }
             _queued.clear();
+            _queuedNonce.clear();
           }
           _prevStatus = next.status;
           // A pending approval/answer is acknowledged the moment the run leaves
@@ -594,6 +606,19 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Future<void> _sendMessage() async {
+    // The composer can be triggered by both the send button and keyboard submit;
+    // serialize the entire async path so a rapid double tap cannot create two
+    // distinct nonces and two server turns.
+    if (_sendingMessage) return;
+    _sendingMessage = true;
+    try {
+      await _sendMessageOnce();
+    } finally {
+      _sendingMessage = false;
+    }
+  }
+
+  Future<void> _sendMessageOnce() async {
     // Audio can be sent directly from the composer: stop the live take, upload
     // it through the normal attachment path, then continue with the same send.
     if (_sendingAudio) return;
@@ -623,12 +648,14 @@ class _SessionScreenState extends State<SessionScreen>
             : '[attached file — read it at this exact path: ${a.remotePath}]')
         .join('\n');
     final msg = markers.isEmpty ? t : (t.isEmpty ? markers : '$t\n\n$markers');
+    final nonce = _nextNonce();
     setState(() {
       if (running) {
-        // Queue by default — flushes when the run pauses.
+        // Queue by default — flushes when the run pauses. Reserve the nonce now
+        // so a reconnect or screen disposal cannot turn one message into two.
         _queued.add(msg);
+        _queuedNonce.add(nonce);
       } else {
-        final nonce = _nextNonce();
         _send({'kind': 'user_message', 'value': msg, 'nonce': nonce}, tracked: true);
         _pending.add(msg); // show it until the daemon echoes it back
         _pendingNonce.add(nonce);
@@ -1044,14 +1071,21 @@ class _SessionScreenState extends State<SessionScreen>
   // Held messages were never sent to the daemon — drop them locally only.
   // (Daemon `drop_queued` is only for inputs already in pending_inputs.)
   void _cancelQueuedAt(int i) => setState(() {
-        if (i >= 0 && i < _queued.length) _queued.removeAt(i);
+        if (i >= 0 && i < _queued.length) {
+          _queued.removeAt(i);
+          if (i < _queuedNonce.length) _queuedNonce.removeAt(i);
+        }
       });
 
   // Steer: send a queued message immediately while the agent is still running.
   void _steerQueuedAt(int i) {
     if (i < 0 || i >= _queued.length) return;
     final msg = _queued.removeAt(i);
-    final nonce = _nextNonce();
+    // Preserve the nonce reserved when the message was created. Reassigning a
+    // new nonce here misaligns every later queued item after a steer/cancel.
+    final nonce = i < _queuedNonce.length
+        ? _queuedNonce.removeAt(i)
+        : _nextNonce();
     _send({'kind': 'user_message', 'value': msg, 'nonce': nonce}, tracked: true);
     setState(() {
       _pending.add(msg);
@@ -1117,10 +1151,19 @@ class _SessionScreenState extends State<SessionScreen>
         ch.sink.add(p);
       }
       _outbox.clear();
-      for (final m in _queued) {
-        ch.sink.add(jsonEncode({'kind': 'user_message', 'value': m}));
+      for (var i = 0; i < _queued.length; i++) {
+        final m = _queued[i];
+        final nonce = i < _queuedNonce.length
+            ? _queuedNonce[i]
+            : _nextNonce();
+        ch.sink.add(jsonEncode({
+          'kind': 'user_message',
+          'value': m,
+          'nonce': nonce,
+        }));
       }
       _queued.clear();
+      _queuedNonce.clear();
       Future.delayed(const Duration(milliseconds: 300), () => ch.sink.close());
     } else {
       ch?.sink.close();
