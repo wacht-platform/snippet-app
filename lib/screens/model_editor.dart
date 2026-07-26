@@ -18,17 +18,22 @@ const _providers = [
   ('xai', 'xAI (Grok)'),
 ];
 
-bool _needsBaseUrl(String p) => p == 'openai-compatible' || p == 'anthropic-compatible';
-bool _defaultImages(String p) => p == 'anthropic' || p == 'gemini' || p == 'openai' || p == 'chatgpt';
+bool _needsBaseUrl(String p) =>
+    p == 'openai-compatible' || p == 'anthropic-compatible';
+bool _defaultImages(String p) =>
+    p == 'anthropic' || p == 'gemini' || p == 'openai' || p == 'chatgpt';
 // Providers that go through the OpenAI-compatible adapter, where `stream` applies.
-bool _usesOpenAiAdapter(String p) => p == 'openai' || p == 'openai-compatible' || p == 'openrouter';
+bool _usesOpenAiAdapter(String p) =>
+    p == 'openai' || p == 'openai-compatible' || p == 'openrouter';
 
 class ModelEditorScreen extends StatefulWidget {
   final DaemonClient client;
   final ModelProfile? existing;
+
   /// Dismiss when hosted in a responsive panel (desktop drawer / phone full-screen).
   final VoidCallback? onClose;
-  const ModelEditorScreen({super.key, required this.client, this.existing, this.onClose});
+  const ModelEditorScreen(
+      {super.key, required this.client, this.existing, this.onClose});
   @override
   State<ModelEditorScreen> createState() => _ModelEditorScreenState();
 }
@@ -64,7 +69,8 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     _name = TextEditingController(text: e?.name ?? '');
     _baseUrl = TextEditingController(text: e?.baseUrl ?? '');
     _model = TextEditingController(text: e?.model ?? '');
-    _ctx = TextEditingController(text: (e?.contextWindow ?? 0) > 0 ? '${e!.contextWindow}' : '');
+    _ctx = TextEditingController(
+        text: (e?.contextWindow ?? 0) > 0 ? '${e!.contextWindow}' : '');
     // Editing keeps the profile's actual flag — falling back to the provider
     // default silently reset it on every unrelated edit.
     _images = e?.supportsImages ?? _defaultImages(_provider);
@@ -93,14 +99,18 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
   void _applyPick(CatalogModel m) {
     _model.text = m.id;
     // A reported context window beats whatever was there — it's authoritative.
-    if (m.contextWindow != null && m.contextWindow! > 0) _ctx.text = '${m.contextWindow}';
+    if (m.contextWindow != null && m.contextWindow! > 0)
+      _ctx.text = '${m.contextWindow}';
     final bits = <String>[];
     if (m.efforts != null) {
-      bits.add(m.efforts!.isEmpty ? 'no effort control' : 'effort: ${m.efforts!.join(' · ')}');
+      bits.add(m.efforts!.isEmpty
+          ? 'no effort control'
+          : 'effort: ${m.efforts!.join(' · ')}');
     } else if (m.reasoning != null) {
       bits.add(m.reasoning! ? 'supports reasoning' : 'no reasoning');
     }
-    if (m.contextWindow != null && m.contextWindow! > 0) bits.add(_fmtCtx(m.contextWindow!));
+    if (m.contextWindow != null && m.contextWindow! > 0)
+      bits.add(_fmtCtx(m.contextWindow!));
     setState(() => _modelHint = bits.isEmpty ? null : bits.join(' · '));
   }
 
@@ -120,7 +130,8 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     }
     if (!mounted) return;
     if (models.isEmpty) {
-      setState(() => _error = 'The provider returned no models (this provider may not have a catalog).');
+      setState(() => _error =
+          'The provider returned no models (this provider may not have a catalog).');
       return;
     }
     final picked = await showModalBottomSheet<CatalogModel>(
@@ -128,7 +139,8 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
       backgroundColor: AppColors.surface1,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
       builder: (ctx) => _ModelPickerSheet(models: models),
     );
     if (picked != null) _applyPick(picked);
@@ -142,7 +154,9 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     try {
       if (_model.text.trim().isEmpty) throw 'Model is required.';
       await widget.client.putProfile(
-        name: _isEdit ? widget.existing!.name : (_name.text.trim().isEmpty ? null : _name.text.trim()),
+        name: _isEdit
+            ? widget.existing!.name
+            : (_name.text.trim().isEmpty ? null : _name.text.trim()),
         provider: _provider,
         baseUrl: _needsBaseUrl(_provider) ? _baseUrl.text.trim() : null,
         model: _model.text.trim(),
@@ -168,47 +182,71 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     // include the current provider as a pill even if it's outside the standard list (e.g. chatgpt)
     final pills = [..._providers];
-    if (!pills.any((p) => p.$1 == _provider)) pills.insert(0, (_provider, _provider));
+    if (!pills.any((p) => p.$1 == _provider))
+      pills.insert(0, (_provider, _provider));
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          SnAppBar(title: _isEdit ? 'Edit model' : 'Add model', onBack: widget.onClose ?? () => Navigator.pop(context)),
+          SnAppBar(
+              title: _isEdit ? 'Edit model' : 'Add model',
+              onBack: widget.onClose ?? () => Navigator.pop(context)),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text('Provider', style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+                Text('Provider',
+                    style: sans(12,
+                        weight: FontWeight.w500, color: AppColors.fg2)),
                 const SizedBox(height: 7),
                 Pills<String>(
                   items: pills,
                   selected: _provider,
-                  onSelect: _isEdit ? null : (val) => setState(() {
-                        _provider = val;
-                        _images = _defaultImages(val);
-                      }),
+                  onSelect: _isEdit
+                      ? null
+                      : (val) => setState(() {
+                            _provider = val;
+                            _images = _defaultImages(val);
+                          }),
                 ),
                 const SizedBox(height: 16),
                 if (!_isEdit) ...[
-                  AppField(label: 'Profile name', controller: _name, hint: 'optional — defaults to the provider'),
+                  AppField(
+                      label: 'Profile name',
+                      controller: _name,
+                      hint: 'optional — defaults to the provider'),
                   const SizedBox(height: 16),
                 ],
                 if (_needsBaseUrl(_provider)) ...[
-                  AppField(label: 'Base URL', controller: _baseUrl, mono: true, hint: 'https://api.example.com/v1'),
+                  AppField(
+                      label: 'Base URL',
+                      controller: _baseUrl,
+                      mono: true,
+                      hint: 'https://api.example.com/v1'),
                   const SizedBox(height: 16),
                 ],
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Expanded(child: AppField(label: 'Model', controller: _model, mono: true, hint: 'claude-sonnet-4.5')),
+                  Expanded(
+                      child: AppField(
+                          label: 'Model',
+                          controller: _model,
+                          mono: true,
+                          hint: 'claude-sonnet-4.5')),
                   if (!_isChatgpt) ...[
                     const SizedBox(width: 8),
-                    IconBtn('list', size: 44, iconSize: 18, onTap: _busy ? null : _browseModels),
+                    IconBtn('list',
+                        size: 44,
+                        iconSize: 18,
+                        onTap: _busy ? null : _browseModels),
                   ],
                 ]),
                 if (_modelHint != null) ...[
                   const SizedBox(height: 6),
-                  Text(_modelHint!, style: mono(11, height: 1.4, color: AppColors.fg3)),
+                  Text(_modelHint!,
+                      style: mono(11, height: 1.4, color: AppColors.fg3)),
                 ],
                 const SizedBox(height: 16),
                 AppField(
@@ -217,22 +255,36 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
                   mono: true,
                   keyboardType: TextInputType.number,
                   hint: 'e.g. 200000 — blank keeps the default',
-                  helper: 'Sets the % context gauge and the point where the agent compacts history.',
+                  helper:
+                      'Sets the % context gauge and the point where the agent compacts history.',
                 ),
                 const SizedBox(height: 16),
-                Text('Reasoning effort', style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+                Text('Reasoning effort',
+                    style: sans(12,
+                        weight: FontWeight.w500, color: AppColors.fg2)),
                 const SizedBox(height: 7),
                 Pills<String>(
-                  items: const [('', 'Default'), ('off', 'Off'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('xhigh', 'X-High'), ('max', 'Max')],
+                  items: const [
+                    ('', 'Default'),
+                    ('off', 'Off'),
+                    ('low', 'Low'),
+                    ('medium', 'Medium'),
+                    ('high', 'High'),
+                    ('xhigh', 'X-High'),
+                    ('max', 'Max')
+                  ],
                   selected: _effort,
                   onSelect: (val) => setState(() => _effort = val),
                 ),
                 const SizedBox(height: 6),
-                Text("Higher means more thinking — better on hard problems, more tokens. Default uses the provider's own; Off disables reasoning. X-High/Max are the top tiers (gpt-5.1-codex-max, gpt-5.6, Claude). If a model rejects a tier, snippet steps down automatically instead of failing.",
+                Text(
+                    "Higher means more thinking — better on hard problems, more tokens. Default uses the provider's own; Off disables reasoning. X-High/Max are the top tiers (gpt-5.1-codex-max, gpt-5.6, Claude). If a model rejects a tier, snippet steps down automatically instead of failing.",
                     style: sans(11.5, height: 1.4, color: AppColors.fg4)),
                 const SizedBox(height: 16),
                 if (_isChatgpt)
-                  Text('ChatGPT uses the subscription login set up in the TUI — no API key here.', style: sans(12, height: 1.4, color: AppColors.fg3))
+                  Text(
+                      'ChatGPT uses the subscription login set up in the TUI — no API key here.',
+                      style: sans(12, height: 1.4, color: AppColors.fg3))
                 else if (_isXai)
                   _XaiSignIn(client: widget.client)
                 else
@@ -242,21 +294,40 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
                     mono: true,
                     obscure: !_showKey,
                     icon: 'key',
-                    hint: _isEdit && widget.existing!.hasKey ? 'leave blank to keep current key' : 'sk-…',
-                    helper: 'Stored on the machine running snippet. Never sent to snippet servers.',
+                    hint: _isEdit && widget.existing!.hasKey
+                        ? 'leave blank to keep current key'
+                        : 'sk-…',
+                    helper:
+                        'Stored on the machine running snippet. Never sent to snippet servers.',
                     rightSlot: GestureDetector(
                       onTap: () => setState(() => _showKey = !_showKey),
-                      child: Padding(padding: const EdgeInsets.all(4), child: Text(_showKey ? 'Hide' : 'Show', style: sans(11, color: AppColors.fg3))),
+                      child: Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Text(_showKey ? 'Hide' : 'Show',
+                              style: sans(11, color: AppColors.fg3))),
                     ),
                   ),
                 const SizedBox(height: 16),
-                AppToggle(on: _images, onChanged: (v) => setState(() => _images = v), label: 'Supports images', sub: 'Send screenshots and diagrams to this model'),
+                AppToggle(
+                    on: _images,
+                    onChanged: (v) => setState(() => _images = v),
+                    label: 'Supports images',
+                    sub: 'Send screenshots and diagrams to this model'),
                 if (_usesOpenAiAdapter(_provider)) ...[
                   const SizedBox(height: 8),
-                  AppToggle(on: _stream, onChanged: (v) => setState(() => _stream = v), label: 'Stream responses', sub: 'Turn on for models that return nothing otherwise (e.g. MiniMax on NVIDIA NIM)'),
+                  AppToggle(
+                      on: _stream,
+                      onChanged: (v) => setState(() => _stream = v),
+                      label: 'Stream responses',
+                      sub:
+                          'Turn on for models that return nothing otherwise (e.g. MiniMax on NVIDIA NIM)'),
                 ],
                 const SizedBox(height: 8),
-                AppToggle(on: _active, onChanged: (v) => setState(() => _active = v), label: 'Set as active', sub: 'Use this model for new sessions'),
+                AppToggle(
+                    on: _active,
+                    onChanged: (v) => setState(() => _active = v),
+                    label: 'Set as active',
+                    sub: 'Use this model for new sessions'),
                 if (_error != null) ...[
                   const SizedBox(height: 14),
                   Text(_error!, style: sans(12, color: AppColors.danger)),
@@ -265,12 +336,20 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
             ),
           ),
           Container(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
-            decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
+            padding: EdgeInsets.fromLTRB(
+                16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
+            decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.border))),
             child: Row(children: [
-              Btn('Cancel', variant: BtnVariant.ghost, onTap: widget.onClose ?? () => Navigator.pop(context)),
+              Btn('Cancel',
+                  variant: BtnVariant.ghost,
+                  onTap: widget.onClose ?? () => Navigator.pop(context)),
               const SizedBox(width: 8),
-              Expanded(child: Btn(_busy ? 'Saving…' : 'Save', full: true, disabled: _busy || _model.text.trim().isEmpty, onTap: _save)),
+              Expanded(
+                  child: Btn(_busy ? 'Saving…' : 'Save',
+                      full: true,
+                      disabled: _busy || _model.text.trim().isEmpty,
+                      onTap: _save)),
             ]),
           ),
         ]),
@@ -306,6 +385,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final q = _query.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? widget.models
@@ -316,12 +396,19 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
             .toList();
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.75),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const SizedBox(height: 10),
-            Container(width: 36, height: 4, decoration: BoxDecoration(color: AppColors.surface3, borderRadius: BorderRadius.circular(2))),
+            Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.surface3,
+                    borderRadius: BorderRadius.circular(2))),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: AppField(
@@ -339,7 +426,9 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                   final m = filtered[i];
                   final meta = <String>[
                     if (m.efforts != null)
-                      m.efforts!.isEmpty ? 'no effort control' : 'effort: ${m.efforts!.join('/')}'
+                      m.efforts!.isEmpty
+                          ? 'no effort control'
+                          : 'effort: ${m.efforts!.join('/')}'
                     else if (m.reasoning != null)
                       m.reasoning! ? 'reasoning' : 'no reasoning',
                     if ((m.contextWindow ?? 0) > 0)
@@ -348,19 +437,25 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                   return InkWell(
                     onTap: () => Navigator.pop(ctx, m),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(m.id, style: mono(13, color: AppColors.fg1)),
-                        if (m.displayName != null || meta.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            [if (m.displayName != null) m.displayName!, ...meta].join(' · '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(11.5, color: AppColors.fg3),
-                          ),
-                        ],
-                      ]),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(m.id, style: mono(13, color: AppColors.fg1)),
+                            if (m.displayName != null || meta.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                [
+                                  if (m.displayName != null) m.displayName!,
+                                  ...meta
+                                ].join(' · '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(11.5, color: AppColors.fg3),
+                              ),
+                            ],
+                          ]),
                     ),
                   );
                 },
@@ -404,24 +499,44 @@ class _XaiSignInState extends State<_XaiSignIn> {
 
   Future<void> _refresh() async {
     final on = await widget.client.xaiSignedIn();
-    if (mounted) setState(() { _signedIn = on; _loading = false; });
+    if (mounted)
+      setState(() {
+        _signedIn = on;
+        _loading = false;
+      });
   }
 
   Future<void> _begin() async {
-    setState(() { _err = null; _loading = true; });
+    setState(() {
+      _err = null;
+      _loading = true;
+    });
     try {
       final d = await widget.client.xaiLoginBegin();
       if (!mounted) return;
-      setState(() { _code = d.userCode; _url = d.verificationUri; _loading = false; });
+      setState(() {
+        _code = d.userCode;
+        _url = d.verificationUri;
+        _loading = false;
+      });
       _poll?.cancel();
       _poll = Timer.periodic(const Duration(seconds: 3), (_) async {
         if (await widget.client.xaiSignedIn()) {
           _poll?.cancel();
-          if (mounted) setState(() { _signedIn = true; _code = null; _url = null; });
+          if (mounted)
+            setState(() {
+              _signedIn = true;
+              _code = null;
+              _url = null;
+            });
         }
       });
     } catch (e) {
-      if (mounted) setState(() { _err = '$e'; _loading = false; });
+      if (mounted)
+        setState(() {
+          _err = '$e';
+          _loading = false;
+        });
     }
   }
 
@@ -432,26 +547,35 @@ class _XaiSignInState extends State<_XaiSignIn> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     if (_loading && _code == null) {
-      return const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3));
+      return SizedBox(
+          height: 20,
+          width: 20,
+          child:
+              CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3));
     }
     if (_signedIn) {
       return Row(children: [
-        const AppIcon('check', size: 16, color: AppColors.ok),
+        AppIcon('check', size: 16, color: AppColors.ok),
         const SizedBox(width: 8),
         Text('Signed in to xAI', style: sans(13, color: AppColors.fg2)),
         const Spacer(),
-        GestureDetector(onTap: _signOut, child: Text('Sign out', style: sans(12, color: AppColors.fg3))),
+        GestureDetector(
+            onTap: _signOut,
+            child: Text('Sign out', style: sans(12, color: AppColors.fg3))),
       ]);
     }
     if (_code != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Open this URL and enter the code:', style: sans(12.5, height: 1.4, color: AppColors.fg2)),
+        Text('Open this URL and enter the code:',
+            style: sans(12.5, height: 1.4, color: AppColors.fg2)),
         const SizedBox(height: 8),
         SelectableText(_url ?? '', style: mono(12.5, color: AppColors.accent)),
         const SizedBox(height: 8),
         Row(children: [
-          Text(_code!, style: mono(18, weight: FontWeight.w600, color: AppColors.fg1)),
+          Text(_code!,
+              style: mono(18, weight: FontWeight.w600, color: AppColors.fg1)),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () => Clipboard.setData(ClipboardData(text: _code!)),
@@ -460,17 +584,26 @@ class _XaiSignInState extends State<_XaiSignIn> {
         ]),
         const SizedBox(height: 8),
         Row(children: [
-          const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3)),
+          SizedBox(
+              height: 14,
+              width: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.fg3)),
           const SizedBox(width: 8),
           Text('Waiting for approval…', style: sans(12, color: AppColors.fg3)),
         ]),
       ]);
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Grok uses your SuperGrok / X Premium subscription — no API key.', style: sans(12, height: 1.4, color: AppColors.fg3)),
+      Text('Grok uses your SuperGrok / X Premium subscription — no API key.',
+          style: sans(12, height: 1.4, color: AppColors.fg3)),
       const SizedBox(height: 10),
-      Btn('Sign in with SuperGrok / X Premium', icon: 'key', small: true, onTap: _begin),
-      if (_err != null) ...[const SizedBox(height: 8), Text(_err!, style: sans(12, color: AppColors.danger))],
+      Btn('Sign in with SuperGrok / X Premium',
+          icon: 'key', small: true, onTap: _begin),
+      if (_err != null) ...[
+        SizedBox(height: 8),
+        Text(_err!, style: sans(12, color: AppColors.danger))
+      ],
     ]);
   }
 }

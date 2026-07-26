@@ -47,7 +47,14 @@ String toolArgSummary(String tool, dynamic args) {
     _ => '',
   };
   if (v.isNotEmpty) return first(v);
-  for (final k in const ['command', 'path', 'query', 'pattern', 'url', 'file']) {
+  for (final k in const [
+    'command',
+    'path',
+    'query',
+    'pattern',
+    'url',
+    'file'
+  ]) {
     if (args[k] is String) return first(args[k] as String);
   }
   return '';
@@ -93,7 +100,9 @@ Widget toolDetailView(BuildContext context,
   }
 
   // Spilled / oversized output (generic wrapper the harness may apply).
-  if (d != null && (d['data_omitted'] == true || d['truncated'] == true && d['preview'] != null)) {
+  if (d != null &&
+      (d['data_omitted'] == true ||
+          d['truncated'] == true && d['preview'] != null)) {
     final body = _toolBody(context, tool, a, d, status);
     rows.addAll(body);
     if (d['preview'] != null) {
@@ -120,7 +129,8 @@ Widget toolDetailView(BuildContext context,
 Widget _wrap(List<Widget> rows) =>
     Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
 
-List<Widget> _toolBody(BuildContext context, String tool, Map? a, Map? d, String? status) {
+List<Widget> _toolBody(
+    BuildContext context, String tool, Map? a, Map? d, String? status) {
   switch (tool) {
     case 'edit_file':
       return _editView(a, d, oldKey: 'old_string', newKey: 'new_string');
@@ -174,7 +184,9 @@ List<Widget> _editView(Map? a, Map? d,
     out.add(const SizedBox(height: 8));
     out.add(_DiffBlock(a[oldKey].toString(), a[newKey].toString()));
   } else if (a == null) {
-    out.add(_done(d?['edited'] == true || d?['replaced'] == true ? 'Applied' : 'Pending'));
+    out.add(_done(d?['edited'] == true || d?['replaced'] == true
+        ? 'Applied'
+        : 'Pending'));
   }
   if (d?['note'] != null) {
     out.add(const SizedBox(height: 10));
@@ -190,7 +202,8 @@ List<Widget> _writeView(Map? a, Map? d, {required String verb}) {
   final content = a?['content']?.toString();
   if (content != null) {
     out.add(const SizedBox(height: 8));
-    out.add(_meta([_chip('list', '${'\n'.allMatches(content).length + 1} lines')]));
+    out.add(
+        _meta([_chip('list', '${'\n'.allMatches(content).length + 1} lines')]));
     out.add(const SizedBox(height: 12));
     out.add(const SectionLabel('Contents'));
     out.add(const SizedBox(height: 8));
@@ -205,8 +218,10 @@ List<Widget> _appendView(Map? a, Map? d) {
   final out = <Widget>[];
   out.add(_PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? ''));
   final chips = <Widget>[];
-  if (d?['lines_written'] != null) chips.add(_chip('file-plus', '+${d!['lines_written']} lines'));
-  if (d?['total_lines'] != null) chips.add(_chip('list', '${d!['total_lines']} total'));
+  if (d?['lines_written'] != null)
+    chips.add(_chip('file-plus', '+${d!['lines_written']} lines'));
+  if (d?['total_lines'] != null)
+    chips.add(_chip('list', '${d!['total_lines']} total'));
   if (chips.isNotEmpty) {
     out.add(const SizedBox(height: 8));
     out.add(_meta(chips));
@@ -228,8 +243,10 @@ List<Widget> _readView(Map? a, Map? d) {
   final chips = <Widget>[];
   final sl = d?['start_line'], el = d?['end_line'];
   if (sl != null || el != null) chips.add(_chip('list', 'lines $sl–$el'));
-  if (d?['total_lines'] != null) chips.add(_chip('file', '${d!['total_lines']} lines'));
-  if (d?['total_chars'] != null) chips.add(_chip('grip', '${d!['total_chars']} chars'));
+  if (d?['total_lines'] != null)
+    chips.add(_chip('file', '${d!['total_lines']} lines'));
+  if (d?['total_chars'] != null)
+    chips.add(_chip('grip', '${d!['total_chars']} chars'));
   if (chips.isNotEmpty) {
     out.add(const SizedBox(height: 8));
     out.add(_meta(chips));
@@ -262,13 +279,14 @@ List<Widget> _imageView(Map? a, Map? d) {
             border: Border.all(color: AppColors.border),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const AppIcon('image', size: 30, color: AppColors.fg3),
+          child: AppIcon('image', size: 30, color: AppColors.fg3),
         ),
         const SizedBox(height: 12),
         if (d != null)
           _meta([
             if (d['mime'] != null) _chip('image', d['mime'].toString()),
-            if (d['size_bytes'] != null) _chip('grip', formatBytes(d['size_bytes'])),
+            if (d['size_bytes'] != null)
+              _chip('grip', formatBytes(d['size_bytes'])),
           ]),
       ]),
     ),
@@ -343,7 +361,8 @@ List<Widget> _grepView(Map? a, Map? d) {
 List<Widget> _findView(Map? a, Map? d) {
   final out = <Widget>[];
   out.add(_meta([
-    _chip('search', a?['pattern']?.toString() ?? d?['pattern']?.toString() ?? '*'),
+    _chip('search',
+        a?['pattern']?.toString() ?? d?['pattern']?.toString() ?? '*'),
     if (d?['count'] != null) _chip('file', '${d!['count']} files'),
   ]));
   final results = (d?['results'] as List?) ?? const [];
@@ -351,7 +370,9 @@ List<Widget> _findView(Map? a, Map? d) {
     out.add(const SizedBox(height: 12));
     out.add(_Card(children: [
       for (final f in results.cast<Map>())
-        _FileRow(icon: 'file', name: f['path']?.toString() ?? f['name']?.toString() ?? ''),
+        _FileRow(
+            icon: 'file',
+            name: f['path']?.toString() ?? f['name']?.toString() ?? ''),
     ]));
   } else if (d != null) {
     out.add(const SizedBox(height: 10));
@@ -367,7 +388,8 @@ List<Widget> _lsView(Map? a, Map? d) {
     ..sort((x, y) {
       final dx = x['kind'] == 'dir' ? 0 : 1, dy = y['kind'] == 'dir' ? 0 : 1;
       if (dx != dy) return dx - dy;
-      return (x['name']?.toString() ?? '').compareTo(y['name']?.toString() ?? '');
+      return (x['name']?.toString() ?? '')
+          .compareTo(y['name']?.toString() ?? '');
     });
   if (entries.isNotEmpty) {
     out.add(const SizedBox(height: 12));
@@ -400,7 +422,8 @@ List<Widget> _outlineView(Map? a, Map? d) {
   out.add(const SizedBox(height: 8));
   out.add(_meta([
     if (d?['language'] != null) _chip('cpu', d!['language'].toString()),
-    if (d?['symbol_count'] != null) _chip('list', '${d!['symbol_count']} symbols'),
+    if (d?['symbol_count'] != null)
+      _chip('list', '${d!['symbol_count']} symbols'),
   ]));
   final outline = (d?['outline'] as List?) ?? const [];
   if (outline.isNotEmpty) {
@@ -423,7 +446,8 @@ List<Widget> _codeMapView(Map? a, Map? d) {
   out.add(_meta([
     _chip('map', (d?['root'] ?? a?['path'] ?? '.').toString()),
     if (d?['file_count'] != null) _chip('file', '${d!['file_count']} files'),
-    if (d?['symbol_count'] != null) _chip('list', '${d!['symbol_count']} symbols'),
+    if (d?['symbol_count'] != null)
+      _chip('list', '${d!['symbol_count']} symbols'),
   ]));
   final files = (d?['files'] as List?) ?? const [];
   for (final f in files.cast<Map>()) {
@@ -435,7 +459,8 @@ List<Widget> _codeMapView(Map? a, Map? d) {
       for (final s in syms)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          child: Text(s.toString(), style: mono(11.5, height: 1.4, color: AppColors.fg2)),
+          child: Text(s.toString(),
+              style: mono(11.5, height: 1.4, color: AppColors.fg2)),
         ),
     ]));
   }
@@ -470,7 +495,8 @@ List<Widget> _webReadView(Map? a, Map? d) {
   final title = d?['title']?.toString() ?? '';
   final url = d?['url']?.toString() ?? a?['url']?.toString() ?? '';
   if (title.isNotEmpty) {
-    out.add(Text(title, style: sans(14.5, weight: FontWeight.w600, color: AppColors.fg1)));
+    out.add(Text(title,
+        style: sans(14.5, weight: FontWeight.w600, color: AppColors.fg1)));
     out.add(const SizedBox(height: 4));
   }
   out.add(_LinkText(url));
@@ -516,7 +542,8 @@ String _pretty(dynamic v) {
   return s.length > 6000 ? '${s.substring(0, 6000)}\n…(truncated)' : s;
 }
 
-Widget _meta(List<Widget> chips) => Wrap(spacing: 7, runSpacing: 7, children: chips);
+Widget _meta(List<Widget> chips) =>
+    Wrap(spacing: 7, runSpacing: 7, children: chips);
 
 Widget _chip(String icon, String label) => Container(
       padding: const EdgeInsets.fromLTRB(7, 4, 9, 4),
@@ -528,7 +555,11 @@ Widget _chip(String icon, String label) => Container(
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         AppIcon(icon, size: 11, color: AppColors.fg3),
         const SizedBox(width: 5),
-        Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(10.5, color: AppColors.fg2))),
+        Flexible(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: mono(10.5, color: AppColors.fg2))),
       ]),
     );
 
@@ -539,9 +570,16 @@ Widget _statusChip(bool ok, String label) => Container(
         borderRadius: BorderRadius.circular(99),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        AppIcon(ok ? 'check' : 'alert-triangle', size: 11, color: ok ? AppColors.ok : AppColors.danger),
+        AppIcon(ok ? 'check' : 'alert-triangle',
+            size: 11, color: ok ? AppColors.ok : AppColors.danger),
         const SizedBox(width: 5),
-        Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(10.5, weight: FontWeight.w500, color: ok ? AppColors.ok : AppColors.danger))),
+        Flexible(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: mono(10.5,
+                    weight: FontWeight.w500,
+                    color: ok ? AppColors.ok : AppColors.danger))),
       ]),
     );
 
@@ -550,13 +588,15 @@ Widget _done(String label) => Padding(
       child: _meta([_statusChip(true, label)]),
     );
 
-Widget _empty(String label) => Text(label, style: sans(12.5, color: AppColors.fg3));
+Widget _empty(String label) =>
+    Text(label, style: sans(12.5, color: AppColors.fg3));
 
 class _PathChip extends StatelessWidget {
   final String path;
   const _PathChip(this.path);
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
@@ -566,9 +606,10 @@ class _PathChip extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Row(children: [
-        const AppIcon('file', size: 13, color: AppColors.fg3),
+        AppIcon('file', size: 13, color: AppColors.fg3),
         const SizedBox(width: 8),
-        Expanded(child: SelectableText(path, style: mono(12, color: AppColors.fg1))),
+        Expanded(
+            child: SelectableText(path, style: mono(12, color: AppColors.fg1))),
       ]),
     );
   }
@@ -579,6 +620,7 @@ class _Card extends StatelessWidget {
   const _Card({required this.children});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -590,7 +632,8 @@ class _Card extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const Divider(height: 1, thickness: 1, color: AppColors.border),
+            if (i > 0)
+              Divider(height: 1, thickness: 1, color: AppColors.border),
             children[i],
           ]
         ],
@@ -606,12 +649,15 @@ class _FileRow extends StatelessWidget {
   const _FileRow({required this.icon, required this.name, this.dir = false});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Row(children: [
         AppIcon(icon, size: 14, color: dir ? AppColors.accent : AppColors.fg3),
         const SizedBox(width: 9),
-        Expanded(child: Text(name, style: mono(12, color: dir ? AppColors.fg1 : AppColors.fg2))),
+        Expanded(
+            child: Text(name,
+                style: mono(12, color: dir ? AppColors.fg1 : AppColors.fg2))),
       ]),
     );
   }
@@ -624,12 +670,17 @@ class _MatchRow extends StatelessWidget {
   const _MatchRow({required this.path, this.line, required this.text});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Flexible(child: Text(path, overflow: TextOverflow.ellipsis, style: mono(11, color: AppColors.accent))),
-          if (line != null) Text(':$line', style: mono(11, color: AppColors.fg4)),
+          Flexible(
+              child: Text(path,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(11, color: AppColors.accent))),
+          if (line != null)
+            Text(':$line', style: mono(11, color: AppColors.fg4)),
         ]),
         const SizedBox(height: 3),
         Text(text, style: mono(11.5, height: 1.4, color: AppColors.fg2)),
@@ -643,19 +694,25 @@ class _SymbolRow extends StatelessWidget {
   final String signature;
   final String? line;
   final int depth;
-  const _SymbolRow({required this.kind, required this.signature, this.line, this.depth = 0});
+  const _SymbolRow(
+      {required this.kind, required this.signature, this.line, this.depth = 0});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Padding(
       padding: EdgeInsets.fromLTRB(10.0 + depth * 14, 7, 10, 7),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          decoration: BoxDecoration(color: AppColors.accentBg, borderRadius: BorderRadius.circular(4)),
+          decoration: BoxDecoration(
+              color: AppColors.accentBg,
+              borderRadius: BorderRadius.circular(4)),
           child: Text(kind, style: mono(9.5, color: AppColors.accent)),
         ),
         const SizedBox(width: 8),
-        Expanded(child: Text(signature, style: mono(11.5, height: 1.4, color: AppColors.fg1))),
+        Expanded(
+            child: Text(signature,
+                style: mono(11.5, height: 1.4, color: AppColors.fg1))),
         if (line != null) ...[
           const SizedBox(width: 6),
           Text(':$line', style: mono(10.5, color: AppColors.fg4)),
@@ -670,9 +727,11 @@ class _ResultCard extends StatelessWidget {
   final String url;
   final String? date;
   final String? snippet;
-  const _ResultCard({required this.title, required this.url, this.date, this.snippet});
+  const _ResultCard(
+      {required this.title, required this.url, this.date, this.snippet});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -683,7 +742,8 @@ class _ResultCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (title.isNotEmpty)
-          Text(title, style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)),
+          Text(title,
+              style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)),
         if (title.isNotEmpty) const SizedBox(height: 4),
         _LinkText(url),
         if (snippet != null && snippet!.isNotEmpty) ...[
@@ -704,10 +764,15 @@ class _LinkText extends StatelessWidget {
   const _LinkText(this.url);
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Row(children: [
-      const AppIcon('globe', size: 11, color: AppColors.fg4),
+      AppIcon('globe', size: 11, color: AppColors.fg4),
       const SizedBox(width: 5),
-      Expanded(child: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(11, color: AppColors.accent))),
+      Expanded(
+          child: Text(url,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: mono(11, color: AppColors.accent))),
     ]);
   }
 }
@@ -717,6 +782,7 @@ class _ErrorBox extends StatelessWidget {
   const _ErrorBox(this.message);
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -726,9 +792,14 @@ class _ErrorBox extends StatelessWidget {
         border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Padding(padding: EdgeInsets.only(top: 1), child: AppIcon('alert-triangle', size: 14, color: AppColors.danger)),
+        Padding(
+            padding: EdgeInsets.only(top: 1),
+            child:
+                AppIcon('alert-triangle', size: 14, color: AppColors.danger)),
         const SizedBox(width: 9),
-        Expanded(child: SelectableText(message, style: mono(11.5, height: 1.45, color: AppColors.danger))),
+        Expanded(
+            child: SelectableText(message,
+                style: mono(11.5, height: 1.45, color: AppColors.danger))),
       ]),
     );
   }
@@ -739,13 +810,14 @@ class _Hint extends StatelessWidget {
   const _Hint(this.text);
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.sm),
-        border: const Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
+        border: Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
       ),
       child: Text(text, style: sans(12, height: 1.45, color: AppColors.fg2)),
     );
@@ -758,9 +830,11 @@ class _CodeBox extends StatelessWidget {
   final bool addTint;
   final bool delTint;
   final bool useSans;
-  const _CodeBox(this.text, {this.addTint = false, this.delTint = false, this.useSans = false});
+  const _CodeBox(this.text,
+      {this.addTint = false, this.delTint = false, this.useSans = false});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final bg = addTint
         ? AppColors.diffAddBg
         : delTint
@@ -790,6 +864,7 @@ class _CommandBox extends StatelessWidget {
   const _CommandBox(this.command);
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -800,7 +875,9 @@ class _CommandBox extends StatelessWidget {
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('\$ ', style: mono(11.5, height: 1.5, color: AppColors.accent)),
-        Expanded(child: SelectableText(command, style: mono(11.5, height: 1.5, color: AppColors.fg1))),
+        Expanded(
+            child: SelectableText(command,
+                style: mono(11.5, height: 1.5, color: AppColors.fg1))),
       ]),
     );
   }
@@ -833,6 +910,7 @@ class _HiCodeBlockState extends State<_HiCodeBlock> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final lineCount = '\n'.allMatches(widget.text).length + 1;
     // Snug height for short files; cap + internal scroll for long ones.
     final h = (lineCount * 20.0 + 16).clamp(44.0, 360.0);
@@ -850,10 +928,13 @@ class _HiCodeBlockState extends State<_HiCodeBlock> {
         readOnly: true,
         wordWrap: false,
         style: codeEditorStyle(widget.filename, background: AppColors.bg),
-        indicatorBuilder: (context, editingController, chunkController, notifier) {
+        indicatorBuilder:
+            (context, editingController, chunkController, notifier) {
           return Row(children: [
-            DefaultCodeLineNumber(controller: editingController, notifier: notifier),
-            DefaultCodeChunkIndicator(width: 20, controller: chunkController, notifier: notifier),
+            DefaultCodeLineNumber(
+                controller: editingController, notifier: notifier),
+            DefaultCodeChunkIndicator(
+                width: 20, controller: chunkController, notifier: notifier),
           ]);
         },
       ),
@@ -887,7 +968,9 @@ List<_DLine> _diff(String aStr, String bStr) {
   final dp = List.generate(n + 1, (_) => List<int>.filled(m + 1, 0));
   for (var i = n - 1; i >= 0; i--) {
     for (var j = m - 1; j >= 0; j--) {
-      dp[i][j] = a[i] == b[j] ? dp[i + 1][j + 1] + 1 : (dp[i + 1][j] >= dp[i][j + 1] ? dp[i + 1][j] : dp[i][j + 1]);
+      dp[i][j] = a[i] == b[j]
+          ? dp[i + 1][j + 1] + 1
+          : (dp[i + 1][j] >= dp[i][j + 1] ? dp[i + 1][j] : dp[i][j + 1]);
     }
   }
   final out = <_DLine>[];
@@ -920,12 +1003,15 @@ class _DiffBlock extends StatelessWidget {
   const _DiffBlock(this.before, this.after);
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final lines = _diff(before, after);
     return ClipRRect(
       borderRadius: BorderRadius.circular(R.md),
       child: Container(
         width: double.infinity,
-        decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(R.md)),
+        decoration: BoxDecoration(
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(R.md)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [for (final l in lines) _row(l)],
@@ -945,8 +1031,12 @@ class _DiffBlock extends StatelessWidget {
       color: bg,
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 1.5),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(width: 12, child: Text(sign, style: mono(11.5, height: 1.45, color: fg))),
-        Expanded(child: Text(l.text.isEmpty ? ' ' : l.text, style: mono(11.5, height: 1.45, color: fg))),
+        SizedBox(
+            width: 12,
+            child: Text(sign, style: mono(11.5, height: 1.45, color: fg))),
+        Expanded(
+            child: Text(l.text.isEmpty ? ' ' : l.text,
+                style: mono(11.5, height: 1.45, color: fg))),
       ]),
     );
   }

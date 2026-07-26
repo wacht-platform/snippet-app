@@ -12,11 +12,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../api.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../platform.dart';
+import '../command_palette.dart';
 import '../theme.dart';
 import '../transcript.dart';
 import '../panel.dart';
@@ -94,6 +96,12 @@ class _SessionScreenState extends State<SessionScreen>
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
   final List<String> _pending = [];
+  // Nonce per pending message for dedup: _pendingNonce[i] is the nonce for _pending[i].
+  // On reconnect resend, the same nonce is reused so the server drops duplicates.
+  final List<String> _pendingNonce = [];
+  // Monotonic counter for unique nonce IDs.
+  int _nonceCounter = 0;
+  String _nextNonce() => '${++_nonceCounter}-${DateTime.now().microsecondsSinceEpoch}';
 
   // How many user turns (typed or steered) the daemon has echoed into the event
   // log — the FIFO baseline for retiring optimistic bubbles (see the socket
@@ -186,7 +194,7 @@ class _SessionScreenState extends State<SessionScreen>
   void _armAckWatchdog() {
     _ackTimer?.cancel();
     if (_closed || _pending.isEmpty) return;
-    _ackTimer = Timer(const Duration(seconds: 7), () {
+    _ackTimer = Timer(const Duration(seconds: 15), () {
       if (!mounted || _closed || _pending.isEmpty) return;
       final ch = _channel;
       if (ch != null) {
@@ -330,6 +338,7 @@ class _SessionScreenState extends State<SessionScreen>
   void _connect() {
     if (_closed) return;
     _reconnectTimer?.cancel();
+    _bannerTimer?.cancel(); // suppress "Reconnecting…" if we reconnect before 60s
     // Fully detach the old socket first: cancel its subscription so its onDone
     // can't fire _scheduleReconnect against the NEW channel — that cascade
     // orphaned healthy sockets and double-applied every delta.
@@ -390,8 +399,10 @@ class _SessionScreenState extends State<SessionScreen>
               next.status != 'waiting_for_input' &&
               _queued.isNotEmpty) {
             for (final m in _queued) {
-              _send({'kind': 'user_message', 'value': m});
+              final nonce = _nextNonce();
+              _send({'kind': 'user_message', 'value': m, 'nonce': nonce}, tracked: true);
               _pending.add(m);
+              _pendingNonce.add(nonce);
             }
             _queued.clear();
           }
@@ -415,22 +426,28 @@ class _SessionScreenState extends State<SessionScreen>
             var retired = (nextEchoes - prevEchoes).clamp(0, _pending.length);
             while (retired-- > 0) {
               _pending.removeAt(0);
+              if (_pendingNonce.isNotEmpty) _pendingNonce.removeAt(0);
             }
           } else if (j['wire'] != 'delta') {
             _pending
                 .clear(); // first-ever snapshot: nothing optimistic predates it
+            _pendingNonce.clear();
           }
           // First full snapshot after a (re)connect is authoritative: anything
-          // still in _pending was never received by the server — resend it so a
-          // message lost to a network blip actually recovers instead of hanging
-          // as "sending". Reconciliation above already dropped any that DID land.
+          // still in _pending was never received by the server — resend it with
+          // the same nonce so the server deduplicates if it DID land.
           if (_freshConn && j['wire'] != 'delta') {
             _freshConn = false;
-            for (final m in _pending) {
+            for (var i = 0; i < _pending.length; i++) {
+              final m = _pending[i];
+              final nonce = i < _pendingNonce.length ? _pendingNonce[i] : null;
+              final msg = nonce != null
+                  ? {'kind': 'user_message', 'value': m, 'nonce': nonce}
+                  : {'kind': 'user_message', 'value': m};
               try {
-                ch.sink.add(jsonEncode({'kind': 'user_message', 'value': m}));
+                ch.sink.add(jsonEncode(msg));
               } catch (_) {
-                _outbox.add(jsonEncode({'kind': 'user_message', 'value': m}));
+                _outbox.add(jsonEncode(msg));
               }
             }
             // A decision still pending while the snapshot STILL shows the run
@@ -499,6 +516,9 @@ class _SessionScreenState extends State<SessionScreen>
   // Reconnect with exponential backoff (1,2,4,8,15,30s). Deduped so onError+onDone
   // don't double-schedule; reset to 0 on any healthy frame or app-resume. Only the
   // CURRENT channel may schedule — a detached socket's late onDone is ignored.
+  // The "Reconnecting…" banner is suppressed for the first 60s to avoid flicker
+  // on brief network hiccups (WiFi→cellular, backgrounding, etc.).
+  Timer? _bannerTimer;
   void _scheduleReconnect(WebSocketChannel ch) {
     if (_closed) return;
     if (!identical(ch, _channel)) return; // stale socket
@@ -507,7 +527,13 @@ class _SessionScreenState extends State<SessionScreen>
     const steps = [1, 2, 4, 8, 15, 30];
     final delay = steps[_reconnectAttempt.clamp(0, steps.length - 1)];
     _reconnectAttempt++;
-    if (mounted) setState(() => _connError = 'Reconnecting…');
+    // Delay the banner by 60s so brief disconnects don't flash a warning.
+    _bannerTimer?.cancel();
+    _bannerTimer = Timer(const Duration(seconds: 60), () {
+      if (mounted && !_closed && _channel == null) {
+        setState(() => _connError = 'Reconnecting…');
+      }
+    });
     _reconnectTimer = Timer(Duration(seconds: delay), () {
       if (!_closed) _connect();
     });
@@ -550,19 +576,19 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   // Send now, or queue for the reconnect flush — never silently drop.
-  void _send(Map<String, dynamic> m) {
+  // For user messages (tracked in _pending), do NOT also add to _outbox:
+  // _freshConn resend handles recovery, so adding to both would double-send.
+  void _send(Map<String, dynamic> m, {bool tracked = false}) {
     final payload = jsonEncode(m);
     final ch = _channel;
     if (ch == null) {
-      _outbox.add(payload);
+      if (!tracked) _outbox.add(payload); // untracked messages use outbox
       return;
     }
     try {
       ch.sink.add(payload);
     } catch (_) {
-      // Sink rejected it though the socket looked alive — queue for the next
-      // healthy connection rather than dropping the message.
-      _outbox.add(payload);
+      if (!tracked) _outbox.add(payload);
       _scheduleReconnect(ch);
     }
   }
@@ -599,11 +625,13 @@ class _SessionScreenState extends State<SessionScreen>
     final msg = markers.isEmpty ? t : (t.isEmpty ? markers : '$t\n\n$markers');
     setState(() {
       if (running) {
-        // Busy: hold it and auto-submit when the run pauses (don't steer mid-task).
+        // Queue by default — flushes when the run pauses.
         _queued.add(msg);
       } else {
-        _send({'kind': 'user_message', 'value': msg});
+        final nonce = _nextNonce();
+        _send({'kind': 'user_message', 'value': msg, 'nonce': nonce}, tracked: true);
         _pending.add(msg); // show it until the daemon echoes it back
+        _pendingNonce.add(nonce);
       }
       _attachments.clear();
     });
@@ -772,24 +800,20 @@ class _SessionScreenState extends State<SessionScreen>
     }
   }
 
+  bool _confirmingRecording = false;
   Future<bool> _confirmRecording() async {
     final path = _recordingPath;
-    if (path == null || _isRecording) return false;
+    if (path == null || _isRecording || _confirmingRecording) return false;
+    _confirmingRecording = true;
+    // Clear path IMMEDIATELY (synchronously) to prevent a second concurrent
+    // call from the recording panel's confirm button racing through the guard.
+    _recordingPath = null;
     try {
       final bytes = await File(path).readAsBytes();
       if (bytes.isEmpty) {
         await _discardRecording();
         _toast('The recording was empty.');
         return false;
-      }
-      if (mounted) {
-        setState(() {
-          _recordingPath = null;
-          _waveform.clear();
-          _playbackPosition = Duration.zero;
-          _playbackDuration = Duration.zero;
-          _isPlayingRecording = false;
-        });
       }
       await _ingest([
         (
@@ -801,10 +825,18 @@ class _SessionScreenState extends State<SessionScreen>
       await _audioPlayer.stop();
       final file = File(path);
       if (await file.exists()) await file.delete();
+      if (mounted) setState(() {
+        _waveform.clear();
+        _playbackPosition = Duration.zero;
+        _playbackDuration = Duration.zero;
+        _isPlayingRecording = false;
+      });
       return true;
     } catch (e) {
       _toast('Could not attach recording: $e');
       return false;
+    } finally {
+      _confirmingRecording = false;
     }
   }
 
@@ -1015,6 +1047,19 @@ class _SessionScreenState extends State<SessionScreen>
         if (i >= 0 && i < _queued.length) _queued.removeAt(i);
       });
 
+  // Steer: send a queued message immediately while the agent is still running.
+  void _steerQueuedAt(int i) {
+    if (i < 0 || i >= _queued.length) return;
+    final msg = _queued.removeAt(i);
+    final nonce = _nextNonce();
+    _send({'kind': 'user_message', 'value': msg, 'nonce': nonce}, tracked: true);
+    setState(() {
+      _pending.add(msg);
+      _pendingNonce.add(nonce);
+    });
+    _armAckWatchdog();
+  }
+
   // Clean text for a held/pending message (markers stripped). Attachments
   // surface as AttachmentPill beside the text — same as a real Bubble.
   String _queuedText(String m) => hideAttachmentMarkers(m);
@@ -1109,6 +1154,8 @@ class _SessionScreenState extends State<SessionScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Depend on Theme so this rebuilds when the user switches palettes.
+    Theme.of(context);
     final s = _state;
     final status = s?.status ?? 'connecting';
     final running = status == 'running';
@@ -1125,21 +1172,13 @@ class _SessionScreenState extends State<SessionScreen>
             _mobileHeader(s, running, waiting)
           else
             _desktopBar(s, running),
-          // Desktop keeps the detailed chip strip; mobile gets the dense live
-          // status rail (ctx gauge · tokens · lanes · watches · rate · mode).
+          // Desktop keeps the detailed chip strip.
           if (!kMobile) _statusStrip(s, running),
-          if (kMobile)
-            StatusRail(
-              state: s,
-              modelLabel: _modelLabel,
-              onUsageTap: _showUsage,
-              onLanesTap: _showLanes,
-            ),
           if (_connError != null) _disconnectedBanner(),
           Expanded(
             child: Stack(children: [
               _centerWide(s == null
-                  ? const Center(
+                  ? Center(
                       child: SizedBox(
                           width: 22,
                           height: 22,
@@ -1153,7 +1192,7 @@ class _SessionScreenState extends State<SessionScreen>
                       child: SelectionArea(
                         child: ListView(
                           controller: _scroll,
-                          padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                           children: [
                             if (items.isEmpty && !running)
                               const EmptyState(
@@ -1179,10 +1218,11 @@ class _SessionScreenState extends State<SessionScreen>
                               for (var qi = 0; qi < _queued.length; qi++)
                                 _QueuedBubble(
                                   text: _queuedText(_queued[qi]),
-                                  audio: _queuedAttachCounts(_queued[qi]).$3,
-                                  images: _queuedAttachCounts(_queued[qi]).$1,
-                                  files: _queuedAttachCounts(_queued[qi]).$2,
+                                  audio: _queuedAttachCounts(_queued[qi]).$1,
+                                  images: _queuedAttachCounts(_queued[qi]).$2,
+                                  files: _queuedAttachCounts(_queued[qi]).$3,
                                   onCancel: () => _cancelQueuedAt(qi),
+                                  onSteer: () => _steerQueuedAt(qi),
                                 ),
                             ],
                           ],
@@ -1196,10 +1236,9 @@ class _SessionScreenState extends State<SessionScreen>
                   right: 16,
                   bottom: 12,
                   child: Material(
-                    color: AppColors.surface2,
-                    shape: const CircleBorder(
-                        side: BorderSide(color: AppColors.border)),
-                    elevation: 3,
+                    color: AppColors.surface1,
+                    shape: const CircleBorder(),
+                    elevation: 0,
                     child: InkWell(
                       customBorder: const CircleBorder(),
                       onTap: () {
@@ -1207,10 +1246,10 @@ class _SessionScreenState extends State<SessionScreen>
                         setState(() {});
                         _toBottom(jump: true);
                       },
-                      child: const Padding(
-                        padding: EdgeInsets.all(10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
                         child: AppIcon('chevron-down',
-                            size: 18, color: AppColors.fg2),
+                            size: 16, color: AppColors.fg3),
                       ),
                     ),
                   ),
@@ -1272,21 +1311,15 @@ class _SessionScreenState extends State<SessionScreen>
     final statusWord = compacting
         ? 'Compacting history…'
         : (waiting ? 'Needs input' : (running ? 'Running' : 'Idle'));
-    // Just status + model here — ctx/tokens/lanes/watches/rate/mode live in the
-    // StatusRail directly below.
+    // Just status + model here — no StatusRail on mobile.
     final facts = <String>[
       statusWord,
       if (_modelLabel != null) _modelLabel!,
     ];
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 4, 8, 6),
-      decoration: BoxDecoration(
-        color: readingBg,
-        border: const Border(bottom: BorderSide(color: AppColors.border)),
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+      decoration: BoxDecoration(color: readingBg),
       child: Row(children: [
-        // Tapping the title area itself opens the session actions (rename, model,
-        // files, git, …) — no separate ellipsis button needed.
         Expanded(
           child: InkWell(
             onTap: () => _openActions(s),
@@ -1300,13 +1333,13 @@ class _SessionScreenState extends State<SessionScreen>
                     Text(_title.isEmpty ? 'session' : _title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(16,
+                        style: sans(17,
                             weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(facts.join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(11.5, color: AppColors.fg3)),
+                        style: sans(12, color: AppColors.fg3)),
                   ]),
             ),
           ),
@@ -1326,7 +1359,7 @@ class _SessionScreenState extends State<SessionScreen>
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: readingBg,
-        border: const Border(bottom: BorderSide(color: AppColors.border)),
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       // Full-width toolbar: title (+path) takes all free space so the actions
       // are pushed to the extreme right.
@@ -1369,8 +1402,8 @@ class _SessionScreenState extends State<SessionScreen>
       menuPadding: const EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(R.md),
-          side: const BorderSide(color: AppColors.border2)),
-      icon: const AppIcon('more-vertical', color: AppColors.fg2),
+          side: BorderSide(color: AppColors.border2)),
+      icon: AppIcon('more-vertical', color: AppColors.fg2),
       tooltip: 'Actions',
       onSelected: (fn) => fn(),
       itemBuilder: (_) => _actionItems(s),
@@ -1554,7 +1587,7 @@ class _SessionScreenState extends State<SessionScreen>
           onTap: onTap,
           borderRadius: BorderRadius.circular(R.md),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(children: [
               Container(
                 width: 30,
@@ -1624,7 +1657,7 @@ class _SessionScreenState extends State<SessionScreen>
     }
     return Container(
       height: 44,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
           color: AppColors.surface1,
           border: Border(bottom: BorderSide(color: AppColors.border))),
       child: SingleChildScrollView(
@@ -1649,7 +1682,7 @@ class _SessionScreenState extends State<SessionScreen>
               bottom:
                   BorderSide(color: AppColors.danger.withValues(alpha: 0.25)))),
       child: Row(children: [
-        const AppIcon('wifi-off', size: 15, color: AppColors.danger),
+        AppIcon('wifi-off', size: 15, color: AppColors.danger),
         const SizedBox(width: 9),
         Expanded(
             child: Text(
@@ -1663,7 +1696,7 @@ class _SessionScreenState extends State<SessionScreen>
             _connect();
           },
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            const AppIcon('refresh', size: 13, color: AppColors.danger),
+            AppIcon('refresh', size: 13, color: AppColors.danger),
             const SizedBox(width: 5),
             Text('Retry now',
                 style:
@@ -1687,28 +1720,26 @@ class _SessionScreenState extends State<SessionScreen>
   Widget _inputBar(bool running) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          12, 4, 12, 8 + MediaQuery.of(context).padding.bottom),
+          16, 8, 16, 10 + MediaQuery.of(context).padding.bottom),
       child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (_attachments.isNotEmpty) _attachmentBar(),
             if (_isRecording || _recordingPath != null) _recordingPanel(),
-            // Roomier composer: the text field gets its own line, with a control
-            // row (attach · send) beneath it — bigger, and closer in feel to a
-            // modern chat composer while staying in our design language.
+            // Grok-style: rounded card composer with clean layout.
             Container(
               decoration: BoxDecoration(
                 color: AppColors.surface2,
                 border: Border.all(color: AppColors.border),
                 borderRadius: BorderRadius.circular(R.card),
               ),
-              padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
               child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Cmd/Ctrl+Enter sends (handy on desktop where Enter inserts a newline).
+                    // Cmd/Ctrl+Enter sends.
                     CallbackShortcuts(
                       bindings: {
                         const SingleActivator(LogicalKeyboardKey.enter,
@@ -1725,33 +1756,49 @@ class _SessionScreenState extends State<SessionScreen>
                         minLines: 1,
                         maxLines: 8,
                         cursorColor: AppColors.accent,
-                        // No onChanged setState: rebuilding the WHOLE screen (incl. the
-                        // transcript) per keystroke caused typing lag in long sessions.
-                        // The send button listens to the controller directly below.
                         onSubmitted: (_) => _sendMessage(),
-                        style: sans(15, height: 1.45, color: AppColors.fg1),
+                        style: sans(16, height: 1.5, color: AppColors.fg1),
                         decoration: InputDecoration(
                           isCollapsed: true,
                           contentPadding:
                               const EdgeInsets.symmetric(vertical: 4),
                           border: InputBorder.none,
-                          hintText: 'Message snippet…',
-                          hintStyle: sans(15, color: AppColors.fg4),
+                          hintText: 'Ask anything',
+                          hintStyle: sans(16, color: AppColors.fg4),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    // Controls grouped bottom-right (attach next to send) rather than
-                    // split to opposite corners — reads more balanced under the field.
+                    const SizedBox(height: 10),
+                    // Grok-style bottom toolbar: attach + model chip + mic + send.
                     Row(children: [
-                      const Spacer(),
                       IconBtn('plus',
                           size: 36,
                           iconSize: 21,
                           tooltip: 'Attach',
                           onTap: _onAttachTap),
-                      if (kMobile) ...[
-                        const SizedBox(width: 2),
+                      const SizedBox(width: 4),
+                      // Model selector chip (tappable).
+                      InkWell(
+                        borderRadius: BorderRadius.circular(R.sm),
+                        onTap: _switchModel,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface3,
+                            borderRadius: BorderRadius.circular(R.sm),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.bolt_rounded,
+                                size: 13, color: AppColors.accent),
+                            const SizedBox(width: 4),
+                            Text(_modelLabel ?? 'Auto',
+                                style: mono(11, color: AppColors.fg2)),
+                          ]),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (kMobile)
                         IconBtn(
                           _isRecording ? 'mic-off' : 'mic',
                           size: 36,
@@ -1761,9 +1808,7 @@ class _SessionScreenState extends State<SessionScreen>
                               _isRecording ? 'Stop recording' : 'Record voice',
                           onTap: _onMicTap,
                         ),
-                      ],
-                      const SizedBox(width: 2),
-                      // Only the send button re-renders as text changes.
+                      if (kMobile) const SizedBox(width: 2),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _input,
                         builder: (_, __, ___) => _SendBtn(
@@ -1780,13 +1825,13 @@ class _SessionScreenState extends State<SessionScreen>
   // Composer attachment row: image thumbnails + file chips, each with its own ✕.
   Widget _attachmentBar() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 2),
+      padding: const EdgeInsets.only(bottom: 6),
       child: SizedBox(
-        height: 60,
+        height: 36,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: _attachments.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          separatorBuilder: (_, __) => const SizedBox(width: 6),
           itemBuilder: (_, i) => _attachmentTile(_attachments[i]),
         ),
       ),
@@ -1800,28 +1845,27 @@ class _SessionScreenState extends State<SessionScreen>
         ? ClipRRect(
             borderRadius: BorderRadius.circular(R.sm),
             child: Image.file(File(a.localPath!),
-                width: 60, height: 60, fit: BoxFit.cover),
+                width: 36, height: 36, fit: BoxFit.cover),
           )
         : Container(
-            width: 118,
-            height: 60, // match the image thumbnails so the row is even
-            padding: const EdgeInsets.symmetric(horizontal: 9),
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
               color: isAudio ? AppColors.accentBg : AppColors.surface2,
               borderRadius: BorderRadius.circular(R.sm),
               border: Border.all(
                   color: isAudio ? AppColors.accentLine : AppColors.border),
             ),
-            child: Row(children: [
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
               AppIcon(isAudio ? 'mic' : (a.isImage ? 'image' : 'file'),
-                  size: 15, color: isAudio ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 6),
-              Expanded(
+                  size: 12, color: isAudio ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 5),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 100),
                 child: Text(a.name,
-                    maxLines: 3,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(10.5,
-                        height: 1.25,
+                    style: sans(10,
                         color: isAudio ? AppColors.accent : AppColors.fg2)),
               ),
             ]),
@@ -1835,7 +1879,7 @@ class _SessionScreenState extends State<SessionScreen>
                 color: Colors.black45,
                 borderRadius: BorderRadius.circular(R.sm)),
             alignment: Alignment.center,
-            child: const SizedBox(
+            child: SizedBox(
                 width: 16,
                 height: 16,
                 child: CircularProgressIndicator(
@@ -1852,7 +1896,7 @@ class _SessionScreenState extends State<SessionScreen>
             padding: const EdgeInsets.all(3),
             decoration: const BoxDecoration(
                 color: Colors.black87, shape: BoxShape.circle),
-            child: const AppIcon('x', size: 11, color: AppColors.fg1),
+            child: AppIcon('x', size: 11, color: AppColors.fg1),
           ),
         ),
       ),
@@ -1918,12 +1962,12 @@ class _SessionScreenState extends State<SessionScreen>
         case 'steer':
           endTools();
           out.add(Padding(
-              padding: const EdgeInsets.only(top: 2, bottom: 14),
+              padding: const EdgeInsets.only(top: 4, bottom: 20),
               child: Bubble(mine: true, text: _s(e['text']))));
         case 'assistant_text':
           endTools();
           out.add(Padding(
-              padding: const EdgeInsets.only(top: 2, bottom: 14),
+              padding: const EdgeInsets.only(top: 2, bottom: 8),
               child: Bubble(mine: false, text: _s(e['text']))));
         case 'model_error':
           endTools();
@@ -1938,6 +1982,8 @@ class _SessionScreenState extends State<SessionScreen>
           out.add(_NoteLine(entry));
         case 'system_decision':
           endTools();
+          // Don't render "interrupted" decisions — just noise in the chat.
+          if (_s(e['step']) == 'interrupted') break;
           out.add(
               SystemRow(step: _s(e['step']), reasoning: _s(e['reasoning'])));
         case 'file_presented':
@@ -1947,10 +1993,13 @@ class _SessionScreenState extends State<SessionScreen>
           endTools();
           final id = _s(e['id']);
           final title = _s(e['title']);
-          laneRowsShown.add(id);
-          // Live card: resolves the current record each build, so it flips
-          // running → done (with summary) in place.
-          out.add(LaneCard(title: title, live: () => liveLane(id)));
+          // Dedup by ID AND title — the same lane can be spawned with
+          // different IDs on reconnect (resume), producing visual duplicates.
+          if (!laneRowsShown.contains(id) && !laneRowsShown.contains('t:$title')) {
+            laneRowsShown.add(id);
+            laneRowsShown.add('t:$title');
+            out.add(LaneCard(title: title, live: () => liveLane(id)));
+          }
         case 'lane_completed':
           endTools();
           final id = _s(e['id']);
@@ -1974,8 +2023,7 @@ class _SessionScreenState extends State<SessionScreen>
               padding: const EdgeInsets.symmetric(vertical: 6),
               child:
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const AppIcon('corner-down-right',
-                    size: 15, color: AppColors.run),
+                AppIcon('corner-down-right', size: 15, color: AppColors.run),
                 const SizedBox(width: 8),
                 Expanded(
                     child: Text(txt,
@@ -2012,7 +2060,7 @@ class _SessionScreenState extends State<SessionScreen>
             decoration: BoxDecoration(
                 color: AppColors.accentBg,
                 borderRadius: BorderRadius.circular(R.sm)),
-            child: const AppIcon('file', size: 16, color: AppColors.accent),
+            child: AppIcon('file', size: 16, color: AppColors.accent),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -2110,8 +2158,7 @@ class _SessionScreenState extends State<SessionScreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 4, vertical: 12),
                         child: Row(children: [
-                          const AppIcon('cpu',
-                              size: 17, color: AppColors.accent),
+                          AppIcon('cpu', size: 17, color: AppColors.accent),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -2388,8 +2435,8 @@ class _SessionScreenState extends State<SessionScreen>
                         decoration: BoxDecoration(
                             color: AppColors.surface2,
                             borderRadius: BorderRadius.circular(9)),
-                        child: const AppIcon('history',
-                            size: 17, color: AppColors.fg3)),
+                        child:
+                            AppIcon('history', size: 17, color: AppColors.fg3)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -2407,7 +2454,7 @@ class _SessionScreenState extends State<SessionScreen>
                                 style: mono(11, color: AppColors.fg3)),
                           ]),
                     ),
-                    const AppIcon('rotate', size: 16, color: AppColors.fg4),
+                    AppIcon('rotate', size: 16, color: AppColors.fg4),
                   ]),
                 ),
               )),
@@ -2421,7 +2468,7 @@ class _SessionScreenState extends State<SessionScreen>
         backgroundColor: AppColors.surface1,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppColors.border2)),
+            side: BorderSide(color: AppColors.border2)),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Column(
@@ -2503,7 +2550,7 @@ class _TypingDotsState extends State<_TypingDots>
       alignment: Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.surface1,
           border: Border.fromBorderSide(BorderSide(color: AppColors.border)),
           borderRadius: BorderRadius.only(
@@ -2527,7 +2574,7 @@ class _TypingDotsState extends State<_TypingDots>
                         child: Container(
                             width: 6,
                             height: 6,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                                 color: AppColors.fg3, shape: BoxShape.circle))),
                   );
                 },
@@ -2547,12 +2594,14 @@ class _QueuedBubble extends StatelessWidget {
   final String text;
   final int audio, images, files;
   final VoidCallback onCancel;
+  final VoidCallback? onSteer;
   const _QueuedBubble({
     required this.text,
     required this.audio,
     required this.images,
     required this.files,
     required this.onCancel,
+    this.onSteer,
   });
   @override
   Widget build(BuildContext context) {
@@ -2563,11 +2612,25 @@ class _QueuedBubble extends StatelessWidget {
           Container(
               width: 5,
               height: 5,
-              decoration: const BoxDecoration(
-                  color: AppColors.fg4, shape: BoxShape.circle)),
+              decoration:
+                  BoxDecoration(color: AppColors.fg4, shape: BoxShape.circle)),
           const SizedBox(width: 7),
           Text('QUEUED', style: sans(10, color: AppColors.fg4, spacing: 0.8)),
           const Spacer(),
+          if (onSteer != null)
+            GestureDetector(
+              onTap: onSteer,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.accentBg,
+                  borderRadius: BorderRadius.circular(R.sm),
+                  border: Border.all(color: AppColors.accentLine),
+                ),
+                child: Text('Steer', style: sans(11, color: AppColors.accent)),
+              ),
+            ),
+          if (onSteer != null) const SizedBox(width: 6),
           IconBtn('x',
               size: 26, iconSize: 14, tooltip: 'Cancel', onTap: onCancel),
         ]),
@@ -2620,7 +2683,7 @@ class _ApprovalBarState extends State<_ApprovalBar> {
           borderRadius: BorderRadius.circular(14)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Padding(
+          Padding(
               padding: EdgeInsets.only(top: 1),
               child: AppIcon('shield', size: 16, color: AppColors.accent)),
           const SizedBox(width: 9),
@@ -2691,10 +2754,11 @@ class _NoteLineState extends State<_NoteLine> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SelectableText(
-                  text,
-                  maxLines: (!long || _open) ? null : 3,
-                  style: sans(13, height: 1.5, color: AppColors.fg3),
+                MarkdownBody(
+                  data: text,
+                  selectable: false,
+                  styleSheet: markdownStyle(context),
+                  builders: {'pre': PreBlockBuilder()},
                 ),
                 if (long) ...[
                   const SizedBox(height: 4),
@@ -2812,7 +2876,7 @@ class _QuestionBarState extends State<_QuestionBar> {
                           color: sel ? AppColors.fg1 : AppColors.fg2))),
               if (sel) ...[
                 const SizedBox(width: 10),
-                const AppIcon('check', size: 16, color: AppColors.accent)
+                AppIcon('check', size: 16, color: AppColors.accent)
               ],
             ]),
           ),
@@ -2886,7 +2950,7 @@ class _QuestionBarState extends State<_QuestionBar> {
           Container(
               width: 7,
               height: 7,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                   color: AppColors.accent, shape: BoxShape.circle)),
           const SizedBox(width: 9),
           Text('NEEDS YOUR INPUT',

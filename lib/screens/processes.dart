@@ -14,10 +14,7 @@ class ProcessesScreen extends StatefulWidget {
   final String sessionId;
   final VoidCallback? onClose;
   const ProcessesScreen(
-      {super.key,
-      required this.client,
-      required this.sessionId,
-      this.onClose});
+      {super.key, required this.client, required this.sessionId, this.onClose});
   @override
   State<ProcessesScreen> createState() => _ProcessesScreenState();
 }
@@ -35,8 +32,9 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
   void initState() {
     super.initState();
     _load();
-    _ticker = Timer.periodic(const Duration(seconds: 4),
-        (_) { if (mounted) _load(silent: true); });
+    _ticker = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) _load(silent: true);
+    });
   }
 
   @override
@@ -115,6 +113,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final procs = _procs ?? const [];
     return Scaffold(
       body: SafeArea(
@@ -126,7 +125,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             actions: [IconBtn('refresh', onTap: () => _load())],
           ),
           if (_loading)
-            const Expanded(
+            Expanded(
                 child: Center(
                     child: SizedBox(
                         width: 22,
@@ -196,8 +195,8 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                 style: TextButton.styleFrom(
                     minimumSize: const Size(0, 0),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4)),
                 child: Text('Stop', style: sans(12, color: AppColors.danger))),
         ]),
         const SizedBox(height: 4),
@@ -226,7 +225,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                 borderRadius: BorderRadius.circular(R.md),
                 border: Border.all(color: AppColors.border)),
             child: _logLoading
-                ? const Center(
+                ? Center(
                     child: SizedBox(
                         width: 16,
                         height: 16,

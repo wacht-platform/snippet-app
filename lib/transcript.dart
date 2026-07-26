@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'models.dart';
 import 'theme.dart';
@@ -21,10 +22,16 @@ class StatusRail extends StatelessWidget {
   final String? modelLabel;
   final VoidCallback? onUsageTap;
   final VoidCallback? onLanesTap;
-  const StatusRail({super.key, required this.state, this.modelLabel, this.onUsageTap, this.onLanesTap});
+  const StatusRail(
+      {super.key,
+      required this.state,
+      this.modelLabel,
+      this.onUsageTap,
+      this.onLanesTap});
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final s = state;
     final items = <Widget>[];
 
@@ -46,7 +53,8 @@ class StatusRail extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text('${(pct * 100).round()}%', style: mono(11, color: AppColors.fg2)),
+          Text('${(pct * 100).round()}%',
+              style: mono(11, color: AppColors.fg2)),
         ]),
       ));
     }
@@ -61,26 +69,33 @@ class StatusRail extends StatelessWidget {
     if (runningLanes > 0) {
       items.add(_railTap(
         onTap: onLanesTap,
-        child: Text('◆ $runningLanes', style: mono(11, color: AppColors.accent)),
+        child:
+            Text('◆ $runningLanes', style: mono(11, color: AppColors.accent)),
       ));
     }
     if ((s?.watchCount ?? 0) > 0) {
-      items.add(Text('◉ ${s!.watchCount}', style: mono(11, color: AppColors.run)));
+      items.add(
+          Text('◉ ${s!.watchCount}', style: mono(11, color: AppColors.run)));
     }
     final rp = s?.ratePrimary;
     if (rp != null) {
       items.add(_railTap(
         onTap: onUsageTap,
-        child: Text('${rateWindowLabel(rp.windowMinutes)} ${rp.leftPercent.round()}%',
-            style: mono(11, color: rp.leftPercent < 15 ? AppColors.danger : AppColors.fg3)),
+        child: Text(
+            '${rateWindowLabel(rp.windowMinutes)} ${rp.leftPercent.round()}%',
+            style: mono(11,
+                color: rp.leftPercent < 15 ? AppColors.danger : AppColors.fg3)),
       ));
     }
     if (s?.goal?.ongoing ?? false) {
-      items.add(Text(s!.goal!.paused ? '◇ paused' : '◇ goal', style: mono(11, color: AppColors.accent)));
+      items.add(Text(s!.goal!.paused ? '◇ paused' : '◇ goal',
+          style: mono(11, color: AppColors.accent)));
     }
     if (s != null) {
       items.add(Text(s.approvalMode == 'auto' ? 'auto' : 'ask',
-          style: mono(11, color: s.approvalMode == 'auto' ? AppColors.fg4 : AppColors.run)));
+          style: mono(11,
+              color:
+                  s.approvalMode == 'auto' ? AppColors.fg4 : AppColors.run)));
     }
     if (s?.compacting ?? false) {
       items.add(Text('compacting…', style: mono(11, color: AppColors.run)));
@@ -89,7 +104,7 @@ class StatusRail extends StatelessWidget {
 
     return Container(
       height: 30,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: SingleChildScrollView(
@@ -97,7 +112,12 @@ class StatusRail extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(children: [
           for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) Container(width: 1, height: 12, color: AppColors.border, margin: const EdgeInsets.symmetric(horizontal: 10)),
+            if (i > 0)
+              Container(
+                  width: 1,
+                  height: 12,
+                  color: AppColors.border,
+                  margin: EdgeInsets.symmetric(horizontal: 10)),
             items[i],
           ],
         ]),
@@ -137,7 +157,9 @@ class _DenseToolRowState extends State<DenseToolRow> {
         child: toolDetailView(context,
             tool: widget.tool,
             args: widget.args,
-            result: widget.result is Map ? (widget.result as Map).cast<String, dynamic>() : null));
+            result: widget.result is Map
+                ? (widget.result as Map).cast<String, dynamic>()
+                : null));
   }
 
   // Right-aligned meta: bash exit code, edit diff stat, else ✓/✗.
@@ -145,13 +167,19 @@ class _DenseToolRowState extends State<DenseToolRow> {
     final r = widget.result;
     if (r is! Map) return '';
     if (widget.tool == 'bash') {
-      final exit = (r['data'] is Map) ? (r['data']['exit_code']?.toString() ?? '') : '';
+      final exit =
+          (r['data'] is Map) ? (r['data']['exit_code']?.toString() ?? '') : '';
       return exit.isEmpty ? '' : 'exit $exit';
     }
-    if (widget.tool == 'edit_file' || widget.tool == 'write_file' || widget.tool == 'replace_file_content') {
+    if (widget.tool == 'edit_file' ||
+        widget.tool == 'write_file' ||
+        widget.tool == 'replace_file_content') {
       final a = widget.args;
       if (a is Map) {
-        final add = (a['new_string'] ?? a['content'] ?? '').toString().split('\n').length;
+        final add = (a['new_string'] ?? a['content'] ?? '')
+            .toString()
+            .split('\n')
+            .length;
         final del = (a['old_string'] ?? '').toString().split('\n').length;
         return '+$add −${a['old_string'] == null ? 0 : del}';
       }
@@ -161,9 +189,11 @@ class _DenseToolRowState extends State<DenseToolRow> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final glyph = _pending
         ? const _BrailleSpinner()
-        : Text(_ok ? '✓' : '✗', style: mono(12, color: _ok ? AppColors.fg4 : AppColors.danger));
+        : Text(_ok ? '✓' : '✗',
+            style: mono(12, color: _ok ? AppColors.fg4 : AppColors.danger));
     final meta = _meta;
 
     return InkWell(
@@ -174,7 +204,8 @@ class _DenseToolRowState extends State<DenseToolRow> {
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SizedBox(width: 16, child: Center(child: glyph)),
           const SizedBox(width: 6),
-          Text(widget.tool, style: mono(12, weight: FontWeight.w600, color: AppColors.fg2)),
+          Text(widget.tool,
+              style: mono(12, weight: FontWeight.w600, color: AppColors.fg2)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -186,10 +217,11 @@ class _DenseToolRowState extends State<DenseToolRow> {
           ),
           if (meta.isNotEmpty) ...[
             const SizedBox(width: 8),
-            Text(meta, style: mono(11, color: _ok ? AppColors.fg4 : AppColors.danger)),
+            Text(meta,
+                style: mono(11, color: _ok ? AppColors.fg4 : AppColors.danger)),
           ],
           const SizedBox(width: 4),
-          const AppIcon('chevron-right', size: 13, color: AppColors.fg4),
+          AppIcon('chevron-right', size: 13, color: AppColors.fg4),
         ]),
       ),
     );
@@ -243,13 +275,14 @@ class _ToolRunState extends State<ToolRun> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final rows = widget.rows;
     final collapsed = !_all && rows.length > visibleTail + 2;
     final shown = collapsed ? rows.sublist(rows.length - visibleTail) : rows;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.only(left: 8),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(left: BorderSide(color: AppColors.border2, width: 2)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -279,7 +312,8 @@ class LaneCard extends StatefulWidget {
   final String title;
   final LaneInfo? Function() live;
   final String? summary; // completion summary when this row is the completion
-  const LaneCard({super.key, required this.title, required this.live, this.summary});
+  const LaneCard(
+      {super.key, required this.title, required this.live, this.summary});
 
   @override
   State<LaneCard> createState() => _LaneCardState();
@@ -321,7 +355,8 @@ class _LaneCardState extends State<LaneCard> {
     final report = lane?.report;
     final summary = widget.summary ?? lane?.summary;
     final error = lane?.error;
-    if ([handoff, report, summary, error].every((s) => s == null || s.trim().isEmpty)) return;
+    if ([handoff, report, summary, error]
+        .every((s) => s == null || s.trim().isEmpty)) return;
 
     Widget section(String heading, String? text, {bool errorTone = false}) {
       if (text == null || text.trim().isEmpty) return const SizedBox.shrink();
@@ -329,12 +364,16 @@ class _LaneCardState extends State<LaneCard> {
         padding: const EdgeInsets.only(bottom: 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(heading,
-              style: mono(11, weight: FontWeight.w600,
+              style: mono(11,
+                  weight: FontWeight.w600,
                   color: errorTone ? AppColors.danger : AppColors.fg3)),
           const SizedBox(height: 6),
-          SelectableText(text,
-              style: sans(12.5, height: 1.5,
-                  color: errorTone ? AppColors.danger : AppColors.fg1)),
+          MarkdownBody(
+            data: text,
+            selectable: true,
+            styleSheet: markdownStyle(context),
+            builders: {'pre': PreBlockBuilder()},
+          ),
         ]),
       );
     }
@@ -350,6 +389,7 @@ class _LaneCardState extends State<LaneCard> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final l = widget.live();
     final running = l?.running ?? false;
     final failed = (l?.status ?? '') == 'failed';
@@ -367,22 +407,28 @@ class _LaneCardState extends State<LaneCard> {
       decoration: BoxDecoration(
         color: AppColors.surface1,
         borderRadius: BorderRadius.circular(R.sm),
-        border: Border.all(color: running ? AppColors.accentLine : AppColors.border),
+        border: Border.all(
+            color: running ? AppColors.accentLine : AppColors.border),
       ),
       child: InkWell(
         onTap: hasDetails ? () => _showDetails(context, l) : null,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Container(width: 8, height: 8, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+            Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(widget.title,
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
             ),
             if (hasDetails) ...[
               const SizedBox(width: 6),
-              const AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
             ],
             const SizedBox(width: 8),
             Text(
@@ -391,12 +437,15 @@ class _LaneCardState extends State<LaneCard> {
                   : failed
                       ? 'failed'
                       : 'done',
-              style: mono(11, color: running ? AppColors.accent : (failed ? AppColors.danger : AppColors.fg4)),
+              style: mono(11,
+                  color: running
+                      ? AppColors.accent
+                      : (failed ? AppColors.danger : AppColors.fg4)),
             ),
           ]),
           if (summary != null && summary.trim().isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(summary,
+            Text(summary.replaceAll(RegExp(r'^#{1,6}\s*'), '').trim(),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: sans(12, height: 1.45, color: AppColors.fg3)),
@@ -419,22 +468,32 @@ class SystemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final (glyph, color) = switch (step) {
       'watch_added' || 'watch_removed' => ('◉', AppColors.run),
       'file_watch' => ('◉', AppColors.accent),
-      'goal_set' || 'goal_completed' || 'goal_paused' || 'goal_cancelled' => ('◇', AppColors.accent),
-      'history_compaction_pass' || 'history_compacted' || 'history_compaction_skipped' => ('▣', AppColors.fg4),
+      'goal_set' || 'goal_completed' || 'goal_paused' || 'goal_cancelled' => (
+          '◇',
+          AppColors.accent
+        ),
+      'history_compaction_pass' ||
+      'history_compacted' ||
+      'history_compaction_skipped' =>
+        ('▣', AppColors.fg4),
       'interrupted' => ('■', AppColors.danger),
       _ => ('·', AppColors.fg4),
     };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(width: 16, child: Center(child: Text(glyph, style: mono(11, color: color)))),
+        SizedBox(
+            width: 16,
+            child: Center(child: Text(glyph, style: mono(11, color: color)))),
         const SizedBox(width: 6),
         Expanded(
           child: Text(reasoning,
-              maxLines: 3, overflow: TextOverflow.ellipsis,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: sans(11.5, height: 1.4, color: AppColors.fg4)),
         ),
       ]),

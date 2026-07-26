@@ -1,49 +1,400 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'platform.dart';
 
-/// snippet — "Terminal Ink" (design direction #3): near-black, mono-forward,
-/// chrome kept almost invisible; color carries STATE (amber = active/attention,
-/// green = success, red = failure), never decoration.
+// ---------------------------------------------------------------------------
+// Theme presets — each one defines every color the app uses. Ported from the
+// TUI's 13 presets (src/tui/theme.rs) plus mobile-specific surface/diff slots.
+// ---------------------------------------------------------------------------
+
+class ThemePreset {
+  final String name;
+  final String label;
+
+  // Surfaces (darkest → lightest)
+  final Color bg;
+  final Color canvas;
+  final Color surface1;
+  final Color surface2;
+  final Color surface3;
+
+  // Foreground (brightest → faintest)
+  final Color fg1;
+  final Color fg2;
+  final Color fg3;
+  final Color fg4;
+
+  // Borders
+  final Color border;
+  final Color border2;
+
+  // Accent
+  final Color accent;
+  final Color accentHover;
+  final Color accentFg;
+  final Color accentBg;
+  final Color accentLine;
+  final Color accentRing;
+
+  // Status
+  final Color ok;
+  final Color okBg;
+  final Color run;
+  final Color runBg;
+  final Color danger;
+  final Color dangerBg;
+
+  // Diff
+  final Color diffAddBg;
+  final Color diffDelBg;
+  final Color diffAddFg;
+  final Color diffDelFg;
+  final Color diffGutter;
+
+  const ThemePreset({
+    required this.name,
+    required this.label,
+    required this.bg,
+    required this.canvas,
+    required this.surface1,
+    required this.surface2,
+    required this.surface3,
+    required this.fg1,
+    required this.fg2,
+    required this.fg3,
+    required this.fg4,
+    required this.border,
+    required this.border2,
+    required this.accent,
+    required this.accentHover,
+    required this.accentFg,
+    required this.accentBg,
+    required this.accentLine,
+    required this.accentRing,
+    required this.ok,
+    required this.okBg,
+    required this.run,
+    required this.runBg,
+    required this.danger,
+    required this.dangerBg,
+    required this.diffAddBg,
+    required this.diffDelBg,
+    required this.diffAddFg,
+    required this.diffDelFg,
+    required this.diffGutter,
+  });
+}
+
+// Helper: derive dark surfaces + status from a TUI accent/text palette.
+ThemePreset _dark({
+  required String name,
+  required String label,
+  required Color accent,
+  required Color text,
+  required Color muted,
+  required Color faint,
+  required Color success,
+  required Color danger,
+  required Color warn,
+  bool isAmoled = false,
+}) {
+  // Surfaces: neutral grays (no color tint) — Grok-style.
+  // AMOLED mode: pure #000000 for deepest blacks on OLED screens.
+  final bg = isAmoled ? const Color(0xFF000000) : const Color(0xFF121212);
+  final canvas = isAmoled ? const Color(0xFF000000) : const Color(0xFF181818);
+  final surface1 = isAmoled ? const Color(0xFF0A0A0A) : const Color(0xFF1E1E1E);
+  final surface2 = isAmoled ? const Color(0xFF141414) : const Color(0xFF2A2A2A);
+  final surface3 = isAmoled ? const Color(0xFF1E1E1E) : const Color(0xFF363636);
+
+  return ThemePreset(
+    name: name,
+    label: label,
+    bg: bg,
+    canvas: canvas,
+    surface1: surface1,
+    surface2: surface2,
+    surface3: surface3,
+    fg1: text,
+    fg2: muted,
+    fg3: _lighten(muted, 0.15),
+    fg4: _lighten(faint, 0.20),
+    border: _alphaWhite(0.09),
+    border2: _alphaWhite(0.14),
+    accent: accent,
+    accentHover: _lighten(accent, 0.12),
+    accentFg: _nearBlack(),
+    accentBg: _withAlpha(accent, 0.15),
+    accentLine: _withAlpha(accent, 0.40),
+    accentRing: _withAlpha(accent, 0.30),
+    ok: success,
+    okBg: _withAlpha(success, 0.15),
+    run: warn,
+    runBg: _withAlpha(warn, 0.15),
+    danger: danger,
+    dangerBg: _withAlpha(danger, 0.15),
+    diffAddBg: _withAlpha(success, 0.12),
+    diffDelBg: _withAlpha(danger, 0.12),
+    diffAddFg: _lighten(success, 0.20),
+    diffDelFg: _lighten(danger, 0.20),
+    diffGutter: _lighten(faint, 0.15),
+  );
+}
+
+// Light theme helper: white-based surfaces.
+ThemePreset _light({
+  required String name,
+  required String label,
+  required Color accent,
+  required Color text,
+  required Color muted,
+  required Color faint,
+  required Color success,
+  required Color danger,
+  required Color warn,
+}) {
+  return ThemePreset(
+    name: name,
+    label: label,
+    bg: const Color(0xFFF5F5F5),
+    canvas: const Color(0xFFFFFFFF),
+    surface1: const Color(0xFFFFFFFF),
+    surface2: const Color(0xFFF0F0F0),
+    surface3: const Color(0xFFE5E5E5),
+    fg1: text,
+    fg2: muted,
+    fg3: _lighten(muted, 0.2),
+    fg4: faint,
+    border: _alphaBlack(0.08),
+    border2: _alphaBlack(0.14),
+    accent: accent,
+    accentHover: _darken(accent, 0.08),
+    accentFg: const Color(0xFFFFFFFF),
+    accentBg: _withAlpha(accent, 0.12),
+    accentLine: _withAlpha(accent, 0.35),
+    accentRing: _withAlpha(accent, 0.25),
+    ok: success,
+    okBg: _withAlpha(success, 0.12),
+    run: warn,
+    runBg: _withAlpha(warn, 0.12),
+    danger: danger,
+    dangerBg: _withAlpha(danger, 0.12),
+    diffAddBg: _withAlpha(success, 0.10),
+    diffDelBg: _withAlpha(danger, 0.10),
+    diffAddFg: _darken(success, 0.15),
+    diffDelFg: _darken(danger, 0.15),
+    diffGutter: faint,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4 curated presets — each one beautiful, no filler.
+// ---------------------------------------------------------------------------
+
+const _terminalInk = ThemePreset(
+  name: 'terminal-ink',
+  label: 'Terminal Ink',
+  bg: Color(0xFF121212),
+  canvas: Color(0xFF181818),
+  surface1: Color(0xFF1E1E1E),
+  surface2: Color(0xFF2A2A2A),
+  surface3: Color(0xFF363636),
+  fg1: Color(0xFFE8ECEA),
+  fg2: Color(0xFFB0B8B4),
+  fg3: Color(0xFF8A918E),
+  fg4: Color(0xFF6E7572),
+  border: Color(0x17FFFFFF),
+  border2: Color(0x24FFFFFF),
+  accent: Color(0xFFE0A458),
+  accentHover: Color(0xFFEBB470),
+  accentFg: Color(0xFF160E02),
+  accentBg: Color(0x26E0A458),
+  accentLine: Color(0x66E0A458),
+  accentRing: Color(0x4DE0A458),
+  ok: Color(0xFF7BC49A),
+  okBg: Color(0x267BC49A),
+  run: Color(0xFFE0A458),
+  runBg: Color(0x26E0A458),
+  danger: Color(0xFFE86A6A),
+  dangerBg: Color(0x26E86A6A),
+  diffAddBg: Color(0x1F7BC49A),
+  diffDelBg: Color(0x1FE86A6A),
+  diffAddFg: Color(0xFF9AD4B4),
+  diffDelFg: Color(0xFFF0A0A0),
+  diffGutter: Color(0xFF6E7572),
+);
+
+final _nord = _dark(
+  name: 'nord',
+  label: 'Nord',
+  accent: const Color(0xFF88C0D0),
+  text: const Color(0xFFD8DEE9),
+  muted: const Color(0xFFA0AAB8),
+  faint: const Color(0xFF7B8899),
+  success: const Color(0xFFA3BE8C),
+  danger: const Color(0xFFBF616A),
+  warn: const Color(0xFFEBCB8B),
+);
+
+final _dracula = _dark(
+  name: 'dracula',
+  label: 'Dracula',
+  accent: const Color(0xFFBD93F9),
+  text: const Color(0xFFF8F8F2),
+  muted: const Color(0xFFB0B8D0),
+  faint: const Color(0xFF8890B0),
+  success: const Color(0xFF50FA7B),
+  danger: const Color(0xFFFF5555),
+  warn: const Color(0xFFF1FA8C),
+);
+
+final _lightPreset = _light(
+  name: 'light',
+  label: 'Light',
+  accent: const Color(0xFF2563EB),
+  text: const Color(0xFF1E293B),
+  muted: const Color(0xFF475569),
+  faint: const Color(0xFF94A3B8),
+  success: const Color(0xFF15804C),
+  danger: const Color(0xFFDC2626),
+  warn: const Color(0xFFD97706),
+);
+
+// Pure black AMOLED theme — deepest blacks, no surface elevation.
+final _amoled = _dark(
+  name: 'amoled',
+  label: 'AMOLED Black',
+  accent: const Color(0xFF60A5FA),  // blue-400
+  text: const Color(0xFFE5E7EB),    // gray-200
+  muted: const Color(0xFF9CA3AF),   // gray-400
+  faint: const Color(0xFF6B7280),   // gray-500
+  success: const Color(0xFF34D399), // emerald-400
+  danger: const Color(0xFFF87171),  // red-400
+  warn: const Color(0xFFFBBF24),    // amber-400
+  isAmoled: true,
+);
+
+List<ThemePreset> get allPresets => [
+      _amoled,
+      _terminalInk,
+      _nord,
+      _dracula,
+      _lightPreset,
+    ];
+
+// ---------------------------------------------------------------------------
+// Color helpers
+// ---------------------------------------------------------------------------
+
+Color _withAlpha(Color c, double a) => c.withValues(alpha: a);
+Color _alphaWhite(double a) => Color.fromRGBO(255, 255, 255, a);
+Color _alphaBlack(double a) => Color.fromRGBO(0, 0, 0, a);
+Color _nearBlack() => const Color(0xFF160E02);
+
+Color _lighten(Color c, double amount) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl
+      .withLightness((hsl.lightness + amount).clamp(0.0, 1.0))
+      .toColor()
+      .withValues(alpha: c.a);
+}
+
+Color _darken(Color c, double amount) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl
+      .withLightness((hsl.lightness - amount).clamp(0.0, 1.0))
+      .toColor()
+      .withValues(alpha: c.a);
+}
+
+// ---------------------------------------------------------------------------
+// ThemeManager — singleton, persists to SharedPreferences, notifies listeners
+// ---------------------------------------------------------------------------
+
+class ThemeManager extends ChangeNotifier {
+  static const _prefsKey = 'theme_index';
+  static const _defaultIndex = 0; // Terminal Ink
+
+  static final ThemeManager instance = ThemeManager._();
+  ThemeManager._();
+
+  int _index = _defaultIndex;
+  int get index => _index;
+  ThemePreset get current => allPresets[_index];
+
+  Future<void> init() async {
+    final p = await SharedPreferences.getInstance();
+    final saved = p.getInt(_prefsKey);
+    if (saved != null && saved >= 0 && saved < allPresets.length) {
+      _index = saved;
+    }
+  }
+
+  Future<void> setIndex(int i) async {
+    if (i < 0 || i >= allPresets.length || i == _index) return;
+    _index = i;
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setInt(_prefsKey, i);
+  }
+
+  Future<void> setName(String name) async {
+    final i = allPresets.indexWhere((p) => p.name == name);
+    if (i >= 0) await setIndex(i);
+  }
+}
+
+/// Convenience accessor — same as `ThemeManager.instance.current`.
+ThemePreset get currentTheme => ThemeManager.instance.current;
+
+// ---------------------------------------------------------------------------
+// AppColors — dynamic getters that read from the active theme preset. Every
+// `AppColors.xxx` call site works unchanged; the value shifts when the user
+// picks a different theme.
+// ---------------------------------------------------------------------------
+
 class AppColors {
-  static const bg = Color(0xFF060707); // shell / sidebar
-  static const canvas = Color(0xFF0B0D0D); // desktop reading area (a hair up)
-  static const surface1 = Color(0xFF0D0F0F); // cards / popovers / sheets
-  static const surface2 = Color(0xFF151818); // inputs, chips
-  static const surface3 = Color(0xFF1D2120); // pressed / hover raise
+  // Surfaces
+  static Color get bg => currentTheme.bg;
+  static Color get canvas => currentTheme.canvas;
+  static Color get surface1 => currentTheme.surface1;
+  static Color get surface2 => currentTheme.surface2;
+  static Color get surface3 => currentTheme.surface3;
 
-  static const fg1 = Color(0xFFE8ECEA); // primary text
-  static const fg2 = Color(0xFFAAB2AE); // secondary text, icons
-  static const fg3 = Color(0xFF6C7370); // muted
-  static const fg4 = Color(0xFF565C59); // faint icons, disabled
+  // Foreground
+  static Color get fg1 => currentTheme.fg1;
+  static Color get fg2 => currentTheme.fg2;
+  static Color get fg3 => currentTheme.fg3;
+  static Color get fg4 => currentTheme.fg4;
 
-  static const border = Color(0x17FFFFFF); // hairline (white ~9%)
-  static const border2 = Color(0x24FFFFFF); // inputs (white ~14%)
+  // Borders
+  static Color get border => currentTheme.border;
+  static Color get border2 => currentTheme.border2;
 
-  // Amber accent — the "live" color; fills carry near-black text.
-  static const accent = Color(0xFFE0A458);
-  static const accentHover = Color(0xFFEBB470);
-  static const accentFg = Color(0xFF160E02);
-  static const accentBg = Color(0x26E0A458);
-  static const accentLine = Color(0x66E0A458);
-  static const accentRing = Color(0x4DE0A458);
+  // Accent
+  static Color get accent => currentTheme.accent;
+  static Color get accentHover => currentTheme.accentHover;
+  static Color get accentFg => currentTheme.accentFg;
+  static Color get accentBg => currentTheme.accentBg;
+  static Color get accentLine => currentTheme.accentLine;
+  static Color get accentRing => currentTheme.accentRing;
 
-  // Status: green = done/ok, amber = running/live, red = failed.
-  static const ok = Color(0xFF7BC49A);
-  static const okBg = Color(0x267BC49A);
-  static const run = Color(0xFFE0A458);
-  static const runBg = Color(0x26E0A458);
-  static const danger = Color(0xFFE86A6A);
-  static const dangerBg = Color(0x26E86A6A);
+  // Status
+  static Color get ok => currentTheme.ok;
+  static Color get okBg => currentTheme.okBg;
+  static Color get run => currentTheme.run;
+  static Color get runBg => currentTheme.runBg;
+  static Color get danger => currentTheme.danger;
+  static Color get dangerBg => currentTheme.dangerBg;
 
-  // diff line tints — real green/red, terminal-style.
-  static const diffAddBg = Color(0x1F7BC49A);
-  static const diffDelBg = Color(0x1FE86A6A);
-  static const diffAddFg = Color(0xFF9AD4B4);
-  static const diffDelFg = Color(0xFFF0A0A0);
-  static const diffGutter = Color(0xFF565C59);
+  // Diff
+  static Color get diffAddBg => currentTheme.diffAddBg;
+  static Color get diffDelBg => currentTheme.diffDelBg;
+  static Color get diffAddFg => currentTheme.diffAddFg;
+  static Color get diffDelFg => currentTheme.diffDelFg;
+  static Color get diffGutter => currentTheme.diffGutter;
 }
 
 /// Reading/content surfaces (chat, editor, file viewer, diff). Phones use ONE
@@ -51,102 +402,106 @@ class AppColors {
 /// screen); desktop keeps the lighter canvas against the darker sidebar.
 Color get readingBg => kMobile ? AppColors.bg : AppColors.canvas;
 
-// Terminal Ink, softened: crisp but friendly corners.
+// ---------------------------------------------------------------------------
+// Radius — crisp but friendly corners.
+// ---------------------------------------------------------------------------
+
 class R {
-  static const card = 14.0;
-  static const md = 10.0; // buttons, inputs, icon buttons
-  static const sm = 8.0; // menu items, list rows
-  static const xs = 6.0; // inner chips
-  static const sheetTop = 18.0;
+  static const card = 18.0;
+  static const md = 14.0;
+  static const sm = 10.0;
+  static const xs = 6.0;
+  static const sheetTop = 22.0;
 }
 
-/// Type helpers — Geist (modern, minimal sans) for prose + UI; Geist Mono only
-/// for genuinely technical text (commands, code, numbers, the rail). Everything
-/// regular (400): hierarchy comes from size and color, never boldness.
+// ---------------------------------------------------------------------------
+// Typography — Inter for UI (clean, readable at all sizes), Geist Mono for code.
+// ---------------------------------------------------------------------------
+
 FontWeight _cap(FontWeight w) => w.value > 400 ? FontWeight.w400 : w;
 
 TextStyle sans(double size,
         {FontWeight weight = FontWeight.w400,
         double? height,
         double? spacing,
-        Color color = AppColors.fg1}) =>
-    GoogleFonts.geist(
+        Color? color}) =>
+    GoogleFonts.inter(
       fontSize: size,
       fontWeight: _cap(weight),
-      height: height,
+      height: height ?? 1.5,
       letterSpacing: spacing,
-      color: color,
+      color: color ?? AppColors.fg1,
     );
 
-/// Large display titles (page headers) — same face, tighter tracking.
-TextStyle display(double size, {Color color = AppColors.fg1, double? height}) =>
-    GoogleFonts.geist(
+TextStyle display(double size, {Color? color, double? height}) =>
+    GoogleFonts.inter(
       fontSize: size,
       fontWeight: FontWeight.w400,
       height: height,
       letterSpacing: -0.3,
-      color: color,
+      color: color ?? AppColors.fg1,
     );
 
-// Code / mono font — Geist Mono (pairs with Geist; used only for code, commands,
-// numbers, the status rail — never prose).
 TextStyle mono(double size,
-        {FontWeight weight = FontWeight.w400,
-        double? height,
-        Color color = AppColors.fg1}) =>
-    GoogleFonts.geistMono(
+        {FontWeight weight = FontWeight.w400, double? height, Color? color}) =>
+    GoogleFonts.jetBrainsMono(
       fontSize: size,
       fontWeight: _cap(weight),
-      height: height,
-      color: color,
+      height: height ?? 1.45,
+      color: color ?? AppColors.fg1,
     );
 
-/// The code font family name (for widgets that need a raw family, e.g. re_editor).
-String get monoFamily => GoogleFonts.geistMono().fontFamily ?? 'monospace';
+String get monoFamily => GoogleFonts.jetBrainsMono().fontFamily ?? 'monospace';
+
+// ---------------------------------------------------------------------------
+// Material ThemeData — derived from the active palette.
+// ---------------------------------------------------------------------------
 
 ThemeData buildAppTheme() {
+  final c = currentTheme;
   final base = ThemeData(
     useMaterial3: true,
-    brightness: Brightness.dark,
-    colorScheme: const ColorScheme.dark(
-      surface: AppColors.bg,
-      primary: AppColors.accent,
-      error: AppColors.danger,
+    brightness:
+        c.bg.computeLuminance() > 0.18 ? Brightness.light : Brightness.dark,
+    colorScheme: ColorScheme(
+      brightness:
+          c.bg.computeLuminance() > 0.18 ? Brightness.light : Brightness.dark,
+      surface: c.bg,
+      primary: c.accent,
+      secondary: c.accent,
+      error: c.danger,
+      onSurface: c.fg1,
+      onPrimary: c.accentFg,
+      onSecondary: c.accentFg,
+      onError: Colors.white,
     ),
   );
   return base.copyWith(
-    scaffoldBackgroundColor: AppColors.bg,
-    canvasColor: AppColors.bg,
-    dividerColor: AppColors.border,
-    // Selection must be VISIBLE on near-black: a solid amber wash + amber
-    // handles (the M3 default was too faint to see what you'd grabbed).
-    textSelectionTheme: const TextSelectionThemeData(
-      selectionColor: Color(0x59E0A458), // ~35% amber
-      cursorColor: AppColors.accent,
-      selectionHandleColor: AppColors.accent,
+    scaffoldBackgroundColor: c.bg,
+    canvasColor: c.bg,
+    dividerColor: c.border,
+    textSelectionTheme: TextSelectionThemeData(
+      selectionColor: _withAlpha(c.accent, 0.35),
+      cursorColor: c.accent,
+      selectionHandleColor: c.accent,
     ),
-    splashColor: AppColors.surface3.withValues(alpha: 0.4),
-    highlightColor: AppColors.surface3.withValues(alpha: 0.3),
-    hoverColor: AppColors.surface3
-        .withValues(alpha: 0.35), // desktop hover raise on every InkWell
-    // Popovers/menus: surface1 card look everywhere (never default Material).
+    splashColor: c.surface3.withValues(alpha: 0.4),
+    highlightColor: c.surface3.withValues(alpha: 0.3),
+    hoverColor: c.surface3.withValues(alpha: 0.35),
     popupMenuTheme: PopupMenuThemeData(
-      color: AppColors.surface1,
+      color: c.surface1,
       elevation: 8,
       shadowColor: Colors.black54,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(R.md),
-          side: const BorderSide(color: AppColors.border2)),
+          side: BorderSide(color: c.border2)),
     ),
-    textTheme: _allRegular(GoogleFonts.geistTextTheme(base.textTheme)
-        .apply(bodyColor: AppColors.fg1, displayColor: AppColors.fg1)),
-    // Subtle dividers everywhere (incl. PopupMenuDivider) — no bright lines.
-    dividerTheme: const DividerThemeData(
-        color: AppColors.border, thickness: 1, space: 12),
+    textTheme: _allRegular(GoogleFonts.interTextTheme(base.textTheme)
+        .apply(bodyColor: c.fg1, displayColor: c.fg1)),
+    dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 12),
   );
 }
 
-/// Force every text style to regular weight (no >400 anywhere).
 TextTheme _allRegular(TextTheme t) {
   TextStyle? r(TextStyle? s) => s?.copyWith(fontWeight: FontWeight.w400);
   return t.copyWith(
@@ -168,10 +523,12 @@ TextTheme _allRegular(TextTheme t) {
   );
 }
 
-/// Map the app's icon names to Iconsax (linear) — outlined, borderless variants.
+// ---------------------------------------------------------------------------
+// Icon map
+// ---------------------------------------------------------------------------
+
 IconData iconFor(String name) {
   switch (name) {
-    // Directional chevrons: Material's bare glyphs (Iconsax's are circle/box-enclosed).
     case 'chevron-left':
       return Icons.chevron_left_rounded;
     case 'chevron-right':
@@ -187,7 +544,7 @@ IconData iconFor(String name) {
     case 'x':
       return Icons.close_rounded;
     case 'more-vertical':
-      return IconsaxPlusLinear.more;
+      return Icons.more_vert;
     case 'search':
       return IconsaxPlusLinear.search_normal_1;
     case 'settings':

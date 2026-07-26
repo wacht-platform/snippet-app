@@ -15,7 +15,12 @@ class EditorScreen extends StatefulWidget {
   final String path;
   final String name;
   final VoidCallback? onClose; // dismiss when hosted in a desktop panel
-  const EditorScreen({super.key, required this.client, required this.path, required this.name, this.onClose});
+  const EditorScreen(
+      {super.key,
+      required this.client,
+      required this.path,
+      required this.name,
+      this.onClose});
   @override
   State<EditorScreen> createState() => _EditorScreenState();
 }
@@ -46,7 +51,8 @@ class _EditorScreenState extends State<EditorScreen> {
   // Whether the file arrived with CRLF endings (restored on save).
   bool _crlf = false;
 
-  String _normalized(String s) => s.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+  String _normalized(String s) =>
+      s.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
   String _forSave() {
     final text = _normalized(_controller.text);
@@ -65,7 +71,9 @@ class _EditorScreenState extends State<EditorScreen> {
       if (!mounted) return;
       if (!f.editable) {
         setState(() {
-          _error = f.binary ? 'Binary file — not editable.' : 'File is too large to edit safely.';
+          _error = f.binary
+              ? 'Binary file — not editable.'
+              : 'File is too large to edit safely.';
           _loading = false;
         });
         return;
@@ -96,7 +104,8 @@ class _EditorScreenState extends State<EditorScreen> {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      final r = await widget.client.writeFile(widget.path, _forSave(), prevHash: force ? null : _hash);
+      final r = await widget.client
+          .writeFile(widget.path, _forSave(), prevHash: force ? null : _hash);
       if (!mounted) return;
       if (r['ok'] == true) {
         _initial = _normalized(_controller.text);
@@ -123,20 +132,29 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Future<void> _conflictSheet() async {
-    final choice = await showAppSheet<String>(context, title: 'File changed on disk', child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('This file was modified on the server since you opened it (likely by the agent). Keep your version, or reload theirs and lose your edits?',
-            style: sans(13, height: 1.45, color: AppColors.fg2)),
-        const SizedBox(height: 16),
-        Btn('Overwrite with mine', icon: 'check', onTap: () => Navigator.pop(context, 'overwrite')),
-        const SizedBox(height: 8),
-        Btn('Reload theirs', variant: BtnVariant.secondary, icon: 'refresh', onTap: () => Navigator.pop(context, 'reload')),
-        const SizedBox(height: 8),
-        Btn('Cancel', variant: BtnVariant.ghost, onTap: () => Navigator.pop(context)),
-      ],
-    ));
+    final choice = await showAppSheet<String>(context,
+        title: 'File changed on disk',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+                'This file was modified on the server since you opened it (likely by the agent). Keep your version, or reload theirs and lose your edits?',
+                style: sans(13, height: 1.45, color: AppColors.fg2)),
+            const SizedBox(height: 16),
+            Btn('Overwrite with mine',
+                icon: 'check',
+                onTap: () => Navigator.pop(context, 'overwrite')),
+            const SizedBox(height: 8),
+            Btn('Reload theirs',
+                variant: BtnVariant.secondary,
+                icon: 'refresh',
+                onTap: () => Navigator.pop(context, 'reload')),
+            const SizedBox(height: 8),
+            Btn('Cancel',
+                variant: BtnVariant.ghost, onTap: () => Navigator.pop(context)),
+          ],
+        ));
     if (choice == 'overwrite') {
       await _save(force: true);
     } else if (choice == 'reload') {
@@ -151,22 +169,30 @@ class _EditorScreenState extends State<EditorScreen> {
       _exit();
       return;
     }
-    final discard = await showAppSheet<bool>(context, title: 'Discard changes?', child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('You have unsaved edits to this file.', style: sans(13, color: AppColors.fg2)),
-        const SizedBox(height: 16),
-        Btn('Discard', variant: BtnVariant.danger, onTap: () => Navigator.pop(context, true)),
-        const SizedBox(height: 8),
-        Btn('Keep editing', variant: BtnVariant.secondary, onTap: () => Navigator.pop(context, false)),
-      ],
-    ));
+    final discard = await showAppSheet<bool>(context,
+        title: 'Discard changes?',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('You have unsaved edits to this file.',
+                style: sans(13, color: AppColors.fg2)),
+            const SizedBox(height: 16),
+            Btn('Discard',
+                variant: BtnVariant.danger,
+                onTap: () => Navigator.pop(context, true)),
+            const SizedBox(height: 8),
+            Btn('Keep editing',
+                variant: BtnVariant.secondary,
+                onTap: () => Navigator.pop(context, false)),
+          ],
+        ));
     if (discard == true && mounted) _exit();
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -183,25 +209,44 @@ class _EditorScreenState extends State<EditorScreen> {
               onBack: _maybePop,
               actions: [
                 if (!_loading && _error == null)
-                  IconBtn('check', tooltip: 'Save', active: _dirty, onTap: (_saving || !_dirty) ? null : () => _save()),
+                  IconBtn('check',
+                      tooltip: 'Save',
+                      active: _dirty,
+                      onTap: (_saving || !_dirty) ? null : () => _save()),
               ],
             ),
             if (_saving)
-              const LinearProgressIndicator(minHeight: 2, backgroundColor: AppColors.surface2, color: AppColors.accent),
+              LinearProgressIndicator(
+                  minHeight: 2,
+                  backgroundColor: AppColors.surface2,
+                  color: AppColors.accent),
             if (_loading)
-              const Expanded(child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3))))
+              Expanded(
+                  child: Center(
+                      child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppColors.fg3))))
             else if (_error != null)
-              Expanded(child: EmptyState(icon: 'file', title: "Can't edit", body: _error!))
+              Expanded(
+                  child: EmptyState(
+                      icon: 'file', title: "Can't edit", body: _error!))
             else
               Expanded(
                 child: CodeEditor(
                   controller: _controller,
                   wordWrap: false,
                   style: codeEditorStyle(widget.name),
-                  indicatorBuilder: (context, editingController, chunkController, notifier) {
+                  indicatorBuilder:
+                      (context, editingController, chunkController, notifier) {
                     return Row(children: [
-                      DefaultCodeLineNumber(controller: editingController, notifier: notifier),
-                      DefaultCodeChunkIndicator(width: 20, controller: chunkController, notifier: notifier),
+                      DefaultCodeLineNumber(
+                          controller: editingController, notifier: notifier),
+                      DefaultCodeChunkIndicator(
+                          width: 20,
+                          controller: chunkController,
+                          notifier: notifier),
                     ]);
                   },
                 ),

@@ -198,6 +198,7 @@ class _FileExplorerState extends State<FileExplorer> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -276,19 +277,18 @@ class _FileExplorerState extends State<FileExplorer> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 13),
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                             border: Border(
                                 bottom: BorderSide(color: AppColors.border))),
                         child: Row(children: [
-                          const AppIcon('edit',
-                              size: 16, color: AppColors.accent),
+                          AppIcon('edit', size: 16, color: AppColors.accent),
                           const SizedBox(width: 10),
                           Expanded(
                               child: Text('New chat in this folder',
                                   style: sans(13.5,
                                       weight: FontWeight.w600,
                                       color: AppColors.accent))),
-                          const AppIcon('arrow-right',
+                          AppIcon('arrow-right',
                               size: 15, color: AppColors.accent),
                         ]),
                       ),
@@ -298,11 +298,11 @@ class _FileExplorerState extends State<FileExplorer> {
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                         border: Border(
                             bottom: BorderSide(color: AppColors.border))),
                     child: Row(children: [
-                      const SizedBox(
+                      SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(
@@ -314,7 +314,7 @@ class _FileExplorerState extends State<FileExplorer> {
                 if (segs.isNotEmpty)
                   Container(
                     height: 40,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                         border: Border(
                             bottom: BorderSide(color: AppColors.border))),
                     child: SingleChildScrollView(
@@ -324,7 +324,7 @@ class _FileExplorerState extends State<FileExplorer> {
                         Text('/', style: mono(11.5, color: AppColors.fg4)),
                         for (var i = 0; i < segs.length; i++) ...[
                           if (i > 0)
-                            const Padding(
+                            Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 2),
                                 child: AppIcon('chevron-right',
                                     size: 13, color: AppColors.fg4)),
@@ -339,7 +339,7 @@ class _FileExplorerState extends State<FileExplorer> {
                   ),
                 Expanded(
                   child: snap.connectionState == ConnectionState.waiting
-                      ? const Center(
+                      ? Center(
                           child: SizedBox(
                               width: 22,
                               height: 22,
@@ -407,6 +407,7 @@ class _Row extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final isFile = icon == 'file';
     return Material(
       color: selected ? AppColors.accentBg : Colors.transparent,
@@ -429,13 +430,13 @@ class _Row extends StatelessWidget {
                     style: mono(13,
                         color: muted ? AppColors.fg3 : AppColors.fg1))),
             if (git) ...[
-              const AppIcon('git-branch', size: 12, color: AppColors.ok),
+              AppIcon('git-branch', size: 12, color: AppColors.ok),
               const SizedBox(width: 4),
               Text('git', style: mono(10.5, color: AppColors.fg3)),
               const SizedBox(width: 8),
             ],
             if (chevron)
-              const AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
           ]),
         ),
       ),
@@ -453,8 +454,7 @@ class _Row extends StatelessWidget {
               color: on ? AppColors.accent : AppColors.border2, width: 1.5),
         ),
         child: on
-            ? const Icon(Icons.check_rounded,
-                size: 12, color: AppColors.accentFg)
+            ? Icon(Icons.check_rounded, size: 12, color: AppColors.accentFg)
             : null,
       );
 }
@@ -561,6 +561,7 @@ class _FileViewerState extends State<FileViewer> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final f = _f;
     return Scaffold(
       backgroundColor: readingBg,
@@ -603,7 +604,7 @@ class _FileViewerState extends State<FileViewer> {
                       fit: BoxFit.contain,
                       loadingBuilder: (ctx, child, prog) => prog == null
                           ? child
-                          : const Center(
+                          : Center(
                               child: SizedBox(
                                   width: 22,
                                   height: 22,
@@ -621,7 +622,7 @@ class _FileViewerState extends State<FileViewer> {
           else if (_isVideo)
             Expanded(child: _VideoView(url: widget.client.fileUrl(widget.path)))
           else if (_loading)
-            const Expanded(
+            Expanded(
                 child: Center(
                     child: SizedBox(
                         width: 22,
@@ -644,7 +645,7 @@ class _FileViewerState extends State<FileViewer> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: AppColors.border))),
               child: Text(
                   '${f.content.split('\n').length} lines · ${formatBytes(f.size)}${f.truncated ? ' · truncated' : ''}',
@@ -755,13 +756,14 @@ class _VideoViewState extends State<_VideoView> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     if (_error != null) {
       return EmptyState(
           icon: 'alert-triangle', title: "Can't play video", body: _error!);
     }
     final ch = _chewie;
     if (ch == null) {
-      return const Center(
+      return Center(
           child: SizedBox(
               width: 22,
               height: 22,

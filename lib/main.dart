@@ -10,6 +10,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Theme: load persisted selection before first frame.
+  await ThemeManager.instance.init();
   // Notifications: foreground service on mobile, in-process /events watcher on
   // desktop (macOS/Linux). Tapping one is handled by the shell (it opens the
   // session in-place), so there's no separate full-screen route.
@@ -31,14 +33,18 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ThemeManager.instance.addListener(_onThemeChange);
     if (kCanNotify) reportForeground(true);
   }
 
   @override
   void dispose() {
+    ThemeManager.instance.removeListener(_onThemeChange);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
+  void _onThemeChange() => setState(() {});
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -55,7 +61,9 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: kMobile ? const WithForegroundTask(child: AdaptiveHome()) : const AdaptiveHome(),
+      home: kMobile
+          ? const WithForegroundTask(child: AdaptiveHome())
+          : const AdaptiveHome(),
     );
   }
 }

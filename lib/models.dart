@@ -52,7 +52,8 @@ class ModelProfile {
         contextWindow = (j['context_window'] as num?)?.toInt() ?? 0,
         reasoningEffort = j['reasoning_effort'] as String? ?? '',
         stream = j['stream'] == true,
-        supportsImages = j['supports_images'] is bool ? j['supports_images'] as bool : null;
+        supportsImages =
+            j['supports_images'] is bool ? j['supports_images'] as bool : null;
 
   /// Whether this profile is ready to use. Most providers need an API key, but
   /// ChatGPT authenticates via an OAuth login (no key), so a keyless chatgpt
@@ -275,7 +276,8 @@ class HarnessState {
   /// Merge a delta frame: scalars come from `d`; events are the existing log
   /// plus the appended `new_events`.
   HarnessState applyDelta(Map<String, dynamic> d) {
-    final base = HarnessState.fromJson(d); // scalars; events empty (delta omits them)
+    final base =
+        HarnessState.fromJson(d); // scalars; events empty (delta omits them)
     final added = ((d['new_events'] as List?) ?? const [])
         .map((e) => (e as Map).cast<String, dynamic>())
         .toList();
@@ -344,7 +346,8 @@ class GoalInfo {
   final String dir; // the agent's .snippet/goals/… workspace
   final String status; // active | paused | complete | cancelled
   final int autonomousTurns;
-  final int resumeAt; // unix secs a paused (rate-limited) goal can resume (0 = unknown)
+  final int
+      resumeAt; // unix secs a paused (rate-limited) goal can resume (0 = unknown)
   GoalInfo.fromJson(Map<String, dynamic> j)
       : text = j['text'] as String? ?? '',
         dir = j['dir'] as String? ?? '',
@@ -437,7 +440,8 @@ class GitStatus {
             .toList();
 
   List<GitFile> get staged => files.where((f) => f.staged).toList();
-  List<GitFile> get changed => files.where((f) => f.unstaged && !f.untracked).toList();
+  List<GitFile> get changed =>
+      files.where((f) => f.unstaged && !f.untracked).toList();
   List<GitFile> get untracked => files.where((f) => f.untracked).toList();
 }
 

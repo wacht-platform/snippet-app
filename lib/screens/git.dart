@@ -12,19 +12,28 @@ import '../widgets.dart';
 class GitScreen extends StatefulWidget {
   final DaemonClient client;
   final String sessionId;
+
   /// When set, git runs against this folder directly (no session needed) — used
   /// from the file explorer. Takes precedence over [sessionId].
   final String? folder;
+
   /// When hosted in a desktop panel, dismisses the panel from the root bar.
   final VoidCallback? onClose;
-  const GitScreen({super.key, required this.client, this.sessionId = '', this.folder, this.onClose});
+  const GitScreen(
+      {super.key,
+      required this.client,
+      this.sessionId = '',
+      this.folder,
+      this.onClose});
   @override
   State<GitScreen> createState() => _GitScreenState();
 }
 
 class _GitScreenState extends State<GitScreen> {
   // The git endpoints accept either a session id or a folder path.
-  String get _repo => (widget.folder != null && widget.folder!.isNotEmpty) ? widget.folder! : widget.sessionId;
+  String get _repo => (widget.folder != null && widget.folder!.isNotEmpty)
+      ? widget.folder!
+      : widget.sessionId;
   GitStatus? _st;
   bool _loading = true;
   bool _busy = false;
@@ -65,7 +74,8 @@ class _GitScreenState extends State<GitScreen> {
   }
 
   /// Run a write op, surface git's stderr on failure, then reload.
-  Future<void> _op(Future<Map<String, dynamic>> Function() f, {String? okMsg}) async {
+  Future<void> _op(Future<Map<String, dynamic>> Function() f,
+      {String? okMsg}) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
@@ -91,19 +101,23 @@ class _GitScreenState extends State<GitScreen> {
     final msg = await promptText(context,
         title: 'Commit', hint: 'Commit message', saveLabel: 'Commit');
     if (msg == null || msg.trim().isEmpty) return;
-    await _op(() => widget.client.gitCommit(_repo, msg.trim()), okMsg: 'Committed');
+    await _op(() => widget.client.gitCommit(_repo, msg.trim()),
+        okMsg: 'Committed');
   }
 
   void _openDiff(GitFile f) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _DiffView(
-        client: widget.client,
-        sessionId: _repo,
-        file: f.path,
-        staged: f.staged && !f.unstaged, // staged-only files show the index diff
-        untracked: f.untracked,
-      ),
-    ));
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _DiffView(
+            client: widget.client,
+            sessionId: _repo,
+            file: f.path,
+            staged: f.staged &&
+                !f.unstaged, // staged-only files show the index diff
+            untracked: f.untracked,
+          ),
+        ));
   }
 
   Future<void> _branchSheet() async {
@@ -116,44 +130,62 @@ class _GitScreenState extends State<GitScreen> {
     }
     if (!mounted) return;
     final (current, branches) = data;
-    await showAppSheet<void>(context, title: 'Branches', child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ...branches.map((b) => Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: AppCard(
-                padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-                onTap: b == current
-                    ? null
-                    : () {
-                        Navigator.pop(context);
-                        _op(() => widget.client.gitCheckout(_repo, b),
-                            okMsg: 'Switched to $b');
-                      },
-                child: Row(children: [
-                  AppIcon('git-branch', size: 15, color: b == current ? AppColors.accent : AppColors.fg3),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(b, style: mono(13, color: AppColors.fg1))),
-                  if (b == current) Text('current', style: sans(11, color: AppColors.accent)),
-                ]),
-              ),
-            )),
-        const SizedBox(height: 8),
-        Btn('New branch', icon: 'plus', variant: BtnVariant.secondary, full: true, onTap: () async {
-          Navigator.pop(context);
-          final name = await promptText(context, title: 'New branch', hint: 'branch name', saveLabel: 'Create');
-          if (name == null || name.trim().isEmpty) return;
-          await _op(() => widget.client.gitCheckout(_repo, name.trim(), create: true),
-              okMsg: 'Created ${name.trim()}');
-        }),
-        const SizedBox(height: 8),
-      ],
-    ));
+    await showAppSheet<void>(context,
+        title: 'Branches',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ...branches.map((b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: AppCard(
+                    padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+                    onTap: b == current
+                        ? null
+                        : () {
+                            Navigator.pop(context);
+                            _op(() => widget.client.gitCheckout(_repo, b),
+                                okMsg: 'Switched to $b');
+                          },
+                    child: Row(children: [
+                      AppIcon('git-branch',
+                          size: 15,
+                          color:
+                              b == current ? AppColors.accent : AppColors.fg3),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child:
+                              Text(b, style: mono(13, color: AppColors.fg1))),
+                      if (b == current)
+                        Text('current',
+                            style: sans(11, color: AppColors.accent)),
+                    ]),
+                  ),
+                )),
+            const SizedBox(height: 8),
+            Btn('New branch',
+                icon: 'plus',
+                variant: BtnVariant.secondary,
+                full: true, onTap: () async {
+              Navigator.pop(context);
+              final name = await promptText(context,
+                  title: 'New branch',
+                  hint: 'branch name',
+                  saveLabel: 'Create');
+              if (name == null || name.trim().isEmpty) return;
+              await _op(
+                  () => widget.client
+                      .gitCheckout(_repo, name.trim(), create: true),
+                  okMsg: 'Created ${name.trim()}');
+            }),
+            const SizedBox(height: 8),
+          ],
+        ));
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final st = _st;
     return Scaffold(
       body: SafeArea(
@@ -166,11 +198,22 @@ class _GitScreenState extends State<GitScreen> {
             actions: [IconBtn('refresh', onTap: _busy ? null : _load)],
           ),
           if (_busy)
-            const LinearProgressIndicator(minHeight: 2, backgroundColor: AppColors.surface2, color: AppColors.accent),
+            LinearProgressIndicator(
+                minHeight: 2,
+                backgroundColor: AppColors.surface2,
+                color: AppColors.accent),
           if (_loading)
-            const Expanded(child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3))))
+            Expanded(
+                child: Center(
+                    child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.fg3))))
           else if (_error != null && (st == null || !st.ok))
-            Expanded(child: EmptyState(icon: 'git-branch', title: 'No git here', body: _error!))
+            Expanded(
+                child: EmptyState(
+                    icon: 'git-branch', title: 'No git here', body: _error!))
           else
             Expanded(child: _body(st!)),
         ]),
@@ -183,22 +226,34 @@ class _GitScreenState extends State<GitScreen> {
       _header(st),
       Expanded(
         child: st.files.isEmpty
-            ? const EmptyState(icon: 'check-check', title: 'Working tree clean', body: 'No changes to commit.')
+            ? const EmptyState(
+                icon: 'check-check',
+                title: 'Working tree clean',
+                body: 'No changes to commit.')
             : ListView(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
                 children: [
                   if (st.staged.isNotEmpty) ...[
-                    _sectionHeader('Staged (${st.staged.length})', trailing: 'Unstage all', onTrailing: () => _op(() => widget.client.gitUnstage(_repo))),
+                    _sectionHeader('Staged (${st.staged.length})',
+                        trailing: 'Unstage all',
+                        onTrailing: () =>
+                            _op(() => widget.client.gitUnstage(_repo))),
                     ...st.staged.map((f) => _fileRow(f, staged: true)),
                     const SizedBox(height: 8),
                   ],
                   if (st.changed.isNotEmpty) ...[
-                    _sectionHeader('Changed (${st.changed.length})', trailing: 'Stage all', onTrailing: () => _op(() => widget.client.gitStage(_repo, all: true))),
+                    _sectionHeader('Changed (${st.changed.length})',
+                        trailing: 'Stage all',
+                        onTrailing: () => _op(
+                            () => widget.client.gitStage(_repo, all: true))),
                     ...st.changed.map((f) => _fileRow(f, staged: false)),
                     const SizedBox(height: 8),
                   ],
                   if (st.untracked.isNotEmpty) ...[
-                    _sectionHeader('Untracked (${st.untracked.length})', trailing: 'Stage all', onTrailing: () => _op(() => widget.client.gitStage(_repo, all: true))),
+                    _sectionHeader('Untracked (${st.untracked.length})',
+                        trailing: 'Stage all',
+                        onTrailing: () => _op(
+                            () => widget.client.gitStage(_repo, all: true))),
                     ...st.untracked.map((f) => _fileRow(f, staged: false)),
                   ],
                 ],
@@ -206,8 +261,14 @@ class _GitScreenState extends State<GitScreen> {
       ),
       if (st.staged.isNotEmpty)
         Padding(
-          padding: EdgeInsets.fromLTRB(14, 6, 14, 10 + MediaQuery.of(context).padding.bottom),
-          child: Btn('Commit ${st.staged.length} file${st.staged.length == 1 ? '' : 's'}', icon: 'check', full: true, disabled: _busy, onTap: _commit),
+          padding: EdgeInsets.fromLTRB(
+              14, 6, 14, 10 + MediaQuery.of(context).padding.bottom),
+          child: Btn(
+              'Commit ${st.staged.length} file${st.staged.length == 1 ? '' : 's'}',
+              icon: 'check',
+              full: true,
+              disabled: _busy,
+              onTap: _commit),
         ),
     ]);
   }
@@ -224,22 +285,43 @@ class _GitScreenState extends State<GitScreen> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const AppIcon('git-branch', size: 15, color: AppColors.accent),
+          AppIcon('git-branch', size: 15, color: AppColors.accent),
           const SizedBox(width: 8),
-          Expanded(child: Text(st.branch.isEmpty ? '(no branch)' : st.branch, style: mono(13.5, color: AppColors.fg1))),
+          Expanded(
+              child: Text(st.branch.isEmpty ? '(no branch)' : st.branch,
+                  style: mono(13.5, color: AppColors.fg1))),
           if (hasUp && st.ahead > 0) _miniChip('↑${st.ahead}', AppColors.ok),
           if (hasUp && st.behind > 0) _miniChip('↓${st.behind}', AppColors.run),
-          IconBtn('list', size: 34, iconSize: 16, tooltip: 'Branches', onTap: _busy ? null : _branchSheet),
+          IconBtn('list',
+              size: 34,
+              iconSize: 16,
+              tooltip: 'Branches',
+              onTap: _busy ? null : _branchSheet),
         ]),
-        if (hasUp) Padding(
-          padding: const EdgeInsets.only(top: 2, left: 23),
-          child: Text(st.upstream!, style: mono(10.5, color: AppColors.fg3)),
-        ),
+        if (hasUp)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, left: 23),
+            child: Text(st.upstream!, style: mono(10.5, color: AppColors.fg3)),
+          ),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: Btn('Pull', icon: 'refresh', small: true, variant: BtnVariant.secondary, disabled: _busy, onTap: () => _op(() => widget.client.gitPull(_repo), okMsg: 'Pulled'))),
+          Expanded(
+              child: Btn('Pull',
+                  icon: 'refresh',
+                  small: true,
+                  variant: BtnVariant.secondary,
+                  disabled: _busy,
+                  onTap: () => _op(() => widget.client.gitPull(_repo),
+                      okMsg: 'Pulled'))),
           const SizedBox(width: 8),
-          Expanded(child: Btn('Push', iconRight: 'arrow-right', small: true, variant: BtnVariant.secondary, disabled: _busy, onTap: () => _op(() => widget.client.gitPush(_repo), okMsg: 'Pushed'))),
+          Expanded(
+              child: Btn('Push',
+                  iconRight: 'arrow-right',
+                  small: true,
+                  variant: BtnVariant.secondary,
+                  disabled: _busy,
+                  onTap: () => _op(() => widget.client.gitPush(_repo),
+                      okMsg: 'Pushed'))),
         ]),
       ]),
     );
@@ -250,14 +332,23 @@ class _GitScreenState extends State<GitScreen> {
         child: Text(t, style: mono(12, weight: FontWeight.w600, color: c)),
       );
 
-  Widget _sectionHeader(String title, {String? trailing, VoidCallback? onTrailing}) => Padding(
+  Widget _sectionHeader(String title,
+          {String? trailing, VoidCallback? onTrailing}) =>
+      Padding(
         padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
         child: Row(children: [
-          Expanded(child: Text(title, style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3, spacing: 0.3))),
+          Expanded(
+              child: Text(title,
+                  style: sans(11.5,
+                      weight: FontWeight.w600,
+                      color: AppColors.fg3,
+                      spacing: 0.3))),
           if (trailing != null)
             GestureDetector(
               onTap: _busy ? null : onTrailing,
-              child: Text(trailing, style: sans(11.5, weight: FontWeight.w500, color: AppColors.accent)),
+              child: Text(trailing,
+                  style: sans(11.5,
+                      weight: FontWeight.w500, color: AppColors.accent)),
             ),
         ]),
       );
@@ -271,10 +362,19 @@ class _GitScreenState extends State<GitScreen> {
         padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
         onTap: () => _openDiff(f),
         child: Row(children: [
-          SizedBox(width: 16, child: Text(code, style: mono(13, weight: FontWeight.w700, color: c))),
+          SizedBox(
+              width: 16,
+              child: Text(code,
+                  style: mono(13, weight: FontWeight.w700, color: c))),
           const SizedBox(width: 8),
-          Expanded(child: Text(f.path, maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(12.5, color: AppColors.fg1))),
-          IconBtn(staged ? 'rotate' : 'plus', size: 34, iconSize: 16,
+          Expanded(
+              child: Text(f.path,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(12.5, color: AppColors.fg1))),
+          IconBtn(staged ? 'rotate' : 'plus',
+              size: 34,
+              iconSize: 16,
               tooltip: staged ? 'Unstage' : 'Stage',
               onTap: _busy
                   ? null
@@ -329,7 +429,9 @@ class _DiffViewState extends State<_DiffView> {
     try {
       // Untracked files aren't in the index; their full content shows as an add.
       final p = await widget.client.gitDiff(widget.sessionId,
-          file: widget.file, staged: widget.staged, untracked: widget.untracked);
+          file: widget.file,
+          staged: widget.staged,
+          untracked: widget.untracked);
       if (!mounted) return;
       setState(() {
         _patch = p;
@@ -347,6 +449,7 @@ class _DiffViewState extends State<_DiffView> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final name = widget.file.split('/').last;
     return Scaffold(
       backgroundColor: readingBg,
@@ -366,11 +469,27 @@ class _DiffViewState extends State<_DiffView> {
             ],
           ),
           if (_loading)
-            const Expanded(child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3))))
+            Expanded(
+                child: Center(
+                    child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.fg3))))
           else if (_error != null)
-            Expanded(child: EmptyState(icon: 'alert-triangle', title: 'Diff failed', body: _error!))
+            Expanded(
+                child: EmptyState(
+                    icon: 'alert-triangle',
+                    title: 'Diff failed',
+                    body: _error!))
           else if ((_patch ?? '').trim().isEmpty)
-            Expanded(child: EmptyState(icon: 'file', title: widget.untracked ? 'Untracked file' : 'No diff', body: widget.untracked ? 'New file — stage it to include it in the next commit.' : 'No changes to show for this view.'))
+            Expanded(
+                child: EmptyState(
+                    icon: 'file',
+                    title: widget.untracked ? 'Untracked file' : 'No diff',
+                    body: widget.untracked
+                        ? 'New file — stage it to include it in the next commit.'
+                        : 'No changes to show for this view.'))
           else
             Expanded(child: _diffBody(_patch!)),
         ]),
@@ -408,14 +527,18 @@ class _DiffViewState extends State<_DiffView> {
       fg = AppColors.diffDelFg;
     } else if (line.startsWith('@@')) {
       fg = AppColors.accent;
-    } else if (line.startsWith('diff ') || line.startsWith('index ') || line.startsWith('+++') || line.startsWith('---')) {
+    } else if (line.startsWith('diff ') ||
+        line.startsWith('index ') ||
+        line.startsWith('+++') ||
+        line.startsWith('---')) {
       fg = AppColors.fg4;
     }
     return Container(
       width: double.infinity,
       color: bg,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
-      child: Text(line.isEmpty ? ' ' : line, style: mono(12, height: 1.4, color: fg)),
+      child: Text(line.isEmpty ? ' ' : line,
+          style: mono(12, height: 1.4, color: fg)),
     );
   }
 }

@@ -32,7 +32,9 @@ Future<T?> presentScreen<T>(
         final top = kMacOS ? kMacTitlebar : 0.0;
         if (!wide) {
           // Full-screen (re-lays out to drawer/dialog if the window grows).
-          return Padding(padding: EdgeInsets.only(top: top), child: _frame(content, rounded: false, edge: false));
+          return Padding(
+              padding: EdgeInsets.only(top: top),
+              child: _frame(content, rounded: false, edge: false));
         }
         if (style == PanelStyle.dialog) {
           return Padding(
@@ -40,7 +42,10 @@ Future<T?> presentScreen<T>(
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1040, maxHeight: 860), child: _frame(content, rounded: true)),
+                child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxWidth: 1040, maxHeight: 860),
+                    child: _frame(content, rounded: true)),
               ),
             ),
           );
@@ -49,7 +54,10 @@ Future<T?> presentScreen<T>(
           padding: EdgeInsets.only(top: top),
           child: Align(
             alignment: Alignment.centerRight,
-            child: SizedBox(width: c.maxWidth < 500 ? c.maxWidth : 460.0, height: double.infinity, child: _frame(content, rounded: false, edge: true)),
+            child: SizedBox(
+                width: c.maxWidth < 500 ? c.maxWidth : 460.0,
+                height: double.infinity,
+                child: _frame(content, rounded: false, edge: true)),
           ),
         );
       });
@@ -59,11 +67,14 @@ Future<T?> presentScreen<T>(
       if (style == PanelStyle.dialog) {
         return FadeTransition(
           opacity: curved,
-          child: ScaleTransition(scale: Tween(begin: 0.98, end: 1.0).animate(curved), child: child),
+          child: ScaleTransition(
+              scale: Tween(begin: 0.98, end: 1.0).animate(curved),
+              child: child),
         );
       }
       return SlideTransition(
-        position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(curved),
+        position:
+            Tween(begin: const Offset(1, 0), end: Offset.zero).animate(curved),
         child: child,
       );
     },
@@ -83,7 +94,8 @@ Future<T?> showModal<T>(
   final view = View.of(context);
   final windowWidth = view.physicalSize.width / view.devicePixelRatio;
   if (windowWidth < kDesktopBreakpoint) {
-    return Navigator.of(context).push<T>(MaterialPageRoute(builder: (_) => child));
+    return Navigator.of(context)
+        .push<T>(MaterialPageRoute(builder: (_) => child));
   }
   return showGeneralDialog<T>(
     context: context,
@@ -104,7 +116,8 @@ Future<T?> showModal<T>(
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
       return FadeTransition(
         opacity: curved,
-        child: ScaleTransition(scale: Tween(begin: 0.98, end: 1.0).animate(curved), child: child),
+        child: ScaleTransition(
+            scale: Tween(begin: 0.98, end: 1.0).animate(curved), child: child),
       );
     },
   );
@@ -126,7 +139,7 @@ Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
         borderRadius: rounded ? BorderRadius.circular(R.card) : null,
         border: rounded
             ? Border.all(color: AppColors.border2)
-            : (edge ? const Border(left: BorderSide(color: AppColors.border)) : null),
+            : (edge ? Border(left: BorderSide(color: AppColors.border)) : null),
       ),
       child: !panel
           ? child

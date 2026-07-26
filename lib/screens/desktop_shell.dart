@@ -231,7 +231,7 @@ class _DesktopShellState extends State<DesktopShell> {
               ),
             ]),
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
           _tabMenuItem(ctx, 'x', 'Close tab', () => _closeTab(i)),
           if (_tabs.length > 1)
             _tabMenuItem(
@@ -544,10 +544,11 @@ class _DesktopShellState extends State<DesktopShell> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     if (_loading) {
       return Scaffold(
         backgroundColor: readingBg,
-        body: const Center(
+        body: Center(
             child: SizedBox(
                 width: 22,
                 height: 22,
@@ -604,8 +605,7 @@ class _DesktopShellState extends State<DesktopShell> {
         body: SafeArea(
           child: Row(children: [
             SizedBox(width: 300, child: _sidebar()),
-            const VerticalDivider(
-                width: 1, thickness: 1, color: AppColors.border),
+            VerticalDivider(width: 1, thickness: 1, color: AppColors.border),
             Expanded(child: _mainPane()),
           ]),
         ),
@@ -700,7 +700,7 @@ class _DesktopShellState extends State<DesktopShell> {
     // row and its leading menu button need a full, comfortable touch target.
     return Container(
       height: kMobile ? 56 : 40,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -772,7 +772,7 @@ class _DesktopShellState extends State<DesktopShell> {
           GestureDetector(
             onTap: () => _closeTab(i),
             behavior: HitTestBehavior.opaque,
-            child: const Padding(
+            child: Padding(
               padding: EdgeInsets.all(5),
               child: AppIcon('x', size: 11, color: AppColors.fg4),
             ),
@@ -805,7 +805,7 @@ class _DesktopShellState extends State<DesktopShell> {
                   style: sans(12.5, height: 1.4, color: AppColors.fg3)),
               const SizedBox(height: 18),
               if (_sessionsLoading && _sessions == null)
-                const Center(
+                Center(
                     child: Padding(
                         padding: EdgeInsets.all(16),
                         child: SizedBox(
@@ -889,7 +889,7 @@ class _DesktopShellState extends State<DesktopShell> {
                         color: AppColors.surface2,
                         borderRadius: BorderRadius.circular(R.card),
                         border: Border.all(color: AppColors.border)),
-                    child: const AppIcon('cpu', size: 24, color: AppColors.fg3),
+                    child: AppIcon('cpu', size: 24, color: AppColors.fg3),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -937,6 +937,7 @@ class _KeepAliveState extends State<_KeepAlive>
   bool get wantKeepAlive => true;
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     super.build(context);
     return widget.child;
   }
@@ -992,6 +993,38 @@ class _SidebarState extends State<_Sidebar> {
   List<SessionInfo>? get _sessions => widget.sessions;
   bool get _loading => widget.sessionsLoading;
 
+  void _showFilterSheet() {
+    final counts = <String, int>{
+      'all': widget.sessions?.length ?? 0,
+      'input': widget.sessions?.where((s) => s.status == 'waiting_for_input').length ?? 0,
+      'running': widget.sessions?.where((s) => s.status == 'running').length ?? 0,
+      'done': widget.sessions?.where((s) => s.status != 'waiting_for_input' && s.status != 'running').length ?? 0,
+    };
+    showAppSheet(context,
+        title: 'Filter conversations',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (val, label) in [('all', 'All'), ('input', 'Needs input'), ('running', 'Running'), ('done', 'Done')]) ...[
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(label, style: sans(16, color: _filter == val ? AppColors.accent : AppColors.fg1)),
+                trailing: Text('${counts[val] ?? 0}',
+                    style: sans(14, color: AppColors.fg3)),
+                onTap: () {
+                  setState(() => _filter = val);
+                  Navigator.pop(context);
+                },
+              ),
+              if (val != 'done')
+                Divider(height: 1, color: AppColors.border),
+            ],
+          ],
+        ),
+      );
+  }
+
   void _openSearch() {
     showCommandPalette(
       context,
@@ -1020,37 +1053,192 @@ class _SidebarState extends State<_Sidebar> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final hasClient = widget.client != null;
     return Container(
       color: AppColors.bg, // shell surface — darker than the chat canvas
-      child: Column(children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         SizedBox(
             height:
                 kMacOS ? kMacTitlebar + 6 : 10), // clear the window controls
-        _machineHeader(),
-        _navRow('search', 'Search', onTap: hasClient ? _openSearch : null),
-        // Browse doubles as the new-chat entry point ("New chat here" in a folder).
-        _navRow('folder', 'Browse',
-            sub: 'files · new chat',
-            onTap: hasClient ? widget.onNewSession : null),
-        const SizedBox(height: 4),
-        // Pinned above the list (phones): only the grouped sessions below scroll.
-        if (kMobile && hasClient && (widget.sessions?.isNotEmpty ?? false))
-          Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
-              child: _filterChips(widget.sessions!)),
-        Expanded(
-          child: !hasClient
-              ? Center(
-                  child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text('Add a machine to begin.',
-                          textAlign: TextAlign.center,
-                          style: sans(12.5, color: AppColors.fg4))))
-              : _sessionList(),
+        if (kMobile) ...[
+          // Mobile: full-height conversations list with the machine row at the bottom.
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              // Conversations section header with filter icon.
+              if (hasClient && (_sessions?.isNotEmpty ?? false))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                  child: Row(children: [
+                    Text('Conversations',
+                        style: sans(20,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: _showFilterSheet,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(Icons.filter_list_rounded,
+                            size: 20,
+                            color: _filter != 'all'
+                                ? AppColors.accent
+                                : AppColors.fg3),
+                      ),
+                    ),
+                  ]),
+                ),
+              Expanded(
+                child: !hasClient
+                    ? Center(
+                        child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Text('Add a machine to begin.',
+                                textAlign: TextAlign.center,
+                                style: sans(12.5, color: AppColors.fg4))))
+                    : _sessionList(),
+              ),
+            ]),
+          ),
+          // Bottom actions row: search + folder + settings + machine avatar.
+          _mobileBottomBar(),
+        ],
+        if (!kMobile) ...[
+          _machineHeader(),
+          // Desktop: nav rows above the session list.
+          _navRow('search', 'Search', onTap: hasClient ? _openSearch : null),
+          _navRow('folder', 'Browse',
+              sub: 'files · new chat',
+              onTap: hasClient ? widget.onNewSession : null),
+          const SizedBox(height: 4),
+          Expanded(
+            child: !hasClient
+                ? Center(
+                    child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text('Add a machine to begin.',
+                            textAlign: TextAlign.center,
+                            style: sans(12.5, color: AppColors.fg4))))
+                : _sessionList(),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  /// Grok-style "Browse" card at the top of the mobile drawer.
+  Widget _browseCard() {
+    return Material(
+      color: AppColors.surface2,
+      borderRadius: BorderRadius.circular(R.card),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.card),
+        onTap: widget.client != null ? widget.onNewSession : null,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(R.card),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface3,
+                borderRadius: BorderRadius.circular(R.sm),
+              ),
+              child: AppIcon('folder', size: 16, color: AppColors.fg2),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Browse',
+                        style: sans(14,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const SizedBox(height: 1),
+                    Text('files · new chat',
+                        style: sans(11.5, color: AppColors.fg4)),
+                  ]),
+            ),
+            AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+          ]),
         ),
-        // Settings lives in the machine header (gear, top right) on both
-        // form factors.
+      ),
+    );
+  }
+
+  /// Bottom bar on mobile: full-width search pill + settings + new-chat.
+  Widget _mobileBottomBar() {
+    final hasClient = widget.client != null;
+    final a = widget.active;
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          12, 8, 12, kMobile ? 20 : 8), // safe-area-ish bottom padding
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+      ),
+      child: Row(children: [
+        // Search pill.
+        Expanded(
+          child: GestureDetector(
+            onTap: hasClient ? _openSearch : null,
+            child: Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(children: [
+                AppIcon('search', size: 16, color: AppColors.fg4),
+                const SizedBox(width: 8),
+                Text('Search…', style: sans(13.5, color: AppColors.fg4)),
+              ]),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconBtn('folder',
+            size: 38,
+            iconSize: 19,
+            tooltip: 'Browse',
+            onTap: hasClient ? widget.onNewSession : null),
+        const SizedBox(width: 2),
+        IconBtn('settings',
+            size: 38,
+            iconSize: 19,
+            tooltip: 'Settings',
+            onTap: hasClient ? _openSettings : null),
+        const SizedBox(width: 2),
+        // Small machine avatar — tap to switch machines.
+        GestureDetector(
+          onTap: hasClient
+              ? (widget.instances.isEmpty ? widget.onAddInstance : _openMachines)
+              : null,
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.surface2,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.border, width: 1),
+            ),
+            alignment: Alignment.center,
+            child: a == null
+                ? AppIcon('plus', size: 14, color: AppColors.fg2)
+                : Text(
+                    (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
+                    style: sans(13,
+                        weight: FontWeight.w600, color: AppColors.fg1),
+                  ),
+          ),
+        ),
       ]),
     );
   }
@@ -1141,7 +1329,7 @@ class _SidebarState extends State<_Sidebar> {
 
   Widget _sessionList() {
     if (_loading && _sessions == null) {
-      return const Center(
+      return Center(
           child: SizedBox(
               width: 20,
               height: 20,
@@ -1156,7 +1344,7 @@ class _SidebarState extends State<_Sidebar> {
             child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const AppIcon('wifi-off', size: 20, color: AppColors.fg4),
+                  AppIcon('wifi-off', size: 20, color: AppColors.fg4),
                   const SizedBox(height: 10),
                   Text(widget.sessionsError!,
                       textAlign: TextAlign.center,
@@ -1182,22 +1370,21 @@ class _SidebarState extends State<_Sidebar> {
       final b = _bucket(s.lastActive);
       if (b != bucket) {
         bucket = b;
-        // Quieter, smaller bucket labels on desktop (flat thread list).
-        children.add(kMobile
-            ? Padding(
-                padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
-                child: SectionLabel(b))
-            : Padding(
-                padding: const EdgeInsets.fromLTRB(10, 16, 4, 4),
-                child: Text(b,
-                    style: sans(10.5,
-                        weight: FontWeight.w500,
-                        spacing: 0.4,
-                        color: AppColors.fg4))));
+        // Mobile: no per-bucket labels — the "Conversations" header above is
+        // the single section label. Desktop keeps recency bucket labels.
+        if (!kMobile) {
+          children.add(Padding(
+              padding: const EdgeInsets.fromLTRB(10, 16, 4, 4),
+              child: Text(b,
+                  style: sans(10.5,
+                      weight: FontWeight.w500,
+                      spacing: 0.4,
+                      color: AppColors.fg4))));
+        }
       }
       children.add(kMobile
           ? Padding(
-              padding: const EdgeInsets.only(bottom: 8), child: _sessionCard(s))
+              padding: const EdgeInsets.only(bottom: 2), child: _sessionCard(s))
           : Padding(
               padding: const EdgeInsets.only(bottom: 1),
               child: _sessionRow(s)));
@@ -1210,7 +1397,7 @@ class _SidebarState extends State<_Sidebar> {
               style: sans(12.5, color: AppColors.fg4))));
     }
     final listView = ListView(
-        padding: EdgeInsets.fromLTRB(kMobile ? 12 : 8, 2, kMobile ? 12 : 8, 12),
+        padding: EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
         children: children);
     // Phones: the natural refresh gesture. Desktop keeps the header button.
     if (!kMobile) return listView;
@@ -1310,82 +1497,60 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   Widget _sessionCard(SessionInfo s) {
-    final selected = s.id == widget.selectedSessionId;
-    final (Color dot, String word) = switch (s.status) {
-      'running' => (AppColors.run, 'Running'),
-      'waiting_for_input' => (AppColors.accent, 'Needs input'),
-      'completed' => (AppColors.fg3, 'Done'),
-      'failed' => (AppColors.fg3, 'Failed'),
-      _ => (AppColors.fg3, 'Idle'),
-    };
-    final folder = lastPathSegment(s.folder, ifEmpty: '');
-    final statusSize = kMobile ? 12.5 : 11.5;
-    return Material(
-      color: selected ? AppColors.accentBg : AppColors.surface1,
-      borderRadius: BorderRadius.circular(R.card),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.card),
-        onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
-        onLongPress: () => _sessionActions(s),
-        onSecondaryTap: () => _sessionActions(s),
-        child: Container(
-          padding: EdgeInsets.all(kMobile ? 16 : 13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(
-                color: selected ? AppColors.accentLine : AppColors.border),
-          ),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(
-                  child: Text(s.title.isEmpty ? '(untitled)' : s.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(_rowTitle, color: AppColors.fg1))),
-              const SizedBox(width: 8),
-              Text(relativeTime(s.lastActive),
-                  style: mono(_rowTime, color: AppColors.fg4)),
-            ]),
-            const SizedBox(height: 6),
-            Row(children: [
-              Container(
-                  width: 7,
-                  height: 7,
-                  decoration:
-                      BoxDecoration(color: dot, shape: BoxShape.circle)),
-              const SizedBox(width: 7),
-              Text(word, style: sans(statusSize, color: dot)),
-              if (folder.isNotEmpty)
-                Flexible(
-                    child: Text('  ·  $folder',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(statusSize, color: AppColors.fg4))),
-              if ((s.profile ?? '').isNotEmpty)
-                Flexible(
-                    child: Text('  ·  ${s.profile}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: mono(statusSize - 1.5, color: AppColors.fg4))),
-            ]),
-            if (s.status == 'waiting_for_input') ...[
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(12)),
-                child: Text(
-                    'Snippet is waiting on your answer — open to respond.',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(statusSize, height: 1.4, color: AppColors.fg2)),
-              ),
-            ],
-          ]),
+    final running = s.status == 'running';
+    final waiting = s.status == 'waiting_for_input';
+    return GestureDetector(
+      onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
+      onLongPress: () => _sessionActions(s),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(14),
         ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                  Text(
+                  s.title.isEmpty ? '(untitled)' : s.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(16, color: AppColors.fg1),
+                ),
+                const SizedBox(height: 4),
+                Row(children: [
+                  Text(relativeTime(s.lastActive),
+                      style: sans(12, color: AppColors.fg4)),
+                  if (s.folder.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Text(s.folder,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(11, color: AppColors.fg3)),
+                  ],
+                ]),
+              ],
+            ),
+          ),
+          if (running || waiting) ...[
+            const SizedBox(width: 8),
+            Container(
+              width: 8, height: 8,
+              decoration: BoxDecoration(
+                color: running ? AppColors.run : AppColors.accent,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
+          const SizedBox(width: 8),
+          IconBtn('more-vertical',
+              size: 28, iconSize: 16,
+              tooltip: 'Options',
+              onTap: () => _sessionActions(s)),
+        ]),
       ),
     );
   }
@@ -1497,21 +1662,90 @@ class _SidebarState extends State<_Sidebar> {
     final a = widget.active;
     final ok = a == null ? null : widget.health[a.url];
     final hasClient = widget.client != null;
+    // Mobile: Grok-style profile row with avatar circle + name + host + chevron.
+    if (kMobile) {
+      return Material(
+        key: _machineKey,
+        color: Colors.transparent,
+        child: InkWell(
+          onTap:
+              widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(children: [
+              // Avatar circle — first letter of the machine name.
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.border, width: 1),
+                ),
+                alignment: Alignment.center,
+                child: a == null
+                    ? AppIcon('plus', size: 18, color: AppColors.fg2)
+                    : Text(
+                        (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
+                        style: sans(17,
+                            weight: FontWeight.w600, color: AppColors.fg1),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: a == null
+                    ? Text('Add machine', style: sans(15, color: AppColors.fg1))
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(a.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(15,
+                                  weight: FontWeight.w600,
+                                  color: AppColors.fg1)),
+                          const SizedBox(height: 2),
+                          Row(children: [
+                            Container(
+                                width: 7,
+                                height: 7,
+                                decoration: BoxDecoration(
+                                    color: ok == true
+                                        ? AppColors.ok
+                                        : AppColors.fg4,
+                                    shape: BoxShape.circle)),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(hostOf(a.url),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: mono(11, color: AppColors.fg4)),
+                            ),
+                          ]),
+                        ],
+                      ),
+              ),
+              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+      );
+    }
+    // Desktop: original compact header.
     return Material(
       key: _machineKey,
       color: Colors.transparent,
       child: InkWell(
         onTap: widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
         child: Padding(
-          padding:
-              EdgeInsets.fromLTRB(16, kMobile ? 14 : 12, 8, kMobile ? 14 : 12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
           child: Row(children: [
             Expanded(
               child: a == null
                   ? Row(children: [
-                      const AppIcon('plus', size: 18, color: AppColors.fg1),
+                      AppIcon('plus', size: 18, color: AppColors.fg1),
                       const SizedBox(width: 9),
-                      Text('Add machine', style: display(kMobile ? 20 : 17)),
+                      Text('Add machine', style: display(17)),
                     ])
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1521,7 +1755,7 @@ class _SidebarState extends State<_Sidebar> {
                               child: Text(a.label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: display(kMobile ? 20 : 17))),
+                                  style: display(17))),
                           const SizedBox(width: 8),
                           Container(
                               width: 8,
@@ -1531,7 +1765,7 @@ class _SidebarState extends State<_Sidebar> {
                                       ok == true ? AppColors.ok : AppColors.fg4,
                                   shape: BoxShape.circle)),
                           const SizedBox(width: 6),
-                          const AppIcon('chevron-down',
+                          AppIcon('chevron-down',
                               size: 16, color: AppColors.fg3),
                         ]),
                         const SizedBox(height: 2),
@@ -1550,8 +1784,8 @@ class _SidebarState extends State<_Sidebar> {
                 onTap:
                     hasClient && !_loading ? widget.onRefreshSessions : null),
             IconBtn('settings',
-                size: kMobile ? 38 : 30,
-                iconSize: kMobile ? 19 : 15,
+                size: 30,
+                iconSize: 15,
                 tooltip: 'Settings',
                 onTap: hasClient ? _openSettings : null),
           ]),
@@ -1712,12 +1946,13 @@ class _MachineListState extends State<_MachineList> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ...widget.instances.map(_row),
-          const Divider(height: 13, thickness: 1, color: AppColors.border),
+          Divider(height: 13, thickness: 1, color: AppColors.border),
           _addRow(),
         ]);
   }
@@ -1758,8 +1993,7 @@ class _MachineListState extends State<_MachineList> {
                   style: mono(kMobile ? 11 : 10, color: AppColors.fg4)),
             ]),
           ),
-          if (selected)
-            const AppIcon('check', size: 14, color: AppColors.accent),
+          if (selected) AppIcon('check', size: 14, color: AppColors.accent),
           IconBtn('more-vertical', size: 30, iconSize: 15, tooltip: 'Manage',
               onTap: () {
             Navigator.pop(context);
@@ -1780,7 +2014,7 @@ class _MachineListState extends State<_MachineList> {
         padding:
             EdgeInsets.fromLTRB(14, kMobile ? 11 : 8, 14, kMobile ? 11 : 8),
         child: Row(children: [
-          const AppIcon('plus', size: 15, color: AppColors.accent),
+          AppIcon('plus', size: 15, color: AppColors.accent),
           const SizedBox(width: 10),
           Text('Add machine',
               style: sans(kMobile ? 14 : 12.5,
@@ -1867,6 +2101,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -1874,33 +2109,88 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           SnAppBar(title: 'Settings', onBack: widget.onClose),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               children: [
-                const SectionLabel('Instances'),
-                const SizedBox(height: 6),
-                ..._instances.map(_instanceRow),
-                const SizedBox(height: 16),
-                const SectionLabel('Configuration'),
-                const SizedBox(height: 6),
-                _tile(
-                    'cpu',
-                    'Models',
-                    'Providers & active model',
-                    () => presentScreen(context,
-                        builder: (_, close) => ModelsScreen(
-                            client: widget.client, onClose: close))),
-                const SizedBox(height: 6),
-                _tile(
-                    'key',
-                    'Vault',
-                    'Secrets the agent can use but never see',
-                    () => presentScreen(context,
-                        builder: (_, close) => VaultScreen(
-                            client: widget.client, onClose: close))),
-                if (kCanNotify) ...[
-                  const SizedBox(height: 6),
-                  _notifTile(),
-                ],
+                // Grok-style: Instances section with card grouping.
+                Text('Instances',
+                    style: sans(12,
+                        weight: FontWeight.w500, color: AppColors.fg3)),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(R.card),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _instances.length; i++) ...[
+                        _instanceRow(_instances[i]),
+                        if (i < _instances.length - 1)
+                          Divider(
+                              height: 1, indent: 48, color: AppColors.border),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // Grok-style: Configuration section.
+                Text('Configuration',
+                    style: sans(12,
+                        weight: FontWeight.w500, color: AppColors.fg3)),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(R.card),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      _configTile(
+                          'cpu',
+                          'Models',
+                          'Providers & active model',
+                          () => presentScreen(context,
+                              builder: (_, close) => ModelsScreen(
+                                  client: widget.client, onClose: close))),
+                      Divider(height: 1, indent: 48, color: AppColors.border),
+                      _configTile(
+                          'key',
+                          'Vault',
+                          'Secrets the agent can use',
+                          () => presentScreen(context,
+                              builder: (_, close) => VaultScreen(
+                                  client: widget.client, onClose: close))),
+                      if (kCanNotify) ...[
+                        Divider(height: 1, indent: 48, color: AppColors.border),
+                        _notifTile(),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                // Grok-style: Appearance section.
+                Text('Appearance',
+                    style: sans(12,
+                        weight: FontWeight.w500, color: AppColors.fg3)),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(R.card),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      _configTile(
+                          'sliders',
+                          'Appearance',
+                          ThemeManager.instance.current.label,
+                          () => showThemePicker(context)),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -1911,87 +2201,131 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   Widget _instanceRow(Instance i) {
     final isActive = i.url == widget.active?.url;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 9, 4, 9),
-        decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(R.md)),
-        child: Row(children: [
-          Container(
-              width: 6,
-              height: 6,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {},
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(children: [
+            Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    color: AppColors.surface3,
+                    borderRadius: BorderRadius.circular(R.sm)),
+                child: AppIcon('cpu',
+                    size: 15,
+                    color: isActive ? AppColors.accent : AppColors.fg3)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(i.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(14, color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Text(hostOf(i.url),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: mono(11, color: AppColors.fg4)),
+                  ]),
+            ),
+            if (isActive)
+              Icon(Icons.check_circle_rounded,
+                  size: 18, color: AppColors.accent),
+            IconBtn('trash',
+                size: 32,
+                iconSize: 16,
+                tooltip: 'Remove',
+                onTap: () => _confirmRemove(i)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _configTile(
+      String icon, String label, String sub, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                  color: isActive ? AppColors.accent : AppColors.fg4,
-                  shape: BoxShape.circle)),
-          const SizedBox(width: 10),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(i.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, color: AppColors.fg1)),
-              const SizedBox(height: 1),
-              Text(hostOf(i.url),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(10.5, color: AppColors.fg4)),
-            ]),
-          ),
-          IconBtn('trash',
-              size: 32,
-              iconSize: 16,
-              tooltip: 'Remove',
-              onTap: () => _confirmRemove(i)),
-        ]),
+                  color: AppColors.surface3,
+                  borderRadius: BorderRadius.circular(R.sm)),
+              child: AppIcon(icon, size: 15, color: AppColors.fg2),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: sans(14, color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Text(sub, style: sans(12, color: AppColors.fg4)),
+                  ]),
+            ),
+            AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+          ]),
+        ),
       ),
     );
   }
 
   Widget _notifTile() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
-      decoration: BoxDecoration(
-          color: AppColors.surface2, borderRadius: BorderRadius.circular(R.md)),
-      child: Row(children: [
-        Container(
-          width: 30,
-          height: 30,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-              color: AppColors.surface3,
-              borderRadius: BorderRadius.circular(R.sm)),
-          child: const AppIcon('zap', size: 15, color: AppColors.fg2),
-        ),
-        const SizedBox(width: 11),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Notifications', style: sans(13, color: AppColors.fg1)),
-            const SizedBox(height: 1),
-            Text('Alert when a session needs input or finishes',
-                style: sans(11, color: AppColors.fg4)),
-          ]),
-        ),
-        _notifBusy
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg3))
-            : Transform.scale(
-                scale: 0.78,
-                child: Switch(
-                  value: _notif,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  activeThumbColor: AppColors.accentFg,
-                  activeTrackColor: AppColors.accent,
-                  onChanged: _toggleNotif,
+    return Material(
+      color: Colors.transparent,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(children: [
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: AppColors.surface3,
+                borderRadius: BorderRadius.circular(R.sm)),
+            child: AppIcon('zap', size: 15, color: AppColors.fg2),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Notifications', style: sans(14, color: AppColors.fg1)),
+              const SizedBox(height: 2),
+              Text('Alert when a session needs input',
+                  style: sans(12, color: AppColors.fg4)),
+            ]),
+          ),
+          _notifBusy
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.fg3))
+              : Transform.scale(
+                  scale: 0.78,
+                  child: Switch(
+                    value: _notif,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    activeThumbColor: AppColors.accentFg,
+                    activeTrackColor: AppColors.accent,
+                    onChanged: _toggleNotif,
+                  ),
                 ),
-              ),
-      ]),
+        ]),
+      ),
     );
   }
 
@@ -2024,8 +2358,48 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                     Text(sub, style: sans(11, color: AppColors.fg4)),
                   ]),
             ),
-            const AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+            AppIcon('chevron-right', size: 15, color: AppColors.fg4),
           ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small green pulsing dot indicating a running session.
+class _PulsingDot extends StatefulWidget {
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _ctrl.drive(Tween(begin: 0.4, end: 1.0)),
+      child: Container(
+        width: 7,
+        height: 7,
+        decoration: const BoxDecoration(
+          color: Color(0xFF34D399), // emerald-400
+          shape: BoxShape.circle,
         ),
       ),
     );

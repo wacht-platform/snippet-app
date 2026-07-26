@@ -36,19 +36,33 @@ class _VaultScreenState extends State<VaultScreen> {
       backgroundColor: AppColors.surface1,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
       builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(16, 18, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('Add secret', style: sans(16, color: AppColors.fg1)),
-          const SizedBox(height: 14),
-          AppField(label: 'Name', controller: name, mono: true, hint: 'STRIPE_KEY — env-var style (A-Z, 0-9, _)'),
-          const SizedBox(height: 12),
-          AppField(label: 'Value', controller: value, mono: true, obscure: true, hint: 'stored on the daemon, never shown again'),
-          const SizedBox(height: 16),
-          Btn('Save', full: true, onTap: () => Navigator.pop(ctx, true)),
-          const SizedBox(height: 8),
-        ]),
+        padding: EdgeInsets.fromLTRB(
+            16, 18, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Add secret', style: sans(16, color: AppColors.fg1)),
+              const SizedBox(height: 14),
+              AppField(
+                  label: 'Name',
+                  controller: name,
+                  mono: true,
+                  hint: 'STRIPE_KEY — env-var style (A-Z, 0-9, _)'),
+              const SizedBox(height: 12),
+              AppField(
+                  label: 'Value',
+                  controller: value,
+                  mono: true,
+                  obscure: true,
+                  hint: 'stored on the daemon, never shown again'),
+              const SizedBox(height: 16),
+              Btn('Save', full: true, onTap: () => Navigator.pop(ctx, true)),
+              const SizedBox(height: 8),
+            ]),
       ),
     );
     if (saved != true) return;
@@ -74,17 +88,25 @@ class _VaultScreenState extends State<VaultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          SnAppBar(title: 'Vault', onBack: widget.onClose ?? () => Navigator.pop(context)),
+          SnAppBar(
+              title: 'Vault',
+              onBack: widget.onClose ?? () => Navigator.pop(context)),
           Expanded(
             child: FutureBuilder<List<String>>(
               future: _future,
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3)));
+                  return Center(
+                      child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppColors.fg3)));
                 }
                 final names = snap.data ?? const [];
                 final list = ListView(
@@ -98,7 +120,11 @@ class _VaultScreenState extends State<VaultScreen> {
                     ),
                     const SizedBox(height: 12),
                     if (names.isEmpty) ...[
-                      const EmptyState(icon: 'key', title: 'No secrets', body: 'Add API keys or tokens the agent may use in shell commands without ever seeing them.'),
+                      const EmptyState(
+                          icon: 'key',
+                          title: 'No secrets',
+                          body:
+                              'Add API keys or tokens the agent may use in shell commands without ever seeing them.'),
                       const SizedBox(height: 10),
                     ],
                     ...names.map(_secretRow),
@@ -106,7 +132,12 @@ class _VaultScreenState extends State<VaultScreen> {
                     AddCard(label: 'Add secret', onTap: _add),
                   ],
                 );
-                return kMobile ? list : Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 680), child: list));
+                return kMobile
+                    ? list
+                    : Center(
+                        child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 680),
+                            child: list));
               },
             ),
           ),
@@ -125,8 +156,10 @@ class _VaultScreenState extends State<VaultScreen> {
             width: 34,
             height: 34,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(R.sm)),
-            child: const AppIcon('key', size: 16, color: AppColors.fg3),
+            decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(R.sm)),
+            child: AppIcon('key', size: 16, color: AppColors.fg3),
           ),
           const SizedBox(width: 10),
           Expanded(child: Text(name, style: mono(13.5, color: AppColors.fg1))),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'platform.dart';
@@ -112,6 +113,7 @@ class _ToastCardState extends State<_ToastCard>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final curve = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
     final accent = widget.danger ? AppColors.danger : AppColors.accent;
     // Material ancestor: without it, text floating in the root Overlay falls back
@@ -277,8 +279,7 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     blockquoteDecoration: BoxDecoration(
       color: AppColors.surface2,
       borderRadius: BorderRadius.circular(R.xs),
-      border:
-          const Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
+      border: Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
     ),
     listBullet: sans(16, height: 1.5, color: AppColors.fg1),
     tableBody: sans(14, color: AppColors.fg1),
@@ -287,8 +288,8 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     // supplies horizontal scrolling when a long URL or code value needs it.
     tableColumnWidth:
         kMobile ? const IntrinsicColumnWidth() : const FlexColumnWidth(),
-    horizontalRuleDecoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.border))),
+    horizontalRuleDecoration:
+        BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
   );
 }
 
@@ -353,6 +354,7 @@ class _MdCodeBlockState extends State<_MdCodeBlock> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -449,6 +451,7 @@ class _StatusDotState extends State<StatusDot>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final c = _color;
     final dot = Container(
       width: widget.size,
@@ -480,6 +483,7 @@ class StatusPill extends StatelessWidget {
   const StatusPill({super.key, required this.status});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final (Color c, Color bg, String label, bool live) = switch (status) {
       'running' => (AppColors.run, AppColors.runBg, 'Running', true),
       'online' => (AppColors.ok, AppColors.okBg, 'Online', true),
@@ -516,6 +520,7 @@ class AppCard extends StatelessWidget {
       this.padding = const EdgeInsets.all(14)});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Material(
       color: AppColors.surface1,
       borderRadius: BorderRadius.circular(R.card),
@@ -558,6 +563,7 @@ class Btn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final (Color bg, Color fg, Color? bd) = switch (variant) {
       BtnVariant.primary => (AppColors.accent, AppColors.accentFg, null),
       BtnVariant.secondary => (
@@ -628,6 +634,7 @@ class PillBtn extends StatelessWidget {
   const PillBtn(this.label, {super.key, this.icon, this.onTap});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Opacity(
       opacity: onTap == null ? 0.45 : 1,
       child: Material(
@@ -672,6 +679,7 @@ class IconBtn extends StatelessWidget {
       this.tooltip});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final btn = Material(
       color: active ? AppColors.accentBg : Colors.transparent,
       borderRadius: BorderRadius.circular(R.md),
@@ -697,6 +705,7 @@ class AddCard extends StatelessWidget {
   const AddCard({super.key, required this.label, required this.onTap});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(R.card),
@@ -790,20 +799,21 @@ class AttachmentPill extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     Widget pill(String icon, String label, {bool isAudio = false}) => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: isAudio ? AppColors.accentBg : AppColors.surface2,
-            borderRadius: BorderRadius.circular(R.card),
+            borderRadius: BorderRadius.circular(R.sm),
             border: Border.all(
                 color: isAudio ? AppColors.accentLine : AppColors.border),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             AppIcon(icon,
-                size: 13, color: isAudio ? AppColors.accent : AppColors.fg3),
-            const SizedBox(width: 6),
+                size: 11, color: isAudio ? AppColors.accent : AppColors.fg3),
+            const SizedBox(width: 4),
             Text(label,
-                style: sans(12.5,
+                style: sans(11,
                     color: isAudio ? AppColors.accent : AppColors.fg2)),
           ]),
         );
@@ -835,38 +845,36 @@ class Bubble extends StatelessWidget {
   const Bubble({super.key, required this.mine, required this.text});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final matches = _attachMarkerRe.allMatches(text).toList();
     final shown = hideAttachmentMarkers(text);
     final audio =
         matches.where((m) => isAudioAttachmentPath(m.group(2) ?? '')).length;
     final images = matches.where((m) => m.group(1) == 'image').length;
     final files = matches.length - images - audio;
-    // Clean, Claude-style: a readable sender header (no accent bar / outline),
-    // differentiated by name + colour rather than a border.
+    // User messages: just the text with a thin accent left border — no bubble, no background.
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(
-        mine ? 'You' : 'Snippet',
-        style: sans(13.5,
-            weight: FontWeight.w600,
-            color: mine ? AppColors.fg2 : AppColors.accent),
-      ),
-      const SizedBox(height: 6),
       if (mine) ...[
-        // Plain Text on purpose: the transcript is wrapped in ONE SelectionArea
-        // (session.dart), which gives continuous selection ACROSS paragraphs and
-        // messages. Per-widget SelectableText would break that continuity.
-        if (shown.isNotEmpty)
-          Text(shown, style: sans(16, height: 1.5, color: AppColors.fg1)),
-        // A sent attachment stays visible as a pill (below any text it came with).
-        if (matches.isNotEmpty) ...[
-          if (shown.isNotEmpty) const SizedBox(height: 8),
-          AttachmentPill(audio: audio, images: images, files: files),
-        ],
+        Container(
+          padding: const EdgeInsets.only(left: 10),
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: AppColors.accent, width: 2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (shown.isNotEmpty)
+                Text(shown,
+                    style: sans(16, height: 1.5, color: AppColors.fg1)),
+              if (matches.isNotEmpty) ...[
+                if (shown.isNotEmpty) const SizedBox(height: 8),
+                AttachmentPill(audio: audio, images: images, files: files),
+              ],
+            ],
+          ),
+        ),
       ] else ...[
-        // selectable: false on purpose — with `true`, EVERY markdown block is its
-        // own SelectableText, so a selection can't cross paragraphs and renders
-        // patchily. The transcript-level SelectionArea (session.dart) now owns
-        // selection: continuous across blocks AND messages, native handles.
+        // Agent message: content with tighter inter-message spacing.
         MarkdownBody(
           data: shown,
           selectable: false,
@@ -874,37 +882,43 @@ class Bubble extends StatelessWidget {
           builders: {'pre': PreBlockBuilder()},
           onTapLink: (txt, href, title) => openMarkdownLink(href),
         ),
-        // Copy only on agent messages.
-        _CopyButton(text: shown),
+        _MessageActions(text: shown),
       ],
     ]);
   }
 }
 
-/// Small "Copy" affordance under a message — copies the text to the clipboard.
-class _CopyButton extends StatelessWidget {
+/// Grok-style message action row: icon-only buttons below agent messages.
+class _MessageActions extends StatelessWidget {
   final String text;
-  const _CopyButton({required this.text});
+  const _MessageActions({required this.text});
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.xs),
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: text));
-            toast(context, 'Copied');
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.copy_rounded, size: 12.5, color: AppColors.fg4),
-              const SizedBox(width: 4),
-              Text('Copy', style: sans(11, color: AppColors.fg4)),
-            ]),
-          ),
+    Theme.of(context); // Rebuild on theme change
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(children: [
+        _actionIcon(Icons.copy_rounded, 'Copy', () {
+          Clipboard.setData(ClipboardData(text: text));
+          toast(context, 'Copied');
+        }),
+        const SizedBox(width: 2),
+        _actionIcon(Icons.share_rounded, 'Share', () {
+          Share.share(text);
+        }),
+      ]),
+    );
+  }
+
+  Widget _actionIcon(IconData icon, String tip, VoidCallback onTap) {
+    return Tooltip(
+      message: tip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.sm),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 16, color: AppColors.fg4),
         ),
       ),
     );
@@ -929,6 +943,7 @@ class ToolLine extends StatelessWidget {
       this.onTap});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final inner =
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -942,7 +957,7 @@ class ToolLine extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: mono(12, color: AppColors.fg3))),
         if (onTap != null)
-          const Padding(
+          Padding(
               padding: EdgeInsets.only(left: 4),
               child: AppIcon('chevron-right', size: 14, color: AppColors.fg4)),
       ]),
@@ -984,6 +999,7 @@ class NoteLine extends StatelessWidget {
   const NoteLine(this.text, {super.key, this.error = false});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final c = error ? AppColors.danger : AppColors.fg3;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
@@ -993,7 +1009,7 @@ class NoteLine extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (error) ...[
-            const Padding(
+            Padding(
                 padding: EdgeInsets.only(top: 1),
                 child: AppIcon('alert-triangle',
                     size: 12, color: AppColors.danger)),
@@ -1025,6 +1041,7 @@ class StatTile extends StatelessWidget {
       this.accent = false});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
@@ -1053,22 +1070,19 @@ class StatTile extends StatelessWidget {
 
 class Progress extends StatelessWidget {
   final double pct; // 0..100
-  final Color color;
+  final Color? color;
   final double height;
-  const Progress(
-      {super.key,
-      required this.pct,
-      this.color = AppColors.accent,
-      this.height = 7});
+  const Progress({super.key, required this.pct, this.color, this.height = 7});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return ClipRRect(
       borderRadius: BorderRadius.circular(99),
       child: LinearProgressIndicator(
         value: (pct / 100).clamp(0, 1),
         minHeight: height,
         backgroundColor: AppColors.surface2,
-        valueColor: AlwaysStoppedAnimation(color),
+        valueColor: AlwaysStoppedAnimation(color ?? AppColors.accent),
       ),
     );
   }
@@ -1079,12 +1093,13 @@ class WarnChip extends StatelessWidget {
   const WarnChip({super.key, this.label = 'No key'});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
           color: AppColors.runBg, borderRadius: BorderRadius.circular(99)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const AppIcon('alert-triangle', size: 11, color: AppColors.run),
+        AppIcon('alert-triangle', size: 11, color: AppColors.run),
         const SizedBox(width: 5),
         Text(label,
             style: sans(10.5, weight: FontWeight.w500, color: AppColors.run)),
@@ -1118,6 +1133,7 @@ class EmptyState extends StatelessWidget {
       this.action});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 28),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1165,6 +1181,7 @@ class SnAppBar extends StatelessWidget {
       this.actions = const []});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Container(
       height: 58,
       padding: const EdgeInsets.fromLTRB(6, 0, 8, 0),
@@ -1172,7 +1189,7 @@ class SnAppBar extends StatelessWidget {
         // Follows the ambient shell surface — desktop panels re-theme this to
         // surface1 so the bar never reads as a darker strip (mobile: still bg).
         color: Theme.of(context).scaffoldBackgroundColor,
-        border: const Border(bottom: BorderSide(color: AppColors.border)),
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [
         if (leading != null)
@@ -1260,6 +1277,7 @@ class _AppFieldState extends State<AppField> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     final focused = _focus.hasFocus;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (widget.label != null) ...[
@@ -1375,7 +1393,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
     // Centered, width-capped on desktop (phones are narrower than this → unchanged).
     constraints: const BoxConstraints(maxWidth: 560),
     builder: (_) => Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface1,
         borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
         border: Border(top: BorderSide(color: AppColors.border2)),
@@ -1383,7 +1401,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
       constraints:
           BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.82),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const SizedBox(height: 9),
+        const SizedBox(height: 12),
         Center(
             child: Container(
                 width: 38,
@@ -1392,7 +1410,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                     color: AppColors.border2,
                     borderRadius: BorderRadius.circular(99)))),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 8, 12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
           child: Row(children: [
             Expanded(
                 child: Text(title,
@@ -1427,6 +1445,7 @@ class AppToggle extends StatelessWidget {
       this.sub});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return InkWell(
       onTap: () => onChanged(!on),
       borderRadius: BorderRadius.circular(R.md),

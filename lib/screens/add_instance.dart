@@ -14,14 +14,17 @@ import '../widgets.dart';
 (String, String)? parseConnection(String raw) {
   raw = raw.trim();
   final uri = Uri.tryParse(raw);
-  if (uri != null && uri.scheme.startsWith('http') && (uri.queryParameters['token'] ?? '').isNotEmpty) {
+  if (uri != null &&
+      uri.scheme.startsWith('http') &&
+      (uri.queryParameters['token'] ?? '').isNotEmpty) {
     final token = uri.queryParameters['token']!;
     final port = uri.hasPort ? ':${uri.port}' : '';
     return ('${uri.scheme}://${uri.host}$port', token);
   }
   try {
     final m = jsonDecode(raw);
-    if (m is Map && m['url'] is String && m['token'] is String) return (m['url'] as String, m['token'] as String);
+    if (m is Map && m['url'] is String && m['token'] is String)
+      return (m['url'] as String, m['token'] as String);
   } catch (_) {}
   return null;
 }
@@ -41,7 +44,8 @@ Future<Instance?> showAddMachineDialog(BuildContext context) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
       return FadeTransition(
         opacity: curved,
-        child: ScaleTransition(scale: Tween(begin: 0.98, end: 1.0).animate(curved), child: child),
+        child: ScaleTransition(
+            scale: Tween(begin: 0.98, end: 1.0).animate(curved), child: child),
       );
     },
   );
@@ -82,7 +86,8 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
       final (url, token) = parsed;
       final cfg = await DaemonClient(url, token).getConfig();
       final name = cfg.hostname.isNotEmpty ? cfg.hostname : hostOf(url);
-      if (mounted) Navigator.pop(context, Instance(name: name, url: url, token: token));
+      if (mounted)
+        Navigator.pop(context, Instance(name: name, url: url, token: token));
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -95,6 +100,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Material(
       color: AppColors.surface1,
       borderRadius: BorderRadius.circular(R.card),
@@ -106,47 +112,62 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
           borderRadius: BorderRadius.circular(R.card),
           border: Border.all(color: AppColors.border2),
         ),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Connect a machine', style: display(17)),
-          const SizedBox(height: 8),
-          Text('Run this on the machine you want to control, then paste the connection string it prints.',
-              style: sans(12.5, height: 1.45, color: AppColors.fg3)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(R.sm)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const AppIcon('terminal', size: 13, color: AppColors.fg3),
-              const SizedBox(width: 8),
-              Text('snippet serve', style: mono(12, color: AppColors.fg2)),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(
-                child: AppField(
-                    controller: _paste,
-                    mono: true,
-                    autofocus: true,
-                    hint: 'Paste connection string or URL',
-                    onSubmitted: _connect)),
-            const SizedBox(width: 10),
-            if (_busy)
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Connect a machine', style: display(17)),
+              const SizedBox(height: 8),
+              Text(
+                  'Run this on the machine you want to control, then paste the connection string it prints.',
+                  style: sans(12.5, height: 1.45, color: AppColors.fg3)),
+              const SizedBox(height: 12),
               Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-                child: const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentFg)),
-              )
-            else
-              PillBtn('Connect', onTap: _paste.text.trim().isEmpty ? null : () => _connect(_paste.text)),
-          ]),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(_error!, style: sans(11.5, color: AppColors.danger)),
-          ],
-        ]),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(R.sm)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  AppIcon('terminal', size: 13, color: AppColors.fg3),
+                  const SizedBox(width: 8),
+                  Text('snippet serve', style: mono(12, color: AppColors.fg2)),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                    child: AppField(
+                        controller: _paste,
+                        mono: true,
+                        autofocus: true,
+                        hint: 'Paste connection string or URL',
+                        onSubmitted: _connect)),
+                const SizedBox(width: 10),
+                if (_busy)
+                  Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: AppColors.accent, shape: BoxShape.circle),
+                    child: SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.accentFg)),
+                  )
+                else
+                  PillBtn('Connect',
+                      onTap: _paste.text.trim().isEmpty
+                          ? null
+                          : () => _connect(_paste.text)),
+              ]),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(_error!, style: sans(11.5, color: AppColors.danger)),
+              ],
+            ]),
       ),
     );
   }
@@ -161,7 +182,8 @@ class AddInstanceScreen extends StatefulWidget {
   State<AddInstanceScreen> createState() => _AddInstanceScreenState();
 }
 
-class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindingObserver {
+class _AddInstanceScreenState extends State<AddInstanceScreen>
+    with WidgetsBindingObserver {
   final _paste = TextEditingController();
   PermissionStatus? _perm;
   bool _busy = false;
@@ -172,7 +194,9 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (kMobile) {
-      Permission.camera.request().then((s) => mounted ? setState(() => _perm = s) : null);
+      Permission.camera
+          .request()
+          .then((s) => mounted ? setState(() => _perm = s) : null);
     }
     _paste.addListener(() => setState(() {}));
   }
@@ -181,7 +205,8 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!kMobile) return;
     if (state == AppLifecycleState.resumed) {
-      Permission.camera.status.then((s) => (mounted && s != _perm) ? setState(() => _perm = s) : null);
+      Permission.camera.status.then(
+          (s) => (mounted && s != _perm) ? setState(() => _perm = s) : null);
     }
   }
 
@@ -205,7 +230,8 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
       final client = DaemonClient(url, token);
       final cfg = await client.getConfig();
       final name = cfg.hostname.isNotEmpty ? cfg.hostname : hostOf(url);
-      if (mounted) Navigator.pop(context, Instance(name: name, url: url, token: token));
+      if (mounted)
+        Navigator.pop(context, Instance(name: name, url: url, token: token));
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -218,6 +244,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -234,7 +261,14 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
   Widget _scanArea() {
     final perm = _perm;
     if (perm == null) {
-      return const ColoredBox(color: AppColors.surface1, child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3))));
+      return ColoredBox(
+          color: AppColors.surface1,
+          child: Center(
+              child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.fg3))));
     }
     if (!perm.isGranted) {
       final permanent = perm.isPermanentlyDenied || perm.isRestricted;
@@ -244,17 +278,34 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
           child: Padding(
             padding: const EdgeInsets.all(32),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 56, height: 56, decoration: BoxDecoration(color: AppColors.surface2, border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(R.card)), child: const AppIcon('camera-off', size: 26, color: AppColors.fg3)),
+              Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(R.card)),
+                  child: AppIcon('camera-off', size: 26, color: AppColors.fg3)),
               const SizedBox(height: 12),
-              Text('Camera access needed', style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+              Text('Camera access needed',
+                  style:
+                      sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
               const SizedBox(height: 8),
-              ConstrainedBox(constraints: const BoxConstraints(maxWidth: 250), child: Text('Grant camera access to scan a QR, or paste your connection string below.', textAlign: TextAlign.center, style: sans(12.5, height: 1.5, color: AppColors.fg3))),
+              ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 250),
+                  child: Text(
+                      'Grant camera access to scan a QR, or paste your connection string below.',
+                      textAlign: TextAlign.center,
+                      style: sans(12.5, height: 1.5, color: AppColors.fg3))),
               const SizedBox(height: 16),
-              Btn('Grant camera access', variant: BtnVariant.secondary, icon: 'camera', onTap: () {
+              Btn('Grant camera access',
+                  variant: BtnVariant.secondary, icon: 'camera', onTap: () {
                 if (permanent) {
                   openAppSettings();
                 } else {
-                  Permission.camera.request().then((s) => mounted ? setState(() => _perm = s) : null);
+                  Permission.camera
+                      .request()
+                      .then((s) => mounted ? setState(() => _perm = s) : null);
                 }
               }),
             ]),
@@ -267,7 +318,8 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: Stack(alignment: Alignment.center, fit: StackFit.expand, children: [
+        child:
+            Stack(alignment: Alignment.center, fit: StackFit.expand, children: [
           ReaderWidget(
             showScannerOverlay: false,
             showGallery: false,
@@ -277,7 +329,8 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
             scanDelay: const Duration(milliseconds: 300),
             onScan: (code) {
               final raw = code.text;
-              if (code.isValid && raw != null && raw.trim().isNotEmpty) _connect(raw);
+              if (code.isValid && raw != null && raw.trim().isNotEmpty)
+                _connect(raw);
             },
           ),
           const IgnorePointer(child: Center(child: _Reticle())),
@@ -287,12 +340,18 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
             right: 0,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(color: Colors.black54, border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(99)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                    color: Colors.black54,
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(99)),
                 child: Text.rich(
                   TextSpan(style: sans(12.5, color: AppColors.fg1), children: [
                     const TextSpan(text: 'Scan the QR from '),
-                    TextSpan(text: 'snippet serve', style: mono(12, color: AppColors.fg1)),
+                    TextSpan(
+                        text: 'snippet serve',
+                        style: mono(12, color: AppColors.fg1)),
                   ]),
                 ),
               ),
@@ -306,25 +365,45 @@ class _AddInstanceScreenState extends State<AddInstanceScreen> with WidgetsBindi
   Widget _bottomBar() {
     final empty = _paste.text.trim().isEmpty;
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 14, 16, 14 + MediaQuery.of(context).padding.bottom),
-      decoration: const BoxDecoration(color: AppColors.bg, border: Border(top: BorderSide(color: AppColors.border))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-        Row(children: [
-          Expanded(child: AppField(controller: _paste, mono: true, hint: 'Paste connection string or URL', onSubmitted: _connect)),
-          const SizedBox(width: 10),
-          if (_busy)
-            Container(
-              width: kMobile ? 48 : 36,
-              height: kMobile ? 48 : 36,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
-              child: const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentFg)),
-            )
-          else
-            PillBtn('Connect', onTap: empty ? null : () => _connect(_paste.text)),
-        ]),
-        if (_error != null) ...[const SizedBox(height: 10), Text(_error!, style: sans(11.5, color: AppColors.danger))],
-      ]),
+      padding: EdgeInsets.fromLTRB(
+          16, 14, 16, 14 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+          color: AppColors.bg,
+          border: Border(top: BorderSide(color: AppColors.border))),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(children: [
+              Expanded(
+                  child: AppField(
+                      controller: _paste,
+                      mono: true,
+                      hint: 'Paste connection string or URL',
+                      onSubmitted: _connect)),
+              const SizedBox(width: 10),
+              if (_busy)
+                Container(
+                  width: kMobile ? 48 : 36,
+                  height: kMobile ? 48 : 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                      color: AppColors.accent, shape: BoxShape.circle),
+                  child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.accentFg)),
+                )
+              else
+                PillBtn('Connect',
+                    onTap: empty ? null : () => _connect(_paste.text)),
+            ]),
+            if (_error != null) ...[
+              SizedBox(height: 10),
+              Text(_error!, style: sans(11.5, color: AppColors.danger))
+            ],
+          ]),
     );
   }
 }
@@ -335,8 +414,11 @@ class _Reticle extends StatefulWidget {
   State<_Reticle> createState() => _ReticleState();
 }
 
-class _ReticleState extends State<_Reticle> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat(reverse: true);
+class _ReticleState extends State<_Reticle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 2600))
+    ..repeat(reverse: true);
   @override
   void dispose() {
     _c.dispose();
@@ -352,16 +434,25 @@ class _ReticleState extends State<_Reticle> with SingleTickerProviderStateMixin 
         height: 30,
         decoration: BoxDecoration(
           border: Border(
-            top: top ? const BorderSide(color: AppColors.accent, width: 3) : BorderSide.none,
-            bottom: !top ? const BorderSide(color: AppColors.accent, width: 3) : BorderSide.none,
-            left: left ? const BorderSide(color: AppColors.accent, width: 3) : BorderSide.none,
-            right: !left ? const BorderSide(color: AppColors.accent, width: 3) : BorderSide.none,
+            top: top
+                ? BorderSide(color: AppColors.accent, width: 3)
+                : BorderSide.none,
+            bottom: !top
+                ? BorderSide(color: AppColors.accent, width: 3)
+                : BorderSide.none,
+            left: left
+                ? BorderSide(color: AppColors.accent, width: 3)
+                : BorderSide.none,
+            right: !left
+                ? BorderSide(color: AppColors.accent, width: 3)
+                : BorderSide.none,
           ),
           borderRadius: BorderRadius.only(
             topLeft: top && left ? const Radius.circular(12) : Radius.zero,
             topRight: top && !left ? const Radius.circular(12) : Radius.zero,
             bottomLeft: !top && left ? const Radius.circular(12) : Radius.zero,
-            bottomRight: !top && !left ? const Radius.circular(12) : Radius.zero,
+            bottomRight:
+                !top && !left ? const Radius.circular(12) : Radius.zero,
           ),
         ),
       ),
@@ -370,6 +461,7 @@ class _ReticleState extends State<_Reticle> with SingleTickerProviderStateMixin 
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
     return SizedBox(
       width: 232,
       height: 232,
@@ -384,7 +476,14 @@ class _ReticleState extends State<_Reticle> with SingleTickerProviderStateMixin 
             left: 8,
             right: 8,
             top: 8 + _c.value * 216,
-            child: Container(height: 2, decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(99), boxShadow: const [BoxShadow(color: AppColors.accent, blurRadius: 12)])),
+            child: Container(
+                height: 2,
+                decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(99),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.accent, blurRadius: 12)
+                    ])),
           ),
         ),
       ]),
