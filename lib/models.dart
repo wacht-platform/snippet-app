@@ -317,6 +317,10 @@ class LaneInfo {
   final String? summary;
   final String? report;
   final String? error;
+  final String? activity;
+  final String? activityKind;
+  final String? activityAt;
+  final List<LaneActivity> activityLog;
   LaneInfo({
     required this.id,
     required this.title,
@@ -326,6 +330,10 @@ class LaneInfo {
     this.summary,
     this.report,
     this.error,
+    this.activity,
+    this.activityKind,
+    this.activityAt,
+    this.activityLog = const [],
   });
   factory LaneInfo.fromJson(Map<String, dynamic> j) => LaneInfo(
         id: j['id'] as String? ?? '',
@@ -336,8 +344,28 @@ class LaneInfo {
         summary: j['summary'] as String?,
         report: j['report'] as String?,
         error: j['error'] as String?,
+        activity: j['activity'] as String?,
+        activityKind: j['activity_kind'] as String?,
+        activityAt: j['activity_at'] as String?,
+        activityLog: ((j['activity_log'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => LaneActivity.fromJson(e.cast<String, dynamic>()))
+            .toList(),
       );
   bool get running => status == 'running';
+}
+
+class LaneActivity {
+  final String at;
+  final String kind;
+  final String text;
+  const LaneActivity(
+      {required this.at, required this.kind, required this.text});
+  factory LaneActivity.fromJson(Map<String, dynamic> j) => LaneActivity(
+        at: j['at'] as String? ?? '',
+        kind: j['kind'] as String? ?? '',
+        text: j['text'] as String? ?? '',
+      );
 }
 
 /// An active autonomous `/goal` the agent is driving toward.

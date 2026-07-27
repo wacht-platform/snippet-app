@@ -355,8 +355,11 @@ class _LaneCardState extends State<LaneCard> {
     final report = lane?.report;
     final summary = widget.summary ?? lane?.summary;
     final error = lane?.error;
-    if ([handoff, report, summary, error]
-        .every((s) => s == null || s.trim().isEmpty)) return;
+    final activity = lane?.activity;
+    final activityLog = lane?.activityLog ?? const <LaneActivity>[];
+    if ([handoff, report, summary, error, activity]
+            .every((s) => s == null || s.trim().isEmpty) &&
+        activityLog.isEmpty) return;
 
     Widget section(String heading, String? text, {bool errorTone = false}) {
       if (text == null || text.trim().isEmpty) return const SizedBox.shrink();
@@ -382,6 +385,7 @@ class _LaneCardState extends State<LaneCard> {
         title: 'Delegated thread · ${widget.title}',
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           section('HANDOFF', handoff),
+          section('ACTIVITY', activity),
           section('RESULT', report ?? summary),
           section('ERROR', error, errorTone: true),
         ]));
@@ -394,7 +398,8 @@ class _LaneCardState extends State<LaneCard> {
     final running = l?.running ?? false;
     final failed = (l?.status ?? '') == 'failed';
     final summary = widget.summary ?? l?.summary;
-    final hasDetails = [l?.handoff, l?.report, summary, l?.error]
+    final activity = l?.activity;
+    final hasDetails = [l?.handoff, l?.report, summary, l?.error, activity]
         .any((s) => s != null && s.trim().isNotEmpty);
     final dot = running
         ? AppColors.accent
@@ -443,6 +448,19 @@ class _LaneCardState extends State<LaneCard> {
                       : (failed ? AppColors.danger : AppColors.fg4)),
             ),
           ]),
+          if (activity != null && activity.trim().isNotEmpty && running) ...[
+            const SizedBox(height: 6),
+            Row(children: [
+              AppIcon('terminal', size: 13, color: AppColors.accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(activity,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(11, color: AppColors.fg3)),
+              ),
+            ]),
+          ],
           if (summary != null && summary.trim().isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(summary.replaceAll(RegExp(r'^#{1,6}\s*'), '').trim(),
