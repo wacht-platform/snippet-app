@@ -244,6 +244,24 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('rewind', r);
   }
 
+  /// Branch a NEW conversation at [checkpoint] and/or [eventIndex].
+  /// Returns `{id, title, event_end, message_end}`. Source session is untouched.
+  Future<Map<String, dynamic>> forkSession(
+    String sessionId, {
+    String? checkpoint,
+    int? eventIndex,
+  }) async {
+    final body = <String, dynamic>{
+      'session': sessionId,
+      if (checkpoint != null && checkpoint.isNotEmpty) 'checkpoint': checkpoint,
+      if (eventIndex != null) 'event_index': eventIndex,
+    };
+    final r = await http.post(_uri('/session/fork'),
+        headers: _json, body: jsonEncode(body));
+    if (r.statusCode != 200) throw _err('fork session', r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   Future<void> deleteSession(String sessionId) async {
     final r = await http.post(_uri('/session/delete'),
         headers: _json, body: jsonEncode({'session': sessionId}));

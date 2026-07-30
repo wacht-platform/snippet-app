@@ -179,16 +179,23 @@ class Checkpoint {
   final String id;
   final String label;
   final String createdAt;
+  final int eventIndex;
+  final int messageIndex;
   Checkpoint.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         label = j['label'] as String? ?? '',
-        createdAt = j['created_at'] as String? ?? '';
+        createdAt = j['created_at'] as String? ?? '',
+        eventIndex = (j['event_index'] is num)
+            ? (j['event_index'] as num).toInt()
+            : int.tryParse('${j['event_index'] ?? ''}') ?? 0,
+        messageIndex = (j['message_index'] is num)
+            ? (j['message_index'] as num).toInt()
+            : int.tryParse('${j['message_index'] ?? ''}') ?? 0;
 }
 
 class HarnessState {
   final String status;
   final String workspace;
-  final String userRequest;
   final String? title;
   final List<Map<String, dynamic>> events;
   final String? finalText;
@@ -211,7 +218,6 @@ class HarnessState {
   HarnessState({
     required this.status,
     required this.workspace,
-    required this.userRequest,
     required this.title,
     required this.events,
     required this.finalText,
@@ -233,24 +239,53 @@ class HarnessState {
   });
 
   factory HarnessState.fromJson(Map<String, dynamic> j) {
-    final rl = j['rate_limit'] as Map<String, dynamic>?;
+    final rl = j['rate_limit'] is Map
+        ? (j['rate_limit'] as Map).cast<String, dynamic>()
+        : null;
     RateWindow? win(String k) {
       final m = rl?[k];
       return m is Map ? RateWindow.fromJson(m.cast<String, dynamic>()) : null;
     }
 
-    int n(String k) => (j[k] as num?)?.toInt() ?? 0;
+    int n(String k) {
+      final v = j[k];
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v) ?? 0;
+      return 0;
+    }
+
+    String? asString(dynamic v) {
+      if (v == null) return null;
+      if (v is String) return v;
+      return v.toString();
+    }
+
+    List<Map<String, dynamic>> mapList(dynamic raw) {
+      if (raw is! List) return const [];
+      final out = <Map<String, dynamic>>[];
+      for (final e in raw) {
+        if (e is Map) out.add(e.cast<String, dynamic>());
+      }
+      return out;
+    }
+
+    final legacyRequest = asString(j['user_request']);
+    final rawTitle = asString(j['title']);
+    final title = (rawTitle != null && rawTitle.trim().isNotEmpty)
+        ? rawTitle
+        : ((legacyRequest != null && legacyRequest.trim().isNotEmpty)
+            ? legacyRequest
+            : null);
     return HarnessState(
-      status: j['status'] as String? ?? 'idle',
-      workspace: j['workspace'] as String? ?? '',
-      userRequest: j['user_request'] as String? ?? '',
-      title: j['title'] as String?,
-      events: ((j['events'] as List?) ?? const [])
-          .map((e) => (e as Map).cast<String, dynamic>())
-          .toList(),
-      finalText: j['final_text'] as String?,
-      approvalMode: j['approval_mode'] as String? ?? 'auto',
-      pendingQuestion: (j['pending_question'] as Map?)?.cast<String, dynamic>(),
+      status: asString(j['status']) ?? 'idle',
+      workspace: asString(j['workspace']) ?? '',
+      title: title,
+      events: mapList(j['events']),
+      finalText: asString(j['final_text']),
+      approvalMode: asString(j['approval_mode']) ?? 'auto',
+      pendingQuestion: j['pending_question'] is Map
+          ? (j['pending_question'] as Map).cast<String, dynamic>()
+          : null,
       totalTokens: n('total_tokens'),
       promptTokens: n('prompt_tokens'),
       completionTokens: n('completion_tokens'),
@@ -259,17 +294,13 @@ class HarnessState {
       contextWindow: n('context_window'),
       ratePrimary: win('primary'),
       rateSecondary: win('secondary'),
-      checkpoints: ((j['checkpoints'] as List?) ?? const [])
-          .map((e) => Checkpoint.fromJson((e as Map).cast<String, dynamic>()))
-          .toList(),
+      checkpoints: mapList(j['checkpoints']).map(Checkpoint.fromJson).toList(),
       goal: (j['goal'] is Map)
           ? GoalInfo.fromJson((j['goal'] as Map).cast<String, dynamic>())
           : null,
-      compacting: j['compacting'] as bool? ?? false,
-      watchCount: (j['watches'] as List?)?.length ?? 0,
-      lanes: ((j['lanes'] as List?) ?? const [])
-          .map((e) => LaneInfo.fromJson((e as Map).cast<String, dynamic>()))
-          .toList(),
+      compacting: j['compacting'] == true,
+      watchCount: (j['watches'] is List) ? (j['watches'] as List).length : 0,
+      lanes: mapList(j['lanes']).map(LaneInfo.fromJson).toList(),
     );
   }
 
@@ -278,15 +309,19 @@ class HarnessState {
   HarnessState applyDelta(Map<String, dynamic> d) {
     final base =
         HarnessState.fromJson(d); // scalars; events empty (delta omits them)
-    final added = ((d['new_events'] as List?) ?? const [])
-        .map((e) => (e as Map).cast<String, dynamic>())
-        .toList();
+    final added = <Map<String, dynamic>>[];
+    final rawAdded = d['new_events'];
+    if (rawAdded is List) {
+      for (final e in rawAdded) {
+        if (e is Map) added.add(e.cast<String, dynamic>());
+      }
+    }
     return HarnessState(
       status: base.status,
       workspace: base.workspace,
-      userRequest: base.userRequest,
       title: d.containsKey('title') ? base.title : title,
-      events: [...events, ...added],
+      events: List<Map<String, dynamic>>.of(events, growable: true)
+        ..addAll(added),
       finalText: base.finalText,
       approvalMode: base.approvalMode,
       pendingQuestion: base.pendingQuestion,
@@ -298,7 +333,10 @@ class HarnessState {
       contextWindow: base.contextWindow,
       ratePrimary: base.ratePrimary,
       rateSecondary: base.rateSecondary,
-      checkpoints: base.checkpoints,
+      // Only replace checkpoints when the delta explicitly includes them —
+      // missing field deserializes to [] and would wipe history after rewind.
+      checkpoints:
+          d.containsKey('checkpoints') ? base.checkpoints : checkpoints,
       goal: base.goal,
       compacting: base.compacting,
       watchCount: base.watchCount,
@@ -335,23 +373,43 @@ class LaneInfo {
     this.activityAt,
     this.activityLog = const [],
   });
-  factory LaneInfo.fromJson(Map<String, dynamic> j) => LaneInfo(
-        id: j['id'] as String? ?? '',
-        title: j['title'] as String? ?? '',
-        status: j['status'] as String? ?? '',
-        startedAt: j['started_at'] as String? ?? '',
-        handoff: j['handoff'] as String?,
-        summary: j['summary'] as String?,
-        report: j['report'] as String?,
-        error: j['error'] as String?,
-        activity: j['activity'] as String?,
-        activityKind: j['activity_kind'] as String?,
-        activityAt: j['activity_at'] as String?,
-        activityLog: ((j['activity_log'] as List?) ?? const [])
-            .whereType<Map>()
-            .map((e) => LaneActivity.fromJson(e.cast<String, dynamic>()))
-            .toList(),
-      );
+  factory LaneInfo.fromJson(Map<String, dynamic> j) {
+    String s(dynamic v) {
+      if (v == null) return '';
+      if (v is String) return v;
+      return v.toString();
+    }
+
+    String? opt(dynamic v) {
+      if (v == null) return null;
+      if (v is String) return v;
+      return v.toString();
+    }
+
+    final log = <LaneActivity>[];
+    final rawLog = j['activity_log'];
+    if (rawLog is List) {
+      for (final e in rawLog) {
+        if (e is Map) {
+          log.add(LaneActivity.fromJson(e.cast<String, dynamic>()));
+        }
+      }
+    }
+    return LaneInfo(
+      id: s(j['id']),
+      title: s(j['title']),
+      status: s(j['status']),
+      startedAt: s(j['started_at']),
+      handoff: opt(j['handoff']),
+      summary: opt(j['summary']),
+      report: opt(j['report']),
+      error: opt(j['error']),
+      activity: opt(j['activity']),
+      activityKind: opt(j['activity_kind']),
+      activityAt: opt(j['activity_at']),
+      activityLog: log,
+    );
+  }
   bool get running => status == 'running';
 }
 

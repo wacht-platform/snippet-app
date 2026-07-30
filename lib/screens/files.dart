@@ -601,6 +601,15 @@ class _FileViewerState extends State<FileViewer> {
                   child: Center(
                     child: Image.network(
                       widget.client.fileUrl(widget.path),
+                      cacheWidth: (MediaQuery.sizeOf(context).width *
+                              MediaQuery.devicePixelRatioOf(context))
+                          .round()
+                          .clamp(720, 2048),
+                      cacheHeight: (MediaQuery.sizeOf(context).height *
+                              MediaQuery.devicePixelRatioOf(context))
+                          .round()
+                          .clamp(720, 2048),
+                      filterQuality: FilterQuality.low,
                       fit: BoxFit.contain,
                       loadingBuilder: (ctx, child, prog) => prog == null
                           ? child

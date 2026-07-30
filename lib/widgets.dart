@@ -261,8 +261,20 @@ void openMarkdownLink(String? href) {
 }
 
 /// Themed markdown stylesheet for agent messages.
+/// Cached per-process to avoid rebuilding the full stylesheet on every Bubble
+/// rebuild — the stylesheet is pure allocation and identical across the session
+/// lifetime when the theme doesn't change.
+MarkdownStyleSheet? _cachedMarkdownStyle;
+Brightness? _cachedMarkdownBrightness;
+
 MarkdownStyleSheet markdownStyle(BuildContext context) {
-  return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+  final brightness = Theme.of(context).brightness;
+  if (_cachedMarkdownStyle != null && _cachedMarkdownBrightness == brightness) {
+    return _cachedMarkdownStyle!;
+  }
+  _cachedMarkdownBrightness = brightness;
+  _cachedMarkdownStyle =
+      MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
     p: sans(16, height: 1.5, color: AppColors.fg1),
     pPadding: EdgeInsets.zero,
     a: sans(16, height: 1.5, color: AppColors.accent),
@@ -291,6 +303,109 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     horizontalRuleDecoration:
         BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
   );
+  return _cachedMarkdownStyle!;
+}
+
+/// Dimmed markdown for live model thinking/reasoning — same structure as
+/// [markdownStyle], quieter palette so it reads as an aside, not the answer.
+MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
+  final dim = AppColors.fg3;
+  final dim2 = AppColors.fg4;
+  return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+    p: sans(13.5, height: 1.45, color: dim),
+    pPadding: EdgeInsets.zero,
+    em: sans(13.5, height: 1.45, color: dim)
+        .copyWith(fontStyle: FontStyle.italic),
+    strong: sans(13.5, height: 1.45, color: dim, weight: FontWeight.w600),
+    a: sans(13.5, height: 1.45, color: AppColors.accent),
+    h1: sans(15, weight: FontWeight.w600, height: 1.3, color: dim),
+    h1Padding: const EdgeInsets.only(top: 4, bottom: 2),
+    h2: sans(14.5, weight: FontWeight.w600, height: 1.3, color: dim),
+    h2Padding: const EdgeInsets.only(top: 4, bottom: 2),
+    h3: sans(14, weight: FontWeight.w600, height: 1.3, color: dim),
+    h3Padding: const EdgeInsets.only(top: 2, bottom: 1),
+    code: mono(12.5, color: dim2),
+    codeblockPadding: EdgeInsets.zero,
+    codeblockDecoration: const BoxDecoration(),
+    blockquote: sans(13, height: 1.45, color: dim2),
+    blockquoteDecoration: BoxDecoration(
+      color: AppColors.surface2,
+      borderRadius: BorderRadius.circular(R.xs),
+      border: Border(left: BorderSide(color: AppColors.border, width: 2)),
+    ),
+    listBullet: sans(13.5, height: 1.45, color: dim),
+    tableBody: sans(12.5, color: dim),
+    tableColumnWidth:
+        kMobile ? const IntrinsicColumnWidth() : const FlexColumnWidth(),
+    horizontalRuleDecoration:
+        BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
+  );
+}
+
+/// Live thinking/reasoning stream — full markdown, dimmed.
+class ThinkingMarkdown extends StatelessWidget {
+  final String data;
+  const ThinkingMarkdown({super.key, required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final text = data.trim();
+    if (text.isEmpty) return const SizedBox.shrink();
+    return MarkdownBody(
+      data: text,
+      selectable: false,
+      styleSheet: thinkingMarkdownStyle(context),
+      builders: {'pre': PreBlockBuilder()},
+      onTapLink: (txt, href, title) => openMarkdownLink(href),
+    );
+  }
+}
+
+/// A compact markdown rendering for summaries shown in lane cards and notices.
+/// It keeps previews short while preserving headings, emphasis, lists, links,
+/// inline code, and fenced-code styling.
+class MarkdownPreview extends StatelessWidget {
+  final String data;
+  final int maxLines;
+
+  const MarkdownPreview({
+    super.key,
+    required this.data,
+    this.maxLines = 2,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = markdownStyle(context).copyWith(
+      p: sans(12.5, height: 1.35, color: AppColors.fg3),
+      pPadding: EdgeInsets.zero,
+      h1: sans(13.5,
+          weight: FontWeight.w600, height: 1.3, color: AppColors.fg2),
+      h1Padding: EdgeInsets.zero,
+      h2: sans(13, weight: FontWeight.w600, height: 1.3, color: AppColors.fg2),
+      h2Padding: EdgeInsets.zero,
+      h3: sans(12.5,
+          weight: FontWeight.w600, height: 1.3, color: AppColors.fg2),
+      h3Padding: EdgeInsets.zero,
+      a: sans(12.5, height: 1.35, color: AppColors.accent),
+      code: mono(11.5, color: AppColors.accent),
+      listBullet: sans(12.5, height: 1.35, color: AppColors.fg3),
+      blockquote: sans(12.5, height: 1.35, color: AppColors.fg3),
+    );
+    return ClipRect(
+      child: SizedBox(
+        height: maxLines * 18.0,
+        child: MarkdownBody(
+          data: data,
+          selectable: false,
+          styleSheet: compact,
+          builders: {'pre': PreBlockBuilder()},
+          onTapLink: (text, href, title) => openMarkdownLink(href),
+        ),
+      ),
+    );
+  }
 }
 
 /// Inline `code` only. Fenced blocks are handled by [PreBlockBuilder] on `pre`
@@ -760,9 +875,43 @@ class _DashedBorder extends CustomPainter {
 /// user-facing chat text.
 final RegExp _attachMarkerRe =
     RegExp(r'\[attached (image|file) —([^\]]*)\]', multiLine: true);
-final RegExp _audioTranscriptRe = RegExp(
-  r'(?:\r?\n)*\[Audio transcript for [^\]\r\n]+\]\r?\n[\s\S]*$',
+final RegExp _audioTranscriptHeaderRe = RegExp(
+  r'\[Audio transcript for ([^\]\r\n]+)\]\r?\n',
+  multiLine: true,
 );
+final RegExp _audioUnavailableRe = RegExp(
+  r'\[Audio transcription unavailable: ([^\]\r\n]*)\]',
+  multiLine: true,
+);
+
+class AudioTranscriptItem {
+  final String text;
+  final bool unavailable;
+  const AudioTranscriptItem(this.text, {this.unavailable = false});
+}
+
+/// Extract the daemon's audio transcript block(s) without exposing its internal
+/// attachment path. A message may contain more than one audio attachment.
+List<AudioTranscriptItem> audioTranscriptItems(String raw) {
+  final headers = _audioTranscriptHeaderRe.allMatches(raw).toList();
+  final items = <AudioTranscriptItem>[];
+  for (var i = 0; i < headers.length; i++) {
+    final start = headers[i].end;
+    final end = i + 1 < headers.length ? headers[i + 1].start : raw.length;
+    final text = raw.substring(start, end).trim();
+    if (text.isNotEmpty) items.add(AudioTranscriptItem(text));
+  }
+  for (final match in _audioUnavailableRe.allMatches(raw)) {
+    final error = match.group(1)?.trim() ?? 'unknown error';
+    items.add(AudioTranscriptItem(error, unavailable: true));
+  }
+  return items;
+}
+
+String? audioTranscriptionError(String raw) {
+  final match = _audioUnavailableRe.firstMatch(raw);
+  return match?.group(1)?.trim();
+}
 
 bool isAudioAttachmentPath(String value) {
   final path = value.trim().toLowerCase();
@@ -779,13 +928,21 @@ bool isAudioAttachmentPath(String value) {
   ].any(path.endsWith);
 }
 
-/// Strip internal attachment/transcription metadata from displayed text. The
-/// original message still contains it when sent to the daemon, so the agent can
-/// use the transcript while the user sees only their own message and attachment.
-String hideAttachmentMarkers(String raw) => raw
-    .replaceAll(_audioTranscriptRe, '')
-    .replaceAll(_attachMarkerRe, '')
-    .trim();
+/// Remove internal attachment/transcription metadata from the message body while
+/// leaving the audio transcript available to the dedicated transcript card.
+String hideAttachmentMarkers(String raw) {
+  var shown = raw;
+  final headers = _audioTranscriptHeaderRe.allMatches(shown).toList();
+  for (var i = headers.length - 1; i >= 0; i--) {
+    final start = headers[i].start;
+    final end = i + 1 < headers.length ? headers[i + 1].start : shown.length;
+    shown = shown.replaceRange(start, end, '');
+  }
+  return shown
+      .replaceAll(_audioUnavailableRe, '')
+      .replaceAll(_attachMarkerRe, '')
+      .trim();
+}
 
 /// Read-only attachment summary on a sent message — icon + count, no emoji.
 /// Images and files each get their own compact pill (matches desktop).
@@ -836,6 +993,81 @@ class AttachmentPill extends StatelessWidget {
   }
 }
 
+/// A compact, readable transcript attached to the audio pill. It is collapsed by
+/// default so the conversation stays compact, but can be expanded without hiding
+/// the original audio attachment.
+class AudioTranscriptCard extends StatefulWidget {
+  final List<AudioTranscriptItem> items;
+  const AudioTranscriptCard({super.key, required this.items});
+
+  @override
+  State<AudioTranscriptCard> createState() => _AudioTranscriptCardState();
+}
+
+class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final unavailable = widget.items.any((item) => item.unavailable);
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        border: Border.all(
+            color: unavailable ? AppColors.border : AppColors.accentLine),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(R.md),
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+            child: Row(children: [
+              AppIcon('file', size: 14, color: AppColors.accent),
+              const SizedBox(width: 7),
+              Text('Transcript',
+                  style: sans(11.5,
+                      weight: FontWeight.w600, color: AppColors.fg2)),
+              const Spacer(),
+              Text(unavailable ? 'unavailable' : (_expanded ? 'hide' : 'show'),
+                  style: mono(10,
+                      color: unavailable ? AppColors.fg4 : AppColors.fg3)),
+              const SizedBox(width: 4),
+              AppIcon(_expanded ? 'chevron-up' : 'chevron-down',
+                  size: 14, color: AppColors.fg3),
+            ]),
+          ),
+        ),
+        if (_expanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < widget.items.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  Text(
+                    widget.items[i].unavailable
+                        ? 'Could not transcribe this audio: ${widget.items[i].text}'
+                        : widget.items[i].text,
+                    style: sans(13,
+                        height: 1.45,
+                        color: widget.items[i].unavailable
+                            ? AppColors.fg3
+                            : AppColors.fg1),
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
 /// One chat message — flat (no bubble/box). YOUR messages get a left accent bar
 /// + label; the agent's are plain full-width markdown under a dim label. The bar
 /// vs no-bar is the primary you/agent distinction.
@@ -847,6 +1079,7 @@ class Bubble extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final matches = _attachMarkerRe.allMatches(text).toList();
+    final transcripts = audioTranscriptItems(text);
     final shown = hideAttachmentMarkers(text);
     final audio =
         matches.where((m) => isAudioAttachmentPath(m.group(2) ?? '')).length;
@@ -864,12 +1097,23 @@ class Bubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (shown.isNotEmpty)
-                Text(shown,
-                    style: sans(16, height: 1.5, color: AppColors.fg1)),
+                Text(shown, style: sans(16, height: 1.5, color: AppColors.fg1)),
               if (matches.isNotEmpty) ...[
                 if (shown.isNotEmpty) const SizedBox(height: 8),
                 AttachmentPill(audio: audio, images: images, files: files),
               ],
+              if (transcripts.isNotEmpty)
+                AudioTranscriptCard(items: transcripts),
+              if (audio > 0 && transcripts.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(children: [
+                    AppIcon('activity', size: 13, color: AppColors.accent),
+                    const SizedBox(width: 6),
+                    Text('Transcribing audio…',
+                        style: sans(11.5, color: AppColors.fg3)),
+                  ]),
+                ),
             ],
           ),
         ),

@@ -5,7 +5,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'models.dart';
 import 'theme.dart';
@@ -236,32 +235,47 @@ class _BrailleSpinner extends StatefulWidget {
   State<_BrailleSpinner> createState() => _BrailleSpinnerState();
 }
 
+/// Shared braille animation timer: one Timer.periodic drives all visible
+/// spinners, avoiding N individual timers when many tool calls run at once.
 class _BrailleSpinnerState extends State<_BrailleSpinner> {
   static const _frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  Timer? _t;
-  int _i = 0;
+  static Timer? _sharedTimer;
+  static int _tick = 0;
+  static final Set<State<_BrailleSpinner>> _listeners = {};
+
+  static void _onTick(_) {
+    _tick = (_tick + 1) % _frames.length;
+    for (final s in _listeners) {
+      if (s.mounted) s.setState(() {});
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _t = Timer.periodic(const Duration(milliseconds: 90), (_) {
-      if (mounted) setState(() => _i = (_i + 1) % _frames.length);
-    });
+    _listeners.add(this);
+    if (_sharedTimer == null || !_sharedTimer!.isActive) {
+      _sharedTimer = Timer.periodic(const Duration(milliseconds: 150), _onTick);
+    }
   }
 
   @override
   void dispose() {
-    _t?.cancel();
+    _listeners.remove(this);
+    if (_listeners.isEmpty) {
+      _sharedTimer?.cancel();
+      _sharedTimer = null;
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) =>
-      Text(_frames[_i], style: mono(12, color: AppColors.run));
+      Text(_frames[_tick], style: mono(12, color: AppColors.run));
 }
 
-/// A run of consecutive tool rows behind a subtle left rail. Short runs render
-/// fully; long ones collapse to the last few with a "+N earlier" toggle.
+/// A run of consecutive tool rows behind a subtle left rail. It opens compactly
+/// with the newest tool step visible; tapping the summary reveals the full run.
 class ToolRun extends StatefulWidget {
   final List<Widget> rows;
   const ToolRun(this.rows, {super.key});
@@ -270,14 +284,14 @@ class ToolRun extends StatefulWidget {
 }
 
 class _ToolRunState extends State<ToolRun> {
-  static const int visibleTail = 6;
+  static const int visibleTail = 1;
   bool _all = false;
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final rows = widget.rows;
-    final collapsed = !_all && rows.length > visibleTail + 2;
+    final collapsed = !_all && rows.length > visibleTail;
     final shown = collapsed ? rows.sublist(rows.length - visibleTail) : rows;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -302,178 +316,84 @@ class _ToolRunState extends State<ToolRun> {
 }
 
 // ---------------------------------------------------------------------------
-// Lane card — first-class: status dot, subject, ticking elapsed while running,
-// summary preview when done; expands inline to the full summary.
+// Lane notice — the transcript keeps only a compact pointer. Full lane output
+// belongs in the dedicated lanes screen.
 // ---------------------------------------------------------------------------
 
-class LaneCard extends StatefulWidget {
-  /// Spawn row: [live] resolves the CURRENT record from state so the card
-  /// updates in place (running → done) without new transcript entries.
+class LaneNotice extends StatelessWidget {
   final String title;
   final LaneInfo? Function() live;
-  final String? summary; // completion summary when this row is the completion
-  const LaneCard(
-      {super.key, required this.title, required this.live, this.summary});
+  final VoidCallback onOpen;
+  final String? summary;
 
-  @override
-  State<LaneCard> createState() => _LaneCardState();
-}
-
-class _LaneCardState extends State<LaneCard> {
-  Timer? _tick;
-
-  @override
-  void initState() {
-    super.initState();
-    // Tick the elapsed label only while the lane runs.
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      final l = widget.live();
-      if (l == null || !l.running) {
-        _tick?.cancel();
-      }
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _tick?.cancel();
-    super.dispose();
-  }
-
-  String _elapsed(String startedAt) {
-    final t = DateTime.tryParse(startedAt);
-    if (t == null) return '';
-    final d = DateTime.now().toUtc().difference(t.toUtc());
-    if (d.inSeconds < 60) return '${d.inSeconds}s';
-    if (d.inMinutes < 60) return '${d.inMinutes}m ${d.inSeconds % 60}s';
-    return '${d.inHours}h ${d.inMinutes % 60}m';
-  }
-
-  void _showDetails(BuildContext context, LaneInfo? lane) {
-    final handoff = lane?.handoff;
-    final report = lane?.report;
-    final summary = widget.summary ?? lane?.summary;
-    final error = lane?.error;
-    final activity = lane?.activity;
-    final activityLog = lane?.activityLog ?? const <LaneActivity>[];
-    if ([handoff, report, summary, error, activity]
-            .every((s) => s == null || s.trim().isEmpty) &&
-        activityLog.isEmpty) return;
-
-    Widget section(String heading, String? text, {bool errorTone = false}) {
-      if (text == null || text.trim().isEmpty) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(heading,
-              style: mono(11,
-                  weight: FontWeight.w600,
-                  color: errorTone ? AppColors.danger : AppColors.fg3)),
-          const SizedBox(height: 6),
-          MarkdownBody(
-            data: text,
-            selectable: true,
-            styleSheet: markdownStyle(context),
-            builders: {'pre': PreBlockBuilder()},
-          ),
-        ]),
-      );
-    }
-
-    showAppSheet(context,
-        title: 'Delegated thread · ${widget.title}',
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          section('HANDOFF', handoff),
-          section('ACTIVITY', activity),
-          section('RESULT', report ?? summary),
-          section('ERROR', error, errorTone: true),
-        ]));
-  }
+  const LaneNotice({
+    super.key,
+    required this.title,
+    required this.live,
+    required this.onOpen,
+    this.summary,
+  });
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final l = widget.live();
-    final running = l?.running ?? false;
-    final failed = (l?.status ?? '') == 'failed';
-    final summary = widget.summary ?? l?.summary;
-    final activity = l?.activity;
-    final hasDetails = [l?.handoff, l?.report, summary, l?.error, activity]
-        .any((s) => s != null && s.trim().isNotEmpty);
-    final dot = running
+    Theme.of(context);
+    final lane = live();
+    final failed = lane?.status == 'failed';
+    final running = lane?.running ?? false;
+    final color = running
         ? AppColors.accent
         : failed
             ? AppColors.danger
             : AppColors.fg4;
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 5),
-      padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(R.sm),
-        border: Border.all(
-            color: running ? AppColors.accentLine : AppColors.border),
-      ),
+    final status = running
+        ? 'running'
+        : failed
+            ? 'failed'
+            : 'complete';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
-        onTap: hasDetails ? () => _showDetails(context, l) : null,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(widget.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style:
-                      sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
-            ),
-            if (hasDetails) ...[
-              const SizedBox(width: 6),
-              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
-            ],
-            const SizedBox(width: 8),
-            Text(
-              running
-                  ? 'running · ${l != null ? _elapsed(l.startedAt) : ''}'
-                  : failed
-                      ? 'failed'
-                      : 'done',
-              style: mono(11,
-                  color: running
-                      ? AppColors.accent
-                      : (failed ? AppColors.danger : AppColors.fg4)),
-            ),
-          ]),
-          if (activity != null && activity.trim().isNotEmpty && running) ...[
-            const SizedBox(height: 6),
-            Row(children: [
-              AppIcon('terminal', size: 13, color: AppColors.accent),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(activity,
+        borderRadius: BorderRadius.circular(R.sm),
+        onTap: onOpen,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.sm),
+            border: Border.all(
+                color: running ? AppColors.accentLine : AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [
+                AppIcon('layers', size: 15, color: color),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: mono(11, color: AppColors.fg3)),
-              ),
-            ]),
-          ],
-          if (summary != null && summary.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(summary.replaceAll(RegExp(r'^#{1,6}\s*'), '').trim(),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: sans(12, height: 1.45, color: AppColors.fg3)),
-          ],
-        ]),
+                    style: sans(12.5,
+                        weight: FontWeight.w600, color: AppColors.fg2),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Text(status, style: mono(10.5, color: color)),
+                const SizedBox(width: 5),
+                AppIcon('chevron-right', size: 13, color: AppColors.fg4),
+              ]),
+              if (summary != null && summary!.trim().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                MarkdownPreview(data: summary!, maxLines: 2),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 }
-
 // ---------------------------------------------------------------------------
 // Styled system rows: watches, goals, compaction, generic decisions — each
 // recognizable at a glance instead of identical grey notes.
@@ -487,6 +407,23 @@ class SystemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+
+    // Full-width quiet dividers (match TUI compaction / tool-prune chrome).
+    if (step == 'history_compacted') {
+      return _SystemDivider(label: 'context compacted');
+    }
+    if (step == 'history_compaction_pass' ||
+        step == 'history_compaction_skipped') {
+      return const SizedBox.shrink();
+    }
+    if (step == 'tool_payloads_pruned') {
+      final detail = reasoning.trim();
+      final label = detail.isEmpty
+          ? 'old tool results cleared'
+          : 'tools cleared · $detail';
+      return _SystemDivider(label: label);
+    }
+
     final (glyph, color) = switch (step) {
       'watch_added' || 'watch_removed' => ('◉', AppColors.run),
       'file_watch' => ('◉', AppColors.accent),
@@ -494,10 +431,6 @@ class SystemRow extends StatelessWidget {
           '◇',
           AppColors.accent
         ),
-      'history_compaction_pass' ||
-      'history_compacted' ||
-      'history_compaction_skipped' =>
-        ('▣', AppColors.fg4),
       'interrupted' => ('■', AppColors.danger),
       _ => ('·', AppColors.fg4),
     };
@@ -514,6 +447,30 @@ class SystemRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: sans(11.5, height: 1.4, color: AppColors.fg4)),
         ),
+      ]),
+    );
+  }
+}
+
+/// Centered hairline + label — used for compaction and tool-prune boundaries.
+class _SystemDivider extends StatelessWidget {
+  final String label;
+  const _SystemDivider({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final style = mono(10.5, color: AppColors.fg4);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      child: Row(children: [
+        const Expanded(child: Divider(height: 1, thickness: 0.6)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(label,
+              style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        const Expanded(child: Divider(height: 1, thickness: 0.6)),
       ]),
     );
   }

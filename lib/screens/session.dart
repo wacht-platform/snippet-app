@@ -18,7 +18,6 @@ import '../api.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../platform.dart';
-import '../command_palette.dart';
 import '../theme.dart';
 import '../transcript.dart';
 import '../panel.dart';
@@ -27,6 +26,46 @@ import 'editor.dart';
 import 'files.dart';
 import 'processes.dart';
 import 'git.dart';
+import 'lanes.dart';
+
+String formatCheckpointDate(String raw) {
+  final parsed = DateTime.tryParse(raw)?.toLocal();
+  if (parsed == null) return raw;
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(parsed.year, parsed.month, parsed.day);
+  final daysAgo = today.difference(day).inDays;
+  final hour = parsed.hour == 0
+      ? 12
+      : (parsed.hour > 12 ? parsed.hour - 12 : parsed.hour);
+  final minute = parsed.minute.toString().padLeft(2, '0');
+  final meridiem = parsed.hour >= 12 ? 'PM' : 'AM';
+  final time = '$hour:$minute $meridiem';
+
+  if (daysAgo == 0) return 'Today · $time';
+  if (daysAgo == 1) return 'Yesterday · $time';
+  if (daysAgo >= 0 && daysAgo < 7) {
+    const weekdays = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return '${weekdays[parsed.weekday - 1]} · $time';
+  }
+  const months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  final date = '${months[parsed.month - 1]} ${parsed.day}, ${parsed.year}';
+  return '$date · $time';
+}
 
 class SessionScreen extends StatefulWidget {
   final DaemonClient client;
@@ -44,6 +83,11 @@ class SessionScreen extends StatefulWidget {
   /// When set, opening a file from the Files browser opens it as a shell tab
   /// instead of pushing an editor route.
   final void Function(String path, String name)? onOpenFileTab;
+
+  /// Open a forked conversation (new tab / replace). Shell provides this so
+  /// fork can jump straight into the branch.
+  final void Function(String id, String title, String? profile)? onOpenSession;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -52,7 +96,8 @@ class SessionScreen extends StatefulWidget {
       this.profile,
       this.embedded = false,
       this.onMenu,
-      this.onOpenFileTab});
+      this.onOpenFileTab,
+      this.onOpenSession});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
 }
@@ -70,6 +115,11 @@ class _SessionScreenState extends State<SessionScreen>
   static String _registeredOpenKey = '';
   late final String _openKey;
   HarnessState? _state;
+  // Live token/thinking stream from attach `wire: stream` frames — NOT part of
+  // HarnessState. Must never be applied via fromJson (that wiped events empty).
+  String _liveText = '';
+  String _liveThinking = '';
+  bool _liveTextVisible = false;
   String? _connError;
   String? _modelLabel;
   String? _currentProfile;
@@ -103,9 +153,14 @@ class _SessionScreenState extends State<SessionScreen>
   // Nonce per pending message for dedup: _pendingNonce[i] is the nonce for _pending[i].
   // On reconnect resend, the same nonce is reused so the server drops duplicates.
   final List<String> _pendingNonce = [];
+  // user_input/steer count observed when each pending item was enqueued. Lets us
+  // retire by "echoes advanced past this baseline" even when a snapshot arrives
+  // with the same total as the previous local frame (no delta edge).
+  final List<int> _pendingEchoBaseline = [];
   // Monotonic counter for unique nonce IDs.
   int _nonceCounter = 0;
-  String _nextNonce() => '${++_nonceCounter}-${DateTime.now().microsecondsSinceEpoch}';
+  String _nextNonce() =>
+      '${++_nonceCounter}-${DateTime.now().microsecondsSinceEpoch}';
 
   // How many user turns (typed or steered) the daemon has echoed into the event
   // log — the FIFO baseline for retiring optimistic bubbles (see the socket
@@ -113,6 +168,71 @@ class _SessionScreenState extends State<SessionScreen>
   static int _userEchoCount(List<Map<String, dynamic>> events) => events
       .where((e) => e['kind'] == 'user_input' || e['kind'] == 'steer')
       .length;
+
+  static String _normEchoText(String s) =>
+      s.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  void _trackPending(String msg, String nonce) {
+    _pending.add(msg);
+    _pendingNonce.add(nonce);
+    _pendingEchoBaseline
+        .add(_userEchoCount(_state?.events ?? const <Map<String, dynamic>>[]));
+  }
+
+  void _clearPendingAll() {
+    _pending.clear();
+    _pendingNonce.clear();
+    _pendingEchoBaseline.clear();
+  }
+
+  void _popPendingFront() {
+    if (_pending.isEmpty) return;
+    _pending.removeAt(0);
+    if (_pendingNonce.isNotEmpty) _pendingNonce.removeAt(0);
+    if (_pendingEchoBaseline.isNotEmpty) _pendingEchoBaseline.removeAt(0);
+  }
+
+  void _removePendingAt(int i) {
+    if (i < 0 || i >= _pending.length) return;
+    _pending.removeAt(i);
+    if (i < _pendingNonce.length) _pendingNonce.removeAt(i);
+    if (i < _pendingEchoBaseline.length) _pendingEchoBaseline.removeAt(i);
+  }
+
+  /// Drop optimistic bubbles that the authoritative event log already contains.
+  /// Runs on every snapshot/delta — count-based retirement alone misses cases
+  /// where the echo is present but the local prev→next count edge is zero
+  /// (e.g. late snapshot after a missed delta, or reconnect race).
+  void _retirePendingAlreadyEchoed(List<Map<String, dynamic>> events) {
+    if (_pending.isEmpty) return;
+    final echoed = <String>{};
+    for (final e in events) {
+      final kind = e['kind'];
+      if (kind != 'user_input' && kind != 'steer') continue;
+      final t = e['text'];
+      if (t is String && t.trim().isNotEmpty) echoed.add(_normEchoText(t));
+    }
+    if (echoed.isEmpty) return;
+    var i = 0;
+    while (i < _pending.length) {
+      if (echoed.contains(_normEchoText(_pending[i]))) {
+        _removePendingAt(i);
+      } else {
+        i++;
+      }
+    }
+  }
+
+  /// Retire FIFO items whose baseline echo count has been surpassed.
+  void _retirePendingByBaseline(int nextEchoes) {
+    while (_pending.isNotEmpty) {
+      final base =
+          _pendingEchoBaseline.isNotEmpty ? _pendingEchoBaseline.first : -1;
+      if (nextEchoes <= base) break;
+      _popPendingFront();
+    }
+  }
+
   // Big-paste interception: a paste arrives as ONE controller change, so an
   // insertion this large can't be typing — pull it out of the field and attach
   // it as a text file instead (through the same _ingest pipeline as any file).
@@ -174,7 +294,14 @@ class _SessionScreenState extends State<SessionScreen>
   final List<_Attachment> _attachments = [];
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   static const int _maxAttachments = 5;
-  bool _didInitialScroll = false;
+  bool _transcriptDirty = true;
+  List<Widget>? _transcriptCache;
+  // Stream frame throttle: store the latest pending stream payload and flush
+  // at most every 50ms to avoid rebuilding the full widget tree on every token.
+  String _pendingLiveText = '';
+  String _pendingLiveThinking = '';
+  bool _pendingLiveTextVisible = false;
+  Timer? _streamFlushTimer;
   // Auto-reconnect: backoff timer + attempt counter; _closed stops retries on leave.
   Timer? _reconnectTimer;
   int _reconnectAttempt = 0;
@@ -346,7 +473,8 @@ class _SessionScreenState extends State<SessionScreen>
   void _connect() {
     if (_closed) return;
     _reconnectTimer?.cancel();
-    _bannerTimer?.cancel(); // suppress "Reconnecting…" if we reconnect before 60s
+    _bannerTimer
+        ?.cancel(); // suppress "Reconnecting…" if we reconnect before 60s
     // Fully detach the old socket first: cancel its subscription so its onDone
     // can't fire _scheduleReconnect against the NEW channel — that cascade
     // orphaned healthy sockets and double-applied every delta.
@@ -374,23 +502,75 @@ class _SessionScreenState extends State<SessionScreen>
           _outbox.clear();
         }
         try {
-          final j = jsonDecode(msg as String) as Map<String, dynamic>;
+          // web_socket_channel can deliver either a String or binary bytes for
+          // the same text frame depending on platform/proxy. Casting only to
+          // String throws, the catch resyncs forever, and the canvas stays empty.
+          final raw = switch (msg) {
+            final String s => s,
+            final Uint8List b => utf8.decode(b, allowMalformed: true),
+            final List<int> b => utf8.decode(b, allowMalformed: true),
+            _ => '',
+          };
+          if (raw.isEmpty) return;
+          final decoded = jsonDecode(raw);
+          if (decoded is! Map) return;
+          final j = decoded.cast<String, dynamic>();
           if (!mounted) return;
+          // Only snapshot/delta carry HarnessState. Stream frames are live
+          // token/thinking updates with no events — applying them via
+          // fromJson wiped the transcript to empty until the next real state
+          // frame (often only after a TUI-side persist).
+          final wire = j['wire'] as String? ?? 'snapshot';
+          if (wire == 'stream') {
+            final text = (j['text'] as String?) ?? '';
+            final thinking = (j['thinking'] as String?) ?? '';
+            final visible = j['text_visible'] == true;
+            if (!mounted) return;
+            // Ignore non-empty stream while the run is idle/stopped — a late
+            // frame after commit would re-show thinking/answer next to the
+            // durable AssistantText (duplicate bubble + sticky reasoning).
+            final status = _state?.status;
+            final liveOk = status == null ||
+                status == 'running' ||
+                status == 'waiting_for_input' ||
+                (text.isEmpty && thinking.isEmpty);
+            if (!liveOk) {
+              if (_liveText.isNotEmpty ||
+                  _liveThinking.isNotEmpty ||
+                  _liveTextVisible) {
+                setState(() {
+                  _liveText = '';
+                  _liveThinking = '';
+                  _liveTextVisible = false;
+                });
+              }
+              return;
+            }
+            // Throttle stream frames: store latest payload and flush at most
+            // every 50ms to avoid rebuilding the full widget tree on every token.
+            _pendingLiveText = text;
+            _pendingLiveThinking = thinking;
+            _pendingLiveTextVisible = visible;
+            if (_streamFlushTimer?.isActive ?? false) return;
+            _streamFlushTimer =
+                Timer(const Duration(milliseconds: 50), _flushStreamFrame);
+            return;
+          }
+          if (wire != 'snapshot' && wire != 'delta') return;
           final cur = _state;
-          final next = (j['wire'] == 'delta' && cur != null)
+          final next = (wire == 'delta' && cur != null)
               ? cur.applyDelta(j)
               : HarnessState.fromJson(j);
           // Drift check: our event log must line up with the server's count — a
           // mismatch (dropped/bad frame) resyncs via reconnect, since a fresh
           // socket's first frame is always a full snapshot.
           final ec = j['event_count'];
-          if (j['wire'] == 'delta' && ec is int && next.events.length != ec) {
+          if (wire == 'delta' && ec is int && next.events.length != ec) {
             _resync(ch);
             return;
           }
-          final firstLoad = !_didInitialScroll && next.events.isNotEmpty;
-          // Auto-follow while pinned to the bottom; the user scrolling up turns it
-          // off (and back on when they return) — content growth never does.
+          // A reversed transcript is anchored at offset 0 (latest). No initial
+          // jump is needed; preserve whether the user has scrolled into history.
           final follow = _stickToBottom;
           // Auto-submit queued messages only when the run lands on IDLE. Flushing
           // on any running→non-running edge also fired into waiting_for_input,
@@ -408,12 +588,11 @@ class _SessionScreenState extends State<SessionScreen>
               _queued.isNotEmpty) {
             for (var i = 0; i < _queued.length; i++) {
               final m = _queued[i];
-              final nonce = i < _queuedNonce.length
-                  ? _queuedNonce[i]
-                  : _nextNonce();
-              _send({'kind': 'user_message', 'value': m, 'nonce': nonce}, tracked: true);
-              _pending.add(m);
-              _pendingNonce.add(nonce);
+              final nonce =
+                  i < _queuedNonce.length ? _queuedNonce[i] : _nextNonce();
+              _send({'kind': 'user_message', 'value': m, 'nonce': nonce},
+                  tracked: true);
+              _trackPending(m, nonce);
             }
             _queued.clear();
             _queuedNonce.clear();
@@ -426,29 +605,30 @@ class _SessionScreenState extends State<SessionScreen>
             _pendingDecision = null;
             _decisionTimer?.cancel();
           }
-          // Retire optimistic bubbles as the daemon echoes user turns back —
-          // FIFO by COUNT of user_input/steer events, not by exact text (the
-          // daemon trims/normalizes, so text equality left stuck/dup bubbles).
-          // On a full snapshot, reconcile against the previous event log rather
-          // than blanket-clearing: a clear here erased just-sent messages that
-          // were flushed from the outbox but not yet echoed (they "vanished").
+          // Retire optimistic bubbles once the daemon has echoed them:
+          // 1) FIFO by echo-count delta (prev→next) when we have prior state
+          // 2) by per-item baseline (covers missed delta / same-count snapshot)
+          // 3) by normalized text match against the authoritative event log
+          //    (every frame — not only snapshots — so stuck faint bubbles clear)
           final prevEchoes = cur == null ? null : _userEchoCount(cur.events);
           final nextEchoes = _userEchoCount(next.events);
           if (prevEchoes != null) {
             var retired = (nextEchoes - prevEchoes).clamp(0, _pending.length);
             while (retired-- > 0) {
-              _pending.removeAt(0);
-              if (_pendingNonce.isNotEmpty) _pendingNonce.removeAt(0);
+              _popPendingFront();
             }
-          } else if (j['wire'] != 'delta') {
-            _pending
-                .clear(); // first-ever snapshot: nothing optimistic predates it
-            _pendingNonce.clear();
+          } else if (wire != 'delta') {
+            // first-ever snapshot: nothing optimistic predates it
+            _clearPendingAll();
+          }
+          if (_pending.isNotEmpty) {
+            _retirePendingByBaseline(nextEchoes);
+            _retirePendingAlreadyEchoed(next.events);
           }
           // First full snapshot after a (re)connect is authoritative: anything
           // still in _pending was never received by the server — resend it with
           // the same nonce so the server deduplicates if it DID land.
-          if (_freshConn && j['wire'] != 'delta') {
+          if (_freshConn && wire != 'delta') {
             _freshConn = false;
             for (var i = 0; i < _pending.length; i++) {
               final m = _pending[i];
@@ -475,36 +655,33 @@ class _SessionScreenState extends State<SessionScreen>
               }
             }
           }
+          // Only rebuild the transcript widget list when events actually
+          // changed — status-only deltas waste a full transcript rebuild.
+          final eventsChanged = cur == null ||
+              identical(next.events, cur.events) ||
+              next.events.length != cur.events.length ||
+              (next.events.isNotEmpty &&
+                  cur.events.isNotEmpty &&
+                  next.events.last != cur.events.last);
+          if (eventsChanged) _transcriptDirty = true;
           setState(() {
             _state = next;
-            _title = next.title ??
-                (next.userRequest.trim().isEmpty
-                    ? widget.title
-                    : next.userRequest);
+            _title = next.title ?? widget.title;
+            // Snapshot/delta commit durable events; drop partial stream so it
+            // doesn't double-render against AssistantText once it lands.
+            if (wire == 'snapshot' || wire == 'delta') {
+              _liveText = '';
+              _liveThinking = '';
+              _liveTextVisible = false;
+              // Cancel any in-flight stream throttle so stale frames don't
+              // re-apply after the snapshot/delta clears live state.
+              _streamFlushTimer?.cancel();
+              _streamFlushTimer = null;
+            }
           });
           // Re-arm (or cancel) the ack watchdog against the new _pending state.
           _armAckWatchdog();
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (firstLoad) {
-              _didInitialScroll = true;
-              // Jump to the bottom on open; re-jump to catch late layout growth
-              // (markdown/code blocks measure after the first frame).
-              _toBottom(jump: true);
-              Future.delayed(const Duration(milliseconds: 120), () {
-                if (mounted) _toBottom(jump: true);
-              });
-              Future.delayed(const Duration(milliseconds: 350), () {
-                if (mounted) _toBottom(jump: true);
-              });
-            } else if (follow) {
-              // Jump (not animate) so it reaches the true bottom even as a streaming
-              // reply keeps growing; a short re-jump catches late markdown layout.
-              _toBottom(jump: true);
-              Future.delayed(const Duration(milliseconds: 100), () {
-                if (mounted && _stickToBottom) _toBottom(jump: true);
-              });
-            }
-          });
+          if (follow) _scheduleBottom();
         } catch (_) {
           // A frame we couldn't apply would silently corrupt the transcript —
           // resync instead of swallowing it.
@@ -551,15 +728,31 @@ class _SessionScreenState extends State<SessionScreen>
     });
   }
 
+  // Throttled stream frame flush — called by the 50ms timer.
+  void _flushStreamFrame() {
+    if (_closed || !mounted) return;
+    final text = _pendingLiveText;
+    final thinking = _pendingLiveThinking;
+    final visible = _pendingLiveTextVisible;
+    setState(() {
+      _liveText = text;
+      _liveThinking = thinking;
+      _liveTextVisible = visible;
+    });
+    if (_stickToBottom && (text.isNotEmpty || thinking.isNotEmpty)) {
+      _scheduleBottom();
+    }
+  }
+
   // Whether to keep pinning to the latest message. Only the USER's own scrolling
   // flips this (see the NotificationListener) — content growth never does, so a
   // streaming reply keeps reaching the true bottom instead of falling behind.
   bool _stickToBottom = true;
 
-  // True when the view is pinned at (or near) the latest message.
+  // In a reversed list, offset 0 is the latest message.
   bool _atBottom() {
     if (!_scroll.hasClients) return true;
-    return _scroll.position.pixels >= _scroll.position.maxScrollExtent - 80;
+    return _scroll.position.pixels <= 80;
   }
 
   // Update the stick flag from a user-driven scroll (drag or settle).
@@ -576,14 +769,13 @@ class _SessionScreenState extends State<SessionScreen>
     return false;
   }
 
-  void _toBottom({bool jump = false}) {
+  void _scheduleBottom({bool settle = false, bool smooth = false}) {
     if (!_scroll.hasClients) return;
-    final target = _scroll.position.maxScrollExtent;
-    if (jump) {
-      _scroll.jumpTo(target);
-    } else {
-      _scroll.animateTo(target,
+    if (smooth) {
+      _scroll.animateTo(0,
           duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+    } else if (_scroll.offset != 0) {
+      _scroll.jumpTo(0);
     }
   }
 
@@ -656,9 +848,9 @@ class _SessionScreenState extends State<SessionScreen>
         _queued.add(msg);
         _queuedNonce.add(nonce);
       } else {
-        _send({'kind': 'user_message', 'value': msg, 'nonce': nonce}, tracked: true);
-        _pending.add(msg); // show it until the daemon echoes it back
-        _pendingNonce.add(nonce);
+        _send({'kind': 'user_message', 'value': msg, 'nonce': nonce},
+            tracked: true);
+        _trackPending(msg, nonce); // faint bubble until daemon echoes it
       }
       _attachments.clear();
     });
@@ -666,7 +858,7 @@ class _SessionScreenState extends State<SessionScreen>
     _armAckWatchdog(); // recover if this send silently dies on a dead socket
     // Sending is an explicit action — re-pin and jump to the bottom.
     _stickToBottom = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _toBottom(jump: true));
+    _scheduleBottom();
   }
 
   bool _isImageName(String n) {
@@ -852,12 +1044,13 @@ class _SessionScreenState extends State<SessionScreen>
       await _audioPlayer.stop();
       final file = File(path);
       if (await file.exists()) await file.delete();
-      if (mounted) setState(() {
-        _waveform.clear();
-        _playbackPosition = Duration.zero;
-        _playbackDuration = Duration.zero;
-        _isPlayingRecording = false;
-      });
+      if (mounted)
+        setState(() {
+          _waveform.clear();
+          _playbackPosition = Duration.zero;
+          _playbackDuration = Duration.zero;
+          _isPlayingRecording = false;
+        });
       return true;
     } catch (e) {
       _toast('Could not attach recording: $e');
@@ -1083,13 +1276,12 @@ class _SessionScreenState extends State<SessionScreen>
     final msg = _queued.removeAt(i);
     // Preserve the nonce reserved when the message was created. Reassigning a
     // new nonce here misaligns every later queued item after a steer/cancel.
-    final nonce = i < _queuedNonce.length
-        ? _queuedNonce.removeAt(i)
-        : _nextNonce();
-    _send({'kind': 'user_message', 'value': msg, 'nonce': nonce}, tracked: true);
+    final nonce =
+        i < _queuedNonce.length ? _queuedNonce.removeAt(i) : _nextNonce();
+    _send({'kind': 'user_message', 'value': msg, 'nonce': nonce},
+        tracked: true);
     setState(() {
-      _pending.add(msg);
-      _pendingNonce.add(nonce);
+      _trackPending(msg, nonce);
     });
     _armAckWatchdog();
   }
@@ -1133,6 +1325,7 @@ class _SessionScreenState extends State<SessionScreen>
     _reconnectTimer?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
+    _streamFlushTimer?.cancel();
     _sub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Only clear the suppression key if this screen still owns it — on a session
@@ -1153,9 +1346,7 @@ class _SessionScreenState extends State<SessionScreen>
       _outbox.clear();
       for (var i = 0; i < _queued.length; i++) {
         final m = _queued[i];
-        final nonce = i < _queuedNonce.length
-            ? _queuedNonce[i]
-            : _nextNonce();
+        final nonce = i < _queuedNonce.length ? _queuedNonce[i] : _nextNonce();
         ch.sink.add(jsonEncode({
           'kind': 'user_message',
           'value': m,
@@ -1204,7 +1395,11 @@ class _SessionScreenState extends State<SessionScreen>
     final running = status == 'running';
     final waiting = status == 'waiting_for_input';
     final events = s?.events ?? const [];
-    final items = _transcript(events);
+    if (_transcriptDirty || _transcriptCache == null) {
+      _transcriptCache = _transcript(events);
+      _transcriptDirty = false;
+    }
+    final items = _transcriptCache!;
     final scaffold = Scaffold(
       backgroundColor: readingBg,
       body: SafeArea(
@@ -1233,10 +1428,8 @@ class _SessionScreenState extends State<SessionScreen>
                       // selection across paragraphs, markdown blocks, and messages
                       // (per-widget SelectableText could never cross its own bounds).
                       child: SelectionArea(
-                        child: ListView(
-                          controller: _scroll,
-                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-                          children: [
+                        child: Builder(builder: (context) {
+                          final timeline = <Widget>[
                             if (items.isEmpty && !running)
                               const EmptyState(
                                   icon: 'terminal',
@@ -1244,14 +1437,29 @@ class _SessionScreenState extends State<SessionScreen>
                                   body: 'Send a task to get started.'),
                             ...items,
                             // Optimistic bubbles for messages sent but not yet echoed.
-                            // Pass full payload so Bubble can render attach pills.
-                            for (final p in _pending)
+                            for (var pi = 0; pi < _pending.length; pi++)
                               Opacity(
+                                  key: ValueKey(
+                                      'pending-$pi-${_pending[pi].hashCode}'),
                                   opacity: 0.5,
                                   child: Padding(
                                       padding:
                                           const EdgeInsets.only(bottom: 12),
-                                      child: Bubble(mine: true, text: p))),
+                                      child: Bubble(
+                                          mine: true, text: _pending[pi]))),
+                            if (_liveThinking.trim().isNotEmpty)
+                              Padding(
+                                key: const ValueKey('live-thinking'),
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: ThinkingMarkdown(data: _liveThinking),
+                              ),
+                            if (_liveTextVisible && _liveText.trim().isNotEmpty)
+                              Padding(
+                                key: const ValueKey('live-text'),
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child:
+                                    Bubble(mine: false, text: _liveText.trim()),
+                              ),
                             if (running) ...[
                               const SizedBox(height: 12),
                               const _TypingDots()
@@ -1259,17 +1467,30 @@ class _SessionScreenState extends State<SessionScreen>
                             if (_queued.isNotEmpty) ...[
                               const SizedBox(height: 12),
                               for (var qi = 0; qi < _queued.length; qi++)
-                                _QueuedBubble(
-                                  text: _queuedText(_queued[qi]),
-                                  audio: _queuedAttachCounts(_queued[qi]).$1,
-                                  images: _queuedAttachCounts(_queued[qi]).$2,
-                                  files: _queuedAttachCounts(_queued[qi]).$3,
-                                  onCancel: () => _cancelQueuedAt(qi),
-                                  onSteer: () => _steerQueuedAt(qi),
+                                KeyedSubtree(
+                                  key: ValueKey(
+                                      'queued-$qi-${_queued[qi].hashCode}'),
+                                  child: _QueuedBubble(
+                                    text: _queuedText(_queued[qi]),
+                                    audio: _queuedAttachCounts(_queued[qi]).$1,
+                                    images: _queuedAttachCounts(_queued[qi]).$2,
+                                    files: _queuedAttachCounts(_queued[qi]).$3,
+                                    onCancel: () => _cancelQueuedAt(qi),
+                                    onSteer: () => _steerQueuedAt(qi),
+                                  ),
                                 ),
                             ],
-                          ],
-                        ),
+                          ];
+                          return ListView.builder(
+                            controller: _scroll,
+                            reverse: true,
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                            itemCount: timeline.length,
+                            itemBuilder: (context, index) => RepaintBoundary(
+                              child: timeline[timeline.length - 1 - index],
+                            ),
+                          );
+                        }),
                       ),
                     )),
               // Floating "jump to latest": scrolling up unpins auto-follow, and a
@@ -1287,7 +1508,7 @@ class _SessionScreenState extends State<SessionScreen>
                       onTap: () {
                         _stickToBottom = true;
                         setState(() {});
-                        _toBottom(jump: true);
+                        _scheduleBottom(settle: true, smooth: true);
                       },
                       child: Padding(
                         padding: const EdgeInsets.all(8),
@@ -1888,7 +2109,11 @@ class _SessionScreenState extends State<SessionScreen>
         ? ClipRRect(
             borderRadius: BorderRadius.circular(R.sm),
             child: Image.file(File(a.localPath!),
-                width: 36, height: 36, fit: BoxFit.cover),
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+                cacheWidth: 72,
+                cacheHeight: 72),
           )
         : Container(
             height: 36,
@@ -2038,10 +2263,15 @@ class _SessionScreenState extends State<SessionScreen>
           final title = _s(e['title']);
           // Dedup by ID AND title — the same lane can be spawned with
           // different IDs on reconnect (resume), producing visual duplicates.
-          if (!laneRowsShown.contains(id) && !laneRowsShown.contains('t:$title')) {
+          if (!laneRowsShown.contains(id) &&
+              !laneRowsShown.contains('t:$title')) {
             laneRowsShown.add(id);
             laneRowsShown.add('t:$title');
-            out.add(LaneCard(title: title, live: () => liveLane(id)));
+            out.add(LaneNotice(
+              title: title,
+              live: () => liveLane(id),
+              onOpen: _showLanes,
+            ));
           }
         case 'lane_completed':
           endTools();
@@ -2049,10 +2279,12 @@ class _SessionScreenState extends State<SessionScreen>
           // The spawn card already tracks this lane live — only render a card
           // here if the spawn row is gone (e.g. compacted away).
           if (!laneRowsShown.contains(id)) {
-            out.add(LaneCard(
-                title: _s(e['title']),
-                live: () => liveLane(id),
-                summary: _s(e['summary'])));
+            out.add(LaneNotice(
+              title: _s(e['title']),
+              live: () => liveLane(id),
+              onOpen: _showLanes,
+              summary: _s(e['summary']),
+            ));
           }
         case 'user_question':
           endTools();
@@ -2299,74 +2531,15 @@ class _SessionScreenState extends State<SessionScreen>
     )).whenComplete(ctrl.dispose);
   }
 
-  // Live lane status: every delegated lane with a status dot, elapsed time for
-  // running ones, and the summary for finished ones.
   void _showLanes() {
-    final lanes = _state?.lanes ?? const <LaneInfo>[];
-    if (lanes.isEmpty) return;
-    String elapsed(String startedAt) {
-      final t = DateTime.tryParse(startedAt);
-      if (t == null) return '';
-      final d = DateTime.now().toUtc().difference(t.toUtc());
-      if (d.inMinutes < 1) return '${d.inSeconds}s';
-      if (d.inHours < 1) return '${d.inMinutes}m';
-      return '${d.inHours}h ${d.inMinutes % 60}m';
-    }
-
-    showAppSheet(context,
-        title: 'Lanes',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final l in lanes.reversed)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 5),
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: l.running
-                                ? AppColors.accent
-                                : (l.status == 'failed'
-                                    ? AppColors.danger
-                                    : AppColors.ok),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(l.title,
-                                  style: sans(13.5,
-                                      weight: FontWeight.w500,
-                                      color: AppColors.fg1)),
-                              const SizedBox(height: 2),
-                              Text(
-                                l.running
-                                    ? 'running · ${elapsed(l.startedAt)}'
-                                    : (l.summary?.trim().isNotEmpty == true
-                                        ? '${l.status} — ${l.summary}'
-                                        : l.status),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(11.5,
-                                    height: 1.35, color: AppColors.fg3),
-                              ),
-                            ]),
-                      ),
-                    ]),
-              ),
-          ],
-        ));
+    if ((_state?.lanes ?? const <LaneInfo>[]).isEmpty) return;
+    presentScreen(
+      context,
+      builder: (_, close) => LanesScreen(
+        liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
+        onClose: close,
+      ),
+    );
   }
 
   void _showUsage() {
@@ -2493,11 +2666,15 @@ class _SessionScreenState extends State<SessionScreen>
                                     height: 1.2,
                                     color: AppColors.fg1)),
                             const SizedBox(height: 3),
-                            Text(c.createdAt,
+                            Text(formatCheckpointDate(c.createdAt),
                                 style: mono(11, color: AppColors.fg3)),
                           ]),
                     ),
-                    AppIcon('rotate', size: 16, color: AppColors.fg4),
+                    IconBtn('git-branch',
+                        size: 32,
+                        iconSize: 16,
+                        tooltip: 'Fork from here',
+                        onTap: () => _confirmFork(c)),
                   ]),
                 ),
               )),
@@ -2545,6 +2722,181 @@ class _SessionScreenState extends State<SessionScreen>
     try {
       await widget.client.rewind(widget.sessionId, c.id);
       _toast('Workspace restored');
+    } catch (e) {
+      _toast('$e');
+    }
+  }
+
+  // Kept temporarily for compatibility with any in-flight route callbacks; the
+  // user-facing fork entry now lives only inside Checkpoints.
+  // ignore: unused_element
+  void _showForkPoints() {
+    final s = _state;
+    if (s == null) return;
+    final cps = s.checkpoints.reversed.toList();
+    showAppSheet(context,
+        title: 'Fork conversation',
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+            child: Text(
+              'Creates a new session with history up to the point you pick. '
+              'This chat is left unchanged. Workspace files are shared.',
+              style: sans(12.5, height: 1.45, color: AppColors.fg3),
+            ),
+          ),
+          if (cps.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                      'No checkpoints yet — you can still fork the full history.',
+                      style: sans(12.5, color: AppColors.fg3)),
+                  const SizedBox(height: 12),
+                  Btn('Fork full history', onTap: () => _confirmFork(null)),
+                ],
+              ),
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AppCard(
+                padding: const EdgeInsets.all(13),
+                onTap: () => _confirmFork(null),
+                child: Row(children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: AppIcon('git-branch',
+                        size: 17, color: AppColors.accent),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Full history',
+                            style: sans(13,
+                                weight: FontWeight.w500, color: AppColors.fg1)),
+                        const SizedBox(height: 3),
+                        Text('Branch everything so far',
+                            style: mono(11, color: AppColors.fg3)),
+                      ],
+                    ),
+                  ),
+                  AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+                ]),
+              ),
+            ),
+            ...cps.map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: AppCard(
+                    padding: const EdgeInsets.all(13),
+                    onTap: () => _confirmFork(c),
+                    child: Row(children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: AppIcon('git-branch',
+                            size: 17, color: AppColors.fg3),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(c.label.isEmpty ? c.id : c.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(13,
+                                    weight: FontWeight.w500,
+                                    height: 1.2,
+                                    color: AppColors.fg1)),
+                            const SizedBox(height: 3),
+                            Text(formatCheckpointDate(c.createdAt),
+                                style: mono(11, color: AppColors.fg3)),
+                          ],
+                        ),
+                      ),
+                      AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+                    ]),
+                  ),
+                )),
+          ],
+        ]));
+  }
+
+  Future<void> _confirmFork(Checkpoint? c) async {
+    final label =
+        c == null ? 'full history' : (c.label.isEmpty ? c.id : c.label);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: AppColors.surface1,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: AppColors.border2)),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Fork conversation?',
+                    style: sans(15,
+                        weight: FontWeight.w600, color: AppColors.fg1)),
+                const SizedBox(height: 6),
+                Text(
+                    'Opens a new session branched at “$label”. '
+                    'This chat stays as-is. Files on disk are shared.',
+                    style: sans(12.5, height: 1.5, color: AppColors.fg3)),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(
+                      child: Btn('Cancel',
+                          variant: BtnVariant.ghost,
+                          onTap: () => Navigator.pop(context, false))),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Btn('Fork',
+                          onTap: () => Navigator.pop(context, true))),
+                ]),
+              ]),
+        ),
+      ),
+    );
+    if (ok != true) return;
+    if (mounted) Navigator.pop(context); // close the sheet
+    try {
+      final result = await widget.client.forkSession(
+        widget.sessionId,
+        checkpoint: c?.id,
+        eventIndex: c == null && (_state?.events.isNotEmpty ?? false)
+            ? _state!.events.length - 1
+            : null,
+      );
+      final id = result['id']?.toString() ?? '';
+      final title = result['title']?.toString() ?? 'fork';
+      if (id.isEmpty) {
+        _toast('Fork created but no session id returned');
+        return;
+      }
+      final open = widget.onOpenSession;
+      if (open != null) {
+        open(id, title, widget.profile);
+      } else {
+        _toast('Forked → $title');
+      }
     } catch (e) {
       _toast('$e');
     }
@@ -2664,7 +3016,8 @@ class _QueuedBubble extends StatelessWidget {
             GestureDetector(
               onTap: onSteer,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.accentBg,
                   borderRadius: BorderRadius.circular(R.sm),

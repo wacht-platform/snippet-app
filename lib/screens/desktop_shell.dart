@@ -102,6 +102,7 @@ class _DesktopShellState extends State<DesktopShell> {
   @override
   void dispose() {
     _sessionsTicker?.cancel();
+    _persistTabsDebounce?.cancel();
     _pageController.dispose();
     _stripController.dispose();
     if (onNotifTap == _onNotif) onNotifTap = null;
@@ -130,19 +131,26 @@ class _DesktopShellState extends State<DesktopShell> {
     }
   }
 
+  Timer? _persistTabsDebounce;
   void _persistTabs() {
-    _store.saveOpenTabs(
-      _tabs
-          .map((t) => OpenTabDescriptor(
-                instanceUrl: t.instanceUrl,
-                sessionId: t.sessionId,
-                filePath: t.filePath,
-                title: t.title,
-                profile: t.profile,
-              ))
-          .toList(),
-      _activeIndex,
-    );
+    // Debounce rapid tab mutations (close/open/reorder) to avoid N
+    // sequential SharedPreferences writes in a single frame.
+    _persistTabsDebounce?.cancel();
+    _persistTabsDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      _store.saveOpenTabs(
+        _tabs
+            .map((t) => OpenTabDescriptor(
+                  instanceUrl: t.instanceUrl,
+                  sessionId: t.sessionId,
+                  filePath: t.filePath,
+                  title: t.title,
+                  profile: t.profile,
+                ))
+            .toList(),
+        _activeIndex,
+      );
+    });
   }
 
   Future<void> _restoreTabs(List<Instance> instances) async {
@@ -575,8 +583,9 @@ class _DesktopShellState extends State<DesktopShell> {
             key: _scaffoldKey,
             backgroundColor: readingBg,
             onDrawerChanged: (open) => setState(() => _drawerOpen = open),
-            // Wider left-edge swipe target on phones so the sidebar is easy to pull open.
-            drawerEdgeDragWidth: kMobile ? 56 : 24,
+            // Keep drawer gestures confined to the physical edge. A wide edge
+            // target competes with fast, slightly angled transcript scrolling.
+            drawerEdgeDragWidth: kMobile ? 20 : 24,
             drawer: Drawer(
               width: drawerW,
               backgroundColor: AppColors.bg,
@@ -638,16 +647,6 @@ class _DesktopShellState extends State<DesktopShell> {
                     notification.metrics.axis == Axis.horizontal) {
                   FocusManager.instance.primaryFocus?.unfocus();
                 }
-                if (onMenu != null && _activeIndex == 0) {
-                  if (notification is OverscrollNotification &&
-                      notification.overscroll < -6.0) {
-                    onMenu();
-                  } else if (notification is ScrollUpdateNotification &&
-                      (notification.metrics.pixels <= 0) &&
-                      (notification.scrollDelta ?? 0) < -6.0) {
-                    onMenu();
-                  }
-                }
                 return false;
               },
               child: PageView.builder(
@@ -684,6 +683,7 @@ class _DesktopShellState extends State<DesktopShell> {
                             onMenu: null,
                             onOpenFileTab: (path, name) => _openFileTab(
                                 t.client, t.instanceUrl, path, name),
+                            onOpenSession: _openSession,
                           ),
                   );
                 },
@@ -996,33 +996,49 @@ class _SidebarState extends State<_Sidebar> {
   void _showFilterSheet() {
     final counts = <String, int>{
       'all': widget.sessions?.length ?? 0,
-      'input': widget.sessions?.where((s) => s.status == 'waiting_for_input').length ?? 0,
-      'running': widget.sessions?.where((s) => s.status == 'running').length ?? 0,
-      'done': widget.sessions?.where((s) => s.status != 'waiting_for_input' && s.status != 'running').length ?? 0,
+      'input': widget.sessions
+              ?.where((s) => s.status == 'waiting_for_input')
+              .length ??
+          0,
+      'running':
+          widget.sessions?.where((s) => s.status == 'running').length ?? 0,
+      'done': widget.sessions
+              ?.where((s) =>
+                  s.status != 'waiting_for_input' && s.status != 'running')
+              .length ??
+          0,
     };
-    showAppSheet(context,
-        title: 'Filter conversations',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final (val, label) in [('all', 'All'), ('input', 'Needs input'), ('running', 'Running'), ('done', 'Done')]) ...[
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text(label, style: sans(16, color: _filter == val ? AppColors.accent : AppColors.fg1)),
-                trailing: Text('${counts[val] ?? 0}',
-                    style: sans(14, color: AppColors.fg3)),
-                onTap: () {
-                  setState(() => _filter = val);
-                  Navigator.pop(context);
-                },
-              ),
-              if (val != 'done')
-                Divider(height: 1, color: AppColors.border),
-            ],
+    showAppSheet(
+      context,
+      title: 'Filter conversations',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (val, label) in [
+            ('all', 'All'),
+            ('input', 'Needs input'),
+            ('running', 'Running'),
+            ('done', 'Done')
+          ]) ...[
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(label,
+                  style: sans(16,
+                      color:
+                          _filter == val ? AppColors.accent : AppColors.fg1)),
+              trailing: Text('${counts[val] ?? 0}',
+                  style: sans(14, color: AppColors.fg3)),
+              onTap: () {
+                setState(() => _filter = val);
+                Navigator.pop(context);
+              },
+            ),
+            if (val != 'done') Divider(height: 1, color: AppColors.border),
           ],
-        ),
-      );
+        ],
+      ),
+    );
   }
 
   void _openSearch() {
@@ -1064,40 +1080,42 @@ class _SidebarState extends State<_Sidebar> {
         if (kMobile) ...[
           // Mobile: full-height conversations list with the machine row at the bottom.
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              // Conversations section header with filter icon.
-              if (hasClient && (_sessions?.isNotEmpty ?? false))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-                  child: Row(children: [
-                    Text('Conversations',
-                        style: sans(20,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: _showFilterSheet,
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(Icons.filter_list_rounded,
-                            size: 24,
-                            color: _filter != 'all'
-                                ? AppColors.accent
-                                : AppColors.fg3),
-                      ),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Conversations section header with filter icon.
+                  if (hasClient && (_sessions?.isNotEmpty ?? false))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                      child: Row(children: [
+                        Text('Conversations',
+                            style: sans(20,
+                                weight: FontWeight.w600, color: AppColors.fg1)),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _showFilterSheet,
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(Icons.filter_list_rounded,
+                                size: 24,
+                                color: _filter != 'all'
+                                    ? AppColors.accent
+                                    : AppColors.fg3),
+                          ),
+                        ),
+                      ]),
                     ),
-                  ]),
-                ),
-              Expanded(
-                child: !hasClient
-                    ? Center(
-                        child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Text('Add a machine to begin.',
-                                textAlign: TextAlign.center,
-                                style: sans(12.5, color: AppColors.fg4))))
-                    : _sessionList(),
-              ),
-            ]),
+                  Expanded(
+                    child: !hasClient
+                        ? Center(
+                            child: Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Text('Add a machine to begin.',
+                                    textAlign: TextAlign.center,
+                                    style: sans(12.5, color: AppColors.fg4))))
+                        : _sessionList(),
+                  ),
+                ]),
           ),
           // Bottom actions row: search + folder + settings + machine avatar.
           _mobileBottomBar(),
@@ -1177,7 +1195,13 @@ class _SidebarState extends State<_Sidebar> {
     final a = widget.active;
     return Container(
       padding: EdgeInsets.fromLTRB(
-          20, 8, 20, 10 + MediaQuery.of(context).padding.bottom), // safe-area-ish bottom padding
+          20,
+          8,
+          20,
+          10 +
+              MediaQuery.of(context)
+                  .padding
+                  .bottom), // safe-area-ish bottom padding
       decoration: BoxDecoration(
         color: AppColors.bg,
         border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
@@ -1219,7 +1243,9 @@ class _SidebarState extends State<_Sidebar> {
         // Small machine avatar — tap to switch machines.
         GestureDetector(
           onTap: hasClient
-              ? (widget.instances.isEmpty ? widget.onAddInstance : _openMachines)
+              ? (widget.instances.isEmpty
+                  ? widget.onAddInstance
+                  : _openMachines)
               : null,
           child: Container(
             width: 32,
@@ -1234,8 +1260,8 @@ class _SidebarState extends State<_Sidebar> {
                 ? AppIcon('plus', size: 14, color: AppColors.fg2)
                 : Text(
                     (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
-                    style: sans(13,
-                        weight: FontWeight.w600, color: AppColors.fg1),
+                    style:
+                        sans(13, weight: FontWeight.w600, color: AppColors.fg1),
                   ),
           ),
         ),
@@ -1514,7 +1540,7 @@ class _SidebarState extends State<_Sidebar> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  Text(
+                Text(
                   s.title.isEmpty ? '(untitled)' : s.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1538,7 +1564,8 @@ class _SidebarState extends State<_Sidebar> {
           if (running || waiting) ...[
             const SizedBox(width: 8),
             Container(
-              width: 8, height: 8,
+              width: 8,
+              height: 8,
               decoration: BoxDecoration(
                 color: running ? AppColors.run : AppColors.accent,
                 shape: BoxShape.circle,
@@ -1547,7 +1574,8 @@ class _SidebarState extends State<_Sidebar> {
           ],
           const SizedBox(width: 8),
           IconBtn('more-vertical',
-              size: 28, iconSize: 16,
+              size: 28,
+              iconSize: 16,
               tooltip: 'Options',
               onTap: () => _sessionActions(s)),
         ]),
