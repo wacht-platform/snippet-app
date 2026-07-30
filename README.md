@@ -43,7 +43,9 @@ Open the link on your phone and tap the file to install (allow *"install unknown
 
 - **Sessions across every machine** you've connected — open, resume, rename, delete; switch machines from a dropdown in the header.
 - **Tabs** — keep multiple sessions and files open at once; a strip under the toolbar switches between them, or swipe.
-- **Chat** with the agent: streaming replies, inline tool activity, approvals, and steering mid-run. Markdown is fully **selectable** for copy-out.
+- **Chat** with the agent: streaming replies, selectable Markdown, inline tool activity, approvals, steering mid-run, live titles, and compact thinking/tool details.
+- **Bottom-anchored transcript** — opens on the latest message and lazily loads older history as you scroll upward.
+- **Delegated lanes** — a dedicated screen shows each background agent’s state, summary, and recent activity, including recovered work after reconnects.
 - **Files** — browse, view with syntax highlighting, edit (with conflict detection), upload, download, create folders, select/delete — with or without a session open.
 - **Media** — preview **images** inline and **stream videos** straight from the daemon over HTTP range requests, without downloading first.
 - **Downloads that land where you expect** — saved to your device's **Downloads** folder with a native notification and **Open** / **Share** actions.
@@ -65,8 +67,8 @@ Requires the [Flutter SDK](https://docs.flutter.dev/get-started/install).
 flutter pub get
 flutter run                                      # a connected Android device / emulator
 
-flutter build apk --release --target-platform android-arm64   # slim arm64 APK (what CI ships)
-flutter build apk --release                                   # universal APK (all ABIs, larger)
+flutter build apk --release --split-per-abi
+# CI and releases publish build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
 
 ## The agent itself
