@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -292,6 +293,7 @@ class _SessionScreenState extends State<SessionScreen>
   // Pending attachments (images + files, up to 5): each uploads to the daemon
   // and is referenced in the next message. Images → read_image, files → read.
   final List<_Attachment> _attachments = [];
+  bool _draggingFiles = false;
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   static const int _maxAttachments = 5;
   bool _transcriptDirty = true;
@@ -1555,7 +1557,14 @@ class _SessionScreenState extends State<SessionScreen>
         ]),
       ),
     );
-    return scaffold;
+    return kMacOS
+        ? DropTarget(
+            onDragEntered: (_) => setState(() => _draggingFiles = true),
+            onDragExited: (_) => setState(() => _draggingFiles = false),
+            onDragDone: _ingestDroppedFiles,
+            child: scaffold,
+          )
+        : scaffold;
   }
 
   Future<void> _renameCurrent() async {
@@ -1996,6 +2005,34 @@ class _SessionScreenState extends State<SessionScreen>
       !_anyUploading &&
       !_sendingAudio;
 
+  Future<void> _ingestDroppedFiles(DropDoneDetails details) async {
+    if (!kMacOS) return;
+    setState(() => _draggingFiles = false);
+    final files = details.files.whereType<DropItemFile>().map((item) {
+      final bookmark = item.extraAppleBookmark;
+      return (
+        name: item.name,
+        localPath: item.path,
+        readBytes: () async {
+          var accessed = false;
+          try {
+            if (bookmark != null && bookmark.isNotEmpty) {
+              accessed = await DesktopDrop.instance
+                  .startAccessingSecurityScopedResource(bookmark: bookmark);
+            }
+            return await item.readAsBytes();
+          } finally {
+            if (accessed) {
+              await DesktopDrop.instance
+                  .stopAccessingSecurityScopedResource(bookmark: bookmark!);
+            }
+          }
+        },
+      );
+    }).toList();
+    await _ingest(files);
+  }
+
   Widget _inputBar(bool running) {
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -2010,7 +2047,9 @@ class _SessionScreenState extends State<SessionScreen>
             Container(
               decoration: BoxDecoration(
                 color: AppColors.surface2,
-                border: Border.all(color: AppColors.border),
+                border: Border.all(
+                    color: _draggingFiles ? AppColors.accent : AppColors.border,
+                    width: _draggingFiles ? 1.5 : 1),
                 borderRadius: BorderRadius.circular(R.card),
               ),
               padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
