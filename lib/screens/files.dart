@@ -4,13 +4,13 @@ import 'package:chewie/chewie.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_store_plus/media_store_plus.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
 import '../api.dart';
+import '../file_actions.dart';
 import '../highlight.dart';
 import '../models.dart';
 import '../notifications.dart';
@@ -894,8 +894,8 @@ Future<void> _downloadDoneSheetFor(
         ],
       ));
   if (action == 'open') {
-    final r = await OpenFilex.open(path);
-    if (r.type != ResultType.done) shareFile();
+    final opened = await openLocalFile(path);
+    if (!opened) shareFile();
   } else if (action == 'share') {
     shareFile();
   }

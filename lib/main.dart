@@ -10,14 +10,17 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Theme: load persisted selection before first frame.
-  await ThemeManager.instance.init();
-  // Notifications: foreground service on mobile, in-process /events watcher on
-  // desktop (macOS/Linux). Tapping one is handled by the shell (it opens the
-  // session in-place), so there's no separate full-screen route.
+  // Theme and notification setup must never prevent the first frame. A native
+  // plugin can be unavailable or permission-gated on a new desktop install;
+  // the app remains usable and the feature can be retried from Settings.
+  try {
+    await ThemeManager.instance.init();
+  } catch (_) {}
   if (kCanNotify) {
-    await initNotifications();
-    await resumeWatchingIfEnabled();
+    try {
+      await initNotifications();
+      await resumeWatchingIfEnabled();
+    } catch (_) {}
   }
   runApp(const SnippetApp());
 }

@@ -13,7 +13,7 @@ The remote client for [**snippet**](https://github.com/wacht-platform/snippet-se
 [![built with Flutter](https://img.shields.io/badge/built%20with-Flutter-02569B.svg)](https://flutter.dev)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
-A native **Android** app — one adaptive UI that also scales up on tablets.
+A native **Android** app plus a **macOS desktop app** — one adaptive UI that scales from phones to large windows.
 
 _Built by the team behind [Wacht](https://wacht.dev) — open-source infrastructure for AI-native apps._
 
@@ -33,11 +33,11 @@ Open the link on your phone and tap the file to install (allow *"install unknown
 
 ## Platforms
 
-| Platform            | Status                        |
-| ------------------- | ----------------------------- |
-| **Android** (arm64) | ✅ Primary target — polished  |
-
-> Looking for a desktop client? It's a separate native app — see [snippet-desktop](https://github.com/wacht-platform/snippet-desktop).
+| Platform            | Status                              |
+| ------------------- | ----------------------------------- |
+| **Android** (arm64) | ✅ Primary target — polished        |
+| **macOS**           | ✅ Desktop target — unsigned build  |
+| **Web**              | ✅ Browser preview                  |
 
 ## Features
 
@@ -69,6 +69,10 @@ flutter run                                      # a connected Android device / 
 
 flutter build apk --release --split-per-abi
 # CI and releases publish build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+
+# macOS (run on macOS with Xcode installed)
+flutter build macos --release
+# output: build/macos/Build/Products/Release/snippet.app
 ```
 
 ## The agent itself

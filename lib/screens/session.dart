@@ -912,14 +912,21 @@ class _SessionScreenState extends State<SessionScreen>
     }
   }
 
+  static const _maxRecordingDuration = Duration(minutes: 3);
+
   Future<void> _startRecording() async {
-    if (!kMobile) return;
-    final granted = await Permission.microphone.request();
-    if (!granted.isGranted) {
-      _toast(granted.isPermanentlyDenied
-          ? 'Microphone permission is blocked; enable it in app settings.'
-          : 'Microphone permission is required.');
-      if (granted.isPermanentlyDenied) await openAppSettings();
+    if (!kCanRecord) return;
+    final granted = kMobile
+        ? (await Permission.microphone.request()).isGranted
+        : await _recorder.hasPermission();
+    if (!granted) {
+      _toast(kMobile
+          ? 'Microphone permission is required.'
+          : 'Microphone permission is required by macOS.');
+      if (kMobile) {
+        final status = await Permission.microphone.status;
+        if (status.isPermanentlyDenied) await openAppSettings();
+      }
       return;
     }
     try {
@@ -957,8 +964,14 @@ class _SessionScreenState extends State<SessionScreen>
       });
       _recordingTimer?.cancel();
       _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (mounted) {
-          setState(() => _recordingElapsed += const Duration(seconds: 1));
+        if (!mounted) return;
+        final next = _recordingElapsed + const Duration(seconds: 1);
+        if (next >= _maxRecordingDuration) {
+          setState(() => _recordingElapsed = _maxRecordingDuration);
+          unawaited(_stopRecording());
+          _toast('Recording stopped at the 3-minute limit.');
+        } else {
+          setState(() => _recordingElapsed = next);
         }
       });
       if (mounted) {
@@ -1315,7 +1328,9 @@ class _SessionScreenState extends State<SessionScreen>
       } catch (_) {}
     }
     try {
-      await _recorder.dispose();
+      if (kCanRecord) {
+        await _recorder.dispose();
+      }
     } catch (_) {}
   }
 
@@ -2062,7 +2077,7 @@ class _SessionScreenState extends State<SessionScreen>
                         ),
                       ),
                       const Spacer(),
-                      if (kMobile)
+                      if (kCanRecord)
                         IconBtn(
                           _isRecording ? 'mic-off' : 'mic',
                           size: 36,
@@ -2072,7 +2087,7 @@ class _SessionScreenState extends State<SessionScreen>
                               _isRecording ? 'Stop recording' : 'Record voice',
                           onTap: _onMicTap,
                         ),
-                      if (kMobile) const SizedBox(width: 2),
+                      if (kCanRecord) const SizedBox(width: 2),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _input,
                         builder: (_, __, ___) => _SendBtn(

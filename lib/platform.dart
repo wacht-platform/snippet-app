@@ -15,6 +15,10 @@ bool get kDesktopNotify =>
     (defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.linux);
 
+/// True wherever the recorder can capture voice input. macOS uses the native
+/// record_macos plugin and requests permission through AudioRecorder itself.
+bool get kCanRecord => kMobile || kMacOS;
+
 /// True wherever we can deliver session notifications at all.
 bool get kCanNotify => kMobile || kDesktopNotify;
 

@@ -518,7 +518,9 @@ class _DesktopShellState extends State<DesktopShell> {
     _syncPage();
   }
 
-  Widget _sidebar({VoidCallback? onAfterPick}) => _Sidebar(
+  Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) =>
+      _Sidebar(
+        topInset: topInset,
         instances: _instances,
         active: _active,
         client: _client,
@@ -548,6 +550,82 @@ class _DesktopShellState extends State<DesktopShell> {
     final i = _tabs.indexWhere((t) => t.sessionId == id);
     if (i >= 0) _closeTab(i);
     _loadSessions();
+  }
+
+  Widget _macWindowBar() {
+    final activeTitle = _activeTab?.title.trim();
+    final machine = _active;
+    final online = machine == null ? null : _health[machine.url];
+    return SizedBox(
+      height: kMacTitlebar + 10,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.bg.withValues(alpha: 0.96),
+          border: Border(bottom: BorderSide(color: AppColors.border)),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 78, right: 14),
+              child: Row(children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: AppColors.accentBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.accentLine),
+                  ),
+                  alignment: Alignment.center,
+                  child: AppIcon('cpu', size: 12, color: AppColors.accent),
+                ),
+                const SizedBox(width: 8),
+                Text('snippet',
+                    style: sans(13,
+                        weight: FontWeight.w600, color: AppColors.fg1)),
+                const Spacer(),
+                if (machine != null) ...[
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: online == true ? AppColors.ok : AppColors.fg4,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 180),
+                    child: Text(machine.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: mono(10.5, color: AppColors.fg3)),
+                  ),
+                ],
+              ]),
+            ),
+            IgnorePointer(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Text(
+                    activeTitle == null || activeTitle.isEmpty
+                        ? 'Snippet'
+                        : activeTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: sans(12.5,
+                        weight: FontWeight.w500, color: AppColors.fg2),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -592,6 +670,7 @@ class _DesktopShellState extends State<DesktopShell> {
               shape: const RoundedRectangleBorder(),
               child: SafeArea(
                   child: _sidebar(
+                      topInset: !kMacOS,
                       onAfterPick: () =>
                           _scaffoldKey.currentState?.closeDrawer())),
             ),
@@ -612,10 +691,16 @@ class _DesktopShellState extends State<DesktopShell> {
       return Scaffold(
         backgroundColor: readingBg,
         body: SafeArea(
-          child: Row(children: [
-            SizedBox(width: 300, child: _sidebar()),
-            VerticalDivider(width: 1, thickness: 1, color: AppColors.border),
-            Expanded(child: _mainPane()),
+          child: Column(children: [
+            if (kMacOS) _macWindowBar(),
+            Expanded(
+              child: Row(children: [
+                SizedBox(width: 300, child: _sidebar(topInset: !kMacOS)),
+                VerticalDivider(
+                    width: 1, thickness: 1, color: AppColors.border),
+                Expanded(child: _mainPane()),
+              ]),
+            ),
           ]),
         ),
       );
@@ -961,6 +1046,7 @@ class _Sidebar extends StatefulWidget {
   final void Function(String id) onSessionDeleted;
   final Map<String, bool> health;
   final VoidCallback onRefreshHealth;
+  final bool topInset;
   const _Sidebar({
     required this.instances,
     required this.active,
@@ -979,6 +1065,7 @@ class _Sidebar extends StatefulWidget {
     required this.onSessionDeleted,
     required this.health,
     required this.onRefreshHealth,
+    required this.topInset,
   });
   @override
   State<_Sidebar> createState() => _SidebarState();
@@ -1074,9 +1161,8 @@ class _SidebarState extends State<_Sidebar> {
     return Container(
       color: AppColors.bg, // shell surface — darker than the chat canvas
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(
-            height:
-                kMacOS ? kMacTitlebar + 6 : 10), // clear the window controls
+        SizedBox(height: widget.topInset && kMacOS ? kMacTitlebar + 6 : 10),
+        // clear the window controls when this sidebar owns the title edge
         if (kMobile) ...[
           // Mobile: full-height conversations list with the machine row at the bottom.
           Expanded(

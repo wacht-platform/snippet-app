@@ -265,14 +265,14 @@ void openMarkdownLink(String? href) {
 /// rebuild — the stylesheet is pure allocation and identical across the session
 /// lifetime when the theme doesn't change.
 MarkdownStyleSheet? _cachedMarkdownStyle;
-Brightness? _cachedMarkdownBrightness;
+int? _cachedMarkdownThemeIndex;
 
 MarkdownStyleSheet markdownStyle(BuildContext context) {
-  final brightness = Theme.of(context).brightness;
-  if (_cachedMarkdownStyle != null && _cachedMarkdownBrightness == brightness) {
+  final themeIndex = ThemeManager.instance.index;
+  if (_cachedMarkdownStyle != null && _cachedMarkdownThemeIndex == themeIndex) {
     return _cachedMarkdownStyle!;
   }
-  _cachedMarkdownBrightness = brightness;
+  _cachedMarkdownThemeIndex = themeIndex;
   _cachedMarkdownStyle =
       MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
     p: sans(16, height: 1.5, color: AppColors.fg1),
@@ -308,10 +308,20 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
 
 /// Dimmed markdown for live model thinking/reasoning — same structure as
 /// [markdownStyle], quieter palette so it reads as an aside, not the answer.
+MarkdownStyleSheet? _cachedThinkingMarkdownStyle;
+int? _cachedThinkingMarkdownThemeIndex;
+
 MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
+  final themeIndex = ThemeManager.instance.index;
+  if (_cachedThinkingMarkdownStyle != null &&
+      _cachedThinkingMarkdownThemeIndex == themeIndex) {
+    return _cachedThinkingMarkdownStyle!;
+  }
+  _cachedThinkingMarkdownThemeIndex = themeIndex;
   final dim = AppColors.fg3;
   final dim2 = AppColors.fg4;
-  return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+  _cachedThinkingMarkdownStyle =
+      MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
     p: sans(13.5, height: 1.45, color: dim),
     pPadding: EdgeInsets.zero,
     em: sans(13.5, height: 1.45, color: dim)
@@ -340,18 +350,29 @@ MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
     horizontalRuleDecoration:
         BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
   );
+  return _cachedThinkingMarkdownStyle!;
 }
 
 /// Live thinking/reasoning stream — full markdown, dimmed.
 class ThinkingMarkdown extends StatelessWidget {
+  static const _liveTailChars = 12000;
   final String data;
   const ThinkingMarkdown({super.key, required this.data});
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final text = data.trim();
+    var text = data.trim();
     if (text.isEmpty) return const SizedBox.shrink();
+    if (text.length > _liveTailChars) {
+      var start = text.length - _liveTailChars;
+      if (start < text.length &&
+          text.codeUnitAt(start) >= 0xDC00 &&
+          text.codeUnitAt(start) <= 0xDFFF) {
+        start++;
+      }
+      text = '…\n\n${text.substring(start)}';
+    }
     return MarkdownBody(
       data: text,
       selectable: false,

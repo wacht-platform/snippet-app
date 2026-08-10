@@ -1,0 +1,51 @@
+name: macos
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build macOS app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
+
+      - name: Test Dart code
+        run: flutter test --no-pub
+
+      - name: Build unsigned macOS app
+        run: flutter build macos --release
+
+      - name: Package app
+        run: |
+          set -euo pipefail
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent snippet.app "$GITHUB_WORKSPACE/snippet-macos.zip"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snippet-macos-${{ github.sha }}
+          path: snippet-macos.zip
+          if-no-files-found: error

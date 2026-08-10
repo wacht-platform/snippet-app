@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'file_actions.dart';
 import 'models.dart';
 import 'platform.dart';
 import 'store.dart';
@@ -255,7 +255,7 @@ void _route(String payload) {
     // A download notification opens the saved file directly, not a session.
     if (m['type'] == 'download') {
       final path = m['path'] as String?;
-      if (path != null) OpenFilex.open(path);
+      if (path != null) openLocalFile(path);
       return;
     }
     onNotifTap?.call(m);
