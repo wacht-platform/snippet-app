@@ -13,6 +13,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
 import 'files.dart';
+import 'git.dart';
 import 'models.dart';
 import 'vault.dart';
 import 'session.dart';
@@ -621,47 +622,27 @@ class _DesktopShellState extends State<DesktopShell> {
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [
-        SizedBox(width: 300, child: _macSidebarHeader()),
-        Container(width: 1, height: 42, color: AppColors.border),
         Expanded(
-          child: Row(children: [
-            Expanded(
-              child: ListView.builder(
-                controller: _stripController,
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: _tabs.length,
-                itemBuilder: (_, i) => _tabChip(i),
-              ),
-            ),
-            Container(width: 1, height: 18, color: AppColors.border2),
-            IconBtn('plus',
-                size: 36,
-                iconSize: 17,
-                tooltip: 'New session',
-                onTap: _newSessionFlow),
-            const SizedBox(width: 8),
-          ]),
+          child: ListView.builder(
+            controller: _stripController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: _tabs.length,
+            itemBuilder: (_, i) => _tabChip(i),
+          ),
         ),
+        Container(width: 1, height: 18, color: AppColors.border2),
+        IconBtn('plus',
+            size: 36,
+            iconSize: 17,
+            tooltip: 'New session',
+            onTap: _newSessionFlow),
+        const SizedBox(width: 8),
       ]),
     );
   }
 
-  Widget _macSidebarHeader() {
-    return Container(
-      height: 42,
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-    );
-  }
-
   Widget _macStatusBar() {
-    final machine = _active?.label.trim();
-    final initial = machine == null || machine.isEmpty
-        ? '?'
-        : machine.characters.first.toUpperCase();
     final tab = _activeTab;
     final connected = _client != null;
     return Container(
@@ -690,29 +671,6 @@ class _DesktopShellState extends State<DesktopShell> {
               style: mono(10, color: AppColors.fg4)),
         ],
         const Spacer(),
-        if (_macBranchLabel() != null) ...[
-          AppIcon('git-branch', size: 11, color: AppColors.fg4),
-          const SizedBox(width: 5),
-          Text(_macBranchLabel()!, style: mono(10, color: AppColors.fg4)),
-          const SizedBox(width: 14),
-        ],
-        if (machine != null && machine.isNotEmpty)
-          Tooltip(
-            message: machine,
-            child: Container(
-              width: 20,
-              height: 20,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.border2),
-              ),
-              child: Text(initial,
-                  style:
-                      sans(10, weight: FontWeight.w600, color: AppColors.fg1)),
-            ),
-          ),
       ]),
     );
   }
@@ -729,41 +687,68 @@ class _DesktopShellState extends State<DesktopShell> {
         ),
         child: Padding(
           // Leave the native traffic lights their own space. The native window
-          // drag handler owns this strip, so the Flutter content remains
-          // informational rather than pretending to be window controls.
+          // drag handler owns this strip; the repository context is the one
+          // intentional workspace action exposed here.
           padding: const EdgeInsets.only(left: 88, right: 16),
-          child: Row(children: [
-            AppIcon('folder-open', size: 13, color: AppColors.fg3),
-            const SizedBox(width: 7),
-            Flexible(
-              flex: 2,
-              child: Text(_macRepositoryLabel(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(12.5,
-                      weight: FontWeight.w500, color: AppColors.fg1)),
-            ),
-            if (branch != null) ...[
-              const SizedBox(width: 12),
-              Container(width: 1, height: 14, color: AppColors.border2),
-              const SizedBox(width: 12),
-              AppIcon('git-branch', size: 13, color: AppColors.fg3),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(branch,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(11.5, color: AppColors.fg2)),
+          child: Tooltip(
+            message: 'Open Git',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(R.sm),
+              onTap: _openMacGit,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(children: [
+                  AppIcon('folder-open', size: 13, color: AppColors.fg3),
+                  const SizedBox(width: 7),
+                  Flexible(
+                    flex: 2,
+                    child: Text(_macRepositoryLabel(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(12.5,
+                            weight: FontWeight.w500, color: AppColors.fg1)),
+                  ),
+                  if (branch != null) ...[
+                    const SizedBox(width: 12),
+                    Container(width: 1, height: 14, color: AppColors.border2),
+                    const SizedBox(width: 12),
+                    AppIcon('git-branch', size: 13, color: AppColors.fg3),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(branch,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: mono(11.5, color: AppColors.fg2)),
+                    ),
+                  ],
+                  if (changes.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    Container(width: 1, height: 14, color: AppColors.border2),
+                    const SizedBox(width: 12),
+                    Text(changes, style: sans(11, color: AppColors.fg4)),
+                  ],
+                ]),
               ),
-            ],
-            if (changes.isNotEmpty) ...[
-              const SizedBox(width: 12),
-              Container(width: 1, height: 14, color: AppColors.border2),
-              const SizedBox(width: 12),
-              Text(changes, style: sans(11, color: AppColors.fg4)),
-            ],
-          ]),
+            ),
+          ),
         ),
+      ),
+    );
+  }
+
+  void _openMacGit() {
+    final tab = _activeTab;
+    if (tab == null) return;
+    final path = tab.filePath;
+    final slash = path?.lastIndexOf('/') ?? -1;
+    final folder = path != null && slash > 0 ? path.substring(0, slash) : null;
+    presentScreen(
+      context,
+      builder: (_, close) => GitScreen(
+        client: tab.client,
+        sessionId: tab.sessionId ?? '',
+        folder: folder,
+        onClose: close,
       ),
     );
   }
@@ -826,25 +811,46 @@ class _DesktopShellState extends State<DesktopShell> {
           ),
         );
       }
-      // Wide: only the sidebar (top-left) sits under the traffic lights; the chat
-      // toolbar fills the title-bar row at the top — no dead strip.
+      // Wide macOS uses a persistent sidebar column beside the content column.
+      // The tab strip belongs only to the content pane, so the sidebar can use
+      // the full height below the native title bar without an empty header gap.
+      if (kMacOS) {
+        return Scaffold(
+          backgroundColor: readingBg,
+          body: SafeArea(
+            child: Column(children: [
+              _macWindowBar(),
+              Expanded(
+                child: Row(children: [
+                  SizedBox(width: 300, child: _sidebar(topInset: false)),
+                  VerticalDivider(
+                      width: 1, thickness: 1, color: AppColors.border),
+                  Expanded(
+                    child: Column(children: [
+                      _macNavigationBar(),
+                      Expanded(child: _mainPane()),
+                    ]),
+                  ),
+                ]),
+              ),
+              _macStatusBar(),
+            ]),
+          ),
+        );
+      }
+
       return Scaffold(
         backgroundColor: readingBg,
         body: SafeArea(
           child: Column(children: [
-            if (kMacOS) ...[
-              _macWindowBar(),
-              _macNavigationBar(),
-            ],
             Expanded(
               child: Row(children: [
-                SizedBox(width: 300, child: _sidebar(topInset: !kMacOS)),
+                SizedBox(width: 300, child: _sidebar(topInset: true)),
                 VerticalDivider(
                     width: 1, thickness: 1, color: AppColors.border),
                 Expanded(child: _mainPane()),
               ]),
             ),
-            if (kMacOS) _macStatusBar(),
           ]),
         ),
       );
@@ -1321,8 +1327,7 @@ class _SidebarState extends State<_Sidebar> {
     return Container(
       color: AppColors.bg, // shell surface — darker than the chat canvas
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(height: widget.topInset && kMacOS ? kMacTitlebar + 6 : 10),
-        // clear the window controls when this sidebar owns the title edge
+        if (widget.topInset && kMacOS) SizedBox(height: kMacTitlebar + 6),
         if (kMobile) ...[
           // Mobile: full-height conversations list with the machine row at the bottom.
           Expanded(

@@ -1550,7 +1550,6 @@ class _SessionScreenState extends State<SessionScreen>
               child: _QuestionBar(
                   question: s!.pendingQuestion!, onSend: _sendDecision),
             )),
-          if (kMacOS) _macActionBar(s, running),
           _centerWide(_inputBar(running)),
         ]),
       ),
@@ -1597,11 +1596,8 @@ class _SessionScreenState extends State<SessionScreen>
     final statusWord = compacting
         ? 'Compacting history…'
         : (waiting ? 'Needs input' : (running ? 'Running' : 'Idle'));
-    // Just status + model here — no StatusRail on mobile.
-    final facts = <String>[
-      statusWord,
-      if (_modelLabel != null) _modelLabel!,
-    ];
+    // Keep the model selector in the composer, where it is always visible.
+    final facts = <String>[statusWord];
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
       decoration: BoxDecoration(color: readingBg),
@@ -1637,12 +1633,64 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
-  // macOS has three distinct shell levels: the native project/title row and
-  // tab navigation live above this pane; this row is only the active session
-  // title plus actions for the content below it.
+  List<Widget> _macSessionMetadata(HarnessState? s, bool running) {
+    final status = s?.compacting == true
+        ? 'Compacting'
+        : s?.status == 'waiting_for_input'
+            ? 'Needs input'
+            : running
+                ? 'Running'
+                : 'Idle';
+    final statusColor = s?.compacting == true
+        ? AppColors.accent
+        : s?.status == 'waiting_for_input'
+            ? AppColors.accent
+            : running
+                ? AppColors.run
+                : AppColors.fg2;
+    final items = <Widget>[
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+            width: 7,
+            height: 7,
+            decoration:
+                BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Text(status, style: sans(11.5, color: statusColor)),
+      ]),
+    ];
+    if (s != null) {
+      items.add(_StatMeta(
+          icon: 'shield',
+          label: s.approvalMode == 'auto' ? 'Auto' : 'Ask',
+          tone: s.approvalMode == 'auto' ? 'accent' : 'default'));
+      if (s.contextWindow > 0 && s.lastPromptTokens > 0) {
+        items.add(_StatMeta(
+            icon: 'activity',
+            label:
+                '${(s.lastPromptTokens / s.contextWindow * 100).clamp(0, 999).round()}% ctx'));
+      }
+      if (s.totalTokens > 0) {
+        items.add(_StatMeta(icon: 'zap', label: '${fmtSi(s.totalTokens)} tok'));
+      }
+      final rp = s.ratePrimary;
+      if (rp != null) {
+        items.add(_StatMeta(
+            icon: 'clipboard',
+            label:
+                '${rateWindowLabel(rp.windowMinutes)} · ${rp.leftPercent.round()}%',
+            tone: 'run'));
+      }
+    }
+    return items;
+  }
+
+  // macOS keeps this row focused on the active session title. Workspace
+  // context and Git actions live in the clickable repository bar above.
   Widget _desktopBar(HarnessState? s, bool running) {
     final mac = kMacOS;
     final title = _title.isEmpty ? 'session' : _title;
+    final metadata = mac ? _macSessionMetadata(s, running) : const <Widget>[];
     return Container(
       height: mac ? 42 : 50,
       padding: EdgeInsets.symmetric(horizontal: mac ? 16 : 8),
@@ -1664,6 +1712,26 @@ class _SessionScreenState extends State<SessionScreen>
               style: sans(mac ? 13.5 : 16.5,
                   weight: FontWeight.w500, color: AppColors.fg1)),
         ),
+        if (mac && metadata.isNotEmpty)
+          Flexible(
+            flex: 3,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(left: 16),
+              child: Row(children: [
+                for (var i = 0; i < metadata.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 14),
+                  metadata[i],
+                ],
+              ]),
+            ),
+          ),
+        if (mac && running)
+          IconBtn('stop',
+              size: 30,
+              iconSize: 15,
+              tooltip: 'Stop',
+              onTap: () => _send({'kind': 'interrupt'})),
         if (!mac && running)
           IconBtn('stop',
               size: 32,
@@ -1671,68 +1739,6 @@ class _SessionScreenState extends State<SessionScreen>
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
         if (!mac) _menu(s),
-      ]),
-    );
-  }
-
-  void _openGitPanel() {
-    presentScreen(context,
-        builder: (_, close) => GitScreen(
-            client: widget.client,
-            sessionId: widget.sessionId,
-            onClose: close));
-  }
-
-  void _openFilesPanel(HarnessState? s) {
-    final workspace = s?.workspace ?? '';
-    final name = lastPathSegment(workspace, ifEmpty: 'Files');
-    presentScreen(context,
-        builder: (_, close) => FileExplorer(
-              client: widget.client,
-              title: name,
-              start: workspace.isEmpty ? null : workspace,
-              onClose: close,
-              onOpenFile: widget.onOpenFileTab,
-            ));
-  }
-
-  // macOS keeps workspace/session actions in the lower content toolbar. The
-  // upper session row stays calm: title on the left, no machine badge or menu
-  // competing with the project and tab chrome above it.
-  Widget _macActionBar(HarnessState? s, bool running) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border(
-          top: BorderSide(color: AppColors.border),
-          bottom: BorderSide(color: AppColors.border),
-        ),
-      ),
-      child: Row(children: [
-        IconBtn('git-branch',
-            size: 30, iconSize: 15, tooltip: 'Git', onTap: _openGitPanel),
-        IconBtn('folder-open',
-            size: 30,
-            iconSize: 15,
-            tooltip: 'Browse files',
-            onTap: () => _openFilesPanel(s)),
-        IconBtn('terminal',
-            size: 30, iconSize: 15, tooltip: 'Run command', onTap: _showExec),
-        IconBtn('cpu',
-            size: 30,
-            iconSize: 15,
-            tooltip: 'Switch model',
-            onTap: _switchModel),
-        const Spacer(),
-        if (running)
-          IconBtn('stop',
-              size: 30,
-              iconSize: 15,
-              tooltip: 'Stop',
-              onTap: () => _send({'kind': 'interrupt'})),
-        _menu(s),
       ]),
     );
   }
@@ -1797,7 +1803,6 @@ class _SessionScreenState extends State<SessionScreen>
           ]),
         );
     return [
-      item('cpu', 'Switch model', _switchModel, value: _modelLabel),
       item('edit', 'Rename session', _renameCurrent),
       item('shield', 'Approval mode', () {
         _send({'kind': 'set_mode', 'value': manual ? 'auto' : 'manual'});
@@ -1863,8 +1868,6 @@ class _SessionScreenState extends State<SessionScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SectionLabel('Session'),
-            _actionTile('cpu', 'Switch model',
-                value: _modelLabel, onTap: () => run(_switchModel)),
             _actionTile('edit', 'Rename session',
                 onTap: () => run(_renameCurrent)),
             _actionTile('shield', 'Approval mode',
@@ -1980,9 +1983,6 @@ class _SessionScreenState extends State<SessionScreen>
       chips.add(_StatMeta(
           icon: 'folder',
           label: lastPathSegment(s.workspace, ifEmpty: s.workspace)));
-    }
-    if (_modelLabel != null) {
-      chips.add(_StatMeta(icon: 'cpu', label: _modelLabel!));
     }
     if (s != null) {
       if (s.contextWindow > 0 && s.lastPromptTokens > 0) {

@@ -1670,43 +1670,47 @@ Future<T?> showAppSheet<T>(BuildContext context,
     isScrollControlled: true,
     // Centered, width-capped on desktop (phones are narrower than this → unchanged).
     constraints: const BoxConstraints(maxWidth: 560),
-    builder: (_) => Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-        border: Border(top: BorderSide(color: AppColors.border2)),
-      ),
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.82),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const SizedBox(height: 12),
-        Center(
-            child: Container(
-                width: 38,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.border2,
-                    borderRadius: BorderRadius.circular(99)))),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
-          child: Row(children: [
-            Expanded(
-                child: Text(title,
-                    style: sans(16,
-                        weight: FontWeight.w600, color: AppColors.fg1))),
-            IconBtn('x',
-                size: 32, iconSize: 18, onTap: () => Navigator.pop(context)),
-          ]),
+    builder: (sheetContext) {
+      final media = MediaQuery.of(sheetContext);
+      return Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+          border: Border(top: BorderSide(color: AppColors.border2)),
         ),
-        Flexible(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: child,
+        constraints: BoxConstraints(maxHeight: media.size.height * 0.82),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 12),
+          Center(
+              child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: AppColors.border2,
+                      borderRadius: BorderRadius.circular(99)))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+            child: Row(children: [
+              Expanded(
+                  child: Text(title,
+                      style: sans(16,
+                          weight: FontWeight.w600, color: AppColors.fg1))),
+              IconBtn('x',
+                  size: 32,
+                  iconSize: 18,
+                  onTap: () => Navigator.pop(sheetContext)),
+            ]),
           ),
-        ),
-        SizedBox(height: MediaQuery.of(context).padding.bottom),
-      ]),
-    ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: child,
+            ),
+          ),
+          SizedBox(height: media.padding.bottom),
+        ]),
+      );
+    },
   );
 }
 
