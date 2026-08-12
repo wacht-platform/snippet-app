@@ -55,6 +55,12 @@ class _ShellTab {
       isFile ? '$instanceUrl|file|$filePath' : '$instanceUrl|$sessionId';
 }
 
+class _MacSessionStatus {
+  final HarnessState? state;
+  final bool running;
+  const _MacSessionStatus(this.state, this.running);
+}
+
 class _DesktopShellState extends State<DesktopShell> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final InstanceStore _store = InstanceStore();
@@ -82,6 +88,7 @@ class _DesktopShellState extends State<DesktopShell> {
   bool _drawerOpen = false;
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
+  final Map<String, _MacSessionStatus> _macSessionStatuses = {};
   GitStatus? _macGit;
   String _macGitKey = '';
 
@@ -110,6 +117,11 @@ class _DesktopShellState extends State<DesktopShell> {
     _stripController.dispose();
     if (onNotifTap == _onNotif) onNotifTap = null;
     super.dispose();
+  }
+
+  void _setMacSessionStatus(String key, HarnessState? state, bool running) {
+    _macSessionStatuses[key] = _MacSessionStatus(state, running);
+    if (mounted && _activeTab?.key == key) setState(() {});
   }
 
   void _syncPage() {
@@ -258,11 +270,18 @@ class _DesktopShellState extends State<DesktopShell> {
   void _closeOthers(int keep) {
     if (keep < 0 || keep >= _tabs.length) return;
     final kept = _tabs[keep];
+    final removedKeys = _tabs
+        .where((tab) => !identical(tab, kept))
+        .map((tab) => tab.key)
+        .toList();
     setState(() {
       _tabs
         ..clear()
         ..add(kept);
       _activeIndex = 0;
+      for (final key in removedKeys) {
+        _macSessionStatuses.remove(key);
+      }
     });
     _persistTabs();
     _syncPage();
@@ -270,6 +289,9 @@ class _DesktopShellState extends State<DesktopShell> {
 
   void _closeAllTabs() {
     setState(() {
+      for (final tab in _tabs) {
+        _macSessionStatuses.remove(tab.key);
+      }
       _tabs.clear();
       _activeIndex = -1;
     });
@@ -334,7 +356,9 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   void _closeTab(int i) {
+    final key = _tabs[i].key;
     setState(() {
+      _macSessionStatuses.remove(key);
       _tabs.removeAt(i);
       if (_tabs.isEmpty) {
         _activeIndex = -1;
@@ -569,6 +593,9 @@ class _DesktopShellState extends State<DesktopShell> {
     if (!mounted) return;
     setState(() {
       _instances = items;
+      for (final tab in _tabs.where((t) => t.instanceUrl == inst.url)) {
+        _macSessionStatuses.remove(tab.key);
+      }
       _tabs.removeWhere((t) => t.instanceUrl == inst.url);
       if (_activeIndex >= _tabs.length) _activeIndex = _tabs.length - 1;
       if (_active?.url == inst.url) {
@@ -644,9 +671,39 @@ class _DesktopShellState extends State<DesktopShell> {
 
   Widget _macStatusBar() {
     final tab = _activeTab;
+    final status = tab == null ? null : _macSessionStatuses[tab.key];
+    final state = status?.state;
+    final statusLabel = state?.compacting == true
+        ? 'Compacting'
+        : state?.status == 'waiting_for_input'
+            ? 'Needs input'
+            : status?.running == true
+                ? 'Running'
+                : null;
+    final statusColor = state?.compacting == true
+        ? AppColors.accent
+        : state?.status == 'waiting_for_input'
+            ? AppColors.accent
+            : AppColors.run;
     final connected = _client != null;
+    final metrics = <Widget>[];
+    if (state != null &&
+        state.contextWindow > 0 &&
+        state.lastPromptTokens > 0) {
+      final pct =
+          (state.lastPromptTokens / state.contextWindow * 100).clamp(0, 999);
+      metrics.add(_macStatusMetric('activity', '${pct.round()}% ctx'));
+    }
+    if (state != null && state.totalTokens > 0) {
+      metrics.add(_macStatusMetric('zap', '${fmtSi(state.totalTokens)} tok'));
+    }
+    final rate = state?.ratePrimary;
+    if (rate != null) {
+      metrics.add(_macStatusMetric('clipboard',
+          '${rateWindowLabel(rate.windowMinutes)} · ${rate.leftPercent.round()}%'));
+    }
     return Container(
-      height: 26,
+      height: 30,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: AppColors.surface1,
@@ -658,6 +715,18 @@ class _DesktopShellState extends State<DesktopShell> {
         Text(connected ? 'Connected' : 'Offline',
             style: sans(10.5,
                 color: connected ? AppColors.fg2 : AppColors.danger)),
+        if (statusLabel != null) ...[
+          const SizedBox(width: 14),
+          Container(width: 1, height: 12, color: AppColors.border2),
+          const SizedBox(width: 10),
+          Container(
+              width: 6,
+              height: 6,
+              decoration:
+                  BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text(statusLabel, style: sans(10.5, color: statusColor)),
+        ],
         if (tab != null) ...[
           const SizedBox(width: 14),
           Container(width: 1, height: 12, color: AppColors.border2),
@@ -665,14 +734,41 @@ class _DesktopShellState extends State<DesktopShell> {
           AppIcon(tab.isFile ? 'file' : 'terminal',
               size: 11, color: AppColors.fg4),
           const SizedBox(width: 5),
-          Text(tab.title.isEmpty ? 'session' : tab.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: mono(10, color: AppColors.fg4)),
+          Flexible(
+            child: Text(tab.title.isEmpty ? 'session' : tab.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: mono(10, color: AppColors.fg4)),
+          ),
         ],
-        const Spacer(),
+        if (metrics.isNotEmpty) ...[
+          const SizedBox(width: 14),
+          Container(width: 1, height: 12, color: AppColors.border2),
+          const SizedBox(width: 10),
+          Flexible(
+            flex: 3,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(children: [
+                for (var i = 0; i < metrics.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 14),
+                  metrics[i],
+                ],
+              ]),
+            ),
+          ),
+        ],
       ]),
     );
+  }
+
+  Widget _macStatusMetric(String icon, String label) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      AppIcon(icon, size: 11, color: AppColors.fg4),
+      const SizedBox(width: 5),
+      Text(label, style: mono(10, color: AppColors.fg3)),
+    ]);
   }
 
   Widget _macWindowBar() {
@@ -921,6 +1017,10 @@ class _DesktopShellState extends State<DesktopShell> {
                             onOpenFileTab: (path, name) => _openFileTab(
                                 t.client, t.instanceUrl, path, name),
                             onOpenSession: _openSession,
+                            onMacStatus: kMacOS
+                                ? (state, running) =>
+                                    _setMacSessionStatus(t.key, state, running)
+                                : null,
                           ),
                   );
                 },

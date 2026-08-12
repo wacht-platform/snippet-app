@@ -89,6 +89,9 @@ class SessionScreen extends StatefulWidget {
   /// fork can jump straight into the branch.
   final void Function(String id, String title, String? profile)? onOpenSession;
 
+  /// Publishes live usage data to the macOS shell status rail.
+  final void Function(HarnessState? state, bool running)? onMacStatus;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -98,7 +101,8 @@ class SessionScreen extends StatefulWidget {
       this.embedded = false,
       this.onMenu,
       this.onOpenFileTab,
-      this.onOpenSession});
+      this.onOpenSession,
+      this.onMacStatus});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
 }
@@ -681,6 +685,7 @@ class _SessionScreenState extends State<SessionScreen>
               _streamFlushTimer = null;
             }
           });
+          widget.onMacStatus?.call(next, next.status == 'running');
           // Re-arm (or cancel) the ack watchdog against the new _pending state.
           _armAckWatchdog();
           if (follow) _scheduleBottom();
@@ -1633,64 +1638,11 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
-  List<Widget> _macSessionMetadata(HarnessState? s, bool running) {
-    final status = s?.compacting == true
-        ? 'Compacting'
-        : s?.status == 'waiting_for_input'
-            ? 'Needs input'
-            : running
-                ? 'Running'
-                : 'Idle';
-    final statusColor = s?.compacting == true
-        ? AppColors.accent
-        : s?.status == 'waiting_for_input'
-            ? AppColors.accent
-            : running
-                ? AppColors.run
-                : AppColors.fg2;
-    final items = <Widget>[
-      Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 7,
-            height: 7,
-            decoration:
-                BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-        const SizedBox(width: 6),
-        Text(status, style: sans(11.5, color: statusColor)),
-      ]),
-    ];
-    if (s != null) {
-      items.add(_StatMeta(
-          icon: 'shield',
-          label: s.approvalMode == 'auto' ? 'Auto' : 'Ask',
-          tone: s.approvalMode == 'auto' ? 'accent' : 'default'));
-      if (s.contextWindow > 0 && s.lastPromptTokens > 0) {
-        items.add(_StatMeta(
-            icon: 'activity',
-            label:
-                '${(s.lastPromptTokens / s.contextWindow * 100).clamp(0, 999).round()}% ctx'));
-      }
-      if (s.totalTokens > 0) {
-        items.add(_StatMeta(icon: 'zap', label: '${fmtSi(s.totalTokens)} tok'));
-      }
-      final rp = s.ratePrimary;
-      if (rp != null) {
-        items.add(_StatMeta(
-            icon: 'clipboard',
-            label:
-                '${rateWindowLabel(rp.windowMinutes)} · ${rp.leftPercent.round()}%',
-            tone: 'run'));
-      }
-    }
-    return items;
-  }
-
   // macOS keeps this row focused on the active session title. Workspace
   // context and Git actions live in the clickable repository bar above.
   Widget _desktopBar(HarnessState? s, bool running) {
     final mac = kMacOS;
     final title = _title.isEmpty ? 'session' : _title;
-    final metadata = mac ? _macSessionMetadata(s, running) : const <Widget>[];
     return Container(
       height: mac ? 42 : 50,
       padding: EdgeInsets.symmetric(horizontal: mac ? 16 : 8),
@@ -1712,26 +1664,18 @@ class _SessionScreenState extends State<SessionScreen>
               style: sans(mac ? 13.5 : 16.5,
                   weight: FontWeight.w500, color: AppColors.fg1)),
         ),
-        if (mac && metadata.isNotEmpty)
-          Flexible(
-            flex: 3,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.only(left: 16),
-              child: Row(children: [
-                for (var i = 0; i < metadata.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 14),
-                  metadata[i],
-                ],
-              ]),
-            ),
-          ),
         if (mac && running)
           IconBtn('stop',
               size: 30,
               iconSize: 15,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
+        if (mac)
+          IconBtn('more-horizontal',
+              size: 30,
+              iconSize: 17,
+              tooltip: 'More',
+              onTap: () => _openActions(s)),
         if (!mac && running)
           IconBtn('stop',
               size: 32,
@@ -1890,12 +1834,13 @@ class _SessionScreenState extends State<SessionScreen>
                   onTap: () => run(_showLanes)),
             const SizedBox(height: 12),
             const SectionLabel('Workspace'),
-            _actionTile('git-branch', 'Git',
-                onTap: () => run(() => presentScreen(context,
-                    builder: (_, close) => GitScreen(
-                        client: widget.client,
-                        sessionId: widget.sessionId,
-                        onClose: close)))),
+            if (!kMacOS)
+              _actionTile('git-branch', 'Git',
+                  onTap: () => run(() => presentScreen(context,
+                      builder: (_, close) => GitScreen(
+                          client: widget.client,
+                          sessionId: widget.sessionId,
+                          onClose: close)))),
             _actionTile('folder', 'Open files',
                 onTap: () => run(() {
                       final name = lastPathSegment(ws, ifEmpty: 'Files');
