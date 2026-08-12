@@ -1550,6 +1550,7 @@ class _SessionScreenState extends State<SessionScreen>
               child: _QuestionBar(
                   question: s!.pendingQuestion!, onSend: _sendDecision),
             )),
+          if (kMacOS) _macActionBar(s, running),
           _centerWide(_inputBar(running)),
         ]),
       ),
@@ -1663,22 +1664,13 @@ class _SessionScreenState extends State<SessionScreen>
               style: sans(mac ? 13.5 : 16.5,
                   weight: FontWeight.w500, color: AppColors.fg1)),
         ),
-        if (mac) ...[
-          IconBtn('git-branch',
-              size: 32, iconSize: 15, tooltip: 'Git', onTap: _openGitPanel),
-          IconBtn('folder-open',
-              size: 32,
-              iconSize: 15,
-              tooltip: 'Browse files',
-              onTap: () => _openFilesPanel(s)),
-        ],
-        if (running)
+        if (!mac && running)
           IconBtn('stop',
               size: 32,
               iconSize: 16,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
-        _menu(s),
+        if (!mac) _menu(s),
       ]),
     );
   }
@@ -1702,6 +1694,47 @@ class _SessionScreenState extends State<SessionScreen>
               onClose: close,
               onOpenFile: widget.onOpenFileTab,
             ));
+  }
+
+  // macOS keeps workspace/session actions in the lower content toolbar. The
+  // upper session row stays calm: title on the left, no machine badge or menu
+  // competing with the project and tab chrome above it.
+  Widget _macActionBar(HarnessState? s, bool running) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        border: Border(
+          top: BorderSide(color: AppColors.border),
+          bottom: BorderSide(color: AppColors.border),
+        ),
+      ),
+      child: Row(children: [
+        IconBtn('git-branch',
+            size: 30, iconSize: 15, tooltip: 'Git', onTap: _openGitPanel),
+        IconBtn('folder-open',
+            size: 30,
+            iconSize: 15,
+            tooltip: 'Browse files',
+            onTap: () => _openFilesPanel(s)),
+        IconBtn('terminal',
+            size: 30, iconSize: 15, tooltip: 'Run command', onTap: _showExec),
+        IconBtn('cpu',
+            size: 30,
+            iconSize: 15,
+            tooltip: 'Switch model',
+            onTap: _switchModel),
+        const Spacer(),
+        if (running)
+          IconBtn('stop',
+              size: 30,
+              iconSize: 15,
+              tooltip: 'Stop',
+              onTap: () => _send({'kind': 'interrupt'})),
+        _menu(s),
+      ]),
+    );
   }
 
   Widget _menu(HarnessState? s) {

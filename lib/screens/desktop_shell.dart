@@ -358,10 +358,6 @@ class _DesktopShellState extends State<DesktopShell> {
     _syncPage();
   }
 
-  void _activateRelativeTab(int delta) {
-    _activateTab(_activeIndex + delta);
-  }
-
   void _onNotif(Map<String, dynamic> m) async {
     if (!mounted) return;
     final url = '${m['url']}';
@@ -618,8 +614,6 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   Widget _macNavigationBar() {
-    final hasPrevious = _activeIndex > 0;
-    final hasNext = _activeIndex >= 0 && _activeIndex < _tabs.length - 1;
     return Container(
       height: 42,
       decoration: BoxDecoration(
@@ -627,40 +621,47 @@ class _DesktopShellState extends State<DesktopShell> {
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [
-        const SizedBox(width: 10),
-        IconBtn('chevron-left',
-            size: 30,
-            iconSize: 17,
-            tooltip: 'Previous tab',
-            onTap: hasPrevious ? () => _activateRelativeTab(-1) : null),
-        IconBtn('chevron-right',
-            size: 30,
-            iconSize: 17,
-            tooltip: 'Next tab',
-            onTap: hasNext ? () => _activateRelativeTab(1) : null),
-        Container(width: 1, height: 18, color: AppColors.border2),
+        SizedBox(width: 300, child: _macSidebarHeader()),
+        Container(width: 1, height: 42, color: AppColors.border),
         Expanded(
-          child: ListView.builder(
-            controller: _stripController,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: _tabs.length,
-            itemBuilder: (_, i) => _tabChip(i),
-          ),
+          child: Row(children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _stripController,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: _tabs.length,
+                itemBuilder: (_, i) => _tabChip(i),
+              ),
+            ),
+            Container(width: 1, height: 18, color: AppColors.border2),
+            IconBtn('plus',
+                size: 36,
+                iconSize: 17,
+                tooltip: 'New session',
+                onTap: _newSessionFlow),
+            const SizedBox(width: 8),
+          ]),
         ),
-        Container(width: 1, height: 18, color: AppColors.border2),
-        IconBtn('plus',
-            size: 36,
-            iconSize: 17,
-            tooltip: 'New session',
-            onTap: _newSessionFlow),
-        const SizedBox(width: 8),
       ]),
+    );
+  }
+
+  Widget _macSidebarHeader() {
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
     );
   }
 
   Widget _macStatusBar() {
     final machine = _active?.label.trim();
+    final initial = machine == null || machine.isEmpty
+        ? '?'
+        : machine.characters.first.toUpperCase();
     final tab = _activeTab;
     final connected = _client != null;
     return Container(
@@ -673,10 +674,7 @@ class _DesktopShellState extends State<DesktopShell> {
       child: Row(children: [
         StatusDot(status: connected ? 'online' : 'offline', size: 6),
         const SizedBox(width: 7),
-        Text(
-            connected
-                ? (machine?.isNotEmpty == true ? machine! : 'Connected')
-                : 'Offline',
+        Text(connected ? 'Connected' : 'Offline',
             style: sans(10.5,
                 color: connected ? AppColors.fg2 : AppColors.danger)),
         if (tab != null) ...[
@@ -698,7 +696,23 @@ class _DesktopShellState extends State<DesktopShell> {
           Text(_macBranchLabel()!, style: mono(10, color: AppColors.fg4)),
           const SizedBox(width: 14),
         ],
-        Text('macOS', style: mono(10, color: AppColors.fg4)),
+        if (machine != null && machine.isNotEmpty)
+          Tooltip(
+            message: machine,
+            child: Container(
+              width: 20,
+              height: 20,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.border2),
+              ),
+              child: Text(initial,
+                  style:
+                      sans(10, weight: FontWeight.w600, color: AppColors.fg1)),
+            ),
+          ),
       ]),
     );
   }
@@ -706,10 +720,6 @@ class _DesktopShellState extends State<DesktopShell> {
   Widget _macWindowBar() {
     final branch = _macBranchLabel();
     final changes = _macChangeLabel();
-    final machine = _active?.label.trim();
-    final initial = machine == null || machine.isEmpty
-        ? '?'
-        : machine.characters.first.toUpperCase();
     return SizedBox(
       height: kMacTitlebar + 8,
       child: DecoratedBox(
@@ -719,8 +729,8 @@ class _DesktopShellState extends State<DesktopShell> {
         ),
         child: Padding(
           // Leave the native traffic lights their own space. The native window
-          // drag handler owns this strip, so the compact machine badge remains
-          // informational and does not compete with window dragging.
+          // drag handler owns this strip, so the Flutter content remains
+          // informational rather than pretending to be window controls.
           padding: const EdgeInsets.only(left: 88, right: 16),
           child: Row(children: [
             AppIcon('folder-open', size: 13, color: AppColors.fg3),
@@ -752,24 +762,6 @@ class _DesktopShellState extends State<DesktopShell> {
               const SizedBox(width: 12),
               Text(changes, style: sans(11, color: AppColors.fg4)),
             ],
-            const Spacer(),
-            if (machine != null && machine.isNotEmpty)
-              Tooltip(
-                message: machine,
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.border2),
-                  ),
-                  child: Text(initial,
-                      style: sans(11,
-                          weight: FontWeight.w600, color: AppColors.fg1)),
-                ),
-              ),
           ]),
         ),
       ),
