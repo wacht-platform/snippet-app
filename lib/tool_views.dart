@@ -7,7 +7,13 @@ import 'highlight.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-// Per-tool rendering: a glyph + one-line summary for the inline ToolLine, and a
+// The daemon can evolve independently of the client. Keep malformed or newer
+// result items visible only as far as they can be safely rendered; one bad item
+// must not make the entire tool panel fail to build.
+List<Map> _mapItems(dynamic value) =>
+    value is List ? value.whereType<Map>().toList() : const <Map>[];
+
+/// Per-tool rendering: a glyph + one-line summary for the inline ToolLine, and a
 // rich, tool-specific body for the detail drawer (never raw JSON unless unknown).
 
 /// Lucide-ish glyph name for a tool (resolved via [iconFor]).
@@ -79,6 +85,34 @@ String toolTitle(String tool) => switch (tool) {
       _ => tool,
     };
 
+/// Tool detail rendering is isolated behind a small error boundary. A malformed
+/// result must produce a useful panel message instead of taking down the sheet.
+Widget safeToolDetailView(BuildContext context,
+    {required String tool, dynamic args, dynamic result}) {
+  return Builder(builder: (panelContext) {
+    try {
+      return toolDetailView(panelContext,
+          tool: tool, args: args, result: result);
+    } catch (error, stack) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stack,
+        library: 'snippet tool panel',
+        context: ErrorDescription('building $tool details'),
+      ));
+      return const _ToolPanelError();
+    }
+  });
+}
+
+class _ToolPanelError extends StatelessWidget {
+  const _ToolPanelError();
+  @override
+  Widget build(BuildContext context) {
+    return const _ErrorBox('This tool panel could not render its result.');
+  }
+}
+
 /// The drawer body for a tool. [result] is the full ToolResult map
 /// ({status, data, error}); null while the call is still pending.
 Widget toolDetailView(BuildContext context,
@@ -109,7 +143,7 @@ Widget toolDetailView(BuildContext context,
       rows.add(const SizedBox(height: 14));
       rows.add(const SectionLabel('Preview'));
       rows.add(const SizedBox(height: 8));
-      rows.add(_CodeBox(d['preview'].toString()));
+      rows.add(_CodeBox(_displayText(d['preview'].toString())));
     }
     if (d['hint'] != null) {
       rows.add(const SizedBox(height: 10));
@@ -334,12 +368,12 @@ List<Widget> _grepView(Map? a, Map? d) {
     _chip('search', '"${a?['query'] ?? d?['query'] ?? ''}"'),
     if (d?['count'] != null) _chip('list', '${d!['count']} matches'),
   ]));
-  final results = (d?['results'] as List?) ?? const [];
+  final results = _mapItems(d?['results']);
   if (results.isNotEmpty) {
     out.add(const SizedBox(height: 12));
     out.add(_Card(
       children: [
-        for (final m in results.cast<Map>())
+        for (final m in results)
           _MatchRow(
             path: m['path']?.toString() ?? '',
             line: m['line_number']?.toString(),
@@ -365,11 +399,11 @@ List<Widget> _findView(Map? a, Map? d) {
         a?['pattern']?.toString() ?? d?['pattern']?.toString() ?? '*'),
     if (d?['count'] != null) _chip('file', '${d!['count']} files'),
   ]));
-  final results = (d?['results'] as List?) ?? const [];
+  final results = _mapItems(d?['results']);
   if (results.isNotEmpty) {
     out.add(const SizedBox(height: 12));
     out.add(_Card(children: [
-      for (final f in results.cast<Map>())
+      for (final f in results)
         _FileRow(
             icon: 'file',
             name: f['path']?.toString() ?? f['name']?.toString() ?? ''),
@@ -384,7 +418,7 @@ List<Widget> _findView(Map? a, Map? d) {
 List<Widget> _lsView(Map? a, Map? d) {
   final out = <Widget>[];
   out.add(_PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? '.'));
-  final entries = ((d?['entries'] as List?) ?? const []).cast<Map>().toList()
+  final entries = _mapItems(d?['entries'])
     ..sort((x, y) {
       final dx = x['kind'] == 'dir' ? 0 : 1, dy = y['kind'] == 'dir' ? 0 : 1;
       if (dx != dy) return dx - dy;
@@ -425,11 +459,11 @@ List<Widget> _outlineView(Map? a, Map? d) {
     if (d?['symbol_count'] != null)
       _chip('list', '${d!['symbol_count']} symbols'),
   ]));
-  final outline = (d?['outline'] as List?) ?? const [];
+  final outline = _mapItems(d?['outline']);
   if (outline.isNotEmpty) {
     out.add(const SizedBox(height: 12));
     out.add(_Card(children: [
-      for (final s in outline.cast<Map>())
+      for (final s in outline)
         _SymbolRow(
           kind: s['kind']?.toString() ?? '',
           signature: s['signature']?.toString() ?? '',
@@ -449,11 +483,11 @@ List<Widget> _codeMapView(Map? a, Map? d) {
     if (d?['symbol_count'] != null)
       _chip('list', '${d!['symbol_count']} symbols'),
   ]));
-  final files = (d?['files'] as List?) ?? const [];
-  for (final f in files.cast<Map>()) {
+  final files = _mapItems(d?['files']);
+  for (final f in files) {
     out.add(const SizedBox(height: 12));
     out.add(_FileRow(icon: 'file', name: f['path']?.toString() ?? ''));
-    final syms = (f['symbols'] as List?) ?? const [];
+    final syms = f['symbols'] is List ? (f['symbols'] as List) : const [];
     out.add(const SizedBox(height: 4));
     out.add(_Card(children: [
       for (final s in syms)
@@ -477,8 +511,8 @@ List<Widget> _webSearchView(Map? a, Map? d) {
     _chip('globe', '"${a?['query'] ?? d?['query'] ?? ''}"'),
     if (d?['count'] != null) _chip('list', '${d!['count']} results'),
   ]));
-  final results = (d?['results'] as List?) ?? const [];
-  for (final res in results.cast<Map>()) {
+  final results = _mapItems(d?['results']);
+  for (final res in results) {
     out.add(const SizedBox(height: 12));
     out.add(_ResultCard(
       title: res['title']?.toString() ?? '',
@@ -823,6 +857,14 @@ class _Hint extends StatelessWidget {
     );
   }
 }
+
+// Tool previews may be JSON strings that were encoded once for the result
+// envelope. Restore escaped control characters for display without changing the
+// underlying command/file data.
+String _displayText(String text) => text
+    .replaceAll(r'\r\n', '\n')
+    .replaceAll(r'\n', '\n')
+    .replaceAll(r'\r', '\r');
 
 /// Plain monospace block (selectable). Optional add/del tint or sans font.
 class _CodeBox extends StatelessWidget {

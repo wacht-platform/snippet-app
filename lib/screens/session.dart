@@ -1428,7 +1428,7 @@ class _SessionScreenState extends State<SessionScreen>
           else
             _desktopBar(s, running),
           // Desktop keeps the detailed chip strip.
-          if (!kMobile) _statusStrip(s, running),
+          if (!kMobile && !kMacOS) _statusStrip(s, running),
           if (_connError != null) _disconnectedBanner(),
           Expanded(
             child: Stack(children: [
@@ -1642,15 +1642,18 @@ class _SessionScreenState extends State<SessionScreen>
   // Compact, desktop-native toolbar for the embedded shell (distinct from the
   // mobile header): slim height, inline muted path, hover-sized controls.
   Widget _desktopBar(HarnessState? s, bool running) {
+    final mac = kMacOS;
+    final title = _title.isEmpty ? 'session' : _title;
+    final statusChips = mac ? _statusChips(s, running) : const <Widget>[];
     return Container(
-      height: 50,
+      height: mac ? 44 : 50,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: readingBg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      // Full-width toolbar: title (+path) takes all free space so the actions
-      // are pushed to the extreme right.
+      // Full-width toolbar: title (+ status on macOS) takes all free space so
+      // the actions stay at the extreme right.
       child: Row(children: [
         if (widget.onMenu != null) ...[
           IconBtn('sidebar',
@@ -1658,12 +1661,35 @@ class _SessionScreenState extends State<SessionScreen>
           const SizedBox(width: 4),
         ] else
           const SizedBox(width: 2),
-        Expanded(
-          child: Text(_title.isEmpty ? 'session' : _title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: sans(16.5, weight: FontWeight.w600, color: AppColors.fg1)),
-        ),
+        if (mac) ...[
+          Flexible(
+            flex: 2,
+            child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            flex: 3,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (var i = 0; i < statusChips.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  statusChips[i],
+                ],
+              ]),
+            ),
+          ),
+        ] else
+          Expanded(
+            child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    sans(16.5, weight: FontWeight.w600, color: AppColors.fg1)),
+          ),
         if (running)
           IconBtn('stop',
               size: 30,
@@ -1898,7 +1924,7 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
-  Widget _statusStrip(HarnessState? s, bool running) {
+  List<Widget> _statusChips(HarnessState? s, bool running) {
     final chips = <Widget>[
       Row(mainAxisSize: MainAxisSize.min, children: [
         Container(
@@ -1919,8 +1945,9 @@ class _SessionScreenState extends State<SessionScreen>
           icon: 'folder',
           label: lastPathSegment(s.workspace, ifEmpty: s.workspace)));
     }
-    if (_modelLabel != null)
+    if (_modelLabel != null) {
       chips.add(_StatMeta(icon: 'cpu', label: _modelLabel!));
+    }
     if (s != null) {
       if (s.contextWindow > 0 && s.lastPromptTokens > 0) {
         chips.add(_StatMeta(
@@ -1928,21 +1955,28 @@ class _SessionScreenState extends State<SessionScreen>
             label:
                 '${(s.lastPromptTokens / s.contextWindow * 100).clamp(0, 999).round()}% ctx'));
       }
-      if (s.totalTokens > 0)
+      if (s.totalTokens > 0) {
         chips.add(_StatMeta(icon: 'zap', label: '${fmtSi(s.totalTokens)} tok'));
+      }
       chips.add(_StatMeta(
           icon: 'shield',
           label: s.approvalMode == 'auto' ? 'Auto-approve' : 'Ask',
           tone: s.approvalMode == 'auto' ? 'accent' : 'default'));
-      // Show for ANY provider that reported limits, not just ChatGPT/Codex.
+      // Show for any provider that reported limits.
       final rp = s.ratePrimary;
-      if (rp != null)
+      if (rp != null) {
         chips.add(_StatMeta(
             icon: 'clipboard',
             label:
                 '${rateWindowLabel(rp.windowMinutes)} · ${rp.leftPercent.round()}%',
             tone: 'run'));
+      }
     }
+    return chips;
+  }
+
+  Widget _statusStrip(HarnessState? s, bool running) {
+    final chips = _statusChips(s, running);
     return Container(
       height: 44,
       decoration: BoxDecoration(

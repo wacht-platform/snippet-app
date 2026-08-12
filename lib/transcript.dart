@@ -153,7 +153,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
   void _openDrawer(BuildContext context) {
     showAppSheet(context,
         title: toolTitle(widget.tool),
-        child: toolDetailView(context,
+        child: safeToolDetailView(context,
             tool: widget.tool,
             args: widget.args,
             result: widget.result is Map

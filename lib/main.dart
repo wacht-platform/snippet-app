@@ -8,8 +8,37 @@ import 'theme.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+Widget _buildErrorWidget(FlutterErrorDetails details) {
+  return Material(
+    color: AppColors.bg,
+    child: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                size: 28, color: AppColors.danger),
+            const SizedBox(height: 12),
+            Text('This panel could not be displayed',
+                textAlign: TextAlign.center,
+                style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+            const SizedBox(height: 6),
+            Text('Close it and try again.',
+                textAlign: TextAlign.center,
+                style: sans(12, color: AppColors.fg3)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Keep a build failure inside a tool panel visible and dismissible instead of
+  // leaving only the modal barrier over the previous screen.
+  ErrorWidget.builder = _buildErrorWidget;
   // Theme and notification setup must never prevent the first frame. A native
   // plugin can be unavailable or permission-gated on a new desktop install;
   // the app remains usable and the feature can be retried from Settings.

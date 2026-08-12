@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:snippet/models.dart';
+import 'package:snippet/tool_views.dart';
 
 void main() {
   test('HarnessState preserves title fallback and checkpoints', () {
@@ -50,5 +52,90 @@ void main() {
     });
 
     expect(delta.title, isNull);
+  });
+
+  testWidgets('tool preview restores escaped newlines', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: Builder(
+            builder: (context) => toolDetailView(
+              context,
+              tool: 'unknown_tool',
+              result: {
+                'status': 'success',
+                'data': {
+                  'truncated': true,
+                  'preview': r'{"stdout":"first\nsecond"}',
+                },
+              },
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+    expect(find.textContaining('first\nsecond'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('tool panels tolerate malformed result lists', (tester) async {
+    final cases = <String, Map<String, dynamic>>{
+      'search_content': {
+        'results': [
+          1,
+          'unexpected',
+          {'path': 'ok.dart'}
+        ]
+      },
+      'search_files': {
+        'results': [
+          false,
+          {'path': 'ok.dart'}
+        ]
+      },
+      'list_files': {
+        'entries': [
+          'unexpected',
+          {'name': 'ok.dart'}
+        ]
+      },
+      'view_outline': {
+        'outline': [
+          null,
+          {'signature': 'ok()'}
+        ]
+      },
+      'code_map': {
+        'files': [
+          'unexpected',
+          {'path': 'ok.dart', 'symbols': 'not-a-list'},
+        ],
+      },
+      'web_search': {
+        'results': [
+          42,
+          {'title': 'Result', 'url': 'https://example.com'}
+        ]
+      },
+    };
+
+    for (final entry in cases.entries) {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Builder(
+              builder: (context) => toolDetailView(
+                context,
+                tool: entry.key,
+                result: {'status': 'success', 'data': entry.value},
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: entry.key);
+    }
   });
 }
