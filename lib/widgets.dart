@@ -1095,7 +1095,17 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
 class Bubble extends StatelessWidget {
   final bool mine;
   final String text;
-  const Bubble({super.key, required this.mine, required this.text});
+
+  /// Live bubbles are intentionally not selectable while their text is changing.
+  /// Set this to false for streaming/optimistic content; durable transcript
+  /// bubbles use the default per-message selection container.
+  final bool selectable;
+  const Bubble({
+    super.key,
+    required this.mine,
+    required this.text,
+    this.selectable = true,
+  });
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -1106,50 +1116,53 @@ class Bubble extends StatelessWidget {
         matches.where((m) => isAudioAttachmentPath(m.group(2) ?? '')).length;
     final images = matches.where((m) => m.group(1) == 'image').length;
     final files = matches.length - images - audio;
-    // User messages: just the text with a thin accent left border — no bubble, no background.
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (mine) ...[
-        Container(
-          padding: const EdgeInsets.only(left: 10),
-          decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: AppColors.accent, width: 2)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (shown.isNotEmpty)
-                Text(shown, style: sans(16, height: 1.5, color: AppColors.fg1)),
-              if (matches.isNotEmpty) ...[
-                if (shown.isNotEmpty) const SizedBox(height: 8),
-                AttachmentPill(audio: audio, images: images, files: files),
-              ],
-              if (transcripts.isNotEmpty)
-                AudioTranscriptCard(items: transcripts),
-              if (audio > 0 && transcripts.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Row(children: [
-                    AppIcon('activity', size: 13, color: AppColors.accent),
-                    const SizedBox(width: 6),
-                    Text('Transcribing audio…',
-                        style: sans(11.5, color: AppColors.fg3)),
-                  ]),
-                ),
-            ],
-          ),
-        ),
-      ] else ...[
-        // Agent message: content with tighter inter-message spacing.
-        MarkdownBody(
-          data: shown,
-          selectable: false,
-          styleSheet: markdownStyle(context),
-          builders: {'pre': PreBlockBuilder()},
-          onTapLink: (txt, href, title) => openMarkdownLink(href),
-        ),
-        _MessageActions(text: shown),
+    final mineContent = Container(
+      padding: const EdgeInsets.only(left: 10),
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: AppColors.accent, width: 2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (shown.isNotEmpty)
+            Text(shown, style: sans(16, height: 1.5, color: AppColors.fg1)),
+          if (matches.isNotEmpty) ...[
+            if (shown.isNotEmpty) const SizedBox(height: 8),
+            AttachmentPill(audio: audio, images: images, files: files),
+          ],
+          if (transcripts.isNotEmpty) AudioTranscriptCard(items: transcripts),
+          if (audio > 0 && transcripts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(children: [
+                AppIcon('activity', size: 13, color: AppColors.accent),
+                const SizedBox(width: 6),
+                Text('Transcribing audio…',
+                    style: sans(11.5, color: AppColors.fg3)),
+              ]),
+            ),
+        ],
+      ),
+    );
+    final agentContent = MarkdownBody(
+      data: shown,
+      selectable: false,
+      styleSheet: markdownStyle(context),
+      builders: {'pre': PreBlockBuilder()},
+      onTapLink: (txt, href, title) => openMarkdownLink(href),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (mine)
+          selectable ? SelectionArea(child: mineContent) : mineContent
+        else ...[
+          selectable ? SelectionArea(child: agentContent) : agentContent,
+          _MessageActions(text: shown),
+        ],
       ],
-    ]);
+    );
   }
 }
 

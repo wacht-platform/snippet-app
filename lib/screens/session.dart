@@ -1441,75 +1441,72 @@ class _SessionScreenState extends State<SessionScreen>
                               strokeWidth: 2, color: AppColors.fg3)))
                   : NotificationListener<ScrollNotification>(
                       onNotification: _onScroll,
-                      // ONE SelectionArea over the whole transcript: continuous
-                      // selection across paragraphs, markdown blocks, and messages
-                      // (per-widget SelectableText could never cross its own bounds).
-                      child: SelectionArea(
-                        child: Builder(builder: (context) {
-                          final timeline = <Widget>[
-                            if (items.isEmpty && !running)
-                              const EmptyState(
-                                  icon: 'terminal',
-                                  title: 'Session ready',
-                                  body: 'Send a task to get started.'),
-                            ...items,
-                            // Optimistic bubbles for messages sent but not yet echoed.
-                            for (var pi = 0; pi < _pending.length; pi++)
-                              Opacity(
-                                  key: ValueKey(
-                                      'pending-$pi-${_pending[pi].hashCode}'),
-                                  opacity: 0.5,
-                                  child: Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 12),
-                                      child: Bubble(
-                                          mine: true, text: _pending[pi]))),
-                            if (_liveThinking.trim().isNotEmpty)
-                              Padding(
-                                key: const ValueKey('live-thinking'),
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: ThinkingMarkdown(data: _liveThinking),
-                              ),
-                            if (_liveTextVisible && _liveText.trim().isNotEmpty)
-                              Padding(
-                                key: const ValueKey('live-text'),
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child:
-                                    Bubble(mine: false, text: _liveText.trim()),
-                              ),
-                            if (running) ...[
-                              const SizedBox(height: 12),
-                              const _TypingDots()
-                            ],
-                            if (_queued.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              for (var qi = 0; qi < _queued.length; qi++)
-                                KeyedSubtree(
-                                  key: ValueKey(
-                                      'queued-$qi-${_queued[qi].hashCode}'),
-                                  child: _QueuedBubble(
-                                    text: _queuedText(_queued[qi]),
-                                    audio: _queuedAttachCounts(_queued[qi]).$1,
-                                    images: _queuedAttachCounts(_queued[qi]).$2,
-                                    files: _queuedAttachCounts(_queued[qi]).$3,
-                                    onCancel: () => _cancelQueuedAt(qi),
-                                    onSteer: () => _steerQueuedAt(qi),
-                                  ),
-                                ),
-                            ],
-                          ];
-                          return ListView.builder(
-                            controller: _scroll,
-                            reverse: true,
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                            itemCount: timeline.length,
-                            itemBuilder: (context, index) => RepaintBoundary(
-                              child: timeline[timeline.length - 1 - index],
+                      child: Builder(builder: (context) {
+                        final timeline = <Widget>[
+                          if (items.isEmpty && !running)
+                            const EmptyState(
+                                icon: 'terminal',
+                                title: 'Session ready',
+                                body: 'Send a task to get started.'),
+                          ...items,
+                          // Optimistic bubbles for messages sent but not yet echoed.
+                          for (var pi = 0; pi < _pending.length; pi++)
+                            Opacity(
+                                key: ValueKey(
+                                    'pending-$pi-${_pending[pi].hashCode}'),
+                                opacity: 0.5,
+                                child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Bubble(
+                                        mine: true,
+                                        text: _pending[pi],
+                                        selectable: false))),
+                          if (_liveThinking.trim().isNotEmpty)
+                            Padding(
+                              key: const ValueKey('live-thinking'),
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: ThinkingMarkdown(data: _liveThinking),
                             ),
-                          );
-                        }),
-                      ),
-                    )),
+                          if (_liveTextVisible && _liveText.trim().isNotEmpty)
+                            Padding(
+                              key: const ValueKey('live-text'),
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Bubble(
+                                  mine: false,
+                                  text: _liveText.trim(),
+                                  selectable: false),
+                            ),
+                          if (running) ...[
+                            const SizedBox(height: 12),
+                            const _TypingDots()
+                          ],
+                          if (_queued.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            for (var qi = 0; qi < _queued.length; qi++)
+                              KeyedSubtree(
+                                key: ValueKey(
+                                    'queued-$qi-${_queued[qi].hashCode}'),
+                                child: _QueuedBubble(
+                                  text: _queuedText(_queued[qi]),
+                                  audio: _queuedAttachCounts(_queued[qi]).$1,
+                                  images: _queuedAttachCounts(_queued[qi]).$2,
+                                  files: _queuedAttachCounts(_queued[qi]).$3,
+                                  onCancel: () => _cancelQueuedAt(qi),
+                                  onSteer: () => _steerQueuedAt(qi),
+                                ),
+                              ),
+                          ],
+                        ];
+                        return ListView.builder(
+                          controller: _scroll,
+                          reverse: true,
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                          itemCount: timeline.length,
+                          itemBuilder: (context, index) => RepaintBoundary(
+                            child: timeline[timeline.length - 1 - index],
+                          ),
+                        );
+                      }))),
               // Floating "jump to latest": scrolling up unpins auto-follow, and a
               // streaming reply then grows silently — give a one-tap way back.
               if (!_stickToBottom && s != null)
@@ -1639,21 +1636,19 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
-  // Compact, desktop-native toolbar for the embedded shell (distinct from the
-  // mobile header): slim height, inline muted path, hover-sized controls.
+  // Compact desktop toolbar: the session title and essential actions only.
+  // macOS already has the native title bar and tab strip, so avoid duplicating
+  // workspace/model/token metadata here.
   Widget _desktopBar(HarnessState? s, bool running) {
     final mac = kMacOS;
     final title = _title.isEmpty ? 'session' : _title;
-    final statusChips = mac ? _statusChips(s, running) : const <Widget>[];
     return Container(
-      height: mac ? 44 : 50,
+      height: mac ? 38 : 50,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: readingBg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
-      // Full-width toolbar: title (+ status on macOS) takes all free space so
-      // the actions stay at the extreme right.
       child: Row(children: [
         if (widget.onMenu != null) ...[
           IconBtn('sidebar',
@@ -1661,35 +1656,13 @@ class _SessionScreenState extends State<SessionScreen>
           const SizedBox(width: 4),
         ] else
           const SizedBox(width: 2),
-        if (mac) ...[
-          Flexible(
-            flex: 2,
-            child: Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            flex: 3,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(children: [
-                for (var i = 0; i < statusChips.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 10),
-                  statusChips[i],
-                ],
-              ]),
-            ),
-          ),
-        ] else
-          Expanded(
-            child: Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    sans(16.5, weight: FontWeight.w600, color: AppColors.fg1)),
-          ),
+        Expanded(
+          child: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(mac ? 14.5 : 16.5,
+                  weight: FontWeight.w600, color: AppColors.fg1)),
+        ),
         if (running)
           IconBtn('stop',
               size: 30,
@@ -2264,22 +2237,57 @@ class _SessionScreenState extends State<SessionScreen>
     final out = <Widget>[];
     Map<String, dynamic>? pending;
     final run = <Widget>[]; // consecutive dense tool rows
+    String? runStartKey;
+    String? pendingKey;
+    final eventOccurrences = <String, int>{};
     final laneRowsShown = <String>{}; // spawn cards already emitted (by id)
 
-    void flushPending() {
+    String eventKey(Map<String, dynamic> event) {
+      // Event indexes shift when the daemon compacts history. Use the event
+      // payload plus its occurrence among identical events so Flutter keeps a
+      // message's State/SelectionArea attached to that message after compaction.
+      final fingerprint = jsonEncode(event);
+      final occurrence = eventOccurrences.update(
+        fingerprint,
+        (count) => count + 1,
+        ifAbsent: () => 0,
+      );
+      return 'transcript-event-${fingerprint.hashCode}-$occurrence';
+    }
+
+    void addEvent(String key, Widget child) {
+      out.add(KeyedSubtree(
+        key: ValueKey(key),
+        child: child,
+      ));
+    }
+
+    void addToolRow(Widget child, String key) {
+      runStartKey ??= key;
+      run.add(child);
+    }
+
+    void flushPending(String fallbackKey) {
       final p = pending;
       if (p != null) {
         final name = _s(p['tool_name']);
-        run.add(DenseToolRow(tool: name, args: p['arguments']));
+        addToolRow(DenseToolRow(tool: name, args: p['arguments']),
+            pendingKey ?? fallbackKey);
         pending = null;
+        pendingKey = null;
       }
     }
 
-    void endTools() {
-      flushPending();
+    void endTools(String fallbackKey) {
+      flushPending(fallbackKey);
       if (run.isEmpty) return;
-      out.add(ToolRun(List.of(run)));
+      final start = runStartKey ?? fallbackKey;
+      out.add(KeyedSubtree(
+        key: ValueKey('transcript-tools-$start'),
+        child: ToolRun(List.of(run)),
+      ));
       run.clear();
+      runStartKey = null;
     }
 
     LaneInfo? liveLane(String id) {
@@ -2290,63 +2298,74 @@ class _SessionScreenState extends State<SessionScreen>
     }
 
     for (final e in events) {
+      final key = eventKey(e);
       final k = e['kind'] as String? ?? '';
       switch (k) {
         case 'tool_call':
-          flushPending();
+          flushPending(key);
           // Meta-tools render via their own events (note → note, ask_user →
           // user_question, delegate_task → lane_spawned). Skip their generic tool
           // lines so they don't double up.
           if (_isMetaTool(_s(e['tool_name']))) break;
           pending = e;
+          pendingKey = key;
         case 'tool_result':
           {
             final p = pending;
             if (p != null) {
-              run.add(DenseToolRow(
-                  tool: _s(p['tool_name']),
-                  args: p['arguments'],
-                  result: e['result']));
+              addToolRow(
+                  DenseToolRow(
+                      tool: _s(p['tool_name']),
+                      args: p['arguments'],
+                      result: e['result']),
+                  pendingKey ?? key);
               pending = null;
+              pendingKey = null;
             } else {
               final name = _s(e['tool_name']);
               if (_isMetaTool(name)) break;
-              run.add(DenseToolRow(tool: name, result: e['result']));
+              addToolRow(DenseToolRow(tool: name, result: e['result']), key);
             }
           }
         case 'user_input':
         case 'steer':
-          endTools();
-          out.add(Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 20),
-              child: Bubble(mine: true, text: _s(e['text']))));
+          endTools(key);
+          addEvent(
+              key,
+              Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 20),
+                  child: Bubble(mine: true, text: _s(e['text']))));
         case 'assistant_text':
-          endTools();
-          out.add(Padding(
-              padding: const EdgeInsets.only(top: 2, bottom: 8),
-              child: Bubble(mine: false, text: _s(e['text']))));
+          endTools(key);
+          addEvent(
+              key,
+              Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 8),
+                  child: Bubble(mine: false, text: _s(e['text']))));
         case 'model_error':
-          endTools();
-          out.add(NoteLine(_s(e['message']), error: true));
+          endTools(key);
+          addEvent(key, NoteLine(_s(e['message']), error: true));
         case 'invalid_tool_call':
-          endTools();
-          out.add(NoteLine('invalid ${_s(e['tool_name'])}: ${_s(e['error'])}',
-              error: true));
+          endTools(key);
+          addEvent(
+              key,
+              NoteLine('invalid ${_s(e['tool_name'])}: ${_s(e['error'])}',
+                  error: true));
         case 'note':
-          endTools();
+          endTools(key);
           final entry = _s(e['entry']);
-          out.add(_NoteLine(entry));
+          addEvent(key, _NoteLine(entry));
         case 'system_decision':
-          endTools();
+          endTools(key);
           // Don't render "interrupted" decisions — just noise in the chat.
           if (_s(e['step']) == 'interrupted') break;
-          out.add(
+          addEvent(key,
               SystemRow(step: _s(e['step']), reasoning: _s(e['reasoning'])));
         case 'file_presented':
-          endTools();
-          out.add(_presentedFileCard(_s(e['path']), _s(e['caption'])));
+          endTools(key);
+          addEvent(key, _presentedFileCard(_s(e['path']), _s(e['caption'])));
         case 'lane_spawned':
-          endTools();
+          endTools(key);
           final id = _s(e['id']);
           final title = _s(e['title']);
           // Dedup by ID AND title — the same lane can be spawned with
@@ -2355,47 +2374,55 @@ class _SessionScreenState extends State<SessionScreen>
               !laneRowsShown.contains('t:$title')) {
             laneRowsShown.add(id);
             laneRowsShown.add('t:$title');
-            out.add(LaneNotice(
-              title: title,
-              live: () => liveLane(id),
-              onOpen: _showLanes,
-            ));
+            addEvent(
+                key,
+                LaneNotice(
+                  title: title,
+                  live: () => liveLane(id),
+                  onOpen: _showLanes,
+                ));
           }
         case 'lane_completed':
-          endTools();
+          endTools(key);
           final id = _s(e['id']);
           // The spawn card already tracks this lane live — only render a card
           // here if the spawn row is gone (e.g. compacted away).
           if (!laneRowsShown.contains(id)) {
-            out.add(LaneNotice(
-              title: _s(e['title']),
-              live: () => liveLane(id),
-              onOpen: _showLanes,
-              summary: _s(e['summary']),
-            ));
+            addEvent(
+                key,
+                LaneNotice(
+                  title: _s(e['title']),
+                  live: () => liveLane(id),
+                  onOpen: _showLanes,
+                  summary: _s(e['summary']),
+                ));
           }
         case 'user_question':
-          endTools();
+          endTools(key);
           final qd = e['questions'];
           final qs = (qd is Map ? qd['questions'] : null) as List?;
           final txt = (qs != null && qs.isNotEmpty && qs.first is Map)
               ? _s((qs.first as Map)['text'])
               : '';
           if (txt.isNotEmpty) {
-            out.add(Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child:
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                AppIcon('corner-down-right', size: 15, color: AppColors.run),
-                const SizedBox(width: 8),
-                Expanded(
-                    child: Text(txt,
-                        style: sans(13.5,
-                            height: 1.45,
-                            weight: FontWeight.w500,
-                            color: AppColors.fg2))),
-              ]),
-            ));
+            addEvent(
+                key,
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppIcon('corner-down-right',
+                            size: 15, color: AppColors.run),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Text(txt,
+                                style: sans(13.5,
+                                    height: 1.45,
+                                    weight: FontWeight.w500,
+                                    color: AppColors.fg2))),
+                      ]),
+                ));
           }
         case 'approval_request':
           break; // shown by the approval bar
@@ -2403,7 +2430,7 @@ class _SessionScreenState extends State<SessionScreen>
           break;
       }
     }
-    endTools();
+    endTools('transcript-end');
     return out;
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:snippet/models.dart';
 import 'package:snippet/tool_views.dart';
+import 'package:snippet/widgets.dart';
 
 void main() {
   test('HarnessState preserves title fallback and checkpoints', () {
@@ -137,6 +138,42 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull, reason: entry.key);
     }
+  });
+
+  testWidgets('dynamic transcript bubbles rebuild without selection exceptions',
+      (tester) async {
+    final messages = ValueNotifier<List<String>>(
+      List<String>.generate(24, (i) => 'assistant message $i'),
+    );
+    addTearDown(messages.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ValueListenableBuilder<List<String>>(
+          valueListenable: messages,
+          builder: (context, values, _) => ListView.builder(
+            itemCount: values.length,
+            itemBuilder: (context, index) => Bubble(
+              key: ValueKey('message-$index'),
+              mine: false,
+              text: values[index],
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
+    messages.value = List<String>.generate(7, (i) => 'updated message $i');
+    await tester.pump();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
+    messages.value = List<String>.generate(31, (i) => 'final message $i');
+    await tester.pump();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('tool panels tolerate null optional fields', (tester) async {

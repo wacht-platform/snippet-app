@@ -553,76 +553,21 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   Widget _macWindowBar() {
-    final activeTitle = _activeTab?.title.trim();
-    final machine = _active;
-    final online = machine == null ? null : _health[machine.url];
     return SizedBox(
-      height: kMacTitlebar + 10,
+      height: kMacTitlebar + 8,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.bg.withValues(alpha: 0.96),
+          color: AppColors.bg,
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 78, right: 14),
-              child: Row(children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: AppColors.accentBg,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.accentLine),
-                  ),
-                  alignment: Alignment.center,
-                  child: AppIcon('cpu', size: 12, color: AppColors.accent),
-                ),
-                const SizedBox(width: 8),
-                Text('snippet',
-                    style: sans(13,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-                const Spacer(),
-                if (machine != null) ...[
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: online == true ? AppColors.ok : AppColors.fg4,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 180),
-                    child: Text(machine.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: mono(10.5, color: AppColors.fg3)),
-                  ),
-                ],
-              ]),
-            ),
-            IgnorePointer(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 360),
-                  child: Text(
-                    activeTitle == null || activeTitle.isEmpty
-                        ? 'Snippet'
-                        : activeTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: sans(12.5,
-                        weight: FontWeight.w500, color: AppColors.fg2),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        child: Center(
+          child: IgnorePointer(
+            child: Text('Snippet',
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.fg2)),
+          ),
         ),
       ),
     );
