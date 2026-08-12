@@ -81,6 +81,8 @@ class _DesktopShellState extends State<DesktopShell> {
   bool _drawerOpen = false;
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
+  GitStatus? _macGit;
+  String _macGitKey = '';
 
   Timer? _sessionsTicker;
 
@@ -116,6 +118,64 @@ class _DesktopShellState extends State<DesktopShell> {
       }
       _scrollStripToActive();
     });
+    _refreshMacGit();
+  }
+
+  Future<void> _refreshMacGit() async {
+    if (!kMacOS) return;
+    final tab = _activeTab;
+    final sessionId = tab?.sessionId;
+    final key = tab?.key ?? '';
+    _macGitKey = key;
+    if (sessionId == null || tab == null) {
+      if (mounted && _macGit != null) {
+        setState(() => _macGit = null);
+      }
+      return;
+    }
+    try {
+      final status = await tab.client.gitStatus(sessionId);
+      if (!mounted || _activeTab?.key != key || _macGitKey != key) return;
+      setState(() => _macGit = status.ok ? status : null);
+    } catch (_) {
+      if (mounted && _activeTab?.key == key && _macGitKey == key) {
+        setState(() => _macGit = null);
+      }
+    }
+  }
+
+  String _macRepositoryLabel() {
+    final tab = _activeTab;
+    if (tab == null) return _active?.label ?? 'Workspace';
+    if (tab.isFile) {
+      final path = tab.filePath ?? '';
+      final slash = path.lastIndexOf('/');
+      final parent = slash > 0 ? path.substring(0, slash) : '';
+      return lastPathSegment(parent, ifEmpty: 'Workspace');
+    }
+    final id = tab.sessionId;
+    SessionInfo? session;
+    if (id != null) {
+      for (final candidate in _sessions ?? const <SessionInfo>[]) {
+        if (candidate.id == id) {
+          session = candidate;
+          break;
+        }
+      }
+    }
+    return lastPathSegment(session?.folder ?? '',
+        ifEmpty: _active?.label ?? 'Workspace');
+  }
+
+  String? _macBranchLabel() {
+    final branch = _macGit?.branch.trim();
+    return branch == null || branch.isEmpty ? null : branch;
+  }
+
+  String _macChangeLabel() {
+    final git = _macGit;
+    if (git == null || git.clean || git.files.isEmpty) return '';
+    return '${git.files.length} change${git.files.length == 1 ? '' : 's'}';
   }
 
   // Bring the active tab's chip into view in the strip.
@@ -553,6 +613,8 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   Widget _macWindowBar() {
+    final branch = _macBranchLabel();
+    final changes = _macChangeLabel();
     return SizedBox(
       height: kMacTitlebar + 8,
       child: DecoratedBox(
@@ -560,14 +622,42 @@ class _DesktopShellState extends State<DesktopShell> {
           color: AppColors.bg,
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
-        child: Center(
-          child: IgnorePointer(
-            child: Text('Snippet',
-                style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.fg2)),
-          ),
+        child: Padding(
+          // Leave the native traffic lights their own space. The native window
+          // drag handler owns this strip, so all of the Flutter content remains
+          // informational rather than pretending to be window controls.
+          padding: const EdgeInsets.only(left: 88, right: 16),
+          child: Row(children: [
+            AppIcon('folder-open', size: 13, color: AppColors.fg3),
+            const SizedBox(width: 7),
+            Flexible(
+              flex: 2,
+              child: Text(_macRepositoryLabel(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12.5,
+                      weight: FontWeight.w500, color: AppColors.fg1)),
+            ),
+            if (branch != null) ...[
+              const SizedBox(width: 12),
+              Container(width: 1, height: 14, color: AppColors.border2),
+              const SizedBox(width: 12),
+              AppIcon('git-branch', size: 13, color: AppColors.fg3),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(branch,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(11.5, color: AppColors.fg2)),
+              ),
+            ],
+            if (changes.isNotEmpty) ...[
+              const SizedBox(width: 12),
+              Container(width: 1, height: 14, color: AppColors.border2),
+              const SizedBox(width: 12),
+              Text(changes, style: sans(11, color: AppColors.fg4)),
+            ],
+          ]),
         ),
       ),
     );
@@ -691,6 +781,7 @@ class _DesktopShellState extends State<DesktopShell> {
                   setState(() => _activeIndex = i);
                   _persistTabs();
                   _scrollStripToActive();
+                  _refreshMacGit();
                 },
                 itemBuilder: (_, i) {
                   final t = _tabs[i];
@@ -726,10 +817,9 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   Widget _tabStrip(VoidCallback? onMenu) {
-    // Match the mobile session header: this is primary phone navigation, so the
-    // row and its leading menu button need a full, comfortable touch target.
+    final compact = kMobile ? 56.0 : (kMacOS ? 38.0 : 40.0);
     return Container(
-      height: kMobile ? 56 : 40,
+      height: compact,
       decoration: BoxDecoration(
         color: AppColors.bg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
@@ -745,7 +835,7 @@ class _DesktopShellState extends State<DesktopShell> {
           child: ListView.builder(
             controller: _stripController,
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.symmetric(horizontal: kMobile ? 4 : 8),
             itemCount: _tabs.length,
             itemBuilder: (_, i) => _tabChip(i),
           ),
@@ -762,6 +852,8 @@ class _DesktopShellState extends State<DesktopShell> {
   Widget _tabChip(int i) {
     final t = _tabs[i];
     final active = i == _activeIndex;
+    final desktop = !kMobile;
+    final mac = kMacOS && desktop;
     final title = t.title.isEmpty ? '(untitled)' : t.title;
     final key = _chipKeys.putIfAbsent(t.key, () => GlobalKey());
     return GestureDetector(
@@ -769,19 +861,32 @@ class _DesktopShellState extends State<DesktopShell> {
       onLongPress: () => _tabMenu(i),
       child: Container(
         key: key,
-        margin: EdgeInsets.symmetric(vertical: kMobile ? 7 : 6, horizontal: 3),
-        padding: EdgeInsets.only(left: kMobile ? 13 : 11, right: 5),
+        margin: EdgeInsets.only(
+            top: mac ? 0 : (kMobile ? 7 : 6),
+            bottom: mac ? 0 : (kMobile ? 7 : 6),
+            left: mac ? 0 : 3,
+            right: mac ? 8 : 3),
+        padding: EdgeInsets.only(
+            left: mac ? 10 : (kMobile ? 13 : 11), right: mac ? 7 : 5),
         constraints: const BoxConstraints(maxWidth: 210),
         decoration: BoxDecoration(
-          color: active ? AppColors.surface2 : Colors.transparent,
-          borderRadius: BorderRadius.circular(R.xs),
-          border:
-              Border.all(color: active ? AppColors.border : Colors.transparent),
+          color: mac
+              ? (active ? AppColors.surface1 : Colors.transparent)
+              : (active ? AppColors.surface2 : Colors.transparent),
+          borderRadius: mac ? BorderRadius.zero : BorderRadius.circular(R.xs),
+          border: mac
+              ? Border(
+                  bottom: BorderSide(
+                      color: active ? AppColors.accent : Colors.transparent,
+                      width: 2))
+              : Border.all(
+                  color: active ? AppColors.border : Colors.transparent),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (t.isFile)
             AppIcon('file',
-                size: 12, color: active ? AppColors.accent : AppColors.fg4)
+                size: mac ? 13 : 12,
+                color: active ? AppColors.accent : AppColors.fg4)
           else
             Container(
               width: 6,
@@ -790,21 +895,21 @@ class _DesktopShellState extends State<DesktopShell> {
                   shape: BoxShape.circle,
                   color: active ? AppColors.accent : AppColors.fg4),
             ),
-          const SizedBox(width: 8),
+          SizedBox(width: mac ? 7 : 8),
           Flexible(
             child: Text(title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style:
-                    sans(12.5, color: active ? AppColors.fg1 : AppColors.fg3)),
+                style: sans(mac ? 12 : 12.5,
+                    color: active ? AppColors.fg1 : AppColors.fg3)),
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: mac ? 3 : 4),
           GestureDetector(
             onTap: () => _closeTab(i),
             behavior: HitTestBehavior.opaque,
             child: Padding(
-              padding: EdgeInsets.all(5),
-              child: AppIcon('x', size: 11, color: AppColors.fg4),
+              padding: EdgeInsets.all(mac ? 4 : 5),
+              child: AppIcon('x', size: mac ? 11 : 11, color: AppColors.fg4),
             ),
           ),
         ]),
