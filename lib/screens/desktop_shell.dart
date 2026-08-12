@@ -348,6 +348,7 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   void _activateTab(int i) {
+    if (i < 0 || i >= _tabs.length) return;
     // PageView keeps each session mounted. Remove focus from the old composer
     // before changing pages so the platform text-input client cannot remain
     // attached to the previous session after a swipe or tab tap.
@@ -355,6 +356,10 @@ class _DesktopShellState extends State<DesktopShell> {
     setState(() => _activeIndex = i);
     _persistTabs();
     _syncPage();
+  }
+
+  void _activateRelativeTab(int delta) {
+    _activateTab(_activeIndex + delta);
   }
 
   void _onNotif(Map<String, dynamic> m) async {
@@ -612,9 +617,99 @@ class _DesktopShellState extends State<DesktopShell> {
     _loadSessions();
   }
 
+  Widget _macNavigationBar() {
+    final hasPrevious = _activeIndex > 0;
+    final hasNext = _activeIndex >= 0 && _activeIndex < _tabs.length - 1;
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(children: [
+        const SizedBox(width: 10),
+        IconBtn('chevron-left',
+            size: 30,
+            iconSize: 17,
+            tooltip: 'Previous tab',
+            onTap: hasPrevious ? () => _activateRelativeTab(-1) : null),
+        IconBtn('chevron-right',
+            size: 30,
+            iconSize: 17,
+            tooltip: 'Next tab',
+            onTap: hasNext ? () => _activateRelativeTab(1) : null),
+        Container(width: 1, height: 18, color: AppColors.border2),
+        Expanded(
+          child: ListView.builder(
+            controller: _stripController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: _tabs.length,
+            itemBuilder: (_, i) => _tabChip(i),
+          ),
+        ),
+        Container(width: 1, height: 18, color: AppColors.border2),
+        IconBtn('plus',
+            size: 36,
+            iconSize: 17,
+            tooltip: 'New session',
+            onTap: _newSessionFlow),
+        const SizedBox(width: 8),
+      ]),
+    );
+  }
+
+  Widget _macStatusBar() {
+    final machine = _active?.label.trim();
+    final tab = _activeTab;
+    final connected = _client != null;
+    return Container(
+      height: 26,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(children: [
+        StatusDot(status: connected ? 'online' : 'offline', size: 6),
+        const SizedBox(width: 7),
+        Text(
+            connected
+                ? (machine?.isNotEmpty == true ? machine! : 'Connected')
+                : 'Offline',
+            style: sans(10.5,
+                color: connected ? AppColors.fg2 : AppColors.danger)),
+        if (tab != null) ...[
+          const SizedBox(width: 14),
+          Container(width: 1, height: 12, color: AppColors.border2),
+          const SizedBox(width: 14),
+          AppIcon(tab.isFile ? 'file' : 'terminal',
+              size: 11, color: AppColors.fg4),
+          const SizedBox(width: 5),
+          Text(tab.title.isEmpty ? 'session' : tab.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: mono(10, color: AppColors.fg4)),
+        ],
+        const Spacer(),
+        if (_macBranchLabel() != null) ...[
+          AppIcon('git-branch', size: 11, color: AppColors.fg4),
+          const SizedBox(width: 5),
+          Text(_macBranchLabel()!, style: mono(10, color: AppColors.fg4)),
+          const SizedBox(width: 14),
+        ],
+        Text('macOS', style: mono(10, color: AppColors.fg4)),
+      ]),
+    );
+  }
+
   Widget _macWindowBar() {
     final branch = _macBranchLabel();
     final changes = _macChangeLabel();
+    final machine = _active?.label.trim();
+    final initial = machine == null || machine.isEmpty
+        ? '?'
+        : machine.characters.first.toUpperCase();
     return SizedBox(
       height: kMacTitlebar + 8,
       child: DecoratedBox(
@@ -624,8 +719,8 @@ class _DesktopShellState extends State<DesktopShell> {
         ),
         child: Padding(
           // Leave the native traffic lights their own space. The native window
-          // drag handler owns this strip, so all of the Flutter content remains
-          // informational rather than pretending to be window controls.
+          // drag handler owns this strip, so the compact machine badge remains
+          // informational and does not compete with window dragging.
           padding: const EdgeInsets.only(left: 88, right: 16),
           child: Row(children: [
             AppIcon('folder-open', size: 13, color: AppColors.fg3),
@@ -657,6 +752,24 @@ class _DesktopShellState extends State<DesktopShell> {
               const SizedBox(width: 12),
               Text(changes, style: sans(11, color: AppColors.fg4)),
             ],
+            const Spacer(),
+            if (machine != null && machine.isNotEmpty)
+              Tooltip(
+                message: machine,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border2),
+                  ),
+                  child: Text(initial,
+                      style: sans(11,
+                          weight: FontWeight.w600, color: AppColors.fg1)),
+                ),
+              ),
           ]),
         ),
       ),
@@ -727,7 +840,10 @@ class _DesktopShellState extends State<DesktopShell> {
         backgroundColor: readingBg,
         body: SafeArea(
           child: Column(children: [
-            if (kMacOS) _macWindowBar(),
+            if (kMacOS) ...[
+              _macWindowBar(),
+              _macNavigationBar(),
+            ],
             Expanded(
               child: Row(children: [
                 SizedBox(width: 300, child: _sidebar(topInset: !kMacOS)),
@@ -736,6 +852,7 @@ class _DesktopShellState extends State<DesktopShell> {
                 Expanded(child: _mainPane()),
               ]),
             ),
+            if (kMacOS) _macStatusBar(),
           ]),
         ),
       );
@@ -751,7 +868,8 @@ class _DesktopShellState extends State<DesktopShell> {
       return _withMenu(onMenu, _recentPlaceholder());
     }
     return Column(children: [
-      _tabStrip(onMenu),
+      // Narrow desktop keeps its local strip because the sidebar is a drawer.
+      if (!kMacOS) _tabStrip(onMenu),
       Expanded(
         // Pane-scoped MediaQuery so window-width sizing (chat bubbles) fits the pane.
         child: LayoutBuilder(builder: (ctx, c) {

@@ -1636,42 +1636,72 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
-  // Compact desktop toolbar: the session title and essential actions only.
-  // macOS already has the native title bar and tab strip, so avoid duplicating
-  // workspace/model/token metadata here.
+  // macOS has three distinct shell levels: the native project/title row and
+  // tab navigation live above this pane; this row is only the active session
+  // title plus actions for the content below it.
   Widget _desktopBar(HarnessState? s, bool running) {
     final mac = kMacOS;
     final title = _title.isEmpty ? 'session' : _title;
     return Container(
-      height: mac ? 38 : 50,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: mac ? 42 : 50,
+      padding: EdgeInsets.symmetric(horizontal: mac ? 16 : 8),
       decoration: BoxDecoration(
-        color: readingBg,
+        color: mac ? AppColors.surface1 : readingBg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [
-        if (widget.onMenu != null) ...[
+        if (!mac && widget.onMenu != null) ...[
           IconBtn('sidebar',
               size: 30, iconSize: 16, tooltip: 'Sidebar', onTap: widget.onMenu),
           const SizedBox(width: 4),
-        ] else
+        ] else if (!mac)
           const SizedBox(width: 2),
         Expanded(
           child: Text(title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: sans(mac ? 14.5 : 16.5,
-                  weight: FontWeight.w600, color: AppColors.fg1)),
+              style: sans(mac ? 13.5 : 16.5,
+                  weight: FontWeight.w500, color: AppColors.fg1)),
         ),
+        if (mac) ...[
+          IconBtn('git-branch',
+              size: 32, iconSize: 15, tooltip: 'Git', onTap: _openGitPanel),
+          IconBtn('folder-open',
+              size: 32,
+              iconSize: 15,
+              tooltip: 'Browse files',
+              onTap: () => _openFilesPanel(s)),
+        ],
         if (running)
           IconBtn('stop',
-              size: 30,
+              size: 32,
               iconSize: 16,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
         _menu(s),
       ]),
     );
+  }
+
+  void _openGitPanel() {
+    presentScreen(context,
+        builder: (_, close) => GitScreen(
+            client: widget.client,
+            sessionId: widget.sessionId,
+            onClose: close));
+  }
+
+  void _openFilesPanel(HarnessState? s) {
+    final workspace = s?.workspace ?? '';
+    final name = lastPathSegment(workspace, ifEmpty: 'Files');
+    presentScreen(context,
+        builder: (_, close) => FileExplorer(
+              client: widget.client,
+              title: name,
+              start: workspace.isEmpty ? null : workspace,
+              onClose: close,
+              onOpenFile: widget.onOpenFileTab,
+            ));
   }
 
   Widget _menu(HarnessState? s) {
