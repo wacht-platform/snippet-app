@@ -156,9 +156,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
         child: safeToolDetailView(context,
             tool: widget.tool,
             args: widget.args,
-            result: widget.result is Map
-                ? (widget.result as Map).cast<String, dynamic>()
-                : null));
+            result: widget.result is Map ? widget.result : null));
   }
 
   // Right-aligned meta: bash exit code, edit diff stat, else ✓/✗.

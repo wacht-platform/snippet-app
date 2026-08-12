@@ -222,9 +222,9 @@ List<Widget> _editView(Map? a, Map? d,
         ? 'Applied'
         : 'Pending'));
   }
-  if (d?['note'] != null) {
+  if (d != null && d['note'] != null) {
     out.add(const SizedBox(height: 10));
-    out.add(_Hint(d!['note'].toString()));
+    out.add(_Hint(d['note'].toString()));
   }
   return out;
 }
@@ -253,9 +253,9 @@ List<Widget> _appendView(Map? a, Map? d) {
   out.add(_PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? ''));
   final chips = <Widget>[];
   if (d?['lines_written'] != null)
-    chips.add(_chip('file-plus', '+${d!['lines_written']} lines'));
+    chips.add(_chip('file-plus', '+${d?['lines_written']} lines'));
   if (d?['total_lines'] != null)
-    chips.add(_chip('list', '${d!['total_lines']} total'));
+    chips.add(_chip('list', '${d?['total_lines']} total'));
   if (chips.isNotEmpty) {
     out.add(const SizedBox(height: 8));
     out.add(_meta(chips));
@@ -278,9 +278,9 @@ List<Widget> _readView(Map? a, Map? d) {
   final sl = d?['start_line'], el = d?['end_line'];
   if (sl != null || el != null) chips.add(_chip('list', 'lines $sl–$el'));
   if (d?['total_lines'] != null)
-    chips.add(_chip('file', '${d!['total_lines']} lines'));
+    chips.add(_chip('file', '${d?['total_lines']} lines'));
   if (d?['total_chars'] != null)
-    chips.add(_chip('grip', '${d!['total_chars']} chars'));
+    chips.add(_chip('grip', '${d?['total_chars']} chars'));
   if (chips.isNotEmpty) {
     out.add(const SizedBox(height: 8));
     out.add(_meta(chips));
@@ -294,7 +294,7 @@ List<Widget> _readView(Map? a, Map? d) {
   }
   if (d?['truncated'] == true && d?['hint'] != null) {
     out.add(const SizedBox(height: 10));
-    out.add(_Hint(d!['hint'].toString()));
+    out.add(_Hint(d?['hint']?.toString() ?? ''));
   }
   return out;
 }
@@ -366,7 +366,7 @@ List<Widget> _grepView(Map? a, Map? d) {
   final out = <Widget>[];
   out.add(_meta([
     _chip('search', '"${a?['query'] ?? d?['query'] ?? ''}"'),
-    if (d?['count'] != null) _chip('list', '${d!['count']} matches'),
+    if (d?['count'] != null) _chip('list', '${d?['count']} matches'),
   ]));
   final results = _mapItems(d?['results']);
   if (results.isNotEmpty) {
@@ -387,7 +387,7 @@ List<Widget> _grepView(Map? a, Map? d) {
   }
   if (d?['truncated'] == true && d?['hint'] != null) {
     out.add(const SizedBox(height: 10));
-    out.add(_Hint(d!['hint'].toString()));
+    out.add(_Hint(d?['hint']?.toString() ?? ''));
   }
   return out;
 }
@@ -397,7 +397,7 @@ List<Widget> _findView(Map? a, Map? d) {
   out.add(_meta([
     _chip('search',
         a?['pattern']?.toString() ?? d?['pattern']?.toString() ?? '*'),
-    if (d?['count'] != null) _chip('file', '${d!['count']} files'),
+    if (d?['count'] != null) _chip('file', '${d?['count']} files'),
   ]));
   final results = _mapItems(d?['results']);
   if (results.isNotEmpty) {
@@ -455,9 +455,9 @@ List<Widget> _outlineView(Map? a, Map? d) {
   }
   out.add(const SizedBox(height: 8));
   out.add(_meta([
-    if (d?['language'] != null) _chip('cpu', d!['language'].toString()),
+    if (d?['language'] != null) _chip('cpu', '${d?['language']}'),
     if (d?['symbol_count'] != null)
-      _chip('list', '${d!['symbol_count']} symbols'),
+      _chip('list', '${d?['symbol_count']} symbols'),
   ]));
   final outline = _mapItems(d?['outline']);
   if (outline.isNotEmpty) {
@@ -479,9 +479,9 @@ List<Widget> _codeMapView(Map? a, Map? d) {
   final out = <Widget>[];
   out.add(_meta([
     _chip('map', (d?['root'] ?? a?['path'] ?? '.').toString()),
-    if (d?['file_count'] != null) _chip('file', '${d!['file_count']} files'),
+    if (d?['file_count'] != null) _chip('file', '${d?['file_count']} files'),
     if (d?['symbol_count'] != null)
-      _chip('list', '${d!['symbol_count']} symbols'),
+      _chip('list', '${d?['symbol_count']} symbols'),
   ]));
   final files = _mapItems(d?['files']);
   for (final f in files) {
@@ -500,7 +500,7 @@ List<Widget> _codeMapView(Map? a, Map? d) {
   }
   if (d?['truncated'] == true && d?['hint'] != null) {
     out.add(const SizedBox(height: 10));
-    out.add(_Hint(d!['hint'].toString()));
+    out.add(_Hint(d?['hint']?.toString() ?? ''));
   }
   return out;
 }
@@ -509,7 +509,7 @@ List<Widget> _webSearchView(Map? a, Map? d) {
   final out = <Widget>[];
   out.add(_meta([
     _chip('globe', '"${a?['query'] ?? d?['query'] ?? ''}"'),
-    if (d?['count'] != null) _chip('list', '${d!['count']} results'),
+    if (d?['count'] != null) _chip('list', '${d?['count']} results'),
   ]));
   final results = _mapItems(d?['results']);
   for (final res in results) {
@@ -536,7 +536,9 @@ List<Widget> _webReadView(Map? a, Map? d) {
   out.add(_LinkText(url));
   if (d?['published_date'] != null) {
     out.add(const SizedBox(height: 6));
-    out.add(_meta([_chip('history', d!['published_date'].toString())]));
+    out.add(_meta([
+      _chip('history', '${d?['published_date']}'),
+    ]));
   }
   final text = d?['text']?.toString();
   if (text != null && text.isNotEmpty) {
@@ -766,6 +768,8 @@ class _ResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    final snippetText = snippet ?? '';
+    final dateText = date ?? '';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -780,13 +784,14 @@ class _ResultCard extends StatelessWidget {
               style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)),
         if (title.isNotEmpty) const SizedBox(height: 4),
         _LinkText(url),
-        if (snippet != null && snippet!.isNotEmpty) ...[
+        if (snippetText.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(snippet!, style: sans(12, height: 1.45, color: AppColors.fg2)),
+          Text(snippetText,
+              style: sans(12, height: 1.45, color: AppColors.fg2)),
         ],
-        if (date != null) ...[
+        if (dateText.isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text(date!, style: mono(10, color: AppColors.fg4)),
+          Text(dateText, style: mono(10, color: AppColors.fg4)),
         ],
       ]),
     );

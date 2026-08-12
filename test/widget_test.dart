@@ -138,4 +138,61 @@ void main() {
       expect(tester.takeException(), isNull, reason: entry.key);
     }
   });
+
+  testWidgets('tool panels tolerate null optional fields', (tester) async {
+    final cases = <String, Map<String, dynamic>>{
+      'edit_file': {'note': null},
+      'append_file': {'lines_written': null, 'total_lines': null},
+      'read_file': {
+        'total_lines': null,
+        'total_chars': null,
+        'truncated': true,
+        'hint': null,
+      },
+      'view_outline': {
+        'language': null,
+        'symbol_count': null,
+        'outline': [
+          {'kind': null, 'signature': null, 'depth': null},
+        ],
+      },
+      'code_map': {
+        'file_count': null,
+        'symbol_count': null,
+        'files': [
+          {'path': null, 'symbols': null},
+        ],
+      },
+      'web_search': {
+        'count': null,
+        'results': [
+          {
+            'title': null,
+            'url': null,
+            'snippet': null,
+            'published_date': null,
+          },
+        ],
+      },
+      'web_read': {'published_date': null},
+    };
+
+    for (final entry in cases.entries) {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Builder(
+              builder: (context) => safeToolDetailView(
+                context,
+                tool: entry.key,
+                result: {'status': 'success', 'data': entry.value},
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: entry.key);
+    }
+  });
 }
