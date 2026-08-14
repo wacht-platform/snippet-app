@@ -94,8 +94,9 @@ class SessionScreen extends StatefulWidget {
 
   /// Gives the macOS shell access to session actions after this state mounts,
   /// allowing the shell chrome to replace the duplicate in-session title bar.
-  final void Function(VoidCallback openActions, VoidCallback stop,
-      void Function(String action) performAction)? onMacControls;
+  final void Function(
+          VoidCallback stop, void Function(String action) performAction)?
+      onMacControls;
 
   const SessionScreen(
       {super.key,
@@ -382,10 +383,8 @@ class _SessionScreenState extends State<SessionScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        widget.onMacControls?.call(
-            () => _openActions(_state),
-            () => _send({'kind': 'interrupt'}),
-            _performMacAction);
+        widget.onMacControls
+            ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
       }
     });
     _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
@@ -700,10 +699,8 @@ class _SessionScreenState extends State<SessionScreen>
             }
           });
           widget.onMacStatus?.call(next, next.status == 'running');
-          widget.onMacControls?.call(
-              () => _openActions(next),
-              () => _send({'kind': 'interrupt'}),
-              _performMacAction);
+          widget.onMacControls
+              ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
           // Re-arm (or cancel) the ack watchdog against the new _pending state.
           _armAckWatchdog();
           if (follow) _scheduleBottom();
@@ -1749,31 +1746,55 @@ class _SessionScreenState extends State<SessionScreen>
   void _performMacAction(String action) {
     final s = _state;
     switch (action) {
+      case 'rename':
+        _renameCurrent();
+        return;
       case 'approval':
         final manual = (s?.approvalMode ?? 'auto') == 'manual';
         _send({'kind': 'set_mode', 'value': manual ? 'auto' : 'manual'});
         _toast(manual ? 'Approval: auto' : 'Approval: ask');
+        return;
       case 'goal':
         if (s?.goal?.ongoing ?? false) {
           _cancelGoal();
         } else {
           _setGoal();
         }
+        return;
       case 'lanes':
         _showLanes();
+        return;
+      case 'files':
+        final ws = s?.workspace ?? '';
+        final name = lastPathSegment(ws, ifEmpty: 'Files');
+        presentScreen(context,
+            builder: (_, close) => FileExplorer(
+                client: widget.client,
+                title: name,
+                start: ws.isEmpty ? null : ws,
+                onClose: close,
+                onOpenFile: widget.onOpenFileTab));
+        return;
+      case 'command':
+        _showExec();
+        return;
       case 'processes':
         presentScreen(context,
             builder: (_, close) => ProcessesScreen(
                 client: widget.client,
                 sessionId: widget.sessionId,
                 onClose: close));
+        return;
       case 'compact':
         _send({'kind': 'compact'});
         _toast('Compacting history');
+        return;
       case 'checkpoints':
         _showCheckpoints();
+        return;
       case 'usage':
         _showUsage();
+        return;
     }
   }
 

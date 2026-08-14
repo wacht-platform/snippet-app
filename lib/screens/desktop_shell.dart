@@ -63,10 +63,9 @@ class _MacSessionStatus {
 }
 
 class _MacSessionControls {
-  final VoidCallback openActions;
   final VoidCallback stop;
   final void Function(String action) performAction;
-  const _MacSessionControls(this.openActions, this.stop, this.performAction);
+  const _MacSessionControls(this.stop, this.performAction);
 }
 
 class _DesktopShellState extends State<DesktopShell> {
@@ -133,10 +132,9 @@ class _DesktopShellState extends State<DesktopShell> {
     if (mounted && _activeTab?.key == key) setState(() {});
   }
 
-  void _setMacSessionControls(String key, VoidCallback openActions,
-      VoidCallback stop, void Function(String action) performAction) {
-    _macSessionControls[key] =
-        _MacSessionControls(openActions, stop, performAction);
+  void _setMacSessionControls(String key, VoidCallback stop,
+      void Function(String action) performAction) {
+    _macSessionControls[key] = _MacSessionControls(stop, performAction);
     if (mounted && _activeTab?.key == key) setState(() {});
   }
 
@@ -408,24 +406,8 @@ class _DesktopShellState extends State<DesktopShell> {
     _activateTab(next < 0 ? next + _tabs.length : next);
   }
 
-  void _openActiveFiles() {
-    final tab = _activeTab;
-    if (tab == null) return;
-    final path = tab.filePath;
-    final slash = path?.lastIndexOf('/') ?? -1;
-    final folder = path != null && slash > 0 ? path.substring(0, slash) : null;
-    presentScreen(
-      context,
-      builder: (_, close) => FileExplorer(
-        client: tab.client,
-        title: folder == null ? 'Files' : lastPathSegment(folder),
-        start: folder,
-        onClose: close,
-        onOpenFile: (path, name) =>
-            _openFileTab(tab.client, tab.instanceUrl, path, name),
-      ),
-    );
-  }
+  void _openActiveFiles() =>
+      _macSessionControls[_activeTab?.key]?.performAction('files');
 
   void _showDesktopShortcuts() {
     showAppSheet(
@@ -437,7 +419,6 @@ class _DesktopShellState extends State<DesktopShell> {
         _shortcutRow('⌘/Ctrl 1–9', 'Switch to tab'),
         _shortcutRow('⌘ ⌥ ← / → · Ctrl Tab · Ctrl PageUp/PageDown',
             'Previous / next tab'),
-        _shortcutRow('⌘/Ctrl ⇧ P', 'More actions'),
         _shortcutRow('⌘/Ctrl ⇧ F', 'Browse files'),
         _shortcutRow('⌘/Ctrl ⇧ G', 'Open Git'),
         _shortcutRow('⌘/Ctrl .', 'Stop active run'),
@@ -456,59 +437,58 @@ class _DesktopShellState extends State<DesktopShell> {
 
   Widget _desktopShortcuts(Widget child) {
     if (kMobile) return child;
-    final callbacks = <ShortcutActivator, VoidCallback>{
-      const SingleActivator(LogicalKeyboardKey.keyT, meta: true): _newSessionFlow,
-      const SingleActivator(LogicalKeyboardKey.keyT, control: true): _newSessionFlow,
-      const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
-          () => _activeIndex >= 0 ? _closeTab(_activeIndex) : null,
-      const SingleActivator(LogicalKeyboardKey.keyW, control: true):
-          () => _activeIndex >= 0 ? _closeTab(_activeIndex) : null,
-      const SingleActivator(LogicalKeyboardKey.arrowLeft, meta: true, alt: true):
-          () => _activateRelativeTab(-1),
-      const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true, alt: true):
-          () => _activateRelativeTab(-1),
-      const SingleActivator(LogicalKeyboardKey.pageUp, control: true):
-          () => _activateRelativeTab(-1),
+    final shortcuts = <ShortcutActivator, VoidCallback>{
+      const SingleActivator(LogicalKeyboardKey.keyT, meta: true):
+          _newSessionFlow,
+      const SingleActivator(LogicalKeyboardKey.keyT, control: true):
+          _newSessionFlow,
+      const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () =>
+          _activeIndex >= 0 ? _closeTab(_activeIndex) : null,
+      const SingleActivator(LogicalKeyboardKey.keyW, control: true): () =>
+          _activeIndex >= 0 ? _closeTab(_activeIndex) : null,
+      const SingleActivator(LogicalKeyboardKey.arrowLeft,
+          meta: true, alt: true): () => _activateRelativeTab(-1),
+      const SingleActivator(LogicalKeyboardKey.arrowLeft,
+          control: true, alt: true): () => _activateRelativeTab(-1),
+      const SingleActivator(LogicalKeyboardKey.pageUp, control: true): () =>
+          _activateRelativeTab(-1),
+      const SingleActivator(LogicalKeyboardKey.arrowRight,
+          meta: true, alt: true): () => _activateRelativeTab(1),
+      const SingleActivator(LogicalKeyboardKey.arrowRight,
+          control: true, alt: true): () => _activateRelativeTab(1),
+      const SingleActivator(LogicalKeyboardKey.pageDown, control: true): () =>
+          _activateRelativeTab(1),
       const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
           () => _activateRelativeTab(-1),
-      const SingleActivator(LogicalKeyboardKey.arrowRight, meta: true, alt: true):
-          () => _activateRelativeTab(1),
-      const SingleActivator(LogicalKeyboardKey.arrowRight, control: true, alt: true):
-          () => _activateRelativeTab(1),
-      const SingleActivator(LogicalKeyboardKey.pageDown, control: true):
-          () => _activateRelativeTab(1),
-      const SingleActivator(LogicalKeyboardKey.tab, control: true):
-          () => _activateRelativeTab(1),
-      const SingleActivator(LogicalKeyboardKey.keyP, meta: true, shift: true):
-          () => _macSessionControls[_activeTab?.key]?.openActions(),
-      const SingleActivator(LogicalKeyboardKey.keyP, control: true, shift: true):
-          () => _macSessionControls[_activeTab?.key]?.openActions(),
+      const SingleActivator(LogicalKeyboardKey.tab, control: true): () =>
+          _activateRelativeTab(1),
       const SingleActivator(LogicalKeyboardKey.keyF, meta: true, shift: true):
           _openActiveFiles,
-      const SingleActivator(LogicalKeyboardKey.keyF, control: true, shift: true):
-          _openActiveFiles,
+      const SingleActivator(LogicalKeyboardKey.keyF,
+          control: true, shift: true): _openActiveFiles,
       const SingleActivator(LogicalKeyboardKey.keyG, meta: true, shift: true):
           _openMacGit,
-      const SingleActivator(LogicalKeyboardKey.keyG, control: true, shift: true):
-          _openMacGit,
-      const SingleActivator(LogicalKeyboardKey.period, meta: true):
-          () => _macSessionControls[_activeTab?.key]?.stop(),
-      const SingleActivator(LogicalKeyboardKey.period, control: true):
-          () => _macSessionControls[_activeTab?.key]?.stop(),
+      const SingleActivator(LogicalKeyboardKey.keyG,
+          control: true, shift: true): _openMacGit,
+      const SingleActivator(LogicalKeyboardKey.period, meta: true): () =>
+          _macSessionControls[_activeTab?.key]?.stop(),
+      const SingleActivator(LogicalKeyboardKey.period, control: true): () =>
+          _macSessionControls[_activeTab?.key]?.stop(),
       const SingleActivator(LogicalKeyboardKey.slash, meta: true):
           _showDesktopShortcuts,
       const SingleActivator(LogicalKeyboardKey.slash, control: true):
           _showDesktopShortcuts,
       for (var i = 1; i <= 9; i++)
-        SingleActivator(LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i - 1),
-            meta: true):
-          () => _activateTab(i - 1),
+        SingleActivator(
+            LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i - 1),
+            meta: true): () => _activateTab(i - 1),
       for (var i = 1; i <= 9; i++)
-        SingleActivator(LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i - 1),
-            control: true):
-          () => _activateTab(i - 1),
+        SingleActivator(
+            LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i - 1),
+            control: true): () => _activateTab(i - 1),
     };
-    return CallbackShortcuts(bindings: callbacks, child: Focus(autofocus: true, child: child));
+    return CallbackShortcuts(
+        bindings: shortcuts, child: Focus(autofocus: true, child: child));
   }
 
   void _onNotif(Map<String, dynamic> m) async {
@@ -773,7 +753,6 @@ class _DesktopShellState extends State<DesktopShell> {
   Widget _macNavigationBar() {
     final tab = _activeTab;
     final controls = tab == null ? null : _macSessionControls[tab.key];
-    final state = _macSessionStatuses[tab?.key]?.state;
     final running = _macSessionStatuses[tab?.key]?.running ?? false;
     return Container(
       height: 42,
@@ -791,36 +770,9 @@ class _DesktopShellState extends State<DesktopShell> {
             itemBuilder: (_, i) => _tabChip(i),
           ),
         ),
-        if (controls != null) ...[
-          Container(width: 1, height: 18, color: AppColors.border2),
-          _macActionButton(
-              'shield',
-              state?.approvalMode == 'manual' ? 'Ask' : 'Auto',
-              'Toggle approval mode',
-              () => controls.performAction('approval')),
-          _macActionButton(
-              'zap',
-              state?.goal?.ongoing == true ? 'Goal' : 'Set goal',
-              state?.goal?.ongoing == true ? 'Cancel goal' : 'Set goal',
-              () => controls.performAction('goal')),
-          if (state?.lanes.isNotEmpty ?? false)
-            _macActionButton(
-                'layers',
-                '${state!.lanes.where((lane) => lane.running).length}',
-                'Open lanes',
-                () => controls.performAction('lanes')),
-          if (running)
-            IconBtn('stop',
-                size: 36,
-                iconSize: 15,
-                tooltip: 'Stop',
-                onTap: controls.stop),
-          IconBtn('more-horizontal',
-              size: 36,
-              iconSize: 17,
-              tooltip: 'More actions',
-              onTap: controls.openActions),
-        ],
+        if (controls != null && running)
+          IconBtn('stop',
+              size: 36, iconSize: 15, tooltip: 'Stop', onTap: controls.stop),
         Container(width: 1, height: 18, color: AppColors.border2),
         IconBtn('plus',
             size: 36,
@@ -829,25 +781,6 @@ class _DesktopShellState extends State<DesktopShell> {
             onTap: _newSessionFlow),
         const SizedBox(width: 8),
       ]),
-    );
-  }
-
-  Widget _macActionButton(
-      String icon, String label, String tooltip, VoidCallback onTap) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.xs),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(icon, size: 12, color: AppColors.fg3),
-            const SizedBox(width: 5),
-            Text(label, style: sans(10.5, color: AppColors.fg2)),
-          ]),
-        ),
-      ),
     );
   }
 
@@ -869,27 +802,29 @@ class _DesktopShellState extends State<DesktopShell> {
             ? AppColors.accent
             : AppColors.run;
     final connected = _client != null;
-    final metrics = <Widget>[];
-    if (state != null &&
-        state.contextWindow > 0 &&
-        state.lastPromptTokens > 0) {
-      final pct =
-          (state.lastPromptTokens / state.contextWindow * 100).clamp(0, 999);
-      metrics.add(_macStatusMetric('activity', '${pct.round()}% ctx'));
-    }
+    final rightActions = <Widget>[];
     if (controls != null) {
-      metrics.add(_macStatusAction('history', 'Checkpoints',
-          () => controls.performAction('checkpoints')));
-      metrics.add(_macStatusAction(
-          'activity', 'Usage', () => controls.performAction('usage')));
-    }
-    if (state != null && state.totalTokens > 0) {
-      metrics.add(_macStatusMetric('zap', '${fmtSi(state.totalTokens)} tok'));
-    }
-    final rate = state?.ratePrimary;
-    if (rate != null) {
-      metrics.add(_macStatusMetric('clipboard',
-          '${rateWindowLabel(rate.windowMinutes)} · ${rate.leftPercent.round()}%'));
+      rightActions.addAll([
+        _macStatusAction(
+            'edit', 'Rename', () => controls.performAction('rename')),
+        _macStatusAction(
+            'shield', 'Approval', () => controls.performAction('approval')),
+        _macStatusAction('zap', 'Goal', () => controls.performAction('goal')),
+        _macStatusAction(
+            'folder', 'Files', () => controls.performAction('files')),
+        _macStatusAction(
+            'terminal', 'Run', () => controls.performAction('command')),
+        _macStatusAction(
+            'list', 'Processes', () => controls.performAction('processes')),
+        _macStatusAction(
+            'activity', 'Usage', () => controls.performAction('usage')),
+        _macStatusAction('history', 'Checkpoints',
+            () => controls.performAction('checkpoints')),
+      ]);
+      if (state?.lanes.isNotEmpty ?? false) {
+        rightActions.add(_macStatusAction(
+            'layers', 'Lanes', () => controls.performAction('lanes')));
+      }
     }
     return Container(
       height: 30,
@@ -930,34 +865,17 @@ class _DesktopShellState extends State<DesktopShell> {
                 style: mono(10, color: AppColors.fg4)),
           ),
         ],
-        if (metrics.isNotEmpty) ...[
-          const SizedBox(width: 14),
+        const Spacer(),
+        if (rightActions.isNotEmpty) ...[
           Container(width: 1, height: 12, color: AppColors.border2),
-          const SizedBox(width: 10),
-          Flexible(
-            flex: 3,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              child: Row(children: [
-                for (var i = 0; i < metrics.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 14),
-                  metrics[i],
-                ],
-              ]),
-            ),
-          ),
+          const SizedBox(width: 8),
+          for (var i = 0; i < rightActions.length; i++) ...[
+            if (i > 0) const SizedBox(width: 10),
+            rightActions[i],
+          ],
         ],
       ]),
     );
-  }
-
-  Widget _macStatusMetric(String icon, String label) {
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      AppIcon(icon, size: 11, color: AppColors.fg4),
-      const SizedBox(width: 5),
-      Text(label, style: mono(10, color: AppColors.fg3)),
-    ]);
   }
 
   Widget _macStatusAction(String icon, String label, VoidCallback onTap) {
@@ -968,7 +886,11 @@ class _DesktopShellState extends State<DesktopShell> {
         borderRadius: BorderRadius.circular(R.xs),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
-          child: _macStatusMetric(icon, label),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(icon, size: 11, color: AppColors.fg4),
+            const SizedBox(width: 5),
+            Text(label, style: mono(10, color: AppColors.fg3)),
+          ]),
         ),
       ),
     );
@@ -1226,9 +1148,9 @@ class _DesktopShellState extends State<DesktopShell> {
                                     _setMacSessionStatus(t.key, state, running)
                                 : null,
                             onMacControls: !kMobile
-                                ? (openActions, stop, performAction) =>
-                                    _setMacSessionControls(t.key, openActions,
-                                        stop, performAction)
+                                ? (stop, performAction) =>
+                                    _setMacSessionControls(
+                                        t.key, stop, performAction)
                                 : null,
                           ),
                   );
