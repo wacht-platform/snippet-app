@@ -1633,33 +1633,61 @@ Future<String?> promptText(BuildContext context,
     String initial = '',
     String? hint,
     String saveLabel = 'Save'}) {
-  final ctrl = TextEditingController(text: initial);
-  return showAppSheet<String>(context, title: title,
-      child: Builder(builder: (ctx) {
-    void done() => Navigator.pop(ctx, ctrl.text.trim());
+  return showAppSheet<String>(context,
+      title: title,
+      child:
+          _TextPromptSheet(initial: initial, hint: hint, saveLabel: saveLabel));
+}
+
+class _TextPromptSheet extends StatefulWidget {
+  final String initial;
+  final String? hint;
+  final String saveLabel;
+  const _TextPromptSheet(
+      {required this.initial, required this.hint, required this.saveLabel});
+
+  @override
+  State<_TextPromptSheet> createState() => _TextPromptSheetState();
+}
+
+class _TextPromptSheetState extends State<_TextPromptSheet> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _done() => Navigator.pop(context, _controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppField(
-                controller: ctrl,
-                hint: hint,
+                controller: _controller,
+                hint: widget.hint,
                 autofocus: true,
-                onSubmitted: (_) => done()),
+                onSubmitted: (_) => _done()),
             const SizedBox(height: 14),
             Row(children: [
               Expanded(
                   child: Btn('Cancel',
                       variant: BtnVariant.secondary,
-                      onTap: () => Navigator.pop(ctx))),
+                      onTap: () => Navigator.pop(context))),
               const SizedBox(width: 10),
-              Expanded(child: Btn(saveLabel, onTap: done)),
+              Expanded(child: Btn(widget.saveLabel, onTap: _done)),
             ]),
           ]),
     );
-  }));
+  }
 }
 
 Future<T?> showAppSheet<T>(BuildContext context,
