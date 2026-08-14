@@ -7,6 +7,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'panel.dart';
+import 'platform.dart';
 import 'theme.dart';
 import 'tool_views.dart';
 import 'widgets.dart';
@@ -133,6 +135,36 @@ class StatusRail extends StatelessWidget {
 // full tool view INLINE (capped height) instead of opening a sheet.
 // ---------------------------------------------------------------------------
 
+class _ToolDetailPanel extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final VoidCallback onClose;
+  const _ToolDetailPanel(
+      {required this.title, required this.child, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface1,
+      appBar: AppBar(
+        title: Text(title,
+            style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+        leading: IconBtn('x',
+            size: 36, iconSize: 18, tooltip: 'Close', onTap: onClose),
+        backgroundColor: AppColors.surface1,
+        surfaceTintColor: Colors.transparent,
+        bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(height: 1, color: AppColors.border)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: child,
+      ),
+    );
+  }
+}
+
 class DenseToolRow extends StatefulWidget {
   final String tool;
   final dynamic args;
@@ -151,12 +183,17 @@ class _DenseToolRowState extends State<DenseToolRow> {
   }
 
   void _openDrawer(BuildContext context) {
-    showAppSheet(context,
-        title: toolTitle(widget.tool),
-        child: safeToolDetailView(context,
-            tool: widget.tool,
-            args: widget.args,
-            result: widget.result is Map ? widget.result : null));
+    final detail = safeToolDetailView(context,
+        tool: widget.tool,
+        args: widget.args,
+        result: widget.result is Map ? widget.result : null);
+    if (kMobile) {
+      showAppSheet(context, title: toolTitle(widget.tool), child: detail);
+    } else {
+      presentScreen(context,
+          builder: (_, close) => _ToolDetailPanel(
+              title: toolTitle(widget.tool), onClose: close, child: detail));
+    }
   }
 
   // Right-aligned meta: bash exit code, edit diff stat, else ✓/✗.

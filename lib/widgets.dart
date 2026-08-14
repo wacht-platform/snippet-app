@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'platform.dart';
+import 'panel.dart';
 import 'theme.dart';
 
 OverlayEntry? _activeToast;
@@ -1671,6 +1672,9 @@ class _TextPromptSheetState extends State<_TextPromptSheet> {
 
 Future<T?> showAppSheet<T>(BuildContext context,
     {required String title, required Widget child}) {
+  if (!kMobile) {
+    return showModal<T>(context, _DesktopSheet(title: title, child: child));
+  }
   return showModalBottomSheet<T>(
     context: context,
     backgroundColor: Colors.transparent,
@@ -1719,6 +1723,42 @@ Future<T?> showAppSheet<T>(BuildContext context,
       );
     },
   );
+}
+
+class _DesktopSheet extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _DesktopSheet({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 620),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
+          child: Row(children: [
+            Expanded(
+                child: Text(title,
+                    style: sans(16,
+                        weight: FontWeight.w600, color: AppColors.fg1))),
+            IconBtn('x',
+                size: 32,
+                iconSize: 18,
+                tooltip: 'Close',
+                onTap: () => Navigator.pop(context)),
+          ]),
+        ),
+        Divider(height: 1, color: AppColors.border),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: child,
+          ),
+        ),
+      ]),
+    );
+  }
 }
 
 class AppToggle extends StatelessWidget {
