@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../command_palette.dart';
@@ -397,6 +398,115 @@ class _DesktopShellState extends State<DesktopShell> {
     setState(() => _activeIndex = i);
     _persistTabs();
     _syncPage();
+  }
+
+  void _activateRelativeTab(int delta) {
+    if (_tabs.length < 2 || _activeIndex < 0) return;
+    final next = (_activeIndex + delta) % _tabs.length;
+    _activateTab(next < 0 ? next + _tabs.length : next);
+  }
+
+  void _openActiveFiles() {
+    final tab = _activeTab;
+    if (tab == null) return;
+    final path = tab.filePath;
+    final slash = path?.lastIndexOf('/') ?? -1;
+    final folder = path != null && slash > 0 ? path.substring(0, slash) : null;
+    presentScreen(
+      context,
+      builder: (_, close) => FileExplorer(
+        client: tab.client,
+        title: folder == null ? 'Files' : lastPathSegment(folder),
+        start: folder,
+        onClose: close,
+        onOpenFile: (path, name) =>
+            _openFileTab(tab.client, tab.instanceUrl, path, name),
+      ),
+    );
+  }
+
+  void _showDesktopShortcuts() {
+    showAppSheet(
+      context,
+      title: 'Keyboard shortcuts',
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        _shortcutRow('⌘/Ctrl T', 'New session'),
+        _shortcutRow('⌘/Ctrl W', 'Close active tab'),
+        _shortcutRow('⌘/Ctrl 1–9', 'Switch to tab'),
+        _shortcutRow('⌘ ⌥ ← / → · Ctrl Tab · Ctrl PageUp/PageDown',
+            'Previous / next tab'),
+        _shortcutRow('⌘/Ctrl ⇧ P', 'More actions'),
+        _shortcutRow('⌘/Ctrl ⇧ F', 'Browse files'),
+        _shortcutRow('⌘/Ctrl ⇧ G', 'Open Git'),
+        _shortcutRow('⌘/Ctrl .', 'Stop active run'),
+        _shortcutRow('⌘/Ctrl Enter', 'Send message'),
+      ]),
+    );
+  }
+
+  Widget _shortcutRow(String keys, String label) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(children: [
+          Expanded(child: Text(label, style: sans(13, color: AppColors.fg1))),
+          Text(keys, style: mono(11.5, color: AppColors.fg3)),
+        ]),
+      );
+
+  Widget _desktopShortcuts(Widget child) {
+    if (kMobile) return child;
+    final callbacks = <ShortcutActivator, VoidCallback>{
+      const SingleActivator(LogicalKeyboardKey.keyT, meta: true): _newSessionFlow,
+      const SingleActivator(LogicalKeyboardKey.keyT, control: true): _newSessionFlow,
+      const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+          () => _activeIndex >= 0 ? _closeTab(_activeIndex) : null,
+      const SingleActivator(LogicalKeyboardKey.keyW, control: true):
+          () => _activeIndex >= 0 ? _closeTab(_activeIndex) : null,
+      const SingleActivator(LogicalKeyboardKey.arrowLeft, meta: true, alt: true):
+          () => _activateRelativeTab(-1),
+      const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true, alt: true):
+          () => _activateRelativeTab(-1),
+      const SingleActivator(LogicalKeyboardKey.pageUp, control: true):
+          () => _activateRelativeTab(-1),
+      const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
+          () => _activateRelativeTab(-1),
+      const SingleActivator(LogicalKeyboardKey.arrowRight, meta: true, alt: true):
+          () => _activateRelativeTab(1),
+      const SingleActivator(LogicalKeyboardKey.arrowRight, control: true, alt: true):
+          () => _activateRelativeTab(1),
+      const SingleActivator(LogicalKeyboardKey.pageDown, control: true):
+          () => _activateRelativeTab(1),
+      const SingleActivator(LogicalKeyboardKey.tab, control: true):
+          () => _activateRelativeTab(1),
+      const SingleActivator(LogicalKeyboardKey.keyP, meta: true, shift: true):
+          () => _macSessionControls[_activeTab?.key]?.openActions(),
+      const SingleActivator(LogicalKeyboardKey.keyP, control: true, shift: true):
+          () => _macSessionControls[_activeTab?.key]?.openActions(),
+      const SingleActivator(LogicalKeyboardKey.keyF, meta: true, shift: true):
+          _openActiveFiles,
+      const SingleActivator(LogicalKeyboardKey.keyF, control: true, shift: true):
+          _openActiveFiles,
+      const SingleActivator(LogicalKeyboardKey.keyG, meta: true, shift: true):
+          _openMacGit,
+      const SingleActivator(LogicalKeyboardKey.keyG, control: true, shift: true):
+          _openMacGit,
+      const SingleActivator(LogicalKeyboardKey.period, meta: true):
+          () => _macSessionControls[_activeTab?.key]?.stop(),
+      const SingleActivator(LogicalKeyboardKey.period, control: true):
+          () => _macSessionControls[_activeTab?.key]?.stop(),
+      const SingleActivator(LogicalKeyboardKey.slash, meta: true):
+          _showDesktopShortcuts,
+      const SingleActivator(LogicalKeyboardKey.slash, control: true):
+          _showDesktopShortcuts,
+      for (var i = 1; i <= 9; i++)
+        SingleActivator(LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i - 1),
+            meta: true):
+          () => _activateTab(i - 1),
+      for (var i = 1; i <= 9; i++)
+        SingleActivator(LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i - 1),
+            control: true):
+          () => _activateTab(i - 1),
+    };
+    return CallbackShortcuts(bindings: callbacks, child: Focus(autofocus: true, child: child));
   }
 
   void _onNotif(Map<String, dynamic> m) async {
@@ -897,7 +1007,7 @@ class _DesktopShellState extends State<DesktopShell> {
                     strokeWidth: 2, color: AppColors.fg3))),
       );
     }
-    return LayoutBuilder(builder: (context, c) {
+    return _desktopShortcuts(LayoutBuilder(builder: (context, c) {
       // Narrow window → keep the native shell but collapse the sidebar to a drawer.
       if (c.maxWidth < kShellCompact) {
         // Full-width drawer on phones; a capped one on a shrunk desktop window.
@@ -984,7 +1094,7 @@ class _DesktopShellState extends State<DesktopShell> {
           ]),
         ),
       );
-    });
+    }));
   }
 
   Widget _mainPane({VoidCallback? onMenu}) {
@@ -1055,7 +1165,7 @@ class _DesktopShellState extends State<DesktopShell> {
                                 ? (state, running) =>
                                     _setMacSessionStatus(t.key, state, running)
                                 : null,
-                            onMacControls: kMacOS
+                            onMacControls: !kMobile
                                 ? (openActions, stop) => _setMacSessionControls(
                                     t.key, openActions, stop)
                                 : null,
