@@ -92,6 +92,10 @@ class SessionScreen extends StatefulWidget {
   /// Publishes live usage data to the macOS shell status rail.
   final void Function(HarnessState? state, bool running)? onMacStatus;
 
+  /// Gives the macOS shell access to session actions after this state mounts,
+  /// allowing the shell chrome to replace the duplicate in-session title bar.
+  final void Function(VoidCallback openActions, VoidCallback stop)? onMacControls;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -102,7 +106,8 @@ class SessionScreen extends StatefulWidget {
       this.onMenu,
       this.onOpenFileTab,
       this.onOpenSession,
-      this.onMacStatus});
+      this.onMacStatus,
+      this.onMacControls});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
 }
@@ -374,6 +379,12 @@ class _SessionScreenState extends State<SessionScreen>
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.onMacControls?.call(
+            () => _openActions(_state), () => _send({'kind': 'interrupt'}));
+      }
+    });
     _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
       if (!mounted) return;
       setState(() {
@@ -686,6 +697,8 @@ class _SessionScreenState extends State<SessionScreen>
             }
           });
           widget.onMacStatus?.call(next, next.status == 'running');
+          widget.onMacControls?.call(
+              () => _openActions(next), () => _send({'kind': 'interrupt'}));
           // Re-arm (or cancel) the ack watchdog against the new _pending state.
           _armAckWatchdog();
           if (follow) _scheduleBottom();
@@ -1430,7 +1443,7 @@ class _SessionScreenState extends State<SessionScreen>
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (kMobile)
             _mobileHeader(s, running, waiting)
-          else
+          else if (!kMacOS)
             _desktopBar(s, running),
           // Desktop keeps the detailed chip strip.
           if (!kMobile && !kMacOS) _statusStrip(s, running),

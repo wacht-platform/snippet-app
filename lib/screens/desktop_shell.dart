@@ -61,6 +61,12 @@ class _MacSessionStatus {
   const _MacSessionStatus(this.state, this.running);
 }
 
+class _MacSessionControls {
+  final VoidCallback openActions;
+  final VoidCallback stop;
+  const _MacSessionControls(this.openActions, this.stop);
+}
+
 class _DesktopShellState extends State<DesktopShell> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final InstanceStore _store = InstanceStore();
@@ -89,6 +95,7 @@ class _DesktopShellState extends State<DesktopShell> {
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
+  final Map<String, _MacSessionControls> _macSessionControls = {};
   GitStatus? _macGit;
   String _macGitKey = '';
 
@@ -121,6 +128,12 @@ class _DesktopShellState extends State<DesktopShell> {
 
   void _setMacSessionStatus(String key, HarnessState? state, bool running) {
     _macSessionStatuses[key] = _MacSessionStatus(state, running);
+    if (mounted && _activeTab?.key == key) setState(() {});
+  }
+
+  void _setMacSessionControls(
+      String key, VoidCallback openActions, VoidCallback stop) {
+    _macSessionControls[key] = _MacSessionControls(openActions, stop);
     if (mounted && _activeTab?.key == key) setState(() {});
   }
 
@@ -281,6 +294,7 @@ class _DesktopShellState extends State<DesktopShell> {
       _activeIndex = 0;
       for (final key in removedKeys) {
         _macSessionStatuses.remove(key);
+        _macSessionControls.remove(key);
       }
     });
     _persistTabs();
@@ -291,6 +305,7 @@ class _DesktopShellState extends State<DesktopShell> {
     setState(() {
       for (final tab in _tabs) {
         _macSessionStatuses.remove(tab.key);
+        _macSessionControls.remove(tab.key);
       }
       _tabs.clear();
       _activeIndex = -1;
@@ -359,6 +374,7 @@ class _DesktopShellState extends State<DesktopShell> {
     final key = _tabs[i].key;
     setState(() {
       _macSessionStatuses.remove(key);
+      _macSessionControls.remove(key);
       _tabs.removeAt(i);
       if (_tabs.isEmpty) {
         _activeIndex = -1;
@@ -595,6 +611,7 @@ class _DesktopShellState extends State<DesktopShell> {
       _instances = items;
       for (final tab in _tabs.where((t) => t.instanceUrl == inst.url)) {
         _macSessionStatuses.remove(tab.key);
+        _macSessionControls.remove(tab.key);
       }
       _tabs.removeWhere((t) => t.instanceUrl == inst.url);
       if (_activeIndex >= _tabs.length) _activeIndex = _tabs.length - 1;
@@ -642,6 +659,9 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   Widget _macNavigationBar() {
+    final tab = _activeTab;
+    final controls = tab == null ? null : _macSessionControls[tab.key];
+    final running = _macSessionStatuses[tab?.key]?.running ?? false;
     return Container(
       height: 42,
       decoration: BoxDecoration(
@@ -658,6 +678,20 @@ class _DesktopShellState extends State<DesktopShell> {
             itemBuilder: (_, i) => _tabChip(i),
           ),
         ),
+        if (controls != null) ...[
+          Container(width: 1, height: 18, color: AppColors.border2),
+          if (running)
+            IconBtn('stop',
+                size: 36,
+                iconSize: 15,
+                tooltip: 'Stop',
+                onTap: controls.stop),
+          IconBtn('more-horizontal',
+              size: 36,
+              iconSize: 17,
+              tooltip: 'More actions',
+              onTap: controls.openActions),
+        ],
         Container(width: 1, height: 18, color: AppColors.border2),
         IconBtn('plus',
             size: 36,
@@ -1020,6 +1054,10 @@ class _DesktopShellState extends State<DesktopShell> {
                             onMacStatus: kMacOS
                                 ? (state, running) =>
                                     _setMacSessionStatus(t.key, state, running)
+                                : null,
+                            onMacControls: kMacOS
+                                ? (openActions, stop) => _setMacSessionControls(
+                                    t.key, openActions, stop)
                                 : null,
                           ),
                   );
