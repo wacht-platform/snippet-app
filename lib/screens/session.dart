@@ -94,7 +94,8 @@ class SessionScreen extends StatefulWidget {
 
   /// Gives the macOS shell access to session actions after this state mounts,
   /// allowing the shell chrome to replace the duplicate in-session title bar.
-  final void Function(VoidCallback openActions, VoidCallback stop)? onMacControls;
+  final void Function(VoidCallback openActions, VoidCallback stop,
+      void Function(String action) performAction)? onMacControls;
 
   const SessionScreen(
       {super.key,
@@ -382,7 +383,9 @@ class _SessionScreenState extends State<SessionScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         widget.onMacControls?.call(
-            () => _openActions(_state), () => _send({'kind': 'interrupt'}));
+            () => _openActions(_state),
+            () => _send({'kind': 'interrupt'}),
+            _performMacAction);
       }
     });
     _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
@@ -698,7 +701,9 @@ class _SessionScreenState extends State<SessionScreen>
           });
           widget.onMacStatus?.call(next, next.status == 'running');
           widget.onMacControls?.call(
-              () => _openActions(next), () => _send({'kind': 'interrupt'}));
+              () => _openActions(next),
+              () => _send({'kind': 'interrupt'}),
+              _performMacAction);
           // Re-arm (or cancel) the ack watchdog against the new _pending state.
           _armAckWatchdog();
           if (follow) _scheduleBottom();
@@ -1741,6 +1746,37 @@ class _SessionScreenState extends State<SessionScreen>
     _toast('Cancelling the goal');
   }
 
+  void _performMacAction(String action) {
+    final s = _state;
+    switch (action) {
+      case 'approval':
+        final manual = (s?.approvalMode ?? 'auto') == 'manual';
+        _send({'kind': 'set_mode', 'value': manual ? 'auto' : 'manual'});
+        _toast(manual ? 'Approval: auto' : 'Approval: ask');
+      case 'goal':
+        if (s?.goal?.ongoing ?? false) {
+          _cancelGoal();
+        } else {
+          _setGoal();
+        }
+      case 'lanes':
+        _showLanes();
+      case 'processes':
+        presentScreen(context,
+            builder: (_, close) => ProcessesScreen(
+                client: widget.client,
+                sessionId: widget.sessionId,
+                onClose: close));
+      case 'compact':
+        _send({'kind': 'compact'});
+        _toast('Compacting history');
+      case 'checkpoints':
+        _showCheckpoints();
+      case 'usage':
+        _showUsage();
+    }
+  }
+
   List<PopupMenuEntry<VoidCallback>> _actionItems(HarnessState? s) {
     final manual = (s?.approvalMode ?? 'auto') == 'manual';
     final ws = s?.workspace ?? '';
@@ -1827,21 +1863,23 @@ class _SessionScreenState extends State<SessionScreen>
             const SectionLabel('Session'),
             _actionTile('edit', 'Rename session',
                 onTap: () => run(_renameCurrent)),
-            _actionTile('shield', 'Approval mode',
-                value: manual ? 'Ask' : 'Auto',
-                onTap: () => run(() {
-                      _send({
-                        'kind': 'set_mode',
-                        'value': manual ? 'auto' : 'manual'
-                      });
-                      _toast(manual ? 'Approval: auto' : 'Approval: ask');
-                    })),
-            (s?.goal?.ongoing ?? false)
-                ? _actionTile('zap', 'Cancel goal',
-                    value: s!.goal!.paused ? 'paused' : 'running',
-                    onTap: () => run(_cancelGoal))
-                : _actionTile('zap', 'Set goal', onTap: () => run(_setGoal)),
-            if ((s?.lanes.isNotEmpty ?? false))
+            if (!kMacOS)
+              _actionTile('shield', 'Approval mode',
+                  value: manual ? 'Ask' : 'Auto',
+                  onTap: () => run(() {
+                        _send({
+                          'kind': 'set_mode',
+                          'value': manual ? 'auto' : 'manual'
+                        });
+                        _toast(manual ? 'Approval: auto' : 'Approval: ask');
+                      })),
+            if (!kMacOS)
+              (s?.goal?.ongoing ?? false)
+                  ? _actionTile('zap', 'Cancel goal',
+                      value: s!.goal!.paused ? 'paused' : 'running',
+                      onTap: () => run(_cancelGoal))
+                  : _actionTile('zap', 'Set goal', onTap: () => run(_setGoal)),
+            if (!kMacOS && (s?.lanes.isNotEmpty ?? false))
               _actionTile('layers', 'Lanes',
                   value: '${s!.lanes.where((l) => l.running).length} running',
                   onTap: () => run(_showLanes)),

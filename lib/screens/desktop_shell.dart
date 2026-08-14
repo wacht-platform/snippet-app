@@ -65,7 +65,8 @@ class _MacSessionStatus {
 class _MacSessionControls {
   final VoidCallback openActions;
   final VoidCallback stop;
-  const _MacSessionControls(this.openActions, this.stop);
+  final void Function(String action) performAction;
+  const _MacSessionControls(this.openActions, this.stop, this.performAction);
 }
 
 class _DesktopShellState extends State<DesktopShell> {
@@ -132,9 +133,10 @@ class _DesktopShellState extends State<DesktopShell> {
     if (mounted && _activeTab?.key == key) setState(() {});
   }
 
-  void _setMacSessionControls(
-      String key, VoidCallback openActions, VoidCallback stop) {
-    _macSessionControls[key] = _MacSessionControls(openActions, stop);
+  void _setMacSessionControls(String key, VoidCallback openActions,
+      VoidCallback stop, void Function(String action) performAction) {
+    _macSessionControls[key] =
+        _MacSessionControls(openActions, stop, performAction);
     if (mounted && _activeTab?.key == key) setState(() {});
   }
 
@@ -771,6 +773,7 @@ class _DesktopShellState extends State<DesktopShell> {
   Widget _macNavigationBar() {
     final tab = _activeTab;
     final controls = tab == null ? null : _macSessionControls[tab.key];
+    final state = _macSessionStatuses[tab?.key]?.state;
     final running = _macSessionStatuses[tab?.key]?.running ?? false;
     return Container(
       height: 42,
@@ -790,6 +793,22 @@ class _DesktopShellState extends State<DesktopShell> {
         ),
         if (controls != null) ...[
           Container(width: 1, height: 18, color: AppColors.border2),
+          _macActionButton(
+              'shield',
+              state?.approvalMode == 'manual' ? 'Ask' : 'Auto',
+              'Toggle approval mode',
+              () => controls.performAction('approval')),
+          _macActionButton(
+              'zap',
+              state?.goal?.ongoing == true ? 'Goal' : 'Set goal',
+              state?.goal?.ongoing == true ? 'Cancel goal' : 'Set goal',
+              () => controls.performAction('goal')),
+          if (state?.lanes.isNotEmpty ?? false)
+            _macActionButton(
+                'layers',
+                '${state!.lanes.where((lane) => lane.running).length}',
+                'Open lanes',
+                () => controls.performAction('lanes')),
           if (running)
             IconBtn('stop',
                 size: 36,
@@ -813,8 +832,28 @@ class _DesktopShellState extends State<DesktopShell> {
     );
   }
 
+  Widget _macActionButton(
+      String icon, String label, String tooltip, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(R.xs),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(icon, size: 12, color: AppColors.fg3),
+            const SizedBox(width: 5),
+            Text(label, style: sans(10.5, color: AppColors.fg2)),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Widget _macStatusBar() {
     final tab = _activeTab;
+    final controls = tab == null ? null : _macSessionControls[tab.key];
     final status = tab == null ? null : _macSessionStatuses[tab.key];
     final state = status?.state;
     final statusLabel = state?.compacting == true
@@ -837,6 +876,12 @@ class _DesktopShellState extends State<DesktopShell> {
       final pct =
           (state.lastPromptTokens / state.contextWindow * 100).clamp(0, 999);
       metrics.add(_macStatusMetric('activity', '${pct.round()}% ctx'));
+    }
+    if (controls != null) {
+      metrics.add(_macStatusAction('history', 'Checkpoints',
+          () => controls.performAction('checkpoints')));
+      metrics.add(_macStatusAction(
+          'activity', 'Usage', () => controls.performAction('usage')));
     }
     if (state != null && state.totalTokens > 0) {
       metrics.add(_macStatusMetric('zap', '${fmtSi(state.totalTokens)} tok'));
@@ -913,6 +958,20 @@ class _DesktopShellState extends State<DesktopShell> {
       const SizedBox(width: 5),
       Text(label, style: mono(10, color: AppColors.fg3)),
     ]);
+  }
+
+  Widget _macStatusAction(String icon, String label, VoidCallback onTap) {
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(R.xs),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+          child: _macStatusMetric(icon, label),
+        ),
+      ),
+    );
   }
 
   Widget _macWindowBar() {
@@ -1166,8 +1225,9 @@ class _DesktopShellState extends State<DesktopShell> {
                                     _setMacSessionStatus(t.key, state, running)
                                 : null,
                             onMacControls: !kMobile
-                                ? (openActions, stop) => _setMacSessionControls(
-                                    t.key, openActions, stop)
+                                ? (openActions, stop, performAction) =>
+                                    _setMacSessionControls(t.key, openActions,
+                                        stop, performAction)
                                 : null,
                           ),
                   );
