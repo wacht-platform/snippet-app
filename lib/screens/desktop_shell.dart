@@ -753,6 +753,7 @@ class _DesktopShellState extends State<DesktopShell> {
   Widget _macNavigationBar() {
     final tab = _activeTab;
     final controls = tab == null ? null : _macSessionControls[tab.key];
+    final state = _macSessionStatuses[tab?.key]?.state;
     final running = _macSessionStatuses[tab?.key]?.running ?? false;
     return Container(
       height: 42,
@@ -770,9 +771,28 @@ class _DesktopShellState extends State<DesktopShell> {
             itemBuilder: (_, i) => _tabChip(i),
           ),
         ),
-        if (controls != null && running)
-          IconBtn('stop',
-              size: 36, iconSize: 15, tooltip: 'Stop', onTap: controls.stop),
+        if (controls != null) ...[
+          Container(width: 1, height: 18, color: AppColors.border2),
+          _macTopAction(
+              'shield',
+              state?.approvalMode == 'manual' ? 'Ask' : 'Auto',
+              'Toggle approval mode',
+              () => controls.performAction('approval')),
+          _macTopAction(
+              'zap',
+              state?.goal?.ongoing == true ? 'Goal' : 'Set goal',
+              state?.goal?.ongoing == true ? 'Cancel goal' : 'Set goal',
+              () => controls.performAction('goal')),
+          if (state?.lanes.isNotEmpty ?? false)
+            _macTopAction(
+                'layers',
+                '${state!.lanes.where((lane) => lane.running).length}',
+                'Open lanes',
+                () => controls.performAction('lanes')),
+          if (running)
+            IconBtn('stop',
+                size: 36, iconSize: 15, tooltip: 'Stop', onTap: controls.stop),
+        ],
         Container(width: 1, height: 18, color: AppColors.border2),
         IconBtn('plus',
             size: 36,
@@ -781,6 +801,25 @@ class _DesktopShellState extends State<DesktopShell> {
             onTap: _newSessionFlow),
         const SizedBox(width: 8),
       ]),
+    );
+  }
+
+  Widget _macTopAction(
+      String icon, String label, String tooltip, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(R.xs),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(icon, size: 12, color: AppColors.fg3),
+            const SizedBox(width: 5),
+            Text(label, style: sans(10.5, color: AppColors.fg2)),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -808,9 +847,6 @@ class _DesktopShellState extends State<DesktopShell> {
         _macStatusAction(
             'edit', 'Rename', () => controls.performAction('rename')),
         _macStatusAction(
-            'shield', 'Approval', () => controls.performAction('approval')),
-        _macStatusAction('zap', 'Goal', () => controls.performAction('goal')),
-        _macStatusAction(
             'folder', 'Files', () => controls.performAction('files')),
         _macStatusAction(
             'terminal', 'Run', () => controls.performAction('command')),
@@ -821,10 +857,6 @@ class _DesktopShellState extends State<DesktopShell> {
         _macStatusAction('history', 'Checkpoints',
             () => controls.performAction('checkpoints')),
       ]);
-      if (state?.lanes.isNotEmpty ?? false) {
-        rightActions.add(_macStatusAction(
-            'layers', 'Lanes', () => controls.performAction('lanes')));
-      }
     }
     return Container(
       height: 30,
