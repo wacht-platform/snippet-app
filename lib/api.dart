@@ -7,6 +7,13 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'models.dart';
 
+class DownloadCancelled implements Exception {
+  const DownloadCancelled();
+
+  @override
+  String toString() => 'Download cancelled.';
+}
+
 /// Talks to one snippet `serve` daemon. The token is passed as a `?token=` query
 /// param on every request (matching the daemon's auth) and the session id (a
 /// path with a `/`) is URL-encoded automatically by [Uri].
@@ -328,12 +335,14 @@ class DaemonClient {
     String path,
     File output, {
     void Function(int received, int? total)? onProgress,
+    bool Function()? isCancelled,
   }) async {
     final httpClient = http.Client();
     try {
       final request = http.Request('GET', _uri('/fs/download', {'path': path}));
       final response =
           await httpClient.send(request).timeout(const Duration(minutes: 5));
+      if (isCancelled?.call() ?? false) throw const DownloadCancelled();
       if (response.statusCode != 200) {
         final body = await response.stream.bytesToString();
         throw Exception(
@@ -345,6 +354,7 @@ class DaemonClient {
       try {
         await for (final chunk
             in response.stream.timeout(const Duration(minutes: 5))) {
+          if (isCancelled?.call() ?? false) throw const DownloadCancelled();
           sink.add(chunk);
           received += chunk.length;
           onProgress?.call(received, response.contentLength);

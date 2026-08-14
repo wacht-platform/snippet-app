@@ -96,6 +96,11 @@ Future<void> notifyDownloadProgress(int? id, String name, int progress) async {
       ));
 }
 
+Future<void> notifyDownloadCancelled(int? id) async {
+  if (id == null || !kCanNotify || !kMobile) return;
+  await _enqueueDownloadNotification(() => _mainNotif.cancel(id: id));
+}
+
 Future<void> notifyDownloadFailure(int? id, String name, Object error) async {
   if (id == null || !kCanNotify || !kMobile) return;
   await _enqueueDownloadNotification(() async {

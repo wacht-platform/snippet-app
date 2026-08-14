@@ -505,7 +505,7 @@ class _FileViewerState extends State<FileViewer> {
   Future<void> _download() async {
     setState(() => _downloading = true);
     try {
-      final message = await downloadRemoteFile(
+      final message = await downloadRemoteFileWithCancel(
         context,
         widget.client,
         path: widget.path,
@@ -784,6 +784,23 @@ class _VideoViewState extends State<_VideoView> {
   }
 }
 
+Future<String?> downloadRemoteFileWithCancel(
+  BuildContext context,
+  DaemonClient client, {
+  required String path,
+  required String name,
+}) {
+  if (!kMobile) {
+    return downloadRemoteFile(context, client, path: path, name: name);
+  }
+  var cancelled = false;
+  actionToast(context, 'Downloading $name', actions: [
+    (label: 'Cancel', icon: 'x', onTap: () => cancelled = true),
+  ]);
+  return downloadRemoteFile(context, client,
+      path: path, name: name, isCancelled: () => cancelled);
+}
+
 /// Download a remote daemon path to the device. Used by the file viewer and by
 /// agent `present_file` cards in chat. Returns a short status message, or null
 /// when a modal/notification already covered the outcome.
@@ -792,6 +809,7 @@ Future<String?> downloadRemoteFile(
   DaemonClient client, {
   required String path,
   required String name,
+  bool Function()? isCancelled,
 }) async {
   final dot = name.lastIndexOf('.');
   final ext = dot > 0 ? name.substring(dot + 1).toLowerCase() : '';
@@ -809,6 +827,7 @@ Future<String?> downloadRemoteFile(
           notifyDownloadProgress(progressId, name, percent);
         }
       },
+      isCancelled: isCancelled,
     );
 
     if (kMobile) {
@@ -859,6 +878,9 @@ Future<String?> downloadRemoteFile(
         : saved;
     await tempFile.copy(out);
     return 'Downloaded $name';
+  } on DownloadCancelled {
+    await notifyDownloadCancelled(progressId);
+    return 'Download cancelled.';
   } catch (e) {
     await notifyDownloadFailure(progressId, name, e);
     rethrow;

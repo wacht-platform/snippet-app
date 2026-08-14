@@ -2570,7 +2570,8 @@ class _SessionScreenState extends State<SessionScreen>
             onPressed: () async {
               try {
                 toast(context, 'Downloading $name…');
-                final msg = await downloadRemoteFile(context, widget.client,
+                final msg = await downloadRemoteFileWithCancel(
+                    context, widget.client,
                     path: path, name: name);
                 if (msg != null && mounted) toast(context, msg);
               } catch (e) {
