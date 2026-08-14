@@ -383,9 +383,10 @@ class ThinkingMarkdown extends StatelessWidget {
   }
 }
 
-/// A compact markdown rendering for summaries shown in lane cards and notices.
-/// It keeps previews short while preserving headings, emphasis, lists, links,
-/// inline code, and fenced-code styling.
+/// A compact, clipped text preview for summaries shown in lane cards and notices.
+/// MarkdownBody uses a Column internally, so constraining it to a fixed preview
+/// height can overflow for long lists or code blocks. A native Text preview keeps
+/// its line limit under the parent constraints.
 class MarkdownPreview extends StatelessWidget {
   final String data;
   final int maxLines;
@@ -398,33 +399,11 @@ class MarkdownPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = markdownStyle(context).copyWith(
-      p: sans(12.5, height: 1.35, color: AppColors.fg3),
-      pPadding: EdgeInsets.zero,
-      h1: sans(13.5,
-          weight: FontWeight.w600, height: 1.3, color: AppColors.fg2),
-      h1Padding: EdgeInsets.zero,
-      h2: sans(13, weight: FontWeight.w600, height: 1.3, color: AppColors.fg2),
-      h2Padding: EdgeInsets.zero,
-      h3: sans(12.5,
-          weight: FontWeight.w600, height: 1.3, color: AppColors.fg2),
-      h3Padding: EdgeInsets.zero,
-      a: sans(12.5, height: 1.35, color: AppColors.accent),
-      code: mono(11.5, color: AppColors.accent),
-      listBullet: sans(12.5, height: 1.35, color: AppColors.fg3),
-      blockquote: sans(12.5, height: 1.35, color: AppColors.fg3),
-    );
-    return ClipRect(
-      child: SizedBox(
-        height: maxLines * 18.0,
-        child: MarkdownBody(
-          data: data,
-          selectable: false,
-          styleSheet: compact,
-          builders: {'pre': PreBlockBuilder()},
-          onTapLink: (text, href, title) => openMarkdownLink(href),
-        ),
-      ),
+    return Text(
+      data.replaceAll(RegExp(r'\s+'), ' ').trim(),
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+      style: sans(12.5, height: 1.35, color: AppColors.fg3),
     );
   }
 }
