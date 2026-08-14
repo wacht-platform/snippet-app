@@ -1186,6 +1186,7 @@ class _DesktopShellState extends State<DesktopShell> {
               },
               child: PageView.builder(
                 controller: _pageController,
+                physics: kMobile ? null : const NeverScrollableScrollPhysics(),
                 itemCount: _tabs.length,
                 onPageChanged: (i) {
                   // PageView keeps each session mounted. Remove focus from the
