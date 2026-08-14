@@ -897,15 +897,21 @@ class _DesktopShellState extends State<DesktopShell> {
                 style: mono(10, color: AppColors.fg4)),
           ),
         ],
-        const Spacer(),
-        if (rightActions.isNotEmpty) ...[
-          Container(width: 1, height: 12, color: AppColors.border2),
-          const SizedBox(width: 8),
-          for (var i = 0; i < rightActions.length; i++) ...[
-            if (i > 0) const SizedBox(width: 10),
-            rightActions[i],
-          ],
-        ],
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: rightActions.isEmpty
+                ? const SizedBox.shrink()
+                : Row(mainAxisSize: MainAxisSize.min, children: [
+                    Container(width: 1, height: 12, color: AppColors.border2),
+                    const SizedBox(width: 8),
+                    for (var i = 0; i < rightActions.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 10),
+                      rightActions[i],
+                    ],
+                  ]),
+          ),
+        ),
       ]),
     );
   }
