@@ -865,53 +865,58 @@ class _DesktopShellState extends State<DesktopShell> {
         color: AppColors.surface1,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Row(children: [
-        StatusDot(status: connected ? 'online' : 'offline', size: 6),
-        const SizedBox(width: 7),
-        Text(connected ? 'Connected' : 'Offline',
-            style: sans(10.5,
-                color: connected ? AppColors.fg2 : AppColors.danger)),
-        if (statusLabel != null) ...[
-          const SizedBox(width: 14),
-          Container(width: 1, height: 12, color: AppColors.border2),
-          const SizedBox(width: 10),
-          Container(
-              width: 6,
-              height: 6,
-              decoration:
-                  BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-          const SizedBox(width: 6),
-          Text(statusLabel, style: sans(10.5, color: statusColor)),
-        ],
-        if (tab != null) ...[
-          const SizedBox(width: 14),
-          Container(width: 1, height: 12, color: AppColors.border2),
-          const SizedBox(width: 14),
-          AppIcon(tab.isFile ? 'file' : 'terminal',
-              size: 11, color: AppColors.fg4),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(tab.title.isEmpty ? 'session' : tab.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: mono(10, color: AppColors.fg4)),
-          ),
-        ],
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: rightActions.isEmpty
-                ? const SizedBox.shrink()
-                : Row(mainAxisSize: MainAxisSize.min, children: [
-                    Container(width: 1, height: 12, color: AppColors.border2),
-                    const SizedBox(width: 8),
-                    for (var i = 0; i < rightActions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 10),
-                      rightActions[i],
-                    ],
-                  ]),
+      child: Stack(children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Row(children: [
+              StatusDot(status: connected ? 'online' : 'offline', size: 6),
+              const SizedBox(width: 7),
+              Text(connected ? 'Connected' : 'Offline',
+                  style: sans(10.5,
+                      color: connected ? AppColors.fg2 : AppColors.danger)),
+              if (statusLabel != null) ...[
+                const SizedBox(width: 14),
+                Container(width: 1, height: 12, color: AppColors.border2),
+                const SizedBox(width: 10),
+                Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                        color: statusColor, shape: BoxShape.circle)),
+                const SizedBox(width: 6),
+                Text(statusLabel, style: sans(10.5, color: statusColor)),
+              ],
+              if (tab != null) ...[
+                const SizedBox(width: 14),
+                Container(width: 1, height: 12, color: AppColors.border2),
+                const SizedBox(width: 14),
+                AppIcon(tab.isFile ? 'file' : 'terminal',
+                    size: 11, color: AppColors.fg4),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(tab.title.isEmpty ? 'session' : tab.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(10, color: AppColors.fg4)),
+                ),
+              ],
+            ]),
           ),
         ),
+        if (rightActions.isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 1, height: 12, color: AppColors.border2),
+              const SizedBox(width: 8),
+              for (var i = 0; i < rightActions.length; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                rightActions[i],
+              ],
+            ]),
+          ),
       ]),
     );
   }
