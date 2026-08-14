@@ -18,6 +18,16 @@ const _downloadChannel = 'snippet_downloads';
 const _prefEnabled = 'notif_enabled';
 
 int _downloadNotifId = 7000;
+const _cancelDownloadAction = 'cancel_download';
+final Map<int, VoidCallback> _downloadCancels = {};
+
+void registerDownloadCancel(int? id, VoidCallback cancel) {
+  if (id != null) _downloadCancels[id] = cancel;
+}
+
+void unregisterDownloadCancel(int? id) {
+  if (id != null) _downloadCancels.remove(id);
+}
 
 // The download stream reports progress synchronously, but each native
 // notification update is asynchronous. Serialize updates so a final
@@ -66,6 +76,13 @@ Future<int?> notifyDownloadStarted(String name) async {
             showProgress: true,
             maxProgress: 100,
             progress: 0,
+            actions: <AndroidNotificationAction>[
+              AndroidNotificationAction(
+                _cancelDownloadAction,
+                'Cancel',
+                cancelNotification: true,
+              ),
+            ],
           ),
         ),
         payload: jsonEncode({'type': 'download_progress', 'name': name}),
@@ -91,6 +108,13 @@ Future<void> notifyDownloadProgress(int? id, String name, int progress) async {
             showProgress: true,
             maxProgress: 100,
             progress: progress,
+            actions: const <AndroidNotificationAction>[
+              AndroidNotificationAction(
+                _cancelDownloadAction,
+                'Cancel',
+                cancelNotification: true,
+              ),
+            ],
           ),
         ),
       ));
@@ -198,6 +222,10 @@ Future<void> initNotifications() async {
       settings: const InitializationSettings(
           android: AndroidInitializationSettings('@mipmap/ic_launcher')),
       onDidReceiveNotificationResponse: (resp) {
+        if (resp.actionId == _cancelDownloadAction) {
+          _downloadCancels[resp.id]?.call();
+          return;
+        }
         final p = resp.payload;
         if (p != null) _route(p);
       },

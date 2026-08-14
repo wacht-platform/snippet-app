@@ -790,15 +790,8 @@ Future<String?> downloadRemoteFileWithCancel(
   required String path,
   required String name,
 }) {
-  if (!kMobile) {
-    return downloadRemoteFile(context, client, path: path, name: name);
-  }
-  var cancelled = false;
-  actionToast(context, 'Downloading $name', actions: [
-    (label: 'Cancel', icon: 'x', onTap: () => cancelled = true),
-  ]);
   return downloadRemoteFile(context, client,
-      path: path, name: name, isCancelled: () => cancelled);
+      path: path, name: name, registerNativeCancel: kMobile);
 }
 
 /// Download a remote daemon path to the device. Used by the file viewer and by
@@ -810,10 +803,15 @@ Future<String?> downloadRemoteFile(
   required String path,
   required String name,
   bool Function()? isCancelled,
+  bool registerNativeCancel = false,
 }) async {
+  var cancelled = false;
   final dot = name.lastIndexOf('.');
   final ext = dot > 0 ? name.substring(dot + 1).toLowerCase() : '';
   final progressId = await notifyDownloadStarted(name);
+  if (registerNativeCancel) {
+    registerDownloadCancel(progressId, () => cancelled = true);
+  }
   final tempDir = await getTemporaryDirectory();
   final tempFile = File(
       '${tempDir.path}/snippet-download-${DateTime.now().microsecondsSinceEpoch}-$name');
@@ -827,7 +825,7 @@ Future<String?> downloadRemoteFile(
           notifyDownloadProgress(progressId, name, percent);
         }
       },
-      isCancelled: isCancelled,
+      isCancelled: () => cancelled || (isCancelled?.call() ?? false),
     );
 
     if (kMobile) {
@@ -885,6 +883,7 @@ Future<String?> downloadRemoteFile(
     await notifyDownloadFailure(progressId, name, e);
     rethrow;
   } finally {
+    unregisterDownloadCancel(progressId);
     try {
       if (await tempFile.exists()) await tempFile.delete();
     } catch (_) {}
