@@ -28,19 +28,4 @@ class MainFlutterWindow: NSWindow {
     super.awakeFromNib()
   }
 
-  override func sendEvent(_ event: NSEvent) {
-    if event.type == .leftMouseDown && canBeginFlutterTitlebarDrag(at: event.locationInWindow) {
-      performDrag(with: event)
-      return
-    }
-    super.sendEvent(event)
-  }
-
-  private func canBeginFlutterTitlebarDrag(at point: NSPoint) -> Bool {
-    // NSWindow coordinates have their origin at the bottom-left. Keep the
-    // native traffic lights clickable; the Flutter bar owns the remaining top
-    // strip and currently contains no interactive controls.
-    guard point.y >= frame.height - flutterTitlebarHeight else { return false }
-    return point.x >= 78
-  }
 }

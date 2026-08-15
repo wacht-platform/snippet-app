@@ -2184,6 +2184,9 @@ class _SessionScreenState extends State<SessionScreen>
                     // Cmd/Ctrl+Enter sends.
                     CallbackShortcuts(
                       bindings: {
+                        const SingleActivator(LogicalKeyboardKey.enter): () {
+                          if (!kMobile && _canSend) _sendMessage();
+                        },
                         const SingleActivator(LogicalKeyboardKey.enter,
                             meta: true): () {
                           if (_canSend) _sendMessage();
