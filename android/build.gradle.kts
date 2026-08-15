@@ -15,7 +15,7 @@ rootProject.layout.buildDirectory.value(newBuildDir)
 // compileSdk than newer transitive deps require, which fails AAR metadata
 // checks. Force every Android module (app + all plugins) up to this SDK.
 // Reflection avoids needing the Android Gradle Plugin types on the root classpath.
-val universalCompileSdk = 36
+val universalCompileSdk = 37
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)

@@ -141,25 +141,21 @@ class _FileExplorerState extends State<FileExplorer> {
 
   // Upload files from the device into the current directory.
   Future<void> _upload(String cwd) async {
-    FilePickerResult? res;
+    List<PlatformFile> files;
     try {
-      res = await FilePicker.platform
-          .pickFiles(allowMultiple: true, withData: true, type: FileType.any);
+      files = await FilePicker.pickFiles(type: FileType.any);
     } catch (e) {
       if (mounted) toast(context, '$e', danger: true);
       return;
     }
-    if (res == null) return;
-    final files = res.files;
+    if (files.isEmpty) return;
     var uploaded = 0;
     for (var i = 0; i < files.length; i++) {
       final f = files[i];
       if (mounted)
         setState(() => _busy = 'Uploading ${i + 1}/${files.length}…');
       try {
-        final bytes = f.bytes ??
-            (f.path != null ? await File(f.path!).readAsBytes() : null);
-        if (bytes == null) continue;
+        final bytes = await f.readAsBytes();
         await widget.client.uploadFile(bytes, name: f.name, dir: cwd);
         uploaded++;
       } catch (e) {
@@ -806,8 +802,6 @@ Future<String?> downloadRemoteFile(
   bool registerNativeCancel = false,
 }) async {
   var cancelled = false;
-  final dot = name.lastIndexOf('.');
-  final ext = dot > 0 ? name.substring(dot + 1).toLowerCase() : '';
   final progressId = await notifyDownloadStarted(name);
   if (registerNativeCancel) {
     registerDownloadCancel(progressId, () => cancelled = true);
@@ -834,8 +828,8 @@ Future<String?> downloadRemoteFile(
       await supportFile.parent.create(recursive: true);
       await tempFile.copy(supportFile.path);
       Future<String?> shareIt() async {
-        final res =
-            await Share.shareXFiles([XFile(supportFile.path, name: name)]);
+        final res = await SharePlus.instance
+            .share(ShareParams(files: [XFile(supportFile.path, name: name)]));
         return res.status == ShareResultStatus.success ? 'Saved $name' : null;
       }
 
@@ -869,12 +863,9 @@ Future<String?> downloadRemoteFile(
       return shareIt();
     }
 
-    final saved = await FilePicker.platform.saveFile(fileName: name);
+    final saved = await FilePicker.saveFile(
+        fileName: name, bytes: await tempFile.readAsBytes());
     if (saved == null) return null;
-    final out = (ext.isNotEmpty && !saved.toLowerCase().endsWith('.$ext'))
-        ? '$saved.$ext'
-        : saved;
-    await tempFile.copy(out);
     return 'Downloaded $name';
   } on DownloadCancelled {
     await notifyDownloadCancelled(progressId);
@@ -892,7 +883,10 @@ Future<String?> downloadRemoteFile(
 
 Future<void> _downloadDoneSheetFor(
     BuildContext context, String name, String path) async {
-  void shareFile() => Share.shareXFiles([XFile(path, name: name)]);
+  void shareFile() {
+    SharePlus.instance.share(ShareParams(files: [XFile(path, name: name)]));
+  }
+
   final action = await showAppSheet<String>(context,
       title: 'Saved to Downloads',
       child: Column(

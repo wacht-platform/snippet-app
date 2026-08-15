@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.snippet"
-    compileSdk = 36 // satisfy file_picker (34+) and other plugins (36)
+    compileSdk = 37 // required by permission_handler 13's Android 16 APIs
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

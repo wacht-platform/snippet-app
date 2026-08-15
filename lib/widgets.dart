@@ -1162,7 +1162,7 @@ class _MessageActions extends StatelessWidget {
         }),
         const SizedBox(width: 2),
         _actionIcon(Icons.share_rounded, 'Share', () {
-          Share.share(text);
+          SharePlus.instance.share(ShareParams(text: text));
         }),
       ]),
     );

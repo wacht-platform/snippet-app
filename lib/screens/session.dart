@@ -1253,21 +1253,19 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Future<void> _pickFiles() async {
-    FilePickerResult? res;
+    List<PlatformFile> files;
     try {
-      res = await FilePicker.platform
-          .pickFiles(allowMultiple: true, withData: true, type: FileType.any);
+      files = await FilePicker.pickFiles(type: FileType.any);
     } catch (e) {
       _toast('$e');
       return;
     }
-    if (res == null) return;
-    await _ingest(res.files
+    if (files.isEmpty) return;
+    await _ingest(files
         .map((f) => (
               name: f.name,
               localPath: f.path,
-              readBytes: () async =>
-                  f.bytes ?? await File(f.path!).readAsBytes(),
+              readBytes: f.readAsBytes,
             ))
         .toList());
   }
