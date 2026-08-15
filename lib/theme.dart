@@ -288,6 +288,71 @@ final _everforest = _dark(
   warn: const Color(0xFFDBBC7F), // orange
 );
 
+// Kanagawa Wave — ink-black indigo with Hokusai-inspired muted jewel tones.
+final _kanagawa = _dark(
+  name: 'kanagawa',
+  label: 'Kanagawa Wave',
+  accent: const Color(0xFF7E9CD8),
+  text: const Color(0xFFDCD7BA),
+  muted: const Color(0xFFA6A69C),
+  faint: const Color(0xFF727169),
+  success: const Color(0xFF98BB6C),
+  danger: const Color(0xFFC34043),
+  warn: const Color(0xFFE6C384),
+);
+
+// Ayu Mirage — warm charcoal, amber focus, and restrained blue-green status.
+final _ayuMirage = _dark(
+  name: 'ayu-mirage',
+  label: 'Ayu Mirage',
+  accent: const Color(0xFFFFCC66),
+  text: const Color(0xFFCCCAC2),
+  muted: const Color(0xFFABB0B6),
+  faint: const Color(0xFF5C6773),
+  success: const Color(0xFFBAE67E),
+  danger: const Color(0xFFF07178),
+  warn: const Color(0xFFFFCC66),
+);
+
+// Night Owl — crisp slate navy designed for long, low-light coding sessions.
+final _nightOwl = _dark(
+  name: 'night-owl',
+  label: 'Night Owl',
+  accent: const Color(0xFF82AAFF),
+  text: const Color(0xFFD6DEEB),
+  muted: const Color(0xFF9DB1C5),
+  faint: const Color(0xFF637777),
+  success: const Color(0xFFADDB67),
+  danger: const Color(0xFFEF5350),
+  warn: const Color(0xFFFFCB6B),
+);
+
+// Monokai Pro — high-clarity charcoal with lively, carefully balanced accents.
+final _monokaiPro = _dark(
+  name: 'monokai-pro',
+  label: 'Monokai Pro',
+  accent: const Color(0xFFFC9867),
+  text: const Color(0xFFFCFCFA),
+  muted: const Color(0xFFC1C0C0),
+  faint: const Color(0xFF727072),
+  success: const Color(0xFFA9DC76),
+  danger: const Color(0xFFFF6188),
+  warn: const Color(0xFFFFD866),
+);
+
+// Oxocarbon — IBM Carbon's deep graphite base and cool blue focus color.
+final _oxocarbon = _dark(
+  name: 'oxocarbon',
+  label: 'Oxocarbon',
+  accent: const Color(0xFF78A9FF),
+  text: const Color(0xFFF2F4F8),
+  muted: const Color(0xFFBBC3CF),
+  faint: const Color(0xFF697077),
+  success: const Color(0xFF42BE65),
+  danger: const Color(0xFFFF7EB6),
+  warn: const Color(0xFFF1C21B),
+);
+
 // Pure black AMOLED theme — deepest blacks, no surface elevation.
 final _amoled = _dark(
   name: 'amoled',
@@ -303,6 +368,11 @@ final _amoled = _dark(
 );
 
 List<ThemePreset> get allPresets => [
+      _kanagawa,
+      _ayuMirage,
+      _nightOwl,
+      _monokaiPro,
+      _oxocarbon,
       _amoled,
       _terminalInk,
       _nord,
