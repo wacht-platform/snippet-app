@@ -845,8 +845,6 @@ class _DesktopShellState extends State<DesktopShell> {
     if (controls != null) {
       rightActions.addAll([
         _macStatusAction(
-            'edit', 'Rename', () => controls.performAction('rename')),
-        _macStatusAction(
             'folder', 'Files', () => controls.performAction('files')),
         _macStatusAction(
             'terminal', 'Run', () => controls.performAction('command')),
@@ -2024,7 +2022,8 @@ class _SidebarState extends State<_Sidebar> {
         borderRadius: BorderRadius.circular(R.sm),
         onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
         onLongPress: () => _sessionActions(s),
-        onSecondaryTap: () => _sessionActions(s),
+        onSecondaryTapDown: (details) =>
+            _sessionActions(s, position: details.globalPosition),
         child: Container(
           height: 32,
           padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -2116,7 +2115,29 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   // Long-press / right-click a session → rename or delete.
-  void _sessionActions(SessionInfo s) {
+  Future<void> _sessionActions(SessionInfo s, {Offset? position}) async {
+    if (!kMobile) {
+      final overlay =
+          Overlay.of(context).context.findRenderObject() as RenderBox;
+      final point = position ?? overlay.size.center(Offset.zero);
+      final selected = await showMenu<String>(
+        context: context,
+        position: RelativeRect.fromRect(
+          Rect.fromCircle(center: point, radius: 0),
+          Offset.zero & overlay.size,
+        ),
+        items: const [
+          PopupMenuItem(value: 'rename', child: Text('Rename')),
+          PopupMenuItem(value: 'delete', child: Text('Delete')),
+        ],
+      );
+      if (selected == 'rename') {
+        await _renameSession(s);
+      } else if (selected == 'delete') {
+        await _confirmDeleteSession(s);
+      }
+      return;
+    }
     showAppSheet(context,
         title: s.title.isEmpty ? '(untitled)' : s.title,
         child: Column(
