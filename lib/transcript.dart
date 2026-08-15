@@ -1,7 +1,6 @@
-// Dev-tool-dense transcript components: a live status rail, expandable mono
-// tool rows (output inline, one tap — not buried in sheets), first-class lane
-// cards with ticking elapsed, and styled system rows (watches, goals,
-// compaction) that stop hiding what the agent is doing.
+// Transcript components: expandable mono tool rows (output inline, one tap — not
+// buried in sheets), first-class lane cards with ticking elapsed, and styled system
+// rows for watches, goals, and compaction.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -12,123 +11,6 @@ import 'platform.dart';
 import 'theme.dart';
 import 'tool_views.dart';
 import 'widgets.dart';
-
-// ---------------------------------------------------------------------------
-// Status rail — the always-visible facts: ctx gauge, tokens, lanes, watches,
-// rate limit, approval. Dense, mono, one line; horizontally scrollable.
-// ---------------------------------------------------------------------------
-
-class StatusRail extends StatelessWidget {
-  final HarnessState? state;
-  final String? modelLabel;
-  final VoidCallback? onUsageTap;
-  final VoidCallback? onLanesTap;
-  const StatusRail(
-      {super.key,
-      required this.state,
-      this.modelLabel,
-      this.onUsageTap,
-      this.onLanesTap});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final s = state;
-    final items = <Widget>[];
-
-    if (s != null && s.contextWindow > 0) {
-      final pct = (s.lastPromptTokens / s.contextWindow).clamp(0.0, 1.0);
-      items.add(_railTap(
-        onTap: onUsageTap,
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          SizedBox(
-            width: 34,
-            height: 4,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: pct,
-                backgroundColor: AppColors.surface3,
-                color: pct > 0.85 ? AppColors.danger : AppColors.accent,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text('${(pct * 100).round()}%',
-              style: mono(11, color: AppColors.fg2)),
-        ]),
-      ));
-    }
-    if (s != null && (s.promptTokens > 0 || s.completionTokens > 0)) {
-      items.add(_railTap(
-        onTap: onUsageTap,
-        child: Text('↑${fmtSi(s.promptTokens)} ↓${fmtSi(s.completionTokens)}',
-            style: mono(11, color: AppColors.fg3)),
-      ));
-    }
-    final runningLanes = s?.lanes.where((l) => l.running).length ?? 0;
-    if (runningLanes > 0) {
-      items.add(_railTap(
-        onTap: onLanesTap,
-        child:
-            Text('◆ $runningLanes', style: mono(11, color: AppColors.accent)),
-      ));
-    }
-    if ((s?.watchCount ?? 0) > 0) {
-      items.add(
-          Text('◉ ${s!.watchCount}', style: mono(11, color: AppColors.run)));
-    }
-    final rp = s?.ratePrimary;
-    if (rp != null) {
-      items.add(_railTap(
-        onTap: onUsageTap,
-        child: Text(
-            '${rateWindowLabel(rp.windowMinutes)} ${rp.leftPercent.round()}%',
-            style: mono(11,
-                color: rp.leftPercent < 15 ? AppColors.danger : AppColors.fg3)),
-      ));
-    }
-    if (s?.goal?.ongoing ?? false) {
-      items.add(Text(s!.goal!.paused ? '◇ paused' : '◇ goal',
-          style: mono(11, color: AppColors.accent)));
-    }
-    if (s != null) {
-      items.add(Text(s.approvalMode == 'auto' ? 'auto' : 'ask',
-          style: mono(11,
-              color:
-                  s.approvalMode == 'auto' ? AppColors.fg4 : AppColors.run)));
-    }
-    if (s?.compacting ?? false) {
-      items.add(Text('compacting…', style: mono(11, color: AppColors.run)));
-    }
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      height: 30,
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Row(children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0)
-              Container(
-                  width: 1,
-                  height: 12,
-                  color: AppColors.border,
-                  margin: EdgeInsets.symmetric(horizontal: 10)),
-            items[i],
-          ],
-        ]),
-      ),
-    );
-  }
-
-  Widget _railTap({VoidCallback? onTap, required Widget child}) =>
-      onTap == null ? child : InkWell(onTap: onTap, child: child);
-}
 
 // ---------------------------------------------------------------------------
 // Dense tool row — mono, status glyph, arg summary, right meta; tap expands the

@@ -218,9 +218,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
       ));
     }
 
-    add('CURRENT ACTIVITY', lane.activity);
     add('HANDOFF', lane.handoff);
-    add('RESULT', lane.report ?? lane.summary);
+    add('RESULT', lane.report);
     add('ERROR', lane.error, danger: true);
     if (lane.activityLog.isNotEmpty) {
       sections.add(_ActivityHistory(entries: lane.activityLog));
