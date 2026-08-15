@@ -954,8 +954,9 @@ class _DesktopShellState extends State<DesktopShell> {
           // drag handler owns this strip; the repository context is the one
           // intentional workspace action exposed here.
           padding: const EdgeInsets.only(left: 88, right: 16),
-          child: Tooltip(
-            message: 'Open Git',
+          child: Semantics(
+            button: true,
+            label: 'Open Git',
             child: InkWell(
               borderRadius: BorderRadius.circular(R.sm),
               onTap: _openMacGit,
