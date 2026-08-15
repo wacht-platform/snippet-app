@@ -266,39 +266,39 @@ final _lightPreset = _light(
 final _rosePine = _dark(
   name: 'rose-pine',
   label: 'Rosé Pine',
-  accent: const Color(0xFFEB6F92),   // love (rose)
-  text: const Color(0xFFE0DEF4),     // text
-  muted: const Color(0xFF908CAA),    // subtle
-  faint: const Color(0xFF6E6A86),    // muted
-  success: const Color(0xFF9CCFD8),  // foam
-  danger: const Color(0xFFEB6F92),   // love
-  warn: const Color(0xFFF6C177),     // gold
+  accent: const Color(0xFFEB6F92), // love (rose)
+  text: const Color(0xFFE0DEF4), // text
+  muted: const Color(0xFF908CAA), // subtle
+  faint: const Color(0xFF6E6A86), // muted
+  success: const Color(0xFF9CCFD8), // foam
+  danger: const Color(0xFFEB6F92), // love
+  warn: const Color(0xFFF6C177), // gold
 );
 
 // Everforest Dark — earthy green-gray warmth. Calm, natural, easy on the eyes.
 final _everforest = _dark(
   name: 'everforest',
   label: 'Everforest',
-  accent: const Color(0xFFA7C080),   // green
-  text: const Color(0xFFD3C6AA),     // fg
-  muted: const Color(0xFF8A9B8E),    // grey1
-  faint: const Color(0xFF56635F),    // grey2
-  success: const Color(0xFFA7C080),  // green
-  danger: const Color(0xFFE67E80),   // red
-  warn: const Color(0xFFDBBC7F),     // orange
+  accent: const Color(0xFFA7C080), // green
+  text: const Color(0xFFD3C6AA), // fg
+  muted: const Color(0xFF8A9B8E), // grey1
+  faint: const Color(0xFF56635F), // grey2
+  success: const Color(0xFFA7C080), // green
+  danger: const Color(0xFFE67E80), // red
+  warn: const Color(0xFFDBBC7F), // orange
 );
 
 // Pure black AMOLED theme — deepest blacks, no surface elevation.
 final _amoled = _dark(
   name: 'amoled',
   label: 'AMOLED Black',
-  accent: const Color(0xFF60A5FA),  // blue-400
-  text: const Color(0xFFE5E7EB),    // gray-200
-  muted: const Color(0xFF9CA3AF),   // gray-400
-  faint: const Color(0xFF6B7280),   // gray-500
+  accent: const Color(0xFF60A5FA), // blue-400
+  text: const Color(0xFFE5E7EB), // gray-200
+  muted: const Color(0xFF9CA3AF), // gray-400
+  faint: const Color(0xFF6B7280), // gray-500
   success: const Color(0xFF34D399), // emerald-400
-  danger: const Color(0xFFF87171),  // red-400
-  warn: const Color(0xFFFBBF24),    // amber-400
+  danger: const Color(0xFFF87171), // red-400
+  warn: const Color(0xFFFBBF24), // amber-400
   isAmoled: true,
 );
 
@@ -603,6 +603,8 @@ IconData iconFor(String name) {
       return Icons.mic_off_rounded;
     case 'shield':
       return IconsaxPlusLinear.shield_tick;
+    case 'goal':
+      return Icons.gps_fixed_rounded;
     case 'folder':
       return IconsaxPlusLinear.folder_2;
     case 'folder-open':

@@ -779,7 +779,7 @@ class _DesktopShellState extends State<DesktopShell> {
               'Toggle approval mode',
               () => controls.performAction('approval')),
           _macTopAction(
-              'zap',
+              'goal',
               state?.goal?.ongoing == true ? 'Goal' : 'Set goal',
               state?.goal?.ongoing == true ? 'Cancel goal' : 'Set goal',
               () => controls.performAction('goal')),
