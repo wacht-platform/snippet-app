@@ -954,45 +954,49 @@ class _DesktopShellState extends State<DesktopShell> {
           // drag handler owns this strip; the repository context is the one
           // intentional workspace action exposed here.
           padding: const EdgeInsets.only(left: 88, right: 16),
-          child: Semantics(
-            button: true,
-            label: 'Open Git',
-            child: InkWell(
-              borderRadius: BorderRadius.circular(R.sm),
-              onTap: _openMacGit,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(children: [
-                  AppIcon('folder-open', size: 13, color: AppColors.fg3),
-                  const SizedBox(width: 7),
-                  Flexible(
-                    flex: 2,
-                    child: Text(_macRepositoryLabel(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(12.5,
-                            weight: FontWeight.w500, color: AppColors.fg1)),
-                  ),
-                  if (branch != null) ...[
-                    const SizedBox(width: 12),
-                    Container(width: 1, height: 14, color: AppColors.border2),
-                    const SizedBox(width: 12),
-                    AppIcon('git-branch', size: 13, color: AppColors.fg3),
-                    const SizedBox(width: 6),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Semantics(
+              button: true,
+              label: 'Open Git',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(R.sm),
+                onTap: _openMacGit,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    AppIcon('folder-open', size: 13, color: AppColors.fg3),
+                    const SizedBox(width: 7),
                     Flexible(
-                      child: Text(branch,
+                      flex: 2,
+                      child: Text(_macRepositoryLabel(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: mono(11.5, color: AppColors.fg2)),
+                          style: sans(12.5,
+                              weight: FontWeight.w500, color: AppColors.fg1)),
                     ),
-                  ],
-                  if (changes.isNotEmpty) ...[
-                    const SizedBox(width: 12),
-                    Container(width: 1, height: 14, color: AppColors.border2),
-                    const SizedBox(width: 12),
-                    Text(changes, style: sans(11, color: AppColors.fg4)),
-                  ],
-                ]),
+                    if (branch != null) ...[
+                      const SizedBox(width: 12),
+                      Container(width: 1, height: 14, color: AppColors.border2),
+                      const SizedBox(width: 12),
+                      AppIcon('git-branch', size: 13, color: AppColors.fg3),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(branch,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: mono(11.5, color: AppColors.fg2)),
+                      ),
+                    ],
+                    if (changes.isNotEmpty) ...[
+                      const SizedBox(width: 12),
+                      Container(width: 1, height: 14, color: AppColors.border2),
+                      const SizedBox(width: 12),
+                      Text(changes, style: sans(11, color: AppColors.fg4)),
+                    ],
+                  ]),
+                ),
               ),
             ),
           ),
