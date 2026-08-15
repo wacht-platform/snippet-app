@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 /// True on phones/tablets (Android/iOS). Desktop (macOS/Linux/Windows) and web
 /// are false. Used to guard mobile-only plugins (foreground task, camera
@@ -28,6 +29,20 @@ bool get kMacOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 
 /// Height to reserve at the top for the macOS window controls.
 const double kMacTitlebar = 28.0;
+const _windowStateChannel = MethodChannel('snippet/window_state');
+
+/// Whether macOS is in native full-screen mode. Other platforms never need a
+/// title-bar reservation here, and an unavailable native channel is safe to
+/// treat as a normal window.
+Future<bool> macOSIsFullscreen() async {
+  if (!kMacOS) return false;
+  try {
+    return await _windowStateChannel.invokeMethod<bool>('isFullscreen') ??
+        false;
+  } catch (_) {
+    return false;
+  }
+}
 
 /// The desktop layout (sidebar + panes) kicks in at/above this logical width.
 const double kDesktopBreakpoint = 900;

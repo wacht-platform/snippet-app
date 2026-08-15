@@ -29,33 +29,41 @@ Future<T?> presentScreen<T>(
       final content = builder(ctx, close);
       return LayoutBuilder(builder: (lctx, c) {
         final wide = c.maxWidth >= kDesktopBreakpoint;
-        if (!wide) {
-          // Full-screen (re-lays out to drawer/dialog if the window grows).
-          return _frame(content, rounded: false, edge: false);
-        }
-        if (style == PanelStyle.dialog) {
-          return Padding(
-            padding: EdgeInsets.zero,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                    constraints:
-                        const BoxConstraints(maxWidth: 1040, maxHeight: 860),
-                    child: _frame(content, rounded: true)),
+        return FutureBuilder<bool>(
+          future: macOSIsFullscreen(),
+          builder: (context, snapshot) {
+            final top = kMacOS && snapshot.data != true ? kMacTitlebar : 0.0;
+            if (!wide) {
+              // Full-screen (re-lays out to drawer/dialog if the window grows).
+              return Padding(
+                  padding: EdgeInsets.only(top: top),
+                  child: _frame(content, rounded: false, edge: false));
+            }
+            if (style == PanelStyle.dialog) {
+              return Padding(
+                padding: EdgeInsets.only(top: top),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                            maxWidth: 1040, maxHeight: 860),
+                        child: _frame(content, rounded: true)),
+                  ),
+                ),
+              );
+            }
+            return Padding(
+              padding: EdgeInsets.only(top: top),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                    width: c.maxWidth < 500 ? c.maxWidth : 460.0,
+                    height: double.infinity,
+                    child: _frame(content, rounded: false, edge: true)),
               ),
-            ),
-          );
-        }
-        return Padding(
-          padding: EdgeInsets.zero,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-                width: c.maxWidth < 500 ? c.maxWidth : 460.0,
-                height: double.infinity,
-                child: _frame(content, rounded: false, edge: true)),
-          ),
+            );
+          },
         );
       });
     },

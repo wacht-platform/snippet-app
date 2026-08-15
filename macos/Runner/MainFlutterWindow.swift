@@ -24,6 +24,17 @@ class MainFlutterWindow: NSWindow {
     }
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    let windowStateChannel = FlutterMethodChannel(
+      name: "snippet/window_state",
+      binaryMessenger: flutterViewController.engine.binaryMessenger
+    )
+    windowStateChannel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "isFullscreen" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      result(self?.styleMask.contains(.fullScreen) ?? false)
+    }
 
     super.awakeFromNib()
   }
