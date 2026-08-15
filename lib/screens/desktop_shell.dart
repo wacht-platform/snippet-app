@@ -938,10 +938,20 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   Widget _macWindowBar() {
+    // `fullSizeContentView` does not expose the native titlebar inset through
+    // MediaQuery, so that value is false even while traffic lights are visible.
+    // Ask AppKit instead; reserve their full hit area until native fullscreen
+    // confirms that macOS has removed them.
+    return FutureBuilder<bool>(
+      future: macOSIsFullscreen(),
+      builder: (context, snapshot) =>
+          _macWindowBarContent(hasWindowControls: snapshot.data != true),
+    );
+  }
+
+  Widget _macWindowBarContent({required bool hasWindowControls}) {
     final branch = _macBranchLabel();
     final changes = _macChangeLabel();
-    final hasWindowControls =
-        MediaQuery.viewPaddingOf(context).top >= kMacTitlebar;
     return SizedBox(
       height: kMacTitlebar + 8,
       child: DecoratedBox(
