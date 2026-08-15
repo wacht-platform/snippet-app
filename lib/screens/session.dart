@@ -114,6 +114,43 @@ class SessionScreen extends StatefulWidget {
   State<SessionScreen> createState() => _SessionScreenState();
 }
 
+class _SessionActionPanel extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final VoidCallback onClose;
+  const _SessionActionPanel(
+      {required this.title, required this.child, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface1,
+      body: SafeArea(
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            child: Row(children: [
+              Expanded(
+                  child: Text(title,
+                      style: sans(16,
+                          weight: FontWeight.w600, color: AppColors.fg1))),
+              IconBtn('x',
+                  size: 34, iconSize: 18, tooltip: 'Close', onTap: onClose),
+            ]),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: child,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 class _SessionScreenState extends State<SessionScreen>
     with WidgetsBindingObserver {
   WebSocketChannel? _channel;
@@ -2827,54 +2864,58 @@ class _SessionScreenState extends State<SessionScreen>
     final s = _state;
     if (s == null) return;
     final cps = s.checkpoints.reversed.toList();
-    showAppSheet(context,
-        title: 'Checkpoints',
-        child: Column(children: [
-          if (cps.isEmpty)
-            Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text('No checkpoints yet.',
-                    style: sans(12.5, color: AppColors.fg3))),
-          ...cps.map((c) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: AppCard(
-                  padding: const EdgeInsets.all(13),
-                  onTap: () => _confirmRewind(c),
-                  child: Row(children: [
-                    Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                            color: AppColors.surface2,
-                            borderRadius: BorderRadius.circular(9)),
-                        child:
-                            AppIcon('history', size: 17, color: AppColors.fg3)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(c.label.isEmpty ? c.id : c.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(13,
-                                    weight: FontWeight.w500,
-                                    height: 1.2,
-                                    color: AppColors.fg1)),
-                            const SizedBox(height: 3),
-                            Text(formatCheckpointDate(c.createdAt),
-                                style: mono(11, color: AppColors.fg3)),
-                          ]),
-                    ),
-                    IconBtn('git-branch',
-                        size: 32,
-                        iconSize: 16,
-                        tooltip: 'Fork from here',
-                        onTap: () => _confirmFork(c)),
-                  ]),
+    final content = Column(children: [
+      if (cps.isEmpty)
+        Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text('No checkpoints yet.',
+                style: sans(12.5, color: AppColors.fg3))),
+      ...cps.map((c) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: AppCard(
+              padding: const EdgeInsets.all(13),
+              onTap: () => _confirmRewind(c),
+              child: Row(children: [
+                Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                        color: AppColors.surface2,
+                        borderRadius: BorderRadius.circular(9)),
+                    child: AppIcon('history', size: 17, color: AppColors.fg3)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.label.isEmpty ? c.id : c.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(13,
+                                weight: FontWeight.w500,
+                                height: 1.2,
+                                color: AppColors.fg1)),
+                        const SizedBox(height: 3),
+                        Text(formatCheckpointDate(c.createdAt),
+                            style: mono(11, color: AppColors.fg3)),
+                      ]),
                 ),
-              )),
-        ]));
+                IconBtn('git-branch',
+                    size: 32,
+                    iconSize: 16,
+                    tooltip: 'Fork from here',
+                    onTap: () => _confirmFork(c)),
+              ]),
+            ),
+          )),
+    ]);
+    if (kMobile) {
+      showAppSheet(context, title: 'Checkpoints', child: content);
+    } else {
+      presentScreen(context,
+          builder: (_, close) => _SessionActionPanel(
+              title: 'Checkpoints', onClose: close, child: content));
+    }
   }
 
   Future<void> _confirmRewind(Checkpoint c) async {
