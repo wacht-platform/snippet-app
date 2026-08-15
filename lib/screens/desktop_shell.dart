@@ -942,6 +942,8 @@ class _DesktopShellState extends State<DesktopShell> {
   Widget _macWindowBar() {
     final branch = _macBranchLabel();
     final changes = _macChangeLabel();
+    final hasWindowControls =
+        MediaQuery.viewPaddingOf(context).top >= kMacTitlebar;
     return SizedBox(
       height: kMacTitlebar + 8,
       child: DecoratedBox(
@@ -950,10 +952,10 @@ class _DesktopShellState extends State<DesktopShell> {
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
         child: Padding(
-          // Leave the native traffic lights their own space. The native window
-          // drag handler owns this strip; the repository context is the one
-          // intentional workspace action exposed here.
-          padding: const EdgeInsets.only(left: 88, right: 16),
+          // Reserve room for traffic lights only while macOS actually draws
+          // them; full-screen removes those controls, so use the space.
+          padding:
+              EdgeInsets.only(left: hasWindowControls ? 88 : 16, right: 16),
           child: Align(
             alignment: Alignment.centerLeft,
             child: Semantics(

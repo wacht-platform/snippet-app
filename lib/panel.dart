@@ -29,16 +29,13 @@ Future<T?> presentScreen<T>(
       final content = builder(ctx, close);
       return LayoutBuilder(builder: (lctx, c) {
         final wide = c.maxWidth >= kDesktopBreakpoint;
-        final top = kMacOS ? kMacTitlebar : 0.0;
         if (!wide) {
           // Full-screen (re-lays out to drawer/dialog if the window grows).
-          return Padding(
-              padding: EdgeInsets.only(top: top),
-              child: _frame(content, rounded: false, edge: false));
+          return _frame(content, rounded: false, edge: false);
         }
         if (style == PanelStyle.dialog) {
           return Padding(
-            padding: EdgeInsets.only(top: top),
+            padding: EdgeInsets.zero,
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -51,7 +48,7 @@ Future<T?> presentScreen<T>(
           );
         }
         return Padding(
-          padding: EdgeInsets.only(top: top),
+          padding: EdgeInsets.zero,
           child: Align(
             alignment: Alignment.centerRight,
             child: SizedBox(
