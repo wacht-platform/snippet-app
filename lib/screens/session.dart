@@ -2224,15 +2224,15 @@ class _SessionScreenState extends State<SessionScreen>
             if (_isRecording || _recordingPath != null) _recordingPanel(),
             Container(
               decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(22),
+                color: AppColors.bg,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: AppColors.border),
               ),
-              padding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
+              padding: const EdgeInsets.fromLTRB(18, 16, 12, 12),
               child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Cmd/Ctrl+Enter sends.
                     CallbackShortcuts(
                       bindings: {
                         const SingleActivator(LogicalKeyboardKey.enter): () {
@@ -2251,60 +2251,68 @@ class _SessionScreenState extends State<SessionScreen>
                         controller: _input,
                         minLines: 1,
                         maxLines: 8,
-                        cursorColor: AppColors.accent,
+                        cursorColor: AppColors.fg1,
                         onSubmitted: (_) => _sendMessage(),
-                        style: sans(16, height: 1.5, color: AppColors.fg1),
+                        style: sans(16, height: 1.45, color: AppColors.fg1),
                         decoration: InputDecoration(
                           isCollapsed: true,
                           contentPadding:
-                              const EdgeInsets.symmetric(vertical: 4),
+                              const EdgeInsets.fromLTRB(2, 2, 8, 10),
                           border: InputBorder.none,
                           hintText: 'Ask anything',
-                          hintStyle: sans(16, color: AppColors.fg4),
+                          hintStyle:
+                              sans(16, height: 1.45, color: AppColors.fg4),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    // Grok-style bottom toolbar: attach + model chip + mic + send.
                     Row(children: [
-                      IconBtn('plus',
-                          size: 36,
-                          iconSize: 21,
-                          tooltip: 'Attach',
-                          onTap: _onAttachTap),
-                      const SizedBox(width: 4),
-                      // Model selector chip (tappable).
-                      InkWell(
-                        borderRadius: BorderRadius.circular(R.sm),
+                      GestureDetector(
+                        onTap: _onAttachTap,
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Center(
+                            child:
+                                AppIcon('plus', size: 18, color: AppColors.fg3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      GestureDetector(
                         onTap: _switchModel,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                           decoration: BoxDecoration(
-                            color: AppColors.surface3,
-                            borderRadius: BorderRadius.circular(R.sm),
+                            color: AppColors.surface2,
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.bolt_rounded,
-                                size: 13, color: AppColors.accent),
-                            const SizedBox(width: 4),
+                            AppIcon('sparkles', size: 13, color: AppColors.fg2),
+                            const SizedBox(width: 6),
                             Text(_modelLabel ?? 'Auto',
-                                style: mono(11, color: AppColors.fg2)),
+                                style: sans(13, color: AppColors.fg2)),
+                            const SizedBox(width: 2),
+                            AppIcon('chevron-down',
+                                size: 12, color: AppColors.fg4),
                           ]),
                         ),
                       ),
                       const Spacer(),
                       if (kCanRecord)
-                        IconBtn(
-                          _isRecording ? 'mic-off' : 'mic',
-                          size: 36,
-                          iconSize: 21,
-                          active: _isRecording,
-                          tooltip:
-                              _isRecording ? 'Stop recording' : 'Record voice',
+                        GestureDetector(
                           onTap: _onMicTap,
+                          child: SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: Center(
+                              child: AppIcon(_isRecording ? 'mic-off' : 'mic',
+                                  size: 16,
+                                  color: _isRecording
+                                      ? AppColors.danger
+                                      : AppColors.fg3),
+                            ),
+                          ),
                         ),
-                      if (kCanRecord) const SizedBox(width: 2),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _input,
                         builder: (_, __, ___) => _SendBtn(
@@ -3830,19 +3838,19 @@ class _SendBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: enabled
-          ? (running ? AppColors.danger : AppColors.accent)
-          : AppColors.surface3,
+          ? (running ? AppColors.danger : AppColors.fg1)
+          : AppColors.surface2,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: SizedBox(
-          width: 38,
-          height: 38,
+          width: 36,
+          height: 36,
           child: Center(
-              child: AppIcon(running ? 'stop' : 'send',
-                  size: running ? 16 : 18,
-                  color: enabled ? AppColors.accentFg : AppColors.fg4)),
+              child: AppIcon(running ? 'stop' : 'arrow-up',
+                  size: running ? 15 : 16,
+                  color: enabled ? AppColors.bg : AppColors.fg4)),
         ),
       ),
     );

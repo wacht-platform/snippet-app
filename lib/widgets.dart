@@ -275,29 +275,29 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
   _cachedMarkdownThemeIndex = themeIndex;
   _cachedMarkdownStyle =
       MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-    p: sans(15.5, height: 1.45, color: AppColors.fg1),
+    p: sans(16, height: 1.5, color: AppColors.fg1),
     pPadding: EdgeInsets.zero,
-    a: sans(15.5, height: 1.45, color: AppColors.accent),
-    h1: sans(20, weight: FontWeight.w600, height: 1.25, color: AppColors.fg1),
-    h1Padding: const EdgeInsets.only(top: 6, bottom: 2),
-    h2: sans(17.5, weight: FontWeight.w600, height: 1.25, color: AppColors.fg1),
-    h2Padding: const EdgeInsets.only(top: 6, bottom: 2),
-    h3: sans(16, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
-    h3Padding: const EdgeInsets.only(top: 4, bottom: 2),
+    a: sans(16, height: 1.5, color: AppColors.accent),
+    h1: sans(21, weight: FontWeight.w600, height: 1.25, color: AppColors.fg1),
+    h1Padding: const EdgeInsets.only(top: 8, bottom: 4),
+    h2: sans(18, weight: FontWeight.w600, height: 1.28, color: AppColors.fg1),
+    h2Padding: const EdgeInsets.only(top: 8, bottom: 3),
+    h3: sans(16.5, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
+    h3Padding: const EdgeInsets.only(top: 6, bottom: 2),
     listIndent: 18,
     listBulletPadding: const EdgeInsets.only(right: 6),
-    code: mono(13, color: AppColors.accent),
+    code: mono(13.5, color: AppColors.accent),
     // PreBlockBuilder owns fenced chrome — keep these empty to avoid a double box.
     codeblockPadding: EdgeInsets.zero,
     codeblockDecoration: const BoxDecoration(),
-    blockquote: sans(15.5, height: 1.5, color: AppColors.fg2),
+    blockquote: sans(16, height: 1.5, color: AppColors.fg2),
     blockquoteDecoration: BoxDecoration(
       color: AppColors.surface2,
       borderRadius: BorderRadius.circular(R.xs),
       border: Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
     ),
-    listBullet: sans(15.5, height: 1.45, color: AppColors.fg1),
-    tableBody: sans(14, color: AppColors.fg1),
+    listBullet: sans(16, height: 1.5, color: AppColors.fg1),
+    tableBody: sans(14.5, color: AppColors.fg1),
     // FlexColumnWidth stretches every markdown table to the full message width.
     // Intrinsic columns keep phone tables content-sized; the markdown package
     // supplies horizontal scrolling when a long URL or code value needs it.

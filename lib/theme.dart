@@ -526,8 +526,8 @@ TextStyle sans(double size,
     GoogleFonts.inter(
       fontSize: size,
       fontWeight: _cap(weight),
-      height: height ?? 1.5,
-      letterSpacing: spacing,
+      height: height ?? 1.45,
+      letterSpacing: spacing ?? (size >= 16 ? -0.2 : -0.1),
       color: color ?? AppColors.fg1,
     );
 
@@ -666,7 +666,10 @@ IconData iconFor(String name) {
     case 'pause':
       return Icons.pause_rounded;
     case 'send':
+    case 'arrow-up':
       return IconsaxPlusLinear.arrow_up_3;
+    case 'sparkles':
+      return IconsaxPlusLinear.flash_1;
     case 'mic':
       return Icons.mic_none_rounded;
     case 'mic-off':
