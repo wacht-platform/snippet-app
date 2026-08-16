@@ -1624,7 +1624,9 @@ class _SessionScreenState extends State<SessionScreen>
               child: _QuestionBar(
                   question: s!.pendingQuestion!, onSend: _sendDecision),
             )),
-          _centerWide(_inputBar(running)),
+          if (!(waiting &&
+              (_pendingApproval(events) || s?.pendingQuestion != null)))
+            _centerWide(_inputBar(running)),
         ]),
       ),
     );
@@ -3528,6 +3530,8 @@ class _QuestionBar extends StatefulWidget {
 class _QuestionBarState extends State<_QuestionBar> {
   final Map<String, TextEditingController> _text = {};
   final Map<String, String> _choice = {};
+  final Set<String> _skipped = {};
+  final Set<String> _freeText = {};
   // One answer per ask — the bar lingers until the next frame flips status,
   // so an eager second tap double-submitted the answer.
   bool _sent = false;
@@ -3557,16 +3561,18 @@ class _QuestionBarState extends State<_QuestionBar> {
     final q = _currentQuestion;
     if (q == null) return false;
     final id = q['id'].toString();
-    return _kind(q) == 'free_text'
+    if (_skipped.contains(id)) return true;
+    final textMode = _kind(q) == 'free_text' || _freeText.contains(id);
+    return textMode
         ? (_text[id]?.text.trim().isNotEmpty ?? false)
         : (_choice[id]?.isNotEmpty ?? false);
   }
 
   String _answerFor(Map<String, dynamic> q) {
     final id = q['id'].toString();
-    return _kind(q) == 'free_text'
-        ? (_text[id]?.text.trim() ?? '')
-        : (_choice[id] ?? '');
+    if (_skipped.contains(id)) return 'user skipped the question';
+    final textMode = _kind(q) == 'free_text' || _freeText.contains(id);
+    return textMode ? (_text[id]?.text.trim() ?? '') : (_choice[id] ?? '');
   }
 
   void _submit() {
@@ -3580,6 +3586,55 @@ class _QuestionBarState extends State<_QuestionBar> {
         _questions.map((q) => '${q['text']}\n→ ${_answerFor(q)}').toList();
     widget.onSend({'kind': 'answer', 'value': parts.join('\n\n')});
   }
+
+  void _skip() {
+    final q = _currentQuestion;
+    if (q == null || _sent) return;
+    _skipped.add(q['id'].toString());
+    _freeText.remove(q['id'].toString());
+    _choice.remove(q['id'].toString());
+    if (_step < _questions.length - 1) {
+      setState(() => _step++);
+    } else {
+      _submit();
+    }
+  }
+
+  void _toggleFreeText() {
+    final q = _currentQuestion;
+    if (q == null || _sent) return;
+    final id = q['id'].toString();
+    setState(() {
+      _skipped.remove(id);
+      _freeText.contains(id) ? _freeText.remove(id) : _freeText.add(id);
+    });
+  }
+
+  Widget _freeTextToggle(String id) => InkWell(
+        onTap: _sent ? null : _toggleFreeText,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(_freeText.contains(id) ? 'check' : 'edit',
+                size: 14, color: AppColors.accent),
+            const SizedBox(width: 6),
+            Text(
+                _freeText.contains(id)
+                    ? 'Writing a response'
+                    : 'Write your own answer',
+                style: sans(12, color: AppColors.accent)),
+          ]),
+        ),
+      );
+
+  Widget _skipButton() => TextButton(
+        onPressed: _sent ? null : _skip,
+        style: TextButton.styleFrom(
+            foregroundColor: AppColors.fg3,
+            padding: const EdgeInsets.symmetric(horizontal: 8)),
+        child: Text('Skip', style: sans(12, color: AppColors.fg3)),
+      );
 
   Widget _chip(String label, bool sel, VoidCallback onTap) => Material(
         color: sel ? AppColors.accentBg : AppColors.surface2,
@@ -3636,51 +3691,48 @@ class _QuestionBarState extends State<_QuestionBar> {
   List<Widget> _inputFor(Map<String, dynamic> q) {
     final id = q['id'].toString();
     final k = _kind(q);
-    if (k == 'yes_no' || k == 'confirm') {
-      final opts =
-          k == 'confirm' ? const ['Confirm', 'Cancel'] : const ['Yes', 'No'];
-      final vals =
-          k == 'confirm' ? const ['confirm', 'cancel'] : const ['yes', 'no'];
-      return [
+    final opts =
+        k == 'confirm' ? const ['Confirm', 'Cancel'] : const ['Yes', 'No'];
+    final vals =
+        k == 'confirm' ? const ['confirm', 'cancel'] : const ['yes', 'no'];
+    final choices =
+        ((q['answer_kind']?['choices'] as List?) ?? const []).map((e) {
+      if (e is Map) {
+        final label = '${e['label'] ?? ''}'.trim();
+        final value = '${e['value'] ?? ''}'.trim();
+        final v = value.isEmpty ? label : value;
+        return (value: v, label: label.isEmpty ? v : label);
+      }
+      final s = '$e';
+      return (value: s, label: s);
+    }).toList();
+    _text.putIfAbsent(id, () => TextEditingController());
+    return [
+      if (k == 'single_choice')
+        ...choices.map((c) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _choiceRow(
+                  c.label,
+                  _choice[id] == c.value,
+                  () => setState(() {
+                        _choice[id] = c.value;
+                        _freeText.remove(id);
+                      })),
+            )),
+      if (k == 'yes_no' || k == 'confirm')
         Wrap(spacing: 8, children: [
           for (var i = 0; i < opts.length; i++)
             _chip(opts[i], _choice[id] == vals[i],
                 () => setState(() => _choice[id] = vals[i])),
         ]),
-      ];
-    }
-    if (k == 'single_choice') {
-      // Each choice is {value, label}; show the label, send the value (matches the
-      // TUI). Falling back keeps it robust if one side is missing.
-      final choices =
-          ((q['answer_kind']?['choices'] as List?) ?? const []).map((e) {
-        if (e is Map) {
-          final label = '${e['label'] ?? ''}'.trim();
-          final value = '${e['value'] ?? ''}'.trim();
-          final v = value.isEmpty ? label : value;
-          return (value: v, label: label.isEmpty ? v : label);
-        }
-        final s = '$e';
-        return (value: s, label: s);
-      }).toList();
-      return [
-        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          for (final c in choices)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _choiceRow(c.label, _choice[id] == c.value,
-                  () => setState(() => _choice[id] = c.value)),
-            ),
-        ]),
-      ];
-    }
-    _text.putIfAbsent(id, () => TextEditingController());
-    return [
-      AppField(
-          controller: _text[id]!,
-          hint: 'Your answer',
-          maxLines: 4,
-          onSubmitted: (_) => _submit()),
+      if (k == 'single_choice' || k == 'yes_no' || k == 'confirm')
+        _freeTextToggle(id),
+      if (k == 'free_text' || _freeText.contains(id))
+        AppField(
+            controller: _text[id]!,
+            hint: 'Write your answer',
+            maxLines: 4,
+            onSubmitted: (_) => _submit()),
     ];
   }
 
@@ -3768,12 +3820,15 @@ class _QuestionBarState extends State<_QuestionBar> {
         }(),
         const SizedBox(height: 16),
         Row(children: [
-          if (_step > 0)
+          _skipButton(),
+          if (_step > 0) ...[
+            const SizedBox(width: 4),
             Btn('Back',
                 small: true,
                 variant: BtnVariant.secondary,
                 onTap: _sent ? null : () => setState(() => _step--)),
-          if (_step > 0) const SizedBox(width: 8),
+          ],
+          const SizedBox(width: 8),
           Expanded(
             child: Btn(
                 _sent
