@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -27,6 +25,17 @@ String toolIcon(String tool) => switch (tool) {
       'list_files' => 'folder-open',
       'code_map' || 'view_outline' => 'map',
       'web_search' || 'web_read' => 'globe',
+      'set_session_title' => 'edit',
+      'memory_read' ||
+      'memory_write' ||
+      'memory_index' ||
+      'memory_delete' ||
+      'memory_pattern' ||
+      'memory_rule' =>
+        'layers',
+      'search_skills' || 'skill' => 'zap',
+      'monitor' => 'activity',
+      'present_file' => 'file',
       _ => 'zap',
     };
 
@@ -41,6 +50,16 @@ String toolArgSummary(String tool, dynamic args) {
     'search_files' => s('pattern'),
     'web_read' => s('url'),
     'code_map' => args['path']?.toString() ?? args['query']?.toString() ?? '.',
+    'set_session_title' => s('title'),
+    'memory_read' || 'memory_write' || 'memory_delete' => s('id'),
+    'memory_index' ||
+    'memory_pattern' ||
+    'memory_rule' =>
+      first(s('content').isNotEmpty ? s('content') : s('action')),
+    'search_skills' => s('query'),
+    'skill' => s('name'),
+    'monitor' => s('path').isNotEmpty ? s('path') : s('action'),
+    'present_file' => s('path'),
     'read_file' ||
     'write_file' ||
     'append_file' ||
@@ -54,12 +73,16 @@ String toolArgSummary(String tool, dynamic args) {
   };
   if (v.isNotEmpty) return first(v);
   for (final k in const [
+    'title',
+    'id',
+    'name',
     'command',
     'path',
     'query',
     'pattern',
     'url',
-    'file'
+    'file',
+    'content'
   ]) {
     if (args[k] is String) return first(args[k] as String);
   }
@@ -81,8 +104,26 @@ String toolTitle(String tool) => switch (tool) {
       'view_outline' => 'Outline',
       'web_search' => 'Search',
       'web_read' => 'Page',
-      _ => tool,
+      'set_session_title' => 'Title',
+      'memory_read' => 'Recall',
+      'memory_write' => 'Remember',
+      'memory_index' => 'Index',
+      'memory_delete' => 'Forget',
+      'memory_pattern' => 'Pattern',
+      'memory_rule' => 'Rule',
+      'search_skills' => 'Skills',
+      'skill' => 'Skill',
+      'monitor' => 'Watch',
+      'present_file' => 'Present',
+      _ => _humanizeTool(tool),
     };
+
+String _humanizeTool(String tool) {
+  final parts = tool.split(RegExp(r'[_\-]+')).where((p) => p.isNotEmpty);
+  return parts
+      .map((p) => p.isEmpty ? p : '${p[0].toUpperCase()}${p.substring(1)}')
+      .join(' ');
+}
 
 /// Tool detail rendering is isolated behind a small error boundary. A malformed
 /// result must produce a useful panel message instead of taking down the sheet.
@@ -194,8 +235,24 @@ List<Widget> _toolBody(
       return _webSearchView(a, d);
     case 'web_read':
       return _webReadView(a, d);
+    case 'set_session_title':
+      return _titleView(a, d);
+    case 'memory_read':
+    case 'memory_write':
+    case 'memory_index':
+    case 'memory_delete':
+    case 'memory_pattern':
+    case 'memory_rule':
+      return _memoryView(tool, a, d);
+    case 'search_skills':
+    case 'skill':
+      return _skillView(tool, a, d);
+    case 'monitor':
+      return _monitorView(a, d);
+    case 'present_file':
+      return _presentView(a, d);
     default:
-      return _jsonFallback(a, d, status);
+      return _simpleFallback(a, d);
   }
 }
 
@@ -416,33 +473,133 @@ List<Widget> _webReadView(Map? a, Map? d) {
   return out;
 }
 
-List<Widget> _jsonFallback(Map? a, Map? d, String? status) {
-  final out = <Widget>[];
-  if (a != null) {
-    out.add(const SectionLabel('Arguments'));
-    out.add(const SizedBox(height: 8));
-    out.add(_CodeBox(_pretty(a)));
+List<Widget> _titleView(Map? a, Map? d) {
+  final title = (d?['title'] ?? a?['title'])?.toString() ?? '';
+  if (title.trim().isEmpty) {
+    return [Text('Cleared title', style: sans(13, color: AppColors.fg3))];
   }
-  if (d != null) {
-    if (a != null) out.add(const SizedBox(height: 16));
-    out.add(const SectionLabel('Result'));
-    out.add(const SizedBox(height: 8));
-    out.add(_CodeBox(_pretty(d)));
+  return [
+    Text(title,
+        style: sans(14.5, weight: FontWeight.w600, color: AppColors.fg1)),
+  ];
+}
+
+List<Widget> _memoryView(String tool, Map? a, Map? d) {
+  final out = <Widget>[];
+  final id = (d?['id'] ?? a?['id'])?.toString() ?? '';
+  final content = (d?['content'] ?? a?['content'])?.toString() ?? '';
+  if (id.isNotEmpty) {
+    out.add(Text(id,
+        style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)));
+  }
+  if (content.trim().isNotEmpty) {
+    if (out.isNotEmpty) out.add(const SizedBox(height: 6));
+    out.add(_CodeBox(
+        _previewLines(_displayText(content).trimRight(), maxLines: 10),
+        useSans: true));
+  }
+  if (out.isEmpty) {
+    out.add(Text(toolTitle(tool), style: sans(13, color: AppColors.fg3)));
   }
   return out;
 }
 
-// ---- shared pieces ----
-
-String _pretty(dynamic v) {
-  String s;
-  try {
-    s = const JsonEncoder.withIndent('  ').convert(v);
-  } catch (_) {
-    s = v.toString();
+List<Widget> _skillView(String tool, Map? a, Map? d) {
+  final name = (d?['name'] ?? a?['name'] ?? a?['query'])?.toString() ?? '';
+  final text =
+      (d?['content'] ?? d?['description'] ?? d?['text'])?.toString() ?? '';
+  final out = <Widget>[];
+  if (name.isNotEmpty) {
+    out.add(Text(name,
+        style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)));
   }
-  return s.length > 6000 ? '${s.substring(0, 6000)}\n…(truncated)' : s;
+  if (text.trim().isNotEmpty) {
+    if (out.isNotEmpty) out.add(const SizedBox(height: 6));
+    out.add(_CodeBox(
+        _previewLines(_displayText(text).trimRight(), maxLines: 12),
+        useSans: true));
+  }
+  if (out.isEmpty) {
+    out.add(Text(toolTitle(tool), style: sans(13, color: AppColors.fg3)));
+  }
+  return out;
 }
+
+List<Widget> _monitorView(Map? a, Map? d) {
+  final action = (a?['action'] ?? d?['action'] ?? 'add').toString();
+  final path = (a?['path'] ?? d?['path'])?.toString() ?? '';
+  final filter = (a?['filter'] ?? d?['filter'])?.toString() ?? '';
+  final out = <Widget>[
+    Text(action,
+        style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+  ];
+  if (path.isNotEmpty) {
+    out.add(const SizedBox(height: 4));
+    out.add(Text(path, style: mono(12, color: AppColors.fg2)));
+  }
+  if (filter.isNotEmpty) {
+    out.add(const SizedBox(height: 4));
+    out.add(Text(filter, style: mono(11.5, color: AppColors.fg3)));
+  }
+  return out;
+}
+
+List<Widget> _presentView(Map? a, Map? d) {
+  final path = (a?['path'] ?? d?['path'])?.toString() ?? '';
+  final caption = (a?['caption'] ?? d?['caption'])?.toString() ?? '';
+  return [
+    if (path.isNotEmpty)
+      Text(path,
+          style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)),
+    if (caption.isNotEmpty) ...[
+      const SizedBox(height: 4),
+      Text(caption, style: sans(13, color: AppColors.fg3)),
+    ],
+  ];
+}
+
+List<Widget> _simpleFallback(Map? a, Map? d) {
+  final bits = <String>[];
+  void take(dynamic v) {
+    if (v is String && v.trim().isNotEmpty) bits.add(v.trim());
+  }
+
+  if (a != null) {
+    for (final k in const [
+      'title',
+      'id',
+      'name',
+      'path',
+      'query',
+      'content',
+      'text'
+    ]) {
+      take(a[k]);
+    }
+  }
+  if (d != null) {
+    for (final k in const [
+      'title',
+      'id',
+      'name',
+      'path',
+      'content',
+      'text',
+      'message'
+    ]) {
+      take(d[k]);
+    }
+  }
+  if (bits.isEmpty) {
+    return [Text('Done', style: sans(13, color: AppColors.fg3))];
+  }
+  return [
+    _CodeBox(_previewLines(_displayText(bits.first).trimRight(), maxLines: 8),
+        useSans: true)
+  ];
+}
+
+// ---- shared pieces ----
 
 Widget _meta(List<Widget> chips) =>
     Wrap(spacing: 7, runSpacing: 7, children: chips);
