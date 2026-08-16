@@ -1839,7 +1839,7 @@ class _SessionScreenState extends State<SessionScreen>
         _renameCurrent();
         return;
       case 'model':
-        _switchModel();
+        _switchModel(context);
         return;
       case 'approval':
         final manual = (s?.approvalMode ?? 'auto') == 'manual';
@@ -2278,25 +2278,29 @@ class _SessionScreenState extends State<SessionScreen>
                         ),
                       ),
                       const SizedBox(width: 2),
-                      GestureDetector(
-                        onTap: _switchModel,
-                        child: Container(
-                          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface2,
-                            borderRadius: BorderRadius.circular(20),
+                      Builder(builder: (chipCtx) {
+                        return GestureDetector(
+                          onTap: () => _switchModel(chipCtx),
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface2,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                              AppIcon('sparkles',
+                                  size: 13, color: AppColors.fg2),
+                              const SizedBox(width: 6),
+                              Text(_modelLabel ?? 'Auto',
+                                  style: sans(13, color: AppColors.fg2)),
+                              const SizedBox(width: 2),
+                              AppIcon('chevron-down',
+                                  size: 12, color: AppColors.fg4),
+                            ]),
                           ),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            AppIcon('sparkles', size: 13, color: AppColors.fg2),
-                            const SizedBox(width: 6),
-                            Text(_modelLabel ?? 'Auto',
-                                style: sans(13, color: AppColors.fg2)),
-                            const SizedBox(width: 2),
-                            AppIcon('chevron-down',
-                                size: 12, color: AppColors.fg4),
-                          ]),
-                        ),
-                      ),
+                        );
+                      }),
                       const Spacer(),
                       if (kCanRecord)
                         GestureDetector(
@@ -2708,7 +2712,7 @@ class _SessionScreenState extends State<SessionScreen>
       n == 'monitor' ||
       n == 'present_file';
 
-  Future<void> _switchModel() async {
+  Future<void> _switchModel([BuildContext? anchor]) async {
     ServerConfig cfg;
     try {
       cfg = await widget.client.getConfig();
@@ -2717,41 +2721,69 @@ class _SessionScreenState extends State<SessionScreen>
       return;
     }
     if (!mounted) return;
-    final picked = await showAppSheet<String>(context,
-        title: 'Switch model',
-        child: Column(
-          children: cfg.profiles
-              .map((p) => Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(R.sm),
-                      onTap: () => Navigator.pop(context, p.name),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 12),
-                        child: Row(children: [
-                          AppIcon('cpu', size: 17, color: AppColors.accent),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(p.name,
-                                      style: sans(13.5,
-                                          weight: FontWeight.w500,
-                                          color: AppColors.fg1)),
-                                  const SizedBox(height: 2),
-                                  Text('${p.provider} · ${p.model}',
-                                      style: mono(11, color: AppColors.fg3)),
-                                ]),
-                          ),
-                        ]),
-                      ),
-                    ),
-                  ))
-              .toList(),
-        ));
-    if (picked == null) return;
+    if (cfg.profiles.isEmpty) {
+      _toast('No model profiles');
+      return;
+    }
+    final box = (anchor ?? context).findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    RelativeRect position;
+    if (box != null && overlay != null) {
+      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+      position = RelativeRect.fromRect(
+        origin & box.size,
+        Offset.zero & overlay.size,
+      );
+    } else {
+      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+    }
+    final current = _modelLabel;
+    final picked = await showMenu<String>(
+      context: context,
+      position: position,
+      color: AppColors.surface1,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: AppColors.border2),
+      ),
+      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
+      items: [
+        for (final p in cfg.profiles)
+          PopupMenuItem<String>(
+            value: p.name,
+            height: 48,
+            child: Row(children: [
+              AppIcon('sparkles',
+                  size: 14,
+                  color: p.name == current ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(p.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13,
+                            weight: FontWeight.w500,
+                            color: p.name == current
+                                ? AppColors.accent
+                                : AppColors.fg1)),
+                    Text('${p.provider} · ${p.model}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(11, color: AppColors.fg4)),
+                  ],
+                ),
+              ),
+            ]),
+          ),
+      ],
+    );
+    if (picked == null || picked == current) return;
     try {
       await widget.client.setSessionModel(widget.sessionId, picked);
       _toast('Switched to $picked');
