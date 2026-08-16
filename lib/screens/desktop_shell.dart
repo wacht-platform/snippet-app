@@ -1273,16 +1273,18 @@ class _DesktopShellState extends State<DesktopShell> {
     return GestureDetector(
       onTap: () => _activateTab(i),
       onLongPress: () => _tabMenu(i),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
         key: key,
         margin: EdgeInsets.only(
             top: mac ? 0 : (kMobile ? 7 : 6),
             bottom: mac ? 0 : (kMobile ? 7 : 6),
             left: mac ? 0 : 3,
-            right: mac ? 8 : 3),
+            right: mac ? 0 : 3),
         padding: EdgeInsets.only(
             left: mac ? 10 : (kMobile ? 13 : 11), right: mac ? 7 : 5),
-        constraints: const BoxConstraints(maxWidth: 210),
+        constraints: BoxConstraints(maxWidth: active ? 230 : 180),
         decoration: BoxDecoration(
           color: mac
               ? (active ? AppColors.surface1 : Colors.transparent)

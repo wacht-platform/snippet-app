@@ -125,48 +125,63 @@ class _ModelsScreenState extends State<ModelsScreen> {
         delegate != null && delegate.isNotEmpty && delegate == p.name;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: AppCard(
-        onTap: p.usable
-            ? () =>
-                _run(() => widget.client.setActiveProfile(p.name), 'activate')
-            : null,
-        padding: const EdgeInsets.fromLTRB(12, 11, 6, 11),
-        child: Row(children: [
-          Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: p.active ? AppColors.accentBg : AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.md),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        margin: EdgeInsets.zero,
+        child: AppCard(
+          onTap: p.usable
+              ? () =>
+                  _run(() => widget.client.setActiveProfile(p.name), 'activate')
+              : null,
+          padding: const EdgeInsets.fromLTRB(12, 11, 6, 11),
+          child: Row(children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: p.active ? AppColors.accentBg : AppColors.surface2,
+                borderRadius: BorderRadius.circular(R.md),
+              ),
+              child: AppIcon('cpu',
+                  size: 18, color: p.active ? AppColors.accent : AppColors.fg3),
             ),
-            child: AppIcon('cpu',
-                size: 18, color: p.active ? AppColors.accent : AppColors.fg3),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Flexible(
-                    child: Text(p.name,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Flexible(
+                          child: Text(p.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(14, color: AppColors.fg1))),
+                      if (p.active) ...[
+                        const SizedBox(width: 8),
+                        _activeChip()
+                      ],
+                      if (isDelegate) ...[
+                        const SizedBox(width: 8),
+                        _delegateChip()
+                      ],
+                      if (!p.usable) ...[
+                        const SizedBox(width: 8),
+                        const WarnChip()
+                      ],
+                    ]),
+                    const SizedBox(height: 4),
+                    Text('${p.provider} · ${p.model}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(14, color: AppColors.fg1))),
-                if (p.active) ...[const SizedBox(width: 8), _activeChip()],
-                if (isDelegate) ...[const SizedBox(width: 8), _delegateChip()],
-                if (!p.usable) ...[const SizedBox(width: 8), const WarnChip()],
-              ]),
-              const SizedBox(height: 4),
-              Text('${p.provider} · ${p.model}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(11.5, color: AppColors.fg3)),
-            ]),
-          ),
-          IconBtn('edit', size: 34, iconSize: 16, onTap: () => _edit(p)),
-          _overflowMenu(p, isDelegate),
-        ]),
+                        style: mono(11.5, color: AppColors.fg3)),
+                  ]),
+            ),
+            IconBtn('edit', size: 34, iconSize: 16, onTap: () => _edit(p)),
+            _overflowMenu(p, isDelegate),
+          ]),
+        ),
       ),
     );
   }
