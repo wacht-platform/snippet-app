@@ -342,6 +342,7 @@ class _SessionScreenState extends State<SessionScreen>
   // Pending attachments (images + files, up to 5): each uploads to the daemon
   // and is referenced in the next message. Images → read_image, files → read.
   final List<_Attachment> _attachments = [];
+  int _attachmentGeneration = 0;
   bool _draggingFiles = false;
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   static const int _maxAttachments = 5;
@@ -447,6 +448,29 @@ class _SessionScreenState extends State<SessionScreen>
     _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
     _registeredOpenKey = _openKey;
     reportOpenSession(_openKey);
+  }
+
+  @override
+  void didUpdateWidget(covariant SessionScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sessionId == widget.sessionId &&
+        oldWidget.client.baseUrl == widget.client.baseUrl) {
+      return;
+    }
+    // PageView normally keys each session, but a parent may reuse this State
+    // while switching tabs. Never carry composer/upload state across sessions.
+    // Invalidate completions from an upload started by the previous session.
+    _attachmentGeneration++;
+    if (mounted) {
+      setState(() => _attachments.clear());
+    } else {
+      _attachments.clear();
+    }
+    _queued.clear();
+    _queuedNonce.clear();
+    _clearPendingAll();
+    _input.clear();
+    _lastInput = '';
   }
 
   @override
@@ -1321,13 +1345,14 @@ class _SessionScreenState extends State<SessionScreen>
         .toList();
     if (entries.isEmpty) return;
     setState(() => _attachments.addAll(entries));
+    final generation = _attachmentGeneration;
     for (var i = 0; i < entries.length; i++) {
       final p = items[i];
       final a = entries[i];
       try {
         final bytes = await p.readBytes();
         final path = await widget.client.uploadFile(bytes, name: p.name);
-        if (!mounted) return;
+        if (!mounted || generation != _attachmentGeneration) return;
         setState(() {
           a.remotePath = path;
           a.uploading = false;
