@@ -236,7 +236,7 @@ class _ToolRunState extends State<ToolRun> {
           behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _open = !_open),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: EdgeInsets.zero,
             child: Row(children: [
               if (widget.running)
                 const SizedBox(
