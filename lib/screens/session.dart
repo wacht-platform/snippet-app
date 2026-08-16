@@ -2214,16 +2214,15 @@ class _SessionScreenState extends State<SessionScreen>
           children: [
             if (_attachments.isNotEmpty) _attachmentBar(),
             if (_isRecording || _recordingPath != null) _recordingPanel(),
-            // Grok-style: rounded card composer with clean layout.
             Container(
               decoration: BoxDecoration(
-                color: AppColors.surface2,
+                color: AppColors.surface1,
                 border: Border.all(
-                    color: _draggingFiles ? AppColors.accent : AppColors.border,
-                    width: _draggingFiles ? 1.5 : 1),
-                borderRadius: BorderRadius.circular(R.card),
+                    color:
+                        _draggingFiles ? AppColors.accent : AppColors.border),
+                borderRadius: BorderRadius.circular(22),
               ),
-              padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+              padding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
               child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3417,49 +3416,22 @@ class _ApprovalBarState extends State<_ApprovalBar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 15, 16, 14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.accentLine),
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: AppColors.accent.withValues(alpha: 0.07),
-              blurRadius: 16,
-              offset: const Offset(0, 5)),
-        ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-                color: AppColors.accentBg,
-                borderRadius: BorderRadius.circular(R.sm)),
-            child: AppIcon('shield', size: 16, color: AppColors.accent),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(_sent ? 'Decision sending…' : 'Approval required',
-                  style:
-                      sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
-              const SizedBox(height: 2),
-              Text(
-                  widget.showApproveAll
-                      ? 'Several actions are waiting for your decision'
-                      : 'The agent is waiting before continuing',
-                  style: sans(11.5, color: AppColors.fg3)),
-            ]),
-          ),
-          if (!_sent)
-            Text('ACTION',
-                style: mono(10, weight: FontWeight.w600, color: AppColors.fg4)),
-        ]),
-        const SizedBox(height: 14),
+        Text(_sent ? 'Decision sending…' : 'Tool Approval',
+            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+        const SizedBox(height: 4),
+        Text(
+            widget.showApproveAll
+                ? 'Several actions are waiting'
+                : 'Approve this action to continue',
+            style: sans(12, color: AppColors.fg3)),
+        const SizedBox(height: 12),
         Opacity(
           opacity: _sent ? 0.5 : 1,
           child: Row(children: [
@@ -3766,47 +3738,21 @@ class _QuestionBarState extends State<_QuestionBar> {
     final ctx = widget.question['context']?.toString();
     final total = _questions.length;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.accentLine),
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: AppColors.accent.withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 6)),
-        ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-                color: AppColors.accentBg,
-                borderRadius: BorderRadius.circular(R.sm)),
-            child: AppIcon('message-circle', size: 16, color: AppColors.accent),
+        Text(_sent ? 'Sending…' : 'Question',
+            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+        if (total > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text('${_step + 1} of $total',
+                style: sans(12, color: AppColors.fg4)),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Your input is needed',
-                  style:
-                      sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
-              const SizedBox(height: 2),
-              Text(
-                  total > 1
-                      ? '$total questions'
-                      : 'The agent is waiting for your answer',
-                  style: mono(10.5, color: AppColors.fg3)),
-            ]),
-          ),
-          if (_sent)
-            Text('Sending…', style: mono(10.5, color: AppColors.accent)),
-        ]),
         if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
           const SizedBox(height: 12),
           Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg2)),
@@ -3815,56 +3761,28 @@ class _QuestionBarState extends State<_QuestionBar> {
           final q = _currentQuestion;
           if (q == null) return <Widget>[];
           return <Widget>[
-            const SizedBox(height: 15),
-            Row(children: [
-              Text('${_step + 1}/$total',
-                  style: mono(10.5,
-                      weight: FontWeight.w600, color: AppColors.accent)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: total == 0 ? 0 : (_step + 1) / total,
-                    minHeight: 4,
-                    backgroundColor: AppColors.surface3,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
-                  ),
-                ),
-              ),
-            ]),
             const SizedBox(height: 12),
             Text(q['text']?.toString() ?? '',
-                style: sans(15,
-                    weight: FontWeight.w600,
-                    height: 1.4,
-                    color: AppColors.fg1)),
-            const SizedBox(height: 11),
+                style: sans(14, height: 1.45, color: AppColors.fg1)),
+            const SizedBox(height: 10),
             ..._inputFor(q),
           ];
         }(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Row(children: [
           _skipButton(),
           if (_step > 0) ...[
             const SizedBox(width: 4),
             Btn('Back',
                 small: true,
-                variant: BtnVariant.secondary,
+                variant: BtnVariant.ghost,
                 onTap: _sent ? null : () => setState(() => _step--)),
           ],
-          const SizedBox(width: 8),
-          Expanded(
-            child: Btn(
-                _sent
-                    ? 'Sending…'
-                    : (_step < total - 1 ? 'Next question' : 'Send answer'),
-                small: true,
-                icon: _step < total - 1 ? 'arrow-right' : 'send',
-                full: true,
-                disabled: !_ready || _sent,
-                onTap: (_ready && !_sent) ? _submit : null),
-          ),
+          const Spacer(),
+          Btn(_sent ? 'Sending…' : (_step < total - 1 ? 'Continue' : 'Submit'),
+              small: true,
+              disabled: !_ready || _sent,
+              onTap: (_ready && !_sent) ? _submit : null),
         ]),
       ]),
     );

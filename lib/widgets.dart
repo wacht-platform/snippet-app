@@ -1096,33 +1096,27 @@ class Bubble extends StatelessWidget {
         matches.where((m) => isAudioAttachmentPath(m.group(2) ?? '')).length;
     final images = matches.where((m) => m.group(1) == 'image').length;
     final files = matches.length - images - audio;
-    final mineContent = Container(
-      padding: const EdgeInsets.only(left: 10),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: AppColors.accent, width: 2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (shown.isNotEmpty)
-            Text(shown, style: sans(16, height: 1.5, color: AppColors.fg1)),
-          if (matches.isNotEmpty) ...[
-            if (shown.isNotEmpty) const SizedBox(height: 8),
-            AttachmentPill(audio: audio, images: images, files: files),
-          ],
-          if (transcripts.isNotEmpty) AudioTranscriptCard(items: transcripts),
-          if (audio > 0 && transcripts.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Row(children: [
-                AppIcon('activity', size: 13, color: AppColors.accent),
-                const SizedBox(width: 6),
-                Text('Transcribing audio…',
-                    style: sans(11.5, color: AppColors.fg3)),
-              ]),
-            ),
+    final mineContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (shown.isNotEmpty)
+          Text(shown, style: sans(15, height: 1.45, color: AppColors.fg1)),
+        if (matches.isNotEmpty) ...[
+          if (shown.isNotEmpty) const SizedBox(height: 8),
+          AttachmentPill(audio: audio, images: images, files: files),
         ],
-      ),
+        if (transcripts.isNotEmpty) AudioTranscriptCard(items: transcripts),
+        if (audio > 0 && transcripts.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon('activity', size: 12, color: AppColors.fg3),
+              const SizedBox(width: 6),
+              Text('Transcribing audio…',
+                  style: sans(11.5, color: AppColors.fg3)),
+            ]),
+          ),
+      ],
     );
     final agentContent = MarkdownBody(
       data: shown,
@@ -1141,21 +1135,21 @@ class Bubble extends StatelessWidget {
       child: Container(
         constraints: BoxConstraints(
           maxWidth:
-              mine ? MediaQuery.sizeOf(context).width * 0.82 : double.infinity,
+              mine ? MediaQuery.sizeOf(context).width * 0.72 : double.infinity,
         ),
         margin: EdgeInsets.only(
-            left: mine ? 42 : 0, right: mine ? 0 : 20, bottom: mine ? 14 : 20),
-        padding: EdgeInsets.fromLTRB(
-            mine ? 14 : 0, mine ? 11 : 0, mine ? 14 : 0, mine ? 11 : 0),
+            left: mine ? 56 : 0, right: mine ? 0 : 8, bottom: mine ? 10 : 16),
+        padding:
+            mine ? const EdgeInsets.fromLTRB(13, 8, 13, 8) : EdgeInsets.zero,
         decoration: mine
             ? BoxDecoration(
                 color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(16),
               )
             : null,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             content,
             if (!mine) _MessageActions(text: shown),

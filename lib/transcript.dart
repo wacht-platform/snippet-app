@@ -37,16 +37,15 @@ class _DenseToolRowState extends State<DenseToolRow> {
   @override
   void initState() {
     super.initState();
-    _expanded = widget.result != null;
+    // BeUI: running tools show their live output; completed tools stay one line.
+    _expanded = widget.result == null;
   }
 
   @override
   void didUpdateWidget(covariant DenseToolRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reveal the result as soon as a live tool completes. Older completed steps
-    // remain compact when ToolRun collapses the activity history.
     if (oldWidget.result == null && widget.result != null) {
-      _expanded = true;
+      _expanded = false;
     }
   }
 
@@ -76,25 +75,17 @@ class _DenseToolRowState extends State<DenseToolRow> {
   }
 
   Widget _inlineDetail(BuildContext context) {
-    if (widget.result == null || !_expanded) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(left: 39, right: 4, bottom: 5),
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        border: Border(
-          left: BorderSide(color: _ok ? AppColors.border2 : AppColors.danger),
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(6),
-          bottomRight: Radius.circular(6),
-        ),
-      ),
+    if (!_expanded) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(left: 22, right: 2, bottom: 8, top: 1),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 280),
+        constraints: const BoxConstraints(maxHeight: 220),
         child: SingleChildScrollView(
-          child: safeToolDetailView(context,
-              tool: widget.tool, args: widget.args, result: widget.result),
+          child: DefaultTextStyle(
+            style: mono(11.5, height: 1.45, color: AppColors.fg3),
+            child: safeToolDetailView(context,
+                tool: widget.tool, args: widget.args, result: widget.result),
+          ),
         ),
       ),
     );
@@ -109,45 +100,38 @@ class _DenseToolRowState extends State<DenseToolRow> {
             style: mono(12, color: _ok ? AppColors.ok : AppColors.danger));
     final meta = _meta;
 
+    final summary = toolArgSummary(widget.tool, widget.args);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
-        onTap: widget.result == null
-            ? null
-            : () => setState(() => _expanded = !_expanded),
+        onTap: () => setState(() => _expanded = !_expanded),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+          padding: const EdgeInsets.symmetric(vertical: 5),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(width: 18, child: Center(child: glyph)),
-            const SizedBox(width: 7),
-            AppIcon(toolIcon(widget.tool),
-                size: 14, color: _pending ? AppColors.run : AppColors.fg3),
-            const SizedBox(width: 7),
+            SizedBox(width: 16, child: Center(child: glyph)),
+            const SizedBox(width: 8),
             Expanded(
-              child: Text(toolTitle(widget.tool),
-                  style: mono(11.5,
-                      weight: FontWeight.w600, color: AppColors.fg2)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(toolTitle(widget.tool),
+                      style: sans(13.5,
+                          weight: FontWeight.w500, color: AppColors.fg1)),
+                  if (summary.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(summary,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(12, color: AppColors.fg4)),
+                    ),
+                ],
+              ),
             ),
-            if (meta.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Text(meta,
-                  style:
-                      mono(11, color: _ok ? AppColors.fg4 : AppColors.danger)),
-            ],
-            const SizedBox(width: 7),
-            Flexible(
-              flex: 2,
-              child: Text(toolArgSummary(widget.tool, widget.args),
-                  maxLines: 1,
-                  textAlign: TextAlign.right,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(11, color: AppColors.fg3)),
-            ),
-            if (widget.result != null) ...[
-              const SizedBox(width: 5),
-              AppIcon(_expanded ? 'chevron-down' : 'chevron-right',
-                  size: 13, color: AppColors.fg4),
-            ],
+            if (meta.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 10, top: 2),
+                child: Text(meta, style: sans(11.5, color: AppColors.fg4)),
+              ),
           ]),
         ),
       ),
@@ -222,20 +206,16 @@ class _ToolRunState extends State<ToolRun> {
     final rows = widget.rows;
     final collapsed = !_all && rows.length > visibleTail;
     final shown = collapsed ? rows.sublist(rows.length - visibleTail) : rows;
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.only(left: 8),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: AppColors.border2, width: 2)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (collapsed)
           InkWell(
             onTap: () => setState(() => _all = true),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-              child: Text('⌄ +${rows.length - visibleTail} earlier steps',
-                  style: mono(11, color: AppColors.fg4)),
+              padding: const EdgeInsets.only(bottom: 6, left: 24),
+              child: Text('${rows.length - visibleTail} completed steps',
+                  style: sans(12, color: AppColors.fg4)),
             ),
           ),
         ...shown,
