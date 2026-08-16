@@ -695,11 +695,15 @@ class _CodeBox extends StatelessWidget {
         : addTint
             ? AppColors.ok
             : AppColors.fg2;
-    return SelectableText(
-      text,
-      style: useSans
-          ? sans(12, height: 1.45, color: color)
-          : mono(11.5, height: 1.45, color: color),
+    final style = useSans
+        ? sans(12, height: 1.4, color: color)
+        : mono(11.5, height: 1.4, color: color);
+    return NotificationListener<ScrollNotification>(
+      onNotification: (_) => true,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SelectableText(text, style: style, maxLines: null),
+      ),
     );
   }
 }
