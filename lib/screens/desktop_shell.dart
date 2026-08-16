@@ -1206,6 +1206,7 @@ class _DesktopShellState extends State<DesktopShell> {
                             title: t.title,
                             profile: t.profile,
                             embedded: true,
+                            acceptDrops: i == _activeIndex,
                             onMenu: null,
                             onOpenFileTab: (path, name) => _openFileTab(
                                 t.client, t.instanceUrl, path, name),

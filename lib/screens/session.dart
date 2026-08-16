@@ -98,6 +98,11 @@ class SessionScreen extends StatefulWidget {
           VoidCallback stop, void Function(String action) performAction)?
       onMacControls;
 
+  /// Desktop PageView keeps every tab mounted. Only the visible session should
+  /// accept file drops — otherwise every keep-alive DropTarget ingests the same
+  /// file and the composer chips leak across tabs.
+  final bool acceptDrops;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -109,7 +114,8 @@ class SessionScreen extends StatefulWidget {
       this.onOpenFileTab,
       this.onOpenSession,
       this.onMacStatus,
-      this.onMacControls});
+      this.onMacControls,
+      this.acceptDrops = true});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
 }
@@ -1652,8 +1658,15 @@ class _SessionScreenState extends State<SessionScreen>
     );
     return kMacOS
         ? DropTarget(
-            onDragEntered: (_) => setState(() => _draggingFiles = true),
-            onDragExited: (_) => setState(() => _draggingFiles = false),
+            enable: widget.acceptDrops,
+            onDragEntered: (_) {
+              if (!widget.acceptDrops) return;
+              setState(() => _draggingFiles = true);
+            },
+            onDragExited: (_) {
+              if (!widget.acceptDrops) return;
+              setState(() => _draggingFiles = false);
+            },
             onDragDone: _ingestDroppedFiles,
             child: scaffold,
           )
@@ -2172,7 +2185,7 @@ class _SessionScreenState extends State<SessionScreen>
       !_sendingAudio;
 
   Future<void> _ingestDroppedFiles(DropDoneDetails details) async {
-    if (!kMacOS) return;
+    if (!kMacOS || !widget.acceptDrops) return;
     setState(() => _draggingFiles = false);
     final files = details.files.whereType<DropItemFile>().map((item) {
       final bookmark = item.extraAppleBookmark;
