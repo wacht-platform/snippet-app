@@ -85,7 +85,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
       padding: const EdgeInsets.only(left: 22, right: 2, bottom: 4, top: 2),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: widget.tool == 'bash' ? 132 : 220,
+          maxHeight: widget.tool == 'bash' ? 220 : 220,
         ),
         child: SingleChildScrollView(
           child: DefaultTextStyle(

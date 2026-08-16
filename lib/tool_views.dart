@@ -261,19 +261,12 @@ String _previewLines(String text, {int maxLines = 6}) {
 }
 
 List<Widget> _bashView(Map? a, Map? d) {
-  final out = <Widget>[];
-  if (d != null) {
-    final stdout =
-        _previewLines(_displayText(d['stdout']?.toString() ?? '').trimRight());
-    final stderr =
-        _previewLines(_displayText(d['stderr']?.toString() ?? '').trimRight());
-    if (stdout.isNotEmpty) out.add(_CodeBox(stdout));
-    if (stderr.isNotEmpty) out.add(_CodeBox(stderr, delTint: true));
-    if (stdout.isEmpty && stderr.isEmpty) {
-      out.add(Text('no output', style: mono(11.5, color: AppColors.fg4)));
-    }
-  }
-  return out;
+  final command = (a?['command']?.toString() ?? '').trim();
+  final stdout =
+      _previewLines(_displayText(d?['stdout']?.toString() ?? '').trimRight());
+  final stderr =
+      _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
+  return [_ShellCard(command: command, stdout: stdout, stderr: stderr)];
 }
 
 List<Widget> _grepView(Map? a, Map? d) {
@@ -678,6 +671,53 @@ String _displayText(String text) => text
     .replaceAll(r'\r\n', '\n')
     .replaceAll(r'\n', '\n')
     .replaceAll(r'\r', '\r');
+
+class _ShellCard extends StatelessWidget {
+  final String command;
+  final String stdout;
+  final String stderr;
+  const _ShellCard(
+      {required this.command, required this.stdout, required this.stderr});
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final empty = stdout.isEmpty && stderr.isEmpty;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (command.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(
+                      text: '\$ ',
+                      style: mono(12, color: AppColors.fg3, height: 1.4)),
+                  TextSpan(
+                      text: command,
+                      style: mono(12, color: AppColors.fg1, height: 1.4)),
+                ]),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          if (stdout.isNotEmpty) _CodeBox(stdout),
+          if (stderr.isNotEmpty) _CodeBox(stderr, delTint: true),
+          if (empty) Text('no output', style: mono(11.5, color: AppColors.fg4)),
+        ],
+      ),
+    );
+  }
+}
 
 /// Plain monospace block (selectable). Optional add/del tint or sans font.
 class _CodeBox extends StatelessWidget {
