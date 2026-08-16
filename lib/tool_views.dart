@@ -305,16 +305,7 @@ List<Widget> _imageView(Map? a, Map? d) {
     const SizedBox(height: 12),
     Center(
       child: Column(children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: AppIcon('image', size: 30, color: AppColors.fg3),
-        ),
+        AppIcon('image', size: 28, color: AppColors.fg3),
         const SizedBox(height: 12),
         if (d != null)
           _meta([
@@ -581,21 +572,16 @@ String _pretty(dynamic v) {
 Widget _meta(List<Widget> chips) =>
     Wrap(spacing: 7, runSpacing: 7, children: chips);
 
-Widget _chip(String icon, String label) => Container(
-      padding: const EdgeInsets.fromLTRB(7, 4, 9, 4),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: AppColors.border),
-      ),
+Widget _chip(String icon, String label) => Padding(
+      padding: const EdgeInsets.only(right: 10, bottom: 4),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        AppIcon(icon, size: 11, color: AppColors.fg3),
+        AppIcon(icon, size: 11, color: AppColors.fg4),
         const SizedBox(width: 5),
         Flexible(
             child: Text(label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: mono(10.5, color: AppColors.fg2))),
+                style: mono(11, color: AppColors.fg3))),
       ]),
     );
 
@@ -633,19 +619,13 @@ class _PathChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.sm),
-        border: Border.all(color: AppColors.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(children: [
-        AppIcon('file', size: 13, color: AppColors.fg3),
-        const SizedBox(width: 8),
+        AppIcon('file', size: 13, color: AppColors.fg4),
+        const SizedBox(width: 7),
         Expanded(
-            child: SelectableText(path, style: mono(12, color: AppColors.fg1))),
+            child: SelectableText(path, style: mono(12, color: AppColors.fg2))),
       ]),
     );
   }
@@ -657,23 +637,11 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0)
-              Divider(height: 1, thickness: 1, color: AppColors.border),
-            children[i],
-          ]
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < children.length; i++) children[i],
+      ],
     );
   }
 }
@@ -770,14 +738,8 @@ class _ResultCard extends StatelessWidget {
     Theme.of(context); // Rebuild on theme change
     final snippetText = snippet ?? '';
     final dateText = date ?? '';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(color: AppColors.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (title.isNotEmpty)
           Text(title,
@@ -822,14 +784,8 @@ class _ErrorBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
             padding: EdgeInsets.only(top: 1),
@@ -889,12 +845,8 @@ class _CodeBox extends StatelessWidget {
             : AppColors.surface2;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(color: AppColors.border),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      color: addTint || delTint ? bg : Colors.transparent,
       child: SelectableText(
         text,
         style: useSans
@@ -912,14 +864,8 @@ class _CommandBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(color: AppColors.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('\$ ', style: mono(11.5, height: 1.5, color: AppColors.accent)),
         Expanded(
@@ -961,15 +907,9 @@ class _HiCodeBlockState extends State<_HiCodeBlock> {
     final lineCount = '\n'.allMatches(widget.text).length + 1;
     // Snug height for short files; cap + internal scroll for long ones.
     final h = (lineCount * 20.0 + 16).clamp(44.0, 360.0);
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: h,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(color: AppColors.border),
-      ),
       child: CodeEditor(
         controller: _c,
         readOnly: true,
@@ -1054,40 +994,23 @@ class _DiffBlock extends StatelessWidget {
     final lines = _diff(before, after);
     final added = lines.where((l) => l.kind == _DKind.add).length;
     final removed = lines.where((l) => l.kind == _DKind.del).length;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(R.md),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(R.md)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 7),
-              child: Row(children: [
-                AppIcon('git-branch', size: 13, color: AppColors.fg3),
-                const SizedBox(width: 7),
-                Text('File diff',
-                    style: mono(10.5,
-                        weight: FontWeight.w600, color: AppColors.fg2)),
-                const Spacer(),
-                if (added > 0)
-                  Text('+$added',
-                      style: mono(10.5, color: AppColors.diffAddFg)),
-                if (added > 0 && removed > 0) const SizedBox(width: 7),
-                if (removed > 0)
-                  Text('−$removed',
-                      style: mono(10.5, color: AppColors.diffDelFg)),
-              ]),
-            ),
-            Divider(height: 1, color: AppColors.border),
-            for (final l in lines) _row(l),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(children: [
+            Text('diff', style: mono(11, color: AppColors.fg4)),
+            const Spacer(),
+            if (added > 0)
+              Text('+$added', style: mono(11, color: AppColors.diffAddFg)),
+            if (added > 0 && removed > 0) const SizedBox(width: 8),
+            if (removed > 0)
+              Text('−$removed', style: mono(11, color: AppColors.diffDelFg)),
+          ]),
         ),
-      ),
+        for (final l in lines) _row(l),
+      ],
     );
   }
 
