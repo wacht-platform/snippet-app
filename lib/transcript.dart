@@ -116,19 +116,19 @@ class _DenseToolRowState extends State<DenseToolRow> {
 
 /// Terminal-style running indicator: the classic braille spinner, mono + amber —
 /// on-theme for Terminal Ink where the Material ring felt foreign.
-class _BrailleSpinner extends StatefulWidget {
-  const _BrailleSpinner();
+class BrailleSpinner extends StatefulWidget {
+  const BrailleSpinner({super.key});
   @override
-  State<_BrailleSpinner> createState() => _BrailleSpinnerState();
+  State<BrailleSpinner> createState() => _BrailleSpinnerState();
 }
 
 /// Shared braille animation timer: one Timer.periodic drives all visible
 /// spinners, avoiding N individual timers when many tool calls run at once.
-class _BrailleSpinnerState extends State<_BrailleSpinner> {
+class _BrailleSpinnerState extends State<BrailleSpinner> {
   static const _frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   static Timer? _sharedTimer;
   static int _tick = 0;
-  static final Set<State<_BrailleSpinner>> _listeners = {};
+  static final Set<State<BrailleSpinner>> _listeners = {};
 
   static void _onTick(_) {
     _tick = (_tick + 1) % _frames.length;
@@ -203,7 +203,7 @@ class _ToolRunState extends State<ToolRun> {
           onTap: () => setState(() => _open = !_open),
           child: Row(children: [
             if (widget.running)
-              const SizedBox(width: 16, child: Center(child: _BrailleSpinner()))
+              const SizedBox(width: 16, child: Center(child: BrailleSpinner()))
             else
               AppIcon('check', size: 13, color: AppColors.fg4),
             const SizedBox(width: 8),

@@ -1577,8 +1577,8 @@ class _SessionScreenState extends State<SessionScreen>
                                   selectable: false),
                             ),
                           if (running) ...[
-                            const SizedBox(height: 12),
-                            const _TypingDots()
+                            const SizedBox(height: 10),
+                            const _ChurningStatus(),
                           ],
                           if (_queued.isNotEmpty) ...[
                             const SizedBox(height: 12),
@@ -3222,59 +3222,51 @@ class _StatMeta extends StatelessWidget {
   }
 }
 
-class _TypingDots extends StatefulWidget {
-  const _TypingDots();
+class _ChurningStatus extends StatefulWidget {
+  const _ChurningStatus();
   @override
-  State<_TypingDots> createState() => _TypingDotsState();
+  State<_ChurningStatus> createState() => _ChurningStatusState();
 }
 
-class _TypingDotsState extends State<_TypingDots>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 900))
-    ..repeat();
+class _ChurningStatusState extends State<_ChurningStatus> {
+  late final DateTime _started = DateTime.now();
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   @override
   void dispose() {
-    _c.dispose();
+    _tick?.cancel();
     super.dispose();
+  }
+
+  String get _elapsed {
+    final d = DateTime.now().difference(_started);
+    final total = d.inMilliseconds / 1000;
+    final m = total ~/ 60;
+    final s = total - m * 60;
+    return m > 0
+        ? '${m}m ${s.toStringAsFixed(1)}s'
+        : '${s.toStringAsFixed(1)}s';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          border: Border.fromBorderSide(BorderSide(color: AppColors.border)),
-          borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-              bottomRight: Radius.circular(16),
-              bottomLeft: Radius.circular(5)),
-        ),
-        child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(3, (i) {
-              return AnimatedBuilder(
-                animation: _c,
-                builder: (_, __) {
-                  final t = ((_c.value + i * 0.18) % 1.0);
-                  final o = 0.4 + 0.6 * (t < 0.5 ? t * 2 : (1 - t) * 2);
-                  return Padding(
-                    padding: EdgeInsets.only(right: i < 2 ? 4 : 0),
-                    child: Opacity(
-                        opacity: o,
-                        child: Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                                color: AppColors.fg3, shape: BoxShape.circle))),
-                  );
-                },
-              );
-            })),
+    Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 2, bottom: 4),
+      child: Row(
+        children: [
+          const SizedBox(width: 16, child: Center(child: BrailleSpinner())),
+          const SizedBox(width: 8),
+          Text('Churning $_elapsed', style: sans(13, color: AppColors.fg3)),
+        ],
       ),
     );
   }
