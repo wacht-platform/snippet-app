@@ -107,10 +107,11 @@ class _DenseToolRowState extends State<DenseToolRow> {
 
     final summary = toolArgSummary(widget.tool, widget.args);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      InkWell(
+      GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => setState(() => _expanded = !_expanded),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(vertical: 5),
           child: Row(children: [
             SizedBox(width: 16, child: Center(child: glyph)),
             const SizedBox(width: 8),
@@ -231,10 +232,11 @@ class _ToolRunState extends State<ToolRun> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        InkWell(
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _open = !_open),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(children: [
               if (widget.running)
                 const SizedBox(
@@ -249,7 +251,11 @@ class _ToolRunState extends State<ToolRun> {
             ]),
           ),
         ),
-        if (_open) ...widget.rows,
+        if (_open)
+          for (var i = 0; i < widget.rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 6),
+            widget.rows[i],
+          ],
       ]),
     );
   }
