@@ -110,7 +110,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
       InkWell(
         onTap: () => setState(() => _expanded = !_expanded),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(children: [
             SizedBox(width: 16, child: Center(child: glyph)),
             const SizedBox(width: 8),
@@ -229,7 +229,7 @@ class _ToolRunState extends State<ToolRun> {
         ? (n == 1 ? 'Running tool' : 'Running tools')
         : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools');
     return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 14),
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         InkWell(
           onTap: () => setState(() => _open = !_open),

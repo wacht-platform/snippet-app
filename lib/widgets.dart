@@ -275,13 +275,17 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
   _cachedMarkdownThemeIndex = themeIndex;
   _cachedMarkdownStyle =
       MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-    p: sans(15.5, height: 1.55, color: AppColors.fg1),
-    pPadding: EdgeInsets.zero,
-    a: sans(15.5, height: 1.55, color: AppColors.accent),
-    h1: sans(20, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
-    h1Padding: const EdgeInsets.only(top: 8, bottom: 4),
-    h2: sans(17.5, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
-    h3: sans(16, weight: FontWeight.w600, height: 1.35, color: AppColors.fg1),
+    p: sans(15.5, height: 1.45, color: AppColors.fg1),
+    pPadding: const EdgeInsets.only(bottom: 4),
+    a: sans(15.5, height: 1.45, color: AppColors.accent),
+    h1: sans(20, weight: FontWeight.w600, height: 1.25, color: AppColors.fg1),
+    h1Padding: const EdgeInsets.only(top: 6, bottom: 2),
+    h2: sans(17.5, weight: FontWeight.w600, height: 1.25, color: AppColors.fg1),
+    h2Padding: const EdgeInsets.only(top: 6, bottom: 2),
+    h3: sans(16, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
+    h3Padding: const EdgeInsets.only(top: 4, bottom: 2),
+    listIndent: 18,
+    listBulletPadding: const EdgeInsets.only(right: 6),
     code: mono(13, color: AppColors.accent),
     // PreBlockBuilder owns fenced chrome — keep these empty to avoid a double box.
     codeblockPadding: EdgeInsets.zero,
@@ -292,7 +296,7 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
       borderRadius: BorderRadius.circular(R.xs),
       border: Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
     ),
-    listBullet: sans(15.5, height: 1.55, color: AppColors.fg1),
+    listBullet: sans(15.5, height: 1.45, color: AppColors.fg1),
     tableBody: sans(14, color: AppColors.fg1),
     // FlexColumnWidth stretches every markdown table to the full message width.
     // Intrinsic columns keep phone tables content-sized; the markdown package
@@ -463,7 +467,7 @@ class _MdCodeBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: NotificationListener<ScrollNotification>(
         onNotification: (_) => true,
         child: SingleChildScrollView(
@@ -1075,7 +1079,7 @@ class Bubble extends StatelessWidget {
       return Align(
         alignment: Alignment.centerLeft,
         child: Padding(
-          padding: const EdgeInsets.only(right: 8, bottom: 16),
+          padding: const EdgeInsets.only(right: 8, bottom: 6),
           child: agent,
         ),
       );
@@ -1088,7 +1092,7 @@ class Bubble extends StatelessWidget {
           maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
         child: Padding(
-          padding: const EdgeInsets.only(left: 48, bottom: 12),
+          padding: const EdgeInsets.only(left: 48, bottom: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
