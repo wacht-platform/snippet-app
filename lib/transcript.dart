@@ -213,11 +213,13 @@ class _ToolRunState extends State<ToolRun> {
                 size: 13, color: AppColors.fg4),
           ]),
         ),
-        if (_open)
+        if (_open) ...[
+          const SizedBox(height: 8),
           for (var i = 0; i < widget.rows.length; i++) ...[
             if (i > 0) const SizedBox(height: 2),
             widget.rows[i],
           ],
+        ],
       ]),
     );
   }
