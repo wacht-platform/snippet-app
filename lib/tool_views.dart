@@ -257,12 +257,12 @@ List<Widget> _imageView(Map? a, Map? d) {
 List<Widget> _bashView(Map? a, Map? d) {
   final out = <Widget>[];
   if (d != null) {
-    final stdout = d['stdout']?.toString() ?? '';
-    final stderr = d['stderr']?.toString() ?? '';
-    if (stdout.trim().isNotEmpty) out.add(_CodeBox(stdout));
-    if (stderr.trim().isNotEmpty) out.add(_CodeBox(stderr, delTint: true));
-    if (stdout.trim().isEmpty && stderr.trim().isEmpty) {
-      out.add(Text('(no output)', style: mono(11.5, color: AppColors.fg4)));
+    final stdout = _displayText(d['stdout']?.toString() ?? '').trimRight();
+    final stderr = _displayText(d['stderr']?.toString() ?? '').trimRight();
+    if (stdout.isNotEmpty) out.add(_CodeBox(stdout));
+    if (stderr.isNotEmpty) out.add(_CodeBox(stderr, delTint: true));
+    if (stdout.isEmpty && stderr.isEmpty) {
+      out.add(Text('no output', style: mono(11.5, color: AppColors.fg4)));
     }
   }
   return out;
@@ -682,21 +682,16 @@ class _CodeBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final bg = addTint
-        ? AppColors.diffAddBg
-        : delTint
-            ? AppColors.diffDelBg
-            : AppColors.surface2;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      color: addTint || delTint ? bg : Colors.transparent,
-      child: SelectableText(
-        text,
-        style: useSans
-            ? sans(12, height: 1.5, color: AppColors.fg1)
-            : mono(11.5, height: 1.5, color: AppColors.fg1),
-      ),
+    final color = delTint
+        ? AppColors.danger
+        : addTint
+            ? AppColors.ok
+            : AppColors.fg2;
+    return SelectableText(
+      text,
+      style: useSans
+          ? sans(12, height: 1.45, color: color)
+          : mono(11.5, height: 1.45, color: color),
     );
   }
 }

@@ -117,24 +117,26 @@ class _DenseToolRowState extends State<DenseToolRow> {
             const SizedBox(width: 8),
             AppIcon(toolIcon(widget.tool), size: 14, color: AppColors.fg3),
             const SizedBox(width: 7),
-            Text(toolTitle(widget.tool),
-                style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
-            if (summary.isNotEmpty) ...[
-              const SizedBox(width: 8),
+            if (widget.tool == 'bash' && summary.isNotEmpty)
               Flexible(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
+                child: Text(summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(12, height: 1.35, color: AppColors.fg2)),
+              )
+            else ...[
+              Text(toolTitle(widget.tool),
+                  style:
+                      sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
+              if (summary.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Flexible(
                   child: Text(summary,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(11, color: AppColors.fg3)),
+                      style: mono(11.5, color: AppColors.fg3)),
                 ),
-              ),
+              ],
             ],
             if (meta.isNotEmpty) ...[
               const SizedBox(width: 8),
