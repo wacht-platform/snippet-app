@@ -3295,9 +3295,20 @@ class _ChurningStatusState extends State<_ChurningStatus> {
       padding: const EdgeInsets.only(left: 2, bottom: 4),
       child: Row(
         children: [
-          const SizedBox(width: 16, child: Center(child: BrailleSpinner())),
+          SizedBox(
+              width: 16,
+              child: Center(child: BrailleSpinner(color: AppColors.accent))),
           const SizedBox(width: 8),
-          Text('Churning $_elapsed', style: sans(13, color: AppColors.fg3)),
+          Text.rich(TextSpan(children: [
+            TextSpan(
+                text: 'Churning',
+                style:
+                    sans(13, weight: FontWeight.w600, color: AppColors.accent)),
+            TextSpan(
+                text: ' $_elapsed',
+                style:
+                    sans(13, color: AppColors.accent.withValues(alpha: 0.72))),
+          ])),
         ],
       ),
     );

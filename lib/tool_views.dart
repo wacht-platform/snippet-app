@@ -341,6 +341,7 @@ List<Widget> _grepView(Map? a, Map? d) {
             path: m['path']?.toString() ?? '',
             line: m['line_number']?.toString(),
             text: m['content']?.toString() ?? '',
+            query: a?['query']?.toString() ?? '',
           ),
       ],
     ));
@@ -453,6 +454,7 @@ List<Widget> _webSearchView(Map? a, Map? d) {
       url: res['url']?.toString() ?? '',
       date: res['published_date']?.toString(),
       snippet: res['snippet']?.toString(),
+      query: a?['query']?.toString() ?? '',
     ));
   }
   return out;
@@ -677,12 +679,14 @@ class _MatchRow extends StatelessWidget {
   final String path;
   final String? line;
   final String text;
-  const _MatchRow({required this.path, this.line, required this.text});
+  final String query;
+  const _MatchRow(
+      {required this.path, this.line, required this.text, this.query = ''});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Flexible(
@@ -690,13 +694,40 @@ class _MatchRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: mono(11, color: AppColors.accent))),
           if (line != null)
-            Text(':$line', style: mono(11, color: AppColors.fg4)),
+            Text(':$line',
+                style: mono(11, color: AppColors.ok.withValues(alpha: 0.9))),
         ]),
         const SizedBox(height: 3),
-        Text(text, style: mono(11.5, height: 1.4, color: AppColors.fg2)),
+        _highlightedLine(text, query),
       ]),
     );
   }
+}
+
+Widget _highlightedLine(String text, String query) {
+  final base = mono(11.5, height: 1.45, color: AppColors.fg2);
+  final q = query.trim();
+  if (q.isEmpty) return Text(text, style: base);
+  final lower = text.toLowerCase();
+  final needle = q.toLowerCase();
+  final spans = <InlineSpan>[];
+  var i = 0;
+  while (i < text.length) {
+    final at = lower.indexOf(needle, i);
+    if (at < 0) {
+      spans.add(TextSpan(text: text.substring(i)));
+      break;
+    }
+    if (at > i) spans.add(TextSpan(text: text.substring(i, at)));
+    spans.add(TextSpan(
+      text: text.substring(at, at + needle.length),
+      style: mono(11.5,
+              height: 1.45, color: AppColors.accent, weight: FontWeight.w600)
+          .copyWith(backgroundColor: AppColors.accentBg),
+    ));
+    i = at + needle.length;
+  }
+  return Text.rich(TextSpan(style: base, children: spans));
 }
 
 class _SymbolRow extends StatelessWidget {
@@ -737,8 +768,13 @@ class _ResultCard extends StatelessWidget {
   final String url;
   final String? date;
   final String? snippet;
+  final String query;
   const _ResultCard(
-      {required this.title, required this.url, this.date, this.snippet});
+      {required this.title,
+      required this.url,
+      this.date,
+      this.snippet,
+      this.query = ''});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -749,13 +785,13 @@ class _ResultCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (title.isNotEmpty)
           Text(title,
-              style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)),
+              style:
+                  sans(13.5, weight: FontWeight.w600, color: AppColors.accent)),
         if (title.isNotEmpty) const SizedBox(height: 4),
         _LinkText(url),
         if (snippetText.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(snippetText,
-              style: sans(12, height: 1.45, color: AppColors.fg2)),
+          _highlightedLine(snippetText, query),
         ],
         if (dateText.isNotEmpty) ...[
           const SizedBox(height: 6),

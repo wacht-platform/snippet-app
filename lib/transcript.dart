@@ -117,7 +117,8 @@ class _DenseToolRowState extends State<DenseToolRow> {
 /// Terminal-style running indicator: the classic braille spinner, mono + amber —
 /// on-theme for Terminal Ink where the Material ring felt foreign.
 class BrailleSpinner extends StatefulWidget {
-  const BrailleSpinner({super.key});
+  final Color? color;
+  const BrailleSpinner({super.key, this.color});
   @override
   State<BrailleSpinner> createState() => _BrailleSpinnerState();
 }
@@ -157,8 +158,8 @@ class _BrailleSpinnerState extends State<BrailleSpinner> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      Text(_frames[_tick], style: mono(12, color: AppColors.run));
+  Widget build(BuildContext context) => Text(_frames[_tick],
+      style: mono(12, color: widget.color ?? AppColors.run));
 }
 
 /// Consecutive tools as a BeUI group: one header row, details on expand.
