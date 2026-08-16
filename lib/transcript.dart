@@ -21,6 +21,8 @@ class DenseToolRow extends StatefulWidget {
   final dynamic result; // null while running
   const DenseToolRow({super.key, required this.tool, this.args, this.result});
 
+  bool get pending => result == null;
+
   @override
   State<DenseToolRow> createState() => _DenseToolRowState();
 }
@@ -105,33 +107,35 @@ class _DenseToolRowState extends State<DenseToolRow> {
       InkWell(
         onTap: () => setState(() => _expanded = !_expanded),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(children: [
             SizedBox(width: 16, child: Center(child: glyph)),
             const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(toolTitle(widget.tool),
-                      style: sans(13.5,
-                          weight: FontWeight.w500, color: AppColors.fg1)),
-                  if (summary.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Text(summary,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12, color: AppColors.fg4)),
-                    ),
-                ],
+            AppIcon(toolIcon(widget.tool), size: 14, color: AppColors.fg3),
+            const SizedBox(width: 7),
+            Text(toolTitle(widget.tool),
+                style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
+            if (summary.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(11, color: AppColors.fg3)),
+                ),
               ),
-            ),
-            if (meta.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 10, top: 2),
-                child: Text(meta, style: sans(11.5, color: AppColors.fg4)),
-              ),
+            ],
+            if (meta.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(meta, style: sans(11, color: AppColors.fg4)),
+            ],
           ]),
         ),
       ),
@@ -187,38 +191,61 @@ class _BrailleSpinnerState extends State<_BrailleSpinner> {
       Text(_frames[_tick], style: mono(12, color: AppColors.run));
 }
 
-/// A run of consecutive tool rows behind a subtle left rail. It opens compactly
-/// with the newest tool step visible; tapping the summary reveals the full run.
+/// Consecutive tools as a BeUI group: one header row, details on expand.
 class ToolRun extends StatefulWidget {
   final List<Widget> rows;
-  const ToolRun(this.rows, {super.key});
+  final bool running;
+  const ToolRun(this.rows, {super.key, this.running = false});
   @override
   State<ToolRun> createState() => _ToolRunState();
 }
 
 class _ToolRunState extends State<ToolRun> {
-  static const int visibleTail = 1;
-  bool _all = false;
+  bool _open = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _open = widget.running && widget.rows.length <= 2;
+  }
+
+  @override
+  void didUpdateWidget(covariant ToolRun oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.running && !oldWidget.running && widget.rows.length <= 2) {
+      _open = true;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final rows = widget.rows;
-    final collapsed = !_all && rows.length > visibleTail;
-    final shown = collapsed ? rows.sublist(rows.length - visibleTail) : rows;
+    Theme.of(context);
+    final n = widget.rows.length;
+    final label = widget.running
+        ? (n == 1 ? 'Running tool' : 'Running tools')
+        : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools');
     return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 10),
+      padding: const EdgeInsets.only(top: 2, bottom: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (collapsed)
-          InkWell(
-            onTap: () => setState(() => _all = true),
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 6, left: 24),
-              child: Text('${rows.length - visibleTail} completed steps',
-                  style: sans(12, color: AppColors.fg4)),
-            ),
+        InkWell(
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(children: [
+              if (widget.running)
+                const SizedBox(
+                    width: 16, child: Center(child: _BrailleSpinner()))
+              else
+                AppIcon('check', size: 14, color: AppColors.fg4),
+              const SizedBox(width: 8),
+              Text(label, style: sans(13, color: AppColors.fg3)),
+              const SizedBox(width: 4),
+              AppIcon(_open ? 'chevron-down' : 'chevron-right',
+                  size: 13, color: AppColors.fg4),
+            ]),
           ),
-        ...shown,
+        ),
+        if (_open) ...widget.rows,
       ]),
     );
   }
@@ -264,14 +291,8 @@ class LaneNotice extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(R.sm),
         onTap: onOpen,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.sm),
-            border: Border.all(
-                color: running ? AppColors.accentLine : AppColors.border),
-          ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

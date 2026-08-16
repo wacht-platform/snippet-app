@@ -1210,8 +1210,6 @@ class _SessionScreenState extends State<SessionScreen>
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(
-            color: _isRecording ? AppColors.accentLine : AppColors.border),
       ),
       child: Row(children: [
         IconBtn(
@@ -1269,11 +1267,8 @@ class _SessionScreenState extends State<SessionScreen>
         child: InkWell(
           borderRadius: BorderRadius.circular(R.md),
           onTap: () => Navigator.pop(context, value),
-          child: Container(
+          child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border)),
             child: Column(children: [
               AppIcon(icon, size: 22, color: AppColors.fg2),
               const SizedBox(height: 8),
@@ -2216,10 +2211,7 @@ class _SessionScreenState extends State<SessionScreen>
             if (_isRecording || _recordingPath != null) _recordingPanel(),
             Container(
               decoration: BoxDecoration(
-                color: AppColors.surface1,
-                border: Border.all(
-                    color:
-                        _draggingFiles ? AppColors.accent : AppColors.border),
+                color: AppColors.surface2,
                 borderRadius: BorderRadius.circular(22),
               ),
               padding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
@@ -2351,8 +2343,6 @@ class _SessionScreenState extends State<SessionScreen>
             decoration: BoxDecoration(
               color: isAudio ? AppColors.accentBg : AppColors.surface2,
               borderRadius: BorderRadius.circular(R.sm),
-              border: Border.all(
-                  color: isAudio ? AppColors.accentLine : AppColors.border),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               AppIcon(isAudio ? 'mic' : (a.isImage ? 'image' : 'file'),
@@ -2451,9 +2441,10 @@ class _SessionScreenState extends State<SessionScreen>
       flushPending(fallbackKey);
       if (run.isEmpty) return;
       final start = runStartKey ?? fallbackKey;
+      final running = run.any((w) => w is DenseToolRow && w.pending);
       out.add(KeyedSubtree(
         key: ValueKey('transcript-tools-$start'),
-        child: ToolRun(List.of(run)),
+        child: ToolRun(List.of(run), running: running),
       ));
       run.clear();
       runStartKey = null;
@@ -2804,7 +2795,6 @@ class _SessionScreenState extends State<SessionScreen>
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                   color: AppColors.surface2,
-                  border: Border.all(color: AppColors.border),
                   borderRadius: BorderRadius.circular(R.md)),
               child: SelectableText(output,
                   style: mono(11.5, height: 1.5, color: AppColors.fg1)),
@@ -3310,7 +3300,6 @@ class _QueuedBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.accentBg,
                   borderRadius: BorderRadius.circular(R.sm),
-                  border: Border.all(color: AppColors.accentLine),
                 ),
                 child: Text('Steer', style: sans(11, color: AppColors.accent)),
               ),
@@ -3347,13 +3336,8 @@ class _GoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final paused = goal.paused;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 11, 10, 11),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
           width: 28,
@@ -3415,13 +3399,8 @@ class _ApprovalBarState extends State<_ApprovalBar> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(_sent ? 'Decision sending…' : 'Tool Approval',
             style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
@@ -3639,13 +3618,8 @@ class _QuestionBarState extends State<_QuestionBar> {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(99),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(99),
-              border: Border.all(
-                  color: sel ? AppColors.accentLine : AppColors.border),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(label,
                 style: sans(13,
                     weight: FontWeight.w600,
@@ -3657,18 +3631,13 @@ class _QuestionBarState extends State<_QuestionBar> {
   // Full-width selectable row for single-choice options (labels are sentences).
   // Selected reads as a quiet accent tint + border + check, not a solid orange slab.
   Widget _choiceRow(String label, bool sel, VoidCallback onTap) => Material(
-        color: sel ? AppColors.accentBg : AppColors.surface2,
-        borderRadius: BorderRadius.circular(12),
+        color: sel ? AppColors.accentBg : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: sel ? AppColors.accentLine : AppColors.border),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             child: Row(children: [
               Expanded(
                   child: Text(label,
@@ -3737,13 +3706,8 @@ class _QuestionBarState extends State<_QuestionBar> {
   Widget build(BuildContext context) {
     final ctx = widget.question['context']?.toString();
     final total = _questions.length;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(_sent ? 'Sending…' : 'Question',
             style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),

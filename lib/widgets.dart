@@ -1550,7 +1550,6 @@ class _AppFieldState extends State<AppField> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final focused = _focus.hasFocus;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (widget.label != null) ...[
         Text(widget.label!,
@@ -1564,16 +1563,6 @@ class _AppFieldState extends State<AppField> {
         decoration: BoxDecoration(
           color: AppColors.surface2,
           borderRadius: BorderRadius.circular(R.md),
-          border:
-              Border.all(color: focused ? AppColors.accent : AppColors.border),
-          boxShadow: focused
-              ? [
-                  BoxShadow(
-                      color: AppColors.accentRing,
-                      blurRadius: 0,
-                      spreadRadius: 2)
-                ]
-              : null,
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           if (widget.icon != null) ...[
