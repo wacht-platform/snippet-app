@@ -773,16 +773,14 @@ class _DesktopShellState extends State<DesktopShell> {
         ),
         if (controls != null) ...[
           Container(width: 1, height: 18, color: AppColors.border2),
-          _macTopAction('cpu', 'Model', 'Switch model for this session',
-              () => controls.performAction('model')),
-          _macTopAction(
+          _macTopIconAction(
               'shield',
-              state?.approvalMode == 'manual' ? 'Ask' : 'Auto',
-              'Toggle approval mode',
+              state?.approvalMode == 'manual'
+                  ? 'Switch to auto approval'
+                  : 'Ask before tool actions',
               () => controls.performAction('approval')),
-          _macTopAction(
+          _macTopIconAction(
               'goal',
-              state?.goal?.ongoing == true ? 'Goal' : 'Set goal',
               state?.goal?.ongoing == true ? 'Cancel goal' : 'Set goal',
               () => controls.performAction('goal')),
           if (state?.lanes.isNotEmpty ?? false)
@@ -822,6 +820,14 @@ class _DesktopShellState extends State<DesktopShell> {
           ]),
         ),
       ),
+    );
+  }
+
+  Widget _macTopIconAction(String icon, String tooltip, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child:
+          IconBtn(icon, size: 34, iconSize: 15, tooltip: tooltip, onTap: onTap),
     );
   }
 
