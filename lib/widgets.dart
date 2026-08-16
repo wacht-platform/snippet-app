@@ -276,7 +276,7 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
   _cachedMarkdownStyle =
       MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
     p: sans(15.5, height: 1.45, color: AppColors.fg1),
-    pPadding: const EdgeInsets.only(bottom: 4),
+    pPadding: EdgeInsets.zero,
     a: sans(15.5, height: 1.45, color: AppColors.accent),
     h1: sans(20, weight: FontWeight.w600, height: 1.25, color: AppColors.fg1),
     h1Padding: const EdgeInsets.only(top: 6, bottom: 2),
@@ -1079,7 +1079,7 @@ class Bubble extends StatelessWidget {
       return Align(
         alignment: Alignment.centerLeft,
         child: Padding(
-          padding: const EdgeInsets.only(right: 8, bottom: 6),
+          padding: const EdgeInsets.only(right: 8, bottom: 8),
           child: agent,
         ),
       );
