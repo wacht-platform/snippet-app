@@ -773,6 +773,8 @@ class _DesktopShellState extends State<DesktopShell> {
         ),
         if (controls != null) ...[
           Container(width: 1, height: 18, color: AppColors.border2),
+          _macTopAction('cpu', 'Model', 'Switch model for this session',
+              () => controls.performAction('model')),
           _macTopAction(
               'shield',
               state?.approvalMode == 'manual' ? 'Ask' : 'Auto',
@@ -1182,6 +1184,7 @@ class _DesktopShellState extends State<DesktopShell> {
                 itemBuilder: (_, i) {
                   final t = _tabs[i];
                   return _KeepAlive(
+                    key: ValueKey(t.key),
                     child: t.isFile
                         ? FileViewer(
                             key: ValueKey(t.key),
@@ -1466,7 +1469,7 @@ class _DesktopShellState extends State<DesktopShell> {
 /// survive switching between tabs.
 class _KeepAlive extends StatefulWidget {
   final Widget child;
-  const _KeepAlive({required this.child});
+  const _KeepAlive({super.key, required this.child});
   @override
   State<_KeepAlive> createState() => _KeepAliveState();
 }

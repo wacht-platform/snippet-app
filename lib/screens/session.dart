@@ -1784,6 +1784,9 @@ class _SessionScreenState extends State<SessionScreen>
       case 'rename':
         _renameCurrent();
         return;
+      case 'model':
+        _switchModel();
+        return;
       case 'approval':
         final manual = (s?.approvalMode ?? 'auto') == 'manual';
         _send({'kind': 'set_mode', 'value': manual ? 'auto' : 'manual'});
