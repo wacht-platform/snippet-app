@@ -28,41 +28,39 @@ class DenseToolRow extends StatefulWidget {
 }
 
 class _DenseToolRowState extends State<DenseToolRow> {
-  late bool _expanded;
-
-  bool get _pending => widget.result == null;
-  bool get _ok {
-    final r = widget.result;
-    return r is Map && r['status'] == 'success';
-  }
-
   @override
-  void initState() {
-    super.initState();
-    // Running tools can show live output. Completed tools stay one named line.
-    _expanded = widget.result == null &&
-        (widget.tool == 'bash' ||
-            widget.tool == 'search_content' ||
-            widget.tool == 'web_search');
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final summary = toolArgSummary(widget.tool, widget.args);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(children: [
+        AppIcon(toolIcon(widget.tool), size: 16, color: AppColors.fg3),
+        const SizedBox(width: 10),
+        Text(toolTitle(widget.tool),
+            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+        if (summary.isNotEmpty) ...[
+          const SizedBox(width: 10),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(summary,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, color: AppColors.fg3)),
+            ),
+          ),
+        ],
+        ..._metaWidgets(),
+      ]),
+    );
   }
 
-  @override
-  void didUpdateWidget(covariant DenseToolRow oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.result == null && widget.result != null) {
-      _expanded = false;
-    }
-  }
-
-  // Right-aligned meta: bash exit code, edit diff stat, else ✓/✗.
-  String get _meta {
-    final r = widget.result;
-    if (r is! Map) return '';
-    if (widget.tool == 'bash') {
-      final exit =
-          (r['data'] is Map) ? (r['data']['exit_code']?.toString() ?? '') : '';
-      return exit.isEmpty ? '' : 'exit $exit';
-    }
+  List<Widget> _metaWidgets() {
     if (widget.tool == 'edit_file' ||
         widget.tool == 'write_file' ||
         widget.tool == 'replace_file_content') {
@@ -72,83 +70,18 @@ class _DenseToolRowState extends State<DenseToolRow> {
             .toString()
             .split('\n')
             .length;
-        final del = (a['old_string'] ?? '').toString().split('\n').length;
-        return '+$add −${a['old_string'] == null ? 0 : del}';
+        final del = a['old_string'] == null
+            ? 0
+            : (a['old_string'] ?? '').toString().split('\n').length;
+        return [
+          const SizedBox(width: 10),
+          Text('+$add', style: sans(12, color: AppColors.ok)),
+          const SizedBox(width: 6),
+          Text('-$del', style: sans(12, color: AppColors.danger)),
+        ];
       }
     }
-    return '';
-  }
-
-  Widget _inlineDetail(BuildContext context) {
-    if (!_expanded) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(left: 22, right: 2, bottom: 4, top: 2),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: widget.tool == 'bash' ? 220 : 220,
-        ),
-        child: SingleChildScrollView(
-          child: DefaultTextStyle(
-            style: mono(11.5, height: 1.4, color: AppColors.fg3),
-            child: safeToolDetailView(context,
-                tool: widget.tool, args: widget.args, result: widget.result),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final glyph = _pending
-        ? const _BrailleSpinner()
-        : Text(_ok ? '✓' : '✗',
-            style: mono(12, color: _ok ? AppColors.ok : AppColors.danger));
-    final meta = _meta;
-
-    final summary = toolArgSummary(widget.tool, widget.args);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Row(children: [
-            SizedBox(width: 16, child: Center(child: glyph)),
-            const SizedBox(width: 8),
-            AppIcon(toolIcon(widget.tool), size: 14, color: AppColors.fg3),
-            const SizedBox(width: 7),
-            if (widget.tool == 'bash' && summary.isNotEmpty)
-              Flexible(
-                child: Text(summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(12, height: 1.35, color: AppColors.fg2)),
-              )
-            else ...[
-              Text(toolTitle(widget.tool),
-                  style:
-                      sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
-              if (summary.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(summary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(11.5, color: AppColors.fg3)),
-                ),
-              ],
-            ],
-            if (meta.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Text(meta, style: sans(11, color: AppColors.fg4)),
-            ],
-          ]),
-        ),
-      ),
-      _inlineDetail(context),
-    ]);
+    return const [];
   }
 }
 

@@ -68,20 +68,19 @@ String toolArgSummary(String tool, dynamic args) {
 
 /// Friendly title for the drawer header.
 String toolTitle(String tool) => switch (tool) {
-      'edit_file' => 'Edit file',
-      'replace_file_content' => 'Replace lines',
-      'write_file' => 'Write file',
-      'append_file' => 'Append file',
-      'read_file' => 'Read file',
-      'read_image' => 'Read image',
-      'bash' => 'Shell command',
-      'search_content' => 'Search content',
-      'search_files' => 'Find files',
-      'list_files' => 'List files',
-      'code_map' => 'Code map',
-      'view_outline' => 'File outline',
-      'web_search' => 'Web search',
-      'web_read' => 'Read page',
+      'edit_file' || 'replace_file_content' => 'Edit',
+      'write_file' => 'Write',
+      'append_file' => 'Append',
+      'read_file' => 'Read',
+      'read_image' => 'Image',
+      'bash' => 'Run',
+      'search_content' => 'Search',
+      'search_files' => 'Find',
+      'list_files' => 'List',
+      'code_map' => 'Map',
+      'view_outline' => 'Outline',
+      'web_search' => 'Search',
+      'web_read' => 'Page',
       _ => tool,
     };
 
