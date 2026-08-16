@@ -1052,16 +1052,40 @@ class _DiffBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final lines = _diff(before, after);
+    final added = lines.where((l) => l.kind == _DKind.add).length;
+    final removed = lines.where((l) => l.kind == _DKind.del).length;
     return ClipRRect(
       borderRadius: BorderRadius.circular(R.md),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
+            color: AppColors.surface2,
             border: Border.all(color: AppColors.border),
             borderRadius: BorderRadius.circular(R.md)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [for (final l in lines) _row(l)],
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 7),
+              child: Row(children: [
+                AppIcon('git-branch', size: 13, color: AppColors.fg3),
+                const SizedBox(width: 7),
+                Text('File diff',
+                    style: mono(10.5,
+                        weight: FontWeight.w600, color: AppColors.fg2)),
+                const Spacer(),
+                if (added > 0)
+                  Text('+$added',
+                      style: mono(10.5, color: AppColors.diffAddFg)),
+                if (added > 0 && removed > 0) const SizedBox(width: 7),
+                if (removed > 0)
+                  Text('−$removed',
+                      style: mono(10.5, color: AppColors.diffDelFg)),
+              ]),
+            ),
+            Divider(height: 1, color: AppColors.border),
+            for (final l in lines) _row(l),
+          ],
         ),
       ),
     );

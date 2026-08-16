@@ -1132,16 +1132,45 @@ class Bubble extends StatelessWidget {
       onTapLink: (txt, href, title) => openMarkdownLink(href),
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (mine)
-          selectable ? SelectionArea(child: mineContent) : mineContent
-        else ...[
-          selectable ? SelectionArea(child: agentContent) : agentContent,
-          _MessageActions(text: shown),
+    final content = mine
+        ? (selectable ? SelectionArea(child: mineContent) : mineContent)
+        : (selectable ? SelectionArea(child: agentContent) : agentContent);
+
+    return Container(
+      margin: EdgeInsets.only(
+          left: mine ? 28 : 0, right: mine ? 0 : 18, bottom: 18),
+      padding: EdgeInsets.fromLTRB(mine ? 14 : 4, 12, mine ? 14 : 4, 8),
+      decoration: BoxDecoration(
+        color: mine ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(mine ? 16 : 4),
+          bottomRight: const Radius.circular(16),
+        ),
+        border: mine ? Border.all(color: AppColors.border) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: mine ? AppColors.accent : AppColors.fg4,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 7),
+            Text(mine ? 'You' : 'Snippet',
+                style: mono(10, weight: FontWeight.w600, color: AppColors.fg4)),
+          ]),
+          const SizedBox(height: 7),
+          content,
+          if (!mine) _MessageActions(text: shown),
         ],
-      ],
+      ),
     );
   }
 }

@@ -173,6 +173,7 @@ class _SessionScreenState extends State<SessionScreen>
   String? _modelLabel;
   String? _currentProfile;
   final _input = TextEditingController();
+  final _inputFocus = FocusNode();
   final _scroll = ScrollController();
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
@@ -1432,6 +1433,7 @@ class _SessionScreenState extends State<SessionScreen>
       ch?.sink.close();
     }
     _input.dispose();
+    _inputFocus.dispose();
     _scroll.dispose();
     _amplitudeSub?.cancel();
     _recordingTimer?.cancel();
@@ -1485,6 +1487,14 @@ class _SessionScreenState extends State<SessionScreen>
           // Desktop keeps the detailed chip strip.
           if (!kMobile && !kMacOS) _statusStrip(s, running),
           if (_connError != null) _disconnectedBanner(),
+          if (s?.goal?.ongoing == true)
+            _centerWide(Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+              child: _GoalCard(
+                goal: s!.goal!,
+                onCancel: _cancelGoal,
+              ),
+            )),
           Expanded(
             child: Stack(children: [
               _centerWide(s == null
@@ -2258,8 +2268,11 @@ class _SessionScreenState extends State<SessionScreen>
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _input,
                         builder: (_, __, ___) => _SendBtn(
-                            enabled: _canSend,
-                            onTap: _canSend ? _sendMessage : null),
+                            enabled: running || _canSend,
+                            running: running,
+                            onTap: running
+                                ? () => _send({'kind': 'interrupt'})
+                                : (_canSend ? _sendMessage : null)),
                       ),
                     ]),
                   ]),
@@ -3291,6 +3304,61 @@ class _QueuedBubble extends StatelessWidget {
   }
 }
 
+class _GoalCard extends StatelessWidget {
+  final GoalInfo goal;
+  final VoidCallback onCancel;
+  const _GoalCard({required this.goal, required this.onCancel});
+
+  @override
+  Widget build(BuildContext context) {
+    final paused = goal.paused;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 11, 10, 11),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: paused ? AppColors.surface3 : AppColors.accentBg,
+            borderRadius: BorderRadius.circular(R.sm),
+          ),
+          child: AppIcon('goal',
+              size: 15, color: paused ? AppColors.fg3 : AppColors.accent),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text(paused ? 'Goal paused' : 'Working toward goal',
+                  style: sans(12.5,
+                      weight: FontWeight.w600, color: AppColors.fg1)),
+              const SizedBox(width: 7),
+              Text('${goal.autonomousTurns} turns',
+                  style: mono(10, color: AppColors.fg4)),
+            ]),
+            if (goal.text.trim().isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(goal.text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(11.5, height: 1.35, color: AppColors.fg3)),
+            ],
+          ]),
+        ),
+        IconBtn('x',
+            size: 30, iconSize: 14, tooltip: 'Cancel goal', onTap: onCancel),
+      ]),
+    );
+  }
+}
+
 class _ApprovalBar extends StatefulWidget {
   final void Function(Map<String, dynamic>) onSend;
   final bool showApproveAll; // only when >1 tool is pending this batch
@@ -3313,25 +3381,49 @@ class _ApprovalBarState extends State<_ApprovalBar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.fromLTRB(16, 15, 16, 14),
       decoration: BoxDecoration(
-          color: AppColors.accentBg,
-          border: Border.all(color: AppColors.accentLine),
-          borderRadius: BorderRadius.circular(14)),
+        color: AppColors.surface1,
+        border: Border.all(color: AppColors.accentLine),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.accent.withValues(alpha: 0.07),
+              blurRadius: 16,
+              offset: const Offset(0, 5)),
+        ],
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-              padding: EdgeInsets.only(top: 1),
-              child: AppIcon('shield', size: 16, color: AppColors.accent)),
-          const SizedBox(width: 9),
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: AppColors.accentBg,
+                borderRadius: BorderRadius.circular(R.sm)),
+            child: AppIcon('shield', size: 16, color: AppColors.accent),
+          ),
+          const SizedBox(width: 10),
           Expanded(
-              child: Text(_sent ? 'Sending…' : 'Approve this action?',
-                  style: sans(13,
-                      weight: FontWeight.w600,
-                      height: 1.3,
-                      color: AppColors.fg1))),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_sent ? 'Decision sending…' : 'Approval required',
+                  style:
+                      sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+              const SizedBox(height: 2),
+              Text(
+                  widget.showApproveAll
+                      ? 'Several actions are waiting for your decision'
+                      : 'The agent is waiting before continuing',
+                  style: sans(11.5, color: AppColors.fg3)),
+            ]),
+          ),
+          if (!_sent)
+            Text('ACTION',
+                style: mono(10, weight: FontWeight.w600, color: AppColors.fg4)),
         ]),
-        const SizedBox(height: 11),
+        const SizedBox(height: 14),
         Opacity(
           opacity: _sent ? 0.5 : 1,
           child: Row(children: [
@@ -3698,12 +3790,15 @@ class _Attachment {
 /// Inline circular send button for the composer.
 class _SendBtn extends StatelessWidget {
   final bool enabled;
+  final bool running;
   final VoidCallback? onTap;
-  const _SendBtn({required this.enabled, this.onTap});
+  const _SendBtn({required this.enabled, this.running = false, this.onTap});
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: enabled ? AppColors.accent : AppColors.surface3,
+      color: enabled
+          ? (running ? AppColors.danger : AppColors.accent)
+          : AppColors.surface3,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -3712,8 +3807,8 @@ class _SendBtn extends StatelessWidget {
           width: 38,
           height: 38,
           child: Center(
-              child: AppIcon('send',
-                  size: 18,
+              child: AppIcon(running ? 'stop' : 'send',
+                  size: running ? 16 : 18,
                   color: enabled ? AppColors.accentFg : AppColors.fg4)),
         ),
       ),
