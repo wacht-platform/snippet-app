@@ -82,12 +82,14 @@ class _DenseToolRowState extends State<DenseToolRow> {
   Widget _inlineDetail(BuildContext context) {
     if (!_expanded) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(left: 22, right: 2, bottom: 8, top: 1),
+      padding: const EdgeInsets.only(left: 22, right: 2, bottom: 4, top: 2),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 220),
+        constraints: BoxConstraints(
+          maxHeight: widget.tool == 'bash' ? 96 : 220,
+        ),
         child: SingleChildScrollView(
           child: DefaultTextStyle(
-            style: mono(11.5, height: 1.45, color: AppColors.fg3),
+            style: mono(11.5, height: 1.4, color: AppColors.fg3),
             child: safeToolDetailView(context,
                 tool: widget.tool, args: widget.args, result: widget.result),
           ),
@@ -232,26 +234,22 @@ class _ToolRunState extends State<ToolRun> {
         ? (n == 1 ? 'Running tool' : 'Running tools')
         : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools');
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _open = !_open),
-          child: Padding(
-            padding: EdgeInsets.zero,
-            child: Row(children: [
-              if (widget.running)
-                const SizedBox(
-                    width: 16, child: Center(child: _BrailleSpinner()))
-              else
-                AppIcon('check', size: 13, color: AppColors.fg4),
-              const SizedBox(width: 8),
-              Text(label, style: sans(13, color: AppColors.fg3)),
-              const SizedBox(width: 4),
-              AppIcon(_open ? 'chevron-down' : 'chevron-right',
-                  size: 13, color: AppColors.fg4),
-            ]),
-          ),
+          child: Row(children: [
+            if (widget.running)
+              const SizedBox(width: 16, child: Center(child: _BrailleSpinner()))
+            else
+              AppIcon('check', size: 13, color: AppColors.fg4),
+            const SizedBox(width: 8),
+            Text(label, style: sans(13, color: AppColors.fg3)),
+            const SizedBox(width: 4),
+            AppIcon(_open ? 'chevron-down' : 'chevron-right',
+                size: 13, color: AppColors.fg4),
+          ]),
         ),
         if (_open)
           for (var i = 0; i < widget.rows.length; i++) ...[

@@ -254,11 +254,19 @@ List<Widget> _imageView(Map? a, Map? d) {
   return const [];
 }
 
+String _previewLines(String text, {int maxLines = 6}) {
+  final lines = text.split('\n');
+  if (lines.length <= maxLines) return text;
+  return '${lines.take(maxLines).join('\n')}\n…';
+}
+
 List<Widget> _bashView(Map? a, Map? d) {
   final out = <Widget>[];
   if (d != null) {
-    final stdout = _displayText(d['stdout']?.toString() ?? '').trimRight();
-    final stderr = _displayText(d['stderr']?.toString() ?? '').trimRight();
+    final stdout =
+        _previewLines(_displayText(d['stdout']?.toString() ?? '').trimRight());
+    final stderr =
+        _previewLines(_displayText(d['stderr']?.toString() ?? '').trimRight());
     if (stdout.isNotEmpty) out.add(_CodeBox(stdout));
     if (stderr.isNotEmpty) out.add(_CodeBox(stderr, delTint: true));
     if (stdout.isEmpty && stderr.isEmpty) {
