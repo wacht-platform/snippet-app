@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/io.dart' as ws_io;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'models.dart';
@@ -111,7 +112,11 @@ class DaemonClient {
       path: '/attach',
       queryParameters: {'session': sessionId, 'token': token},
     );
-    return WebSocketChannel.connect(uri);
+    return ws_io.IOWebSocketChannel.connect(
+      uri,
+      connectTimeout: const Duration(seconds: 10),
+      pingInterval: const Duration(seconds: 20),
+    );
   }
 
   // ---- model configuration (shared with the TUI's config.toml) ----

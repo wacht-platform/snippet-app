@@ -355,6 +355,7 @@ class _SessionScreenState extends State<SessionScreen>
   Timer? _streamFlushTimer;
   // Auto-reconnect: backoff timer + attempt counter; _closed stops retries on leave.
   Timer? _reconnectTimer;
+  Timer? _connectionWatchdog;
   int _reconnectAttempt = 0;
   bool _closed = false;
   // A message can silently die on a socket that looks alive (dropped network, no
@@ -537,15 +538,22 @@ class _SessionScreenState extends State<SessionScreen>
     // orphaned healthy sockets and double-applied every delta.
     _sub?.cancel();
     _sub = null;
+    _connectionWatchdog?.cancel();
     _channel?.sink.close();
     if (mounted) setState(() => _connError = null);
     final ch = widget.client.attach(widget.sessionId);
     _channel = ch;
-    // The first snapshot on this socket triggers the unacked-message resend.
-    _freshConn = true;
+    _connectionWatchdog?.cancel();
+    _connectionWatchdog = Timer(const Duration(seconds: 12), () {
+      if (!_closed && identical(ch, _channel)) {
+        _resync(ch);
+      }
+    });
     _sub = ch.stream.listen(
       (msg) {
         if (!identical(ch, _channel)) return; // stale socket — ignore
+        _connectionWatchdog?.cancel();
+        _connectionWatchdog = null;
         // Any frame means a healthy socket — reset backoff + clear the banner.
         if (_reconnectAttempt != 0 || _connError != null) {
           _reconnectAttempt = 0;
@@ -1396,6 +1404,7 @@ class _SessionScreenState extends State<SessionScreen>
   void dispose() {
     _closed = true;
     _reconnectTimer?.cancel();
+    _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
     _streamFlushTimer?.cancel();
@@ -3522,6 +3531,11 @@ class _QuestionBarState extends State<_QuestionBar> {
   // One answer per ask — the bar lingers until the next frame flips status,
   // so an eager second tap double-submitted the answer.
   bool _sent = false;
+  int _step = 0;
+
+  Map<String, dynamic>? get _currentQuestion => _questions.isEmpty
+      ? null
+      : _questions[_step.clamp(0, _questions.length - 1)];
 
   List<Map<String, dynamic>> get _questions =>
       ((widget.question['questions'] as List?) ?? const [])
@@ -3539,24 +3553,31 @@ class _QuestionBarState extends State<_QuestionBar> {
     super.dispose();
   }
 
-  bool get _ready => _questions.every((q) {
-        final id = q['id'].toString();
-        return _kind(q) == 'free_text'
-            ? (_text[id]?.text.trim().isNotEmpty ?? false)
-            : (_choice[id]?.isNotEmpty ?? false);
-      });
+  bool get _ready {
+    final q = _currentQuestion;
+    if (q == null) return false;
+    final id = q['id'].toString();
+    return _kind(q) == 'free_text'
+        ? (_text[id]?.text.trim().isNotEmpty ?? false)
+        : (_choice[id]?.isNotEmpty ?? false);
+  }
+
+  String _answerFor(Map<String, dynamic> q) {
+    final id = q['id'].toString();
+    return _kind(q) == 'free_text'
+        ? (_text[id]?.text.trim() ?? '')
+        : (_choice[id] ?? '');
+  }
 
   void _submit() {
-    if (!_ready || _sent) return;
+    if (_questions.isEmpty || !_ready || _sent) return;
+    if (_step < _questions.length - 1) {
+      setState(() => _step++);
+      return;
+    }
     setState(() => _sent = true);
-    final multi = _questions.length > 1;
-    final parts = _questions.map((q) {
-      final id = q['id'].toString();
-      final a = _kind(q) == 'free_text'
-          ? (_text[id]?.text.trim() ?? '')
-          : (_choice[id] ?? '');
-      return multi ? '${q['text']}\n→ $a' : a;
-    }).toList();
+    final parts =
+        _questions.map((q) => '${q['text']}\n→ ${_answerFor(q)}').toList();
     widget.onSend({'kind': 'answer', 'value': parts.join('\n\n')});
   }
 
@@ -3713,21 +3734,58 @@ class _QuestionBarState extends State<_QuestionBar> {
           const SizedBox(height: 12),
           Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg2)),
         ],
-        for (final q in _questions) ...[
-          const SizedBox(height: 15),
-          Text(q['text']?.toString() ?? '',
-              style: sans(15,
-                  weight: FontWeight.w600, height: 1.4, color: AppColors.fg1)),
-          const SizedBox(height: 11),
-          ..._inputFor(q),
-        ],
+        ...() {
+          final q = _currentQuestion;
+          if (q == null) return <Widget>[];
+          return <Widget>[
+            const SizedBox(height: 15),
+            Row(children: [
+              Text('${_step + 1}/$total',
+                  style: mono(10.5,
+                      weight: FontWeight.w600, color: AppColors.accent)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: total == 0 ? 0 : (_step + 1) / total,
+                    minHeight: 4,
+                    backgroundColor: AppColors.surface3,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
+                  ),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Text(q['text']?.toString() ?? '',
+                style: sans(15,
+                    weight: FontWeight.w600,
+                    height: 1.4,
+                    color: AppColors.fg1)),
+            const SizedBox(height: 11),
+            ..._inputFor(q),
+          ];
+        }(),
         const SizedBox(height: 16),
-        Btn(_sent ? 'Sending…' : 'Send answer',
-            small: true,
-            icon: 'send',
-            full: true,
-            disabled: !_ready || _sent,
-            onTap: (_ready && !_sent) ? _submit : null),
+        Row(children: [
+          if (_step > 0)
+            Btn('Back',
+                small: true,
+                variant: BtnVariant.secondary,
+                onTap: _sent ? null : () => setState(() => _step--)),
+          if (_step > 0) const SizedBox(width: 8),
+          Expanded(
+            child: Btn(
+                _sent
+                    ? 'Sending…'
+                    : (_step < total - 1 ? 'Next question' : 'Send answer'),
+                small: true,
+                icon: _step < total - 1 ? 'arrow-right' : 'send',
+                full: true,
+                disabled: !_ready || _sent,
+                onTap: (_ready && !_sent) ? _submit : null),
+          ),
+        ]),
       ]),
     );
   }
