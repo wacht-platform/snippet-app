@@ -1136,40 +1136,31 @@ class Bubble extends StatelessWidget {
         ? (selectable ? SelectionArea(child: mineContent) : mineContent)
         : (selectable ? SelectionArea(child: agentContent) : agentContent);
 
-    return Container(
-      margin: EdgeInsets.only(
-          left: mine ? 28 : 0, right: mine ? 0 : 18, bottom: 18),
-      padding: EdgeInsets.fromLTRB(mine ? 14 : 4, 12, mine ? 14 : 4, 8),
-      decoration: BoxDecoration(
-        color: mine ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(16),
-          topRight: const Radius.circular(16),
-          bottomLeft: Radius.circular(mine ? 16 : 4),
-          bottomRight: const Radius.circular(16),
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth:
+              mine ? MediaQuery.sizeOf(context).width * 0.82 : double.infinity,
         ),
-        border: mine ? Border.all(color: AppColors.border) : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: mine ? AppColors.accent : AppColors.fg4,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 7),
-            Text(mine ? 'You' : 'Snippet',
-                style: mono(10, weight: FontWeight.w600, color: AppColors.fg4)),
-          ]),
-          const SizedBox(height: 7),
-          content,
-          if (!mine) _MessageActions(text: shown),
-        ],
+        margin: EdgeInsets.only(
+            left: mine ? 42 : 0, right: mine ? 0 : 20, bottom: mine ? 14 : 20),
+        padding: EdgeInsets.fromLTRB(
+            mine ? 14 : 0, mine ? 11 : 0, mine ? 14 : 0, mine ? 11 : 0),
+        decoration: mine
+            ? BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.border),
+              )
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            content,
+            if (!mine) _MessageActions(text: shown),
+          ],
+        ),
       ),
     );
   }

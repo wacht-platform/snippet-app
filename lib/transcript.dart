@@ -6,8 +6,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
-import 'panel.dart';
-import 'platform.dart';
 import 'theme.dart';
 import 'tool_views.dart';
 import 'widgets.dart';
@@ -16,36 +14,6 @@ import 'widgets.dart';
 // Dense tool row — mono, status glyph, arg summary, right meta; tap expands the
 // full tool view INLINE (capped height) instead of opening a sheet.
 // ---------------------------------------------------------------------------
-
-class _ToolDetailPanel extends StatelessWidget {
-  final String title;
-  final Widget child;
-  final VoidCallback onClose;
-  const _ToolDetailPanel(
-      {required this.title, required this.child, required this.onClose});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface1,
-      appBar: AppBar(
-        title: Text(title,
-            style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
-        leading: IconBtn('x',
-            size: 36, iconSize: 18, tooltip: 'Close', onTap: onClose),
-        backgroundColor: AppColors.surface1,
-        surfaceTintColor: Colors.transparent,
-        bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1),
-            child: Divider(height: 1, color: AppColors.border)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: child,
-      ),
-    );
-  }
-}
 
 class DenseToolRow extends StatefulWidget {
   final String tool;
@@ -58,23 +26,27 @@ class DenseToolRow extends StatefulWidget {
 }
 
 class _DenseToolRowState extends State<DenseToolRow> {
+  late bool _expanded;
+
   bool get _pending => widget.result == null;
   bool get _ok {
     final r = widget.result;
     return r is Map && r['status'] == 'success';
   }
 
-  void _openDrawer(BuildContext context) {
-    final detail = safeToolDetailView(context,
-        tool: widget.tool,
-        args: widget.args,
-        result: widget.result is Map ? widget.result : null);
-    if (kMobile) {
-      showAppSheet(context, title: toolTitle(widget.tool), child: detail);
-    } else {
-      presentScreen(context,
-          builder: (_, close) => _ToolDetailPanel(
-              title: toolTitle(widget.tool), onClose: close, child: detail));
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.result != null;
+  }
+
+  @override
+  void didUpdateWidget(covariant DenseToolRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reveal the result as soon as a live tool completes. Older completed steps
+    // remain compact when ToolRun collapses the activity history.
+    if (oldWidget.result == null && widget.result != null) {
+      _expanded = true;
     }
   }
 
@@ -103,53 +75,84 @@ class _DenseToolRowState extends State<DenseToolRow> {
     return '';
   }
 
+  Widget _inlineDetail(BuildContext context) {
+    if (widget.result == null || !_expanded) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(left: 39, right: 4, bottom: 5),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        border: Border(
+          left: BorderSide(color: _ok ? AppColors.border2 : AppColors.danger),
+        ),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(6),
+          bottomRight: Radius.circular(6),
+        ),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 280),
+        child: SingleChildScrollView(
+          child: safeToolDetailView(context,
+              tool: widget.tool, args: widget.args, result: widget.result),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final glyph = _pending
         ? const _BrailleSpinner()
         : Text(_ok ? '✓' : '✗',
-            style: mono(12, color: _ok ? AppColors.fg4 : AppColors.danger));
+            style: mono(12, color: _ok ? AppColors.ok : AppColors.danger));
     final meta = _meta;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(R.sm),
-      onTap: () => _openDrawer(context),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-        decoration: BoxDecoration(
-          color: _pending ? AppColors.surface2 : AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 18, child: Center(child: glyph)),
-          const SizedBox(width: 7),
-          AppIcon(toolIcon(widget.tool),
-              size: 14, color: _pending ? AppColors.run : AppColors.fg3),
-          const SizedBox(width: 7),
-          Text(toolTitle(widget.tool),
-              style: mono(11.5, weight: FontWeight.w600, color: AppColors.fg2)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              toolArgSummary(widget.tool, widget.args),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: mono(11.5, color: AppColors.fg3),
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      InkWell(
+        borderRadius: BorderRadius.circular(R.sm),
+        onTap: widget.result == null
+            ? null
+            : () => setState(() => _expanded = !_expanded),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(width: 18, child: Center(child: glyph)),
+            const SizedBox(width: 7),
+            AppIcon(toolIcon(widget.tool),
+                size: 14, color: _pending ? AppColors.run : AppColors.fg3),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(toolTitle(widget.tool),
+                  style: mono(11.5,
+                      weight: FontWeight.w600, color: AppColors.fg2)),
             ),
-          ),
-          if (meta.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            Text(meta,
-                style: mono(11, color: _ok ? AppColors.fg4 : AppColors.danger)),
-          ],
-          const SizedBox(width: 4),
-          AppIcon('chevron-right', size: 13, color: AppColors.fg4),
-        ]),
+            if (meta.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Text(meta,
+                  style:
+                      mono(11, color: _ok ? AppColors.fg4 : AppColors.danger)),
+            ],
+            const SizedBox(width: 7),
+            Flexible(
+              flex: 2,
+              child: Text(toolArgSummary(widget.tool, widget.args),
+                  maxLines: 1,
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(11, color: AppColors.fg3)),
+            ),
+            if (widget.result != null) ...[
+              const SizedBox(width: 5),
+              AppIcon(_expanded ? 'chevron-down' : 'chevron-right',
+                  size: 13, color: AppColors.fg4),
+            ],
+          ]),
+        ),
       ),
-    );
+      _inlineDetail(context),
+    ]);
   }
 }
 
