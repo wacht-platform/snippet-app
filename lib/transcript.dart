@@ -204,15 +204,53 @@ class ToolRun extends StatefulWidget {
 }
 
 class _ToolRunState extends State<ToolRun> {
+  late bool _open;
+
+  @override
+  void initState() {
+    super.initState();
+    _open = widget.running;
+  }
+
+  @override
+  void didUpdateWidget(covariant ToolRun oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.running && !oldWidget.running) _open = true;
+    if (!widget.running && oldWidget.running && widget.rows.length > 2) {
+      _open = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final n = widget.rows.length;
+    final label = widget.running
+        ? (n == 1 ? 'Running tool' : 'Running tools')
+        : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools');
     return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: widget.rows,
-      ),
+      padding: const EdgeInsets.only(top: 6, bottom: 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        InkWell(
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(children: [
+              if (widget.running)
+                const SizedBox(
+                    width: 16, child: Center(child: _BrailleSpinner()))
+              else
+                AppIcon('check', size: 13, color: AppColors.fg4),
+              const SizedBox(width: 8),
+              Text(label, style: sans(13, color: AppColors.fg3)),
+              const SizedBox(width: 4),
+              AppIcon(_open ? 'chevron-down' : 'chevron-right',
+                  size: 13, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+        if (_open) ...widget.rows,
+      ]),
     );
   }
 }

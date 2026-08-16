@@ -1,9 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/languages/all.dart';
+import 'package:re_highlight/re_highlight.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 
 import 'theme.dart';
+
+final Highlight _hl = Highlight()..registerLanguages(builtinAllLanguages);
+
+/// Highlight a fenced markdown block. [language] is the ``` tag (or empty).
+TextSpan highlightedCodeSpan(String code, {String language = ''}) {
+  final base = TextStyle(
+    fontFamily: monoFamily,
+    fontFamilyFallback: const ['Menlo', 'Consolas', 'monospace'],
+    fontSize: 13,
+    height: 1.55,
+    color: AppColors.fg1,
+  );
+  final lang = language.trim().toLowerCase();
+  final mapped = _extToLang[lang] ?? lang;
+  final mode = mapped.isEmpty ? null : builtinAllLanguages[mapped];
+  if (mode == null) return TextSpan(text: code, style: base);
+  try {
+    final result = _hl.highlight(code: code, language: mapped);
+    final renderer = TextSpanRenderer(base, atomOneDarkTheme);
+    result.render(renderer);
+    return renderer.span ?? TextSpan(text: code, style: base);
+  } catch (_) {
+    return TextSpan(text: code, style: base);
+  }
+}
 
 /// Shared CodeEditor style — the app's code font (matches `mono` typography),
 /// app colors, and syntax highlighting by file extension. Used by both the

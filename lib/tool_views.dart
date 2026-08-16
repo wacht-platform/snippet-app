@@ -170,9 +170,7 @@ List<Widget> _toolBody(
       return _editView(a, d, oldKey: 'old_string', newKey: 'new_string');
     case 'replace_file_content':
       return _editView(a, d,
-          oldKey: 'target_content',
-          newKey: 'replacement_content',
-          range: a == null ? null : '${a['start_line']}–${a['end_line']}');
+          oldKey: 'target_content', newKey: 'replacement_content');
     case 'write_file':
       return _writeView(a, d, verb: 'Wrote');
     case 'append_file':
@@ -205,13 +203,9 @@ List<Widget> _toolBody(
 // ---- per-tool views ----
 
 List<Widget> _editView(Map? a, Map? d,
-    {required String oldKey, required String newKey, String? range}) {
+    {required String oldKey, required String newKey}) {
   final out = <Widget>[];
   if (a != null) out.add(_PathChip(a['path']?.toString() ?? ''));
-  if (range != null) {
-    out.add(const SizedBox(height: 8));
-    out.add(_meta([_chip('list', 'lines $range')]));
-  }
   if (a != null && a[oldKey] != null && a[newKey] != null) {
     out.add(const SizedBox(height: 12));
     out.add(const SectionLabel('Diff'));
@@ -235,12 +229,7 @@ List<Widget> _writeView(Map? a, Map? d, {required String verb}) {
   out.add(_PathChip(path));
   final content = a?['content']?.toString();
   if (content != null) {
-    out.add(const SizedBox(height: 8));
-    out.add(
-        _meta([_chip('list', '${'\n'.allMatches(content).length + 1} lines')]));
-    out.add(const SizedBox(height: 12));
-    out.add(const SectionLabel('Contents'));
-    out.add(const SizedBox(height: 8));
+    out.add(const SizedBox(height: 6));
     out.add(_HiCodeBlock(path, content));
   } else if (d?['written'] == true) {
     out.add(_done('$verb file'));
@@ -251,15 +240,6 @@ List<Widget> _writeView(Map? a, Map? d, {required String verb}) {
 List<Widget> _appendView(Map? a, Map? d) {
   final out = <Widget>[];
   out.add(_PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? ''));
-  final chips = <Widget>[];
-  if (d?['lines_written'] != null)
-    chips.add(_chip('file-plus', '+${d?['lines_written']} lines'));
-  if (d?['total_lines'] != null)
-    chips.add(_chip('list', '${d?['total_lines']} total'));
-  if (chips.isNotEmpty) {
-    out.add(const SizedBox(height: 8));
-    out.add(_meta(chips));
-  }
   final content = a?['content']?.toString();
   if (content != null && content.isNotEmpty) {
     out.add(const SizedBox(height: 12));
@@ -273,27 +253,11 @@ List<Widget> _appendView(Map? a, Map? d) {
 List<Widget> _readView(Map? a, Map? d) {
   final out = <Widget>[];
   final path = a?['path']?.toString() ?? d?['path']?.toString() ?? '';
-  out.add(_PathChip(path));
-  final chips = <Widget>[];
-  final sl = d?['start_line'], el = d?['end_line'];
-  if (sl != null || el != null) chips.add(_chip('list', 'lines $sl–$el'));
-  if (d?['total_lines'] != null)
-    chips.add(_chip('file', '${d?['total_lines']} lines'));
-  if (d?['total_chars'] != null)
-    chips.add(_chip('grip', '${d?['total_chars']} chars'));
-  if (chips.isNotEmpty) {
-    out.add(const SizedBox(height: 8));
-    out.add(_meta(chips));
-  }
+  if (path.isNotEmpty) out.add(_PathChip(path));
   final content = d?['content']?.toString();
   if (content != null && content.trim().isNotEmpty) {
-    final preview = content.split('\n').take(8).join('\n');
     out.add(const SizedBox(height: 6));
-    out.add(_CodeBox(preview));
-  }
-  if (d?['truncated'] == true && d?['hint'] != null) {
-    out.add(const SizedBox(height: 10));
-    out.add(_Hint(d?['hint']?.toString() ?? ''));
+    out.add(_HiCodeBlock(path, content));
   }
   return out;
 }
@@ -301,23 +265,13 @@ List<Widget> _readView(Map? a, Map? d) {
 List<Widget> _imageView(Map? a, Map? d) {
   return [
     _PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? ''),
-    if (d?['mime'] != null || d?['size_bytes'] != null) ...[
-      const SizedBox(height: 4),
-      _meta([
-        if (d?['mime'] != null) _chip('image', d!['mime'].toString()),
-        if (d?['size_bytes'] != null)
-          _chip('grip', formatBytes(d!['size_bytes'])),
-      ]),
-    ],
   ];
 }
 
 List<Widget> _bashView(Map? a, Map? d) {
   final out = <Widget>[];
   final cmd = a?['command']?.toString() ?? d?['command']?.toString() ?? '';
-  out.add(const SectionLabel('Command'));
-  out.add(const SizedBox(height: 8));
-  out.add(_CommandBox(cmd));
+  if (cmd.isNotEmpty) out.add(_CommandBox(cmd));
   if (d != null) {
     final code = d['exit_code'];
     final ok = d['success'] == true || code == 0;

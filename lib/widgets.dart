@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'highlight.dart';
 import 'platform.dart';
 import 'panel.dart';
 import 'theme.dart';
@@ -275,15 +275,14 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
   _cachedMarkdownThemeIndex = themeIndex;
   _cachedMarkdownStyle =
       MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-    p: sans(16, height: 1.5, color: AppColors.fg1),
+    p: sans(15.5, height: 1.55, color: AppColors.fg1),
     pPadding: EdgeInsets.zero,
-    a: sans(16, height: 1.5, color: AppColors.accent),
-    h1: sans(21, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
-    h1Padding: const EdgeInsets.only(top: 6, bottom: 2),
-    h2: sans(18.5, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
-    h3: sans(16.5, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
-    // Inline style fallback; CodeBlockBuilder draws the real pill.
-    code: mono(13.5, color: AppColors.accent),
+    a: sans(15.5, height: 1.55, color: AppColors.accent),
+    h1: sans(20, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
+    h1Padding: const EdgeInsets.only(top: 8, bottom: 4),
+    h2: sans(17.5, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
+    h3: sans(16, weight: FontWeight.w600, height: 1.35, color: AppColors.fg1),
+    code: mono(13, color: AppColors.accent),
     // PreBlockBuilder owns fenced chrome — keep these empty to avoid a double box.
     codeblockPadding: EdgeInsets.zero,
     codeblockDecoration: const BoxDecoration(),
@@ -293,7 +292,7 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
       borderRadius: BorderRadius.circular(R.xs),
       border: Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
     ),
-    listBullet: sans(16, height: 1.5, color: AppColors.fg1),
+    listBullet: sans(15.5, height: 1.55, color: AppColors.fg1),
     tableBody: sans(14, color: AppColors.fg1),
     // FlexColumnWidth stretches every markdown table to the full message width.
     // Intrinsic columns keep phone tables content-sized; the markdown package
@@ -433,8 +432,7 @@ class CodeBlockBuilder extends MarkdownElementBuilder {
   }
 }
 
-/// Fenced ``` blocks — full-width surface, clean border, copy chip. Registered
-/// on `pre` so flutter_markdown does not also wrap us in codeblockDecoration.
+/// Fenced ``` blocks — highlighted text only, no boxed chrome.
 class PreBlockBuilder extends MarkdownElementBuilder {
   @override
   bool isBlockElement() => true;
@@ -444,82 +442,35 @@ class PreBlockBuilder extends MarkdownElementBuilder {
       TextStyle? preferredStyle, TextStyle? parentStyle) {
     var code = element.textContent;
     if (code.endsWith('\n')) code = code.substring(0, code.length - 1);
-    return _MdCodeBlock(code: code);
+    var lang = '';
+    for (final child in element.children ?? const <md.Node>[]) {
+      if (child is md.Element && child.tag == 'code') {
+        final cls = child.attributes['class'] ?? '';
+        if (cls.startsWith('language-')) lang = cls.substring(9);
+        break;
+      }
+    }
+    return _MdCodeBlock(code: code, language: lang);
   }
 }
 
-class _MdCodeBlock extends StatefulWidget {
+class _MdCodeBlock extends StatelessWidget {
   final String code;
-  const _MdCodeBlock({required this.code});
-  @override
-  State<_MdCodeBlock> createState() => _MdCodeBlockState();
-}
-
-class _MdCodeBlockState extends State<_MdCodeBlock> {
-  bool _copied = false;
-
-  Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: widget.code));
-    if (!mounted) return;
-    setState(() => _copied = true);
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _copied = false);
-    });
-  }
+  final String language;
+  const _MdCodeBlock({required this.code, this.language = ''});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          border: Border.all(color: AppColors.border2),
-          borderRadius: BorderRadius.circular(R.sm),
-        ),
-        child: Stack(
-          children: [
-            // Keep code-block scroll notifications from reaching the shell's
-            // PageView/drawer gesture handler.
-            NotificationListener<ScrollNotification>(
-              onNotification: (_) => true,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(14, 14, 44, 14),
-                child: Text(
-                  widget.code,
-                  style: mono(13, height: 1.55, color: AppColors.fg1),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 6,
-              right: 6,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(R.xs),
-                  onTap: _copy,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface3,
-                      borderRadius: BorderRadius.circular(R.xs),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: AppIcon(
-                      _copied ? 'check' : 'clipboard',
-                      size: 13,
-                      color: _copied ? AppColors.ok : AppColors.fg3,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+    Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (_) => true,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SelectableText.rich(
+            highlightedCodeSpan(code, language: language),
+          ),
         ),
       ),
     );
@@ -986,10 +937,7 @@ class AttachmentPill extends StatelessWidget {
       pills.add(pill('file', files == 1 ? 'file' : '$files files'));
     }
     if (pills.isEmpty) return const SizedBox.shrink();
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Wrap(spacing: 8, runSpacing: 6, children: pills),
-    );
+    return Wrap(spacing: 8, runSpacing: 6, children: pills);
   }
 }
 
@@ -1095,28 +1043,23 @@ class Bubble extends StatelessWidget {
         matches.where((m) => isAudioAttachmentPath(m.group(2) ?? '')).length;
     final images = matches.where((m) => m.group(1) == 'image').length;
     final files = matches.length - images - audio;
-    final mineContent = Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (shown.isNotEmpty)
-          Text(shown, style: sans(15, height: 1.45, color: AppColors.fg1)),
-        if (matches.isNotEmpty) ...[
-          if (shown.isNotEmpty) const SizedBox(height: 8),
-          AttachmentPill(audio: audio, images: images, files: files),
-        ],
-        if (transcripts.isNotEmpty) AudioTranscriptCard(items: transcripts),
-        if (audio > 0 && transcripts.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon('activity', size: 12, color: AppColors.fg3),
-              const SizedBox(width: 6),
-              Text('Transcribing audio…',
-                  style: sans(11.5, color: AppColors.fg3)),
-            ]),
-          ),
-      ],
-    );
+    final textBody = shown.isNotEmpty
+        ? Text(shown, style: sans(15.5, height: 1.5, color: AppColors.fg1))
+        : null;
+    final extras = <Widget>[
+      if (matches.isNotEmpty)
+        AttachmentPill(audio: audio, images: images, files: files),
+      if (transcripts.isNotEmpty) AudioTranscriptCard(items: transcripts),
+      if (audio > 0 && transcripts.isEmpty)
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          AppIcon('activity', size: 12, color: AppColors.fg3),
+          const SizedBox(width: 6),
+          Text('Transcribing audio…', style: sans(12, color: AppColors.fg3)),
+        ]),
+    ];
+    final mineText = textBody == null
+        ? const SizedBox.shrink()
+        : (selectable ? SelectionArea(child: textBody) : textBody);
     final agentContent = MarkdownBody(
       data: shown,
       selectable: false,
@@ -1125,28 +1068,46 @@ class Bubble extends StatelessWidget {
       onTapLink: (txt, href, title) => openMarkdownLink(href),
     );
 
-    final content = mine
-        ? (selectable ? SelectionArea(child: mineContent) : mineContent)
-        : (selectable ? SelectionArea(child: agentContent) : agentContent);
+    final agent =
+        selectable ? SelectionArea(child: agentContent) : agentContent;
+
+    if (!mine) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8, bottom: 16),
+          child: agent,
+        ),
+      );
+    }
 
     return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
+      alignment: Alignment.centerRight,
+      child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth:
-              mine ? MediaQuery.sizeOf(context).width * 0.72 : double.infinity,
+          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
-        margin: EdgeInsets.only(
-            left: mine ? 56 : 0, right: mine ? 0 : 8, bottom: mine ? 10 : 16),
-        padding:
-            mine ? const EdgeInsets.fromLTRB(13, 8, 13, 8) : EdgeInsets.zero,
-        decoration: mine
-            ? BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(16),
-              )
-            : null,
-        child: content,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 48, bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (shown.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: mineText,
+                ),
+              for (final extra in extras) ...[
+                const SizedBox(height: 4),
+                extra,
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
