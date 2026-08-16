@@ -2525,7 +2525,7 @@ class _SessionScreenState extends State<SessionScreen>
           addEvent(
               key,
               Padding(
-                  padding: const EdgeInsets.only(top: 2, bottom: 8),
+                  padding: const EdgeInsets.only(top: 4, bottom: 4),
                   child: Bubble(mine: false, text: _s(e['text']))));
         case 'model_error':
           endTools(key);

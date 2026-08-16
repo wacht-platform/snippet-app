@@ -1079,7 +1079,7 @@ class Bubble extends StatelessWidget {
       return Align(
         alignment: Alignment.centerLeft,
         child: Padding(
-          padding: const EdgeInsets.only(right: 8, top: 6, bottom: 6),
+          padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
           child: agent,
         ),
       );
@@ -1092,7 +1092,7 @@ class Bubble extends StatelessWidget {
           maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
         child: Padding(
-          padding: const EdgeInsets.only(left: 48, top: 6, bottom: 6),
+          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
