@@ -286,11 +286,10 @@ List<Widget> _readView(Map? a, Map? d) {
     out.add(_meta(chips));
   }
   final content = d?['content']?.toString();
-  if (content != null) {
-    out.add(const SizedBox(height: 12));
-    out.add(const SectionLabel('Contents'));
-    out.add(const SizedBox(height: 8));
-    out.add(_HiCodeBlock(path, content));
+  if (content != null && content.trim().isNotEmpty) {
+    final preview = content.split('\n').take(8).join('\n');
+    out.add(const SizedBox(height: 6));
+    out.add(_CodeBox(preview));
   }
   if (d?['truncated'] == true && d?['hint'] != null) {
     out.add(const SizedBox(height: 10));
@@ -302,19 +301,14 @@ List<Widget> _readView(Map? a, Map? d) {
 List<Widget> _imageView(Map? a, Map? d) {
   return [
     _PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? ''),
-    const SizedBox(height: 12),
-    Center(
-      child: Column(children: [
-        AppIcon('image', size: 28, color: AppColors.fg3),
-        const SizedBox(height: 12),
-        if (d != null)
-          _meta([
-            if (d['mime'] != null) _chip('image', d['mime'].toString()),
-            if (d['size_bytes'] != null)
-              _chip('grip', formatBytes(d['size_bytes'])),
-          ]),
+    if (d?['mime'] != null || d?['size_bytes'] != null) ...[
+      const SizedBox(height: 4),
+      _meta([
+        if (d?['mime'] != null) _chip('image', d!['mime'].toString()),
+        if (d?['size_bytes'] != null)
+          _chip('grip', formatBytes(d!['size_bytes'])),
       ]),
-    ),
+    ],
   ];
 }
 

@@ -39,8 +39,11 @@ class _DenseToolRowState extends State<DenseToolRow> {
   @override
   void initState() {
     super.initState();
-    // BeUI: running tools show their live output; completed tools stay one line.
-    _expanded = widget.result == null;
+    // Running tools can show live output. Completed tools stay one named line.
+    _expanded = widget.result == null &&
+        (widget.tool == 'bash' ||
+            widget.tool == 'search_content' ||
+            widget.tool == 'web_search');
   }
 
   @override
@@ -201,52 +204,15 @@ class ToolRun extends StatefulWidget {
 }
 
 class _ToolRunState extends State<ToolRun> {
-  bool _open = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _open = widget.running && widget.rows.length <= 2;
-  }
-
-  @override
-  void didUpdateWidget(covariant ToolRun oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.running && !oldWidget.running && widget.rows.length <= 2) {
-      _open = true;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final n = widget.rows.length;
-    final label = widget.running
-        ? (n == 1 ? 'Running tool' : 'Running tools')
-        : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools');
     return Padding(
       padding: const EdgeInsets.only(top: 2, bottom: 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        InkWell(
-          onTap: () => setState(() => _open = !_open),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(children: [
-              if (widget.running)
-                const SizedBox(
-                    width: 16, child: Center(child: _BrailleSpinner()))
-              else
-                AppIcon('check', size: 14, color: AppColors.fg4),
-              const SizedBox(width: 8),
-              Text(label, style: sans(13, color: AppColors.fg3)),
-              const SizedBox(width: 4),
-              AppIcon(_open ? 'chevron-down' : 'chevron-right',
-                  size: 13, color: AppColors.fg4),
-            ]),
-          ),
-        ),
-        if (_open) ...widget.rows,
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: widget.rows,
+      ),
     );
   }
 }

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'platform.dart';
@@ -1147,51 +1146,7 @@ class Bubble extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               )
             : null,
-        child: Column(
-          crossAxisAlignment:
-              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            content,
-            if (!mine) _MessageActions(text: shown),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Grok-style message action row: icon-only buttons below agent messages.
-class _MessageActions extends StatelessWidget {
-  final String text;
-  const _MessageActions({required this.text});
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Row(children: [
-        _actionIcon(Icons.copy_rounded, 'Copy', () {
-          Clipboard.setData(ClipboardData(text: text));
-          toast(context, 'Copied');
-        }),
-        const SizedBox(width: 2),
-        _actionIcon(Icons.share_rounded, 'Share', () {
-          SharePlus.instance.share(ShareParams(text: text));
-        }),
-      ]),
-    );
-  }
-
-  Widget _actionIcon(IconData icon, String tip, VoidCallback onTap) {
-    return Tooltip(
-      message: tip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Icon(icon, size: 16, color: AppColors.fg4),
-        ),
+        child: content,
       ),
     );
   }
