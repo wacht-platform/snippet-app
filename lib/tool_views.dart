@@ -205,11 +205,7 @@ List<Widget> _toolBody(
 List<Widget> _editView(Map? a, Map? d,
     {required String oldKey, required String newKey}) {
   final out = <Widget>[];
-  if (a != null) out.add(_PathChip(a['path']?.toString() ?? ''));
   if (a != null && a[oldKey] != null && a[newKey] != null) {
-    out.add(const SizedBox(height: 12));
-    out.add(const SectionLabel('Diff'));
-    out.add(const SizedBox(height: 8));
     out.add(_DiffBlock(a[oldKey].toString(), a[newKey].toString()));
   } else if (a == null) {
     out.add(_done(d?['edited'] == true || d?['replaced'] == true
@@ -226,10 +222,8 @@ List<Widget> _editView(Map? a, Map? d,
 List<Widget> _writeView(Map? a, Map? d, {required String verb}) {
   final out = <Widget>[];
   final path = a?['path']?.toString() ?? d?['path']?.toString() ?? '';
-  out.add(_PathChip(path));
   final content = a?['content']?.toString();
   if (content != null) {
-    out.add(const SizedBox(height: 6));
     out.add(_HiCodeBlock(path, content));
   } else if (d?['written'] == true) {
     out.add(_done('$verb file'));
@@ -239,12 +233,8 @@ List<Widget> _writeView(Map? a, Map? d, {required String verb}) {
 
 List<Widget> _appendView(Map? a, Map? d) {
   final out = <Widget>[];
-  out.add(_PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? ''));
   final content = a?['content']?.toString();
   if (content != null && content.isNotEmpty) {
-    out.add(const SizedBox(height: 12));
-    out.add(const SectionLabel('Appended'));
-    out.add(const SizedBox(height: 8));
     out.add(_CodeBox(content, addTint: true));
   }
   return out;
@@ -253,48 +243,25 @@ List<Widget> _appendView(Map? a, Map? d) {
 List<Widget> _readView(Map? a, Map? d) {
   final out = <Widget>[];
   final path = a?['path']?.toString() ?? d?['path']?.toString() ?? '';
-  if (path.isNotEmpty) out.add(_PathChip(path));
   final content = d?['content']?.toString();
   if (content != null && content.trim().isNotEmpty) {
-    out.add(const SizedBox(height: 6));
     out.add(_HiCodeBlock(path, content));
   }
   return out;
 }
 
 List<Widget> _imageView(Map? a, Map? d) {
-  return [
-    _PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? ''),
-  ];
+  return const [];
 }
 
 List<Widget> _bashView(Map? a, Map? d) {
   final out = <Widget>[];
-  final cmd = a?['command']?.toString() ?? d?['command']?.toString() ?? '';
-  if (cmd.isNotEmpty) out.add(_CommandBox(cmd));
   if (d != null) {
-    final code = d['exit_code'];
-    final ok = d['success'] == true || code == 0;
-    out.add(const SizedBox(height: 12));
-    out.add(_meta([
-      _statusChip(ok, ok ? 'exit 0' : 'exit ${code ?? '?'}'),
-    ]));
     final stdout = d['stdout']?.toString() ?? '';
     final stderr = d['stderr']?.toString() ?? '';
-    if (stdout.trim().isNotEmpty) {
-      out.add(const SizedBox(height: 12));
-      out.add(const SectionLabel('stdout'));
-      out.add(const SizedBox(height: 8));
-      out.add(_CodeBox(stdout));
-    }
-    if (stderr.trim().isNotEmpty) {
-      out.add(const SizedBox(height: 12));
-      out.add(const SectionLabel('stderr'));
-      out.add(const SizedBox(height: 8));
-      out.add(_CodeBox(stderr, delTint: true));
-    }
+    if (stdout.trim().isNotEmpty) out.add(_CodeBox(stdout));
+    if (stderr.trim().isNotEmpty) out.add(_CodeBox(stderr, delTint: true));
     if (stdout.trim().isEmpty && stderr.trim().isEmpty) {
-      out.add(const SizedBox(height: 10));
       out.add(Text('(no output)', style: mono(11.5, color: AppColors.fg4)));
     }
   }
@@ -303,13 +270,8 @@ List<Widget> _bashView(Map? a, Map? d) {
 
 List<Widget> _grepView(Map? a, Map? d) {
   final out = <Widget>[];
-  out.add(_meta([
-    _chip('search', '"${a?['query'] ?? d?['query'] ?? ''}"'),
-    if (d?['count'] != null) _chip('list', '${d?['count']} matches'),
-  ]));
   final results = _mapItems(d?['results']);
   if (results.isNotEmpty) {
-    out.add(const SizedBox(height: 12));
     out.add(_Card(
       children: [
         for (final m in results)
@@ -333,14 +295,8 @@ List<Widget> _grepView(Map? a, Map? d) {
 
 List<Widget> _findView(Map? a, Map? d) {
   final out = <Widget>[];
-  out.add(_meta([
-    _chip('search',
-        a?['pattern']?.toString() ?? d?['pattern']?.toString() ?? '*'),
-    if (d?['count'] != null) _chip('file', '${d?['count']} files'),
-  ]));
   final results = _mapItems(d?['results']);
   if (results.isNotEmpty) {
-    out.add(const SizedBox(height: 12));
     out.add(_Card(children: [
       for (final f in results)
         _FileRow(
@@ -356,7 +312,6 @@ List<Widget> _findView(Map? a, Map? d) {
 
 List<Widget> _lsView(Map? a, Map? d) {
   final out = <Widget>[];
-  out.add(_PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? '.'));
   final entries = _mapItems(d?['entries'])
     ..sort((x, y) {
       final dx = x['kind'] == 'dir' ? 0 : 1, dy = y['kind'] == 'dir' ? 0 : 1;
@@ -365,7 +320,6 @@ List<Widget> _lsView(Map? a, Map? d) {
           .compareTo(y['name']?.toString() ?? '');
     });
   if (entries.isNotEmpty) {
-    out.add(const SizedBox(height: 12));
     out.add(_Card(children: [
       for (final e in entries)
         _FileRow(
@@ -383,24 +337,13 @@ List<Widget> _lsView(Map? a, Map? d) {
 
 List<Widget> _outlineView(Map? a, Map? d) {
   final out = <Widget>[];
-  out.add(_PathChip(a?['path']?.toString() ?? d?['path']?.toString() ?? ''));
-  if (d?['is_directory'] == true) {
-    return [...out, const SizedBox(height: 10), ..._lsView(a, d).skip(1)];
-  }
+  if (d?['is_directory'] == true) return _lsView(a, d);
   if (d?['supported'] == false) {
-    out.add(const SizedBox(height: 10));
     out.add(_Hint(d?['note']?.toString() ?? 'No outline available.'));
     return out;
   }
-  out.add(const SizedBox(height: 8));
-  out.add(_meta([
-    if (d?['language'] != null) _chip('cpu', '${d?['language']}'),
-    if (d?['symbol_count'] != null)
-      _chip('list', '${d?['symbol_count']} symbols'),
-  ]));
   final outline = _mapItems(d?['outline']);
   if (outline.isNotEmpty) {
-    out.add(const SizedBox(height: 12));
     out.add(_Card(children: [
       for (final s in outline)
         _SymbolRow(
@@ -416,15 +359,9 @@ List<Widget> _outlineView(Map? a, Map? d) {
 
 List<Widget> _codeMapView(Map? a, Map? d) {
   final out = <Widget>[];
-  out.add(_meta([
-    _chip('map', (d?['root'] ?? a?['path'] ?? '.').toString()),
-    if (d?['file_count'] != null) _chip('file', '${d?['file_count']} files'),
-    if (d?['symbol_count'] != null)
-      _chip('list', '${d?['symbol_count']} symbols'),
-  ]));
   final files = _mapItems(d?['files']);
   for (final f in files) {
-    out.add(const SizedBox(height: 12));
+    if (out.isNotEmpty) out.add(const SizedBox(height: 8));
     out.add(_FileRow(icon: 'file', name: f['path']?.toString() ?? ''));
     final syms = f['symbols'] is List ? (f['symbols'] as List) : const [];
     out.add(const SizedBox(height: 4));
@@ -446,13 +383,9 @@ List<Widget> _codeMapView(Map? a, Map? d) {
 
 List<Widget> _webSearchView(Map? a, Map? d) {
   final out = <Widget>[];
-  out.add(_meta([
-    _chip('globe', '"${a?['query'] ?? d?['query'] ?? ''}"'),
-    if (d?['count'] != null) _chip('list', '${d?['count']} results'),
-  ]));
   final results = _mapItems(d?['results']);
   for (final res in results) {
-    out.add(const SizedBox(height: 12));
+    if (out.isNotEmpty) out.add(const SizedBox(height: 8));
     out.add(_ResultCard(
       title: res['title']?.toString() ?? '',
       url: res['url']?.toString() ?? '',
@@ -466,24 +399,18 @@ List<Widget> _webSearchView(Map? a, Map? d) {
 List<Widget> _webReadView(Map? a, Map? d) {
   final out = <Widget>[];
   final title = d?['title']?.toString() ?? '';
-  final url = d?['url']?.toString() ?? a?['url']?.toString() ?? '';
   if (title.isNotEmpty) {
     out.add(Text(title,
         style: sans(14.5, weight: FontWeight.w600, color: AppColors.fg1)));
     out.add(const SizedBox(height: 4));
   }
-  out.add(_LinkText(url));
   if (d?['published_date'] != null) {
-    out.add(const SizedBox(height: 6));
-    out.add(_meta([
-      _chip('history', '${d?['published_date']}'),
-    ]));
+    out.add(
+        Text('${d?['published_date']}', style: mono(10, color: AppColors.fg4)));
   }
   final text = d?['text']?.toString();
   if (text != null && text.isNotEmpty) {
-    out.add(const SizedBox(height: 12));
-    out.add(const SectionLabel('Page text'));
-    out.add(const SizedBox(height: 8));
+    if (out.isNotEmpty) out.add(const SizedBox(height: 8));
     out.add(_CodeBox(text, useSans: true));
   }
   return out;
@@ -520,19 +447,6 @@ String _pretty(dynamic v) {
 Widget _meta(List<Widget> chips) =>
     Wrap(spacing: 7, runSpacing: 7, children: chips);
 
-Widget _chip(String icon, String label) => Padding(
-      padding: const EdgeInsets.only(right: 10, bottom: 4),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        AppIcon(icon, size: 11, color: AppColors.fg4),
-        const SizedBox(width: 5),
-        Flexible(
-            child: Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: mono(11, color: AppColors.fg3))),
-      ]),
-    );
-
 Widget _statusChip(bool ok, String label) => Container(
       padding: const EdgeInsets.fromLTRB(7, 4, 9, 4),
       decoration: BoxDecoration(
@@ -560,24 +474,6 @@ Widget _done(String label) => Padding(
 
 Widget _empty(String label) =>
     Text(label, style: sans(12.5, color: AppColors.fg3));
-
-class _PathChip extends StatelessWidget {
-  final String path;
-  const _PathChip(this.path);
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(children: [
-        AppIcon('file', size: 13, color: AppColors.fg4),
-        const SizedBox(width: 7),
-        Expanded(
-            child: SelectableText(path, style: mono(12, color: AppColors.fg2))),
-      ]),
-    );
-  }
-}
 
 class _Card extends StatelessWidget {
   final List<Widget> children;
@@ -805,25 +701,6 @@ class _CodeBox extends StatelessWidget {
   }
 }
 
-/// Shell command box with a `$` prompt.
-class _CommandBox extends StatelessWidget {
-  final String command;
-  const _CommandBox(this.command);
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('\$ ', style: mono(11.5, height: 1.5, color: AppColors.accent)),
-        Expanded(
-            child: SelectableText(command,
-                style: mono(11.5, height: 1.5, color: AppColors.fg1))),
-      ]),
-    );
-  }
-}
-
 /// Read-only code block with syntax highlighting (by filename) + line numbers,
 /// matching the file viewer. Bounded height with its own scroll for the drawer.
 class _HiCodeBlock extends StatefulWidget {
@@ -940,23 +817,9 @@ class _DiffBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final lines = _diff(before, after);
-    final added = lines.where((l) => l.kind == _DKind.add).length;
-    final removed = lines.where((l) => l.kind == _DKind.del).length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(children: [
-            Text('diff', style: mono(11, color: AppColors.fg4)),
-            const Spacer(),
-            if (added > 0)
-              Text('+$added', style: mono(11, color: AppColors.diffAddFg)),
-            if (added > 0 && removed > 0) const SizedBox(width: 8),
-            if (removed > 0)
-              Text('−$removed', style: mono(11, color: AppColors.diffDelFg)),
-          ]),
-        ),
         for (final l in lines) _row(l),
       ],
     );
