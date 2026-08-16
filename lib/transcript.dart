@@ -28,35 +28,64 @@ class DenseToolRow extends StatefulWidget {
 }
 
 class _DenseToolRowState extends State<DenseToolRow> {
+  bool _open = false;
+
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
     final summary = toolArgSummary(widget.tool, widget.args);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(children: [
-        AppIcon(toolIcon(widget.tool), size: 16, color: AppColors.fg3),
-        const SizedBox(width: 10),
-        Text(toolTitle(widget.tool),
-            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
-        if (summary.isNotEmpty) ...[
-          const SizedBox(width: 10),
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(99),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(children: [
+              AppIcon(toolIcon(widget.tool), size: 15, color: AppColors.fg3),
+              const SizedBox(width: 8),
+              Text(toolTitle(widget.tool),
+                  style:
+                      sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+              if (summary.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(summary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(12.5, color: AppColors.fg3)),
+                  ),
+                ),
+              ],
+              ..._metaWidgets(),
+            ]),
+          ),
+        ),
+        if (_open)
+          Padding(
+            padding: const EdgeInsets.only(left: 23, top: 2, bottom: 6),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: SingleChildScrollView(
+                child: DefaultTextStyle(
+                  style: mono(11.5, height: 1.4, color: AppColors.fg3),
+                  child: safeToolDetailView(context,
+                      tool: widget.tool,
+                      args: widget.args,
+                      result: widget.result),
+                ),
               ),
-              child: Text(summary,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, color: AppColors.fg3)),
             ),
           ),
-        ],
-        ..._metaWidgets(),
-      ]),
+      ],
     );
   }
 
@@ -186,7 +215,7 @@ class _ToolRunState extends State<ToolRun> {
         ),
         if (_open)
           for (var i = 0; i < widget.rows.length; i++) ...[
-            if (i > 0) const SizedBox(height: 6),
+            if (i > 0) const SizedBox(height: 2),
             widget.rows[i],
           ],
       ]),
