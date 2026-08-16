@@ -113,22 +113,31 @@ class _DenseToolRowState extends State<DenseToolRow> {
     final meta = _meta;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(R.xs),
+      borderRadius: BorderRadius.circular(R.sm),
       onTap: () => _openDrawer(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+        decoration: BoxDecoration(
+          color: _pending ? AppColors.surface2 : AppColors.surface1,
+          borderRadius: BorderRadius.circular(R.sm),
+          border: Border.all(color: AppColors.border),
+        ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 16, child: Center(child: glyph)),
-          const SizedBox(width: 6),
-          Text(widget.tool,
-              style: mono(12, weight: FontWeight.w600, color: AppColors.fg2)),
+          SizedBox(width: 18, child: Center(child: glyph)),
+          const SizedBox(width: 7),
+          AppIcon(toolIcon(widget.tool),
+              size: 14, color: _pending ? AppColors.run : AppColors.fg3),
+          const SizedBox(width: 7),
+          Text(toolTitle(widget.tool),
+              style: mono(11.5, weight: FontWeight.w600, color: AppColors.fg2)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               toolArgSummary(widget.tool, widget.args),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: mono(12, color: AppColors.fg3),
+              style: mono(11.5, color: AppColors.fg3),
             ),
           ),
           if (meta.isNotEmpty) ...[

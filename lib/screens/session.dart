@@ -3574,25 +3574,48 @@ class _QuestionBarState extends State<_QuestionBar> {
   @override
   Widget build(BuildContext context) {
     final ctx = widget.question['context']?.toString();
+    final total = _questions.length;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.accentLine),
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 6)),
+        ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // A quiet eyebrow — accent dot + label — rather than an alarm-triangle box.
-        Row(children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                  color: AppColors.accent, shape: BoxShape.circle)),
-          const SizedBox(width: 9),
-          Text('NEEDS YOUR INPUT',
-              style: sans(11,
-                  weight: FontWeight.w600, spacing: 0.6, color: AppColors.fg3)),
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: AppColors.accentBg,
+                borderRadius: BorderRadius.circular(R.sm)),
+            child: AppIcon('message-circle', size: 16, color: AppColors.accent),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Your input is needed',
+                  style:
+                      sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+              const SizedBox(height: 2),
+              Text(
+                  total > 1
+                      ? '$total questions'
+                      : 'The agent is waiting for your answer',
+                  style: mono(10.5, color: AppColors.fg3)),
+            ]),
+          ),
+          if (_sent)
+            Text('Sending…', style: mono(10.5, color: AppColors.accent)),
         ]),
         if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
           const SizedBox(height: 12),

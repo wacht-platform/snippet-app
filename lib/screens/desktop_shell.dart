@@ -2705,6 +2705,14 @@ class _SettingsPanelState extends State<_SettingsPanel> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               children: [
+                Text('Workspace controls',
+                    style: sans(20,
+                        weight: FontWeight.w600, color: AppColors.fg1)),
+                const SizedBox(height: 5),
+                Text(
+                    'Connections, models, secrets, and appearance for this client.',
+                    style: sans(12.5, height: 1.4, color: AppColors.fg3)),
+                const SizedBox(height: 24),
                 // Grok-style: Instances section with card grouping.
                 Text('Instances',
                     style: sans(12,
