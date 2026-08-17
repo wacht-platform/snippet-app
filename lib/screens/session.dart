@@ -768,10 +768,13 @@ class _SessionScreenState extends State<SessionScreen>
             // doesn't double-render against AssistantText once it lands.
             if (wire == 'snapshot' || wire == 'delta') {
               _liveText = '';
-              _liveThinking = '';
               _liveTextVisible = false;
-              // Cancel any in-flight stream throttle so stale frames don't
-              // re-apply after the snapshot/delta clears live state.
+              // Keep live thinking while the run is still going. Deltas for
+              // tool_call/tool_result used to wipe it, which looked like the
+              // app truncated the thought mid-stream.
+              if (next.status != 'running') {
+                _liveThinking = '';
+              }
               _streamFlushTimer?.cancel();
               _streamFlushTimer = null;
             }
@@ -828,11 +831,25 @@ class _SessionScreenState extends State<SessionScreen>
     });
   }
 
+  // Stream frames may be a full buffer or a tailed snippet (`…\\n\\n` + last
+  // N chars). Never shrink what we already show while the run is live.
+  String _mergeLiveThinking(String prev, String next) {
+    var incoming = next;
+    if (incoming.startsWith('…')) {
+      incoming = incoming.replaceFirst(RegExp(r'^…+\s*'), '');
+    }
+    if (incoming.isEmpty) return prev;
+    if (prev.isEmpty) return incoming;
+    if (incoming.startsWith(prev) || incoming.contains(prev)) return incoming;
+    if (prev.endsWith(incoming) || prev.contains(incoming)) return prev;
+    return prev + incoming;
+  }
+
   // Throttled stream frame flush — called by the 50ms timer.
   void _flushStreamFrame() {
     if (_closed || !mounted) return;
     final text = _pendingLiveText;
-    final thinking = _pendingLiveThinking;
+    final thinking = _mergeLiveThinking(_liveThinking, _pendingLiveThinking);
     final visible = _pendingLiveTextVisible;
     setState(() {
       _liveText = text;
@@ -1647,14 +1664,14 @@ class _SessionScreenState extends State<SessionScreen>
           // bottom of a scrolled-up transcript it read as "the agent is stuck".
           if (waiting && _pendingApproval(events))
             _centerWide(Padding(
-              padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
               child: _ApprovalBar(
                   onSend: _sendDecision,
                   showApproveAll: _pendingApprovalTotal(events) > 1),
             ))
           else if (waiting && s?.pendingQuestion != null)
             _centerWide(Padding(
-              padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
               child: _QuestionBar(
                   question: s!.pendingQuestion!, onSend: _sendDecision),
             )),
@@ -2236,7 +2253,7 @@ class _SessionScreenState extends State<SessionScreen>
   Widget _inputBar(bool running) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          16, 8, 16, 10 + MediaQuery.of(context).padding.bottom),
+          20, 8, 20, 10 + MediaQuery.of(context).padding.bottom),
       child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -457,13 +457,21 @@ class _MdCodeBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (_) => true,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SelectableText.rich(
-            highlightedCodeSpan(code, language: language),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.sm),
+        ),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (_) => true,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SelectableText.rich(
+              highlightedCodeSpan(code, language: language),
+            ),
           ),
         ),
       ),
