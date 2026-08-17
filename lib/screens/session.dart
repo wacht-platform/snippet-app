@@ -3798,9 +3798,28 @@ class _ChurningStatusState extends State<_ChurningStatus> {
 /// A run of consecutive tool calls, grouped under a left rule. The "N steps"
 /// header toggles the group collapsed/expanded.
 
+class _ClearScrollTerminal extends Terminal {
+  _ClearScrollTerminal() : super(maxLines: 5000);
+
+  @override
+  void eraseDisplay() {
+    // CSI 2J only blanks the viewport. Fish `clear` then CUP 1;1 and
+    // reprints the prompt — if we leave the last history line sitting
+    // on row 0, that leftover stays glued to the new prompt. Push the
+    // current screen into scrollback first, like gnome-terminal / iTerm.
+    if (!buffer.isAltBuffer) {
+      final n = viewHeight;
+      for (var i = 0; i < n; i++) {
+        buffer.index();
+      }
+    }
+    buffer.eraseDisplay();
+    buffer.setCursor(0, 0);
+  }
+}
+
 class _LiveTerm {
-  _LiveTerm(this.id, {required this.title})
-      : terminal = Terminal(maxLines: 5000);
+  _LiveTerm(this.id, {required this.title}) : terminal = _ClearScrollTerminal();
   final String id;
   final String title;
   final Terminal terminal;
