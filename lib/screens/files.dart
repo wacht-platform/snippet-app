@@ -461,12 +461,17 @@ class FileViewer extends StatefulWidget {
   final String path;
   final String name;
   final VoidCallback? onClose;
+
+  /// When true (desktop/shell tab), the window already has a tab strip —
+  /// skip the in-pane title bar and put download/edit on a thin action row.
+  final bool embedded;
   const FileViewer(
       {super.key,
       required this.client,
       required this.path,
       required this.name,
-      this.onClose});
+      this.onClose,
+      this.embedded = false});
   @override
   State<FileViewer> createState() => _FileViewerState();
 }
@@ -559,34 +564,34 @@ class _FileViewerState extends State<FileViewer> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final f = _f;
+    final actions = <Widget>[
+      IconBtn('download',
+          tooltip: 'Download', onTap: _downloading ? null : _download),
+      if (!_isMedia)
+        IconBtn('edit',
+            tooltip: 'Edit',
+            onTap: () => presentScreen(
+                  context,
+                  style: PanelStyle.dialog,
+                  dismissible: false,
+                  builder: (_, close) => EditorScreen(
+                      client: widget.client,
+                      path: widget.path,
+                      name: widget.name,
+                      onClose: close),
+                ).then((_) => _load())),
+    ];
     return Scaffold(
       backgroundColor: readingBg,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          SnAppBar(
-              title: widget.name,
-              subtitle: widget.path,
-              onBack: widget.onClose ?? () => Navigator.pop(context),
-              actions: [
-                IconBtn('download',
-                    tooltip: 'Download',
-                    onTap: _downloading ? null : _download),
-                // Editing is text-only.
-                if (!_isMedia)
-                  IconBtn('edit',
-                      tooltip: 'Edit',
-                      onTap: () => presentScreen(
-                            context,
-                            style: PanelStyle.dialog,
-                            dismissible: false,
-                            builder: (_, close) => EditorScreen(
-                                client: widget.client,
-                                path: widget.path,
-                                name: widget.name,
-                                onClose: close),
-                          ).then((_) => _load())),
-              ]),
+          if (!widget.embedded)
+            SnAppBar(
+                title: widget.name,
+                subtitle: widget.path,
+                onBack: widget.onClose ?? () => Navigator.pop(context),
+                actions: actions),
           if (_isImage)
             Expanded(
               child: ColoredBox(

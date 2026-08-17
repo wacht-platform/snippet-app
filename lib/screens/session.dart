@@ -764,19 +764,20 @@ class _SessionScreenState extends State<SessionScreen>
           setState(() {
             _state = next;
             _title = next.title ?? widget.title;
-            // Snapshot/delta commit durable events; drop partial stream so it
+            // Snapshot/delta commit durable events; drop the live answer so it
             // doesn't double-render against AssistantText once it lands.
+            // Do not cancel the stream flush or wipe thinking on tool deltas —
+            // those frames arrive between thinking tokens and made the thought
+            // look truncated / frozen.
             if (wire == 'snapshot' || wire == 'delta') {
               _liveText = '';
               _liveTextVisible = false;
-              // Keep live thinking while the run is still going. Deltas for
-              // tool_call/tool_result used to wipe it, which looked like the
-              // app truncated the thought mid-stream.
               if (next.status != 'running') {
                 _liveThinking = '';
+                _pendingLiveThinking = '';
+                _streamFlushTimer?.cancel();
+                _streamFlushTimer = null;
               }
-              _streamFlushTimer?.cancel();
-              _streamFlushTimer = null;
             }
           });
           widget.onMacStatus?.call(next, next.status == 'running');
@@ -840,9 +841,24 @@ class _SessionScreenState extends State<SessionScreen>
     }
     if (incoming.isEmpty) return prev;
     if (prev.isEmpty) return incoming;
-    if (incoming.startsWith(prev) || incoming.contains(prev)) return incoming;
+    if (incoming == prev) return prev;
+    if (incoming.startsWith(prev)) return incoming;
+    if (prev.startsWith(incoming)) return prev;
+    if (incoming.contains(prev) && incoming.length >= prev.length) {
+      return incoming;
+    }
     if (prev.endsWith(incoming) || prev.contains(incoming)) return prev;
-    return prev + incoming;
+    // Overlapping tail/head (tailed snapshots) — grow instead of mash.
+    final maxOverlap =
+        prev.length < incoming.length ? prev.length : incoming.length;
+    for (var n = maxOverlap; n >= 24; n--) {
+      if (prev.endsWith(incoming.substring(0, n))) {
+        return prev + incoming.substring(n);
+      }
+    }
+    // Never concatenate two full snapshots; keep the longer coherent one.
+    if (incoming.length >= prev.length) return incoming;
+    return prev;
   }
 
   // Throttled stream frame flush — called by the 50ms timer.

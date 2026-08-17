@@ -13,6 +13,7 @@ import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
+import 'editor.dart';
 import 'files.dart';
 import 'git.dart';
 import 'models.dart';
@@ -771,7 +772,12 @@ class _DesktopShellState extends State<DesktopShell> {
             itemBuilder: (_, i) => _tabChip(i),
           ),
         ),
-        if (controls != null) ...[
+        if (tab != null && tab.isFile) ...[
+          Container(width: 1, height: 18, color: AppColors.border2),
+          _macTopIconAction(
+              'download', 'Download', () => _downloadActiveFile()),
+          _macTopIconAction('edit', 'Edit', () => _editActiveFile()),
+        ] else if (controls != null) ...[
           Container(width: 1, height: 18, color: AppColors.border2),
           _macTopIconAction(
               'shield',
@@ -1023,6 +1029,39 @@ class _DesktopShellState extends State<DesktopShell> {
     );
   }
 
+  Future<void> _downloadActiveFile() async {
+    final tab = _activeTab;
+    if (tab == null || !tab.isFile) return;
+    try {
+      final message = await downloadRemoteFileWithCancel(
+        context,
+        tab.client,
+        path: tab.filePath!,
+        name: tab.title,
+      );
+      if (!mounted) return;
+      if (message != null) toast(context, message);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
+  void _editActiveFile() {
+    final tab = _activeTab;
+    if (tab == null || !tab.isFile) return;
+    presentScreen(
+      context,
+      style: PanelStyle.dialog,
+      dismissible: false,
+      builder: (_, close) => EditorScreen(
+        client: tab.client,
+        path: tab.filePath!,
+        name: tab.title,
+        onClose: close,
+      ),
+    );
+  }
+
   void _openMacGit() {
     final tab = _activeTab;
     if (tab == null) return;
@@ -1197,6 +1236,7 @@ class _DesktopShellState extends State<DesktopShell> {
                             client: t.client,
                             path: t.filePath!,
                             name: t.title,
+                            embedded: true,
                             onClose: () => _closeTabByKey(t.key),
                           )
                         : SessionScreen(
@@ -1255,6 +1295,15 @@ class _DesktopShellState extends State<DesktopShell> {
             itemBuilder: (_, i) => _tabChip(i),
           ),
         ),
+        if (!kMobile && _activeTab?.isFile == true) ...[
+          IconBtn('download',
+              size: 38,
+              iconSize: 16,
+              tooltip: 'Download',
+              onTap: _downloadActiveFile),
+          IconBtn('edit',
+              size: 38, iconSize: 16, tooltip: 'Edit', onTap: _editActiveFile),
+        ],
         IconBtn('plus',
             size: kMobile ? 52 : 38,
             iconSize: kMobile ? 25 : 17,

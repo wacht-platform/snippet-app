@@ -332,17 +332,15 @@ List<Widget> _grepView(Map? a, Map? d) {
   final out = <Widget>[];
   final results = _mapItems(d?['results']);
   if (results.isNotEmpty) {
-    out.add(_Card(
-      children: [
-        for (final m in results)
-          _MatchRow(
-            path: m['path']?.toString() ?? '',
-            line: m['line_number']?.toString(),
-            text: m['content']?.toString() ?? '',
-            query: a?['query']?.toString() ?? '',
-          ),
-      ],
-    ));
+    out.add(_SearchHitList(children: [
+      for (final m in results)
+        _MatchRow(
+          path: m['path']?.toString() ?? '',
+          line: m['line_number']?.toString(),
+          text: m['content']?.toString() ?? '',
+          query: a?['query']?.toString() ?? '',
+        ),
+    ]));
   } else if (d != null) {
     out.add(const SizedBox(height: 10));
     out.add(_empty('No matches'));
@@ -443,19 +441,20 @@ List<Widget> _codeMapView(Map? a, Map? d) {
 }
 
 List<Widget> _webSearchView(Map? a, Map? d) {
-  final out = <Widget>[];
   final results = _mapItems(d?['results']);
-  for (final res in results) {
-    if (out.isNotEmpty) out.add(const SizedBox(height: 8));
-    out.add(_ResultCard(
-      title: res['title']?.toString() ?? '',
-      url: res['url']?.toString() ?? '',
-      date: res['published_date']?.toString(),
-      snippet: res['snippet']?.toString(),
-      query: a?['query']?.toString() ?? '',
-    ));
-  }
-  return out;
+  if (results.isEmpty) return const [];
+  return [
+    _SearchHitList(children: [
+      for (final res in results)
+        _ResultCard(
+          title: res['title']?.toString() ?? '',
+          url: res['url']?.toString() ?? '',
+          date: res['published_date']?.toString(),
+          snippet: res['snippet']?.toString(),
+          query: a?['query']?.toString() ?? '',
+        ),
+    ]),
+  ];
 }
 
 List<Widget> _webReadView(Map? a, Map? d) {
@@ -673,6 +672,24 @@ class _FileRow extends StatelessWidget {
   }
 }
 
+class _SearchHitList extends StatelessWidget {
+  final List<Widget> children;
+  const _SearchHitList({required this.children});
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) Divider(height: 1, thickness: 1, color: AppColors.border),
+          children[i],
+        ],
+      ],
+    );
+  }
+}
+
 class _MatchRow extends StatelessWidget {
   final String path;
   final String? line;
@@ -684,17 +701,19 @@ class _MatchRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Flexible(
-              child: Text(path,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(11, color: AppColors.accent))),
-          if (line != null)
-            Text(':$line',
-                style: mono(11, color: AppColors.ok.withValues(alpha: 0.9))),
-        ]),
+        Text.rich(
+          TextSpan(children: [
+            TextSpan(text: path, style: mono(12, color: AppColors.accent)),
+            if (line != null)
+              TextSpan(
+                  text: ':$line',
+                  style: mono(12, color: AppColors.ok.withValues(alpha: 0.9))),
+          ]),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         const SizedBox(height: 3),
         _highlightedLine(text, query),
       ]),
@@ -779,42 +798,31 @@ class _ResultCard extends StatelessWidget {
     final snippetText = snippet ?? '';
     final dateText = date ?? '';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (title.isNotEmpty)
           Text(title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style:
                   sans(13.5, weight: FontWeight.w600, color: AppColors.accent)),
-        if (title.isNotEmpty) const SizedBox(height: 4),
-        _LinkText(url),
+        if (url.isNotEmpty) ...[
+          if (title.isNotEmpty) const SizedBox(height: 2),
+          Text(url,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: mono(11, color: AppColors.fg4)),
+        ],
         if (snippetText.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           _highlightedLine(snippetText, query),
         ],
         if (dateText.isNotEmpty) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(dateText, style: mono(10, color: AppColors.fg4)),
         ],
       ]),
     );
-  }
-}
-
-class _LinkText extends StatelessWidget {
-  final String url;
-  const _LinkText(this.url);
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Row(children: [
-      AppIcon('globe', size: 11, color: AppColors.fg4),
-      const SizedBox(width: 5),
-      Expanded(
-          child: Text(url,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: mono(11, color: AppColors.accent))),
-    ]);
   }
 }
 
