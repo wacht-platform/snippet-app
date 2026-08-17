@@ -1539,6 +1539,60 @@ class _AppFieldState extends State<AppField> {
 /// Bottom sheet matching the handoff (drag handle, title + close, scroll body).
 /// A bottom-sheet single-field text prompt (rename, etc.). Returns the trimmed
 /// text on save, or null if cancelled.
+/// Compact confirm — no oversized desktop sheet chrome.
+Future<bool> confirmAction(
+  BuildContext context, {
+  required String title,
+  required String body,
+  String confirmLabel = 'Delete',
+  bool danger = true,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.45),
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: AppColors.surface1,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(R.md),
+          side: BorderSide(color: AppColors.border2),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(title,
+                    style: sans(15,
+                        weight: FontWeight.w600, color: AppColors.fg1)),
+                const SizedBox(height: 8),
+                Text(body, style: sans(13, height: 1.45, color: AppColors.fg3)),
+                const SizedBox(height: 16),
+                Row(children: [
+                  const Spacer(),
+                  Btn('Cancel',
+                      variant: BtnVariant.ghost,
+                      onTap: () => Navigator.pop(ctx, false)),
+                  const SizedBox(width: 8),
+                  Btn(confirmLabel,
+                      variant: danger ? BtnVariant.danger : BtnVariant.primary,
+                      onTap: () => Navigator.pop(ctx, true)),
+                ]),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+  return result == true;
+}
+
 Future<String?> promptText(BuildContext context,
     {required String title,
     String initial = '',

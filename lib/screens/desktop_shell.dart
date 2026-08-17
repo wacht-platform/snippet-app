@@ -1592,6 +1592,18 @@ class _SidebarState extends State<_Sidebar> {
   // sidebar is presentational, so opening the drawer doesn't refetch.
   String _filter = 'all'; // all | input | running | done
   final _machineKey = GlobalKey(); // anchors the desktop machine popover
+  bool _selecting = false;
+  final Set<String> _selected = {};
+  String? _renamingId;
+  final TextEditingController _renameCtl = TextEditingController();
+  final FocusNode _renameFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _renameCtl.dispose();
+    _renameFocus.dispose();
+    super.dispose();
+  }
 
   List<SessionInfo>? get _sessions => widget.sessions;
   bool get _loading => widget.sessionsLoading;
@@ -1688,23 +1700,49 @@ class _SidebarState extends State<_Sidebar> {
                   if (hasClient && (_sessions?.isNotEmpty ?? false))
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-                      child: Row(children: [
-                        Text('Conversations',
-                            style: sans(20,
-                                weight: FontWeight.w600, color: AppColors.fg1)),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: _showFilterSheet,
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Icon(Icons.filter_list_rounded,
-                                size: 24,
-                                color: _filter != 'all'
-                                    ? AppColors.accent
-                                    : AppColors.fg3),
-                          ),
-                        ),
-                      ]),
+                      child: _selecting
+                          ? Row(children: [
+                              Text('${_selected.length} selected',
+                                  style: sans(16,
+                                      weight: FontWeight.w600,
+                                      color: AppColors.fg1)),
+                              const Spacer(),
+                              IconBtn('x',
+                                  size: 32,
+                                  iconSize: 18,
+                                  tooltip: 'Cancel',
+                                  onTap: _exitSelect),
+                              IconBtn('trash',
+                                  size: 32,
+                                  iconSize: 16,
+                                  tooltip: 'Delete selected',
+                                  onTap: _selected.isEmpty
+                                      ? null
+                                      : _confirmDeleteSelected),
+                            ])
+                          : Row(children: [
+                              Text('Conversations',
+                                  style: sans(20,
+                                      weight: FontWeight.w600,
+                                      color: AppColors.fg1)),
+                              const Spacer(),
+                              IconBtn('check-check',
+                                  size: 32,
+                                  iconSize: 16,
+                                  tooltip: 'Select',
+                                  onTap: _enterSelect),
+                              GestureDetector(
+                                onTap: _showFilterSheet,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Icon(Icons.filter_list_rounded,
+                                      size: 24,
+                                      color: _filter != 'all'
+                                          ? AppColors.accent
+                                          : AppColors.fg3),
+                                ),
+                              ),
+                            ]),
                     ),
                   Expanded(
                     child: !hasClient
@@ -1728,6 +1766,29 @@ class _SidebarState extends State<_Sidebar> {
           _navRow('folder', 'Browse',
               sub: 'files · new chat',
               onTap: hasClient ? widget.onNewSession : null),
+          if (hasClient && (_sessions?.isNotEmpty ?? false))
+            _selecting
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
+                    child: Row(children: [
+                      Text('${_selected.length} selected',
+                          style: sans(11.5, color: AppColors.fg3)),
+                      const Spacer(),
+                      IconBtn('x',
+                          size: 28,
+                          iconSize: 15,
+                          tooltip: 'Cancel',
+                          onTap: _exitSelect),
+                      IconBtn('trash',
+                          size: 28,
+                          iconSize: 14,
+                          tooltip: 'Delete selected',
+                          onTap: _selected.isEmpty
+                              ? null
+                              : _confirmDeleteSelected),
+                    ]),
+                  )
+                : _navRow('check-check', 'Select', onTap: _enterSelect),
           const SizedBox(height: 4),
           Expanded(
             child: !hasClient
@@ -2086,20 +2147,43 @@ class _SidebarState extends State<_Sidebar> {
     final selected = s.id == widget.selectedSessionId;
     final waiting = s.status == 'waiting_for_input';
     final running = s.status == 'running';
+    final checked = _selected.contains(s.id);
+    final renaming = _renamingId == s.id;
     return Material(
-      color: selected ? AppColors.surface2 : Colors.transparent,
+      color: selected || checked ? AppColors.surface2 : Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
       child: InkWell(
         borderRadius: BorderRadius.circular(R.sm),
-        onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
-        onLongPress: () => _sessionActions(s),
-        onSecondaryTapDown: (details) =>
-            _sessionActions(s, position: details.globalPosition),
+        onTap: renaming
+            ? null
+            : () {
+                if (_selecting) {
+                  _toggleSelected(s.id);
+                } else {
+                  widget.onOpenSession(s.id, s.title, s.profile);
+                }
+              },
+        onLongPress: renaming
+            ? null
+            : () {
+                if (_selecting) {
+                  _toggleSelected(s.id);
+                } else {
+                  _enterSelect(seed: s.id);
+                }
+              },
+        onSecondaryTapDown: renaming
+            ? null
+            : (details) => _sessionActions(s, position: details.globalPosition),
         child: Container(
           height: 32,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(children: [
-            if (waiting || running) ...[
+            if (_selecting) ...[
+              AppIcon(checked ? 'check' : 'plus',
+                  size: 13, color: checked ? AppColors.accent : AppColors.fg4),
+              const SizedBox(width: 8),
+            ] else if (waiting || running) ...[
               Container(
                   width: 6,
                   height: 6,
@@ -2109,15 +2193,19 @@ class _SidebarState extends State<_Sidebar> {
               const SizedBox(width: 8),
             ],
             Expanded(
-                child: Text(s.title.isEmpty ? '(untitled)' : s.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12.5,
-                        color: selected ? AppColors.fg1 : AppColors.fg2))),
-            const SizedBox(width: 8),
-            Text(relativeTime(s.lastActive),
-                style: mono(10,
-                    color: waiting ? AppColors.accent : AppColors.fg4)),
+                child: renaming
+                    ? _inlineRenameField(s, compact: true)
+                    : Text(s.title.isEmpty ? '(untitled)' : s.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(12.5,
+                            color: selected ? AppColors.fg1 : AppColors.fg2))),
+            if (!renaming) ...[
+              const SizedBox(width: 8),
+              Text(relativeTime(s.lastActive),
+                  style: mono(10,
+                      color: waiting ? AppColors.accent : AppColors.fg4)),
+            ],
           ]),
         ),
       ),
@@ -2127,27 +2215,52 @@ class _SidebarState extends State<_Sidebar> {
   Widget _sessionCard(SessionInfo s) {
     final running = s.status == 'running';
     final waiting = s.status == 'waiting_for_input';
+    final checked = _selected.contains(s.id);
+    final renaming = _renamingId == s.id;
     return GestureDetector(
-      onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
-      onLongPress: () => _sessionActions(s),
+      onTap: renaming
+          ? null
+          : () {
+              if (_selecting) {
+                _toggleSelected(s.id);
+              } else {
+                widget.onOpenSession(s.id, s.title, s.profile);
+              }
+            },
+      onLongPress: renaming
+          ? null
+          : () {
+              if (_selecting) {
+                _toggleSelected(s.id);
+              } else {
+                _enterSelect(seed: s.id);
+              }
+            },
       child: Container(
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.surface2,
+          color: checked ? AppColors.accentBg : AppColors.surface2,
           borderRadius: BorderRadius.circular(R.md),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          if (_selecting) ...[
+            AppIcon(checked ? 'check' : 'plus',
+                size: 16, color: checked ? AppColors.accent : AppColors.fg4),
+            const SizedBox(width: 10),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  s.title.isEmpty ? '(untitled)' : s.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(16, color: AppColors.fg1),
-                ),
+                renaming
+                    ? _inlineRenameField(s, compact: false)
+                    : Text(
+                        s.title.isEmpty ? '(untitled)' : s.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(16, color: AppColors.fg1),
+                      ),
                 const SizedBox(height: 4),
                 Row(children: [
                   Text(relativeTime(s.lastActive),
@@ -2163,7 +2276,7 @@ class _SidebarState extends State<_Sidebar> {
               ],
             ),
           ),
-          if (running || waiting) ...[
+          if (!_selecting && (running || waiting)) ...[
             const SizedBox(width: 8),
             Container(
               width: 8,
@@ -2174,12 +2287,14 @@ class _SidebarState extends State<_Sidebar> {
               ),
             ),
           ],
-          const SizedBox(width: 8),
-          IconBtn('more-vertical',
-              size: 28,
-              iconSize: 16,
-              tooltip: 'Options',
-              onTap: () => _sessionActions(s)),
+          if (!_selecting && !renaming) ...[
+            const SizedBox(width: 8),
+            IconBtn('more-vertical',
+                size: 28,
+                iconSize: 16,
+                tooltip: 'Options',
+                onTap: () => _sessionActions(s)),
+          ],
         ]),
       ),
     );
@@ -2203,9 +2318,9 @@ class _SidebarState extends State<_Sidebar> {
         ],
       );
       if (selected == 'rename') {
-        await _renameSession(s);
+        _beginRename(s);
       } else if (selected == 'delete') {
-        await _confirmDeleteSession(s);
+        await _confirmDeleteSessions([s]);
       }
       return;
     }
@@ -2217,11 +2332,15 @@ class _SidebarState extends State<_Sidebar> {
           children: [
             _sessionActionTile('edit', 'Rename', onTap: () {
               Navigator.pop(context);
-              _renameSession(s);
+              _beginRename(s);
+            }),
+            _sessionActionTile('check-check', 'Select', onTap: () {
+              Navigator.pop(context);
+              _enterSelect(seed: s.id);
             }),
             _sessionActionTile('trash', 'Delete', danger: true, onTap: () {
               Navigator.pop(context);
-              _confirmDeleteSession(s);
+              _confirmDeleteSessions([s]);
             }),
           ],
         ));
@@ -2248,15 +2367,65 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  Future<void> _renameSession(SessionInfo s) async {
+  void _enterSelect({String? seed}) {
+    setState(() {
+      _selecting = true;
+      _renamingId = null;
+      if (seed != null) _selected.add(seed);
+    });
+  }
+
+  void _exitSelect() {
+    setState(() {
+      _selecting = false;
+      _selected.clear();
+    });
+  }
+
+  void _toggleSelected(String id) {
+    setState(() {
+      if (!_selected.add(id)) _selected.remove(id);
+    });
+  }
+
+  void _beginRename(SessionInfo s) {
+    _renameCtl.text = s.title;
+    _renameCtl.selection =
+        TextSelection(baseOffset: 0, extentOffset: _renameCtl.text.length);
+    setState(() {
+      _selecting = false;
+      _selected.clear();
+      _renamingId = s.id;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _renameFocus.requestFocus();
+    });
+  }
+
+  Widget _inlineRenameField(SessionInfo s, {required bool compact}) {
+    return TextField(
+      controller: _renameCtl,
+      focusNode: _renameFocus,
+      autofocus: true,
+      maxLines: 1,
+      style: sans(compact ? 12.5 : 16, color: AppColors.fg1),
+      cursorColor: AppColors.fg1,
+      decoration: const InputDecoration(
+        isCollapsed: true,
+        border: InputBorder.none,
+        hintText: 'Session title',
+      ),
+      onSubmitted: (_) => _commitRename(s),
+      onTapOutside: (_) => _commitRename(s),
+    );
+  }
+
+  Future<void> _commitRename(SessionInfo s) async {
+    if (_renamingId != s.id) return;
     final c = widget.client;
-    if (c == null) return;
-    final title = await promptText(context,
-        title: 'Rename session',
-        initial: s.title,
-        hint: 'New title',
-        saveLabel: 'Rename');
-    if (title == null) return;
+    final title = _renameCtl.text.trim();
+    setState(() => _renamingId = null);
+    if (c == null || title.isEmpty || title == s.title) return;
     try {
       await c.renameSession(s.id, title);
       widget.onRefreshSessions();
@@ -2265,40 +2434,38 @@ class _SidebarState extends State<_Sidebar> {
     }
   }
 
-  Future<void> _confirmDeleteSession(SessionInfo s) async {
+  Future<void> _confirmDeleteSelected() async {
+    final ids = _selected.toList();
+    final sessions = (widget.sessions ?? const <SessionInfo>[])
+        .where((s) => ids.contains(s.id))
+        .toList();
+    if (sessions.isEmpty) return;
+    await _confirmDeleteSessions(sessions);
+  }
+
+  Future<void> _confirmDeleteSessions(List<SessionInfo> sessions) async {
     final c = widget.client;
-    if (c == null) return;
-    final ok = await showAppSheet<bool>(context,
-        title: 'Delete session?',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(s.title.isEmpty ? '(untitled session)' : s.title,
-                style: sans(13.5, color: AppColors.fg1)),
-            const SizedBox(height: 6),
-            Text(
-                'Permanently removes the conversation. The folder and its files are untouched.',
-                style: sans(12, height: 1.45, color: AppColors.fg3)),
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(
-                  child: Btn('Cancel',
-                      variant: BtnVariant.secondary,
-                      onTap: () => Navigator.pop(context, false))),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Btn('Delete',
-                      variant: BtnVariant.danger,
-                      icon: 'trash',
-                      onTap: () => Navigator.pop(context, true))),
-            ]),
-          ],
-        ));
-    if (ok != true) return;
+    if (c == null || sessions.isEmpty) return;
+    final n = sessions.length;
+    final first = sessions.first.title.isEmpty
+        ? '(untitled session)'
+        : sessions.first.title;
+    final body = n == 1
+        ? '$first\n\nPermanently removes the conversation. The folder and its files are untouched.'
+        : 'Delete $n conversations? Folders and files are untouched.';
+    final ok = await confirmAction(
+      context,
+      title: n == 1 ? 'Delete session?' : 'Delete $n sessions?',
+      body: body,
+      confirmLabel: n == 1 ? 'Delete' : 'Delete $n',
+    );
+    if (!ok) return;
     try {
-      await c.deleteSession(s.id);
-      widget.onSessionDeleted(s.id);
+      for (final s in sessions) {
+        await c.deleteSession(s.id);
+        widget.onSessionDeleted(s.id);
+      }
+      if (mounted) _exitSelect();
       widget.onRefreshSessions();
     } catch (e) {
       if (mounted) toast(context, '$e', danger: true);
