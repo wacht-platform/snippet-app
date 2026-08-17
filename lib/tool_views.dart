@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:re_editor/re_editor.dart';
 
 import 'highlight.dart';
@@ -499,9 +500,7 @@ List<Widget> _memoryView(String tool, Map? a, Map? d) {
   }
   if (content.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
-    out.add(_CodeBox(
-        _previewLines(_displayText(content).trimRight(), maxLines: 10),
-        useSans: true));
+    out.add(_ToolMarkdown(_displayText(content).trimRight()));
   }
   if (out.isEmpty) {
     out.add(Text(toolTitle(tool), style: sans(13, color: AppColors.fg3)));
@@ -520,9 +519,7 @@ List<Widget> _skillView(String tool, Map? a, Map? d) {
   }
   if (text.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
-    out.add(_CodeBox(
-        _previewLines(_displayText(text).trimRight(), maxLines: 12),
-        useSans: true));
+    out.add(_ToolMarkdown(_displayText(text).trimRight()));
   }
   if (out.isEmpty) {
     out.add(Text(toolTitle(tool), style: sans(13, color: AppColors.fg3)));
@@ -845,6 +842,22 @@ class _ErrorBox extends StatelessWidget {
             child: SelectableText(message,
                 style: mono(11.5, height: 1.45, color: AppColors.danger))),
       ]),
+    );
+  }
+}
+
+class _ToolMarkdown extends StatelessWidget {
+  final String data;
+  const _ToolMarkdown(this.data);
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return MarkdownBody(
+      data: data,
+      selectable: false,
+      styleSheet: markdownStyle(context),
+      builders: {'pre': PreBlockBuilder()},
+      onTapLink: (txt, href, title) => openMarkdownLink(href),
     );
   }
 }
