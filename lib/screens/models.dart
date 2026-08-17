@@ -106,19 +106,6 @@ class _ModelsScreenState extends State<ModelsScreen> {
                         ]),
                       ),
                     ),
-                    if (profiles.length > 1) ...[
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          snap.data?.delegate == null ||
-                                  snap.data!.delegate!.isEmpty
-                              ? 'Delegated lanes use the active model. Tap ⋮ on a profile to run them on a different one.'
-                              : 'Delegated lanes run on “${snap.data!.delegate}”.',
-                          style: mono(11, height: 1.4, color: AppColors.fg3),
-                        ),
-                      ),
-                    ],
                   ],
                 );
                 // Don't stretch full-width on desktop — keep a readable column.
