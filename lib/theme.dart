@@ -143,244 +143,21 @@ ThemePreset _dark({
   );
 }
 
-// Light theme helper: white-based surfaces.
-ThemePreset _light({
-  required String name,
-  required String label,
-  required Color accent,
-  required Color text,
-  required Color muted,
-  required Color faint,
-  required Color success,
-  required Color danger,
-  required Color warn,
-}) {
-  return ThemePreset(
-    name: name,
-    label: label,
-    bg: const Color(0xFFF5F5F5),
-    canvas: const Color(0xFFFFFFFF),
-    surface1: const Color(0xFFFFFFFF),
-    surface2: const Color(0xFFF0F0F0),
-    surface3: const Color(0xFFE5E5E5),
-    fg1: text,
-    fg2: muted,
-    fg3: _lighten(muted, 0.2),
-    fg4: faint,
-    border: _alphaBlack(0.08),
-    border2: _alphaBlack(0.14),
-    accent: accent,
-    accentHover: _darken(accent, 0.08),
-    accentFg: const Color(0xFFFFFFFF),
-    accentBg: _withAlpha(accent, 0.12),
-    accentLine: _withAlpha(accent, 0.35),
-    accentRing: _withAlpha(accent, 0.25),
-    ok: success,
-    okBg: _withAlpha(success, 0.12),
-    run: warn,
-    runBg: _withAlpha(warn, 0.12),
-    danger: danger,
-    dangerBg: _withAlpha(danger, 0.12),
-    diffAddBg: _withAlpha(success, 0.10),
-    diffDelBg: _withAlpha(danger, 0.10),
-    diffAddFg: _darken(success, 0.15),
-    diffDelFg: _darken(danger, 0.15),
-    diffGutter: faint,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 4 curated presets — each one beautiful, no filler.
-// ---------------------------------------------------------------------------
-
-const _terminalInk = ThemePreset(
-  name: 'terminal-ink',
-  label: 'Terminal Ink',
-  bg: Color(0xFF121212),
-  canvas: Color(0xFF181818),
-  surface1: Color(0xFF1E1E1E),
-  surface2: Color(0xFF2A2A2A),
-  surface3: Color(0xFF363636),
-  fg1: Color(0xFFE8ECEA),
-  fg2: Color(0xFFB0B8B4),
-  fg3: Color(0xFF8A918E),
-  fg4: Color(0xFF6E7572),
-  border: Color(0x17FFFFFF),
-  border2: Color(0x24FFFFFF),
-  accent: Color(0xFFE0A458),
-  accentHover: Color(0xFFEBB470),
-  accentFg: Color(0xFF160E02),
-  accentBg: Color(0x26E0A458),
-  accentLine: Color(0x66E0A458),
-  accentRing: Color(0x4DE0A458),
-  ok: Color(0xFF7BC49A),
-  okBg: Color(0x267BC49A),
-  run: Color(0xFFE0A458),
-  runBg: Color(0x26E0A458),
-  danger: Color(0xFFE86A6A),
-  dangerBg: Color(0x26E86A6A),
-  diffAddBg: Color(0x1F7BC49A),
-  diffDelBg: Color(0x1FE86A6A),
-  diffAddFg: Color(0xFF9AD4B4),
-  diffDelFg: Color(0xFFF0A0A0),
-  diffGutter: Color(0xFF6E7572),
-);
-
-final _nord = _dark(
-  name: 'nord',
-  label: 'Nord',
-  accent: const Color(0xFF88C0D0),
-  text: const Color(0xFFD8DEE9),
-  muted: const Color(0xFFA0AAB8),
-  faint: const Color(0xFF7B8899),
-  success: const Color(0xFFA3BE8C),
-  danger: const Color(0xFFBF616A),
-  warn: const Color(0xFFEBCB8B),
-);
-
-final _dracula = _dark(
-  name: 'dracula',
-  label: 'Dracula',
-  accent: const Color(0xFFBD93F9),
-  text: const Color(0xFFF8F8F2),
-  muted: const Color(0xFFB0B8D0),
-  faint: const Color(0xFF8890B0),
-  success: const Color(0xFF50FA7B),
-  danger: const Color(0xFFFF5555),
-  warn: const Color(0xFFF1FA8C),
-);
-
-final _lightPreset = _light(
-  name: 'light',
-  label: 'Light',
-  accent: const Color(0xFF2563EB),
-  text: const Color(0xFF1E293B),
-  muted: const Color(0xFF475569),
-  faint: const Color(0xFF94A3B8),
-  success: const Color(0xFF15804C),
-  danger: const Color(0xFFDC2626),
-  warn: const Color(0xFFD97706),
-);
-
-// Rosé Pine — moody dark blue-purple with soft rose accents. Cozy, elegant, low-strain.
-final _rosePine = _dark(
-  name: 'rose-pine',
-  label: 'Rosé Pine',
-  accent: const Color(0xFFEB6F92), // love (rose)
-  text: const Color(0xFFE0DEF4), // text
-  muted: const Color(0xFF908CAA), // subtle
-  faint: const Color(0xFF6E6A86), // muted
-  success: const Color(0xFF9CCFD8), // foam
-  danger: const Color(0xFFEB6F92), // love
-  warn: const Color(0xFFF6C177), // gold
-);
-
-// Everforest Dark — earthy green-gray warmth. Calm, natural, easy on the eyes.
-final _everforest = _dark(
-  name: 'everforest',
-  label: 'Everforest',
-  accent: const Color(0xFFA7C080), // green
-  text: const Color(0xFFD3C6AA), // fg
-  muted: const Color(0xFF8A9B8E), // grey1
-  faint: const Color(0xFF56635F), // grey2
-  success: const Color(0xFFA7C080), // green
-  danger: const Color(0xFFE67E80), // red
-  warn: const Color(0xFFDBBC7F), // orange
-);
-
-// Kanagawa Wave — ink-black indigo with Hokusai-inspired muted jewel tones.
-final _kanagawa = _dark(
-  name: 'kanagawa',
-  label: 'Kanagawa Wave',
-  accent: const Color(0xFF7E9CD8),
-  text: const Color(0xFFDCD7BA),
-  muted: const Color(0xFFA6A69C),
-  faint: const Color(0xFF727169),
-  success: const Color(0xFF98BB6C),
-  danger: const Color(0xFFC34043),
-  warn: const Color(0xFFE6C384),
-);
-
-// Ayu Mirage — warm charcoal, amber focus, and restrained blue-green status.
-final _ayuMirage = _dark(
-  name: 'ayu-mirage',
-  label: 'Ayu Mirage',
-  accent: const Color(0xFFFFCC66),
-  text: const Color(0xFFCCCAC2),
-  muted: const Color(0xFFABB0B6),
-  faint: const Color(0xFF5C6773),
-  success: const Color(0xFFBAE67E),
-  danger: const Color(0xFFF07178),
-  warn: const Color(0xFFFFCC66),
-);
-
-// Night Owl — crisp slate navy designed for long, low-light coding sessions.
-final _nightOwl = _dark(
-  name: 'night-owl',
-  label: 'Night Owl',
-  accent: const Color(0xFF82AAFF),
-  text: const Color(0xFFD6DEEB),
-  muted: const Color(0xFF9DB1C5),
-  faint: const Color(0xFF637777),
-  success: const Color(0xFFADDB67),
-  danger: const Color(0xFFEF5350),
-  warn: const Color(0xFFFFCB6B),
-);
-
-// Monokai Pro — high-clarity charcoal with lively, carefully balanced accents.
-final _monokaiPro = _dark(
-  name: 'monokai-pro',
-  label: 'Monokai Pro',
-  accent: const Color(0xFFFC9867),
-  text: const Color(0xFFFCFCFA),
-  muted: const Color(0xFFC1C0C0),
-  faint: const Color(0xFF727072),
-  success: const Color(0xFFA9DC76),
-  danger: const Color(0xFFFF6188),
-  warn: const Color(0xFFFFD866),
-);
-
-// Oxocarbon — IBM Carbon's deep graphite base and cool blue focus color.
-final _oxocarbon = _dark(
-  name: 'oxocarbon',
-  label: 'Oxocarbon',
-  accent: const Color(0xFF78A9FF),
-  text: const Color(0xFFF2F4F8),
-  muted: const Color(0xFFBBC3CF),
-  faint: const Color(0xFF697077),
-  success: const Color(0xFF42BE65),
-  danger: const Color(0xFFFF7EB6),
-  warn: const Color(0xFFF1C21B),
-);
-
-// Pure black AMOLED theme — deepest blacks, no surface elevation.
+// The only client theme. Other palettes were removed on request.
 final _amoled = _dark(
   name: 'amoled',
   label: 'AMOLED Black',
-  accent: const Color(0xFF60A5FA), // blue-400
-  text: const Color(0xFFE5E7EB), // gray-200
-  muted: const Color(0xFF9CA3AF), // gray-400
-  faint: const Color(0xFF6B7280), // gray-500
-  success: const Color(0xFF34D399), // emerald-400
-  danger: const Color(0xFFF87171), // red-400
-  warn: const Color(0xFFFBBF24), // amber-400
+  accent: const Color(0xFF60A5FA),
+  text: const Color(0xFFE5E7EB),
+  muted: const Color(0xFF9CA3AF),
+  faint: const Color(0xFF6B7280),
+  success: const Color(0xFF34D399),
+  danger: const Color(0xFFF87171),
+  warn: const Color(0xFFFBBF24),
   isAmoled: true,
 );
 
-List<ThemePreset> get allPresets => [
-      _kanagawa,
-      _ayuMirage,
-      _nightOwl,
-      _monokaiPro,
-      _oxocarbon,
-      _amoled,
-      _terminalInk,
-      _nord,
-      _dracula,
-      _rosePine,
-      _everforest,
-      _lightPreset,
-    ];
+List<ThemePreset> get allPresets => [_amoled];
 
 // ---------------------------------------------------------------------------
 // Color helpers
@@ -388,7 +165,6 @@ List<ThemePreset> get allPresets => [
 
 Color _withAlpha(Color c, double a) => c.withValues(alpha: a);
 Color _alphaWhite(double a) => Color.fromRGBO(255, 255, 255, a);
-Color _alphaBlack(double a) => Color.fromRGBO(0, 0, 0, a);
 Color _nearBlack() => const Color(0xFF160E02);
 
 Color _lighten(Color c, double amount) {
@@ -399,43 +175,32 @@ Color _lighten(Color c, double amount) {
       .withValues(alpha: c.a);
 }
 
-Color _darken(Color c, double amount) {
-  final hsl = HSLColor.fromColor(c);
-  return hsl
-      .withLightness((hsl.lightness - amount).clamp(0.0, 1.0))
-      .toColor()
-      .withValues(alpha: c.a);
-}
-
 // ---------------------------------------------------------------------------
 // ThemeManager — singleton, persists to SharedPreferences, notifies listeners
 // ---------------------------------------------------------------------------
 
 class ThemeManager extends ChangeNotifier {
   static const _prefsKey = 'theme_index';
-  static const _defaultIndex = 0; // Terminal Ink
+  static const _defaultIndex = 0; // AMOLED Black — the only remaining preset
 
   static final ThemeManager instance = ThemeManager._();
   ThemeManager._();
 
   int _index = _defaultIndex;
   int get index => _index;
-  ThemePreset get current => allPresets[_index];
+  ThemePreset get current => allPresets[0];
 
   Future<void> init() async {
+    _index = 0;
     final p = await SharedPreferences.getInstance();
-    final saved = p.getInt(_prefsKey);
-    if (saved != null && saved >= 0 && saved < allPresets.length) {
-      _index = saved;
-    }
+    await p.setInt(_prefsKey, 0);
   }
 
   Future<void> setIndex(int i) async {
-    if (i < 0 || i >= allPresets.length || i == _index) return;
-    _index = i;
-    notifyListeners();
+    if (i != 0) return;
+    _index = 0;
     final p = await SharedPreferences.getInstance();
-    await p.setInt(_prefsKey, i);
+    await p.setInt(_prefsKey, 0);
   }
 
   Future<void> setName(String name) async {

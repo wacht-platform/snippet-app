@@ -121,7 +121,11 @@ class _GitScreenState extends State<GitScreen> {
   }
 
   Future<void> _branchSheet() async {
-    (String, List<String>) data;
+    late final ({
+      String current,
+      List<String> local,
+      List<String> remotes
+    }) data;
     try {
       data = await widget.client.gitBranches(_repo);
     } catch (e) {
@@ -129,58 +133,22 @@ class _GitScreenState extends State<GitScreen> {
       return;
     }
     if (!mounted) return;
-    final (current, branches) = data;
-    await showAppSheet<void>(context,
-        title: 'Branches',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ...branches.map((b) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: AppCard(
-                    padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-                    onTap: b == current
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            _op(() => widget.client.gitCheckout(_repo, b),
-                                okMsg: 'Switched to $b');
-                          },
-                    child: Row(children: [
-                      AppIcon('git-branch',
-                          size: 15,
-                          color:
-                              b == current ? AppColors.accent : AppColors.fg3),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child:
-                              Text(b, style: mono(13, color: AppColors.fg1))),
-                      if (b == current)
-                        Text('current',
-                            style: sans(11, color: AppColors.accent)),
-                    ]),
-                  ),
-                )),
-            const SizedBox(height: 8),
-            Btn('New branch',
-                icon: 'plus',
-                variant: BtnVariant.secondary,
-                full: true, onTap: () async {
-              Navigator.pop(context);
-              final name = await promptText(context,
-                  title: 'New branch',
-                  hint: 'branch name',
-                  saveLabel: 'Create');
-              if (name == null || name.trim().isEmpty) return;
-              await _op(
-                  () => widget.client
-                      .gitCheckout(_repo, name.trim(), create: true),
-                  okMsg: 'Created ${name.trim()}');
-            }),
-            const SizedBox(height: 8),
-          ],
-        ));
+    await showAppSheet<void>(
+      context,
+      title: 'Branches',
+      child: _BranchPicker(
+        current: data.current,
+        local: data.local,
+        remotes: data.remotes,
+        onSelect: (name, {required bool create}) {
+          Navigator.pop(context);
+          _op(
+            () => widget.client.gitCheckout(_repo, name, create: create),
+            okMsg: create ? 'Created $name' : 'Switched to $name',
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -275,39 +243,44 @@ class _GitScreenState extends State<GitScreen> {
 
   Widget _header(GitStatus st) {
     final hasUp = st.upstream != null;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(R.card),
-        border: Border.all(color: AppColors.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          AppIcon('git-branch', size: 15, color: AppColors.accent),
-          const SizedBox(width: 8),
           Expanded(
-              child: Text(st.branch.isEmpty ? '(no branch)' : st.branch,
-                  style: mono(13.5, color: AppColors.fg1))),
-          if (hasUp && st.ahead > 0) _miniChip('↑${st.ahead}', AppColors.ok),
-          if (hasUp && st.behind > 0) _miniChip('↓${st.behind}', AppColors.run),
-          IconBtn('list',
-              size: 34,
-              iconSize: 16,
-              tooltip: 'Branches',
+            child: GestureDetector(
+              onTap: _busy ? null : _branchSheet,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(st.branch.isEmpty ? '(no branch)' : st.branch,
+                      style: sans(15.5,
+                          weight: FontWeight.w600, color: AppColors.fg1)),
+                  if (hasUp)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        [
+                          st.upstream!,
+                          if (st.ahead > 0) '↑${st.ahead}',
+                          if (st.behind > 0) '↓${st.behind}',
+                        ].join('  '),
+                        style: mono(11.5, color: AppColors.fg3),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          Btn('Branches',
+              small: true,
+              variant: BtnVariant.ghost,
               onTap: _busy ? null : _branchSheet),
         ]),
-        if (hasUp)
-          Padding(
-            padding: const EdgeInsets.only(top: 2, left: 23),
-            child: Text(st.upstream!, style: mono(10.5, color: AppColors.fg3)),
-          ),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(
               child: Btn('Pull',
-                  icon: 'refresh',
                   small: true,
                   variant: BtnVariant.secondary,
                   disabled: _busy,
@@ -316,7 +289,6 @@ class _GitScreenState extends State<GitScreen> {
           const SizedBox(width: 8),
           Expanded(
               child: Btn('Push',
-                  iconRight: 'arrow-right',
                   small: true,
                   variant: BtnVariant.secondary,
                   disabled: _busy,
@@ -326,11 +298,6 @@ class _GitScreenState extends State<GitScreen> {
       ]),
     );
   }
-
-  Widget _miniChip(String t, Color c) => Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: Text(t, style: mono(12, weight: FontWeight.w600, color: c)),
-      );
 
   Widget _sectionHeader(String title,
           {String? trailing, VoidCallback? onTrailing}) =>
@@ -394,6 +361,145 @@ class _GitScreenState extends State<GitScreen> {
         '?' => (AppColors.fg3, 'untracked'),
         _ => (AppColors.fg3, code),
       };
+}
+
+class _BranchPicker extends StatefulWidget {
+  final String current;
+  final List<String> local;
+  final List<String> remotes;
+  final void Function(String name, {required bool create}) onSelect;
+  const _BranchPicker({
+    required this.current,
+    required this.local,
+    required this.remotes,
+    required this.onSelect,
+  });
+  @override
+  State<_BranchPicker> createState() => _BranchPickerState();
+}
+
+class _BranchPickerState extends State<_BranchPicker> {
+  final _q = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _q.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  bool _hit(String name) {
+    final q = _q.text.trim().toLowerCase();
+    return q.isEmpty || name.toLowerCase().contains(q);
+  }
+
+  String _localNameForRemote(String remote) {
+    final i = remote.indexOf('/');
+    return i < 0 ? remote : remote.substring(i + 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final local = widget.local.where(_hit).toList();
+    final remotes = widget.remotes.where(_hit).toList();
+    final q = _q.text.trim();
+    final canCreate = q.isNotEmpty &&
+        !widget.local.contains(q) &&
+        !q.contains(' ') &&
+        !q.startsWith('-');
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppField(
+          controller: _q,
+          hint: 'Search local or remote branches',
+          icon: 'search',
+        ),
+        const SizedBox(height: 10),
+        if (local.isNotEmpty) ...[
+          Text('Local',
+              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+          const SizedBox(height: 6),
+          ...local.map((b) => _row(
+                name: b,
+                current: b == widget.current,
+                onTap: b == widget.current
+                    ? null
+                    : () => widget.onSelect(b, create: false),
+              )),
+          const SizedBox(height: 10),
+        ],
+        if (remotes.isNotEmpty) ...[
+          Text('Remote',
+              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+          const SizedBox(height: 6),
+          ...remotes.map((b) => _row(
+                name: b,
+                remote: true,
+                onTap: () => widget.onSelect(b, create: false),
+              )),
+          const SizedBox(height: 10),
+        ],
+        if (local.isEmpty && remotes.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              q.isEmpty ? 'No branches.' : 'No matches for “$q”.',
+              style: sans(13, color: AppColors.fg3),
+            ),
+          ),
+        Btn(
+          canCreate ? 'Create “$q”' : 'New branch',
+          icon: 'plus',
+          variant: BtnVariant.secondary,
+          full: true,
+          onTap: () async {
+            if (canCreate) {
+              widget.onSelect(q, create: true);
+              return;
+            }
+            final name = await promptText(context,
+                title: 'New branch', hint: 'branch name', saveLabel: 'Create');
+            if (name == null || name.trim().isEmpty) return;
+            widget.onSelect(name.trim(), create: true);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _row({
+    required String name,
+    required VoidCallback? onTap,
+    bool current = false,
+    bool remote = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+        onTap: onTap,
+        child: Row(children: [
+          AppIcon('git-branch',
+              size: 15, color: current ? AppColors.accent : AppColors.fg3),
+          const SizedBox(width: 10),
+          Expanded(child: Text(name, style: mono(13, color: AppColors.fg1))),
+          if (current)
+            Text('current', style: sans(11, color: AppColors.accent))
+          else if (remote)
+            Text(_localNameForRemote(name),
+                style: sans(11, color: AppColors.fg4)),
+        ]),
+      ),
+    );
+  }
 }
 
 /// Read-only unified-diff viewer with +/- line tints. Reused later by the editor.

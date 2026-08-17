@@ -416,12 +416,16 @@ class DaemonClient {
         .toList();
   }
 
-  /// Returns (current branch, all local branches).
-  Future<(String, List<String>)> gitBranches(String session) async {
+  /// Current branch, local names, and remote-tracking names (`origin/foo`).
+  Future<({String current, List<String> local, List<String> remotes})>
+      gitBranches(String session) async {
     final d = await _gitPost('branches', {'session': session});
+    List<String> names(dynamic raw) =>
+        ((raw as List?) ?? const []).map((e) => e.toString()).toList();
     return (
-      d['current'] as String? ?? '',
-      ((d['branches'] as List?) ?? const []).map((e) => e as String).toList(),
+      current: d['current'] as String? ?? '',
+      local: names(d['branches']),
+      remotes: names(d['remotes']),
     );
   }
 

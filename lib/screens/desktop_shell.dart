@@ -3031,28 +3031,6 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 28),
-                // Grok-style: Appearance section.
-                Text('Appearance',
-                    style: sans(12,
-                        weight: FontWeight.w500, color: AppColors.fg3)),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(R.card),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      _configTile(
-                          'sliders',
-                          'Appearance',
-                          ThemeManager.instance.current.label,
-                          () => showThemePicker(context)),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
