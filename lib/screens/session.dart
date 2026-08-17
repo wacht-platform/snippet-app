@@ -1561,12 +1561,6 @@ class _SessionScreenState extends State<SessionScreen>
                                         mine: true,
                                         text: _pending[pi],
                                         selectable: false))),
-                          if (_liveThinking.trim().isNotEmpty)
-                            Padding(
-                              key: const ValueKey('live-thinking'),
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: ThinkingMarkdown(data: _liveThinking),
-                            ),
                           if (_liveTextVisible && _liveText.trim().isNotEmpty)
                             Padding(
                               key: const ValueKey('live-text'),
@@ -1578,7 +1572,7 @@ class _SessionScreenState extends State<SessionScreen>
                             ),
                           if (running) ...[
                             const SizedBox(height: 10),
-                            const _ChurningStatus(),
+                            _ChurningStatus(thinking: _liveThinking),
                           ],
                           if (_queued.isNotEmpty) ...[
                             const SizedBox(height: 12),
@@ -3262,7 +3256,8 @@ class _StatMeta extends StatelessWidget {
 }
 
 class _ChurningStatus extends StatefulWidget {
-  const _ChurningStatus();
+  final String thinking;
+  const _ChurningStatus({this.thinking = ''});
   @override
   State<_ChurningStatus> createState() => _ChurningStatusState();
 }
@@ -3296,6 +3291,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
   Timer? _tick;
   Timer? _swap;
   late String _verb = _verbs[_rng.nextInt(_verbs.length)];
+  bool _open = true;
 
   @override
   void initState() {
@@ -3340,24 +3336,48 @@ class _ChurningStatusState extends State<_ChurningStatus> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final thought = widget.thinking.trim();
     return Padding(
       padding: const EdgeInsets.only(left: 2, bottom: 4),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-              width: 16,
-              child: Center(child: BrailleSpinner(color: AppColors.accent))),
-          const SizedBox(width: 8),
-          Text.rich(TextSpan(children: [
-            TextSpan(
-                text: _verb,
-                style:
-                    sans(13, weight: FontWeight.w600, color: AppColors.accent)),
-            TextSpan(
-                text: ' $_elapsed',
-                style:
-                    sans(13, color: AppColors.accent.withValues(alpha: 0.72))),
-          ])),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap:
+                thought.isEmpty ? null : () => setState(() => _open = !_open),
+            child: Row(
+              children: [
+                SizedBox(
+                    width: 16,
+                    child:
+                        Center(child: BrailleSpinner(color: AppColors.accent))),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text.rich(TextSpan(children: [
+                    TextSpan(
+                        text: _verb,
+                        style: sans(13,
+                            weight: FontWeight.w600, color: AppColors.accent)),
+                    TextSpan(
+                        text: ' $_elapsed',
+                        style: sans(13,
+                            color: AppColors.accent.withValues(alpha: 0.72))),
+                  ])),
+                ),
+                if (thought.isNotEmpty) ...[
+                  const SizedBox(width: 4),
+                  AppIcon(_open ? 'chevron-down' : 'chevron-right',
+                      size: 13, color: AppColors.accent.withValues(alpha: 0.7)),
+                ],
+              ],
+            ),
+          ),
+          if (_open && thought.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 24, top: 8),
+              child: ThinkingMarkdown(data: thought),
+            ),
         ],
       ),
     );

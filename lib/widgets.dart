@@ -358,24 +358,14 @@ MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
 
 /// Live thinking/reasoning stream — full markdown, dimmed.
 class ThinkingMarkdown extends StatelessWidget {
-  static const _liveTailChars = 12000;
   final String data;
   const ThinkingMarkdown({super.key, required this.data});
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    var text = data.trim();
+    final text = data.trim();
     if (text.isEmpty) return const SizedBox.shrink();
-    if (text.length > _liveTailChars) {
-      var start = text.length - _liveTailChars;
-      if (start < text.length &&
-          text.codeUnitAt(start) >= 0xDC00 &&
-          text.codeUnitAt(start) <= 0xDFFF) {
-        start++;
-      }
-      text = '…\n\n${text.substring(start)}';
-    }
     return MarkdownBody(
       data: text,
       selectable: false,
