@@ -265,23 +265,6 @@ class _FileExplorerState extends State<FileExplorer> {
                                     : () => _newFolder(listing.path)),
                         ],
                 ),
-                // Prominent CTA: start a chat in the folder you're browsing (no session needed).
-                if (!_selecting && listing != null && widget.onNewChat != null)
-                  InkWell(
-                    onTap: () => widget.onNewChat!(listing.path),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                      child: Row(children: [
-                        AppIcon('edit', size: 16, color: AppColors.accent),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: Text('New chat in this folder',
-                                style: sans(13.5,
-                                    weight: FontWeight.w500,
-                                    color: AppColors.accent))),
-                      ]),
-                    ),
-                  ),
                 if (_busy != null)
                   Container(
                     padding:
@@ -343,6 +326,22 @@ class _FileExplorerState extends State<FileExplorer> {
                           : ListView(
                               padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
                               children: [
+                                if (!_selecting && widget.onNewChat != null)
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(8, 8, 8, 6),
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Btn(
+                                        'New chat here',
+                                        icon: 'edit',
+                                        small: true,
+                                        variant: BtnVariant.secondary,
+                                        onTap: () =>
+                                            widget.onNewChat!(listing!.path),
+                                      ),
+                                    ),
+                                  ),
                                 if (listing!.parent != null && !_selecting)
                                   _Row(
                                       icon: 'folder-open',
