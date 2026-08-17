@@ -1123,7 +1123,31 @@ class Bubble extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-          child: agent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              agent,
+              if (selectable && shown.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: shown));
+                      toast(context, 'Copied');
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon('clipboard', size: 12, color: AppColors.fg4),
+                        const SizedBox(width: 5),
+                        Text('Copy', style: sans(12, color: AppColors.fg4)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       );
     }
