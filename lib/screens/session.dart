@@ -2731,9 +2731,12 @@ class _SessionScreenState extends State<SessionScreen>
     RelativeRect position;
     if (box != null && overlay != null) {
       final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      position = RelativeRect.fromRect(
-        origin & box.size,
-        Offset.zero & overlay.size,
+      final menuW = box.size.width.clamp(220.0, 320.0);
+      position = RelativeRect.fromLTRB(
+        origin.dx,
+        origin.dy + box.size.height + 6,
+        overlay.size.width - origin.dx - menuW,
+        16,
       );
     } else {
       position = const RelativeRect.fromLTRB(16, 80, 16, 80);
@@ -2870,89 +2873,93 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
+  Widget _usageBody(HarnessState s) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (s.contextWindow > 0) ...[
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('Context window',
+              style: sans(12.5, weight: FontWeight.w500, color: AppColors.fg2)),
+          Text('${fmtSi(s.lastPromptTokens)} / ${fmtSi(s.contextWindow)}',
+              style: mono(11.5, color: AppColors.fg3)),
+        ]),
+        const SizedBox(height: 9),
+        Progress(pct: s.lastPromptTokens / s.contextWindow * 100, height: 9),
+        const SizedBox(height: 7),
+        Text('${(s.lastPromptTokens / s.contextWindow * 100).round()}% used',
+            style: mono(11, color: AppColors.accent)),
+        const SizedBox(height: 18),
+      ],
+      const SectionLabel('Tokens'),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(
+            child: StatTile(label: '↑ Input', value: fmtSi(s.promptTokens))),
+        const SizedBox(width: 8),
+        Expanded(
+            child:
+                StatTile(label: '↓ Output', value: fmtSi(s.completionTokens))),
+      ]),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(
+            child:
+                StatTile(label: '↻ Cached', value: fmtSi(s.cacheReadTokens))),
+        const SizedBox(width: 8),
+        Expanded(
+            child: StatTile(
+                label: 'Total', value: fmtSi(s.totalTokens), accent: true)),
+      ]),
+      if (s.ratePrimary != null || s.rateSecondary != null) ...[
+        const SizedBox(height: 18),
+        const SectionLabel('Rate limits · remaining'),
+        const SizedBox(height: 8),
+        for (final w in [s.ratePrimary, s.rateSecondary])
+          if (w != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 11),
+              child: Builder(builder: (_) {
+                final rem = w.leftPercent;
+                final color = rem < 20
+                    ? AppColors.danger
+                    : rem < 50
+                        ? AppColors.run
+                        : AppColors.ok;
+                final reset = rateResetLabel(w.resetsAt);
+                return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(rateWindowLabel(w.windowMinutes),
+                                style: sans(12, color: AppColors.fg2)),
+                            Text('${rem.round()}% left',
+                                style: mono(11, color: color)),
+                          ]),
+                      const SizedBox(height: 6),
+                      Progress(pct: rem, color: color, height: 6),
+                      if (reset != null) ...[
+                        const SizedBox(height: 5),
+                        Text(reset, style: mono(10.5, color: AppColors.fg4)),
+                      ],
+                    ]);
+              }),
+            ),
+      ],
+    ]);
+  }
+
   void _showUsage() {
     final s = _state;
     if (s == null) return;
-    showAppSheet(context,
-        title: 'Usage',
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (s.contextWindow > 0) ...[
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('Context window',
-                  style: sans(12.5,
-                      weight: FontWeight.w500, color: AppColors.fg2)),
-              Text('${fmtSi(s.lastPromptTokens)} / ${fmtSi(s.contextWindow)}',
-                  style: mono(11.5, color: AppColors.fg3)),
-            ]),
-            const SizedBox(height: 9),
-            Progress(
-                pct: s.lastPromptTokens / s.contextWindow * 100, height: 9),
-            const SizedBox(height: 7),
-            Text(
-                '${(s.lastPromptTokens / s.contextWindow * 100).round()}% used',
-                style: mono(11, color: AppColors.accent)),
-            const SizedBox(height: 18),
-          ],
-          const SectionLabel('Tokens'),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(
-                child:
-                    StatTile(label: '↑ Input', value: fmtSi(s.promptTokens))),
-            const SizedBox(width: 8),
-            Expanded(
-                child: StatTile(
-                    label: '↓ Output', value: fmtSi(s.completionTokens))),
-          ]),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(
-                child: StatTile(
-                    label: '↻ Cached', value: fmtSi(s.cacheReadTokens))),
-            const SizedBox(width: 8),
-            Expanded(
-                child: StatTile(
-                    label: 'Total', value: fmtSi(s.totalTokens), accent: true)),
-          ]),
-          if (s.ratePrimary != null || s.rateSecondary != null) ...[
-            const SizedBox(height: 18),
-            const SectionLabel('Rate limits · remaining'),
-            const SizedBox(height: 8),
-            for (final w in [s.ratePrimary, s.rateSecondary])
-              if (w != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 11),
-                  child: Builder(builder: (_) {
-                    final rem = w.leftPercent;
-                    final color = rem < 20
-                        ? AppColors.danger
-                        : rem < 50
-                            ? AppColors.run
-                            : AppColors.ok;
-                    final reset = rateResetLabel(w.resetsAt);
-                    return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(rateWindowLabel(w.windowMinutes),
-                                    style: sans(12, color: AppColors.fg2)),
-                                Text('${rem.round()}% left',
-                                    style: mono(11, color: color)),
-                              ]),
-                          const SizedBox(height: 6),
-                          Progress(pct: rem, color: color, height: 6),
-                          if (reset != null) ...[
-                            const SizedBox(height: 5),
-                            Text(reset,
-                                style: mono(10.5, color: AppColors.fg4)),
-                          ],
-                        ]);
-                  }),
-                ),
-          ],
-        ]));
+    final body = _usageBody(s);
+    if (kMobile) {
+      showAppSheet(context, title: 'Usage', child: body);
+    } else {
+      presentScreen(context,
+          builder: (_, close) =>
+              _SessionActionPanel(title: 'Usage', onClose: close, child: body));
+    }
   }
 
   void _showCheckpoints() {
