@@ -37,6 +37,7 @@ dependencies:
   video_player: ^2.11.1
   chewie: ^1.13.1
   audioplayers: ^6.8.1
+  xterm: ^4.0.0
 
 dev_dependencies:
   flutter_test:

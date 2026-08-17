@@ -26,6 +26,7 @@ import '../transcript.dart';
 import '../term.dart';
 import '../panel.dart';
 import '../widgets.dart';
+import 'package:xterm/xterm.dart';
 import 'editor.dart';
 import 'files.dart';
 import 'processes.dart';
@@ -962,7 +963,8 @@ class _SessionScreenState extends State<SessionScreen>
       final pane = _ensureTerm(id);
       pane.alive = j['alive'] == true;
       if (op == 'snapshot') return;
-      if (bytes.isNotEmpty) pane.screen.feed(bytes);
+      if (bytes.isNotEmpty)
+        pane.terminal.write(utf8.decode(bytes, allowMalformed: true));
       if (cols != null) pane.cols = cols;
       if (rows != null) pane.rows = rows;
       if (op == 'out') pane.live = true;
@@ -2048,7 +2050,7 @@ class _SessionScreenState extends State<SessionScreen>
             height: _termHeight,
             child: SessionTermView(
               alive: t.alive,
-              screen: t.screen,
+              terminal: t.terminal,
               onInput: _termIn,
               onResize: _termResize,
               onClose: () => _closeTerm(t.id),
@@ -2116,7 +2118,7 @@ class _SessionScreenState extends State<SessionScreen>
         Expanded(
           child: SessionTermView(
             alive: t.alive,
-            screen: t.screen,
+            terminal: t.terminal,
             onInput: _termIn,
             onResize: _termResize,
             onClose: () => _closeTerm(t.id),
@@ -2269,9 +2271,6 @@ class _SessionScreenState extends State<SessionScreen>
                 onClose: close,
                 onOpenFile: widget.onOpenFileTab));
         return;
-      case 'command':
-        _showExec();
-        return;
       case 'shell':
         _openTerm();
         return;
@@ -2344,7 +2343,6 @@ class _SessionScreenState extends State<SessionScreen>
                 onClose: close,
                 onOpenFile: widget.onOpenFileTab));
       }),
-      item('terminal', 'Run command', _showExec),
       item(
           'list',
           'Processes',
@@ -2406,7 +2404,6 @@ class _SessionScreenState extends State<SessionScreen>
                     onClose: close,
                     onOpenFile: widget.onOpenFileTab));
           }),
-          onCommand: () => run(_showExec),
           onProcesses: () => run(() => presentScreen(context,
               builder: (_, close) => ProcessesScreen(
                   client: widget.client,
@@ -3187,68 +3184,6 @@ class _SessionScreenState extends State<SessionScreen>
     }
   }
 
-  void _showExec() {
-    final ctrl = TextEditingController();
-    String output = '';
-    bool busy = false;
-    showAppSheet(context, title: 'Run command', child: StatefulBuilder(
-      builder: (ctx, setSheet) {
-        Future<void> run() async {
-          final cmd = ctrl.text.trim();
-          if (cmd.isEmpty || busy) return;
-          setSheet(() {
-            busy = true;
-            output = '';
-          });
-          try {
-            final r = await widget.client.exec(widget.sessionId, cmd);
-            final so = (r['stdout'] ?? '').toString();
-            final se = (r['stderr'] ?? '').toString();
-            output = [
-              if (so.isNotEmpty) so,
-              if (se.isNotEmpty) se,
-              'exit ${r['exit_code']}',
-            ].join('\n');
-          } catch (e) {
-            output = '$e';
-          }
-          if (!ctx.mounted) return; // sheet dismissed mid-command
-          setSheet(() => busy = false);
-        }
-
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Runs in the session workspace.',
-              style: sans(11.5, color: AppColors.fg3)),
-          const SizedBox(height: 10),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(
-                child: AppField(
-                    controller: ctrl,
-                    mono: true,
-                    icon: 'terminal',
-                    hint: 'ls -la',
-                    onSubmitted: (_) => run())),
-            const SizedBox(width: 8),
-            Btn(busy ? '\u2026' : 'Run', disabled: busy, onTap: run),
-          ]),
-          if (output.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.md)),
-              child: SelectableText(output,
-                  style: mono(11.5, height: 1.5, color: AppColors.fg1)),
-            ),
-          ],
-        ]);
-      },
-      // Free the controller when the sheet closes (it leaked one per open).
-    )).whenComplete(ctrl.dispose);
-  }
-
   void _showLanes() {
     if ((_state?.lanes ?? const <LaneInfo>[]).isEmpty) return;
     presentScreen(
@@ -3859,7 +3794,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
 class _LiveTerm {
   _LiveTerm(this.id);
   final String id;
-  final VtScreen screen = VtScreen(80, 24);
+  final Terminal terminal = Terminal(maxLines: 5000);
   int cols = 80;
   int rows = 24;
   bool alive = false;
@@ -4651,7 +4586,6 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
-  final VoidCallback onCommand;
   final VoidCallback onProcesses;
   final VoidCallback onCompact;
   final VoidCallback onCheckpoints;
@@ -4667,7 +4601,6 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
-    required this.onCommand,
     required this.onProcesses,
     required this.onCompact,
     required this.onCheckpoints,
@@ -4842,7 +4775,6 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
         _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
         _row(icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
-        _row(icon: 'terminal', label: 'Run command', onTap: widget.onCommand),
         _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
         _section('History'),
         _row(
