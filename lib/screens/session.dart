@@ -3261,8 +3261,34 @@ class _ChurningStatus extends StatefulWidget {
 }
 
 class _ChurningStatusState extends State<_ChurningStatus> {
+  static const _verbs = [
+    'Churning',
+    'Pondering',
+    'Rummaging',
+    'Noodling',
+    'Tinkering',
+    'Scheming',
+    'Weaving',
+    'Sifting',
+    'Puttering',
+    'Brewing',
+    'Fiddling',
+    'Mulling',
+    'Foraging',
+    'Juggling',
+    'Unraveling',
+    'Conjuring',
+    'Whittling',
+    'Riffling',
+    'Plotting',
+    'Kneading',
+  ];
+
   late final DateTime _started = DateTime.now();
+  late final math.Random _rng = math.Random();
   Timer? _tick;
+  Timer? _swap;
+  late String _verb = _verbs[_rng.nextInt(_verbs.length)];
 
   @override
   void initState() {
@@ -3270,11 +3296,27 @@ class _ChurningStatusState extends State<_ChurningStatus> {
     _tick = Timer.periodic(const Duration(milliseconds: 100), (_) {
       if (mounted) setState(() {});
     });
+    _scheduleSwap();
+  }
+
+  void _scheduleSwap() {
+    final wait = Duration(milliseconds: 2800 + _rng.nextInt(4200));
+    _swap?.cancel();
+    _swap = Timer(wait, () {
+      if (!mounted) return;
+      String next;
+      do {
+        next = _verbs[_rng.nextInt(_verbs.length)];
+      } while (next == _verb && _verbs.length > 1);
+      setState(() => _verb = next);
+      _scheduleSwap();
+    });
   }
 
   @override
   void dispose() {
     _tick?.cancel();
+    _swap?.cancel();
     super.dispose();
   }
 
@@ -3301,7 +3343,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
           const SizedBox(width: 8),
           Text.rich(TextSpan(children: [
             TextSpan(
-                text: 'Churning',
+                text: _verb,
                 style:
                     sans(13, weight: FontWeight.w600, color: AppColors.accent)),
             TextSpan(
