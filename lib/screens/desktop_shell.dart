@@ -116,13 +116,13 @@ class _DesktopShellState extends State<DesktopShell> {
       if (mounted && !_sessionsLoading) _loadSessions();
       if (mounted) _refreshHealth();
     });
-    if (!kMobile) HardwareKeyboard.instance.addHandler(_handleGlobalCloseTab);
+    if (!kMobile) HardwareKeyboard.instance.addHandler(_handleGlobalShortcuts);
   }
 
   @override
   void dispose() {
     if (!kMobile)
-      HardwareKeyboard.instance.removeHandler(_handleGlobalCloseTab);
+      HardwareKeyboard.instance.removeHandler(_handleGlobalShortcuts);
     _sessionsTicker?.cancel();
     _persistTabsDebounce?.cancel();
     _pageController.dispose();
@@ -131,17 +131,82 @@ class _DesktopShellState extends State<DesktopShell> {
     super.dispose();
   }
 
-  bool _handleGlobalCloseTab(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-    if (event.logicalKey != LogicalKeyboardKey.keyW) return false;
+  bool _mod(LogicalKeyboardKey left, LogicalKeyboardKey right) {
     final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    final chord = keys.contains(LogicalKeyboardKey.metaLeft) ||
-        keys.contains(LogicalKeyboardKey.metaRight) ||
-        keys.contains(LogicalKeyboardKey.controlLeft) ||
-        keys.contains(LogicalKeyboardKey.controlRight);
-    if (!chord) return false;
-    if (_activeIndex >= 0) _closeTab(_activeIndex);
-    return true;
+    return keys.contains(left) || keys.contains(right);
+  }
+
+  bool get _metaDown =>
+      _mod(LogicalKeyboardKey.metaLeft, LogicalKeyboardKey.metaRight);
+  bool get _ctrlDown =>
+      _mod(LogicalKeyboardKey.controlLeft, LogicalKeyboardKey.controlRight);
+  bool get _altDown =>
+      _mod(LogicalKeyboardKey.altLeft, LogicalKeyboardKey.altRight);
+  bool get _shiftDown =>
+      _mod(LogicalKeyboardKey.shiftLeft, LogicalKeyboardKey.shiftRight);
+  bool get _cmdOrCtrl => _metaDown || _ctrlDown;
+
+  /// Tab / window chords must not depend on Focus staying on the shell.
+  /// Clicking a tab, a message, or the composer steals focus and used to
+  /// kill Ctrl+Tab and Cmd+W after the first use.
+  bool _handleGlobalShortcuts(KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+    if (!_cmdOrCtrl) return false;
+    final key = event.logicalKey;
+
+    if (key == LogicalKeyboardKey.keyW && !_shiftDown && !_altDown) {
+      if (_activeIndex >= 0) _closeTab(_activeIndex);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.keyT && !_shiftDown && !_altDown) {
+      _newSessionFlow();
+      return true;
+    }
+    if ((key == LogicalKeyboardKey.tab || key == LogicalKeyboardKey.pageDown) &&
+        _ctrlDown &&
+        !_altDown &&
+        !_metaDown) {
+      _activateRelativeTab(_shiftDown ? -1 : 1);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.pageUp &&
+        _ctrlDown &&
+        !_altDown &&
+        !_metaDown) {
+      _activateRelativeTab(-1);
+      return true;
+    }
+    if ((key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.arrowRight) &&
+        _altDown) {
+      _activateRelativeTab(key == LogicalKeyboardKey.arrowLeft ? -1 : 1);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.keyF && _shiftDown && !_altDown) {
+      _openActiveFiles();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.keyG && _shiftDown && !_altDown) {
+      _openMacGit();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.period && !_shiftDown && !_altDown) {
+      _macSessionControls[_activeTab?.key]?.stop();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.slash && !_shiftDown && !_altDown) {
+      _showDesktopShortcuts();
+      return true;
+    }
+    for (var i = 0; i < 9; i++) {
+      if (key.keyId == LogicalKeyboardKey.digit1.keyId + i &&
+          !_shiftDown &&
+          !_altDown) {
+        _activateTab(i);
+        return true;
+      }
+    }
+    return false;
   }
 
   void _setMacSessionStatus(String key, HarnessState? state, bool running) {
@@ -453,78 +518,9 @@ class _DesktopShellState extends State<DesktopShell> {
       );
 
   Widget _desktopShortcuts(Widget child) {
-    if (kMobile) return child;
-    final shortcuts = <ShortcutActivator, VoidCallback>{
-      const SingleActivator(LogicalKeyboardKey.keyT, meta: true):
-          _newSessionFlow,
-      const SingleActivator(LogicalKeyboardKey.keyT, control: true):
-          _newSessionFlow,
-      const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () =>
-          _activeIndex >= 0 ? _closeTab(_activeIndex) : null,
-      const SingleActivator(LogicalKeyboardKey.keyW, control: true): () =>
-          _activeIndex >= 0 ? _closeTab(_activeIndex) : null,
-      const SingleActivator(LogicalKeyboardKey.arrowLeft,
-          meta: true, alt: true): () => _activateRelativeTab(-1),
-      const SingleActivator(LogicalKeyboardKey.arrowLeft,
-          control: true, alt: true): () => _activateRelativeTab(-1),
-      const SingleActivator(LogicalKeyboardKey.pageUp, control: true): () =>
-          _activateRelativeTab(-1),
-      const SingleActivator(LogicalKeyboardKey.arrowRight,
-          meta: true, alt: true): () => _activateRelativeTab(1),
-      const SingleActivator(LogicalKeyboardKey.arrowRight,
-          control: true, alt: true): () => _activateRelativeTab(1),
-      const SingleActivator(LogicalKeyboardKey.pageDown, control: true): () =>
-          _activateRelativeTab(1),
-      const SingleActivator(LogicalKeyboardKey.tab, control: true, shift: true):
-          () => _activateRelativeTab(-1),
-      const SingleActivator(LogicalKeyboardKey.tab, control: true): () =>
-          _activateRelativeTab(1),
-      const SingleActivator(LogicalKeyboardKey.keyF, meta: true, shift: true):
-          _openActiveFiles,
-      const SingleActivator(LogicalKeyboardKey.keyF,
-          control: true, shift: true): _openActiveFiles,
-      const SingleActivator(LogicalKeyboardKey.keyG, meta: true, shift: true):
-          _openMacGit,
-      const SingleActivator(LogicalKeyboardKey.keyG,
-          control: true, shift: true): _openMacGit,
-      const SingleActivator(LogicalKeyboardKey.period, meta: true): () =>
-          _macSessionControls[_activeTab?.key]?.stop(),
-      const SingleActivator(LogicalKeyboardKey.period, control: true): () =>
-          _macSessionControls[_activeTab?.key]?.stop(),
-      const SingleActivator(LogicalKeyboardKey.slash, meta: true):
-          _showDesktopShortcuts,
-      const SingleActivator(LogicalKeyboardKey.slash, control: true):
-          _showDesktopShortcuts,
-      for (var i = 1; i <= 9; i++)
-        SingleActivator(
-            LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i - 1),
-            meta: true): () => _activateTab(i - 1),
-      for (var i = 1; i <= 9; i++)
-        SingleActivator(
-            LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i - 1),
-            control: true): () => _activateTab(i - 1),
-    };
-    return CallbackShortcuts(
-      bindings: shortcuts,
-      child: Focus(
-        autofocus: true,
-        canRequestFocus: true,
-        skipTraversal: true,
-        descendantsAreFocusable: true,
-        onKeyEvent: (node, event) {
-          if (event is! KeyDownEvent) return KeyEventResult.ignored;
-          final key = event.logicalKey;
-          final meta = HardwareKeyboard.instance.isMetaPressed;
-          final control = HardwareKeyboard.instance.isControlPressed;
-          if ((meta || control) && key == LogicalKeyboardKey.keyW) {
-            if (_activeIndex >= 0) _closeTab(_activeIndex);
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        },
-        child: child,
-      ),
-    );
+    // Chords are handled globally in _handleGlobalShortcuts so they keep
+    // working after a tab click or composer focus steal.
+    return child;
   }
 
   void _onNotif(Map<String, dynamic> m) async {
