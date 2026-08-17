@@ -1703,7 +1703,8 @@ class _SessionScreenState extends State<SessionScreen>
           // bottom of a scrolled-up transcript it read as "the agent is stuck".
           if (waiting && _pendingApproval(events))
             _centerWide(Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+              padding: EdgeInsets.fromLTRB(
+                  widget.embedded ? 0 : 20, 6, widget.embedded ? 0 : 20, 0),
               child: _ApprovalBar(
                   events: events,
                   onSend: _sendDecision,
@@ -1711,7 +1712,8 @@ class _SessionScreenState extends State<SessionScreen>
             )),
           if (waiting && s?.pendingQuestion != null)
             _centerWide(Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+              padding: EdgeInsets.fromLTRB(
+                  widget.embedded ? 0 : 20, 6, widget.embedded ? 0 : 20, 0),
               child: _QuestionBar(
                   question: s!.pendingQuestion!, onSend: _sendDecision),
             )),
@@ -2268,8 +2270,8 @@ class _SessionScreenState extends State<SessionScreen>
 
   Widget _inputBar(bool running) {
     return Container(
-      padding: EdgeInsets.fromLTRB(
-          20, 8, 20, 10 + MediaQuery.of(context).padding.bottom),
+      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 8,
+          widget.embedded ? 0 : 20, 10 + MediaQuery.of(context).padding.bottom),
       child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

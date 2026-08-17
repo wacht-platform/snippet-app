@@ -994,56 +994,68 @@ class AudioTranscriptCard extends StatefulWidget {
 class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
   bool _expanded = false;
 
+  String _lineFor(AudioTranscriptItem item) => item.unavailable
+      ? 'Could not transcribe this audio: ${item.text}'
+      : item.text;
+
+  String get _preview {
+    final first = widget.items.isEmpty ? '' : _lineFor(widget.items.first);
+    return first.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  bool get _canExpand {
+    if (widget.items.length > 1) return true;
+    if (widget.items.isEmpty) return false;
+    return _lineFor(widget.items.first).contains('\n') || _preview.length > 72;
+  }
+
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(top: 4),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: InkWell(
+        onTap: _canExpand ? () => setState(() => _expanded = !_expanded) : null,
         borderRadius: BorderRadius.circular(R.sm),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 5, 6, 5),
-            child: Row(children: [
-              AppIcon('file', size: 12, color: AppColors.fg3),
-              const SizedBox(width: 6),
-              Text('Transcript',
-                  style:
-                      sans(11, weight: FontWeight.w500, color: AppColors.fg3)),
-              const Spacer(),
-              AppIcon(_expanded ? 'chevron-up' : 'chevron-down',
-                  size: 12, color: AppColors.fg4),
-            ]),
-          ),
-        ),
-        if (_expanded)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 7),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < widget.items.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 6),
-                  Text(
-                    widget.items[i].unavailable
-                        ? 'Could not transcribe this audio: ${widget.items[i].text}'
-                        : widget.items[i].text,
-                    style: sans(12.5,
-                        height: 1.4,
-                        color: widget.items[i].unavailable
-                            ? AppColors.fg3
-                            : AppColors.fg2),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!_expanded)
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: Text(
+                    _preview.isEmpty ? 'Transcript' : _preview,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12.5, height: 1.4, color: AppColors.fg2),
                   ),
+                ),
+                if (_canExpand) ...[
+                  const SizedBox(width: 8),
+                  AppIcon('chevron-down', size: 13, color: AppColors.fg4),
                 ],
+              ])
+            else ...[
+              for (var i = 0; i < widget.items.length; i++) ...[
+                if (i > 0) const SizedBox(height: 6),
+                Text(
+                  _lineFor(widget.items[i]),
+                  style: sans(12.5,
+                      height: 1.4,
+                      color: widget.items[i].unavailable
+                          ? AppColors.fg3
+                          : AppColors.fg2),
+                ),
               ],
-            ),
-          ),
-      ]),
+              const SizedBox(height: 4),
+              Row(children: [
+                const Spacer(),
+                AppIcon('chevron-up', size: 13, color: AppColors.fg4),
+              ]),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
