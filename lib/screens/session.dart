@@ -1532,7 +1532,7 @@ class _SessionScreenState extends State<SessionScreen>
             )),
           Expanded(
             child: Stack(children: [
-              _centerWide(s == null
+              s == null
                   ? Center(
                       child: SizedBox(
                           width: 22,
@@ -1596,11 +1596,13 @@ class _SessionScreenState extends State<SessionScreen>
                           reverse: true,
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                           itemCount: timeline.length,
-                          itemBuilder: (context, index) => RepaintBoundary(
-                            child: timeline[timeline.length - 1 - index],
+                          itemBuilder: (context, index) => _centerWide(
+                            RepaintBoundary(
+                              child: timeline[timeline.length - 1 - index],
+                            ),
                           ),
                         );
-                      }))),
+                      })),
               // Floating "jump to latest": scrolling up unpins auto-follow, and a
               // streaming reply then grows silently — give a one-tap way back.
               if (!_stickToBottom && s != null)
