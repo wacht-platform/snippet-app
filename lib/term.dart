@@ -262,10 +262,13 @@ class _SessionTermViewState extends State<SessionTermView> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: Wrap(spacing: 6, runSpacing: 6, children: [
+                child: Row(children: [
                   _modChip('Ctrl', _ctrl, () => setState(() => _ctrl = !_ctrl)),
+                  const SizedBox(width: 6),
                   _modChip('Alt', _alt, () => setState(() => _alt = !_alt)),
+                  const SizedBox(width: 6),
                   _keyChip('Esc', () => _sendKey(TerminalKey.escape)),
+                  const SizedBox(width: 6),
                   _keyChip('Tab', () => _sendKey(TerminalKey.tab)),
                 ]),
               ),
