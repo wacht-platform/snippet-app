@@ -5,7 +5,6 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +16,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../api.dart';
+import '../desktop_pick.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../platform.dart';
@@ -1342,9 +1342,9 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Future<void> _pickFiles() async {
-    List<PlatformFile> files;
+    List<PickedLocalFile> files;
     try {
-      files = await FilePicker.pickFiles(type: FileType.any);
+      files = await pickLocalFiles();
     } catch (e) {
       _toast('$e');
       return;
@@ -2063,7 +2063,6 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _openActions(HarnessState? s) {
-    final manual = (s?.approvalMode ?? 'auto') == 'manual';
     final ws = s?.workspace ?? '';
     void run(VoidCallback f) {
       Navigator.pop(context);
@@ -2072,107 +2071,58 @@ class _SessionScreenState extends State<SessionScreen>
 
     showAppSheet(context,
         title: 'Actions',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SectionLabel('Session'),
-            _actionTile('edit', 'Rename session',
-                onTap: () => run(_renameCurrent)),
-            if (!kMacOS)
-              _actionTile('shield', 'Approval mode',
-                  value: manual ? 'Ask' : 'Auto',
-                  onTap: () => run(() {
-                        _send({
-                          'kind': 'set_mode',
-                          'value': manual ? 'auto' : 'manual'
-                        });
-                        _toast(manual ? 'Approval: auto' : 'Approval: ask');
-                      })),
-            if (!kMacOS)
-              (s?.goal?.ongoing ?? false)
-                  ? _actionTile('zap', 'Cancel goal',
-                      value: s!.goal!.paused ? 'paused' : 'running',
-                      onTap: () => run(_cancelGoal))
-                  : _actionTile('zap', 'Set goal', onTap: () => run(_setGoal)),
-            if (!kMacOS && (s?.lanes.isNotEmpty ?? false))
-              _actionTile('layers', 'Lanes',
-                  value: '${s!.lanes.where((l) => l.running).length} running',
-                  onTap: () => run(_showLanes)),
-            const SizedBox(height: 12),
-            const SectionLabel('Workspace'),
-            if (!kMacOS)
-              _actionTile('git-branch', 'Git',
-                  onTap: () => run(() => presentScreen(context,
-                      builder: (_, close) => GitScreen(
-                          client: widget.client,
-                          sessionId: widget.sessionId,
-                          onClose: close)))),
-            _actionTile('folder', 'Open files',
-                onTap: () => run(() {
-                      final name = lastPathSegment(ws, ifEmpty: 'Files');
-                      presentScreen(context,
-                          builder: (_, close) => FileExplorer(
-                              client: widget.client,
-                              title: name,
-                              start: ws.isEmpty ? null : ws,
-                              onClose: close,
-                              onOpenFile: widget.onOpenFileTab));
-                    })),
-            _actionTile('terminal', 'Run command', onTap: () => run(_showExec)),
-            _actionTile('list', 'Processes',
-                onTap: () => run(() => presentScreen(context,
-                    builder: (_, close) => ProcessesScreen(
-                        client: widget.client,
-                        sessionId: widget.sessionId,
-                        onClose: close)))),
-            const SizedBox(height: 12),
-            const SectionLabel('History'),
-            _actionTile('minimize', 'Compact history',
-                onTap: () => run(() {
-                      _send({'kind': 'compact'});
-                      _toast('Compacting history');
-                    })),
-            _actionTile('history', 'Checkpoints',
-                onTap: () => run(_showCheckpoints)),
-            _actionTile('activity', 'Usage', onTap: () => run(_showUsage)),
-            const SizedBox(height: 4),
-          ],
+        child: _SessionActionsPanel(
+          session: s,
+          title: _title,
+          onRename: (name) async {
+            try {
+              await widget.client.renameSession(widget.sessionId, name);
+              if (mounted) setState(() => _title = name);
+            } catch (e) {
+              if (mounted) _toast('$e');
+            }
+          },
+          onApproval: (manual) {
+            _send({
+              'kind': 'set_mode',
+              'value': manual ? 'manual' : 'auto',
+            });
+            _toast(manual ? 'Approval: ask' : 'Approval: auto');
+          },
+          onSetGoal: (text) {
+            _send({'kind': 'set_goal', 'value': text});
+            _toast('Goal set — the agent will drive toward it');
+          },
+          onCancelGoal: _cancelGoal,
+          onLanes: () => run(_showLanes),
+          onGit: () => run(() => presentScreen(context,
+              builder: (_, close) => GitScreen(
+                  client: widget.client,
+                  sessionId: widget.sessionId,
+                  onClose: close))),
+          onFiles: () => run(() {
+            final name = lastPathSegment(ws, ifEmpty: 'Files');
+            presentScreen(context,
+                builder: (_, close) => FileExplorer(
+                    client: widget.client,
+                    title: name,
+                    start: ws.isEmpty ? null : ws,
+                    onClose: close,
+                    onOpenFile: widget.onOpenFileTab));
+          }),
+          onCommand: () => run(_showExec),
+          onProcesses: () => run(() => presentScreen(context,
+              builder: (_, close) => ProcessesScreen(
+                  client: widget.client,
+                  sessionId: widget.sessionId,
+                  onClose: close))),
+          onCompact: () => run(() {
+            _send({'kind': 'compact'});
+            _toast('Compacting history');
+          }),
+          onCheckpoints: () => run(_showCheckpoints),
+          onUsage: () => run(_showUsage),
         ));
-  }
-
-  Widget _actionTile(String icon, String label,
-      {String? value, required VoidCallback onTap}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Material(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(R.md),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(children: [
-              Container(
-                width: 30,
-                height: 30,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                    color: AppColors.surface3,
-                    borderRadius: BorderRadius.circular(R.sm)),
-                child: AppIcon(icon, size: 15, color: AppColors.fg2),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                  child: Text(label, style: sans(13, color: AppColors.fg1))),
-              if (value != null)
-                Text(value, style: mono(11, color: AppColors.fg3)),
-            ]),
-          ),
-        ),
-      ),
-    );
   }
 
   List<Widget> _statusChips(HarnessState? s, bool running) {
@@ -2377,8 +2327,8 @@ class _SessionScreenState extends State<SessionScreen>
                       GestureDetector(
                         onTap: _onAttachTap,
                         child: SizedBox(
-                          width: 36,
-                          height: 36,
+                          width: 40,
+                          height: 40,
                           child: Center(
                             child:
                                 AppIcon('plus', size: 18, color: AppColors.fg3),
@@ -2414,11 +2364,11 @@ class _SessionScreenState extends State<SessionScreen>
                         GestureDetector(
                           onTap: _onMicTap,
                           child: SizedBox(
-                            width: 48,
-                            height: 44,
+                            width: 40,
+                            height: 40,
                             child: Center(
                               child: AppIcon(_isRecording ? 'mic-off' : 'mic',
-                                  size: 22,
+                                  size: 18,
                                   color: _isRecording
                                       ? AppColors.danger
                                       : AppColors.fg3),
@@ -4163,6 +4113,230 @@ class _SendBtn extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _SessionActionsPanel extends StatefulWidget {
+  final HarnessState? session;
+  final String title;
+  final Future<void> Function(String name) onRename;
+  final void Function(bool manual) onApproval;
+  final void Function(String text) onSetGoal;
+  final VoidCallback onCancelGoal;
+  final VoidCallback onLanes;
+  final VoidCallback onGit;
+  final VoidCallback onFiles;
+  final VoidCallback onCommand;
+  final VoidCallback onProcesses;
+  final VoidCallback onCompact;
+  final VoidCallback onCheckpoints;
+  final VoidCallback onUsage;
+  const _SessionActionsPanel({
+    required this.session,
+    required this.title,
+    required this.onRename,
+    required this.onApproval,
+    required this.onSetGoal,
+    required this.onCancelGoal,
+    required this.onLanes,
+    required this.onGit,
+    required this.onFiles,
+    required this.onCommand,
+    required this.onProcesses,
+    required this.onCompact,
+    required this.onCheckpoints,
+    required this.onUsage,
+  });
+
+  @override
+  State<_SessionActionsPanel> createState() => _SessionActionsPanelState();
+}
+
+class _SessionActionsPanelState extends State<_SessionActionsPanel> {
+  String? _open;
+  late final TextEditingController _titleCtl =
+      TextEditingController(text: widget.title);
+  late final TextEditingController _goalCtl = TextEditingController();
+  bool _savingTitle = false;
+
+  @override
+  void dispose() {
+    _titleCtl.dispose();
+    _goalCtl.dispose();
+    super.dispose();
+  }
+
+  void _toggle(String id) => setState(() => _open = _open == id ? null : id);
+
+  Widget _section(String label) => Padding(
+        padding: const EdgeInsets.only(top: 10, bottom: 6),
+        child: SectionLabel(label),
+      );
+
+  Widget _row({
+    required String icon,
+    required String label,
+    String? value,
+    String? id,
+    VoidCallback? onTap,
+    Widget? child,
+  }) {
+    final open = id != null && _open == id;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              onTap: onTap ?? (id == null ? null : () => _toggle(id)),
+              borderRadius: BorderRadius.circular(R.md),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                child: Row(children: [
+                  AppIcon(icon, size: 16, color: AppColors.fg2),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child:
+                          Text(label, style: sans(13, color: AppColors.fg1))),
+                  if (value != null)
+                    Text(value, style: mono(11, color: AppColors.fg3)),
+                  if (id != null) ...[
+                    const SizedBox(width: 6),
+                    AppIcon(open ? 'chevron-down' : 'chevron-right',
+                        size: 14, color: AppColors.fg4),
+                  ],
+                ]),
+              ),
+            ),
+            if (open && child != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: child,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.session;
+    final manual = (s?.approvalMode ?? 'auto') == 'manual';
+    final goalOn = s?.goal?.ongoing ?? false;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _section('Session'),
+        _row(
+          icon: 'edit',
+          label: 'Rename',
+          id: 'rename',
+          value: widget.title.isEmpty ? null : widget.title,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppField(
+                  controller: _titleCtl,
+                  hint: 'Session title',
+                  onSubmitted: (_) => _saveTitle()),
+              const SizedBox(height: 8),
+              Btn(_savingTitle ? 'Saving…' : 'Save title',
+                  disabled: _savingTitle, onTap: _saveTitle),
+            ],
+          ),
+        ),
+        if (!kMacOS)
+          _row(
+            icon: 'shield',
+            label: 'Approval',
+            id: 'approval',
+            value: manual ? 'Ask' : 'Auto',
+            child: Row(children: [
+              Expanded(
+                child: Btn('Auto',
+                    variant: manual ? BtnVariant.secondary : BtnVariant.primary,
+                    onTap: () {
+                  widget.onApproval(false);
+                  setState(() {});
+                }),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Btn('Ask',
+                    variant: manual ? BtnVariant.primary : BtnVariant.secondary,
+                    onTap: () {
+                  widget.onApproval(true);
+                  setState(() {});
+                }),
+              ),
+            ]),
+          ),
+        if (!kMacOS)
+          _row(
+            icon: 'zap',
+            label: goalOn ? 'Goal' : 'Set goal',
+            id: 'goal',
+            value: goalOn ? (s!.goal!.paused ? 'paused' : 'running') : null,
+            child: goalOn
+                ? Btn('Cancel goal',
+                    variant: BtnVariant.secondary, onTap: widget.onCancelGoal)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppField(
+                          controller: _goalCtl,
+                          hint: 'What should the agent work toward?',
+                          minLines: 2,
+                          maxLines: 4),
+                      const SizedBox(height: 8),
+                      Btn('Set goal', onTap: () {
+                        final t = _goalCtl.text.trim();
+                        if (t.isEmpty) return;
+                        widget.onSetGoal(t);
+                        _goalCtl.clear();
+                      }),
+                    ],
+                  ),
+          ),
+        if (!kMacOS && (s?.lanes.isNotEmpty ?? false))
+          _row(
+              icon: 'layers',
+              label: 'Lanes',
+              value: '${s!.lanes.where((l) => l.running).length} running',
+              onTap: widget.onLanes),
+        _section('Workspace'),
+        if (!kMacOS)
+          _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
+        _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
+        _row(icon: 'terminal', label: 'Run command', onTap: widget.onCommand),
+        _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
+        _section('History'),
+        _row(
+            icon: 'minimize',
+            label: 'Compact history',
+            onTap: widget.onCompact),
+        _row(
+            icon: 'history', label: 'Checkpoints', onTap: widget.onCheckpoints),
+        _row(icon: 'activity', label: 'Usage', onTap: widget.onUsage),
+      ],
+    );
+  }
+
+  Future<void> _saveTitle() async {
+    final name = _titleCtl.text.trim();
+    if (name.isEmpty || _savingTitle) return;
+    setState(() => _savingTitle = true);
+    try {
+      await widget.onRename(name);
+    } finally {
+      if (mounted) setState(() => _savingTitle = false);
+    }
   }
 }
 

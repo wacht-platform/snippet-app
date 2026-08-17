@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
 import '../api.dart';
+import '../desktop_pick.dart';
 import '../file_actions.dart';
 import '../highlight.dart';
 import '../models.dart';
@@ -141,9 +142,9 @@ class _FileExplorerState extends State<FileExplorer> {
 
   // Upload files from the device into the current directory.
   Future<void> _upload(String cwd) async {
-    List<PlatformFile> files;
+    List<PickedLocalFile> files;
     try {
-      files = await FilePicker.pickFiles(type: FileType.any);
+      files = await pickLocalFiles();
     } catch (e) {
       if (mounted) toast(context, '$e', danger: true);
       return;

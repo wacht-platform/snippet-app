@@ -671,9 +671,9 @@ IconData iconFor(String name) {
     case 'sparkles':
       return IconsaxPlusLinear.flash_1;
     case 'mic':
-      return Icons.mic_none_rounded;
+      return IconsaxPlusLinear.microphone_2;
     case 'mic-off':
-      return Icons.mic_off_rounded;
+      return IconsaxPlusLinear.microphone_slash;
     case 'shield':
       return IconsaxPlusLinear.shield_tick;
     case 'goal':

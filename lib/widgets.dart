@@ -1620,7 +1620,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
           borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
           border: Border(top: BorderSide(color: AppColors.border2)),
         ),
-        constraints: BoxConstraints(maxHeight: media.size.height * 0.82),
+        constraints: BoxConstraints(maxHeight: media.size.height * 0.92),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 12),
           Center(
