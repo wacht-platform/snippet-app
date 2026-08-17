@@ -960,54 +960,47 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final unavailable = widget.items.any((item) => item.unavailable);
     return Container(
-      margin: const EdgeInsets.only(top: 10),
+      margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
         color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(
-            color: unavailable ? AppColors.border : AppColors.accentLine),
+        borderRadius: BorderRadius.circular(R.sm),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         InkWell(
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(R.sm),
           onTap: () => setState(() => _expanded = !_expanded),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+            padding: const EdgeInsets.fromLTRB(8, 5, 6, 5),
             child: Row(children: [
-              AppIcon('file', size: 14, color: AppColors.accent),
-              const SizedBox(width: 7),
+              AppIcon('file', size: 12, color: AppColors.fg3),
+              const SizedBox(width: 6),
               Text('Transcript',
-                  style: sans(11.5,
-                      weight: FontWeight.w600, color: AppColors.fg2)),
+                  style:
+                      sans(11, weight: FontWeight.w500, color: AppColors.fg3)),
               const Spacer(),
-              Text(unavailable ? 'unavailable' : (_expanded ? 'hide' : 'show'),
-                  style: mono(10,
-                      color: unavailable ? AppColors.fg4 : AppColors.fg3)),
-              const SizedBox(width: 4),
               AppIcon(_expanded ? 'chevron-up' : 'chevron-down',
-                  size: 14, color: AppColors.fg3),
+                  size: 12, color: AppColors.fg4),
             ]),
           ),
         ),
         if (_expanded)
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 7),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var i = 0; i < widget.items.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 8),
+                  if (i > 0) const SizedBox(height: 6),
                   Text(
                     widget.items[i].unavailable
                         ? 'Could not transcribe this audio: ${widget.items[i].text}'
                         : widget.items[i].text,
-                    style: sans(13,
-                        height: 1.45,
+                    style: sans(12.5,
+                        height: 1.4,
                         color: widget.items[i].unavailable
                             ? AppColors.fg3
-                            : AppColors.fg1),
+                            : AppColors.fg2),
                   ),
                 ],
               ],

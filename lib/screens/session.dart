@@ -1033,10 +1033,22 @@ class _SessionScreenState extends State<SessionScreen>
 
   Future<void> _startRecording() async {
     if (!kCanRecord) return;
+    // Flip the UI first so the tap feels instant; permission + encoder
+    // setup still happen before audio is captured.
+    if (mounted) {
+      setState(() {
+        _isRecording = true;
+        _recordingElapsed = Duration.zero;
+        _waveform
+          ..clear()
+          ..add(0.08);
+      });
+    }
     final granted = kMobile
         ? (await Permission.microphone.request()).isGranted
         : await _recorder.hasPermission();
     if (!granted) {
+      if (mounted) setState(() => _isRecording = false);
       _toast(kMobile
           ? 'Microphone permission is required.'
           : 'Microphone permission is required by macOS.');
@@ -1056,13 +1068,14 @@ class _SessionScreenState extends State<SessionScreen>
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
+          bitRate: 96000,
           sampleRate: 16000,
           numChannels: 1,
         ),
         path: path,
       );
       if (!await _recorder.isRecording()) {
+        if (mounted) setState(() => _isRecording = false);
         _toast('Could not start recording.');
         return;
       }
@@ -1091,17 +1104,9 @@ class _SessionScreenState extends State<SessionScreen>
           setState(() => _recordingElapsed = next);
         }
       });
-      if (mounted) {
-        setState(() {
-          _recordingPath = path;
-          _isRecording = true;
-          _recordingElapsed = Duration.zero;
-          _waveform
-            ..clear()
-            ..add(0.08);
-        });
-      }
+      if (mounted) setState(() => _recordingPath = path);
     } catch (e) {
+      if (mounted) setState(() => _isRecording = false);
       _toast('Could not start recording: $e');
     }
   }
