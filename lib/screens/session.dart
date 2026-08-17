@@ -4064,11 +4064,17 @@ class _QuestionBarState extends State<_QuestionBar> {
       );
 
   Widget _chip(String label, bool sel, VoidCallback onTap) => Material(
-        color: sel ? AppColors.accentBg : AppColors.surface2,
-        borderRadius: BorderRadius.circular(99),
+        color:
+            sel ? AppColors.accent.withValues(alpha: 0.18) : AppColors.surface2,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: sel ? AppColors.accent : Colors.transparent,
+            width: 1.2,
+          ),
+        ),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(99),
+          customBorder: const StadiumBorder(),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(label,
@@ -4079,22 +4085,27 @@ class _QuestionBarState extends State<_QuestionBar> {
         ),
       );
 
-  // Full-width selectable row for single-choice options (labels are sentences).
-  // Selected reads as a quiet accent tint + border + check, not a solid orange slab.
   Widget _choiceRow(String label, bool sel, VoidCallback onTap) => Material(
-        color: sel ? AppColors.accentBg : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
+        color:
+            sel ? AppColors.accent.withValues(alpha: 0.14) : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(
+            color: sel ? AppColors.accent : AppColors.border2,
+            width: sel ? 1.2 : 1,
+          ),
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(children: [
               Expanded(
                   child: Text(label,
                       style: sans(14,
                           height: 1.4,
-                          weight: FontWeight.w500,
+                          weight: sel ? FontWeight.w600 : FontWeight.w500,
                           color: sel ? AppColors.fg1 : AppColors.fg2))),
               if (sel) ...[
                 const SizedBox(width: 10),
