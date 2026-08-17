@@ -23,6 +23,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../tool_views.dart';
 import '../transcript.dart';
+import '../term.dart';
 import '../panel.dart';
 import '../widgets.dart';
 import 'editor.dart';
@@ -178,6 +179,11 @@ class _SessionScreenState extends State<SessionScreen>
   String _liveThinking = '';
   bool _liveTextVisible = false;
   String? _connError;
+  bool _termOpen = false;
+  bool _termAlive = false;
+  final VtScreen _term = VtScreen(80, 24);
+  int _termCols = 80;
+  int _termRows = 24;
   String? _modelLabel;
   String? _currentProfile;
   final _input = TextEditingController();
@@ -621,6 +627,10 @@ class _SessionScreenState extends State<SessionScreen>
           // fromJson wiped the transcript to empty until the next real state
           // frame (often only after a TUI-side persist).
           final wire = j['wire'] as String? ?? 'snapshot';
+          if (wire == 'term') {
+            _applyTermFrame(j);
+            return;
+          }
           if (wire == 'stream') {
             final text = (j['text'] as String?) ?? '';
             final thinking = (j['thinking'] as String?) ?? '';
@@ -931,6 +941,53 @@ class _SessionScreenState extends State<SessionScreen>
   // Send now, or queue for the reconnect flush — never silently drop.
   // For user messages (tracked in _pending), do NOT also add to _outbox:
   // _freshConn resend handles recovery, so adding to both would double-send.
+  void _applyTermFrame(Map<String, dynamic> j) {
+    final op = (j['op'] as String?) ?? '';
+    final cols = (j['cols'] as num?)?.toInt() ?? _termCols;
+    final rows = (j['rows'] as num?)?.toInt() ?? _termRows;
+    _termCols = cols;
+    _termRows = rows;
+    _termAlive = j['alive'] == true;
+    final raw = j['data'] as String?;
+    final bytes = (raw == null || raw.isEmpty)
+        ? Uint8List(0)
+        : Uint8List.fromList(base64Decode(raw));
+    if (!mounted) return;
+    setState(() {
+      if (op == 'snapshot') _term.reset(cols, rows);
+      if (bytes.isNotEmpty) {
+        _term.resize(cols, rows);
+        _term.feed(bytes);
+      }
+    });
+  }
+
+  void _openTerm() {
+    setState(() => _termOpen = true);
+    _send({
+      'wire': 'term',
+      'op': 'open',
+      'cols': _termCols,
+      'rows': _termRows,
+    });
+  }
+
+  void _termIn(Uint8List bytes) {
+    _send({
+      'wire': 'term',
+      'op': 'in',
+      'data': base64Encode(bytes),
+      'cols': _termCols,
+      'rows': _termRows,
+    });
+  }
+
+  void _termResize(int cols, int rows) {
+    _termCols = cols;
+    _termRows = rows;
+    _send({'wire': 'term', 'op': 'resize', 'cols': cols, 'rows': rows});
+  }
+
   void _send(Map<String, dynamic> m, {bool tracked = false}) {
     final payload = jsonEncode(m);
     final ch = _channel;
@@ -1573,6 +1630,18 @@ class _SessionScreenState extends State<SessionScreen>
           // Desktop keeps the detailed chip strip.
           if (!kMobile && !kMacOS) _statusStrip(s, running),
           if (_connError != null) _disconnectedBanner(),
+          if (_termOpen)
+            SizedBox(
+              height: kMobile ? 280 : 320,
+              child: SessionTermView(
+                alive: _termAlive,
+                screen: _term,
+                onInput: _termIn,
+                onResize: _termResize,
+                onClose: () => setState(() => _termOpen = false),
+                mobileKeys: kMobile,
+              ),
+            ),
           if (s?.goal?.ongoing == true)
             _centerWide(Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
@@ -1839,6 +1908,7 @@ class _SessionScreenState extends State<SessionScreen>
         if (running)
           IconBtn('stop',
               tooltip: 'Stop', onTap: () => _send({'kind': 'interrupt'})),
+        IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
       ]),
     );
   }
@@ -1876,6 +1946,9 @@ class _SessionScreenState extends State<SessionScreen>
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
         if (mac)
+          IconBtn('terminal',
+              size: 30, iconSize: 15, tooltip: 'Shell', onTap: _openTerm),
+        if (mac)
           IconBtn('more-horizontal',
               size: 30,
               iconSize: 17,
@@ -1887,7 +1960,11 @@ class _SessionScreenState extends State<SessionScreen>
               iconSize: 16,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
-        if (!mac) _menu(s),
+        if (!mac) ...[
+          IconBtn('terminal',
+              size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
+          _menu(s),
+        ],
       ]),
     );
   }
@@ -2030,6 +2107,7 @@ class _SessionScreenState extends State<SessionScreen>
         item('layers', 'Lanes', _showLanes,
             value: '${s!.lanes.where((l) => l.running).length} running'),
       const PopupMenuDivider(),
+      item('terminal', 'Session shell', _openTerm),
       item(
           'git-branch',
           'Git',
@@ -2094,6 +2172,7 @@ class _SessionScreenState extends State<SessionScreen>
           },
           onCancelGoal: _cancelGoal,
           onLanes: () => run(_showLanes),
+          onTerm: () => run(_openTerm),
           onGit: () => run(() => presentScreen(context,
               builder: (_, close) => GitScreen(
                   client: widget.client,
@@ -4318,6 +4397,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final void Function(String text) onSetGoal;
   final VoidCallback onCancelGoal;
   final VoidCallback onLanes;
+  final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
   final VoidCallback onCommand;
@@ -4333,6 +4413,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onSetGoal,
     required this.onCancelGoal,
     required this.onLanes,
+    required this.onTerm,
     required this.onGit,
     required this.onFiles,
     required this.onCommand,
@@ -4509,6 +4590,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
         if (!kMacOS)
           _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
         _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
+        _row(icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
         _row(icon: 'terminal', label: 'Run command', onTap: widget.onCommand),
         _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
         _section('History'),
