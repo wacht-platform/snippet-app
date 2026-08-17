@@ -2222,7 +2222,7 @@ class _SessionScreenState extends State<SessionScreen>
                 borderRadius: BorderRadius.circular(R.card),
                 border: Border.all(color: AppColors.border),
               ),
-              padding: const EdgeInsets.fromLTRB(18, 16, 12, 12),
+              padding: const EdgeInsets.fromLTRB(18, 20, 12, 14),
               child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2251,7 +2251,7 @@ class _SessionScreenState extends State<SessionScreen>
                         decoration: InputDecoration(
                           isCollapsed: true,
                           contentPadding:
-                              const EdgeInsets.fromLTRB(2, 2, 8, 10),
+                              const EdgeInsets.fromLTRB(2, 4, 8, 14),
                           border: InputBorder.none,
                           hintText: 'Ask anything',
                           hintStyle:
@@ -2276,7 +2276,7 @@ class _SessionScreenState extends State<SessionScreen>
                         return GestureDetector(
                           onTap: () => _switchModel(chipCtx),
                           child: Container(
-                            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                            padding: const EdgeInsets.fromLTRB(6, 3, 6, 3),
                             decoration: BoxDecoration(
                               color: AppColors.surface2,
                               borderRadius: BorderRadius.circular(R.sm),
@@ -2284,13 +2284,13 @@ class _SessionScreenState extends State<SessionScreen>
                             child:
                                 Row(mainAxisSize: MainAxisSize.min, children: [
                               AppIcon('sparkles',
-                                  size: 13, color: AppColors.fg2),
-                              const SizedBox(width: 6),
+                                  size: 11, color: AppColors.fg2),
+                              const SizedBox(width: 4),
                               Text(_modelLabel ?? 'Auto',
-                                  style: sans(13, color: AppColors.fg2)),
-                              const SizedBox(width: 2),
+                                  style: sans(11.5, color: AppColors.fg2)),
+                              const SizedBox(width: 1),
                               AppIcon('chevron-down',
-                                  size: 12, color: AppColors.fg4),
+                                  size: 10, color: AppColors.fg4),
                             ]),
                           ),
                         );

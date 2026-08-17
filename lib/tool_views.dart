@@ -331,29 +331,10 @@ List<Widget> _bashView(Map? a, Map? d) {
       _previewLines(_displayText(d?['stdout']?.toString() ?? '').trimRight());
   final stderr =
       _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
-  final exit = bashExitCode(d) ?? bashExitCode(a);
-  final out = <Widget>[];
-  if (cmd.isNotEmpty) {
-    out.add(_ShellOutput(cmd));
-    if (exit != null) {
-      out.add(const SizedBox(height: 6));
-      out.add(Text('exit $exit',
-          style:
-              mono(11.5, color: exit == 0 ? AppColors.ok : AppColors.danger)));
-    }
+  if (cmd.isEmpty && stdout.isEmpty && stderr.isEmpty) {
+    return [Text('no output', style: mono(11.5, color: AppColors.fg4))];
   }
-  if (stdout.isNotEmpty) {
-    if (out.isNotEmpty) out.add(const SizedBox(height: 6));
-    out.add(_ShellOutput(stdout));
-  }
-  if (stderr.isNotEmpty) {
-    if (out.isNotEmpty) out.add(const SizedBox(height: 6));
-    out.add(_ShellOutput(stderr, stderr: true));
-  }
-  if (out.isEmpty) {
-    out.add(Text('no output', style: mono(11.5, color: AppColors.fg4)));
-  }
-  return out;
+  return [_ShellPanel(command: cmd, stdout: stdout, stderr: stderr)];
 }
 
 List<Widget> _grepView(Map? a, Map? d) {
@@ -895,10 +876,12 @@ String _displayText(String text) => text
     .replaceAll(r'\n', '\n')
     .replaceAll(r'\r', '\r');
 
-class _ShellOutput extends StatelessWidget {
-  final String text;
-  final bool stderr;
-  const _ShellOutput(this.text, {this.stderr = false});
+class _ShellPanel extends StatelessWidget {
+  final String command;
+  final String stdout;
+  final String stderr;
+  const _ShellPanel(
+      {required this.command, required this.stdout, required this.stderr});
 
   @override
   Widget build(BuildContext context) {
@@ -907,22 +890,35 @@ class _ShellOutput extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
-        color: stderr ? AppColors.dangerBg : AppColors.surface2,
+        color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.sm),
       ),
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (_) => true,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SelectableText.rich(
-            stderr
-                ? TextSpan(
-                    text: text,
-                    style: mono(11.5, height: 1.45, color: AppColors.danger),
-                  )
-                : highlightedCodeSpan(text, language: 'bash'),
-          ),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (command.isNotEmpty)
+            _shellScroll(highlightedCodeSpan(command, language: 'bash')),
+          if (command.isNotEmpty && (stdout.isNotEmpty || stderr.isNotEmpty))
+            const SizedBox(height: 8),
+          if (stdout.isNotEmpty)
+            _shellScroll(highlightedCodeSpan(stdout, language: 'bash')),
+          if (stdout.isNotEmpty && stderr.isNotEmpty) const SizedBox(height: 6),
+          if (stderr.isNotEmpty)
+            _shellScroll(TextSpan(
+              text: stderr,
+              style: mono(11.5, height: 1.45, color: AppColors.danger),
+            )),
+        ],
+      ),
+    );
+  }
+
+  Widget _shellScroll(TextSpan span) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (_) => true,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SelectableText.rich(span),
       ),
     );
   }
