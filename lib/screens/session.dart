@@ -856,9 +856,22 @@ class _SessionScreenState extends State<SessionScreen>
         return prev + incoming.substring(n);
       }
     }
-    // Never concatenate two full snapshots; keep the longer coherent one.
-    if (incoming.length >= prev.length) return incoming;
-    return prev;
+    // New thought signature: replace the previous snapshot instead of appending.
+    return incoming;
+  }
+
+  String? _latestCompactionDetail(List<Map<String, dynamic>> events) {
+    for (var i = events.length - 1; i >= 0; i--) {
+      final e = events[i];
+      if (e['type'] != 'system_decision') continue;
+      final step = e['step']?.toString() ?? '';
+      if (step == 'history_compaction_pass' ||
+          step == 'history_compaction_skipped') {
+        final r = e['reasoning']?.toString().trim() ?? '';
+        return r.isEmpty ? null : r;
+      }
+    }
+    return null;
   }
 
   // Throttled stream frame flush — called by the 50ms timer.
@@ -1610,7 +1623,12 @@ class _SessionScreenState extends State<SessionScreen>
                                   text: _liveText.trim(),
                                   selectable: false),
                             ),
-                          if (running) ...[
+                          if (s.compacting) ...[
+                            const SizedBox(height: 10),
+                            _CompactingStatus(
+                              detail: _latestCompactionDetail(events),
+                            ),
+                          ] else if (running) ...[
                             const SizedBox(height: 10),
                             _ChurningStatus(thinking: _liveThinking),
                           ],
@@ -2141,10 +2159,15 @@ class _SessionScreenState extends State<SessionScreen>
                 color: running ? AppColors.run : AppColors.fg2,
                 shape: BoxShape.circle)),
         const SizedBox(width: 7),
-        Text(running ? 'Running' : 'Idle',
+        Text(
+            s?.compacting == true
+                ? 'Compacting'
+                : (running ? 'Running' : 'Idle'),
             style: sans(12.5,
                 weight: FontWeight.w600,
-                color: running ? AppColors.run : AppColors.fg2)),
+                color: s?.compacting == true
+                    ? AppColors.accent
+                    : (running ? AppColors.run : AppColors.fg2))),
       ]),
     ];
     if (s != null && s.workspace.isNotEmpty) {
@@ -3332,6 +3355,80 @@ class _StatMeta extends StatelessWidget {
       const SizedBox(width: 6),
       Text(label, style: mono(12.5, color: c)),
     ]);
+  }
+}
+
+class _CompactingStatus extends StatefulWidget {
+  final String? detail;
+  const _CompactingStatus({this.detail});
+  @override
+  State<_CompactingStatus> createState() => _CompactingStatusState();
+}
+
+class _CompactingStatusState extends State<_CompactingStatus> {
+  late final DateTime _started = DateTime.now();
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  String get _elapsed {
+    final d = DateTime.now().difference(_started);
+    final total = d.inMilliseconds / 1000;
+    final m = total ~/ 60;
+    final s = total - m * 60;
+    return m > 0
+        ? '${m}m ${s.toStringAsFixed(1)}s'
+        : '${s.toStringAsFixed(1)}s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final detail = widget.detail?.trim() ?? '';
+    return Padding(
+      padding: const EdgeInsets.only(left: 2, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            SizedBox(
+                width: 16,
+                child: Center(child: BrailleSpinner(color: AppColors.accent))),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text.rich(TextSpan(children: [
+                TextSpan(
+                    text: 'Compacting',
+                    style: sans(13,
+                        weight: FontWeight.w600, color: AppColors.accent)),
+                TextSpan(
+                    text: ' $_elapsed',
+                    style: sans(13,
+                        color: AppColors.accent.withValues(alpha: 0.72))),
+              ])),
+            ),
+          ]),
+          if (detail.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 24, top: 6),
+              child: Text(detail,
+                  style: sans(13, height: 1.4, color: AppColors.fg3)),
+            ),
+        ],
+      ),
+    );
   }
 }
 
