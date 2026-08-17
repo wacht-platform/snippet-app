@@ -2959,74 +2959,34 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           SnAppBar(title: 'Settings', onBack: widget.onClose),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
-                Text('Workspace controls',
-                    style: sans(20,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-                const SizedBox(height: 5),
-                Text(
-                    'Connections, models, secrets, and appearance for this client.',
-                    style: sans(12.5, height: 1.4, color: AppColors.fg3)),
-                const SizedBox(height: 24),
-                // Grok-style: Instances section with card grouping.
-                Text('Instances',
-                    style: sans(12,
-                        weight: FontWeight.w500, color: AppColors.fg3)),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(R.card),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      for (var i = 0; i < _instances.length; i++) ...[
-                        _instanceRow(_instances[i]),
-                        if (i < _instances.length - 1)
-                          Divider(
-                              height: 1, indent: 48, color: AppColors.border),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-                // Grok-style: Configuration section.
-                Text('Configuration',
-                    style: sans(12,
-                        weight: FontWeight.w500, color: AppColors.fg3)),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(R.card),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      _configTile(
-                          'cpu',
-                          'Models',
-                          'Providers & active model',
-                          () => presentScreen(context,
-                              builder: (_, close) => ModelsScreen(
-                                  client: widget.client, onClose: close))),
-                      Divider(height: 1, indent: 48, color: AppColors.border),
-                      _configTile(
-                          'key',
-                          'Vault',
-                          'Secrets the agent can use',
-                          () => presentScreen(context,
-                              builder: (_, close) => VaultScreen(
-                                  client: widget.client, onClose: close))),
-                      if (kCanNotify) ...[
-                        Divider(height: 1, indent: 48, color: AppColors.border),
-                        _notifTile(),
-                      ],
-                    ],
-                  ),
-                ),
+                _sectionLabel('Instances'),
+                if (_instances.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
+                    child: Text('No saved connections.',
+                        style: sans(13, color: AppColors.fg3)),
+                  )
+                else
+                  for (final inst in _instances) _instanceRow(inst),
+                const SizedBox(height: 18),
+                _sectionLabel('Configuration'),
+                _configTile(
+                    'cpu',
+                    'Models',
+                    'Providers & active model',
+                    () => presentScreen(context,
+                        builder: (_, close) => ModelsScreen(
+                            client: widget.client, onClose: close))),
+                _configTile(
+                    'key',
+                    'Vault',
+                    'Secrets the agent can use',
+                    () => presentScreen(context,
+                        builder: (_, close) => VaultScreen(
+                            client: widget.client, onClose: close))),
+                if (kCanNotify) _notifTile(),
               ],
             ),
           ),
@@ -3035,169 +2995,104 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     );
   }
 
+  Widget _sectionLabel(String t) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 10, 2, 6),
+        child: Text(t,
+            style: sans(11.5,
+                weight: FontWeight.w600, color: AppColors.fg3, spacing: 0.3)),
+      );
+
   Widget _instanceRow(Instance i) {
     final isActive = i.url == widget.active?.url;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {},
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(children: [
-            Container(
-                width: 32,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                    color: AppColors.surface3,
-                    borderRadius: BorderRadius.circular(R.sm)),
-                child: AppIcon('cpu',
-                    size: 15,
-                    color: isActive ? AppColors.accent : AppColors.fg3)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(i.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(14, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text(hostOf(i.url),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: mono(11, color: AppColors.fg4)),
-                  ]),
-            ),
-            if (isActive)
-              Icon(Icons.check_circle_rounded,
-                  size: 18, color: AppColors.accent),
-            IconBtn('trash',
-                size: 32,
-                iconSize: 16,
-                tooltip: 'Remove',
-                onTap: () => _confirmRemove(i)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(children: [
+        AppIcon('cpu',
+            size: 16, color: isActive ? AppColors.accent : AppColors.fg3),
+        const SizedBox(width: 12),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(i.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(14, color: AppColors.fg1)),
+            const SizedBox(height: 2),
+            Text(hostOf(i.url),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: mono(11.5, color: AppColors.fg4)),
           ]),
         ),
-      ),
+        if (isActive)
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text('active', style: sans(11, color: AppColors.accent)),
+          ),
+        IconBtn('trash',
+            size: 32,
+            iconSize: 16,
+            tooltip: 'Remove',
+            onTap: () => _confirmRemove(i)),
+      ]),
     );
   }
 
   Widget _configTile(
       String icon, String label, String sub, VoidCallback onTap) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                  color: AppColors.surface3,
-                  borderRadius: BorderRadius.circular(R.sm)),
-              child: AppIcon(icon, size: 15, color: AppColors.fg2),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: sans(14, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text(sub, style: sans(12, color: AppColors.fg4)),
-                  ]),
-            ),
-            AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _notifTile() {
-    return Material(
-      color: Colors.transparent,
+    return InkWell(
+      onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
-          Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-                color: AppColors.surface3,
-                borderRadius: BorderRadius.circular(R.sm)),
-            child: AppIcon('zap', size: 15, color: AppColors.fg2),
-          ),
+          AppIcon(icon, size: 16, color: AppColors.fg3),
           const SizedBox(width: 12),
           Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Notifications', style: sans(14, color: AppColors.fg1)),
+              Text(label, style: sans(14, color: AppColors.fg1)),
               const SizedBox(height: 2),
-              Text('Alert when a session needs input',
-                  style: sans(12, color: AppColors.fg4)),
+              Text(sub, style: sans(12, color: AppColors.fg4)),
             ]),
           ),
-          _notifBusy
-              ? SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.fg3))
-              : Transform.scale(
-                  scale: 0.78,
-                  child: Switch(
-                    value: _notif,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    activeThumbColor: AppColors.accentFg,
-                    activeTrackColor: AppColors.accent,
-                    onChanged: _toggleNotif,
-                  ),
-                ),
+          AppIcon('chevron-right', size: 15, color: AppColors.fg4),
         ]),
       ),
     );
   }
 
-  Widget _tile(String icon, String label, String sub, VoidCallback onTap) {
-    return Material(
-      color: AppColors.surface2,
-      borderRadius: BorderRadius.circular(R.md),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.md),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          child: Row(children: [
-            Container(
-              width: 30,
-              height: 30,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                  color: AppColors.surface3,
-                  borderRadius: BorderRadius.circular(R.sm)),
-              child: AppIcon(icon, size: 15, color: AppColors.fg2),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: sans(13, color: AppColors.fg1)),
-                    const SizedBox(height: 1),
-                    Text(sub, style: sans(11, color: AppColors.fg4)),
-                  ]),
-            ),
-            AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+  Widget _notifTile() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(children: [
+        AppIcon('zap', size: 16, color: AppColors.fg3),
+        const SizedBox(width: 12),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Notifications', style: sans(14, color: AppColors.fg1)),
+            const SizedBox(height: 2),
+            Text('Alert when a session needs input',
+                style: sans(12, color: AppColors.fg4)),
           ]),
         ),
-      ),
+        _notifBusy
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.fg3))
+            : Transform.scale(
+                scale: 0.78,
+                child: Switch(
+                  value: _notif,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  activeThumbColor: AppColors.accentFg,
+                  activeTrackColor: AppColors.accent,
+                  onChanged: _toggleNotif,
+                ),
+              ),
+      ]),
     );
   }
 }
