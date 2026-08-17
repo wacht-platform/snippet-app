@@ -4028,11 +4028,14 @@ class _MessageJumpRailState extends State<_MessageJumpRail> {
         onExit: (_) => setState(() => _hover = null),
         child: LayoutBuilder(builder: (context, c) {
           final n = marks.length;
-          final gap = n <= 1 ? 0.0 : (c.maxHeight - 8) / (n - 1);
+          const tickH = 2.5;
+          const step = 11.0;
+          final cluster = (n - 1) * step + tickH;
+          final start = ((c.maxHeight - cluster) / 2).clamp(0.0, c.maxHeight);
           return Stack(clipBehavior: Clip.none, children: [
             for (var i = 0; i < n; i++)
               Positioned(
-                top: i * gap,
+                top: start + i * step,
                 right: 0,
                 child: MouseRegion(
                   onEnter: (_) => setState(() => _hover = i),
@@ -4059,7 +4062,7 @@ class _MessageJumpRailState extends State<_MessageJumpRail> {
               ),
             if (_hover != null)
               Positioned(
-                top: (_hover! * gap - 10)
+                top: (start + _hover! * step - 10)
                     .clamp(0.0, math.max(0.0, c.maxHeight - 36)),
                 right: 22,
                 child: IgnorePointer(
