@@ -42,10 +42,18 @@ class _ModelsScreenState extends State<ModelsScreen> {
   }
 
   Future<void> _edit(ModelProfile? p) async {
+    String? delegate;
+    try {
+      delegate = (await widget.client.getConfig()).delegate;
+    } catch (_) {}
+    if (!mounted) return;
     final saved = await presentScreen<bool>(
       context,
-      builder: (_, close) =>
-          ModelEditorScreen(client: widget.client, existing: p, onClose: close),
+      builder: (_, close) => ModelEditorScreen(
+          client: widget.client,
+          existing: p,
+          delegateName: delegate,
+          onClose: close),
     );
     if (saved == true) _refresh();
   }

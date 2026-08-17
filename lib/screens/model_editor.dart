@@ -29,11 +29,16 @@ bool _usesOpenAiAdapter(String p) =>
 class ModelEditorScreen extends StatefulWidget {
   final DaemonClient client;
   final ModelProfile? existing;
+  final String? delegateName;
 
   /// Dismiss when hosted in a responsive panel (desktop drawer / phone full-screen).
   final VoidCallback? onClose;
   const ModelEditorScreen(
-      {super.key, required this.client, this.existing, this.onClose});
+      {super.key,
+      required this.client,
+      this.existing,
+      this.delegateName,
+      this.onClose});
   @override
   State<ModelEditorScreen> createState() => _ModelEditorScreenState();
 }
@@ -48,6 +53,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
   bool _showKey = false;
   late bool _images;
   bool _active = false;
+  bool _delegate = false;
   bool _stream = false;
   String _effort = ''; // '' = provider default
   bool _busy = false;
@@ -75,6 +81,9 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     // default silently reset it on every unrelated edit.
     _images = e?.supportsImages ?? _defaultImages(_provider);
     _active = e?.active ?? !_isEdit;
+    _delegate = e != null &&
+        (widget.delegateName ?? '').isNotEmpty &&
+        widget.delegateName == e.name;
     _stream = e?.stream ?? false;
     _effort = e?.reasoningEffort ?? '';
     // The Save button's enabled state depends on this field; without a listener
@@ -169,6 +178,16 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
         stream: _stream,
         setActive: _active,
       );
+      final savedName = _isEdit
+          ? widget.existing!.name
+          : (_name.text.trim().isEmpty
+              ? _model.text.trim()
+              : _name.text.trim());
+      if (_delegate) {
+        await widget.client.setDelegateProfile(savedName);
+      } else if (widget.delegateName == savedName) {
+        await widget.client.setDelegateProfile(null);
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -328,6 +347,13 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
                     onChanged: (v) => setState(() => _active = v),
                     label: 'Set as active',
                     sub: 'Use this model for new sessions'),
+                const SizedBox(height: 8),
+                AppToggle(
+                    on: _delegate,
+                    onChanged: (v) => setState(() => _delegate = v),
+                    label: 'Use for delegated lanes',
+                    sub:
+                        'Lanes run on this profile instead of the active model'),
                 if (_error != null) ...[
                   const SizedBox(height: 14),
                   Text(_error!, style: sans(12, color: AppColors.danger)),
