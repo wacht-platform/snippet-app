@@ -535,6 +535,7 @@ class SessionTermView extends StatefulWidget {
     required this.onClose,
     this.onNew,
     this.mobileKeys = false,
+    this.showChrome = true,
   });
 
   final bool alive;
@@ -544,6 +545,7 @@ class SessionTermView extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback? onNew;
   final bool mobileKeys;
+  final bool showChrome;
 
   @override
   State<SessionTermView> createState() => _SessionTermViewState();
@@ -551,34 +553,45 @@ class SessionTermView extends StatefulWidget {
 
 class _SessionTermViewState extends State<SessionTermView> {
   final _focus = FocusNode();
+  final _typeCtrl = TextEditingController();
+  final _typeFocus = FocusNode();
   int _lastC = 0;
   int _lastR = 0;
 
   @override
   void dispose() {
     _focus.dispose();
+    _typeCtrl.dispose();
+    _typeFocus.dispose();
     super.dispose();
+  }
+
+  void _flushTyped(String value) {
+    if (value.isEmpty) return;
+    widget.onInput(Uint8List.fromList(utf8.encode(value)));
+    _typeCtrl.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
-        child: Row(children: [
-          Text(widget.alive ? 'Shell' : 'Shell · starting',
-              style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
-          const Spacer(),
-          if (widget.onNew != null)
-            IconBtn('plus',
-                size: 28,
-                iconSize: 14,
-                tooltip: 'New shell',
-                onTap: widget.onNew),
-          IconBtn('x',
-              size: 28, iconSize: 14, tooltip: 'Close', onTap: widget.onClose),
-        ]),
-      ),
+      if (widget.showChrome)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
+          child: Row(children: [
+            Text(widget.alive ? 'Shell' : 'Shell · starting',
+                style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+            const Spacer(),
+            if (widget.onNew != null)
+              IconBtn('plus',
+                  size: 28,
+                  iconSize: 14,
+                  tooltip: 'New shell',
+                  onTap: widget.onNew),
+            IconBtn('x',
+                size: 28, iconSize: 14, tooltip: 'Close', onTap: widget.onClose),
+          ]),
+        ),
       Expanded(
         child: LayoutBuilder(builder: (context, box) {
           const cw = 8.2;
@@ -595,13 +608,19 @@ class _SessionTermViewState extends State<SessionTermView> {
           }
           return KeyboardListener(
             focusNode: _focus,
-            autofocus: true,
+            autofocus: !widget.mobileKeys,
             onKeyEvent: (e) {
               final b = encodeTermKey(e);
               if (b != null) widget.onInput(b);
             },
             child: GestureDetector(
-              onTap: () => _focus.requestFocus(),
+              onTap: () {
+                if (widget.mobileKeys) {
+                  _typeFocus.requestFocus();
+                } else {
+                  _focus.requestFocus();
+                }
+              },
               child: ColoredBox(
                 color: const Color(0xff0a0a0a),
                 child: CustomPaint(
@@ -613,16 +632,16 @@ class _SessionTermViewState extends State<SessionTermView> {
           );
         }),
       ),
-      if (widget.mobileKeys)
+      if (widget.mobileKeys) ...[
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
           child: Wrap(spacing: 6, runSpacing: 6, children: [
             for (final e in const [
               ('Esc', [0x1b]),
               ('Tab', [0x09]),
-              ('Ctrl-C', [0x03]),
-              ('Ctrl-D', [0x04]),
-              ('Ctrl-Z', [0x1a]),
+              ('^C', [0x03]),
+              ('^D', [0x04]),
+              ('^Z', [0x1a]),
               ('↑', [0x1b, 0x5b, 0x41]),
               ('↓', [0x1b, 0x5b, 0x42]),
               ('←', [0x1b, 0x5b, 0x44]),
@@ -642,6 +661,53 @@ class _SessionTermViewState extends State<SessionTermView> {
               ),
           ]),
         ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+              8, 0, 8, 8 + MediaQuery.viewInsetsOf(context).bottom),
+          child: TextField(
+            controller: _typeCtrl,
+            focusNode: _typeFocus,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            keyboardType: TextInputType.visiblePassword,
+            textInputAction: TextInputAction.send,
+            style: mono(13, color: AppColors.fg1),
+            cursorColor: AppColors.accent,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'type…',
+              hintStyle: mono(13, color: AppColors.fg4),
+              filled: true,
+              fillColor: AppColors.surface2,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(R.sm),
+                borderSide: BorderSide(color: AppColors.border2),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(R.sm),
+                borderSide: BorderSide(color: AppColors.border2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(R.sm),
+                borderSide: BorderSide(color: AppColors.accent),
+              ),
+            ),
+            onChanged: (v) {
+              // Send printable chars immediately so the PTY sees each keystroke.
+              if (v.isEmpty) return;
+              _flushTyped(v);
+            },
+            onSubmitted: (v) {
+              if (v.isNotEmpty) _flushTyped(v);
+              widget.onInput(Uint8List.fromList([0x0d]));
+              _typeFocus.requestFocus();
+            },
+          ),
+        ),
+      ],
     ]);
   }
 }

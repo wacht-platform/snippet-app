@@ -1381,51 +1381,53 @@ class _SessionScreenState extends State<SessionScreen>
     final position = reviewing ? _playbackPosition : _recordingElapsed;
     final samples = List<double>.of(_waveform);
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.md),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Expanded(
-            child: Text(
-              _isRecording ? 'Recording' : 'Review recording',
-              style: sans(14, weight: FontWeight.w600, color: AppColors.fg1),
+      child: Row(children: [
+        InkWell(
+          onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Center(
+              child: AppIcon(
+                _isRecording
+                    ? 'stop'
+                    : (_isPlayingRecording ? 'pause' : 'play'),
+                size: 16,
+                color: _isRecording ? AppColors.accent : AppColors.fg1,
+              ),
             ),
           ),
-          Text(_audioTime(position),
-              style: mono(12,
-                  color: _isRecording ? AppColors.accent : AppColors.fg3)),
-        ]),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 40,
-          child: CustomPaint(painter: _WaveformPainter(samples)),
         ),
-        const SizedBox(height: 12),
-        Row(children: [
-          if (_isRecording)
-            Btn('Stop',
-                small: true,
-                variant: BtnVariant.secondary,
-                onTap: _stopRecording)
-          else
-            Btn(_isPlayingRecording ? 'Pause' : 'Play',
-                small: true,
-                variant: BtnVariant.secondary,
-                onTap: _toggleRecordingPlayback),
-          const Spacer(),
-          if (reviewing) ...[
-            Btn('Discard',
-                small: true,
-                variant: BtnVariant.ghost,
-                onTap: _discardRecording),
-            const SizedBox(width: 8),
-            Btn('Use recording', small: true, onTap: _confirmRecording),
-          ],
-        ]),
+        const SizedBox(width: 6),
+        Text(_audioTime(position),
+            style: mono(11,
+                color: _isRecording ? AppColors.accent : AppColors.fg3)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SizedBox(
+            height: 22,
+            child: CustomPaint(painter: _WaveformPainter(samples)),
+          ),
+        ),
+        if (reviewing) ...[
+          IconBtn('x',
+              size: 28,
+              iconSize: 14,
+              tooltip: 'Discard',
+              onTap: _discardRecording),
+          IconBtn('check',
+              size: 28,
+              iconSize: 14,
+              tooltip: 'Use recording',
+              onTap: () => unawaited(_confirmRecording())),
+        ],
       ]),
     );
   }
@@ -1678,8 +1680,9 @@ class _SessionScreenState extends State<SessionScreen>
       backgroundColor: readingBg,
       body: SafeArea(
         bottom: false,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: Stack(children: [
+        Positioned.fill(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (kMobile)
             _mobileHeader(s, running, waiting)
           else if (!kMacOS)
@@ -1687,9 +1690,9 @@ class _SessionScreenState extends State<SessionScreen>
           // Desktop keeps the detailed chip strip.
           if (!kMobile && !kMacOS) _statusStrip(s, running),
           if (_connError != null) _disconnectedBanner(),
-          if (_termOpen && _terms.isNotEmpty)
+          if (_termOpen && _terms.isNotEmpty && !kMobile)
             SizedBox(
-              height: kMobile ? 280 : 320,
+              height: 320,
               child: Column(children: [
                 if (_terms.length > 1)
                   SizedBox(
@@ -1723,7 +1726,7 @@ class _SessionScreenState extends State<SessionScreen>
                     onClose: () => _closeTerm(
                         _terms[_termFocus.clamp(0, _terms.length - 1)].id),
                     onNew: () => _openTerm(fresh: true),
-                    mobileKeys: kMobile,
+                    mobileKeys: false,
                   ),
                 ),
               ]),
@@ -1878,6 +1881,10 @@ class _SessionScreenState extends State<SessionScreen>
           if (!(waiting && s?.pendingQuestion != null))
             _centerWide(_inputBar(running)),
         ]),
+        ),
+        if (kMobile && _termOpen && _terms.isNotEmpty)
+          Positioned.fill(child: _mobileTermTab()),
+        ]),
       ),
     );
     return kMacOS
@@ -1998,6 +2005,73 @@ class _SessionScreenState extends State<SessionScreen>
           IconBtn('stop',
               tooltip: 'Stop', onTap: () => _send({'kind': 'interrupt'})),
         IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
+      ]),
+    );
+  }
+
+  Widget _mobileTermTab() {
+    final i = _termFocus.clamp(0, _terms.length - 1);
+    final t = _terms[i];
+    return Material(
+      color: const Color(0xff000000),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
+          child: Row(children: [
+            IconBtn('chevron-left',
+                size: 36,
+                iconSize: 18,
+                tooltip: 'Back to chat',
+                onTap: () => setState(() => _termOpen = false)),
+            Expanded(
+              child: SizedBox(
+                height: 32,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _terms.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, n) {
+                    final on = n == i;
+                    return InkWell(
+                      onTap: () => setState(() => _termFocus = n),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 6),
+                        child: Text(
+                          'shell ${n + 1}',
+                          style: sans(13,
+                              weight: on ? FontWeight.w600 : FontWeight.w400,
+                              color: on ? AppColors.accent : AppColors.fg3),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            IconBtn('plus',
+                size: 32,
+                iconSize: 16,
+                tooltip: 'New shell',
+                onTap: () => _openTerm(fresh: true)),
+            IconBtn('x',
+                size: 32,
+                iconSize: 16,
+                tooltip: 'Close shell',
+                onTap: () => _closeTerm(t.id)),
+          ]),
+        ),
+        Expanded(
+          child: SessionTermView(
+            alive: t.alive,
+            screen: t.screen,
+            onInput: _termIn,
+            onResize: _termResize,
+            onClose: () => _closeTerm(t.id),
+            mobileKeys: true,
+            showChrome: false,
+          ),
+        ),
       ]),
     );
   }
