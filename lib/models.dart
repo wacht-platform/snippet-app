@@ -475,8 +475,11 @@ String? rateResetLabel(int resetsAt) {
   return '$rel · $hh:$mm';
 }
 
-/// Compact SI token formatting (mirrors the TUI's fmt_si: 91M / 425k / 512).
+/// Compact SI token formatting (mirrors the TUI's fmt_si: 1.2B / 91M / 425k / 512).
 String fmtSi(int v) {
+  if (v >= 1000000000) {
+    return '${(v / 1000000000).toStringAsFixed(v >= 10000000000 ? 0 : 1)}B';
+  }
   if (v >= 1000000) {
     return '${(v / 1000000).toStringAsFixed(v >= 10000000 ? 0 : 1)}M';
   }

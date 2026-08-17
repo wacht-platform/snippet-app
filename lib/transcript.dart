@@ -73,7 +73,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
         ),
         if (_open)
           Padding(
-            padding: const EdgeInsets.only(left: 23, top: 2, bottom: 6),
+            padding: const EdgeInsets.only(top: 2, bottom: 6),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 220),
               child: SingleChildScrollView(

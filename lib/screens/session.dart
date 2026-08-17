@@ -7,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -356,6 +357,7 @@ class _SessionScreenState extends State<SessionScreen>
   List<Widget>? _transcriptCache;
   final List<_UserMark> _userMarks = [];
   final Map<String, GlobalKey> _userMarkKeys = {};
+  double _jumpCacheExtent = 400;
   // Stream frame throttle: store the latest pending stream payload and flush
   // at most every 50ms to avoid rebuilding the full widget tree on every token.
   String _pendingLiveText = '';
@@ -1652,6 +1654,8 @@ class _SessionScreenState extends State<SessionScreen>
                         return ListView.builder(
                           controller: _scroll,
                           reverse: true,
+                          scrollCacheExtent:
+                              ScrollCacheExtent.pixels(_jumpCacheExtent),
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                           itemCount: timeline.length,
                           itemBuilder: (context, index) => _centerWide(
@@ -1738,16 +1742,38 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _jumpToUserMark(GlobalKey key) {
-    final ctx = key.currentContext;
-    if (ctx == null) return;
     _stickToBottom = false;
     if (mounted) setState(() {});
-    Scrollable.ensureVisible(
-      ctx,
-      alignment: 0.18,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
+    void reveal() {
+      final ctx = key.currentContext;
+      if (ctx == null || !ctx.mounted) return;
+      final box = ctx.findRenderObject();
+      if (box is! RenderBox || !box.hasSize) return;
+      final scrollable = Scrollable.maybeOf(ctx);
+      if (scrollable == null) return;
+      final viewport = RenderAbstractViewport.maybeOf(box);
+      if (viewport == null) return;
+      final target = viewport.getOffsetToReveal(box, 0.18).offset;
+      final pos = scrollable.position;
+      pos.animateTo(
+        target.clamp(pos.minScrollExtent, pos.maxScrollExtent),
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (key.currentContext != null) {
+        reveal();
+        return;
+      }
+      // Off-screen builder items have no context until they're in cache.
+      setState(() => _jumpCacheExtent = 400000);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) reveal();
+      });
+    });
   }
 
   Future<void> _renameCurrent() async {
@@ -3426,7 +3452,7 @@ class _CompactingStatusState extends State<_CompactingStatus> {
           ]),
           if (detail.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(left: 24, top: 6),
+              padding: const EdgeInsets.only(top: 6),
               child: Text(detail,
                   style: sans(13, height: 1.4, color: AppColors.fg3)),
             ),
@@ -3556,7 +3582,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
           ),
           if (_open && thought.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(left: 24, top: 8),
+              padding: const EdgeInsets.only(top: 6),
               child: ThinkingMarkdown(data: thought),
             ),
         ],
