@@ -976,11 +976,20 @@ class _SessionScreenState extends State<SessionScreen>
     }
   }
 
+  String _nextTermTitle() {
+    var n = _terms.length + 1;
+    final used = _terms.map((t) => t.title).toSet();
+    while (used.contains('shell $n')) {
+      n++;
+    }
+    return 'shell $n';
+  }
+
   _LiveTerm _ensureTerm(String id) {
     for (final t in _terms) {
       if (t.id == id) return t;
     }
-    final t = _LiveTerm(id);
+    final t = _LiveTerm(id, title: _nextTermTitle());
     _terms.add(t);
     return t;
   }
@@ -2024,28 +2033,7 @@ class _SessionScreenState extends State<SessionScreen>
               ),
             ),
           ),
-          if (_terms.length > 1)
-            SizedBox(
-              height: 28,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
-                itemCount: _terms.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, n) {
-                  final on = n == i;
-                  return InkWell(
-                    onTap: () => setState(() => _termFocus = n),
-                    child: Text(
-                      '${n + 1}',
-                      style: sans(12,
-                          weight: on ? FontWeight.w600 : FontWeight.w400,
-                          color: on ? AppColors.accent : AppColors.fg3),
-                    ),
-                  );
-                },
-              ),
-            ),
+          _termTabStrip(i, compact: true),
           SizedBox(
             height: _termHeight,
             child: SessionTermView(
@@ -2054,8 +2042,8 @@ class _SessionScreenState extends State<SessionScreen>
               onInput: _termIn,
               onResize: _termResize,
               onClose: () => _closeTerm(t.id),
-              onNew: () => _openTerm(fresh: true),
               mobileKeys: false,
+              showChrome: false,
             ),
           ),
         ],
@@ -2070,49 +2058,14 @@ class _SessionScreenState extends State<SessionScreen>
       color: const Color(0xff000000),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
           child: Row(children: [
             IconBtn('chevron-left',
                 size: 36,
                 iconSize: 18,
                 tooltip: 'Back to chat',
                 onTap: () => setState(() => _termOpen = false)),
-            Expanded(
-              child: SizedBox(
-                height: 32,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _terms.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, n) {
-                    final on = n == i;
-                    return InkWell(
-                      onTap: () => setState(() => _termFocus = n),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 6),
-                        child: Text(
-                          'shell ${n + 1}',
-                          style: sans(13,
-                              weight: on ? FontWeight.w600 : FontWeight.w400,
-                              color: on ? AppColors.accent : AppColors.fg3),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            IconBtn('plus',
-                size: 32,
-                iconSize: 16,
-                tooltip: 'New shell',
-                onTap: () => _openTerm(fresh: true)),
-            IconBtn('x',
-                size: 32,
-                iconSize: 16,
-                tooltip: 'Close shell',
-                onTap: () => _closeTerm(t.id)),
+            Expanded(child: _termTabStrip(i, compact: false)),
           ]),
         ),
         Expanded(
@@ -2126,6 +2079,60 @@ class _SessionScreenState extends State<SessionScreen>
             showChrome: false,
           ),
         ),
+      ]),
+    );
+  }
+
+  Widget _termTabStrip(int focus, {required bool compact}) {
+    return SizedBox(
+      height: compact ? 30 : 36,
+      child: Row(children: [
+        Expanded(
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.fromLTRB(compact ? 8 : 4, 0, 4, 0),
+            itemCount: _terms.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 4),
+            itemBuilder: (_, n) {
+              final on = n == focus;
+              final pane = _terms[n];
+              return Material(
+                color: on ? AppColors.surface2 : Colors.transparent,
+                borderRadius: BorderRadius.circular(R.xs),
+                child: InkWell(
+                  onTap: () => setState(() => _termFocus = n),
+                  borderRadius: BorderRadius.circular(R.xs),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 6, 4, 6),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Text(
+                        pane.title,
+                        style: sans(compact ? 12 : 13,
+                            weight: on ? FontWeight.w600 : FontWeight.w400,
+                            color: on ? AppColors.fg1 : AppColors.fg3),
+                      ),
+                      const SizedBox(width: 2),
+                      GestureDetector(
+                        onTap: () => _closeTerm(pane.id),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.all(3),
+                          child: AppIcon('x',
+                              size: compact ? 10 : 12, color: AppColors.fg4),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        IconBtn('plus',
+            size: compact ? 28 : 32,
+            iconSize: compact ? 13 : 16,
+            tooltip: 'New shell',
+            onTap: () => _openTerm(fresh: true)),
       ]),
     );
   }
@@ -3792,9 +3799,11 @@ class _ChurningStatusState extends State<_ChurningStatus> {
 /// header toggles the group collapsed/expanded.
 
 class _LiveTerm {
-  _LiveTerm(this.id);
+  _LiveTerm(this.id, {required this.title})
+      : terminal = Terminal(maxLines: 5000);
   final String id;
-  final Terminal terminal = Terminal(maxLines: 5000);
+  final String title;
+  final Terminal terminal;
   int cols = 80;
   int rows = 24;
   bool alive = false;
