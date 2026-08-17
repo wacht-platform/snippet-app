@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:re_editor/re_editor.dart';
 
 import 'highlight.dart';
@@ -885,35 +886,61 @@ class _ShellPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.sm),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (command.isNotEmpty)
-            _shellScroll(TextSpan(children: [
-              TextSpan(
-                  text: '\$ ',
-                  style: mono(11.5, height: 1.45, color: AppColors.accent)),
-              highlightedCodeSpan(command, language: 'bash'),
-            ])),
-          if (command.isNotEmpty && (stdout.isNotEmpty || stderr.isNotEmpty))
-            const SizedBox(height: 8),
-          if (stdout.isNotEmpty)
-            _shellScroll(highlightedCodeSpan(stdout, language: 'bash')),
-          if (stdout.isNotEmpty && stderr.isNotEmpty) const SizedBox(height: 6),
-          if (stderr.isNotEmpty)
-            _shellScroll(TextSpan(
-              text: stderr,
-              style: mono(11.5, height: 1.45, color: AppColors.danger),
-            )),
-        ],
-      ),
+    final copyText = [
+      if (command.isNotEmpty) command,
+      if (stdout.isNotEmpty) stdout,
+      if (stderr.isNotEmpty) stderr,
+    ].join('\n');
+    return Stack(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(10, 8, 36, 8),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(R.sm),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (command.isNotEmpty)
+                _shellScroll(TextSpan(children: [
+                  TextSpan(
+                      text: '\$ ',
+                      style: mono(11.5, height: 1.45, color: AppColors.accent)),
+                  highlightedCodeSpan(command, language: 'bash'),
+                ])),
+              if (command.isNotEmpty &&
+                  (stdout.isNotEmpty || stderr.isNotEmpty))
+                const SizedBox(height: 8),
+              if (stdout.isNotEmpty)
+                _shellScroll(highlightedCodeSpan(stdout, language: 'bash')),
+              if (stdout.isNotEmpty && stderr.isNotEmpty)
+                const SizedBox(height: 6),
+              if (stderr.isNotEmpty)
+                _shellScroll(TextSpan(
+                  text: stderr,
+                  style: mono(11.5, height: 1.45, color: AppColors.danger),
+                )),
+            ],
+          ),
+        ),
+        if (copyText.isNotEmpty)
+          Positioned(
+            top: 0,
+            right: 0,
+            child: IconBtn(
+              'clipboard',
+              size: 28,
+              iconSize: 13,
+              tooltip: 'Copy',
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: copyText));
+                toast(context, 'Copied');
+              },
+            ),
+          ),
+      ],
     );
   }
 
@@ -941,12 +968,33 @@ class _CodeBox extends StatelessWidget {
     final style = useSans
         ? sans(12, height: 1.4, color: color)
         : mono(11.5, height: 1.4, color: color);
-    return NotificationListener<ScrollNotification>(
-      onNotification: (_) => true,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SelectableText(text, style: style, maxLines: null),
-      ),
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 28),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (_) => true,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SelectableText(text, style: style, maxLines: null),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -4,
+          right: -6,
+          child: IconBtn(
+            'clipboard',
+            size: 28,
+            iconSize: 13,
+            tooltip: 'Copy',
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: text));
+              toast(context, 'Copied');
+            },
+          ),
+        ),
+      ],
     );
   }
 }

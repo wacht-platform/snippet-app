@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
@@ -458,22 +459,40 @@ class _MdCodeBlock extends StatelessWidget {
     Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.sm),
-        ),
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (_) => true,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SelectableText.rich(
-              highlightedCodeSpan(code, language: language),
+      child: Stack(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 36, 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(R.sm),
+            ),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (_) => true,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SelectableText.rich(
+                  highlightedCodeSpan(code, language: language),
+                ),
+              ),
             ),
           ),
-        ),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: IconBtn(
+              'clipboard',
+              size: 28,
+              iconSize: 13,
+              tooltip: 'Copy',
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: code));
+                toast(context, 'Copied');
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

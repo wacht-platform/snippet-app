@@ -2388,11 +2388,11 @@ class _SessionScreenState extends State<SessionScreen>
                         GestureDetector(
                           onTap: _onMicTap,
                           child: SizedBox(
-                            width: 36,
-                            height: 36,
+                            width: 48,
+                            height: 44,
                             child: Center(
                               child: AppIcon(_isRecording ? 'mic-off' : 'mic',
-                                  size: 16,
+                                  size: 22,
                                   color: _isRecording
                                       ? AppColors.danger
                                       : AppColors.fg3),
@@ -2401,12 +2401,16 @@ class _SessionScreenState extends State<SessionScreen>
                         ),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _input,
-                        builder: (_, __, ___) => _SendBtn(
-                            enabled: running || _canSend,
-                            running: running,
-                            onTap: running
-                                ? () => _send({'kind': 'interrupt'})
-                                : (_canSend ? _sendMessage : null)),
+                        builder: (_, __, ___) {
+                          final queue = running && _canSend;
+                          final stop = running && !queue;
+                          return _SendBtn(
+                              enabled: stop || _canSend,
+                              running: stop,
+                              onTap: stop
+                                  ? () => _send({'kind': 'interrupt'})
+                                  : (_canSend ? _sendMessage : null));
+                        },
                       ),
                     ]),
                   ]),
