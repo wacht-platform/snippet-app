@@ -897,7 +897,12 @@ class _ShellPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (command.isNotEmpty)
-            _shellScroll(highlightedCodeSpan(command, language: 'bash')),
+            _shellScroll(TextSpan(children: [
+              TextSpan(
+                  text: '\$ ',
+                  style: mono(11.5, height: 1.45, color: AppColors.accent)),
+              highlightedCodeSpan(command, language: 'bash'),
+            ])),
           if (command.isNotEmpty && (stdout.isNotEmpty || stderr.isNotEmpty))
             const SizedBox(height: 8),
           if (stdout.isNotEmpty)
