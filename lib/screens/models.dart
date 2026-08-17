@@ -132,9 +132,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     final isDelegate =
         delegate != null && delegate.isNotEmpty && delegate == p.name;
     return InkWell(
-      onTap: p.usable
-          ? () => _run(() => widget.client.setActiveProfile(p.name), 'activate')
-          : null,
+      onTap: () => _edit(p),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [
@@ -167,7 +165,6 @@ class _ModelsScreenState extends State<ModelsScreen> {
                   style: mono(11.5, color: AppColors.fg4)),
             ]),
           ),
-          IconBtn('edit', size: 32, iconSize: 16, onTap: () => _edit(p)),
           _overflowMenu(p, isDelegate),
         ]),
       ),
@@ -185,6 +182,9 @@ class _ModelsScreenState extends State<ModelsScreen> {
         icon: AppIcon('more-vertical', size: 16, color: AppColors.fg3),
         onSelected: (v) {
           switch (v) {
+            case 'activate':
+              _run(() => widget.client.setActiveProfile(p.name), 'activate');
+              break;
             case 'delegate':
               _run(() => widget.client.setDelegateProfile(p.name),
                   'set delegate');
@@ -199,6 +199,12 @@ class _ModelsScreenState extends State<ModelsScreen> {
           }
         },
         itemBuilder: (_) => [
+          if (p.usable && !p.active)
+            PopupMenuItem(
+              value: 'activate',
+              child:
+                  Text('Set as active', style: sans(13, color: AppColors.fg1)),
+            ),
           PopupMenuItem(
             value: isDelegate ? 'undelegate' : 'delegate',
             child: Text(
