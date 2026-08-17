@@ -116,16 +116,32 @@ class _DesktopShellState extends State<DesktopShell> {
       if (mounted && !_sessionsLoading) _loadSessions();
       if (mounted) _refreshHealth();
     });
+    if (!kMobile) HardwareKeyboard.instance.addHandler(_handleGlobalCloseTab);
   }
 
   @override
   void dispose() {
+    if (!kMobile)
+      HardwareKeyboard.instance.removeHandler(_handleGlobalCloseTab);
     _sessionsTicker?.cancel();
     _persistTabsDebounce?.cancel();
     _pageController.dispose();
     _stripController.dispose();
     if (onNotifTap == _onNotif) onNotifTap = null;
     super.dispose();
+  }
+
+  bool _handleGlobalCloseTab(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    if (event.logicalKey != LogicalKeyboardKey.keyW) return false;
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
+    final chord = keys.contains(LogicalKeyboardKey.metaLeft) ||
+        keys.contains(LogicalKeyboardKey.metaRight) ||
+        keys.contains(LogicalKeyboardKey.controlLeft) ||
+        keys.contains(LogicalKeyboardKey.controlRight);
+    if (!chord) return false;
+    if (_activeIndex >= 0) _closeTab(_activeIndex);
+    return true;
   }
 
   void _setMacSessionStatus(String key, HarnessState? state, bool running) {
@@ -489,7 +505,26 @@ class _DesktopShellState extends State<DesktopShell> {
             control: true): () => _activateTab(i - 1),
     };
     return CallbackShortcuts(
-        bindings: shortcuts, child: Focus(autofocus: true, child: child));
+      bindings: shortcuts,
+      child: Focus(
+        autofocus: true,
+        canRequestFocus: true,
+        skipTraversal: true,
+        descendantsAreFocusable: true,
+        onKeyEvent: (node, event) {
+          if (event is! KeyDownEvent) return KeyEventResult.ignored;
+          final key = event.logicalKey;
+          final meta = HardwareKeyboard.instance.isMetaPressed;
+          final control = HardwareKeyboard.instance.isControlPressed;
+          if ((meta || control) && key == LogicalKeyboardKey.keyW) {
+            if (_activeIndex >= 0) _closeTab(_activeIndex);
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: child,
+      ),
+    );
   }
 
   void _onNotif(Map<String, dynamic> m) async {

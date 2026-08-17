@@ -698,6 +698,12 @@ IconData iconFor(String name) {
       return IconsaxPlusLinear.menu;
     case 'edit':
       return IconsaxPlusLinear.edit_2;
+    case 'eye':
+      return IconsaxPlusLinear.eye;
+    case 'code':
+      return IconsaxPlusLinear.document_code_2;
+    case 'book':
+      return IconsaxPlusLinear.book_1;
     case 'trash':
       return IconsaxPlusLinear.trash;
     case 'key':

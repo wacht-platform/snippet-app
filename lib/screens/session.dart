@@ -21,6 +21,7 @@ import '../models.dart';
 import '../notifications.dart';
 import '../platform.dart';
 import '../theme.dart';
+import '../tool_views.dart';
 import '../transcript.dart';
 import '../panel.dart';
 import '../widgets.dart';
@@ -1709,17 +1710,17 @@ class _SessionScreenState extends State<SessionScreen>
             _centerWide(Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
               child: _ApprovalBar(
+                  events: events,
                   onSend: _sendDecision,
                   showApproveAll: _pendingApprovalTotal(events) > 1),
-            ))
-          else if (waiting && s?.pendingQuestion != null)
+            )),
+          if (waiting && s?.pendingQuestion != null)
             _centerWide(Padding(
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
               child: _QuestionBar(
                   question: s!.pendingQuestion!, onSend: _sendDecision),
             )),
-          if (!(waiting &&
-              (_pendingApproval(events) || s?.pendingQuestion != null)))
+          if (!(waiting && s?.pendingQuestion != null))
             _centerWide(_inputBar(running)),
         ]),
       ),
@@ -3661,9 +3662,13 @@ class _GoalCard extends StatelessWidget {
 }
 
 class _ApprovalBar extends StatefulWidget {
+  final List<Map<String, dynamic>> events;
   final void Function(Map<String, dynamic>) onSend;
   final bool showApproveAll; // only when >1 tool is pending this batch
-  const _ApprovalBar({required this.onSend, this.showApproveAll = false});
+  const _ApprovalBar(
+      {required this.events,
+      required this.onSend,
+      this.showApproveAll = false});
   @override
   State<_ApprovalBar> createState() => _ApprovalBarState();
 }
@@ -3679,49 +3684,97 @@ class _ApprovalBarState extends State<_ApprovalBar> {
     widget.onSend(m);
   }
 
+  Map<String, dynamic>? get _request {
+    for (var i = widget.events.length - 1; i >= 0; i--) {
+      final e = widget.events[i];
+      if (e['kind'] == 'approval_request') return e;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final req = _request;
+    final tool = req?['tool_name']?.toString() ?? '';
+    final title = tool.isEmpty ? 'Approve this action?' : '${toolTitle(tool)}?';
+    final summary = toolArgSummary(tool, req?['arguments']);
+    final count = widget.showApproveAll ? _pendingCount(req) : 1;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(_sent ? 'Decision sending…' : 'Tool Approval',
-            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
-        const SizedBox(height: 4),
-        Text(
-            widget.showApproveAll
-                ? 'Several actions are waiting'
-                : 'Approve this action to continue',
-            style: sans(12, color: AppColors.fg3)),
-        const SizedBox(height: 12),
-        Opacity(
-          opacity: _sent ? 0.5 : 1,
-          child: Row(children: [
-            Expanded(
-                child: Btn('Approve',
-                    small: true,
-                    icon: 'check',
-                    onTap: _sent ? null : () => _decide({'kind': 'approve'}))),
-            const SizedBox(width: 8),
-            if (widget.showApproveAll) ...[
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              AppIcon(tool.isEmpty ? 'shield' : toolIcon(tool),
+                  size: 16, color: AppColors.fg2),
+              const SizedBox(width: 8),
               Expanded(
-                  child: Btn('Approve all',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_sent ? 'Sending…' : title,
+                        style: sans(14,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const SizedBox(height: 3),
+                    Text(
+                        count > 1
+                            ? '$count actions are waiting'
+                            : (summary.isEmpty
+                                ? 'The agent is waiting for your decision.'
+                                : summary),
+                        style: sans(12, height: 1.4, color: AppColors.fg3)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.45)),
+                ),
+                child: Text('Input required',
+                    style: sans(11, color: AppColors.accent)),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Opacity(
+              opacity: _sent ? 0.5 : 1,
+              child: Row(children: [
+                Btn('Approve',
+                    small: true,
+                    onTap: _sent ? null : () => _decide({'kind': 'approve'})),
+                const SizedBox(width: 8),
+                if (widget.showApproveAll)
+                  Btn('Approve all',
                       small: true,
                       variant: BtnVariant.secondary,
-                      icon: 'check-check',
                       onTap: _sent
                           ? null
-                          : () => _decide({'kind': 'approve_all'}))),
-              const SizedBox(width: 8),
-            ],
-            Btn('Deny',
-                small: true,
-                variant: BtnVariant.ghost,
-                onTap: _sent ? null : () => _decide({'kind': 'deny'})),
-          ]),
+                          : () => _decide({'kind': 'approve_all'})),
+                if (widget.showApproveAll) const SizedBox(width: 8),
+                Btn('Reject',
+                    small: true,
+                    variant: BtnVariant.ghost,
+                    onTap: _sent ? null : () => _decide({'kind': 'deny'})),
+              ]),
+            ),
+          ],
         ),
-      ]),
+      ),
     );
   }
+
+  int _pendingCount(Map<String, dynamic>? req) =>
+      (req?['total'] as num?)?.toInt() ?? 1;
 }
 
 class _NoteLine extends StatefulWidget {

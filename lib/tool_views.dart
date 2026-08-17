@@ -19,12 +19,12 @@ List<Map> _mapItems(dynamic value) =>
 String toolIcon(String tool) => switch (tool) {
       'edit_file' || 'replace_file_content' => 'edit',
       'write_file' || 'append_file' => 'file-plus',
-      'read_file' => 'file',
+      'read_file' => 'eye',
       'read_image' => 'image',
-      'bash' => 'terminal',
+      'bash' => 'play',
       'search_content' || 'search_files' => 'search',
       'list_files' => 'folder-open',
-      'code_map' || 'view_outline' => 'map',
+      'code_map' || 'view_outline' => 'code',
       'web_search' || 'web_read' => 'globe',
       'set_session_title' => 'edit',
       'memory_read' ||
@@ -33,11 +33,11 @@ String toolIcon(String tool) => switch (tool) {
       'memory_delete' ||
       'memory_pattern' ||
       'memory_rule' =>
-        'layers',
+        'book',
       'search_skills' || 'skill' => 'zap',
       'monitor' => 'activity',
       'present_file' => 'file',
-      _ => 'zap',
+      _ => 'code',
     };
 
 /// One-line, tool-aware summary for the inline activity line.
