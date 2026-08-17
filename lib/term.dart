@@ -36,10 +36,11 @@ class SessionTermView extends StatefulWidget {
 }
 
 class _SessionTermViewState extends State<SessionTermView> {
-  final _typeCtrl = TextEditingController();
-  final _typeFocus = FocusNode();
+  final _termView = GlobalKey<TerminalViewState>();
   int _lastC = 0;
   int _lastR = 0;
+  bool _ctrl = false;
+  bool _alt = false;
 
   static final _theme = TerminalTheme(
     cursor: const Color(0xffffffff),
@@ -89,8 +90,6 @@ class _SessionTermViewState extends State<SessionTermView> {
   void dispose() {
     widget.terminal.onOutput = null;
     widget.terminal.onResize = null;
-    _typeCtrl.dispose();
-    _typeFocus.dispose();
     super.dispose();
   }
 
@@ -106,10 +105,71 @@ class _SessionTermViewState extends State<SessionTermView> {
     widget.onResize(w, h);
   }
 
-  void _flushTyped(String value) {
-    if (value.isEmpty) return;
-    widget.onInput(Uint8List.fromList(utf8.encode(value)));
-    _typeCtrl.clear();
+  void _sendBytes(List<int> bytes) {
+    if (bytes.isEmpty) return;
+    widget.onInput(Uint8List.fromList(bytes));
+  }
+
+  void _sendKey(TerminalKey key, {bool ctrl = false, bool alt = false}) {
+    widget.terminal.keyInput(key, ctrl: ctrl || _ctrl, alt: alt || _alt);
+    if (_ctrl || _alt) setState(() => _ctrl = _alt = false);
+    _termView.currentState?.requestKeyboard();
+  }
+
+  void _sendCtrlLetter(String letter) {
+    final c = letter.toLowerCase().codeUnitAt(0);
+    if (c >= 0x61 && c <= 0x7a) {
+      widget.terminal.charInput(c, ctrl: true, alt: _alt);
+    }
+    if (_ctrl || _alt) setState(() => _ctrl = _alt = false);
+    _termView.currentState?.requestKeyboard();
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (!_ctrl && !_alt) return KeyEventResult.ignored;
+    final ch = event.character;
+    if (ch != null && ch.isNotEmpty) {
+      final unit = ch.runes.first;
+      widget.terminal.charInput(unit, ctrl: _ctrl, alt: _alt);
+      setState(() => _ctrl = _alt = false);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  Widget _modChip(String label, bool on, VoidCallback tap) {
+    return InkWell(
+      onTap: tap,
+      borderRadius: BorderRadius.circular(R.sm),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: on ? AppColors.accent.withValues(alpha: 0.18) : null,
+          border: Border.all(color: on ? AppColors.accent : AppColors.border2),
+          borderRadius: BorderRadius.circular(R.sm),
+        ),
+        child: Text(label,
+            style: mono(11, color: on ? AppColors.accent : AppColors.fg2)),
+      ),
+    );
+  }
+
+  Widget _keyChip(String label, VoidCallback tap) {
+    return InkWell(
+      onTap: tap,
+      borderRadius: BorderRadius.circular(R.sm),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.border2),
+          borderRadius: BorderRadius.circular(R.sm),
+        ),
+        child: Text(label, style: mono(11, color: AppColors.fg2)),
+      ),
+    );
   }
 
   @override
@@ -138,11 +198,15 @@ class _SessionTermViewState extends State<SessionTermView> {
       Expanded(
         child: TerminalView(
           widget.terminal,
+          key: _termView,
           theme: _theme,
           backgroundOpacity: 1,
-          autofocus: !widget.mobileKeys,
-          readOnly: widget.mobileKeys,
-          hardwareKeyboardOnly: widget.mobileKeys,
+          autofocus: true,
+          readOnly: false,
+          hardwareKeyboardOnly: false,
+          deleteDetection: widget.mobileKeys,
+          keyboardType: TextInputType.visiblePassword,
+          onKeyEvent: widget.mobileKeys ? _onKeyEvent : null,
           padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
           textStyle: const TerminalStyle(
             fontSize: 13,
@@ -150,81 +214,34 @@ class _SessionTermViewState extends State<SessionTermView> {
           ),
         ),
       ),
-      if (widget.mobileKeys) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-          child: Wrap(spacing: 6, runSpacing: 6, children: [
-            for (final e in const [
-              ('Esc', [0x1b]),
-              ('Tab', [0x09]),
-              ('^C', [0x03]),
-              ('^D', [0x04]),
-              ('^Z', [0x1a]),
-              ('↑', [0x1b, 0x5b, 0x41]),
-              ('↓', [0x1b, 0x5b, 0x42]),
-              ('←', [0x1b, 0x5b, 0x44]),
-              ('→', [0x1b, 0x5b, 0x43]),
-            ])
-              InkWell(
-                onTap: () => widget.onInput(Uint8List.fromList(e.$2)),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.border2),
-                    borderRadius: BorderRadius.circular(R.sm),
-                  ),
-                  child: Text(e.$1, style: mono(11, color: AppColors.fg2)),
-                ),
-              ),
-          ]),
-        ),
+      if (widget.mobileKeys)
         Padding(
           padding: EdgeInsets.fromLTRB(
-              8, 0, 8, 8 + MediaQuery.viewInsetsOf(context).bottom),
-          child: TextField(
-            controller: _typeCtrl,
-            focusNode: _typeFocus,
-            autofocus: true,
-            autocorrect: false,
-            enableSuggestions: false,
-            keyboardType: TextInputType.visiblePassword,
-            textInputAction: TextInputAction.send,
-            style: mono(13, color: AppColors.fg1),
-            cursorColor: AppColors.accent,
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: 'type…',
-              hintStyle: mono(13, color: AppColors.fg4),
-              filled: true,
-              fillColor: AppColors.surface2,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(R.sm),
-                borderSide: BorderSide(color: AppColors.border2),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(R.sm),
-                borderSide: BorderSide(color: AppColors.border2),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(R.sm),
-                borderSide: BorderSide(color: AppColors.accent),
-              ),
-            ),
-            onChanged: (v) {
-              if (v.isEmpty) return;
-              _flushTyped(v);
-            },
-            onSubmitted: (v) {
-              if (v.isNotEmpty) _flushTyped(v);
-              widget.onInput(Uint8List.fromList([0x0d]));
-              _typeFocus.requestFocus();
-            },
-          ),
+              8, 4, 8, 8 + MediaQuery.viewInsetsOf(context).bottom),
+          child: Wrap(spacing: 6, runSpacing: 6, children: [
+            _modChip('Ctrl', _ctrl, () => setState(() => _ctrl = !_ctrl)),
+            _modChip('Alt', _alt, () => setState(() => _alt = !_alt)),
+            _keyChip('Esc', () => _sendKey(TerminalKey.escape)),
+            _keyChip('Tab', () => _sendKey(TerminalKey.tab)),
+            _keyChip('⌫', () => _sendBytes(const [0x7f])),
+            _keyChip('^C', () => _sendCtrlLetter('c')),
+            _keyChip('^D', () => _sendCtrlLetter('d')),
+            _keyChip('^Z', () => _sendCtrlLetter('z')),
+            _keyChip('^L', () => _sendCtrlLetter('l')),
+            _keyChip('^W', () => _sendCtrlLetter('w')),
+            _keyChip('^U', () => _sendCtrlLetter('u')),
+            _keyChip('^A', () => _sendCtrlLetter('a')),
+            _keyChip('^E', () => _sendCtrlLetter('e')),
+            _keyChip('^K', () => _sendCtrlLetter('k')),
+            _keyChip('^R', () => _sendCtrlLetter('r')),
+            _keyChip('↑', () => _sendKey(TerminalKey.arrowUp)),
+            _keyChip('↓', () => _sendKey(TerminalKey.arrowDown)),
+            _keyChip('←', () => _sendKey(TerminalKey.arrowLeft)),
+            _keyChip('→', () => _sendKey(TerminalKey.arrowRight)),
+            _keyChip('Home', () => _sendKey(TerminalKey.home)),
+            _keyChip('End', () => _sendKey(TerminalKey.end)),
+          ]),
         ),
-      ],
     ]);
   }
 }
