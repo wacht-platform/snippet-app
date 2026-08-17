@@ -457,42 +457,60 @@ class _MdCodeBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final lines = code.split('\n');
+    final lang = language.trim().isEmpty ? 'code' : language.trim();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Stack(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(12, 10, 36, 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.sm),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.sm),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+              child: Row(children: [
+                Text(lang, style: mono(11.5, color: AppColors.fg3)),
+                const Spacer(),
+                IconBtn(
+                  'clipboard',
+                  size: 28,
+                  iconSize: 13,
+                  tooltip: 'Copy',
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: code));
+                    toast(context, 'Copied');
+                  },
+                ),
+              ]),
             ),
-            child: NotificationListener<ScrollNotification>(
+            Divider(height: 1, color: AppColors.border),
+            NotificationListener<ScrollNotification>(
               onNotification: (_) => true,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
                 child: SelectableText.rich(
-                  highlightedCodeSpan(code, language: language),
+                  TextSpan(children: [
+                    for (var i = 0; i < lines.length; i++) ...[
+                      TextSpan(
+                        text: '${i + 1}'.padLeft(3),
+                        style: mono(12, height: 1.55, color: AppColors.fg4),
+                      ),
+                      const TextSpan(text: '  '),
+                      highlightedCodeSpan(
+                          i == lines.length - 1 ? lines[i] : '${lines[i]}\n',
+                          language: language),
+                    ],
+                  ]),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            top: 2,
-            right: 2,
-            child: IconBtn(
-              'clipboard',
-              size: 28,
-              iconSize: 13,
-              tooltip: 'Copy',
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: code));
-                toast(context, 'Copied');
-              },
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

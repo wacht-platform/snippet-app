@@ -1268,55 +1268,50 @@ class _SessionScreenState extends State<SessionScreen>
     final samples = List<double>.of(_waveform);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.md),
       ),
-      child: Row(children: [
-        IconBtn(
-          reviewing ? (_isPlayingRecording ? 'pause' : 'play') : 'stop',
-          size: 36,
-          iconSize: 19,
-          active: _isRecording || _isPlayingRecording,
-          tooltip: _isRecording
-              ? 'Stop and review'
-              : (_isPlayingRecording ? 'Pause' : 'Play recording'),
-          onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            SizedBox(
-              height: 34,
-              child: CustomPaint(painter: _WaveformPainter(samples)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+            child: Text(
+              _isRecording ? 'Recording' : 'Review recording',
+              style: sans(14, weight: FontWeight.w600, color: AppColors.fg1),
             ),
-            const SizedBox(height: 3),
-            Row(children: [
-              Text(_isRecording ? 'Recording' : 'Voice note',
-                  style: sans(11,
-                      color: _isRecording ? AppColors.accent : AppColors.fg3)),
-              const Spacer(),
-              Text(_audioTime(position), style: mono(11, color: AppColors.fg3)),
-            ]),
-          ]),
+          ),
+          Text(_audioTime(position),
+              style: mono(12,
+                  color: _isRecording ? AppColors.accent : AppColors.fg3)),
+        ]),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 40,
+          child: CustomPaint(painter: _WaveformPainter(samples)),
         ),
-        const SizedBox(width: 6),
-        if (reviewing) ...[
-          IconBtn('trash',
-              size: 36,
-              iconSize: 18,
-              tooltip: 'Discard recording',
-              onTap: _discardRecording),
-          const SizedBox(width: 2),
-          IconBtn('check',
-              size: 36,
-              iconSize: 19,
-              active: true,
-              tooltip: 'Use recording',
-              onTap: _confirmRecording),
-        ],
+        const SizedBox(height: 12),
+        Row(children: [
+          if (_isRecording)
+            Btn('Stop',
+                small: true,
+                variant: BtnVariant.secondary,
+                onTap: _stopRecording)
+          else
+            Btn(_isPlayingRecording ? 'Pause' : 'Play',
+                small: true,
+                variant: BtnVariant.secondary,
+                onTap: _toggleRecordingPlayback),
+          const Spacer(),
+          if (reviewing) ...[
+            Btn('Discard',
+                small: true,
+                variant: BtnVariant.ghost,
+                onTap: _discardRecording),
+            const SizedBox(width: 8),
+            Btn('Use recording', small: true, onTap: _confirmRecording),
+          ],
+        ]),
       ]),
     );
   }
@@ -2580,8 +2575,12 @@ class _SessionScreenState extends State<SessionScreen>
         case 'user_input':
         case 'steer':
           endTools(key);
+          final text = _s(e['text']);
+          // Answers are already shown on the question card — don't also
+          // render them as a user bubble.
+          if (_looksLikeQuestionAnswer(text)) break;
           final markKey = _userMarkKeys.putIfAbsent(key, GlobalKey.new);
-          final preview = hideAttachmentMarkers(_s(e['text'])).trim();
+          final preview = hideAttachmentMarkers(text).trim();
           if (preview.isNotEmpty) {
             _userMarks.add(_UserMark(key: markKey, preview: preview));
             seen.add(key);
@@ -2592,7 +2591,7 @@ class _SessionScreenState extends State<SessionScreen>
                 key: markKey,
                 child: Padding(
                     padding: const EdgeInsets.only(top: 4, bottom: 20),
-                    child: Bubble(mine: true, text: _s(e['text']))),
+                    child: Bubble(mine: true, text: text)),
               ));
         case 'assistant_text':
           endTools(key);
@@ -2658,31 +2657,20 @@ class _SessionScreenState extends State<SessionScreen>
           }
         case 'user_question':
           endTools(key);
-          final qd = e['questions'];
-          final qs = (qd is Map ? qd['questions'] : null) as List?;
-          final txt = (qs != null && qs.isNotEmpty && qs.first is Map)
-              ? _s((qs.first as Map)['text'])
-              : '';
-          if (txt.isNotEmpty) {
-            addEvent(
-                key,
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AppIcon('corner-down-right',
-                            size: 15, color: AppColors.run),
-                        const SizedBox(width: 8),
-                        Expanded(
-                            child: Text(txt,
-                                style: sans(13.5,
-                                    height: 1.45,
-                                    weight: FontWeight.w500,
-                                    color: AppColors.fg2))),
-                      ]),
-                ));
+          String? answer;
+          final qi = events.indexOf(e);
+          for (var j = qi + 1; j < events.length; j++) {
+            final n = events[j];
+            if (n['kind'] == 'user_question') break;
+            if (n['kind'] == 'user_input' || n['kind'] == 'steer') {
+              final t = _s(n['text']);
+              if (t.trim().isNotEmpty) {
+                answer = t;
+                break;
+              }
+            }
           }
+          addEvent(key, _QuestionRecord(e, answer: answer));
         case 'approval_request':
           break; // shown by the approval bar
         default:
@@ -3661,6 +3649,133 @@ class _GoalCard extends StatelessWidget {
   }
 }
 
+bool _looksLikeQuestionAnswer(String text) {
+  final t = text.trim();
+  if (t.isEmpty) return false;
+  if (t == 'user skipped the question') return true;
+  return t.contains('\n→ ') || t.startsWith('→ ');
+}
+
+/// Transcript card for a past `ask_user` turn: the prompt plus the user's
+/// answer (parsed from the following `user_input` that `_QuestionBar` sent).
+class _QuestionRecord extends StatelessWidget {
+  final Map<String, dynamic> event;
+  final String? answer;
+  const _QuestionRecord(this.event, {this.answer});
+
+  List<Map<String, dynamic>> get _questions {
+    final qd = event['questions'];
+    final raw = qd is Map ? qd['questions'] : event['questions'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  String? get _context {
+    final qd = event['questions'];
+    final ctx = qd is Map ? qd['context'] : event['context'];
+    final s = ctx?.toString() ?? '';
+    if (s.isEmpty || s == 'null') return null;
+    return s;
+  }
+
+  Map<String, String> get _answers {
+    final out = <String, String>{};
+    final src = (answer ?? event['answer'] ?? event['value'] ?? '').toString();
+    if (src.trim().isEmpty) return out;
+    final qs = _questions;
+    if (qs.length <= 1) {
+      final text = qs.isEmpty ? '' : (qs.first['text']?.toString() ?? '');
+      var body = src.trim();
+      if (text.isNotEmpty && body.startsWith(text)) {
+        body = body.substring(text.length).trim();
+        if (body.startsWith('→')) body = body.substring(1).trim();
+      } else if (body.contains('\n→ ')) {
+        body = body.split('\n→ ').skip(1).join('\n→ ').trim();
+      }
+      out[qs.isEmpty ? '0' : qs.first['id']?.toString() ?? '0'] = body;
+      return out;
+    }
+    final parts = src.split(RegExp(r'\n\n+'));
+    for (final part in parts) {
+      final idx = part.indexOf('\n→ ');
+      if (idx < 0) continue;
+      final qText = part.substring(0, idx).trim();
+      final a = part.substring(idx + 3).trim();
+      for (final q in qs) {
+        if ((q['text']?.toString() ?? '').trim() == qText) {
+          out[q['id']?.toString() ?? qText] = a;
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final qs = _questions;
+    final answers = _answers;
+    final ctx = _context;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Expanded(
+                child: Text('Question',
+                    style: sans(15.5,
+                        weight: FontWeight.w600, color: AppColors.fg1)),
+              ),
+              Text(answers.isEmpty ? 'Asked' : 'Answered',
+                  style: sans(12, color: AppColors.accent)),
+            ]),
+            if (ctx != null) ...[
+              const SizedBox(height: 8),
+              Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg3)),
+            ],
+            for (var i = 0; i < qs.length; i++) ...[
+              const SizedBox(height: 12),
+              if (qs.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text('${i + 1} of ${qs.length}',
+                      style: sans(12, color: AppColors.fg4)),
+                ),
+              Text(qs[i]['text']?.toString() ?? '',
+                  style: sans(14, height: 1.45, color: AppColors.fg1)),
+              if (answers[qs[i]['id']?.toString() ?? ''] != null ||
+                  answers['0'] != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  answers[qs[i]['id']?.toString()] ?? answers['0'] ?? '',
+                  style: sans(13.5, height: 1.45, color: AppColors.fg2),
+                ),
+              ],
+            ],
+            if (qs.isEmpty && (event['text'] != null)) ...[
+              const SizedBox(height: 8),
+              Text(event['text']?.toString() ?? '',
+                  style: sans(14, height: 1.45, color: AppColors.fg1)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ApprovalBar extends StatefulWidget {
   final List<Map<String, dynamic>> events;
   final void Function(Map<String, dynamic>) onSend;
@@ -3697,13 +3812,16 @@ class _ApprovalBarState extends State<_ApprovalBar> {
     final req = _request;
     final tool = req?['tool_name']?.toString() ?? '';
     final title = tool.isEmpty ? 'Approve this action?' : '${toolTitle(tool)}?';
-    final summary = toolArgSummary(tool, req?['arguments']);
-    final count = widget.showApproveAll ? _pendingCount(req) : 1;
+    final summary = (req?['summary']?.toString() ?? '').trim();
+    final fallback = toolArgSummary(tool, req?['arguments']);
+    final detail = summary.isNotEmpty ? summary : fallback;
+    final index = (req?['index'] as num?)?.toInt() ?? 1;
+    final total = (req?['total'] as num?)?.toInt() ?? 1;
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: BoxDecoration(
           color: AppColors.surface2,
           borderRadius: BorderRadius.circular(R.md),
@@ -3711,41 +3829,20 @@ class _ApprovalBarState extends State<_ApprovalBar> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              AppIcon(tool.isEmpty ? 'shield' : toolIcon(tool),
-                  size: 16, color: AppColors.fg2),
-              const SizedBox(width: 8),
+            Row(children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_sent ? 'Sending…' : title,
-                        style: sans(14,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(height: 3),
-                    Text(
-                        count > 1
-                            ? '$count actions are waiting'
-                            : (summary.isEmpty
-                                ? 'The agent is waiting for your decision.'
-                                : summary),
-                        style: sans(12, height: 1.4, color: AppColors.fg3)),
-                  ],
-                ),
+                child: Text(_sent ? 'Sending…' : title,
+                    style: sans(15.5,
+                        weight: FontWeight.w600, color: AppColors.fg1)),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(99),
-                  border: Border.all(
-                      color: AppColors.accent.withValues(alpha: 0.45)),
-                ),
-                child: Text('Input required',
-                    style: sans(11, color: AppColors.accent)),
-              ),
+              Text(total > 1 ? '$index of $total' : 'Input required',
+                  style: sans(12, color: AppColors.accent)),
             ]),
-            const SizedBox(height: 12),
+            if (detail.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(detail, style: sans(13, height: 1.45, color: AppColors.fg3)),
+            ],
+            const SizedBox(height: 14),
             Opacity(
               opacity: _sent ? 0.5 : 1,
               child: Row(children: [
@@ -3754,7 +3851,7 @@ class _ApprovalBarState extends State<_ApprovalBar> {
                     onTap: _sent ? null : () => _decide({'kind': 'approve'})),
                 const SizedBox(width: 8),
                 if (widget.showApproveAll)
-                  Btn('Approve all',
+                  Btn('Always allow',
                       small: true,
                       variant: BtnVariant.secondary,
                       onTap: _sent
@@ -3772,9 +3869,6 @@ class _ApprovalBarState extends State<_ApprovalBar> {
       ),
     );
   }
-
-  int _pendingCount(Map<String, dynamic>? req) =>
-      (req?['total'] as num?)?.toInt() ?? 1;
 }
 
 class _NoteLine extends StatefulWidget {
@@ -4042,48 +4136,62 @@ class _QuestionBarState extends State<_QuestionBar> {
     final ctx = widget.question['context']?.toString();
     final total = _questions.length;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(_sent ? 'Sending…' : 'Question',
-            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
-        if (total > 1)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text('${_step + 1} of $total',
-                style: sans(12, color: AppColors.fg4)),
-          ),
-        if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
-          const SizedBox(height: 12),
-          Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg2)),
-        ],
-        ...() {
-          final q = _currentQuestion;
-          if (q == null) return <Widget>[];
-          return <Widget>[
-            const SizedBox(height: 12),
-            Text(q['text']?.toString() ?? '',
-                style: sans(14, height: 1.45, color: AppColors.fg1)),
-            const SizedBox(height: 10),
-            ..._inputFor(q),
-          ];
-        }(),
-        const SizedBox(height: 12),
-        Row(children: [
-          _skipButton(),
-          if (_step > 0) ...[
-            const SizedBox(width: 4),
-            Btn('Back',
-                small: true,
-                variant: BtnVariant.ghost,
-                onTap: _sent ? null : () => setState(() => _step--)),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.md),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(
+              child: Text(_sent ? 'Sending…' : 'Question',
+                  style: sans(15.5,
+                      weight: FontWeight.w600, color: AppColors.fg1)),
+            ),
+            Text(
+              total > 1 ? '${_step + 1} of $total' : 'Input required',
+              style: sans(12, color: AppColors.accent),
+            ),
+          ]),
+          if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
+            const SizedBox(height: 8),
+            Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg3)),
           ],
-          const Spacer(),
-          Btn(_sent ? 'Sending…' : (_step < total - 1 ? 'Continue' : 'Submit'),
-              small: true,
-              disabled: !_ready || _sent,
-              onTap: (_ready && !_sent) ? _submit : null),
+          ...() {
+            final q = _currentQuestion;
+            if (q == null) return <Widget>[];
+            return <Widget>[
+              const SizedBox(height: 12),
+              Text(q['text']?.toString() ?? '',
+                  style: sans(14, height: 1.45, color: AppColors.fg1)),
+              const SizedBox(height: 10),
+              ..._inputFor(q),
+            ];
+          }(),
+          const SizedBox(height: 14),
+          Row(children: [
+            _skipButton(),
+            if (_step > 0) ...[
+              const SizedBox(width: 4),
+              Btn('Back',
+                  small: true,
+                  variant: BtnVariant.ghost,
+                  onTap: _sent ? null : () => setState(() => _step--)),
+            ],
+            const Spacer(),
+            Btn(
+                _sent
+                    ? 'Sending…'
+                    : (_step < total - 1 ? 'Continue' : 'Submit'),
+                small: true,
+                disabled: !_ready || _sent,
+                onTap: (_ready && !_sent) ? _submit : null),
+          ]),
         ]),
-      ]),
+      ),
     );
   }
 }
