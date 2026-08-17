@@ -183,6 +183,7 @@ class _SessionScreenState extends State<SessionScreen>
   final List<_LiveTerm> _terms = [];
   int _termFocus = 0;
   int _termSeq = 0;
+  double _termHeight = 280;
   String? _modelLabel;
   String? _currentProfile;
   final _input = TextEditingController();
@@ -960,11 +961,17 @@ class _SessionScreenState extends State<SessionScreen>
     setState(() {
       final pane = _ensureTerm(id);
       pane.alive = j['alive'] == true;
-      if (op == 'snapshot') pane.screen.reset(pane.cols, pane.rows);
+      if (op == 'snapshot') return;
       if (bytes.isNotEmpty) pane.screen.feed(bytes);
       if (cols != null) pane.cols = cols;
       if (rows != null) pane.rows = rows;
+      if (op == 'out') pane.live = true;
     });
+    if (op == 'out' && j['alive'] == false) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _closeTerm(id);
+      });
+    }
   }
 
   _LiveTerm _ensureTerm(String id) {
@@ -1681,209 +1688,182 @@ class _SessionScreenState extends State<SessionScreen>
       body: SafeArea(
         bottom: false,
         child: Stack(children: [
-        Positioned.fill(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (kMobile)
-            _mobileHeader(s, running, waiting)
-          else if (!kMacOS)
-            _desktopBar(s, running),
-          // Desktop keeps the detailed chip strip.
-          if (!kMobile && !kMacOS) _statusStrip(s, running),
-          if (_connError != null) _disconnectedBanner(),
-          if (_termOpen && _terms.isNotEmpty && !kMobile)
-            SizedBox(
-              height: 320,
-              child: Column(children: [
-                if (_terms.length > 1)
-                  SizedBox(
-                    height: 32,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.fromLTRB(10, 4, 10, 0),
-                      itemCount: _terms.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 6),
-                      itemBuilder: (_, i) {
-                        final on = i == _termFocus;
-                        return InkWell(
-                          onTap: () => setState(() => _termFocus = i),
-                          child: Text(
-                            '${i + 1}',
-                            style: sans(12,
-                                weight: on ? FontWeight.w600 : FontWeight.w400,
-                                color: on ? AppColors.accent : AppColors.fg3),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                Expanded(
-                  child: SessionTermView(
-                    alive: _terms[_termFocus.clamp(0, _terms.length - 1)].alive,
-                    screen:
-                        _terms[_termFocus.clamp(0, _terms.length - 1)].screen,
-                    onInput: _termIn,
-                    onResize: _termResize,
-                    onClose: () => _closeTerm(
-                        _terms[_termFocus.clamp(0, _terms.length - 1)].id),
-                    onNew: () => _openTerm(fresh: true),
-                    mobileKeys: false,
-                  ),
-                ),
-              ]),
-            ),
-          if (s?.goal?.ongoing == true)
-            _centerWide(Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-              child: _GoalCard(
-                goal: s!.goal!,
-                onCancel: _cancelGoal,
-              ),
-            )),
-          Expanded(
-            child: Stack(children: [
-              s == null
-                  ? Center(
-                      child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.fg3)))
-                  : NotificationListener<ScrollNotification>(
-                      onNotification: _onScroll,
-                      child: Builder(builder: (context) {
-                        final timeline = <Widget>[
-                          if (items.isEmpty && !running)
-                            const EmptyState(
-                                icon: 'terminal',
-                                title: 'Session ready',
-                                body: 'Send a task to get started.'),
-                          ...items,
-                          // Optimistic bubbles for messages sent but not yet echoed.
-                          for (var pi = 0; pi < _pending.length; pi++)
-                            Opacity(
-                                key: ValueKey(
-                                    'pending-$pi-${_pending[pi].hashCode}'),
-                                opacity: 0.5,
-                                child: Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Bubble(
-                                        mine: true,
-                                        text: _pending[pi],
-                                        selectable: false))),
-                          if (_liveTextVisible && _liveText.trim().isNotEmpty)
-                            Padding(
-                              key: const ValueKey('live-text'),
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Bubble(
-                                  mine: false,
-                                  text: _liveText.trim(),
-                                  selectable: false),
-                            ),
-                          if (s.compacting) ...[
-                            const SizedBox(height: 10),
-                            _CompactingStatus(
-                              detail: _latestCompactionDetail(events),
-                            ),
-                          ] else if (running) ...[
-                            const SizedBox(height: 10),
-                            _ChurningStatus(
-                                thinking: _turnHasVisibleAction(events)
-                                    ? ''
-                                    : _liveThinking),
-                          ],
-                          if (_queued.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            for (var qi = 0; qi < _queued.length; qi++)
-                              KeyedSubtree(
-                                key: ValueKey(
-                                    'queued-$qi-${_queued[qi].hashCode}'),
-                                child: _QueuedBubble(
-                                  text: _queuedText(_queued[qi]),
-                                  audio: _queuedAttachCounts(_queued[qi]).$1,
-                                  images: _queuedAttachCounts(_queued[qi]).$2,
-                                  files: _queuedAttachCounts(_queued[qi]).$3,
-                                  onCancel: () => _cancelQueuedAt(qi),
-                                  onSteer: () => _steerQueuedAt(qi),
-                                ),
-                              ),
-                          ],
-                        ];
-                        return ListView.builder(
-                          controller: _scroll,
-                          reverse: true,
-                          scrollCacheExtent:
-                              ScrollCacheExtent.pixels(_jumpCacheExtent),
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                          itemCount: timeline.length,
-                          itemBuilder: (context, index) => _centerWide(
-                            RepaintBoundary(
-                              child: timeline[timeline.length - 1 - index],
-                            ),
-                          ),
-                        );
-                      })),
-              // Floating "jump to latest": scrolling up unpins auto-follow, and a
-              // streaming reply then grows silently — give a one-tap way back.
-              if (!kMobile && _userMarks.length >= 2)
-                Positioned(
-                  top: 10,
-                  right: 6,
-                  bottom: 10,
-                  child: _MessageJumpRail(
-                    marks: List<_UserMark>.from(_userMarks),
-                    onJump: _jumpToUserMark,
-                  ),
-                ),
-              if (!_stickToBottom && s != null)
-                Positioned(
-                  right: 16,
-                  bottom: 12,
-                  child: Material(
-                    color: AppColors.surface1,
-                    shape: const CircleBorder(),
-                    elevation: 0,
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () {
-                        _stickToBottom = true;
-                        setState(() {});
-                        _scheduleBottom(settle: true, smooth: true);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: AppIcon('chevron-down',
-                            size: 16, color: AppColors.fg3),
+          Positioned.fill(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (kMobile)
+                    _mobileHeader(s, running, waiting)
+                  else if (!kMacOS)
+                    _desktopBar(s, running),
+                  // Desktop keeps the detailed chip strip.
+                  if (!kMobile && !kMacOS) _statusStrip(s, running),
+                  if (_connError != null) _disconnectedBanner(),
+                  if (s?.goal?.ongoing == true)
+                    _centerWide(Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                      child: _GoalCard(
+                        goal: s!.goal!,
+                        onCancel: _cancelGoal,
                       ),
-                    ),
+                    )),
+                  Expanded(
+                    child: Stack(children: [
+                      s == null
+                          ? Center(
+                              child: SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: AppColors.fg3)))
+                          : NotificationListener<ScrollNotification>(
+                              onNotification: _onScroll,
+                              child: Builder(builder: (context) {
+                                final timeline = <Widget>[
+                                  if (items.isEmpty && !running)
+                                    const EmptyState(
+                                        icon: 'terminal',
+                                        title: 'Session ready',
+                                        body: 'Send a task to get started.'),
+                                  ...items,
+                                  // Optimistic bubbles for messages sent but not yet echoed.
+                                  for (var pi = 0; pi < _pending.length; pi++)
+                                    Opacity(
+                                        key: ValueKey(
+                                            'pending-$pi-${_pending[pi].hashCode}'),
+                                        opacity: 0.5,
+                                        child: Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 12),
+                                            child: Bubble(
+                                                mine: true,
+                                                text: _pending[pi],
+                                                selectable: false))),
+                                  if (_liveTextVisible &&
+                                      _liveText.trim().isNotEmpty)
+                                    Padding(
+                                      key: const ValueKey('live-text'),
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Bubble(
+                                          mine: false,
+                                          text: _liveText.trim(),
+                                          selectable: false),
+                                    ),
+                                  if (s.compacting) ...[
+                                    const SizedBox(height: 10),
+                                    _CompactingStatus(
+                                      detail: _latestCompactionDetail(events),
+                                    ),
+                                  ] else if (running) ...[
+                                    const SizedBox(height: 10),
+                                    _ChurningStatus(
+                                        thinking: _turnHasVisibleAction(events)
+                                            ? ''
+                                            : _liveThinking),
+                                  ],
+                                  if (_queued.isNotEmpty) ...[
+                                    const SizedBox(height: 12),
+                                    for (var qi = 0; qi < _queued.length; qi++)
+                                      KeyedSubtree(
+                                        key: ValueKey(
+                                            'queued-$qi-${_queued[qi].hashCode}'),
+                                        child: _QueuedBubble(
+                                          text: _queuedText(_queued[qi]),
+                                          audio:
+                                              _queuedAttachCounts(_queued[qi])
+                                                  .$1,
+                                          images:
+                                              _queuedAttachCounts(_queued[qi])
+                                                  .$2,
+                                          files:
+                                              _queuedAttachCounts(_queued[qi])
+                                                  .$3,
+                                          onCancel: () => _cancelQueuedAt(qi),
+                                          onSteer: () => _steerQueuedAt(qi),
+                                        ),
+                                      ),
+                                  ],
+                                ];
+                                return ListView.builder(
+                                  controller: _scroll,
+                                  reverse: true,
+                                  scrollCacheExtent: ScrollCacheExtent.pixels(
+                                      _jumpCacheExtent),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                                  itemCount: timeline.length,
+                                  itemBuilder: (context, index) => _centerWide(
+                                    RepaintBoundary(
+                                      child:
+                                          timeline[timeline.length - 1 - index],
+                                    ),
+                                  ),
+                                );
+                              })),
+                      // Floating "jump to latest": scrolling up unpins auto-follow, and a
+                      // streaming reply then grows silently — give a one-tap way back.
+                      if (!kMobile && _userMarks.length >= 2)
+                        Positioned(
+                          top: 10,
+                          right: 6,
+                          bottom: 10,
+                          child: _MessageJumpRail(
+                            marks: List<_UserMark>.from(_userMarks),
+                            onJump: _jumpToUserMark,
+                          ),
+                        ),
+                      if (!_stickToBottom && s != null)
+                        Positioned(
+                          right: 16,
+                          bottom: 12,
+                          child: Material(
+                            color: AppColors.surface1,
+                            shape: const CircleBorder(),
+                            elevation: 0,
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: () {
+                                _stickToBottom = true;
+                                setState(() {});
+                                _scheduleBottom(settle: true, smooth: true);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: AppIcon('chevron-down',
+                                    size: 16, color: AppColors.fg3),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ]),
                   ),
-                ),
-            ]),
+                  // The question/approval bars are PINNED here (not inside the scroll
+                  // list) so a "needs input" request is always visible — buried at the
+                  // bottom of a scrolled-up transcript it read as "the agent is stuck".
+                  if (waiting && _pendingApproval(events))
+                    _centerWide(Padding(
+                      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 6,
+                          widget.embedded ? 0 : 20, 0),
+                      child: _ApprovalBar(
+                          events: events,
+                          onSend: _sendDecision,
+                          showApproveAll: _pendingApprovalTotal(events) > 1),
+                    )),
+                  if (waiting && s?.pendingQuestion != null)
+                    _centerWide(Padding(
+                      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 6,
+                          widget.embedded ? 0 : 20, 0),
+                      child: _QuestionBar(
+                          question: s!.pendingQuestion!, onSend: _sendDecision),
+                    )),
+                  if (!(waiting && s?.pendingQuestion != null))
+                    _centerWide(_inputBar(running)),
+                  if (_termOpen && _terms.isNotEmpty && !kMobile)
+                    _desktopTermDrawer(),
+                ]),
           ),
-          // The question/approval bars are PINNED here (not inside the scroll
-          // list) so a "needs input" request is always visible — buried at the
-          // bottom of a scrolled-up transcript it read as "the agent is stuck".
-          if (waiting && _pendingApproval(events))
-            _centerWide(Padding(
-              padding: EdgeInsets.fromLTRB(
-                  widget.embedded ? 0 : 20, 6, widget.embedded ? 0 : 20, 0),
-              child: _ApprovalBar(
-                  events: events,
-                  onSend: _sendDecision,
-                  showApproveAll: _pendingApprovalTotal(events) > 1),
-            )),
-          if (waiting && s?.pendingQuestion != null)
-            _centerWide(Padding(
-              padding: EdgeInsets.fromLTRB(
-                  widget.embedded ? 0 : 20, 6, widget.embedded ? 0 : 20, 0),
-              child: _QuestionBar(
-                  question: s!.pendingQuestion!, onSend: _sendDecision),
-            )),
-          if (!(waiting && s?.pendingQuestion != null))
-            _centerWide(_inputBar(running)),
-        ]),
-        ),
-        if (kMobile && _termOpen && _terms.isNotEmpty)
-          Positioned.fill(child: _mobileTermTab()),
+          if (kMobile && _termOpen && _terms.isNotEmpty)
+            Positioned.fill(child: _mobileTermTab()),
         ]),
       ),
     );
@@ -2006,6 +1986,78 @@ class _SessionScreenState extends State<SessionScreen>
               tooltip: 'Stop', onTap: () => _send({'kind': 'interrupt'})),
         IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
       ]),
+    );
+  }
+
+  Widget _desktopTermDrawer() {
+    final i = _termFocus.clamp(0, _terms.length - 1);
+    final t = _terms[i];
+    return ColoredBox(
+      color: const Color(0xff0a0a0a),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onVerticalDragUpdate: (d) {
+              final maxH = MediaQuery.sizeOf(context).height * 0.72;
+              setState(() {
+                _termHeight = (_termHeight - d.delta.dy).clamp(140.0, maxH);
+              });
+            },
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeRow,
+              child: SizedBox(
+                height: 18,
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: AppColors.border2,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_terms.length > 1)
+            SizedBox(
+              height: 28,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                itemCount: _terms.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, n) {
+                  final on = n == i;
+                  return InkWell(
+                    onTap: () => setState(() => _termFocus = n),
+                    child: Text(
+                      '${n + 1}',
+                      style: sans(12,
+                          weight: on ? FontWeight.w600 : FontWeight.w400,
+                          color: on ? AppColors.accent : AppColors.fg3),
+                    ),
+                  );
+                },
+              ),
+            ),
+          SizedBox(
+            height: _termHeight,
+            child: SessionTermView(
+              alive: t.alive,
+              screen: t.screen,
+              onInput: _termIn,
+              onResize: _termResize,
+              onClose: () => _closeTerm(t.id),
+              onNew: () => _openTerm(fresh: true),
+              mobileKeys: false,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2219,6 +2271,9 @@ class _SessionScreenState extends State<SessionScreen>
         return;
       case 'command':
         _showExec();
+        return;
+      case 'shell':
+        _openTerm();
         return;
       case 'processes':
         presentScreen(context,
@@ -3808,6 +3863,7 @@ class _LiveTerm {
   int cols = 80;
   int rows = 24;
   bool alive = false;
+  bool live = false;
 }
 
 class _QueuedBubble extends StatelessWidget {

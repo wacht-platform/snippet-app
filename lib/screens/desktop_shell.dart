@@ -892,6 +892,8 @@ class _DesktopShellState extends State<DesktopShell> {
         _macStatusAction(
             'folder', 'Files', () => controls.performAction('files')),
         _macStatusAction(
+            'terminal', 'Shell', () => controls.performAction('shell')),
+        _macStatusAction(
             'terminal', 'Run', () => controls.performAction('command')),
         _macStatusAction(
             'list', 'Processes', () => controls.performAction('processes')),
