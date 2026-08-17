@@ -2725,12 +2725,13 @@ class _SessionScreenState extends State<SessionScreen>
     RelativeRect position;
     if (box != null && overlay != null) {
       final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      final menuW = box.size.width.clamp(220.0, 320.0);
+      final menuW = 260.0;
+      // Open above the chip so the menu sits on the picker, not under the field.
       position = RelativeRect.fromLTRB(
         origin.dx,
-        origin.dy + box.size.height + 6,
-        overlay.size.width - origin.dx - menuW,
         16,
+        overlay.size.width - origin.dx - menuW,
+        overlay.size.height - origin.dy + 6,
       );
     } else {
       position = const RelativeRect.fromLTRB(16, 80, 16, 80);
