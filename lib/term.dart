@@ -37,6 +37,7 @@ class SessionTermView extends StatefulWidget {
 
 class _SessionTermViewState extends State<SessionTermView> {
   final _termView = GlobalKey<TerminalViewState>();
+  late Terminal _host;
   int _lastC = 0;
   int _lastR = 0;
   bool _ctrl = false;
@@ -71,31 +72,71 @@ class _SessionTermViewState extends State<SessionTermView> {
   @override
   void initState() {
     super.initState();
-    widget.terminal.onOutput = _onOutput;
-    widget.terminal.onResize = _onTermResize;
+    _host = widget.terminal;
+    _bind(_host);
   }
 
   @override
   void didUpdateWidget(SessionTermView old) {
     super.didUpdateWidget(old);
     if (old.terminal != widget.terminal) {
-      old.terminal.onOutput = null;
-      old.terminal.onResize = null;
-      widget.terminal.onOutput = _onOutput;
-      widget.terminal.onResize = _onTermResize;
+      _unbind(old.terminal);
+      _host = widget.terminal;
+      _bind(_host);
     }
   }
 
   @override
   void dispose() {
-    widget.terminal.onOutput = null;
-    widget.terminal.onResize = null;
+    _unbind(_host);
     super.dispose();
+  }
+
+  void _bind(Terminal t) {
+    t.onOutput = _onOutput;
+    t.onResize = _onTermResize;
+  }
+
+  void _unbind(Terminal t) {
+    t.onOutput = null;
+    t.onResize = null;
   }
 
   void _onOutput(String data) {
     if (data.isEmpty) return;
-    widget.onInput(Uint8List.fromList(utf8.encode(data)));
+    var out = data;
+    if (widget.mobileKeys && (_ctrl || _alt) && _isPrintableInsert(data)) {
+      out = _applyStickyMods(data);
+      setState(() => _ctrl = _alt = false);
+    }
+    if (out.isEmpty) return;
+    widget.onInput(Uint8List.fromList(utf8.encode(out)));
+  }
+
+  bool _isPrintableInsert(String data) {
+    if (data.isEmpty) return false;
+    for (final u in data.runes) {
+      if (u < 0x20 || u == 0x7f) return false;
+    }
+    return true;
+  }
+
+  String _applyStickyMods(String data) {
+    final buf = StringBuffer();
+    for (final u in data.runes) {
+      var code = u;
+      if (_ctrl) {
+        final lower = code >= 0x41 && code <= 0x5a ? code + 32 : code;
+        if (lower >= 0x61 && lower <= 0x7a) {
+          code = lower - 0x60;
+        } else if (code >= 0x40 && code <= 0x5f) {
+          code = code & 0x1f;
+        }
+      }
+      if (_alt) buf.writeCharCode(0x1b);
+      buf.writeCharCode(code);
+    }
+    return buf.toString();
   }
 
   void _onTermResize(int w, int h, int pw, int ph) {
@@ -105,39 +146,10 @@ class _SessionTermViewState extends State<SessionTermView> {
     widget.onResize(w, h);
   }
 
-  void _sendBytes(List<int> bytes) {
-    if (bytes.isEmpty) return;
-    widget.onInput(Uint8List.fromList(bytes));
-  }
-
-  void _sendKey(TerminalKey key, {bool ctrl = false, bool alt = false}) {
-    widget.terminal.keyInput(key, ctrl: ctrl || _ctrl, alt: alt || _alt);
+  void _sendKey(TerminalKey key) {
+    widget.terminal.keyInput(key, ctrl: _ctrl, alt: _alt);
     if (_ctrl || _alt) setState(() => _ctrl = _alt = false);
     _termView.currentState?.requestKeyboard();
-  }
-
-  void _sendCtrlLetter(String letter) {
-    final c = letter.toLowerCase().codeUnitAt(0);
-    if (c >= 0x61 && c <= 0x7a) {
-      widget.terminal.charInput(c, ctrl: true, alt: _alt);
-    }
-    if (_ctrl || _alt) setState(() => _ctrl = _alt = false);
-    _termView.currentState?.requestKeyboard();
-  }
-
-  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-      return KeyEventResult.ignored;
-    }
-    if (!_ctrl && !_alt) return KeyEventResult.ignored;
-    final ch = event.character;
-    if (ch != null && ch.isNotEmpty) {
-      final unit = ch.runes.first;
-      widget.terminal.charInput(unit, ctrl: _ctrl, alt: _alt);
-      setState(() => _ctrl = _alt = false);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
   }
 
   Widget _modChip(String label, bool on, VoidCallback tap) {
@@ -206,7 +218,6 @@ class _SessionTermViewState extends State<SessionTermView> {
           hardwareKeyboardOnly: false,
           deleteDetection: widget.mobileKeys,
           keyboardType: TextInputType.visiblePassword,
-          onKeyEvent: widget.mobileKeys ? _onKeyEvent : null,
           padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
           textStyle: const TerminalStyle(
             fontSize: 13,
@@ -223,23 +234,10 @@ class _SessionTermViewState extends State<SessionTermView> {
             _modChip('Alt', _alt, () => setState(() => _alt = !_alt)),
             _keyChip('Esc', () => _sendKey(TerminalKey.escape)),
             _keyChip('Tab', () => _sendKey(TerminalKey.tab)),
-            _keyChip('⌫', () => _sendBytes(const [0x7f])),
-            _keyChip('^C', () => _sendCtrlLetter('c')),
-            _keyChip('^D', () => _sendCtrlLetter('d')),
-            _keyChip('^Z', () => _sendCtrlLetter('z')),
-            _keyChip('^L', () => _sendCtrlLetter('l')),
-            _keyChip('^W', () => _sendCtrlLetter('w')),
-            _keyChip('^U', () => _sendCtrlLetter('u')),
-            _keyChip('^A', () => _sendCtrlLetter('a')),
-            _keyChip('^E', () => _sendCtrlLetter('e')),
-            _keyChip('^K', () => _sendCtrlLetter('k')),
-            _keyChip('^R', () => _sendCtrlLetter('r')),
             _keyChip('↑', () => _sendKey(TerminalKey.arrowUp)),
             _keyChip('↓', () => _sendKey(TerminalKey.arrowDown)),
             _keyChip('←', () => _sendKey(TerminalKey.arrowLeft)),
             _keyChip('→', () => _sendKey(TerminalKey.arrowRight)),
-            _keyChip('Home', () => _sendKey(TerminalKey.home)),
-            _keyChip('End', () => _sendKey(TerminalKey.end)),
           ]),
         ),
     ]);
