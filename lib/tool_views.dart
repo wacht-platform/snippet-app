@@ -322,8 +322,11 @@ List<Widget> _bashView(Map? a, Map? d) {
   final stderr =
       _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
   final out = <Widget>[];
-  if (stdout.isNotEmpty) out.add(_CodeBox(stdout));
-  if (stderr.isNotEmpty) out.add(_CodeBox(stderr, delTint: true));
+  if (stdout.isNotEmpty) out.add(_ShellOutput(stdout));
+  if (stderr.isNotEmpty) {
+    if (out.isNotEmpty) out.add(const SizedBox(height: 6));
+    out.add(_ShellOutput(stderr, stderr: true));
+  }
   if (out.isEmpty) {
     out.add(Text('no output', style: mono(11.5, color: AppColors.fg4)));
   }
@@ -869,22 +872,49 @@ String _displayText(String text) => text
     .replaceAll(r'\n', '\n')
     .replaceAll(r'\r', '\r');
 
-/// Plain monospace block (selectable). Optional add/del tint or sans font.
+class _ShellOutput extends StatelessWidget {
+  final String text;
+  final bool stderr;
+  const _ShellOutput(this.text, {this.stderr = false});
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: stderr ? AppColors.dangerBg : AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.sm),
+      ),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (_) => true,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SelectableText.rich(
+            stderr
+                ? TextSpan(
+                    text: text,
+                    style: mono(11.5, height: 1.45, color: AppColors.danger),
+                  )
+                : highlightedCodeSpan(text, language: 'bash'),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Plain monospace block (selectable). Optional add tint or sans font.
 class _CodeBox extends StatelessWidget {
   final String text;
   final bool addTint;
-  final bool delTint;
   final bool useSans;
-  const _CodeBox(this.text,
-      {this.addTint = false, this.delTint = false, this.useSans = false});
+  const _CodeBox(this.text, {this.addTint = false, this.useSans = false});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final color = delTint
-        ? AppColors.danger
-        : addTint
-            ? AppColors.ok
-            : AppColors.fg2;
+    final color = addTint ? AppColors.ok : AppColors.fg2;
     final style = useSans
         ? sans(12, height: 1.4, color: color)
         : mono(11.5, height: 1.4, color: color);

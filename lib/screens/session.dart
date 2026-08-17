@@ -3941,9 +3941,7 @@ class _SendBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: enabled
-          ? (running ? AppColors.danger : AppColors.fg1)
-          : AppColors.surface2,
+      color: enabled ? AppColors.fg1 : AppColors.surface2,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
