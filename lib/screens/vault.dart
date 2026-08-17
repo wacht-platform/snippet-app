@@ -112,24 +112,31 @@ class _VaultScreenState extends State<VaultScreen> {
                 final list = ListView(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
                   children: [
-                    const SectionLabel('Secrets'),
-                    const SizedBox(height: 6),
                     Text(
-                      'The agent can use these as \$NAME in shell commands. Values are injected into the process and redacted from everything the model sees — they never appear in chat.',
-                      style: sans(11.5, height: 1.4, color: AppColors.fg3),
+                      'The agent can use these as \$NAME in shell commands. Values stay on the daemon and never appear in chat.',
+                      style: sans(12, height: 1.4, color: AppColors.fg3),
                     ),
-                    const SizedBox(height: 12),
-                    if (names.isEmpty) ...[
-                      const EmptyState(
-                          icon: 'key',
-                          title: 'No secrets',
-                          body:
-                              'Add API keys or tokens the agent may use in shell commands without ever seeing them.'),
-                      const SizedBox(height: 10),
-                    ],
+                    const SizedBox(height: 10),
+                    if (names.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+                        child: Text('No secrets yet.',
+                            style: sans(13, color: AppColors.fg3)),
+                      ),
                     ...names.map(_secretRow),
-                    const SizedBox(height: 2),
-                    AddCard(label: 'Add secret', onTap: _add),
+                    const SizedBox(height: 4),
+                    InkWell(
+                      onTap: _add,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(children: [
+                          AppIcon('plus', size: 16, color: AppColors.fg3),
+                          const SizedBox(width: 12),
+                          Text('Add secret',
+                              style: sans(14, color: AppColors.fg2)),
+                        ]),
+                      ),
+                    ),
                   ],
                 );
                 return kMobile
@@ -148,26 +155,14 @@ class _VaultScreenState extends State<VaultScreen> {
 
   Widget _secretRow(String name) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: AppCard(
-        padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
-        child: Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.sm)),
-            child: AppIcon('key', size: 16, color: AppColors.fg3),
-          ),
-          const SizedBox(width: 10),
-          Expanded(child: Text(name, style: mono(13.5, color: AppColors.fg1))),
-          Text('••••••', style: mono(12, color: AppColors.fg4)),
-          const SizedBox(width: 4),
-          IconBtn('trash', size: 34, iconSize: 16, onTap: () => _remove(name)),
-        ]),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(children: [
+        AppIcon('key', size: 16, color: AppColors.fg3),
+        const SizedBox(width: 12),
+        Expanded(child: Text(name, style: mono(13.5, color: AppColors.fg1))),
+        Text('••••••', style: mono(12, color: AppColors.fg4)),
+        IconBtn('trash', size: 32, iconSize: 16, onTap: () => _remove(name)),
+      ]),
     );
   }
 }

@@ -76,20 +76,28 @@ class _ModelsScreenState extends State<ModelsScreen> {
                 final list = ListView(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
                   children: [
-                    const SectionLabel('Model profiles'),
-                    const SizedBox(height: 10),
-                    if (profiles.isEmpty) ...[
-                      const EmptyState(
-                          icon: 'cpu',
-                          title: 'No model configured',
-                          body:
-                              'Add a model profile with an API key before starting a session.'),
-                      const SizedBox(height: 10),
-                    ],
+                    if (profiles.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(2, 8, 2, 12),
+                        child: Text(
+                            'No model configured. Add a profile with an API key before starting a session.',
+                            style: sans(13, height: 1.4, color: AppColors.fg3)),
+                      ),
                     ...profiles
                         .map((p) => _profileCard(p, snap.data?.delegate)),
-                    const SizedBox(height: 2),
-                    AddCard(label: 'Add model', onTap: () => _edit(null)),
+                    const SizedBox(height: 4),
+                    InkWell(
+                      onTap: () => _edit(null),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(children: [
+                          AppIcon('plus', size: 16, color: AppColors.fg3),
+                          const SizedBox(width: 12),
+                          Text('Add model',
+                              style: sans(14, color: AppColors.fg2)),
+                        ]),
+                      ),
+                    ),
                     if (profiles.length > 1) ...[
                       const SizedBox(height: 6),
                       Padding(
@@ -123,85 +131,48 @@ class _ModelsScreenState extends State<ModelsScreen> {
   Widget _profileCard(ModelProfile p, String? delegate) {
     final isDelegate =
         delegate != null && delegate.isNotEmpty && delegate == p.name;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        margin: EdgeInsets.zero,
-        child: AppCard(
-          onTap: p.usable
-              ? () =>
-                  _run(() => widget.client.setActiveProfile(p.name), 'activate')
-              : null,
-          padding: const EdgeInsets.fromLTRB(12, 11, 6, 11),
-          child: Row(children: [
-            Container(
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: p.active ? AppColors.accentBg : AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.md),
-              ),
-              child: AppIcon('cpu',
-                  size: 18, color: p.active ? AppColors.accent : AppColors.fg3),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Flexible(
-                          child: Text(p.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(14, color: AppColors.fg1))),
-                      if (p.active) ...[
-                        const SizedBox(width: 8),
-                        _activeChip()
-                      ],
-                      if (isDelegate) ...[
-                        const SizedBox(width: 8),
-                        _delegateChip()
-                      ],
-                      if (!p.usable) ...[
-                        const SizedBox(width: 8),
-                        const WarnChip()
-                      ],
-                    ]),
-                    const SizedBox(height: 4),
-                    Text('${p.provider} · ${p.model}',
+    return InkWell(
+      onTap: p.usable
+          ? () => _run(() => widget.client.setActiveProfile(p.name), 'activate')
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(children: [
+          AppIcon('cpu',
+              size: 16, color: p.active ? AppColors.accent : AppColors.fg3),
+          const SizedBox(width: 12),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Flexible(
+                    child: Text(p.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: mono(11.5, color: AppColors.fg3)),
-                  ]),
-            ),
-            IconBtn('edit', size: 34, iconSize: 16, onTap: () => _edit(p)),
-            _overflowMenu(p, isDelegate),
-          ]),
-        ),
+                        style: sans(14, color: AppColors.fg1))),
+                if (p.active) ...[
+                  const SizedBox(width: 8),
+                  Text('active', style: sans(11, color: AppColors.accent))
+                ],
+                if (isDelegate) ...[
+                  const SizedBox(width: 8),
+                  Text('delegate', style: sans(11, color: AppColors.run))
+                ],
+                if (!p.usable) ...[const SizedBox(width: 8), const WarnChip()],
+              ]),
+              const SizedBox(height: 2),
+              Text('${p.provider} · ${p.model}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(11.5, color: AppColors.fg4)),
+            ]),
+          ),
+          IconBtn('edit', size: 32, iconSize: 16, onTap: () => _edit(p)),
+          _overflowMenu(p, isDelegate),
+        ]),
       ),
     );
   }
-
-  Widget _activeChip() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(
-            color: AppColors.accentBg,
-            borderRadius: BorderRadius.circular(R.xs)),
-        child: Text('ACTIVE',
-            style: sans(9.5, spacing: 0.5, color: AppColors.accent)),
-      );
-
-  Widget _delegateChip() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(
-            color: AppColors.runBg, borderRadius: BorderRadius.circular(R.xs)),
-        child: Text('DELEGATE',
-            style: sans(9.5, spacing: 0.5, color: AppColors.run)),
-      );
 
   Widget _overflowMenu(ModelProfile p, bool isDelegate) =>
       PopupMenuButton<String>(

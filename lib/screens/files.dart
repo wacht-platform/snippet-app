@@ -267,28 +267,19 @@ class _FileExplorerState extends State<FileExplorer> {
                 ),
                 // Prominent CTA: start a chat in the folder you're browsing (no session needed).
                 if (!_selecting && listing != null && widget.onNewChat != null)
-                  Material(
-                    color: AppColors.accentBg,
-                    child: InkWell(
-                      onTap: () => widget.onNewChat!(listing.path),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 13),
-                        decoration: BoxDecoration(
-                            border: Border(
-                                bottom: BorderSide(color: AppColors.border))),
-                        child: Row(children: [
-                          AppIcon('edit', size: 16, color: AppColors.accent),
-                          const SizedBox(width: 10),
-                          Expanded(
-                              child: Text('New chat in this folder',
-                                  style: sans(13.5,
-                                      weight: FontWeight.w600,
-                                      color: AppColors.accent))),
-                          AppIcon('arrow-right',
-                              size: 15, color: AppColors.accent),
-                        ]),
-                      ),
+                  InkWell(
+                    onTap: () => widget.onNewChat!(listing.path),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      child: Row(children: [
+                        AppIcon('edit', size: 16, color: AppColors.accent),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: Text('New chat in this folder',
+                                style: sans(13.5,
+                                    weight: FontWeight.w500,
+                                    color: AppColors.accent))),
+                      ]),
                     ),
                   ),
                 if (_busy != null)
@@ -350,8 +341,7 @@ class _FileExplorerState extends State<FileExplorer> {
                                       textAlign: TextAlign.center,
                                       style: sans(12.5, color: AppColors.fg3))))
                           : ListView(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 8),
+                              padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
                               children: [
                                 if (listing!.parent != null && !_selecting)
                                   _Row(
