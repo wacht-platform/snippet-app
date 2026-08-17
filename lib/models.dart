@@ -343,6 +343,29 @@ class HarnessState {
       lanes: base.lanes,
     );
   }
+
+  HarnessState withApprovalMode(String mode) => HarnessState(
+        status: status,
+        workspace: workspace,
+        title: title,
+        events: events,
+        finalText: finalText,
+        approvalMode: mode,
+        pendingQuestion: pendingQuestion,
+        totalTokens: totalTokens,
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+        cacheReadTokens: cacheReadTokens,
+        lastPromptTokens: lastPromptTokens,
+        contextWindow: contextWindow,
+        ratePrimary: ratePrimary,
+        rateSecondary: rateSecondary,
+        checkpoints: checkpoints,
+        goal: goal,
+        compacting: compacting,
+        watchCount: watchCount,
+        lanes: lanes,
+      );
 }
 
 /// A delegated background lane's live status (mirror of the daemon's LaneRecord).

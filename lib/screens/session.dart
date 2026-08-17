@@ -1933,6 +1933,16 @@ class _SessionScreenState extends State<SessionScreen>
     _toast('Cancelling the goal');
   }
 
+  void _setApproval(bool manual) {
+    final mode = manual ? 'manual' : 'auto';
+    final s = _state;
+    if (s != null) {
+      setState(() => _state = s.withApprovalMode(mode));
+    }
+    _send({'kind': 'set_mode', 'value': mode});
+    _toast(manual ? 'Approval: ask' : 'Approval: auto');
+  }
+
   void _performMacAction(String action) {
     final s = _state;
     switch (action) {
@@ -1944,8 +1954,7 @@ class _SessionScreenState extends State<SessionScreen>
         return;
       case 'approval':
         final manual = (s?.approvalMode ?? 'auto') == 'manual';
-        _send({'kind': 'set_mode', 'value': manual ? 'auto' : 'manual'});
-        _toast(manual ? 'Approval: auto' : 'Approval: ask');
+        _setApproval(!manual);
         return;
       case 'goal':
         if (s?.goal?.ongoing ?? false) {
@@ -2011,10 +2020,8 @@ class _SessionScreenState extends State<SessionScreen>
         );
     return [
       item('edit', 'Rename session', _renameCurrent),
-      item('shield', 'Approval mode', () {
-        _send({'kind': 'set_mode', 'value': manual ? 'auto' : 'manual'});
-        _toast(manual ? 'Approval: auto' : 'Approval: ask');
-      }, value: manual ? 'Ask' : 'Auto'),
+      item('shield', 'Approval mode', () => _setApproval(!manual),
+          value: manual ? 'Ask' : 'Auto'),
       (s?.goal?.ongoing ?? false)
           ? item('zap', 'Cancel goal', _cancelGoal,
               value: s!.goal!.paused ? 'paused' : 'running')
@@ -2080,13 +2087,7 @@ class _SessionScreenState extends State<SessionScreen>
               if (mounted) _toast('$e');
             }
           },
-          onApproval: (manual) {
-            _send({
-              'kind': 'set_mode',
-              'value': manual ? 'manual' : 'auto',
-            });
-            _toast(manual ? 'Approval: ask' : 'Approval: auto');
-          },
+          onApproval: _setApproval,
           onSetGoal: (text) {
             _send({'kind': 'set_goal', 'value': text});
             _toast('Goal set — the agent will drive toward it');
@@ -2582,11 +2583,9 @@ class _SessionScreenState extends State<SessionScreen>
           // render them as a user bubble.
           if (_looksLikeQuestionAnswer(text)) break;
           final markKey = _userMarkKeys.putIfAbsent(key, GlobalKey.new);
-          final preview = hideAttachmentMarkers(text).trim();
-          if (preview.isNotEmpty) {
-            _userMarks.add(_UserMark(key: markKey, preview: preview));
-            seen.add(key);
-          }
+          final preview = _jumpPreview(text);
+          _userMarks.add(_UserMark(key: markKey, preview: preview));
+          seen.add(key);
           addEvent(
               key,
               KeyedSubtree(
@@ -3658,6 +3657,27 @@ bool _looksLikeQuestionAnswer(String text) {
   return t.contains('\n→ ') || t.startsWith('→ ');
 }
 
+/// One-line preview for the desktop jump rail. Voice notes often have no
+/// leftover body after markers are stripped — use the transcript instead.
+String _jumpPreview(String text) {
+  final leftover = hideAttachmentMarkers(text).trim();
+  if (leftover.isNotEmpty) {
+    return leftover.replaceAll(RegExp(r'\s+'), ' ');
+  }
+  final items = audioTranscriptItems(text);
+  for (final item in items) {
+    final t = item.text.trim();
+    if (t.isNotEmpty && !item.unavailable) {
+      return t.replaceAll(RegExp(r'\s+'), ' ');
+    }
+  }
+  if (items.any((i) => i.unavailable)) return 'Voice note (no transcript)';
+  if (RegExp(r'\[attached (image|file) —').hasMatch(text)) {
+    return 'Attachment';
+  }
+  return leftover.isEmpty ? 'Message' : leftover;
+}
+
 /// Transcript card for a past `ask_user` turn: the prompt plus the user's
 /// answer (parsed from the following `user_input` that `_QuestionBar` sent).
 class _QuestionRecord extends StatelessWidget {
@@ -4317,6 +4337,7 @@ class _SessionActionsPanel extends StatefulWidget {
 
 class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   String? _open;
+  bool? _manualOverride;
   late final TextEditingController _titleCtl =
       TextEditingController(text: widget.title);
   late final TextEditingController _goalCtl = TextEditingController();
@@ -4389,7 +4410,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
-    final manual = (s?.approvalMode ?? 'auto') == 'manual';
+    final manual = _manualOverride ?? ((s?.approvalMode ?? 'auto') == 'manual');
     final goalOn = s?.goal?.ongoing ?? false;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -4425,8 +4446,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                 child: Btn('Auto',
                     variant: manual ? BtnVariant.secondary : BtnVariant.primary,
                     onTap: () {
+                  setState(() => _manualOverride = false);
                   widget.onApproval(false);
-                  setState(() {});
                 }),
               ),
               const SizedBox(width: 8),
@@ -4434,8 +4455,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                 child: Btn('Ask',
                     variant: manual ? BtnVariant.primary : BtnVariant.secondary,
                     onTap: () {
+                  setState(() => _manualOverride = true);
                   widget.onApproval(true);
-                  setState(() {});
                 }),
               ),
             ]),
