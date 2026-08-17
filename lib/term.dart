@@ -43,6 +43,19 @@ class _SessionTermViewState extends State<SessionTermView> {
   bool _ctrl = false;
   bool _alt = false;
 
+  static const _extraKeys = <(String, TerminalKey)>[
+    ('Home', TerminalKey.home),
+    ('End', TerminalKey.end),
+    ('PgUp', TerminalKey.pageUp),
+    ('PgDn', TerminalKey.pageDown),
+    ('Ins', TerminalKey.insert),
+    ('Del', TerminalKey.delete),
+    ('F1', TerminalKey.f1),
+    ('F2', TerminalKey.f2),
+    ('F5', TerminalKey.f5),
+    ('F10', TerminalKey.f10),
+  ];
+
   static final _theme = TerminalTheme(
     cursor: const Color(0xffffffff),
     selection: const Color(0x66ffffff),
@@ -157,14 +170,14 @@ class _SessionTermViewState extends State<SessionTermView> {
       onTap: tap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: on ? AppColors.accent.withValues(alpha: 0.18) : null,
           border: Border.all(color: on ? AppColors.accent : AppColors.border2),
           borderRadius: BorderRadius.circular(R.sm),
         ),
         child: Text(label,
-            style: mono(11, color: on ? AppColors.accent : AppColors.fg2)),
+            style: mono(10, color: on ? AppColors.accent : AppColors.fg2)),
       ),
     );
   }
@@ -174,14 +187,14 @@ class _SessionTermViewState extends State<SessionTermView> {
       onTap: tap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        constraints: BoxConstraints(minWidth: minWidth, minHeight: 32),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        constraints: BoxConstraints(minWidth: minWidth, minHeight: 24),
+        alignment: minWidth > 0 ? Alignment.center : null,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.border2),
           borderRadius: BorderRadius.circular(R.sm),
         ),
-        child: Text(label, style: mono(11, color: AppColors.fg2)),
+        child: Text(label, style: mono(10, color: AppColors.fg2)),
       ),
     );
   }
@@ -196,7 +209,7 @@ class _SessionTermViewState extends State<SessionTermView> {
             ],
           ],
         );
-    const w = 36.0;
+    const w = 28.0;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -275,19 +288,21 @@ class _SessionTermViewState extends State<SessionTermView> {
                       const SizedBox(width: 6),
                       _keyChip('Tab', () => _sendKey(TerminalKey.tab)),
                     ]),
-                    const SizedBox(height: 6),
-                    Wrap(spacing: 6, runSpacing: 6, children: [
-                      _keyChip('Home', () => _sendKey(TerminalKey.home)),
-                      _keyChip('End', () => _sendKey(TerminalKey.end)),
-                      _keyChip('PgUp', () => _sendKey(TerminalKey.pageUp)),
-                      _keyChip('PgDn', () => _sendKey(TerminalKey.pageDown)),
-                      _keyChip('Ins', () => _sendKey(TerminalKey.insert)),
-                      _keyChip('Del', () => _sendKey(TerminalKey.delete)),
-                      _keyChip('F1', () => _sendKey(TerminalKey.f1)),
-                      _keyChip('F2', () => _sendKey(TerminalKey.f2)),
-                      _keyChip('F5', () => _sendKey(TerminalKey.f5)),
-                      _keyChip('F10', () => _sendKey(TerminalKey.f10)),
-                    ]),
+                    const SizedBox(height: 4),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (var i = 0; i < _extraKeys.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 4),
+                            _keyChip(
+                              _extraKeys[i].$1,
+                              () => _sendKey(_extraKeys[i].$2),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -212,6 +212,9 @@ class HarnessState {
   final List<Checkpoint> checkpoints;
   final GoalInfo? goal; // an active autonomous /goal, if any
   final bool compacting; // a history-compaction pass is running
+  final String? turnStartedAt; // RFC3339 when the current running turn began
+  final String?
+      compactingStartedAt; // RFC3339 when the current compact pass began
   final int watchCount; // active file watches (monitor meta-tool)
   final List<LaneInfo> lanes; // delegated background lanes (live status)
 
@@ -234,6 +237,8 @@ class HarnessState {
     required this.checkpoints,
     required this.goal,
     this.compacting = false,
+    this.turnStartedAt,
+    this.compactingStartedAt,
     this.watchCount = 0,
     this.lanes = const [],
   });
@@ -299,6 +304,8 @@ class HarnessState {
           ? GoalInfo.fromJson((j['goal'] as Map).cast<String, dynamic>())
           : null,
       compacting: j['compacting'] == true,
+      turnStartedAt: asString(j['turn_started_at']),
+      compactingStartedAt: asString(j['compacting_started_at']),
       watchCount: (j['watches'] is List) ? (j['watches'] as List).length : 0,
       lanes: mapList(j['lanes']).map(LaneInfo.fromJson).toList(),
     );
@@ -339,6 +346,8 @@ class HarnessState {
           d.containsKey('checkpoints') ? base.checkpoints : checkpoints,
       goal: base.goal,
       compacting: base.compacting,
+      turnStartedAt: base.turnStartedAt,
+      compactingStartedAt: base.compactingStartedAt,
       watchCount: base.watchCount,
       lanes: base.lanes,
     );
@@ -363,6 +372,8 @@ class HarnessState {
         checkpoints: checkpoints,
         goal: goal,
         compacting: compacting,
+        turnStartedAt: turnStartedAt,
+        compactingStartedAt: compactingStartedAt,
         watchCount: watchCount,
         lanes: lanes,
       );

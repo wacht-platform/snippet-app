@@ -264,11 +264,16 @@ Future<void> initNotifications() async {
     Instance inst, Map<String, dynamic> e) {
   final session = e['session']?.toString() ?? '';
   final title = e['title']?.toString() ?? 'session';
+  final message = e['message']?.toString() ?? '';
   final (String head, String body) = switch (e['kind']?.toString()) {
     'waiting' => ('${inst.label} needs your input', title),
     'done' => ('${inst.label} finished', title),
     'error' => ('${inst.label} hit an error', title),
     'idle' => ('${inst.label} stopped', title),
+    'term' => (
+        message.isEmpty ? '${inst.label} · $title' : message,
+        message.isEmpty ? 'Terminal' : title,
+      ),
     _ => (inst.label, title),
   };
   // No token in the payload: the OS persists notification records and exposes
@@ -528,18 +533,11 @@ class _NotifTaskHandler extends TaskHandler {
     }
     final session = e['session']?.toString() ?? '';
     if (_fg && '${inst.url}|$session' == _open) return; // already on screen
-    final title = e['title']?.toString() ?? 'session';
-    final (String head, String body) = switch (e['kind']?.toString()) {
-      'waiting' => ('${inst.label} needs your input', title),
-      'done' => ('${inst.label} finished', title),
-      'error' => ('${inst.label} hit an error', title),
-      'idle' => ('${inst.label} stopped', title),
-      _ => (inst.label, title),
-    };
+    final c = _notifContent(inst, e);
     _notif.show(
       id: _nid++,
-      title: head,
-      body: body,
+      title: c.head,
+      body: c.body,
       notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           _alertChannel,
@@ -549,13 +547,7 @@ class _NotifTaskHandler extends TaskHandler {
           priority: Priority.high,
         ),
       ),
-      // No token here — see _notifContent; the tap handler resolves it from the store.
-      payload: jsonEncode({
-        'url': inst.url,
-        'name': inst.label,
-        'session': session,
-        'title': title,
-      }),
+      payload: c.payload,
     );
   }
 

@@ -1551,6 +1551,24 @@ class _SessionScreenState extends State<SessionScreen>
     }
   }
 
+  Future<void> _confirmCompact() async {
+    if (_state?.compacting == true) {
+      _toast('Already compacting');
+      return;
+    }
+    final ok = await confirmAction(
+      context,
+      title: 'Compact history?',
+      body:
+          'Older conversation history will be summarized into a context table. Recent messages stay. This cannot be undone.',
+      confirmLabel: 'Compact',
+      danger: false,
+    );
+    if (!ok || !mounted) return;
+    _send({'kind': 'compact'});
+    _toast('Compacting history');
+  }
+
   // Held messages were never sent to the daemon — drop them locally only.
   // (Daemon `drop_queued` is only for inputs already in pending_inputs.)
   void _cancelQueuedAt(int i) => setState(() {
@@ -1763,11 +1781,13 @@ class _SessionScreenState extends State<SessionScreen>
                                   if (s.compacting) ...[
                                     const SizedBox(height: 10),
                                     _CompactingStatus(
+                                      startedAt: s.compactingStartedAt,
                                       detail: _latestCompactionDetail(events),
                                     ),
                                   ] else if (running) ...[
                                     const SizedBox(height: 10),
                                     _ChurningStatus(
+                                        startedAt: s.turnStartedAt,
                                         thinking: _turnHasVisibleAction(events)
                                             ? ''
                                             : _liveThinking),
@@ -2289,8 +2309,7 @@ class _SessionScreenState extends State<SessionScreen>
                 onClose: close));
         return;
       case 'compact':
-        _send({'kind': 'compact'});
-        _toast('Compacting history');
+        _confirmCompact();
         return;
       case 'checkpoints':
         _showCheckpoints();
@@ -2359,10 +2378,7 @@ class _SessionScreenState extends State<SessionScreen>
                   sessionId: widget.sessionId,
                   onClose: close))),
       const PopupMenuDivider(),
-      item('minimize', 'Compact history', () {
-        _send({'kind': 'compact'});
-        _toast('Compacting history');
-      }),
+      item('minimize', 'Compact history', _confirmCompact),
       item('history', 'Checkpoints', _showCheckpoints),
       item('activity', 'Usage', _showUsage),
     ];
@@ -2416,10 +2432,7 @@ class _SessionScreenState extends State<SessionScreen>
                   client: widget.client,
                   sessionId: widget.sessionId,
                   onClose: close))),
-          onCompact: () => run(() {
-            _send({'kind': 'compact'});
-            _toast('Compacting history');
-          }),
+          onCompact: () => run(_confirmCompact),
           onCheckpoints: () => run(_showCheckpoints),
           onUsage: () => run(_showUsage),
         ));
@@ -3590,15 +3603,27 @@ class _StatMeta extends StatelessWidget {
   }
 }
 
+String _activityElapsed(String? startedAt, DateTime fallback) {
+  final parsed = DateTime.tryParse(startedAt ?? '');
+  final start = parsed?.toLocal() ?? fallback;
+  final d = DateTime.now().difference(start);
+  final total = d.inMilliseconds / 1000;
+  if (total < 0) return '0.0s';
+  final m = total ~/ 60;
+  final s = total - m * 60;
+  return m > 0 ? '${m}m ${s.toStringAsFixed(1)}s' : '${s.toStringAsFixed(1)}s';
+}
+
 class _CompactingStatus extends StatefulWidget {
+  final String? startedAt;
   final String? detail;
-  const _CompactingStatus({this.detail});
+  const _CompactingStatus({this.startedAt, this.detail});
   @override
   State<_CompactingStatus> createState() => _CompactingStatusState();
 }
 
 class _CompactingStatusState extends State<_CompactingStatus> {
-  late final DateTime _started = DateTime.now();
+  late final DateTime _mountedAt = DateTime.now();
   Timer? _tick;
 
   @override
@@ -3615,15 +3640,7 @@ class _CompactingStatusState extends State<_CompactingStatus> {
     super.dispose();
   }
 
-  String get _elapsed {
-    final d = DateTime.now().difference(_started);
-    final total = d.inMilliseconds / 1000;
-    final m = total ~/ 60;
-    final s = total - m * 60;
-    return m > 0
-        ? '${m}m ${s.toStringAsFixed(1)}s'
-        : '${s.toStringAsFixed(1)}s';
-  }
+  String get _elapsed => _activityElapsed(widget.startedAt, _mountedAt);
 
   @override
   Widget build(BuildContext context) {
@@ -3665,8 +3682,9 @@ class _CompactingStatusState extends State<_CompactingStatus> {
 }
 
 class _ChurningStatus extends StatefulWidget {
+  final String? startedAt;
   final String thinking;
-  const _ChurningStatus({this.thinking = ''});
+  const _ChurningStatus({this.startedAt, this.thinking = ''});
   @override
   State<_ChurningStatus> createState() => _ChurningStatusState();
 }
@@ -3695,7 +3713,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
     'Kneading',
   ];
 
-  late final DateTime _started = DateTime.now();
+  late final DateTime _mountedAt = DateTime.now();
   late final math.Random _rng = math.Random();
   Timer? _tick;
   Timer? _swap;
@@ -3732,15 +3750,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
     super.dispose();
   }
 
-  String get _elapsed {
-    final d = DateTime.now().difference(_started);
-    final total = d.inMilliseconds / 1000;
-    final m = total ~/ 60;
-    final s = total - m * 60;
-    return m > 0
-        ? '${m}m ${s.toStringAsFixed(1)}s'
-        : '${s.toStringAsFixed(1)}s';
-  }
+  String get _elapsed => _activityElapsed(widget.startedAt, _mountedAt);
 
   @override
   Widget build(BuildContext context) {
