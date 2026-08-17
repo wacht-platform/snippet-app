@@ -1090,9 +1090,8 @@ class Bubble extends StatelessWidget {
     final textBody = shown.isNotEmpty
         ? Text(shown, style: sans(15.5, height: 1.5, color: AppColors.fg1))
         : null;
-    final extras = <Widget>[
-      if (matches.isNotEmpty)
-        AttachmentPill(audio: audio, images: images, files: files),
+    final voice = <Widget>[
+      if (audio > 0) AttachmentPill(audio: audio, images: 0, files: 0),
       if (transcripts.isNotEmpty) AudioTranscriptCard(items: transcripts),
       if (audio > 0 && transcripts.isEmpty)
         Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1100,6 +1099,10 @@ class Bubble extends StatelessWidget {
           const SizedBox(width: 6),
           Text('Transcribing audio…', style: sans(12, color: AppColors.fg3)),
         ]),
+    ];
+    final extras = <Widget>[
+      if (images > 0 || files > 0)
+        AttachmentPill(audio: 0, images: images, files: files),
     ];
     final mineText = textBody == null
         ? const SizedBox.shrink()
@@ -1136,14 +1139,25 @@ class Bubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (shown.isNotEmpty)
+              if (shown.isNotEmpty || voice.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
                   decoration: BoxDecoration(
                     color: AppColors.surface2,
                     borderRadius: BorderRadius.circular(R.card),
                   ),
-                  child: mineText,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (shown.isNotEmpty) mineText,
+                      if (shown.isNotEmpty && voice.isNotEmpty)
+                        const SizedBox(height: 8),
+                      for (var i = 0; i < voice.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 6),
+                        voice[i],
+                      ],
+                    ],
+                  ),
                 ),
               for (final extra in extras) ...[
                 const SizedBox(height: 4),

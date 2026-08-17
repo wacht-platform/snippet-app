@@ -2325,11 +2325,11 @@ class _SessionScreenState extends State<SessionScreen>
                       GestureDetector(
                         onTap: _onAttachTap,
                         child: SizedBox(
-                          width: 40,
-                          height: 40,
+                          width: 48,
+                          height: 48,
                           child: Center(
                             child:
-                                AppIcon('plus', size: 18, color: AppColors.fg3),
+                                AppIcon('plus', size: 22, color: AppColors.fg3),
                           ),
                         ),
                       ),
