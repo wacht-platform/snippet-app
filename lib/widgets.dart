@@ -1101,7 +1101,7 @@ class Bubble extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
                   decoration: BoxDecoration(
                     color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(R.card),
                   ),
                   child: mineText,
                 ),
@@ -1333,7 +1333,7 @@ class EmptyState extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface2,
             border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(R.md),
           ),
           child: AppIcon(icon, size: 24, color: AppColors.fg3),
         ),

@@ -2225,7 +2225,7 @@ class _SessionScreenState extends State<SessionScreen>
             Container(
               decoration: BoxDecoration(
                 color: AppColors.bg,
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(R.card),
                 border: Border.all(color: AppColors.border),
               ),
               padding: const EdgeInsets.fromLTRB(18, 16, 12, 12),
@@ -2285,7 +2285,7 @@ class _SessionScreenState extends State<SessionScreen>
                             padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
                             decoration: BoxDecoration(
                               color: AppColors.surface2,
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(R.sm),
                             ),
                             child:
                                 Row(mainAxisSize: MainAxisSize.min, children: [
@@ -2745,7 +2745,7 @@ class _SessionScreenState extends State<SessionScreen>
       color: AppColors.surface1,
       elevation: 8,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(R.md),
         side: BorderSide(color: AppColors.border2),
       ),
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
@@ -3019,7 +3019,7 @@ class _SessionScreenState extends State<SessionScreen>
       builder: (_) => Dialog(
         backgroundColor: AppColors.surface1,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(R.card),
             side: BorderSide(color: AppColors.border2)),
         child: Padding(
           padding: const EdgeInsets.all(18),
@@ -3176,7 +3176,7 @@ class _SessionScreenState extends State<SessionScreen>
       builder: (_) => Dialog(
         backgroundColor: AppColors.surface1,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(R.card),
             side: BorderSide(color: AppColors.border2)),
         child: Padding(
           padding: const EdgeInsets.all(18),

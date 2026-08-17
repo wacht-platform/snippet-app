@@ -505,11 +505,11 @@ Color get readingBg => kMobile ? AppColors.bg : AppColors.canvas;
 // ---------------------------------------------------------------------------
 
 class R {
-  static const card = 18.0;
-  static const md = 14.0;
-  static const sm = 10.0;
-  static const xs = 6.0;
-  static const sheetTop = 22.0;
+  static const card = 10.0;
+  static const md = 8.0;
+  static const sm = 6.0;
+  static const xs = 4.0;
+  static const sheetTop = 12.0;
 }
 
 // ---------------------------------------------------------------------------

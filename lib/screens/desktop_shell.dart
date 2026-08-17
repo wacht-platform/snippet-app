@@ -1768,7 +1768,7 @@ class _SidebarState extends State<_Sidebar> {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
                 color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(R.sm),
                 border: Border.all(color: AppColors.border),
               ),
               child: Row(children: [
@@ -2086,7 +2086,7 @@ class _SidebarState extends State<_Sidebar> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(R.md),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           Expanded(

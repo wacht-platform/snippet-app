@@ -56,7 +56,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(R.sm),
                     ),
                     child: Text(summary,
                         maxLines: 1,

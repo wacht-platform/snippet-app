@@ -317,7 +317,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(R.card),
         child:
             Stack(alignment: Alignment.center, fit: StackFit.expand, children: [
           ReaderWidget(
@@ -448,11 +448,12 @@ class _ReticleState extends State<_Reticle>
                 : BorderSide.none,
           ),
           borderRadius: BorderRadius.only(
-            topLeft: top && left ? const Radius.circular(12) : Radius.zero,
-            topRight: top && !left ? const Radius.circular(12) : Radius.zero,
-            bottomLeft: !top && left ? const Radius.circular(12) : Radius.zero,
+            topLeft: top && left ? const Radius.circular(R.md) : Radius.zero,
+            topRight: top && !left ? const Radius.circular(R.md) : Radius.zero,
+            bottomLeft:
+                !top && left ? const Radius.circular(R.md) : Radius.zero,
             bottomRight:
-                !top && !left ? const Radius.circular(12) : Radius.zero,
+                !top && !left ? const Radius.circular(R.md) : Radius.zero,
           ),
         ),
       ),
