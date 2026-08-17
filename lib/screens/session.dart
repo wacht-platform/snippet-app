@@ -779,13 +779,14 @@ class _SessionScreenState extends State<SessionScreen>
             _title = next.title ?? widget.title;
             // Snapshot/delta commit durable events; drop the live answer so it
             // doesn't double-render against AssistantText once it lands.
-            // Do not cancel the stream flush or wipe thinking on tool deltas —
-            // those frames arrive between thinking tokens and made the thought
-            // look truncated / frozen.
             if (wire == 'snapshot' || wire == 'delta') {
               _liveText = '';
               _liveTextVisible = false;
-              if (next.status != 'running') {
+              // Thought process is live-only until the first tool/action of
+              // this turn. After that the UI should show the action, not
+              // leftover reasoning.
+              if (next.status != 'running' ||
+                  _turnHasVisibleAction(next.events)) {
                 _liveThinking = '';
                 _pendingLiveThinking = '';
                 _streamFlushTimer?.cancel();
@@ -890,8 +891,11 @@ class _SessionScreenState extends State<SessionScreen>
   // Throttled stream frame flush — called by the 50ms timer.
   void _flushStreamFrame() {
     if (_closed || !mounted) return;
+    final hideThought = _turnHasVisibleAction(_state?.events ?? const []);
     final text = _pendingLiveText;
-    final thinking = _mergeLiveThinking(_liveThinking, _pendingLiveThinking);
+    final thinking = hideThought
+        ? ''
+        : _mergeLiveThinking(_liveThinking, _pendingLiveThinking);
     final visible = _pendingLiveTextVisible;
     setState(() {
       _liveText = text;
@@ -1697,7 +1701,10 @@ class _SessionScreenState extends State<SessionScreen>
                             ),
                           ] else if (running) ...[
                             const SizedBox(height: 10),
-                            _ChurningStatus(thinking: _liveThinking),
+                            _ChurningStatus(
+                                thinking: _turnHasVisibleAction(events)
+                                    ? ''
+                                    : _liveThinking),
                           ],
                           if (_queued.isNotEmpty) ...[
                             const SizedBox(height: 12),
@@ -2845,6 +2852,29 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   String _s(dynamic v) => v?.toString() ?? '';
+
+  /// Live thought stays until this turn produces a tool/action the user can see.
+  bool _turnHasVisibleAction(List<Map<String, dynamic>> events) {
+    for (var i = events.length - 1; i >= 0; i--) {
+      switch (events[i]['kind'] as String? ?? '') {
+        case 'user_input':
+        case 'steer':
+          return false;
+        case 'tool_call':
+        case 'tool_result':
+        case 'invalid_tool_call':
+        case 'note':
+        case 'file_presented':
+        case 'user_question':
+        case 'approval_request':
+        case 'lane_spawned':
+        case 'lane_completed':
+        case 'assistant_text':
+          return true;
+      }
+    }
+    return false;
+  }
 
   // Meta-tools have dedicated event rendering, so their generic tool lines are skipped.
   bool _isMetaTool(String n) =>
