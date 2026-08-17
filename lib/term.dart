@@ -262,15 +262,34 @@ class _SessionTermViewState extends State<SessionTermView> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: Row(children: [
-                  _modChip('Ctrl', _ctrl, () => setState(() => _ctrl = !_ctrl)),
-                  const SizedBox(width: 6),
-                  _modChip('Alt', _alt, () => setState(() => _alt = !_alt)),
-                  const SizedBox(width: 6),
-                  _keyChip('Esc', () => _sendKey(TerminalKey.escape)),
-                  const SizedBox(width: 6),
-                  _keyChip('Tab', () => _sendKey(TerminalKey.tab)),
-                ]),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      _modChip(
+                          'Ctrl', _ctrl, () => setState(() => _ctrl = !_ctrl)),
+                      const SizedBox(width: 6),
+                      _modChip('Alt', _alt, () => setState(() => _alt = !_alt)),
+                      const SizedBox(width: 6),
+                      _keyChip('Esc', () => _sendKey(TerminalKey.escape)),
+                      const SizedBox(width: 6),
+                      _keyChip('Tab', () => _sendKey(TerminalKey.tab)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 6, runSpacing: 6, children: [
+                      _keyChip('Home', () => _sendKey(TerminalKey.home)),
+                      _keyChip('End', () => _sendKey(TerminalKey.end)),
+                      _keyChip('PgUp', () => _sendKey(TerminalKey.pageUp)),
+                      _keyChip('PgDn', () => _sendKey(TerminalKey.pageDown)),
+                      _keyChip('Ins', () => _sendKey(TerminalKey.insert)),
+                      _keyChip('Del', () => _sendKey(TerminalKey.delete)),
+                      _keyChip('F1', () => _sendKey(TerminalKey.f1)),
+                      _keyChip('F2', () => _sendKey(TerminalKey.f2)),
+                      _keyChip('F5', () => _sendKey(TerminalKey.f5)),
+                      _keyChip('F10', () => _sendKey(TerminalKey.f10)),
+                    ]),
+                  ],
+                ),
               ),
               const SizedBox(width: 8),
               _arrowPad(),
