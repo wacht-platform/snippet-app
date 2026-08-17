@@ -184,6 +184,7 @@ class _SessionScreenState extends State<SessionScreen>
   final VtScreen _term = VtScreen(80, 24);
   int _termCols = 80;
   int _termRows = 24;
+  int _termSeq = 0;
   String? _modelLabel;
   String? _currentProfile;
   final _input = TextEditingController();
@@ -946,11 +947,12 @@ class _SessionScreenState extends State<SessionScreen>
   // For user messages (tracked in _pending), do NOT also add to _outbox:
   // _freshConn resend handles recovery, so adding to both would double-send.
   void _applyTermFrame(Map<String, dynamic> j) {
+    final seq = (j['seq'] as num?)?.toInt() ?? 0;
+    if (seq != 0 && seq == _termSeq) return;
+    if (seq != 0) _termSeq = seq;
     final op = (j['op'] as String?) ?? '';
     final cols = (j['cols'] as num?)?.toInt() ?? _termCols;
     final rows = (j['rows'] as num?)?.toInt() ?? _termRows;
-    _termCols = cols;
-    _termRows = rows;
     _termAlive = j['alive'] == true;
     final raw = j['data'] as String?;
     final bytes = (raw == null || raw.isEmpty)
@@ -960,7 +962,6 @@ class _SessionScreenState extends State<SessionScreen>
     setState(() {
       if (op == 'snapshot') _term.reset(cols, rows);
       if (bytes.isNotEmpty) {
-        _term.resize(cols, rows);
         _term.feed(bytes);
       }
     });
