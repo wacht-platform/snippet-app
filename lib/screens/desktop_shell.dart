@@ -791,12 +791,12 @@ class _DesktopShellState extends State<DesktopShell> {
                 () => controls.performAction('lanes')),
           if (running)
             IconBtn('stop',
-                size: 36, iconSize: 15, tooltip: 'Stop', onTap: controls.stop),
+                size: 36, iconSize: 12, tooltip: 'Stop', onTap: controls.stop),
         ],
         Container(width: 1, height: 18, color: AppColors.border2),
         IconBtn('plus',
             size: 36,
-            iconSize: 17,
+            iconSize: 12,
             tooltip: 'New session',
             onTap: _newSessionFlow),
         const SizedBox(width: 8),
@@ -827,7 +827,7 @@ class _DesktopShellState extends State<DesktopShell> {
     return Tooltip(
       message: tooltip,
       child:
-          IconBtn(icon, size: 34, iconSize: 15, tooltip: tooltip, onTap: onTap),
+          IconBtn(icon, size: 34, iconSize: 12, tooltip: tooltip, onTap: onTap),
     );
   }
 
