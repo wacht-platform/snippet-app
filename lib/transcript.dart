@@ -47,7 +47,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
             child: Row(children: [
               AppIcon(toolIcon(widget.tool), size: 15, color: AppColors.fg3),
               const SizedBox(width: 8),
-              Text(widget.tool == 'bash' ? 'Ran' : toolTitle(widget.tool),
+              Text(toolTitle(widget.tool),
                   style:
                       sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
               if (summary.isNotEmpty) ...[
@@ -109,17 +109,6 @@ class _DenseToolRowState extends State<DenseToolRow> {
           Text('+$add', style: sans(12, color: AppColors.ok)),
           const SizedBox(width: 6),
           Text('-$del', style: sans(12, color: AppColors.danger)),
-        ];
-      }
-    }
-    if (widget.tool == 'bash') {
-      final code = bashExitCode(widget.result);
-      if (code != null) {
-        final ok = code == 0;
-        return [
-          const SizedBox(width: 10),
-          Text('exit $code',
-              style: sans(12, color: ok ? AppColors.ok : AppColors.danger)),
         ];
       }
     }

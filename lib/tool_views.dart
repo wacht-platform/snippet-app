@@ -125,15 +125,6 @@ String _humanizeTool(String tool) {
       .join(' ');
 }
 
-int? bashExitCode(dynamic result) {
-  if (result is! Map) return null;
-  final raw = result['exit_code'] ??
-      (result['data'] is Map ? result['data']['exit_code'] : null);
-  if (raw is int) return raw;
-  if (raw is num) return raw.toInt();
-  return int.tryParse(raw?.toString() ?? '');
-}
-
 /// Tool detail rendering is isolated behind a small error boundary. A malformed
 /// result must produce a useful panel message instead of taking down the sheet.
 Widget safeToolDetailView(BuildContext context,
