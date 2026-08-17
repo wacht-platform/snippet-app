@@ -533,6 +533,7 @@ class SessionTermView extends StatefulWidget {
     required this.onInput,
     required this.onResize,
     required this.onClose,
+    this.onNew,
     this.mobileKeys = false,
   });
 
@@ -541,6 +542,7 @@ class SessionTermView extends StatefulWidget {
   final ValueChanged<Uint8List> onInput;
   final void Function(int cols, int rows) onResize;
   final VoidCallback onClose;
+  final VoidCallback? onNew;
   final bool mobileKeys;
 
   @override
@@ -567,6 +569,12 @@ class _SessionTermViewState extends State<SessionTermView> {
           Text(widget.alive ? 'Shell' : 'Shell · starting',
               style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
           const Spacer(),
+          if (widget.onNew != null)
+            IconBtn('plus',
+                size: 28,
+                iconSize: 14,
+                tooltip: 'New shell',
+                onTap: widget.onNew),
           IconBtn('x',
               size: 28, iconSize: 14, tooltip: 'Close', onTap: widget.onClose),
         ]),

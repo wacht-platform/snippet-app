@@ -180,10 +180,8 @@ class _SessionScreenState extends State<SessionScreen>
   bool _liveTextVisible = false;
   String? _connError;
   bool _termOpen = false;
-  bool _termAlive = false;
-  final VtScreen _term = VtScreen(80, 24);
-  int _termCols = 80;
-  int _termRows = 24;
+  final List<_LiveTerm> _terms = [];
+  int _termFocus = 0;
   int _termSeq = 0;
   String? _modelLabel;
   String? _currentProfile;
@@ -950,47 +948,101 @@ class _SessionScreenState extends State<SessionScreen>
     final seq = (j['seq'] as num?)?.toInt() ?? 0;
     if (seq != 0 && seq == _termSeq) return;
     if (seq != 0) _termSeq = seq;
+    final id = (j['id'] as String?) ?? '0';
     final op = (j['op'] as String?) ?? '';
-    final cols = (j['cols'] as num?)?.toInt() ?? _termCols;
-    final rows = (j['rows'] as num?)?.toInt() ?? _termRows;
-    _termAlive = j['alive'] == true;
+    final cols = (j['cols'] as num?)?.toInt();
+    final rows = (j['rows'] as num?)?.toInt();
     final raw = j['data'] as String?;
     final bytes = (raw == null || raw.isEmpty)
         ? Uint8List(0)
         : Uint8List.fromList(base64Decode(raw));
     if (!mounted) return;
     setState(() {
-      if (op == 'snapshot') _term.reset(cols, rows);
-      if (bytes.isNotEmpty) {
-        _term.feed(bytes);
+      final pane = _ensureTerm(id);
+      pane.alive = j['alive'] == true;
+      if (op == 'snapshot') pane.screen.reset(pane.cols, pane.rows);
+      if (bytes.isNotEmpty) pane.screen.feed(bytes);
+      if (cols != null) pane.cols = cols;
+      if (rows != null) pane.rows = rows;
+    });
+  }
+
+  _LiveTerm _ensureTerm(String id) {
+    for (final t in _terms) {
+      if (t.id == id) return t;
+    }
+    final t = _LiveTerm(id);
+    _terms.add(t);
+    return t;
+  }
+
+  void _openTerm({bool fresh = false}) {
+    if (!fresh && _terms.isNotEmpty) {
+      setState(() => _termOpen = true);
+      final t = _terms[_termFocus.clamp(0, _terms.length - 1)];
+      _send({
+        'wire': 'term',
+        'op': 'open',
+        'id': t.id,
+        'cols': t.cols,
+        'rows': t.rows,
+      });
+      return;
+    }
+    final used = _terms.map((t) => int.tryParse(t.id) ?? 0).fold(0, math.max);
+    final id = _terms.isEmpty ? '0' : '${used + 1}';
+    setState(() {
+      _termOpen = true;
+      _ensureTerm(id);
+      _termFocus = _terms.length - 1;
+    });
+    _send({
+      'wire': 'term',
+      'op': fresh ? 'new' : 'open',
+      'id': id,
+      'cols': 80,
+      'rows': 24,
+    });
+  }
+
+  void _closeTerm(String id) {
+    _send({'wire': 'term', 'op': 'close', 'id': id});
+    setState(() {
+      _terms.removeWhere((t) => t.id == id);
+      if (_terms.isEmpty) {
+        _termOpen = false;
+        _termFocus = 0;
+      } else {
+        _termFocus = _termFocus.clamp(0, _terms.length - 1);
       }
     });
   }
 
-  void _openTerm() {
-    setState(() => _termOpen = true);
-    _send({
-      'wire': 'term',
-      'op': 'open',
-      'cols': _termCols,
-      'rows': _termRows,
-    });
-  }
-
   void _termIn(Uint8List bytes) {
+    if (_terms.isEmpty) return;
+    final t = _terms[_termFocus.clamp(0, _terms.length - 1)];
     _send({
       'wire': 'term',
       'op': 'in',
+      'id': t.id,
       'data': base64Encode(bytes),
-      'cols': _termCols,
-      'rows': _termRows,
+      'cols': t.cols,
+      'rows': t.rows,
     });
   }
 
   void _termResize(int cols, int rows) {
-    _termCols = cols;
-    _termRows = rows;
-    _send({'wire': 'term', 'op': 'resize', 'cols': cols, 'rows': rows});
+    if (_terms.isEmpty) return;
+    final t = _terms[_termFocus.clamp(0, _terms.length - 1)];
+    t.cols = cols;
+    t.rows = rows;
+    _send({
+      'wire': 'term',
+      'op': 'resize',
+      'id': t.id,
+      'cols': cols,
+      'rows': rows,
+    });
   }
 
   void _send(Map<String, dynamic> m, {bool tracked = false}) {
@@ -1635,17 +1687,46 @@ class _SessionScreenState extends State<SessionScreen>
           // Desktop keeps the detailed chip strip.
           if (!kMobile && !kMacOS) _statusStrip(s, running),
           if (_connError != null) _disconnectedBanner(),
-          if (_termOpen)
+          if (_termOpen && _terms.isNotEmpty)
             SizedBox(
               height: kMobile ? 280 : 320,
-              child: SessionTermView(
-                alive: _termAlive,
-                screen: _term,
-                onInput: _termIn,
-                onResize: _termResize,
-                onClose: () => setState(() => _termOpen = false),
-                mobileKeys: kMobile,
-              ),
+              child: Column(children: [
+                if (_terms.length > 1)
+                  SizedBox(
+                    height: 32,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.fromLTRB(10, 4, 10, 0),
+                      itemCount: _terms.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 6),
+                      itemBuilder: (_, i) {
+                        final on = i == _termFocus;
+                        return InkWell(
+                          onTap: () => setState(() => _termFocus = i),
+                          child: Text(
+                            '${i + 1}',
+                            style: sans(12,
+                                weight: on ? FontWeight.w600 : FontWeight.w400,
+                                color: on ? AppColors.accent : AppColors.fg3),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                Expanded(
+                  child: SessionTermView(
+                    alive: _terms[_termFocus.clamp(0, _terms.length - 1)].alive,
+                    screen:
+                        _terms[_termFocus.clamp(0, _terms.length - 1)].screen,
+                    onInput: _termIn,
+                    onResize: _termResize,
+                    onClose: () => _closeTerm(
+                        _terms[_termFocus.clamp(0, _terms.length - 1)].id),
+                    onNew: () => _openTerm(fresh: true),
+                    mobileKeys: kMobile,
+                  ),
+                ),
+              ]),
             ),
           if (s?.goal?.ongoing == true)
             _centerWide(Padding(
@@ -3645,6 +3726,15 @@ class _ChurningStatusState extends State<_ChurningStatus> {
 /// the daemon applies it (then it's replaced by the real bubble).
 /// A run of consecutive tool calls, grouped under a left rule. The "N steps"
 /// header toggles the group collapsed/expanded.
+
+class _LiveTerm {
+  _LiveTerm(this.id);
+  final String id;
+  final VtScreen screen = VtScreen(80, 24);
+  int cols = 80;
+  int rows = 24;
+  bool alive = false;
+}
 
 class _QueuedBubble extends StatelessWidget {
   final String text;
