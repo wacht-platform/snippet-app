@@ -8,8 +8,8 @@ enum PanelStyle { drawer, dialog }
 /// Present [builder]'s screen as an overlay whose layout adapts to the window:
 /// full-screen when narrow (phone / shrunk window), a right-side drawer or a
 /// centered dialog when wide. Because the layout is chosen inside a LayoutBuilder,
-/// it re-lays out live when the window crosses the breakpoint while open. Insets
-/// below the macOS window controls. [builder] gets a `close` callback to dismiss.
+/// it re-lays out live when the window crosses the breakpoint while open.
+/// [builder] gets a `close` callback to dismiss.
 Future<T?> presentScreen<T>(
   BuildContext context, {
   required Widget Function(BuildContext context, VoidCallback close) builder,
@@ -29,41 +29,26 @@ Future<T?> presentScreen<T>(
       final content = builder(ctx, close);
       return LayoutBuilder(builder: (lctx, c) {
         final wide = c.maxWidth >= kDesktopBreakpoint;
-        return FutureBuilder<bool>(
-          future: macOSIsFullscreen(),
-          builder: (context, snapshot) {
-            final top = kMacOS && snapshot.data != true ? kMacTitlebar : 0.0;
-            if (!wide) {
-              // Full-screen (re-lays out to drawer/dialog if the window grows).
-              return Padding(
-                  padding: EdgeInsets.only(top: top),
-                  child: _frame(content, rounded: false, edge: false));
-            }
-            if (style == PanelStyle.dialog) {
-              return Padding(
-                padding: EdgeInsets.only(top: top),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                            maxWidth: 1040, maxHeight: 860),
-                        child: _frame(content, rounded: true)),
-                  ),
-                ),
-              );
-            }
-            return Padding(
-              padding: EdgeInsets.only(top: top),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: SizedBox(
-                    width: c.maxWidth < 500 ? c.maxWidth : 460.0,
-                    height: double.infinity,
-                    child: _frame(content, rounded: false, edge: true)),
-              ),
-            );
-          },
+        if (!wide) {
+          return _frame(content, rounded: false, edge: false);
+        }
+        if (style == PanelStyle.dialog) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(maxWidth: 1040, maxHeight: 860),
+                  child: _frame(content, rounded: true)),
+            ),
+          );
+        }
+        return Align(
+          alignment: Alignment.centerRight,
+          child: SizedBox(
+              width: c.maxWidth < 500 ? c.maxWidth : 460.0,
+              height: double.infinity,
+              child: _frame(content, rounded: false, edge: true)),
         );
       });
     },
