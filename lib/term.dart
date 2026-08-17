@@ -169,11 +169,13 @@ class _SessionTermViewState extends State<SessionTermView> {
     );
   }
 
-  Widget _keyChip(String label, VoidCallback tap) {
+  Widget _keyChip(String label, VoidCallback tap, {double minWidth = 0}) {
     return InkWell(
       onTap: tap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
+        constraints: BoxConstraints(minWidth: minWidth, minHeight: 32),
+        alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.border2),
@@ -181,6 +183,33 @@ class _SessionTermViewState extends State<SessionTermView> {
         ),
         child: Text(label, style: mono(11, color: AppColors.fg2)),
       ),
+    );
+  }
+
+  Widget _arrowPad() {
+    Widget row(List<Widget> kids) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < kids.length; i++) ...[
+              if (i > 0) const SizedBox(width: 4),
+              kids[i],
+            ],
+          ],
+        );
+    const w = 36.0;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        row([
+          _keyChip('↑', () => _sendKey(TerminalKey.arrowUp), minWidth: w),
+        ]),
+        const SizedBox(height: 4),
+        row([
+          _keyChip('←', () => _sendKey(TerminalKey.arrowLeft), minWidth: w),
+          _keyChip('↓', () => _sendKey(TerminalKey.arrowDown), minWidth: w),
+          _keyChip('→', () => _sendKey(TerminalKey.arrowRight), minWidth: w),
+        ]),
+      ],
     );
   }
 
@@ -229,16 +258,21 @@ class _SessionTermViewState extends State<SessionTermView> {
         Padding(
           padding: EdgeInsets.fromLTRB(
               8, 4, 8, 8 + MediaQuery.viewInsetsOf(context).bottom),
-          child: Wrap(spacing: 6, runSpacing: 6, children: [
-            _modChip('Ctrl', _ctrl, () => setState(() => _ctrl = !_ctrl)),
-            _modChip('Alt', _alt, () => setState(() => _alt = !_alt)),
-            _keyChip('Esc', () => _sendKey(TerminalKey.escape)),
-            _keyChip('Tab', () => _sendKey(TerminalKey.tab)),
-            _keyChip('↑', () => _sendKey(TerminalKey.arrowUp)),
-            _keyChip('↓', () => _sendKey(TerminalKey.arrowDown)),
-            _keyChip('←', () => _sendKey(TerminalKey.arrowLeft)),
-            _keyChip('→', () => _sendKey(TerminalKey.arrowRight)),
-          ]),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Wrap(spacing: 6, runSpacing: 6, children: [
+                  _modChip('Ctrl', _ctrl, () => setState(() => _ctrl = !_ctrl)),
+                  _modChip('Alt', _alt, () => setState(() => _alt = !_alt)),
+                  _keyChip('Esc', () => _sendKey(TerminalKey.escape)),
+                  _keyChip('Tab', () => _sendKey(TerminalKey.tab)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              _arrowPad(),
+            ],
+          ),
         ),
     ]);
   }
