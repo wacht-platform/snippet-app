@@ -45,7 +45,7 @@ String toolArgSummary(String tool, dynamic args) {
   String s(String k) => args[k]?.toString() ?? '';
   String first(String v) => v.split('\n').first.trim();
   final v = switch (tool) {
-    'bash' => s('command'),
+    'bash' => 'shell command',
     'search_content' || 'web_search' => s('query'),
     'search_files' => s('pattern'),
     'web_read' => s('url'),
@@ -123,6 +123,15 @@ String _humanizeTool(String tool) {
   return parts
       .map((p) => p.isEmpty ? p : '${p[0].toUpperCase()}${p.substring(1)}')
       .join(' ');
+}
+
+int? bashExitCode(dynamic result) {
+  if (result is! Map) return null;
+  final raw = result['exit_code'] ??
+      (result['data'] is Map ? result['data']['exit_code'] : null);
+  if (raw is int) return raw;
+  if (raw is num) return raw.toInt();
+  return int.tryParse(raw?.toString() ?? '');
 }
 
 /// Tool detail rendering is isolated behind a small error boundary. A malformed
@@ -317,12 +326,26 @@ String _previewLines(String text, {int maxLines = 6}) {
 }
 
 List<Widget> _bashView(Map? a, Map? d) {
+  final cmd = _displayText(a?['command']?.toString() ?? '').trimRight();
   final stdout =
       _previewLines(_displayText(d?['stdout']?.toString() ?? '').trimRight());
   final stderr =
       _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
+  final exit = bashExitCode(d) ?? bashExitCode(a);
   final out = <Widget>[];
-  if (stdout.isNotEmpty) out.add(_ShellOutput(stdout));
+  if (cmd.isNotEmpty) {
+    out.add(_ShellOutput(cmd));
+    if (exit != null) {
+      out.add(const SizedBox(height: 6));
+      out.add(Text('exit $exit',
+          style:
+              mono(11.5, color: exit == 0 ? AppColors.ok : AppColors.danger)));
+    }
+  }
+  if (stdout.isNotEmpty) {
+    if (out.isNotEmpty) out.add(const SizedBox(height: 6));
+    out.add(_ShellOutput(stdout));
+  }
   if (stderr.isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
     out.add(_ShellOutput(stderr, stderr: true));
