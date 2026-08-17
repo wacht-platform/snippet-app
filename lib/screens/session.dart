@@ -354,6 +354,8 @@ class _SessionScreenState extends State<SessionScreen>
   static const int _maxAttachments = 5;
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
+  final List<_UserMark> _userMarks = [];
+  final Map<String, GlobalKey> _userMarkKeys = {};
   // Stream frame throttle: store the latest pending stream payload and flush
   // at most every 50ms to avoid rebuilding the full widget tree on every token.
   String _pendingLiveText = '';
@@ -1605,6 +1607,16 @@ class _SessionScreenState extends State<SessionScreen>
                       })),
               // Floating "jump to latest": scrolling up unpins auto-follow, and a
               // streaming reply then grows silently — give a one-tap way back.
+              if (!kMobile && _userMarks.length >= 2)
+                Positioned(
+                  top: 10,
+                  right: 6,
+                  bottom: 10,
+                  child: _MessageJumpRail(
+                    marks: List<_UserMark>.from(_userMarks),
+                    onJump: _jumpToUserMark,
+                  ),
+                ),
               if (!_stickToBottom && s != null)
                 Positioned(
                   right: 16,
@@ -1667,6 +1679,19 @@ class _SessionScreenState extends State<SessionScreen>
             child: scaffold,
           )
         : scaffold;
+  }
+
+  void _jumpToUserMark(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    _stickToBottom = false;
+    if (mounted) setState(() {});
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.18,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _renameCurrent() async {
@@ -2414,6 +2439,8 @@ class _SessionScreenState extends State<SessionScreen>
 
   // ---- event → widget (pairs tool_call with its tool_result) ----
   List<Widget> _transcript(List<Map<String, dynamic>> events) {
+    _userMarks.clear();
+    final seen = <String>{};
     final out = <Widget>[];
     Map<String, dynamic>? pending;
     final run = <Widget>[]; // consecutive dense tool rows
@@ -2511,11 +2538,20 @@ class _SessionScreenState extends State<SessionScreen>
         case 'user_input':
         case 'steer':
           endTools(key);
+          final markKey = _userMarkKeys.putIfAbsent(key, GlobalKey.new);
+          final preview = hideAttachmentMarkers(_s(e['text'])).trim();
+          if (preview.isNotEmpty) {
+            _userMarks.add(_UserMark(key: markKey, preview: preview));
+            seen.add(key);
+          }
           addEvent(
               key,
-              Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 20),
-                  child: Bubble(mine: true, text: _s(e['text']))));
+              KeyedSubtree(
+                key: markKey,
+                child: Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 20),
+                    child: Bubble(mine: true, text: _s(e['text']))),
+              ));
         case 'assistant_text':
           endTools(key);
           addEvent(
@@ -2612,6 +2648,7 @@ class _SessionScreenState extends State<SessionScreen>
       }
     }
     endTools('transcript-end');
+    _userMarkKeys.removeWhere((k, _) => !seen.contains(k));
     return out;
   }
 
@@ -3957,6 +3994,97 @@ class _SendBtn extends StatelessWidget {
                   size: running ? 15 : 16,
                   color: enabled ? AppColors.bg : AppColors.fg4)),
         ),
+      ),
+    );
+  }
+}
+
+class _UserMark {
+  final GlobalKey key;
+  final String preview;
+  const _UserMark({required this.key, required this.preview});
+}
+
+class _MessageJumpRail extends StatefulWidget {
+  final List<_UserMark> marks;
+  final void Function(GlobalKey key) onJump;
+  const _MessageJumpRail({required this.marks, required this.onJump});
+
+  @override
+  State<_MessageJumpRail> createState() => _MessageJumpRailState();
+}
+
+class _MessageJumpRailState extends State<_MessageJumpRail> {
+  int? _hover;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final marks = widget.marks;
+    if (marks.length < 2) return const SizedBox.shrink();
+    return SizedBox(
+      width: 18,
+      child: MouseRegion(
+        onExit: (_) => setState(() => _hover = null),
+        child: LayoutBuilder(builder: (context, c) {
+          final n = marks.length;
+          final gap = n <= 1 ? 0.0 : (c.maxHeight - 8) / (n - 1);
+          return Stack(clipBehavior: Clip.none, children: [
+            for (var i = 0; i < n; i++)
+              Positioned(
+                top: i * gap,
+                right: 0,
+                child: MouseRegion(
+                  onEnter: (_) => setState(() => _hover = i),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => widget.onJump(marks[i].key),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 3, horizontal: 4),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        width: _hover == i ? 14 : 8,
+                        height: 2.5,
+                        decoration: BoxDecoration(
+                          color: _hover == i
+                              ? AppColors.accent
+                              : AppColors.fg4.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (_hover != null)
+              Positioned(
+                top: (_hover! * gap - 10)
+                    .clamp(0.0, math.max(0.0, c.maxHeight - 36)),
+                right: 22,
+                child: IgnorePointer(
+                  child: Material(
+                    color: AppColors.surface1,
+                    elevation: 6,
+                    borderRadius: BorderRadius.circular(R.sm),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 240),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 7),
+                        child: Text(
+                          marks[_hover!].preview,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(12, height: 1.35, color: AppColors.fg1),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ]);
+        }),
       ),
     );
   }
