@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:chewie/chewie.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_store_plus/media_store_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -870,9 +869,10 @@ Future<String?> downloadRemoteFile(
       return shareIt();
     }
 
-    final saved = await FilePicker.saveFile(
+    final saved = await saveLocalFile(
         fileName: name, bytes: await tempFile.readAsBytes());
     if (saved == null) return null;
+    await notifyDownload(name, saved, id: progressId);
     return 'Downloaded $name';
   } on DownloadCancelled {
     await notifyDownloadCancelled(progressId);

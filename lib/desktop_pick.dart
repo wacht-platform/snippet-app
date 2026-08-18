@@ -84,3 +84,62 @@ List<String> _splitChooserOutput(String raw) {
       .where((s) => s.isNotEmpty)
       .toList();
 }
+
+/// Ask where to write [fileName] and persist [bytes].
+///
+/// FilePicker 12's Linux/macOS plugin can throw MissingPluginException for
+/// `save` on a stale runner. Fall back to zenity/kdialog/osascript so
+/// present-file Download still works.
+Future<String?> saveLocalFile({
+  required String fileName,
+  required Uint8List bytes,
+}) async {
+  try {
+    final uri = await FilePicker.saveFile(fileName: fileName, bytes: bytes);
+    return uri?.toFilePath();
+  } on MissingPluginException {
+    if (kMobile) rethrow;
+  } on UnimplementedError {
+    if (kMobile) rethrow;
+  }
+  final dest =
+      kMacOS ? await _osascriptSave(fileName) : await _linuxSave(fileName);
+  if (dest == null) return null;
+  await File(dest).writeAsBytes(bytes, flush: true);
+  return dest;
+}
+
+Future<String?> _osascriptSave(String fileName) async {
+  final escaped = fileName.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+  final result = await Process.run('osascript', [
+    '-e',
+    'POSIX path of (choose file name with prompt "Save as" default name "$escaped")',
+  ]);
+  if (result.exitCode != 0) return null;
+  final path = result.stdout.toString().trim();
+  return path.isEmpty ? null : path;
+}
+
+Future<String?> _linuxSave(String fileName) async {
+  for (final cmd in [
+    [
+      'zenity',
+      '--file-selection',
+      '--save',
+      '--confirm-overwrite',
+      '--filename=$fileName',
+      '--title=Save file',
+    ],
+    ['kdialog', '--getsavefilename', fileName],
+  ]) {
+    try {
+      final result = await Process.run(cmd.first, cmd.sublist(1));
+      if (result.exitCode == 0) {
+        final path = result.stdout.toString().trim();
+        if (path.isNotEmpty) return path;
+      }
+    } catch (_) {}
+  }
+  throw StateError(
+      'No save dialog available. Install zenity or rebuild the desktop app.');
+}
