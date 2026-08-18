@@ -282,31 +282,59 @@ class _FileExplorerState extends State<FileExplorer> {
                       Text(_busy!, style: sans(12, color: AppColors.fg2)),
                     ]),
                   ),
-                if (segs.isNotEmpty)
+                if (segs.isNotEmpty ||
+                    (!_selecting &&
+                        listing != null &&
+                        widget.onNewChat != null))
                   Container(
                     height: 40,
                     decoration: BoxDecoration(
                         border: Border(
                             bottom: BorderSide(color: AppColors.border))),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(children: [
-                        Text('/', style: mono(11.5, color: AppColors.fg4)),
-                        for (var i = 0; i < segs.length; i++) ...[
-                          if (i > 0)
-                            Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 2),
-                                child: AppIcon('chevron-right',
-                                    size: 13, color: AppColors.fg4)),
-                          Text(segs[i],
-                              style: mono(11.5,
-                                  color: i == segs.length - 1
-                                      ? AppColors.fg1
-                                      : AppColors.fg3)),
-                        ],
-                      ]),
-                    ),
+                    child: Row(children: [
+                      Expanded(
+                        child: segs.isEmpty
+                            ? const SizedBox.shrink()
+                            : SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Row(children: [
+                                  Text('/',
+                                      style: mono(11.5, color: AppColors.fg4)),
+                                  for (var i = 0; i < segs.length; i++) ...[
+                                    if (i > 0)
+                                      Padding(
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 2),
+                                          child: AppIcon('chevron-right',
+                                              size: 13, color: AppColors.fg4)),
+                                    Text(segs[i],
+                                        style: mono(11.5,
+                                            color: i == segs.length - 1
+                                                ? AppColors.fg1
+                                                : AppColors.fg3)),
+                                  ],
+                                ]),
+                              ),
+                      ),
+                      if (!_selecting &&
+                          listing != null &&
+                          widget.onNewChat != null)
+                        InkWell(
+                          onTap: () => widget.onNewChat!(listing.path),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 0, 14, 0),
+                            child:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                              AppIcon('edit', size: 13, color: AppColors.fg3),
+                              const SizedBox(width: 6),
+                              Text('New chat',
+                                  style: sans(12.5, color: AppColors.fg2)),
+                            ]),
+                          ),
+                        ),
+                    ]),
                   ),
                 Expanded(
                   child: snap.connectionState == ConnectionState.waiting
@@ -326,22 +354,6 @@ class _FileExplorerState extends State<FileExplorer> {
                           : ListView(
                               padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
                               children: [
-                                if (!_selecting && widget.onNewChat != null)
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(8, 8, 8, 6),
-                                    child: Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Btn(
-                                        'New chat here',
-                                        icon: 'edit',
-                                        small: true,
-                                        variant: BtnVariant.secondary,
-                                        onTap: () =>
-                                            widget.onNewChat!(listing!.path),
-                                      ),
-                                    ),
-                                  ),
                                 if (listing!.parent != null && !_selecting)
                                   _Row(
                                       icon: 'folder-open',
