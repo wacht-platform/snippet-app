@@ -568,7 +568,7 @@ class _FileViewerState extends State<FileViewer> {
     final actions = <Widget>[
       IconBtn('download',
           tooltip: 'Download', onTap: _downloading ? null : _download),
-      if (!_isMedia)
+      if (!_isMedia && !(f?.binary ?? false))
         IconBtn('edit',
             tooltip: 'Edit',
             onTap: () => presentScreen(
@@ -648,10 +648,20 @@ class _FileViewerState extends State<FileViewer> {
                     body: _error!))
           else if (f!.binary)
             Expanded(
+              child: Center(
                 child: EmptyState(
-                    icon: 'file',
-                    title: 'Binary file',
-                    body: '${formatBytes(f.size)} — can\'t display as text.'))
+                  icon: 'file',
+                  title: widget.name,
+                  body: '${formatBytes(f.size)} · can\'t preview this file.',
+                  action: Btn(
+                    _downloading ? 'Downloading…' : 'Download',
+                    icon: 'download',
+                    disabled: _downloading,
+                    onTap: _download,
+                  ),
+                ),
+              ),
+            )
           else ...[
             Container(
               width: double.infinity,
