@@ -4267,6 +4267,18 @@ class _QuestionBarState extends State<_QuestionBar> {
   bool _sent = false;
   int _step = 0;
 
+  TextEditingController _controllerFor(String id) {
+    return _text.putIfAbsent(id, () {
+      final c = TextEditingController();
+      c.addListener(_onAnswerChanged);
+      return c;
+    });
+  }
+
+  void _onAnswerChanged() {
+    if (mounted) setState(() {});
+  }
+
   Map<String, dynamic>? get _currentQuestion => _questions.isEmpty
       ? null
       : _questions[_step.clamp(0, _questions.length - 1)];
@@ -4437,7 +4449,7 @@ class _QuestionBarState extends State<_QuestionBar> {
       final s = '$e';
       return (value: s, label: s);
     }).toList();
-    _text.putIfAbsent(id, () => TextEditingController());
+    final controller = _controllerFor(id);
     return [
       if (k == 'single_choice')
         ...choices.map((c) => Padding(
@@ -4460,8 +4472,9 @@ class _QuestionBarState extends State<_QuestionBar> {
         _freeTextToggle(id),
       if (k == 'free_text' || _freeText.contains(id))
         AppField(
-            controller: _text[id]!,
+            controller: controller,
             hint: 'Write your answer',
+            minLines: 2,
             maxLines: 4,
             onSubmitted: (_) => _submit()),
     ];
