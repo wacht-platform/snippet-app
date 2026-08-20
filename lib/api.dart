@@ -482,6 +482,156 @@ class DaemonClient {
   Future<Map<String, dynamic>> gitStash(String session, String op) =>
       _gitPost('stash', {'session': session, 'op': op});
 
+  // ---- Mission Control ----
+
+  /// POST /mission-control/open — open the dedicated Mission Control session.
+  Future<String> mcOpen({required String folder, String? profile}) async {
+    final body = <String, dynamic>{'folder': folder};
+    if (profile != null && profile.isNotEmpty) body['profile'] = profile;
+    final r = await http.post(_uri('/mission-control/open'),
+        headers: _json, body: jsonEncode(body));
+    if (r.statusCode != 200) throw _err('open Mission Control', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['id'] as String;
+  }
+
+  /// GET /mission-control/overview — dashboard summary.
+  Future<MissionControlOverview> mcOverview() async {
+    final r = await http.get(_uri('/mission-control/overview'));
+    if (r.statusCode != 200) throw _err('mission control overview', r);
+    return MissionControlOverview.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /mission-control/tasks — list all tasks (optionally filtered).
+  Future<List<MissionControlTask>> mcTasks({bool? archived}) async {
+    final q = <String, String>{};
+    if (archived != null) q['archived'] = '$archived';
+    final r =
+        await http.get(_uri('/mission-control/tasks', q.isEmpty ? null : q));
+    if (r.statusCode != 200) throw _err('list mission control tasks', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => MissionControlTask.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /mission-control/tasks — create a new task. Returns the created task.
+  Future<MissionControlTask> mcCreateTask({
+    required String title,
+    String description = '',
+    String priority = 'medium',
+    String? assignee,
+    List<String>? tags,
+    String? sessionId,
+  }) async {
+    final body = <String, dynamic>{
+      'title': title,
+      'description': description,
+      'priority': priority,
+    };
+    if (assignee != null && assignee.isNotEmpty) body['assignee'] = assignee;
+    if (tags != null && tags.isNotEmpty) body['tags'] = tags;
+    if (sessionId != null && sessionId.isNotEmpty) {
+      body['session_id'] = sessionId;
+    }
+    final r = await http.post(_uri('/mission-control/tasks'),
+        headers: _json, body: jsonEncode(body));
+    if (r.statusCode != 200) throw _err('create mission control task', r);
+    return MissionControlTask.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// PUT /mission-control/tasks/{id} — update an existing task.
+  Future<MissionControlTask> mcUpdateTask(
+    String id, {
+    String? title,
+    String? description,
+    String? status,
+    String? priority,
+    String? assignee,
+    List<String>? tags,
+    String? sessionId,
+  }) async {
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (description != null) body['description'] = description;
+    if (status != null) body['status'] = status;
+    if (priority != null) body['priority'] = priority;
+    if (assignee != null) body['assignee'] = assignee;
+    if (tags != null) body['tags'] = tags;
+    if (sessionId != null) body['session_id'] = sessionId;
+    final r = await http.put(_uri('/mission-control/tasks/$id'),
+        headers: _json, body: jsonEncode(body));
+    if (r.statusCode != 200) throw _err('update mission control task', r);
+    return MissionControlTask.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /mission-control/tasks/{id}/archive — soft-archive a task.
+  Future<void> mcArchiveTask(String id) async {
+    final r = await http.post(_uri('/mission-control/tasks/$id/archive'),
+        headers: _json);
+    if (r.statusCode != 200) throw _err('archive mission control task', r);
+  }
+
+  /// GET /mission-control/sessions — list managed sessions.
+  Future<List<ManagedSession>> mcSessions({bool? archived}) async {
+    final q = <String, String>{};
+    if (archived != null) q['archived'] = '$archived';
+    final r = await http
+        .get(_uri('/mission-control/sessions', q.isEmpty ? null : q));
+    if (r.statusCode != 200) throw _err('list mission control sessions', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => ManagedSession.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /mission-control/sessions — register a session with Mission Control.
+  Future<ManagedSession> mcCreateSession({
+    required String sessionId,
+    required String folder,
+    String title = '',
+    String? profile,
+  }) async {
+    final body = <String, dynamic>{
+      'session_id': sessionId,
+      'folder': folder,
+    };
+    if (title.isNotEmpty) body['title'] = title;
+    if (profile != null && profile.isNotEmpty) body['profile'] = profile;
+    final r = await http.post(_uri('/mission-control/sessions'),
+        headers: _json, body: jsonEncode(body));
+    if (r.statusCode != 200) throw _err('create mission control session', r);
+    return ManagedSession.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// PUT /mission-control/sessions/{id} — update a managed session.
+  Future<ManagedSession> mcUpdateSession(
+    String id, {
+    String? title,
+    String? status,
+    String? profile,
+  }) async {
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (status != null) body['status'] = status;
+    if (profile != null) body['profile'] = profile;
+    final r = await http.put(_uri('/mission-control/sessions/$id'),
+        headers: _json, body: jsonEncode(body));
+    if (r.statusCode != 200) throw _err('update mission control session', r);
+    return ManagedSession.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /mission-control/sessions/{id}/archive — soft-archive a session.
+  Future<void> mcArchiveSession(String id) async {
+    final r = await http.post(_uri('/mission-control/sessions/$id/archive'),
+        headers: _json);
+    if (r.statusCode != 200) throw _err('archive mission control session', r);
+  }
+
   String _err(String what, http.Response r) =>
       'Failed to $what (HTTP ${r.statusCode})${r.body.isNotEmpty ? ': ${r.body}' : ''}';
 }
