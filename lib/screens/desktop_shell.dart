@@ -19,6 +19,7 @@ import 'git.dart';
 import 'models.dart';
 import 'vault.dart';
 import 'session.dart';
+import 'mission_control.dart';
 
 /// Desktop two-pane shell: a persistent left sidebar (instances + sessions) and
 /// a main pane showing the selected session. Tools (git/files/editor/models)
@@ -1797,6 +1798,10 @@ class _SidebarState extends State<_Sidebar> {
           _navRow('folder', 'Browse',
               sub: 'files · new chat',
               onTap: hasClient ? widget.onNewSession : null),
+          _navRow('layers', 'Mission Control',
+              onTap: hasClient
+                  ? () => openMissionControl(context, widget.client!)
+                  : null),
           if (hasClient && (_sessions?.isNotEmpty ?? false))
             _selecting
                 ? Padding(

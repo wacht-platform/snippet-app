@@ -484,6 +484,25 @@ class DaemonClient {
 
   // ---- Mission Control ----
 
+  /// GET /mission-control/settings — notification routing policy.
+  Future<String> mcNotificationPolicy() async {
+    final r = await http.get(_uri('/mission-control/settings'));
+    if (r.statusCode != 200) throw _err('get Mission Control settings', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['notification_policy']
+            as String? ??
+        'mission_control_only';
+  }
+
+  /// PUT /mission-control/settings — mission_control_only | all_sessions | none.
+  Future<String> mcSetNotificationPolicy(String policy) async {
+    final r = await http.put(_uri('/mission-control/settings'),
+        headers: _json, body: jsonEncode({'notification_policy': policy}));
+    if (r.statusCode != 200) throw _err('set Mission Control settings', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['notification_policy']
+            as String? ??
+        policy;
+  }
+
   /// POST /mission-control/open — open the dedicated Mission Control session.
   Future<String> mcOpen({required String folder, String? profile}) async {
     final body = <String, dynamic>{'folder': folder};
@@ -578,8 +597,8 @@ class DaemonClient {
   Future<List<ManagedSession>> mcSessions({bool? archived}) async {
     final q = <String, String>{};
     if (archived != null) q['archived'] = '$archived';
-    final r = await http
-        .get(_uri('/mission-control/sessions', q.isEmpty ? null : q));
+    final r =
+        await http.get(_uri('/mission-control/sessions', q.isEmpty ? null : q));
     if (r.statusCode != 200) throw _err('list mission control sessions', r);
     final list = jsonDecode(r.body) as List;
     return list
@@ -603,8 +622,7 @@ class DaemonClient {
     final r = await http.post(_uri('/mission-control/sessions'),
         headers: _json, body: jsonEncode(body));
     if (r.statusCode != 200) throw _err('create mission control session', r);
-    return ManagedSession.fromJson(
-        jsonDecode(r.body) as Map<String, dynamic>);
+    return ManagedSession.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
   /// PUT /mission-control/sessions/{id} — update a managed session.
@@ -621,8 +639,7 @@ class DaemonClient {
     final r = await http.put(_uri('/mission-control/sessions/$id'),
         headers: _json, body: jsonEncode(body));
     if (r.statusCode != 200) throw _err('update mission control session', r);
-    return ManagedSession.fromJson(
-        jsonDecode(r.body) as Map<String, dynamic>);
+    return ManagedSession.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
   /// POST /mission-control/sessions/{id}/archive — soft-archive a session.

@@ -668,6 +668,5 @@ class ManagedSession {
             ? (j['metadata'] as Map).cast<String, dynamic>()
             : null;
 
-  bool get isActive =>
-      !archived && (status == 'active' || status == 'paused');
+  bool get isActive => !archived && (status == 'active' || status == 'paused');
 }
