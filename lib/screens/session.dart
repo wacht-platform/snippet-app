@@ -2955,6 +2955,7 @@ class _SessionScreenState extends State<SessionScreen>
                   onOpen: _showLanes,
                 ));
           }
+        case 'lane_cancelled':
         case 'lane_completed':
           endTools(key);
           final id = _s(e['id']);
@@ -3096,6 +3097,7 @@ class _SessionScreenState extends State<SessionScreen>
         case 'user_question':
         case 'approval_request':
         case 'lane_spawned':
+        case 'lane_cancelled':
         case 'lane_completed':
         case 'assistant_text':
           return true;
@@ -3109,6 +3111,7 @@ class _SessionScreenState extends State<SessionScreen>
       n == 'note' ||
       n == 'ask_user' ||
       n == 'delegate_task' ||
+      n == 'cancel_delegated_task' ||
       n == 'complete_goal' ||
       n == 'monitor' ||
       n == 'present_file';

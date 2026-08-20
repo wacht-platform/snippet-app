@@ -118,16 +118,21 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     Theme.of(context);
     final hasDetails = _hasDetails(lane);
     final failed = lane.status == 'failed';
+    final cancelled = lane.status == 'cancelled';
     final color = lane.running
         ? AppColors.accent
         : failed
             ? AppColors.danger
-            : AppColors.ok;
+            : cancelled
+                ? AppColors.fg4
+                : AppColors.ok;
     final status = lane.running
         ? 'running · ${_elapsed(lane.startedAt)}'
         : failed
             ? 'failed'
-            : 'completed';
+            : cancelled
+                ? 'cancelled'
+                : 'completed';
     final activity = lane.activity?.trim();
     final summary = lane.summary?.trim();
 
