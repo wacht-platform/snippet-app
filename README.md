@@ -8,7 +8,7 @@
 
 The remote client for [**snippet**](https://github.com/wacht-platform/snippet-service), the open-source AI coding agent. Run `snippet serve` on your dev box and drive it from anywhere — chat with the agent, browse and edit files, review git diffs, run commands, and manage sessions, over an authenticated tunnel.
 
-[![download APK](https://img.shields.io/badge/download-snippet.apk-3ddc84.svg)](https://github.com/wacht-platform/snippet-mobile/releases/download/apk-latest/snippet.apk)
+[![download APK](https://img.shields.io/badge/download-snippet.apk-3ddc84.svg)](https://github.com/wacht-platform/snippet-app/releases/download/apk-latest/snippet.apk)
 [![platform: Android](https://img.shields.io/badge/platform-Android-3ddc84.svg)](#platforms)
 [![built with Flutter](https://img.shields.io/badge/built%20with-Flutter-02569B.svg)](https://flutter.dev)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
@@ -27,7 +27,7 @@ Your coding agent runs on your machine; this app is the window into it. Start a 
 
 **Android — no toolchain needed:**
 
-### → [**Download snippet.apk**](https://github.com/wacht-platform/snippet-mobile/releases/download/apk-latest/snippet.apk)
+### → [**Download snippet.apk**](https://github.com/wacht-platform/snippet-app/releases/download/apk-latest/snippet.apk)
 
 Open the link on your phone and tap the file to install (allow *"install unknown apps"* if prompted). This is a **rolling build**: every push to `main` refreshes that same URL with a fresh arm64 APK (~25 MB), built for free on GitHub's runners. It's debug-signed, so if an older install refuses to update over it, uninstall the old one first.
 

@@ -1,7 +1,7 @@
 name: snippet
 description: "Remote control client (Android + macOS) for the snippet coding agent."
 publish_to: 'none'
-repository: https://github.com/wacht-platform/snippet-mobile
+repository: https://github.com/wacht-platform/snippet-app
 version: 0.1.0+9
 
 environment:

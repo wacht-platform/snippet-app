@@ -5,7 +5,7 @@ name: android
 # rebuilds the release APK and replaces the asset on the `apk-latest` release,
 # so there is always a stable public download URL you can open on the phone:
 #
-#   https://github.com/wacht-platform/snippet-mobile/releases/download/apk-latest/snippet.apk
+#   https://github.com/wacht-platform/snippet-app/releases/download/apk-latest/snippet.apk
 #
 # The release build self-signs with the debug key (see android/app/build.gradle.kts),
 # so no keystore/secrets are needed to produce an installable APK.
