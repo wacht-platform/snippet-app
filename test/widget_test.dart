@@ -55,6 +55,38 @@ void main() {
     expect(delta.title, isNull);
   });
 
+  test('Mission Control models mirror the daemon contract', () {
+    final task = MissionControlTask.fromJson({
+      'id': 'task-1',
+      'title': 'Fix lifecycle',
+      'description': 'Use the server task contract only.',
+      'status': 'in_progress',
+      'session_id': 'session-1',
+      'created_at': 10,
+      'updated_at': 20,
+      'archived': false,
+      // Intentionally omit old client-only priority, tags, and assignee fields.
+    });
+    final done = MissionControlTask.fromJson({
+      'id': 'task-2',
+      'status': 'done',
+      'archived': true,
+    });
+    final session = ManagedSession.fromJson({
+      'id': 'session-1',
+      'session_id': 'session-1',
+      'folder': '/workspace',
+      'status': 'active',
+      'task_count': 2,
+      'archived': false,
+    });
+
+    expect(task.isActive, isTrue);
+    expect(done.isActive, isFalse);
+    expect(session.isActive, isTrue);
+    expect(session.taskCount, 2);
+  });
+
   testWidgets('tool preview restores escaped newlines', (tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(

@@ -609,31 +609,22 @@ class MissionControlTask {
   final String id;
   final String title;
   final String description;
-  final String status; // pending | in_progress | completed | failed
-  final String priority; // low | medium | high | critical
+  final String
+      status; // pending | in_progress | blocked | done | failed | cancelled
   final int createdAt;
   final int updatedAt;
-  final String? assignee;
-  final List<String> tags;
   final String? sessionId; // link to a managed session
   final bool archived;
-  final Map<String, dynamic>? metadata;
 
   MissionControlTask.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         title = j['title'] as String? ?? '',
         description = j['description'] as String? ?? '',
         status = j['status'] as String? ?? 'pending',
-        priority = j['priority'] as String? ?? 'medium',
         createdAt = (j['created_at'] as num?)?.toInt() ?? 0,
         updatedAt = (j['updated_at'] as num?)?.toInt() ?? 0,
-        assignee = j['assignee'] as String?,
-        tags = ((j['tags'] as List?) ?? const []).cast<String>(),
         sessionId = j['session_id'] as String?,
-        archived = j['archived'] as bool? ?? false,
-        metadata = j['metadata'] is Map
-            ? (j['metadata'] as Map).cast<String, dynamic>()
-            : null;
+        archived = j['archived'] as bool? ?? false;
 
   bool get isActive =>
       !archived && (status == 'pending' || status == 'in_progress');
@@ -645,13 +636,11 @@ class ManagedSession {
   final String sessionId; // links to the actual snippet session
   final String folder;
   final String title;
-  final String status; // active | paused | completed | failed
+  final String status; // active | archived
   final int createdAt;
   final int lastActiveAt;
-  final String? profile;
   final int taskCount;
   final bool archived;
-  final Map<String, dynamic>? metadata;
 
   ManagedSession.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -661,12 +650,8 @@ class ManagedSession {
         status = j['status'] as String? ?? 'active',
         createdAt = (j['created_at'] as num?)?.toInt() ?? 0,
         lastActiveAt = (j['last_active_at'] as num?)?.toInt() ?? 0,
-        profile = j['profile'] as String?,
         taskCount = (j['task_count'] as num?)?.toInt() ?? 0,
-        archived = j['archived'] as bool? ?? false,
-        metadata = j['metadata'] is Map
-            ? (j['metadata'] as Map).cast<String, dynamic>()
-            : null;
+        archived = j['archived'] as bool? ?? false;
 
-  bool get isActive => !archived && (status == 'active' || status == 'paused');
+  bool get isActive => !archived && status == 'active';
 }

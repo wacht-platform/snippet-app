@@ -25,7 +25,10 @@ class _MissionControlScreenState extends State<MissionControlScreen> {
   List<MissionControlTask> _tasks = const [];
   List<ManagedSession> _sessions = const [];
   bool _loading = true;
+  bool _archiving = false;
+  int _refreshGeneration = 0;
   String? _error;
+  String? _backgroundError;
   Timer? _ticker;
 
   @override
@@ -45,9 +48,12 @@ class _MissionControlScreenState extends State<MissionControlScreen> {
   }
 
   Future<void> _refresh({bool silent = false}) async {
-    if (!silent) {
+    final generation = ++_refreshGeneration;
+    if (!silent && mounted) {
       setState(() {
-        _loading = _error == null;
+        _loading = true;
+        _error = null;
+        _backgroundError = null;
       });
     }
     try {
@@ -57,56 +63,71 @@ class _MissionControlScreenState extends State<MissionControlScreen> {
         c.mcTasks(archived: false),
         c.mcSessions(archived: false),
       ]);
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       setState(() {
         _overview = results[0] as MissionControlOverview;
         _tasks = results[1] as List<MissionControlTask>;
         _sessions = results[2] as List<ManagedSession>;
         _loading = false;
         _error = null;
+        _backgroundError = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       setState(() {
         _loading = false;
-        _error = '$e';
+        if (_overview == null) {
+          _error = '$e';
+        } else {
+          _backgroundError = '$e';
+        }
       });
     }
   }
 
-  Future<void> _archiveTask(MissionControlTask t) async {
+  Future<void> _archiveTask(MissionControlTask task) async {
+    final confirmed = await confirmAction(
+      context,
+      title: 'Archive task?',
+      body:
+          '“${task.title}” will be cancelled and removed from the active board.',
+      confirmLabel: 'Archive task',
+    );
+    if (!confirmed || !mounted || _archiving) return;
+    setState(() => _archiving = true);
     try {
-      await widget.client.mcArchiveTask(t.id);
-      if (mounted) {
-        toast(context, 'Archived "${t.title}"');
-        setState(() => _tasks = _tasks.where((x) => x.id != t.id).toList());
-        // Refresh overview counts.
-        _refreshOverviewOnly();
-      }
+      await widget.client.mcArchiveTask(task.id);
+      if (!mounted) return;
+      toast(context, 'Archived “${task.title}”');
+      await _refresh();
     } catch (e) {
       if (mounted) toast(context, 'Archive failed: $e', danger: true);
+    } finally {
+      if (mounted) setState(() => _archiving = false);
     }
   }
 
-  Future<void> _archiveSession(ManagedSession s) async {
+  Future<void> _archiveSession(ManagedSession session) async {
+    final label = session.title.isEmpty ? session.folder : session.title;
+    final confirmed = await confirmAction(
+      context,
+      title: 'Archive session?',
+      body:
+          '“$label” will be removed from Mission Control. Its history is kept.',
+      confirmLabel: 'Archive session',
+    );
+    if (!confirmed || !mounted || _archiving) return;
+    setState(() => _archiving = true);
     try {
-      await widget.client.mcArchiveSession(s.id);
-      if (mounted) {
-        toast(context, 'Archived session');
-        setState(
-            () => _sessions = _sessions.where((x) => x.id != s.id).toList());
-        _refreshOverviewOnly();
-      }
+      await widget.client.mcArchiveSession(session.id);
+      if (!mounted) return;
+      toast(context, 'Archived session');
+      await _refresh();
     } catch (e) {
       if (mounted) toast(context, 'Archive failed: $e', danger: true);
+    } finally {
+      if (mounted) setState(() => _archiving = false);
     }
-  }
-
-  /// Lightweight overview-only refresh after an archive.
-  void _refreshOverviewOnly() {
-    widget.client.mcOverview().then((ov) {
-      if (mounted) setState(() => _overview = ov);
-    }).catchError((_) {});
   }
 
   @override
@@ -125,9 +146,9 @@ class _MissionControlScreenState extends State<MissionControlScreen> {
             onBack: widget.onClose ?? () => Navigator.pop(context),
             actions: [
               IconBtn('refresh',
-                  size: 38,
+                  size: 44,
                   iconSize: 19,
-                  tooltip: 'Refresh',
+                  tooltip: _loading ? 'Refreshing' : 'Refresh',
                   onTap: _loading ? null : () => _refresh()),
             ],
           ),
@@ -148,29 +169,32 @@ class _MissionControlScreenState extends State<MissionControlScreen> {
               child: CircularProgressIndicator(strokeWidth: 2)));
     }
     final ov = _overview!;
+    final activeTasks = _tasks.where((task) => task.isActive).toList();
     return RefreshIndicator(
       color: AppColors.accent,
       onRefresh: _refresh,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 40),
         children: [
-          // --- Overview stats ---
+          if (_backgroundError != null) ...[
+            _staleDataNotice(),
+            const SizedBox(height: 12),
+          ],
           _OverviewStats(overview: ov),
           const SizedBox(height: 24),
-
-          // --- Active tasks ---
           const SectionLabel('Active tasks'),
           const SizedBox(height: 8),
-          if (_tasks.isEmpty)
+          if (activeTasks.isEmpty)
             _emptyCard(
                 'No active tasks',
                 'Tasks tracked by Mission Control '
                     'will appear here.'),
-          for (final t in _tasks)
-            _TaskCard(task: t, onArchive: () => _archiveTask(t)),
-          if (_tasks.isNotEmpty) const SizedBox(height: 8),
-
-          // --- Managed sessions ---
+          for (final task in activeTasks)
+            _TaskCard(
+                task: task,
+                archiving: _archiving,
+                onArchive: () => _archiveTask(task)),
+          if (activeTasks.isNotEmpty) const SizedBox(height: 8),
           const SectionLabel('Sessions'),
           const SizedBox(height: 8),
           if (_sessions.isEmpty)
@@ -178,9 +202,39 @@ class _MissionControlScreenState extends State<MissionControlScreen> {
                 'No managed sessions',
                 'Sessions registered in '
                     'Mission Control will appear here.'),
-          for (final s in _sessions)
-            _SessionCard(session: s, onArchive: () => _archiveSession(s)),
+          for (final session in _sessions)
+            _SessionCard(
+                session: session,
+                archiving: _archiving,
+                onArchive: () => _archiveSession(session)),
         ],
+      ),
+    );
+  }
+
+  Widget _staleDataNotice() {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.danger.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(R.md),
+          border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
+        ),
+        child: Row(children: [
+          AppIcon('alert-triangle', size: 16, color: AppColors.danger),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Could not refresh. Showing the last available data.',
+                style: sans(12, color: AppColors.fg2)),
+          ),
+          IconBtn('refresh',
+              size: 36,
+              iconSize: 17,
+              tooltip: 'Retry refresh',
+              onTap: _loading ? null : () => _refresh()),
+        ]),
       ),
     );
   }
@@ -200,7 +254,10 @@ class _MissionControlScreenState extends State<MissionControlScreen> {
               style: sans(12.5, color: AppColors.fg3)),
           const SizedBox(height: 20),
           IconBtn('refresh',
-              size: 36, iconSize: 18, tooltip: 'Retry', onTap: _refresh),
+              size: 44,
+              iconSize: 18,
+              tooltip: _loading ? 'Refreshing' : 'Retry',
+              onTap: _loading ? null : () => _refresh()),
         ]),
       ),
     );
@@ -268,13 +325,17 @@ class _OverviewStats extends StatelessWidget {
 
 class _TaskCard extends StatelessWidget {
   final MissionControlTask task;
+  final bool archiving;
   final VoidCallback onArchive;
-  const _TaskCard({required this.task, required this.onArchive});
+  const _TaskCard({
+    required this.task,
+    required this.archiving,
+    required this.onArchive,
+  });
 
   @override
   Widget build(BuildContext context) {
     final statusColor = _statusColor(task.status);
-    final prioColor = _priorityColor(task.priority);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -318,26 +379,13 @@ class _TaskCard extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 10),
-          // Meta row: status badge + priority badge + tags + archive.
           Row(children: [
             _badge(task.status.replaceAll('_', ' '), statusColor),
-            const SizedBox(width: 6),
-            _badge(task.priority, prioColor),
-            if (task.assignee != null && task.assignee!.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              _badge('→ ${task.assignee}', AppColors.fg3),
-            ],
-            for (final tag in task.tags.take(3)) ...[
-              const SizedBox(width: 6),
-              _badge(tag, AppColors.fg4),
-            ],
             const Spacer(),
-            GestureDetector(
+            _ArchiveButton(
+              label: 'Archive task',
+              enabled: !archiving,
               onTap: onArchive,
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: AppIcon('minimize', size: 16, color: AppColors.fg4),
-              ),
             ),
           ]),
         ]),
@@ -358,17 +406,49 @@ class _TaskCard extends StatelessWidget {
 
   static Color _statusColor(String s) => switch (s) {
         'in_progress' => AppColors.run,
-        'completed' => AppColors.ok,
-        'failed' => AppColors.danger,
+        'done' || 'completed' => AppColors.ok,
+        'blocked' || 'failed' || 'cancelled' => AppColors.danger,
         _ => AppColors.fg3,
       };
+}
 
-  static Color _priorityColor(String p) => switch (p) {
-        'critical' => AppColors.danger,
-        'high' => AppColors.run,
-        'medium' => AppColors.accent,
-        _ => AppColors.fg4,
-      };
+class _ArchiveButton extends StatelessWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _ArchiveButton({
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(R.md),
+          child: InkWell(
+            onTap: enabled ? onTap : null,
+            borderRadius: BorderRadius.circular(R.md),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Center(
+                child: AppIcon('trash',
+                    size: 18, color: enabled ? AppColors.fg3 : AppColors.fg4),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -377,8 +457,13 @@ class _TaskCard extends StatelessWidget {
 
 class _SessionCard extends StatelessWidget {
   final ManagedSession session;
+  final bool archiving;
   final VoidCallback onArchive;
-  const _SessionCard({required this.session, required this.onArchive});
+  const _SessionCard({
+    required this.session,
+    required this.archiving,
+    required this.onArchive,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -434,19 +519,13 @@ class _SessionCard extends StatelessWidget {
               _badge(
                   '${session.taskCount} task${session.taskCount == 1 ? '' : 's'}',
                   AppColors.accent),
-            if (session.profile != null && session.profile!.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              _badge(session.profile!, AppColors.fg4),
-            ],
             const Spacer(),
             Text(lastActive, style: mono(10, color: AppColors.fg4)),
             const SizedBox(width: 4),
-            GestureDetector(
+            _ArchiveButton(
+              label: 'Archive session',
+              enabled: !archiving,
               onTap: onArchive,
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: AppIcon('minimize', size: 16, color: AppColors.fg4),
-              ),
             ),
           ]),
         ]),
@@ -467,10 +546,8 @@ class _SessionCard extends StatelessWidget {
 
   static Color _healthColor(String s) => switch (s) {
         'active' => AppColors.ok,
-        'paused' => AppColors.run,
-        'completed' => AppColors.fg3,
-        'failed' => AppColors.danger,
-        _ => AppColors.fg4,
+        'archived' => AppColors.fg4,
+        _ => AppColors.fg3,
       };
 
   static String _age(int epoch) {

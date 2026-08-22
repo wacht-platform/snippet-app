@@ -153,8 +153,9 @@ class DaemonClient {
       body['reasoning_effort'] = reasoningEffort;
     }
     if (supportsImages != null) body['supports_images'] = supportsImages;
-    if (contextWindow != null && contextWindow > 0)
+    if (contextWindow != null && contextWindow > 0) {
       body['context_window'] = contextWindow;
+    }
     if (stream != null) body['stream'] = stream;
     final r = await http.put(_uri('/config/profile'),
         headers: _json, body: jsonEncode(body));
@@ -537,21 +538,17 @@ class DaemonClient {
   /// POST /mission-control/tasks — create a new task. Returns the created task.
   Future<MissionControlTask> mcCreateTask({
     required String title,
+    required String sessionId,
     String description = '',
-    String priority = 'medium',
-    String? assignee,
-    List<String>? tags,
-    String? sessionId,
+    List<String>? ownedPaths,
   }) async {
     final body = <String, dynamic>{
       'title': title,
       'description': description,
-      'priority': priority,
+      'session_id': sessionId,
     };
-    if (assignee != null && assignee.isNotEmpty) body['assignee'] = assignee;
-    if (tags != null && tags.isNotEmpty) body['tags'] = tags;
-    if (sessionId != null && sessionId.isNotEmpty) {
-      body['session_id'] = sessionId;
+    if (ownedPaths != null && ownedPaths.isNotEmpty) {
+      body['owned_paths'] = ownedPaths;
     }
     final r = await http.post(_uri('/mission-control/tasks'),
         headers: _json, body: jsonEncode(body));
@@ -566,19 +563,15 @@ class DaemonClient {
     String? title,
     String? description,
     String? status,
-    String? priority,
-    String? assignee,
-    List<String>? tags,
     String? sessionId,
+    List<String>? ownedPaths,
   }) async {
     final body = <String, dynamic>{};
     if (title != null) body['title'] = title;
     if (description != null) body['description'] = description;
     if (status != null) body['status'] = status;
-    if (priority != null) body['priority'] = priority;
-    if (assignee != null) body['assignee'] = assignee;
-    if (tags != null) body['tags'] = tags;
     if (sessionId != null) body['session_id'] = sessionId;
+    if (ownedPaths != null) body['owned_paths'] = ownedPaths;
     final r = await http.put(_uri('/mission-control/tasks/$id'),
         headers: _json, body: jsonEncode(body));
     if (r.statusCode != 200) throw _err('update mission control task', r);
