@@ -316,7 +316,7 @@ class _SessionScreenState extends State<SessionScreen>
   int _pasteN = 0;
 
   void _interceptBigPaste() {
-    if (_restoringInput) return;
+    if (_closed || _restoringInput) return;
     final prev = _lastInput;
     final now = _input.text;
     if (now.length - prev.length < _pasteAttachChars) {
@@ -1691,8 +1691,19 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   @override
+  void deactivate() {
+    // Close IME while the TextField is still mounted. Parent dispose() runs
+    // after the child EditableText is already gone, which is too late to stop
+    // a pending Android selection snapshot from hitting a disposed controller.
+    _inputFocus.unfocus();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
     _closed = true;
+    _input.removeListener(_interceptBigPaste);
+    _inputFocus.unfocus();
     _reconnectTimer?.cancel();
     _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
@@ -2684,6 +2695,7 @@ class _SessionScreenState extends State<SessionScreen>
                       },
                       child: TextField(
                         controller: _input,
+                        focusNode: _inputFocus,
                         minLines: 1,
                         maxLines: 8,
                         cursorColor: AppColors.fg1,

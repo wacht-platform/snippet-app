@@ -23,7 +23,14 @@ class _MissionComposerState extends State<MissionComposer> {
   final _focus = FocusNode();
 
   @override
+  void deactivate() {
+    _focus.unfocus();
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _focus.unfocus();
     _controller.dispose();
     _focus.dispose();
     super.dispose();

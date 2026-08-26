@@ -425,6 +425,11 @@ class _DesktopShellState extends State<DesktopShell>
     }
     final extras = matches.length > 1 ? matches.sublist(1) : const <int>[];
     final existing = matches.isEmpty ? -1 : matches.first;
+    // Only steal focus when a leftover MC composer is about to unmount.
+    if (extras.isNotEmpty ||
+        (existing >= 0 && !isDedicatedMcSession(_tabs[existing].sessionId))) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
     if (existing == 0 && extras.isEmpty) {
       if (_activeIndex < 0) {
         setState(() => _activeIndex = 0);
