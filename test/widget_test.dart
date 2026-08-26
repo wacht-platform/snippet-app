@@ -77,6 +77,20 @@ void main() {
     expect(isDedicatedMcSession('mission-control'), isTrue);
     expect(isDedicatedMcSession('mission-control/session.json'), isTrue);
     expect(
+      isMissionControlTab(
+        sessionId: 'gmata-backend-74fcefb69dbc56ca/conversations/ef933a40.json',
+        title: 'Mission Control',
+      ),
+      isTrue,
+    );
+    expect(
+      isMissionControlTab(
+        sessionId: 'snippet-service-61c2d836aee8dc5b/state.json',
+        title: 'Design Mission Control',
+      ),
+      isFalse,
+    );
+    expect(
       isMissionControlListRow(SessionInfo.fromJson({
         'id': 'mission-control',
         'title': 'Mission Control',

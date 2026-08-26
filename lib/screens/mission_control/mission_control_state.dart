@@ -115,9 +115,15 @@ bool isDedicatedMcSession(String? id) {
       normalized == 'mission-control/session.json';
 }
 
+/// True for the dedicated MC home — by session id or the exact tab title
+/// leftover from when MC was listed as a regular chat.
+bool isMissionControlTab({String? sessionId, String? title}) {
+  if (isDedicatedMcSession(sessionId)) return true;
+  return title?.trim() == 'Mission Control';
+}
+
 bool isMissionControlListRow(SessionInfo session) {
-  if (isDedicatedMcSession(session.id)) return true;
-  return session.title.trim() == 'Mission Control';
+  return isMissionControlTab(sessionId: session.id, title: session.title);
 }
 
 /// `/attach` may deliver text as a String or as UTF-8 bytes.

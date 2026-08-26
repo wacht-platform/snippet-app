@@ -57,7 +57,8 @@ class _ShellTab {
   })  : sessionId = null,
         profile = null;
   bool get isFile => filePath != null;
-  bool get isMissionControl => !isFile && isDedicatedMcSession(sessionId);
+  bool get isMissionControl =>
+      !isFile && isMissionControlTab(sessionId: sessionId, title: title);
   String get key => isFile
       ? '$instanceUrl|file|$filePath'
       : isMissionControl
@@ -371,7 +372,9 @@ class _DesktopShellState extends State<DesktopShell>
           title: descriptor.title,
         ));
       } else if (descriptor.sessionId != null) {
-        if (isDedicatedMcSession(descriptor.sessionId) &&
+        final mc = isMissionControlTab(
+            sessionId: descriptor.sessionId, title: descriptor.title);
+        if (mc &&
             restored
                 .any((t) => t.isMissionControl && t.instanceUrl == inst.url)) {
           continue;
@@ -379,10 +382,8 @@ class _DesktopShellState extends State<DesktopShell>
         restored.add(_ShellTab.session(
           client: client,
           instanceUrl: inst.url,
-          sessionId: descriptor.sessionId,
-          title: isDedicatedMcSession(descriptor.sessionId)
-              ? 'Mission Control'
-              : descriptor.title,
+          sessionId: mc ? 'mission-control' : descriptor.sessionId,
+          title: mc ? 'Mission Control' : descriptor.title,
           profile: descriptor.profile,
         ));
       }
@@ -417,9 +418,14 @@ class _DesktopShellState extends State<DesktopShell>
     final client = _client;
     if (inst == null) return;
     if (client != null) unawaited(client.mcOpen());
-    final existing = _tabs
-        .indexWhere((t) => t.isMissionControl && t.instanceUrl == inst.url);
-    if (existing == 0) {
+    final matches = <int>[];
+    for (var i = 0; i < _tabs.length; i++) {
+      final t = _tabs[i];
+      if (t.isMissionControl && t.instanceUrl == inst.url) matches.add(i);
+    }
+    final extras = matches.length > 1 ? matches.sublist(1) : const <int>[];
+    final existing = matches.isEmpty ? -1 : matches.first;
+    if (existing == 0 && extras.isEmpty) {
       if (_activeIndex < 0) {
         setState(() => _activeIndex = 0);
         _persistTabs();
@@ -428,21 +434,37 @@ class _DesktopShellState extends State<DesktopShell>
       return;
     }
     setState(() {
-      if (existing > 0) {
-        final tab = _tabs.removeAt(existing);
-        _tabs.insert(0, tab);
-        if (_activeIndex == existing || _activeIndex < 0) {
-          _activeIndex = 0;
-        } else if (_activeIndex < existing) {
-          _activeIndex++;
+      _ShellTab kept;
+      if (existing >= 0) {
+        kept = _tabs.removeAt(existing);
+        for (final i in extras.reversed) {
+          final drop = i > existing ? i - 1 : i;
+          if (drop >= 0 && drop < _tabs.length) {
+            final gone = _tabs.removeAt(drop);
+            _macSessionStatuses.remove(gone.key);
+            _macSessionControls.remove(gone.key);
+          }
+        }
+        if (!isDedicatedMcSession(kept.sessionId)) {
+          kept = _mcTabFor(inst)..inboundShare = kept.inboundShare;
         }
       } else {
-        _tabs.insert(0, _mcTabFor(inst));
-        if (_activeIndex < 0) {
-          _activeIndex = 0;
-        } else {
-          _activeIndex++;
+        kept = _mcTabFor(inst);
+      }
+      var nextActive = _activeIndex;
+      if (existing >= 0 && nextActive > existing) nextActive--;
+      for (final i in extras) {
+        if (nextActive == i) {
+          nextActive = 0;
+        } else if (nextActive > i) {
+          nextActive--;
         }
+      }
+      _tabs.insert(0, kept);
+      if (nextActive < 0 || existing == nextActive) {
+        _activeIndex = 0;
+      } else {
+        _activeIndex = nextActive + 1;
       }
     });
     _persistTabs();
