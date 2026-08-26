@@ -1778,7 +1778,8 @@ Future<T?> showAppSheet<T>(BuildContext context,
           borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
           border: Border(top: BorderSide(color: AppColors.border2)),
         ),
-        constraints: BoxConstraints(maxHeight: media.size.height * 0.92),
+        constraints: BoxConstraints(
+            maxHeight: (media.size.height - media.viewInsets.bottom) * 0.92),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 12),
           Center(
@@ -1807,7 +1808,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
               child: child,
             ),
           ),
-          SizedBox(height: media.padding.bottom),
+          SizedBox(height: media.padding.bottom + media.viewInsets.bottom),
         ]),
       );
     },

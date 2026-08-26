@@ -56,15 +56,17 @@ Future<void> showCommandPalette(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.85),
-        child: _frame(body()),
-      ),
-    ),
+    builder: (_) {
+      final mq = MediaQuery.of(context);
+      final available = mq.size.height - mq.viewInsets.bottom;
+      return Padding(
+        padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: available * 0.85),
+          child: _frame(body()),
+        ),
+      );
+    },
   );
 }
 

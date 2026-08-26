@@ -232,6 +232,15 @@ void main() {
         "I'll inspect the hydrate path, keep loading until the first snapshot.";
     expect(assistantTextIsRedundant(later, [first]), isTrue);
     expect(assistantTextIsRedundant('Fresh direction now.', [first]), isFalse);
+    expect(
+      assistantTextIsRedundant(
+        "I'll keep going on the MC chat: hide the terminal, make the list row distinct, add a dispatched-task list.",
+        [
+          "I'll keep going on the MC chat: distinct list row, hide terminal, dispatched-task list, and tool/handoff rows that only expand when they have something to show.",
+        ],
+      ),
+      isTrue,
+    );
   });
 
   test('tool rows expand only when they have content', () {

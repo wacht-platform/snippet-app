@@ -4000,8 +4000,19 @@ bool assistantTextIsRedundant(String text, List<String> recent) {
     if (prev.isEmpty) continue;
     if (next == prev) return true;
     if (next.length >= 24 && prev.contains(next)) return true;
+    if (prev.length >= 24 && next.contains(prev)) return true;
+    if (_tokenOverlap(next, prev) >= 0.80) return true;
   }
   return false;
+}
+
+double _tokenOverlap(String a, String b) {
+  final as = a.split(' ').where((w) => w.length > 2).toSet();
+  final bs = b.split(' ').where((w) => w.length > 2).toSet();
+  if (as.isEmpty || bs.isEmpty) return 0;
+  final shared = as.intersection(bs).length;
+  final denom = as.length < bs.length ? as.length : bs.length;
+  return shared / denom;
 }
 
 class _MissionEnvelopeCard extends StatelessWidget {
