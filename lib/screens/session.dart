@@ -25,6 +25,7 @@ import '../tool_views.dart';
 import '../transcript.dart';
 import '../term.dart';
 import '../panel.dart';
+import '../share_inbound.dart';
 import '../widgets.dart';
 import 'package:xterm/xterm.dart';
 import 'editor.dart';
@@ -109,6 +110,10 @@ class SessionScreen extends StatefulWidget {
   /// file and the composer chips leak across tabs.
   final bool acceptDrops;
 
+  /// Android share / "Ask Snippet" payload to attach + send once the session
+  /// is connected. Consumed by the first visible session that matches.
+  final SharedInbound? inboundShare;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -121,7 +126,8 @@ class SessionScreen extends StatefulWidget {
       this.onOpenSession,
       this.onMacStatus,
       this.onMacControls,
-      this.acceptDrops = true});
+      this.acceptDrops = true,
+      this.inboundShare});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
 }
@@ -468,6 +474,11 @@ class _SessionScreenState extends State<SessionScreen>
     _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
     _registeredOpenKey = _openKey;
     reportOpenSession(_openKey);
+    if (widget.inboundShare != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _consumeInboundShare(widget.inboundShare!);
+      });
+    }
   }
 
   bool get _isMissionControl => isDedicatedMcSession(widget.sessionId);
@@ -485,24 +496,31 @@ class _SessionScreenState extends State<SessionScreen>
   @override
   void didUpdateWidget(covariant SessionScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.sessionId == widget.sessionId &&
-        oldWidget.client.baseUrl == widget.client.baseUrl) {
-      return;
+    final sameSession = oldWidget.sessionId == widget.sessionId &&
+        oldWidget.client.baseUrl == widget.client.baseUrl;
+    if (!sameSession) {
+      // PageView normally keys each session, but a parent may reuse this State
+      // while switching tabs. Never carry composer/upload state across sessions.
+      // Invalidate completions from an upload started by the previous session.
+      _attachmentGeneration++;
+      if (mounted) {
+        setState(() => _attachments.clear());
+      } else {
+        _attachments.clear();
+      }
+      _queued.clear();
+      _queuedNonce.clear();
+      _clearPendingAll();
+      _input.clear();
+      _lastInput = '';
+      _consumedShare = null;
     }
-    // PageView normally keys each session, but a parent may reuse this State
-    // while switching tabs. Never carry composer/upload state across sessions.
-    // Invalidate completions from an upload started by the previous session.
-    _attachmentGeneration++;
-    if (mounted) {
-      setState(() => _attachments.clear());
-    } else {
-      _attachments.clear();
+    if (widget.inboundShare != null &&
+        widget.inboundShare != oldWidget.inboundShare) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _consumeInboundShare(widget.inboundShare!);
+      });
     }
-    _queued.clear();
-    _queuedNonce.clear();
-    _clearPendingAll();
-    _input.clear();
-    _lastInput = '';
   }
 
   @override
@@ -1566,6 +1584,34 @@ class _SessionScreenState extends State<SessionScreen>
     }
   }
 
+  SharedInbound? _consumedShare;
+
+  Future<void> _consumeInboundShare(SharedInbound share) async {
+    if (_consumedShare == share || share.isEmpty) return;
+    _consumedShare = share;
+    if (share.text.trim().isNotEmpty) {
+      final existing = _input.text;
+      _input.text = existing.isEmpty
+          ? share.text.trim()
+          : '${existing.trim()}\n\n${share.text.trim()}';
+      _input.selection = TextSelection.collapsed(offset: _input.text.length);
+    }
+    if (share.paths.isNotEmpty) {
+      await _ingest([
+        for (var i = 0; i < share.paths.length; i++)
+          (
+            name: i < share.names.length && share.names[i].isNotEmpty
+                ? share.names[i]
+                : share.paths[i].split('/').last,
+            localPath: share.paths[i],
+            readBytes: () => File(share.paths[i]).readAsBytes(),
+          ),
+      ]);
+    }
+    if (!mounted) return;
+    if (_canSend) await _sendMessage();
+  }
+
   Future<void> _confirmCompact() async {
     if (_state?.compacting == true) {
       _toast('Already compacting');
@@ -1729,6 +1775,7 @@ class _SessionScreenState extends State<SessionScreen>
     final items = _transcriptCache!;
     final scaffold = Scaffold(
       backgroundColor: readingBg,
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         bottom: false,
         child: Stack(children: [
@@ -2595,9 +2642,15 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Widget _inputBar(bool running) {
-    return Container(
+    final mq = MediaQuery.of(context);
+    final keyboard = mq.viewInsets.bottom;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: keyboard),
+      child: Container(
       padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 8,
-          widget.embedded ? 0 : 20, 10 + MediaQuery.of(context).padding.bottom),
+          widget.embedded ? 0 : 20, 10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
       child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2716,6 +2769,7 @@ class _SessionScreenState extends State<SessionScreen>
                   ]),
             ),
           ]),
+    ),
     );
   }
 
