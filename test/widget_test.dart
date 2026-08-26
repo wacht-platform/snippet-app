@@ -1,7 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:snippet/api.dart';
 import 'package:snippet/models.dart';
+import 'package:snippet/screens/mission_control/mission_control_state.dart';
+import 'package:snippet/screens/session.dart';
 import 'package:snippet/tool_views.dart';
 import 'package:snippet/widgets.dart';
 
@@ -55,6 +61,44 @@ void main() {
     expect(delta.title, isNull);
   });
 
+  test('Mission Control is the dedicated home session', () {
+    expect(isDedicatedMcSession(null), isFalse);
+    expect(isDedicatedMcSession(''), isFalse);
+    expect(
+      isDedicatedMcSession('snippet-service-61c2d836aee8dc5b/state.json'),
+      isFalse,
+    );
+    expect(
+      isDedicatedMcSession(
+        'gmata-backend-74fcefb69dbc56ca/conversations/deadbeef.json',
+      ),
+      isFalse,
+    );
+    expect(isDedicatedMcSession('mission-control'), isTrue);
+    expect(isDedicatedMcSession('mission-control/session.json'), isTrue);
+    expect(
+      isMissionControlListRow(SessionInfo.fromJson({
+        'id': 'mission-control',
+        'title': 'Mission Control',
+      })),
+      isTrue,
+    );
+    expect(
+      isMissionControlListRow(SessionInfo.fromJson({
+        'id': 'gmata-backend-74fcefb69dbc56ca/conversations/ef933a40.json',
+        'title': 'Mission Control',
+      })),
+      isTrue,
+    );
+    expect(
+      isMissionControlListRow(SessionInfo.fromJson({
+        'id': 'snippet-service-61c2d836aee8dc5b/state.json',
+        'title': 'Design Mission Control',
+      })),
+      isFalse,
+    );
+  });
+
   test('Mission Control models mirror the daemon contract', () {
     final task = MissionControlTask.fromJson({
       'id': 'task-1',
@@ -85,6 +129,132 @@ void main() {
     expect(done.isActive, isFalse);
     expect(session.isActive, isTrue);
     expect(session.taskCount, 2);
+  });
+
+  test('Mission Control hydrates chat rows from harness events', () {
+    final items = feedItemsFromEvents([
+      {'kind': 'user_input', 'text': 'hi yo mission control'},
+      {'kind': 'assistant_text', 'text': 'Hi! How can I help you today?'},
+      {'kind': 'steer', 'text': 'keep going'},
+      {
+        'kind': 'user_question',
+        'questions': [
+          {'prompt': 'Which repo?'},
+        ],
+      },
+      {'kind': 'model_error', 'message': 'rate limited'},
+      {'kind': 'tool_call', 'name': 'bash'},
+    ]);
+    expect(items, hasLength(5));
+    expect(items[0], isA<UserMessageItem>());
+    expect((items[0] as UserMessageItem).text, 'hi yo mission control');
+    expect(items[1], isA<AgentTextItem>());
+    expect((items[1] as AgentTextItem).text, 'Hi! How can I help you today?');
+    expect(items[2], isA<UserMessageItem>());
+    expect(items[3], isA<QuestionItem>());
+    expect((items[3] as QuestionItem).question, 'Which repo?');
+    expect(items[4], isA<SystemNoteItem>());
+    expect(
+      decodeAttachPayload(utf8.encode('{"wire":"snapshot"}')),
+      '{"wire":"snapshot"}',
+    );
+  });
+
+  test('Mission Control stays connecting until the first snapshot', () {
+    final state = MissionControlState(
+      client: DaemonClient('http://127.0.0.1:1', 'token'),
+    );
+    expect(state.loading, isTrue);
+    expect(state.feed, isEmpty);
+
+    state.applyHarnessFrameForTest({
+      'status': 'idle',
+      'workspace': '/workspace',
+      'events': [
+        {'kind': 'user_input', 'text': 'hi yo mission control'},
+        {'kind': 'assistant_text', 'text': 'Hi! How can I help you today?'},
+      ],
+    });
+
+    expect(state.loading, isFalse);
+    expect(state.feed, hasLength(2));
+    expect((state.feed.first as UserMessageItem).text, 'hi yo mission control');
+    state.dispose();
+  });
+
+  test('live Mission Control snapshot hydrates the chat feed', () {
+    final snapshot = jsonDecode(
+      File('/tmp/mc-snapshot.json').readAsStringSync(),
+    ) as Map<String, dynamic>;
+    expect(snapshot['wire'], 'snapshot');
+    expect(snapshot['status'], 'idle');
+
+    final state = MissionControlState(
+      client: DaemonClient('http://127.0.0.1:1', 'token'),
+    );
+    state.applyHarnessFrameForTest(snapshot);
+
+    expect(state.loading, isFalse);
+    expect(state.feed, isNotEmpty);
+    expect(state.feed.first, isA<UserMessageItem>());
+    expect((state.feed.first as UserMessageItem).text, 'hi');
+    expect(state.feed.whereType<AgentTextItem>(), isNotEmpty);
+    state.dispose();
+  });
+
+  test('Mission Control formats task reports instead of raw envelopes', () {
+    final items = feedItemsFromEvents([
+      {
+        'kind': 'user_input',
+        'text':
+            '[mission_control_task]\ntask_id: t-1\ntitle: Fix hydrate\nscope: keep loading until snapshot\n[/mission_control_task]',
+      },
+      {
+        'kind': 'user_input',
+        'text':
+            '[mission_task_report]\ntask_id: t-1\ntitle: Fix hydrate\nstatus: done\nsummary: Snapshot gate landed\n[/mission_task_report]',
+      },
+    ]);
+    expect(items, hasLength(2));
+    expect(items[0], isA<TaskEventItem>());
+    expect((items[0] as TaskEventItem).kind, 'queued');
+    expect((items[0] as TaskEventItem).task.title, 'Fix hydrate');
+    expect(items[1], isA<TaskEventItem>());
+    expect((items[1] as TaskEventItem).kind, 'done');
+    expect(
+        (items[1] as TaskEventItem).task.description, 'Snapshot gate landed');
+  });
+
+  test('repeated subset assistant text is discarded', () {
+    const first =
+        "I'll inspect the hydrate path, keep loading until the first snapshot, then format worker reports.";
+    const later =
+        "I'll inspect the hydrate path, keep loading until the first snapshot.";
+    expect(assistantTextIsRedundant(later, [first]), isTrue);
+    expect(assistantTextIsRedundant('Fresh direction now.', [first]), isFalse);
+  });
+
+  test('tool rows expand only when they have content', () {
+    expect(toolIsExpandable('read_file', {'path': 'a.dart'}, null), isFalse);
+    expect(
+      toolIsExpandable('read_file', {
+        'path': 'a.dart'
+      }, {
+        'status': 'success',
+        'data': {'content': 'hello'},
+      }),
+      isTrue,
+    );
+    expect(toolIsExpandable('bash', {'command': 'ls'}, null), isFalse);
+    expect(
+      toolIsExpandable('bash', {
+        'command': 'ls'
+      }, {
+        'status': 'success',
+        'data': {'stdout': 'ok'},
+      }),
+      isTrue,
+    );
   });
 
   testWidgets('tool preview restores escaped newlines', (tester) async {

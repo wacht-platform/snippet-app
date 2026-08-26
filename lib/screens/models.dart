@@ -170,10 +170,11 @@ class _ModelsScreenState extends State<ModelsScreen> {
       PopupMenuButton<String>(
         tooltip: '',
         color: AppColors.surface1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
-          side: BorderSide(color: AppColors.border2),
-        ),
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        menuPadding: const EdgeInsets.symmetric(vertical: 6),
+        shape: appMenuShape,
         icon: AppIcon('more-vertical', size: 16, color: AppColors.fg3),
         onSelected: (v) {
           switch (v) {
@@ -195,25 +196,14 @@ class _ModelsScreenState extends State<ModelsScreen> {
         },
         itemBuilder: (_) => [
           if (p.usable && !p.active)
-            PopupMenuItem(
-              value: 'activate',
-              child:
-                  Text('Set as active', style: sans(13, color: AppColors.fg1)),
-            ),
-          PopupMenuItem(
+            appMenuItem(value: 'activate', label: 'Set as active'),
+          appMenuItem(
             value: isDelegate ? 'undelegate' : 'delegate',
-            child: Text(
-              isDelegate
-                  ? 'Stop delegating to this'
-                  : 'Use for delegated lanes',
-              style: sans(13, color: AppColors.fg1),
-            ),
+            label: isDelegate
+                ? 'Stop delegating to this'
+                : 'Use for delegated lanes',
           ),
-          PopupMenuItem(
-            value: 'delete',
-            child: Text('Delete profile',
-                style: sans(13, color: AppColors.danger)),
-          ),
+          appMenuItem(value: 'delete', label: 'Delete profile', danger: true),
         ],
       );
 }

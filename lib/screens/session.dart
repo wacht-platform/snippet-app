@@ -32,6 +32,8 @@ import 'files.dart';
 import 'processes.dart';
 import 'git.dart';
 import 'lanes.dart';
+import 'mission_control/mission_control_state.dart'
+    show isDedicatedMcSession, parseMissionEnvelope, MissionEnvelope;
 
 String formatCheckpointDate(String raw) {
   final parsed = DateTime.tryParse(raw)?.toLocal();
@@ -461,11 +463,23 @@ class _SessionScreenState extends State<SessionScreen>
     _durationSub = _audioPlayer.onDurationChanged.listen((duration) {
       if (mounted) setState(() => _playbackDuration = duration);
     });
-    _connect();
+    _startSession();
     _loadModel();
     _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
     _registeredOpenKey = _openKey;
     reportOpenSession(_openKey);
+  }
+
+  bool get _isMissionControl => isDedicatedMcSession(widget.sessionId);
+
+  Future<void> _startSession() async {
+    if (_isMissionControl) {
+      try {
+        await widget.client.mcOpen().timeout(const Duration(seconds: 8));
+      } catch (_) {}
+      if (!mounted || _closed) return;
+    }
+    _connect();
   }
 
   @override
@@ -995,6 +1009,7 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _openTerm({bool fresh = false}) {
+    if (_isMissionControl) return;
     if (!fresh && _terms.isNotEmpty) {
       setState(() => _termOpen = true);
       final t = _terms[_termFocus.clamp(0, _terms.length - 1)];
@@ -2015,7 +2030,8 @@ class _SessionScreenState extends State<SessionScreen>
         if (running)
           IconBtn('stop',
               tooltip: 'Stop', onTap: () => _send({'kind': 'interrupt'})),
-        IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
+        if (!_isMissionControl)
+          IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
       ]),
     );
   }
@@ -2189,7 +2205,7 @@ class _SessionScreenState extends State<SessionScreen>
               iconSize: 15,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
-        if (mac)
+        if (mac && !_isMissionControl)
           IconBtn('terminal',
               size: 30, iconSize: 15, tooltip: 'Shell', onTap: _openTerm),
         if (mac)
@@ -2205,8 +2221,9 @@ class _SessionScreenState extends State<SessionScreen>
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
         if (!mac) ...[
-          IconBtn('terminal',
-              size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
+          if (!_isMissionControl)
+            IconBtn('terminal',
+                size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
           _menu(s),
         ],
       ]),
@@ -2223,12 +2240,12 @@ class _SessionScreenState extends State<SessionScreen>
     }
     return PopupMenuButton<VoidCallback>(
       color: AppColors.surface1,
-      elevation: 8,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shadowColor: Colors.transparent,
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 260),
-      menuPadding: const EdgeInsets.symmetric(vertical: 4),
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
-          side: BorderSide(color: AppColors.border2)),
+      menuPadding: const EdgeInsets.symmetric(vertical: 6),
+      shape: appMenuShape,
       icon: AppIcon('more-vertical', color: AppColors.fg2),
       tooltip: 'Actions',
       onSelected: (fn) => fn(),
@@ -2299,7 +2316,7 @@ class _SessionScreenState extends State<SessionScreen>
                 onOpenFile: widget.onOpenFileTab));
         return;
       case 'shell':
-        _openTerm();
+        if (!_isMissionControl) _openTerm();
         return;
       case 'processes':
         presentScreen(context,
@@ -2325,18 +2342,11 @@ class _SessionScreenState extends State<SessionScreen>
     final ws = s?.workspace ?? '';
     PopupMenuItem<VoidCallback> item(String icon, String label, VoidCallback fn,
             {String? value}) =>
-        PopupMenuItem<VoidCallback>(
+        appMenuItem(
           value: fn,
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(children: [
-            AppIcon(icon, size: 14, color: AppColors.fg2),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(label, style: sans(12.5, color: AppColors.fg1))),
-            if (value != null)
-              Text(value, style: mono(11, color: AppColors.fg4)),
-          ]),
+          icon: icon,
+          label: label,
+          detail: value,
         );
     return [
       item('edit', 'Rename session', _renameCurrent),
@@ -2350,7 +2360,7 @@ class _SessionScreenState extends State<SessionScreen>
         item('layers', 'Lanes', _showLanes,
             value: '${s!.lanes.where((l) => l.running).length} running'),
       const PopupMenuDivider(),
-      item('terminal', 'Session shell', _openTerm),
+      if (!_isMissionControl) item('terminal', 'Session shell', _openTerm),
       item(
           'git-branch',
           'Git',
@@ -2412,6 +2422,7 @@ class _SessionScreenState extends State<SessionScreen>
           onCancelGoal: _cancelGoal,
           onLanes: () => run(_showLanes),
           onTerm: () => run(_openTerm),
+          hideShell: _isMissionControl,
           onGit: () => run(() => presentScreen(context,
               builder: (_, close) => GitScreen(
                   client: widget.client,
@@ -2802,6 +2813,7 @@ class _SessionScreenState extends State<SessionScreen>
     String? pendingKey;
     final eventOccurrences = <String, int>{};
     final laneRowsShown = <String>{}; // spawn cards already emitted (by id)
+    final recentAssistant = <String>[];
 
     String eventKey(Map<String, dynamic> event) {
       // Event indexes shift when the daemon compacts history. Use the event
@@ -2896,6 +2908,11 @@ class _SessionScreenState extends State<SessionScreen>
           // Answers are already shown on the question card — don't also
           // render them as a user bubble.
           if (_looksLikeQuestionAnswer(text)) break;
+          final envelope = parseMissionEnvelope(text);
+          if (envelope != null) {
+            addEvent(key, _MissionEnvelopeCard(envelope: envelope));
+            break;
+          }
           final markKey = _userMarkKeys.putIfAbsent(key, GlobalKey.new);
           final preview = _jumpPreview(text);
           _userMarks.add(_UserMark(key: markKey, preview: preview));
@@ -2910,11 +2927,14 @@ class _SessionScreenState extends State<SessionScreen>
               ));
         case 'assistant_text':
           endTools(key);
+          final reply = _s(e['text']);
+          if (assistantTextIsRedundant(reply, recentAssistant)) break;
+          if (reply.trim().isNotEmpty) recentAssistant.add(reply);
           addEvent(
               key,
               Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 4),
-                  child: Bubble(mine: false, text: _s(e['text']))));
+                  child: Bubble(mine: false, text: reply)));
         case 'model_error':
           endTools(key);
           addEvent(key, NoteLine(_s(e['message']), error: true));
@@ -3153,11 +3173,10 @@ class _SessionScreenState extends State<SessionScreen>
       context: context,
       position: position,
       color: AppColors.surface1,
-      elevation: 8,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(R.md),
-        side: BorderSide(color: AppColors.border2),
-      ),
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shape: appMenuShape,
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
       items: [
         for (final p in cfg.profiles)
@@ -3963,6 +3982,90 @@ bool _looksLikeQuestionAnswer(String text) {
   return t.contains('\n→ ') || t.startsWith('→ ');
 }
 
+String _normalizeAssistantText(String text) {
+  return text
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9\s]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+bool assistantTextIsRedundant(String text, List<String> recent) {
+  final next = _normalizeAssistantText(text);
+  if (next.isEmpty) return false;
+  final window =
+      recent.length <= 3 ? recent : recent.sublist(recent.length - 3);
+  for (final prior in window) {
+    final prev = _normalizeAssistantText(prior);
+    if (prev.isEmpty) continue;
+    if (next == prev) return true;
+    if (next.length >= 24 && prev.contains(next)) return true;
+  }
+  return false;
+}
+
+class _MissionEnvelopeCard extends StatelessWidget {
+  const _MissionEnvelopeCard({required this.envelope});
+  final MissionEnvelope envelope;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final kind = envelope.eventKind;
+    final color = switch (kind) {
+      'working' => AppColors.run,
+      'done' => AppColors.ok,
+      'blocked' || 'failed' => AppColors.danger,
+      _ => AppColors.fg3,
+    };
+    final label = envelope.isReport
+        ? (envelope.status.isEmpty ? kind : envelope.status)
+        : 'queued';
+    final title = envelope.title.isEmpty ? 'Task' : envelope.title;
+    final summary = envelope.summary.trim();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13.5, color: AppColors.fg1)),
+                  ),
+                  Text(label, style: sans(12, color: AppColors.fg4)),
+                ]),
+                if (summary.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(summary,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// One-line preview for the desktop jump rail. Voice notes often have no
 /// leftover body after markers are stripped — use the transcript instead.
 String _jumpPreview(String text) {
@@ -4644,6 +4747,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onCompact;
   final VoidCallback onCheckpoints;
   final VoidCallback onUsage;
+  final bool hideShell;
   const _SessionActionsPanel({
     required this.session,
     required this.title,
@@ -4659,6 +4763,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onCompact,
     required this.onCheckpoints,
     required this.onUsage,
+    this.hideShell = false,
   });
 
   @override
@@ -4828,7 +4933,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
         if (!kMacOS)
           _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
         _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
-        _row(icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
+        if (!widget.hideShell)
+          _row(icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
         _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
         _section('History'),
         _row(

@@ -33,6 +33,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final canExpand = toolIsExpandable(widget.tool, widget.args, widget.result);
     final summary = widget.tool == 'bash'
         ? 'shell command'
         : toolArgSummary(widget.tool, widget.args);
@@ -41,7 +42,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _open = !_open),
+          onTap: canExpand ? () => setState(() => _open = !_open) : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Row(children: [
@@ -71,7 +72,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
             ]),
           ),
         ),
-        if (_open)
+        if (_open && canExpand)
           Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 6),
             child: ConstrainedBox(
@@ -174,22 +175,7 @@ class ToolRun extends StatefulWidget {
 }
 
 class _ToolRunState extends State<ToolRun> {
-  late bool _open;
-
-  @override
-  void initState() {
-    super.initState();
-    _open = widget.running;
-  }
-
-  @override
-  void didUpdateWidget(covariant ToolRun oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.running && !oldWidget.running) _open = true;
-    if (!widget.running && oldWidget.running && widget.rows.length > 2) {
-      _open = false;
-    }
-  }
+  bool _open = false;
 
   @override
   Widget build(BuildContext context) {

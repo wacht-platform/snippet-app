@@ -209,11 +209,11 @@ Future<void> initNotifications() async {
       ),
       iosNotificationOptions: const IOSNotificationOptions(),
       foregroundTaskOptions: ForegroundTaskOptions(
-        eventAction: ForegroundTaskEventAction.repeat(15000),
+        eventAction: ForegroundTaskEventAction.repeat(60000),
         autoRunOnBoot: true,
         autoRunOnMyPackageReplaced: true,
-        allowWakeLock: true,
-        allowWifiLock: true,
+        allowWakeLock: false,
+        allowWifiLock: false,
         allowAutoRestart: true,
       ),
     );
@@ -332,9 +332,6 @@ Future<String?> startWatching() async {
       if (perm != NotificationPermission.granted) {
         return 'Notification permission denied.';
       }
-    }
-    if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
-      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
     }
     if (await FlutterForegroundTask.isRunningService) {
       await FlutterForegroundTask.restartService();

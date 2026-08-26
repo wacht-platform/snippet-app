@@ -270,11 +270,11 @@ Color get readingBg => kMobile ? AppColors.bg : AppColors.canvas;
 // ---------------------------------------------------------------------------
 
 class R {
-  static const card = 10.0;
-  static const md = 8.0;
-  static const sm = 6.0;
-  static const xs = 4.0;
-  static const sheetTop = 12.0;
+  static const card = 14.0;
+  static const md = 12.0;
+  static const sm = 8.0;
+  static const xs = 6.0;
+  static const sheetTop = 16.0;
 }
 
 // ---------------------------------------------------------------------------
@@ -353,11 +353,13 @@ ThemeData buildAppTheme() {
     hoverColor: c.surface3.withValues(alpha: 0.35),
     popupMenuTheme: PopupMenuThemeData(
       color: c.surface1,
-      elevation: 8,
-      shadowColor: Colors.black54,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      menuPadding: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
-          side: BorderSide(color: c.border2)),
+          borderRadius: BorderRadius.circular(R.card),
+          side: BorderSide(color: c.border)),
     ),
     textTheme: _allRegular(GoogleFonts.interTextTheme(base.textTheme)
         .apply(bodyColor: c.fg1, displayColor: c.fg1)),
@@ -394,8 +396,18 @@ IconData iconFor(String name) {
   switch (name) {
     case 'chevron-left':
       return Icons.chevron_left_rounded;
+    case 'arrow-left':
+      return IconsaxPlusLinear.arrow_left_2;
     case 'chevron-right':
       return Icons.chevron_right_rounded;
+    case 'bell':
+      return IconsaxPlusLinear.notification;
+    case 'alert-circle':
+      return IconsaxPlusLinear.info_circle;
+    case 'message':
+      return IconsaxPlusLinear.message_text_1;
+    case 'archive':
+      return IconsaxPlusLinear.archive;
     case 'chevron-down':
       return Icons.expand_more_rounded;
     case 'chevron-up':

@@ -505,8 +505,8 @@ class DaemonClient {
   }
 
   /// POST /mission-control/open — open the dedicated Mission Control session.
-  Future<String> mcOpen({required String folder, String? profile}) async {
-    final body = <String, dynamic>{'folder': folder};
+  Future<String> mcOpen({String? profile}) async {
+    final body = <String, dynamic>{};
     if (profile != null && profile.isNotEmpty) body['profile'] = profile;
     final r = await http.post(_uri('/mission-control/open'),
         headers: _json, body: jsonEncode(body));

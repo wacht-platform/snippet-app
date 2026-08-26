@@ -589,6 +589,10 @@ class MissionControlOverview {
   final int totalSessions;
   final List<MissionControlTask> recentTasks;
   final List<ManagedSession> recentSessions;
+  /// Daemon-side id of the active Mission Control session, if one is open.
+  /// Resolved client-side from the settings sidecar; null when the user has
+  /// never opened Mission Control on this device.
+  final String? mcSessionId;
 
   MissionControlOverview.fromJson(Map<String, dynamic> j)
       : activeTasks = (j['active_tasks'] as num?)?.toInt() ?? 0,
@@ -601,7 +605,31 @@ class MissionControlOverview {
             .toList(),
         recentSessions = ((j['recent_sessions'] as List?) ?? const [])
             .map((e) => ManagedSession.fromJson(e as Map<String, dynamic>))
-            .toList();
+            .toList(),
+        mcSessionId = j['mc_session_id'] as String?;
+}
+
+/// A notification marker attached to a task (e.g. "dispatch failed 3 times",
+/// "waiting on dependency X"). The daemon emits these as part of the task
+/// payload; the UI surfaces unresolved ones in the inbox.
+class NotificationMarker {
+  final String target;
+  final String kind; // blocked | failed | info
+  final String message;
+  final bool delivered;
+
+  const NotificationMarker({
+    required this.target,
+    required this.kind,
+    required this.message,
+    required this.delivered,
+  });
+
+  NotificationMarker.fromJson(Map<String, dynamic> j)
+      : target = j['target'] as String? ?? '',
+        kind = j['kind'] as String? ?? 'info',
+        message = j['message'] as String? ?? '',
+        delivered = j['delivered'] as bool? ?? false;
 }
 
 /// A task tracked by Mission Control.
@@ -615,6 +643,7 @@ class MissionControlTask {
   final int updatedAt;
   final String? sessionId; // link to a managed session
   final bool archived;
+  final List<NotificationMarker> notifications;
 
   MissionControlTask.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -624,7 +653,11 @@ class MissionControlTask {
         createdAt = (j['created_at'] as num?)?.toInt() ?? 0,
         updatedAt = (j['updated_at'] as num?)?.toInt() ?? 0,
         sessionId = j['session_id'] as String?,
-        archived = j['archived'] as bool? ?? false;
+        archived = j['archived'] as bool? ?? false,
+        notifications = ((j['notifications'] as List?) ?? const [])
+            .map((e) => NotificationMarker.fromJson(
+                (e as Map).cast<String, dynamic>()))
+            .toList();
 
   bool get isActive =>
       !archived && (status == 'pending' || status == 'in_progress');

@@ -20,7 +20,7 @@ List<Map> _mapItems(dynamic value) =>
 String toolIcon(String tool) => switch (tool) {
       'edit_file' || 'replace_file_content' => 'edit',
       'write_file' || 'append_file' => 'file-plus',
-      'read_file' => 'eye',
+      'read_file' => 'check-check',
       'read_image' => 'image',
       'bash' => 'play',
       'search_content' || 'search_files' => 'search',
@@ -89,6 +89,53 @@ String toolArgSummary(String tool, dynamic args) {
     if (args[k] is String) return first(args[k] as String);
   }
   return '';
+}
+
+bool toolIsExpandable(String tool, dynamic args, dynamic result) {
+  String arg(String key) {
+    if (args is! Map) return '';
+    return (args[key] ?? '').toString();
+  }
+
+  bool resultHasBody() {
+    if (result == null) return false;
+    if (result is! Map) return result.toString().trim().isNotEmpty;
+    if ((result['status'] ?? '').toString() == 'error') return true;
+    final data = result['data'] is Map ? result['data'] as Map : result;
+    for (final key in const ['stdout', 'stderr', 'content', 'text', 'output']) {
+      if ((data[key] ?? '').toString().trim().isNotEmpty) return true;
+    }
+    final entries = data['entries'];
+    if (entries is List && entries.isNotEmpty) return true;
+    final matches = data['matches'];
+    return matches is List && matches.isNotEmpty;
+  }
+
+  switch (tool) {
+    case 'write_file':
+    case 'append_file':
+      return arg('content').trim().isNotEmpty;
+    case 'edit_file':
+      return arg('old_string').isNotEmpty || arg('new_string').isNotEmpty;
+    case 'bash':
+      final cmd = arg('command');
+      return cmd.split('\n').length > 1 || cmd.length > 80 || resultHasBody();
+    case 'memory_write':
+    case 'memory_rule':
+    case 'memory_pattern':
+    case 'memory_index':
+      return arg('content').trim().isNotEmpty;
+    case 'read_file':
+    case 'search_content':
+    case 'list_files':
+    case 'web_read':
+    case 'view_outline':
+    case 'code_map':
+      return resultHasBody();
+    default:
+      final shown = toolArgSummary(tool, args);
+      return shown.contains('…') || resultHasBody();
+  }
 }
 
 /// Friendly title for the drawer header.

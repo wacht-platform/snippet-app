@@ -54,8 +54,12 @@ class _ShellTab {
   })  : sessionId = null,
         profile = null;
   bool get isFile => filePath != null;
-  String get key =>
-      isFile ? '$instanceUrl|file|$filePath' : '$instanceUrl|$sessionId';
+  bool get isMissionControl => !isFile && isDedicatedMcSession(sessionId);
+  String get key => isFile
+      ? '$instanceUrl|file|$filePath'
+      : isMissionControl
+          ? '$instanceUrl|mission-control'
+          : '$instanceUrl|$sessionId';
 }
 
 class _MacSessionStatus {
@@ -70,7 +74,8 @@ class _MacSessionControls {
   const _MacSessionControls(this.stop, this.performAction);
 }
 
-class _DesktopShellState extends State<DesktopShell> {
+class _DesktopShellState extends State<DesktopShell>
+    with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final InstanceStore _store = InstanceStore();
   List<Instance> _instances = const [];
@@ -103,25 +108,23 @@ class _DesktopShellState extends State<DesktopShell> {
   String _macGitKey = '';
 
   Timer? _sessionsTicker;
+  bool _appForeground = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadInstances();
     // Tapping a session notification opens it in-place (consistent with the app),
     // not a separate full-screen route.
     if (kCanNotify) onNotifTap = _onNotif;
-    // Keep the sidebar live: status dots and model labels drift as sessions run,
-    // finish, or switch models — refresh on a gentle cadence.
-    _sessionsTicker = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted && !_sessionsLoading) _loadSessions();
-      if (mounted) _refreshHealth();
-    });
+    _startSessionsTicker();
     if (!kMobile) HardwareKeyboard.instance.addHandler(_handleGlobalShortcuts);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (!kMobile)
       HardwareKeyboard.instance.removeHandler(_handleGlobalShortcuts);
     _sessionsTicker?.cancel();
@@ -130,6 +133,29 @@ class _DesktopShellState extends State<DesktopShell> {
     _stripController.dispose();
     if (onNotifTap == _onNotif) onNotifTap = null;
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final fg = state == AppLifecycleState.resumed;
+    _appForeground = fg;
+    if (fg) {
+      _startSessionsTicker();
+      if (mounted && !_sessionsLoading) _loadSessions();
+    } else {
+      _sessionsTicker?.cancel();
+      _sessionsTicker = null;
+    }
+  }
+
+  void _startSessionsTicker() {
+    _sessionsTicker?.cancel();
+    final period = Duration(seconds: kMobile ? 90 : 30);
+    _sessionsTicker = Timer.periodic(period, (_) {
+      if (!mounted || !_appForeground) return;
+      if (!_sessionsLoading) _loadSessions();
+      _refreshHealth();
+    });
   }
 
   bool _mod(LogicalKeyboardKey left, LogicalKeyboardKey right) {
@@ -340,61 +366,136 @@ class _DesktopShellState extends State<DesktopShell> {
           title: descriptor.title,
         ));
       } else if (descriptor.sessionId != null) {
+        if (isDedicatedMcSession(descriptor.sessionId) &&
+            restored
+                .any((t) => t.isMissionControl && t.instanceUrl == inst.url)) {
+          continue;
+        }
         restored.add(_ShellTab.session(
           client: client,
           instanceUrl: inst.url,
           sessionId: descriptor.sessionId,
-          title: descriptor.title,
+          title: isDedicatedMcSession(descriptor.sessionId)
+              ? 'Mission Control'
+              : descriptor.title,
           profile: descriptor.profile,
         ));
       }
     }
-    if (!mounted || restored.isEmpty) return;
+    if (!mounted) return;
     setState(() {
-      _tabs
-        ..clear()
-        ..addAll(restored);
-      _activeIndex = saved.activeIndex.clamp(0, restored.length - 1);
-      final active = _tabs[_activeIndex];
-      _active = byUrl[active.instanceUrl];
-      _client =
-          _active == null ? null : DaemonClient(_active!.url, _active!.token);
+      if (restored.isNotEmpty) {
+        _tabs
+          ..clear()
+          ..addAll(restored);
+        _activeIndex = saved.activeIndex.clamp(0, restored.length - 1);
+        final active = _tabs[_activeIndex];
+        _active = byUrl[active.instanceUrl];
+        _client =
+            _active == null ? null : DaemonClient(_active!.url, _active!.token);
+      }
+    });
+    _ensurePinnedMissionControl();
+    _persistTabs();
+    _syncPage();
+  }
+
+  _ShellTab _mcTabFor(Instance inst) => _ShellTab.session(
+        client: DaemonClient(inst.url, inst.token),
+        instanceUrl: inst.url,
+        sessionId: 'mission-control',
+        title: 'Mission Control',
+      );
+
+  void _ensurePinnedMissionControl() {
+    final inst = _active;
+    final client = _client;
+    if (inst == null) return;
+    if (client != null) unawaited(client.mcOpen());
+    final existing = _tabs
+        .indexWhere((t) => t.isMissionControl && t.instanceUrl == inst.url);
+    if (existing == 0) {
+      if (_activeIndex < 0) {
+        setState(() => _activeIndex = 0);
+        _persistTabs();
+        _syncPage();
+      }
+      return;
+    }
+    setState(() {
+      if (existing > 0) {
+        final tab = _tabs.removeAt(existing);
+        _tabs.insert(0, tab);
+        if (_activeIndex == existing || _activeIndex < 0) {
+          _activeIndex = 0;
+        } else if (_activeIndex < existing) {
+          _activeIndex++;
+        }
+      } else {
+        _tabs.insert(0, _mcTabFor(inst));
+        if (_activeIndex < 0) {
+          _activeIndex = 0;
+        } else {
+          _activeIndex++;
+        }
+      }
     });
     _persistTabs();
     _syncPage();
   }
 
+  void _openMissionControlTab() {
+    final inst = _active;
+    final client = _client;
+    if (inst == null) return;
+    if (client != null) unawaited(client.mcOpen());
+    _ensurePinnedMissionControl();
+    final i = _tabs
+        .indexWhere((t) => t.isMissionControl && t.instanceUrl == inst.url);
+    if (i >= 0) _activateTab(i);
+  }
+
   void _closeOthers(int keep) {
     if (keep < 0 || keep >= _tabs.length) return;
     final kept = _tabs[keep];
+    final pinned = _tabs.where((tab) => tab.isMissionControl).toList();
+    final survivors = <_ShellTab>[
+      ...pinned.where((tab) => !identical(tab, kept)),
+      kept,
+    ];
+    final keptKeys = survivors.map((tab) => tab.key).toSet();
     final removedKeys = _tabs
-        .where((tab) => !identical(tab, kept))
+        .where((tab) => !keptKeys.contains(tab.key))
         .map((tab) => tab.key)
         .toList();
     setState(() {
       _tabs
         ..clear()
-        ..add(kept);
-      _activeIndex = 0;
+        ..addAll(survivors);
+      _activeIndex = _tabs.indexWhere((tab) => identical(tab, kept));
+      if (_activeIndex < 0) _activeIndex = 0;
       for (final key in removedKeys) {
         _macSessionStatuses.remove(key);
         _macSessionControls.remove(key);
       }
     });
+    _ensurePinnedMissionControl();
     _persistTabs();
     _syncPage();
   }
 
   void _closeAllTabs() {
     setState(() {
-      for (final tab in _tabs) {
+      for (final tab in _tabs.where((t) => !t.isMissionControl)) {
         _macSessionStatuses.remove(tab.key);
         _macSessionControls.remove(tab.key);
       }
-      _tabs.clear();
-      _activeIndex = -1;
+      _tabs.removeWhere((t) => !t.isMissionControl);
+      _activeIndex = _tabs.isEmpty ? -1 : 0;
     });
+    _ensurePinnedMissionControl();
     _persistTabs();
+    _syncPage();
   }
 
   void _tabMenu(int i) {
@@ -404,7 +505,8 @@ class _DesktopShellState extends State<DesktopShell> {
       context: context,
       backgroundColor: AppColors.surface1,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(R.card))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Padding(
@@ -422,11 +524,12 @@ class _DesktopShellState extends State<DesktopShell> {
             ]),
           ),
           Divider(height: 1, color: AppColors.border),
-          _tabMenuItem(ctx, 'x', 'Close tab', () => _closeTab(i)),
-          if (_tabs.length > 1)
+          if (!t.isMissionControl)
+            _tabMenuItem(ctx, 'x', 'Close tab', () => _closeTab(i)),
+          if (_tabs.any((tab) => !tab.isMissionControl))
             _tabMenuItem(
                 ctx, 'copy', 'Close other tabs', () => _closeOthers(i)),
-          if (_tabs.length > 1)
+          if (_tabs.any((tab) => !tab.isMissionControl))
             _tabMenuItem(ctx, 'trash', 'Close all tabs', _closeAllTabs,
                 danger: true),
         ]),
@@ -455,6 +558,8 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   void _closeTab(int i) {
+    if (i < 0 || i >= _tabs.length) return;
+    if (_tabs[i].isMissionControl) return;
     final key = _tabs[i].key;
     setState(() {
       _macSessionStatuses.remove(key);
@@ -570,6 +675,7 @@ class _DesktopShellState extends State<DesktopShell> {
       _loading = false;
     });
     await _restoreTabs(items);
+    _ensurePinnedMissionControl();
     _loadSessions();
     _refreshHealth();
   }
@@ -593,7 +699,30 @@ class _DesktopShellState extends State<DesktopShell> {
       // A slow response for a PREVIOUS instance must not render under (or route
       // taps to) the one selected since.
       if (!identical(c, _client)) return;
-      s.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      s.removeWhere((row) =>
+          isMissionControlListRow(row) && !isDedicatedMcSession(row.id));
+      final pinned = <SessionInfo>[];
+      final rest = <SessionInfo>[];
+      for (final row in s) {
+        if (isDedicatedMcSession(row.id)) {
+          pinned.add(row);
+        } else {
+          rest.add(row);
+        }
+      }
+      if (pinned.isEmpty) {
+        pinned.add(SessionInfo.fromJson({
+          'id': 'mission-control',
+          'title': 'Mission Control',
+          'status': 'idle',
+          'conversation': 'default',
+        }));
+      }
+      rest.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      s
+        ..clear()
+        ..addAll(pinned)
+        ..addAll(rest);
       if (mounted) {
         setState(() {
           _sessions = s;
@@ -644,10 +773,15 @@ class _DesktopShellState extends State<DesktopShell> {
       _client = DaemonClient(inst.url, inst.token);
       _sessions = null;
     });
+    _ensurePinnedMissionControl();
     _loadSessions();
   }
 
   void _openSession(String id, String title, String? profile) {
+    if (isDedicatedMcSession(id)) {
+      _openMissionControlTab();
+      return;
+    }
     final client = _client;
     final url = _active?.url;
     if (client == null || url == null) return;
@@ -668,6 +802,7 @@ class _DesktopShellState extends State<DesktopShell> {
         _activeIndex = _tabs.length - 1;
       }
     });
+    _persistTabs();
     _syncPage();
   }
 
@@ -746,6 +881,7 @@ class _DesktopShellState extends State<DesktopShell> {
             _active != null ? DaemonClient(_active!.url, _active!.token) : null;
       }
     });
+    _ensurePinnedMissionControl();
     _syncPage();
   }
 
@@ -765,6 +901,10 @@ class _DesktopShellState extends State<DesktopShell> {
           onAfterPick?.call();
         },
         onSelectInstance: _selectInstance,
+        onOpenMissionControl: () {
+          _openMissionControlTab();
+          onAfterPick?.call();
+        },
         onOpenSession: (id, title, profile) {
           _openSession(id, title, profile);
           onAfterPick?.call();
@@ -778,6 +918,7 @@ class _DesktopShellState extends State<DesktopShell> {
       );
 
   void _onSessionDeleted(String id) {
+    if (isDedicatedMcSession(id)) return;
     final i = _tabs.indexWhere((t) => t.sessionId == id);
     if (i >= 0) _closeTab(i);
     _loadSessions();
@@ -892,8 +1033,9 @@ class _DesktopShellState extends State<DesktopShell> {
       rightActions.addAll([
         _macStatusAction(
             'folder', 'Files', () => controls.performAction('files')),
-        _macStatusAction(
-            'terminal', 'Shell', () => controls.performAction('shell')),
+        if (tab?.isMissionControl != true)
+          _macStatusAction(
+              'terminal', 'Shell', () => controls.performAction('shell')),
         _macStatusAction(
             'list', 'Processes', () => controls.performAction('processes')),
         _macStatusAction(
@@ -1262,6 +1404,7 @@ class _DesktopShellState extends State<DesktopShell> {
                   final t = _tabs[i];
                   return _KeepAlive(
                     key: ValueKey(t.key),
+                    keep: !kMobile || t.isMissionControl || i == _activeIndex,
                     child: t.isFile
                         ? FileViewer(
                             key: ValueKey(t.key),
@@ -1381,7 +1524,11 @@ class _DesktopShellState extends State<DesktopShell> {
                   color: active ? AppColors.border : Colors.transparent),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (t.isFile)
+          if (t.isMissionControl)
+            AppIcon('layers',
+                size: mac ? 13 : 12,
+                color: active ? AppColors.accent : AppColors.fg4)
+          else if (t.isFile)
             AppIcon('file',
                 size: mac ? 13 : 12,
                 color: active ? AppColors.accent : AppColors.fg4)
@@ -1401,15 +1548,17 @@ class _DesktopShellState extends State<DesktopShell> {
                 style: sans(mac ? 12 : 12.5,
                     color: active ? AppColors.fg1 : AppColors.fg3)),
           ),
-          SizedBox(width: mac ? 3 : 4),
-          GestureDetector(
-            onTap: () => _closeTab(i),
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: EdgeInsets.all(mac ? 4 : 5),
-              child: AppIcon('x', size: mac ? 11 : 11, color: AppColors.fg4),
+          if (!t.isMissionControl) ...[
+            SizedBox(width: mac ? 3 : 4),
+            GestureDetector(
+              onTap: () => _closeTab(i),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: EdgeInsets.all(mac ? 4 : 5),
+                child: AppIcon('x', size: mac ? 11 : 11, color: AppColors.fg4),
+              ),
             ),
-          ),
+          ],
         ]),
       ),
     );
@@ -1559,7 +1708,8 @@ class _DesktopShellState extends State<DesktopShell> {
 /// survive switching between tabs.
 class _KeepAlive extends StatefulWidget {
   final Widget child;
-  const _KeepAlive({super.key, required this.child});
+  final bool keep;
+  const _KeepAlive({super.key, required this.child, this.keep = true});
   @override
   State<_KeepAlive> createState() => _KeepAliveState();
 }
@@ -1567,10 +1717,16 @@ class _KeepAlive extends StatefulWidget {
 class _KeepAliveState extends State<_KeepAlive>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => widget.keep;
+  @override
+  void didUpdateWidget(covariant _KeepAlive oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.keep != widget.keep) updateKeepAlive();
+  }
+
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
+    Theme.of(context);
     super.build(context);
     return widget.child;
   }
@@ -1587,6 +1743,7 @@ class _Sidebar extends StatefulWidget {
   final VoidCallback onRefreshSessions;
   final VoidCallback onNewSession;
   final void Function(Instance) onSelectInstance;
+  final VoidCallback onOpenMissionControl;
   final void Function(String id, String title, String? profile) onOpenSession;
   final VoidCallback onAddInstance;
   final void Function(Instance, String) onRenameInstance;
@@ -1606,6 +1763,7 @@ class _Sidebar extends StatefulWidget {
     required this.onRefreshSessions,
     required this.onNewSession,
     required this.onSelectInstance,
+    required this.onOpenMissionControl,
     required this.onOpenSession,
     required this.onAddInstance,
     required this.onRenameInstance,
@@ -1635,6 +1793,11 @@ class _SidebarState extends State<_Sidebar> {
     _renameCtl.dispose();
     _renameFocus.dispose();
     super.dispose();
+  }
+
+  void _openMc() {
+    if (widget.client == null) return;
+    widget.onOpenMissionControl();
   }
 
   List<SessionInfo>? get _sessions => widget.sessions;
@@ -1694,6 +1857,7 @@ class _SidebarState extends State<_Sidebar> {
       sessions: _sessions ?? const [],
       onOpenChat: (s) => widget.onOpenSession(s.id, s.title, s.profile),
       commands: [
+        PaletteCommand('layers', 'Mission Control', '', _openMc),
         PaletteCommand('edit', 'New chat', '', widget.onNewSession),
         PaletteCommand('folder', 'Open folder', '', widget.onNewSession),
         PaletteCommand('settings', 'Settings', '', _openSettings),
@@ -1758,11 +1922,6 @@ class _SidebarState extends State<_Sidebar> {
                                       weight: FontWeight.w600,
                                       color: AppColors.fg1)),
                               const Spacer(),
-                              IconBtn('check-check',
-                                  size: 32,
-                                  iconSize: 16,
-                                  tooltip: 'Select',
-                                  onTap: _enterSelect),
                               GestureDetector(
                                 onTap: _showFilterSheet,
                                 child: Padding(
@@ -1793,38 +1952,29 @@ class _SidebarState extends State<_Sidebar> {
         ],
         if (!kMobile) ...[
           _machineHeader(),
-          // Desktop: nav rows above the session list.
           _navRow('search', 'Search', onTap: hasClient ? _openSearch : null),
           _navRow('folder', 'Browse',
               sub: 'files · new chat',
               onTap: hasClient ? widget.onNewSession : null),
-          _navRow('layers', 'Mission Control',
-              onTap: hasClient
-                  ? () => openMissionControl(context, widget.client!)
-                  : null),
-          if (hasClient && (_sessions?.isNotEmpty ?? false))
-            _selecting
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
-                    child: Row(children: [
-                      Text('${_selected.length} selected',
-                          style: sans(11.5, color: AppColors.fg3)),
-                      const Spacer(),
-                      IconBtn('x',
-                          size: 28,
-                          iconSize: 15,
-                          tooltip: 'Cancel',
-                          onTap: _exitSelect),
-                      IconBtn('trash',
-                          size: 28,
-                          iconSize: 14,
-                          tooltip: 'Delete selected',
-                          onTap: _selected.isEmpty
-                              ? null
-                              : _confirmDeleteSelected),
-                    ]),
-                  )
-                : _navRow('check-check', 'Select', onTap: _enterSelect),
+          if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
+              child: Row(children: [
+                Text('${_selected.length} selected',
+                    style: sans(11.5, color: AppColors.fg3)),
+                const Spacer(),
+                IconBtn('x',
+                    size: 28,
+                    iconSize: 15,
+                    tooltip: 'Cancel',
+                    onTap: _exitSelect),
+                IconBtn('trash',
+                    size: 28,
+                    iconSize: 14,
+                    tooltip: 'Delete selected',
+                    onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
+              ]),
+            ),
           const SizedBox(height: 4),
           Expanded(
             child: !hasClient
@@ -1905,6 +2055,12 @@ class _SidebarState extends State<_Sidebar> {
         border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
       ),
       child: Row(children: [
+        IconBtn('layers',
+            size: 38,
+            iconSize: 19,
+            tooltip: 'Mission Control',
+            onTap: hasClient ? _openMc : null),
+        const SizedBox(width: 8),
         // Search pill.
         Expanded(
           child: GestureDetector(
@@ -2064,38 +2220,56 @@ class _SidebarState extends State<_Sidebar> {
     if (all.isEmpty) {
       // Offline ≠ empty: a failed fetch gets an explicit error + retry.
       if (widget.sessionsError != null) {
-        return Center(
-            child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon('wifi-off', size: 20, color: AppColors.fg4),
-                  const SizedBox(height: 10),
-                  Text(widget.sessionsError!,
-                      textAlign: TextAlign.center,
-                      style: sans(12.5, color: AppColors.fg3)),
-                  const SizedBox(height: 12),
-                  TextButton(
-                      onPressed: widget.onRefreshSessions,
-                      child: Text('Retry',
-                          style: sans(12.5, color: AppColors.accent))),
-                ])));
+        return ListView(
+            padding:
+                EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
+            children: [
+              Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    AppIcon('wifi-off', size: 20, color: AppColors.fg4),
+                    const SizedBox(height: 10),
+                    Text(widget.sessionsError!,
+                        textAlign: TextAlign.center,
+                        style: sans(12.5, color: AppColors.fg3)),
+                    const SizedBox(height: 12),
+                    TextButton(
+                        onPressed: widget.onRefreshSessions,
+                        child: Text('Retry',
+                            style: sans(12.5, color: AppColors.accent))),
+                  ])),
+            ]);
       }
-      return Center(
-          child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text('No chats yet.',
-                  style: sans(12.5, color: AppColors.fg4))));
+      return ListView(
+          padding:
+              EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
+          children: [
+            Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('No chats yet.',
+                    textAlign: TextAlign.center,
+                    style: sans(12.5, color: AppColors.fg4))),
+          ]);
     }
-    // Group by recency; the list is already recency-sorted, so buckets are contiguous.
-    final list = all.where((s) => _statusMatch(_filter, s)).toList();
+    final pinned = all.where((s) => isDedicatedMcSession(s.id)).toList();
+    final list = all
+        .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
+        .toList();
     final children = <Widget>[];
+    for (final s in pinned) {
+      children.add(kMobile
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: _missionControlCard(s))
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 1),
+              child: _missionControlRow(s)));
+    }
     String? bucket;
     for (final s in list) {
       final b = _bucket(s.lastActive);
       if (b != bucket) {
         bucket = b;
-        // Mobile: no per-bucket labels — the "Conversations" header above is
-        // the single section label. Desktop keeps recency bucket labels.
         if (!kMobile) {
           children.add(Padding(
               padding: const EdgeInsets.fromLTRB(10, 16, 4, 4),
@@ -2113,7 +2287,7 @@ class _SidebarState extends State<_Sidebar> {
               padding: const EdgeInsets.only(bottom: 1),
               child: _sessionRow(s)));
     }
-    if (list.isEmpty) {
+    if (list.isEmpty && pinned.isEmpty) {
       children.add(Padding(
           padding: const EdgeInsets.all(20),
           child: Text('Nothing here.',
@@ -2173,6 +2347,59 @@ class _SidebarState extends State<_Sidebar> {
                   weight: FontWeight.w500,
                   color: sel ? AppColors.bg : AppColors.fg3)),
         ),
+      ),
+    );
+  }
+
+  Widget _missionControlRow(SessionInfo s) {
+    final selected = s.id == widget.selectedSessionId;
+    return Material(
+      color: selected ? AppColors.surface2 : Colors.transparent,
+      borderRadius: BorderRadius.circular(R.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.sm),
+        onTap: () => widget.onOpenSession(s.id, 'Mission Control', s.profile),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(children: [
+            AppIcon('layers',
+                size: 13, color: selected ? AppColors.accent : AppColors.fg3),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Mission Control',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12.5,
+                      weight: FontWeight.w600,
+                      color: selected ? AppColors.fg1 : AppColors.fg2)),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _missionControlCard(SessionInfo s) {
+    return GestureDetector(
+      onTap: () => widget.onOpenSession(s.id, 'Mission Control', s.profile),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.md),
+        ),
+        child: Row(children: [
+          AppIcon('layers', size: 16, color: AppColors.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text('Mission Control',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(16, color: AppColors.fg1)),
+          ),
+        ]),
       ),
     );
   }
@@ -2338,6 +2565,7 @@ class _SidebarState extends State<_Sidebar> {
 
   // Long-press / right-click a session → rename or delete.
   Future<void> _sessionActions(SessionInfo s, {Offset? position}) async {
+    if (isDedicatedMcSession(s.id)) return;
     if (!kMobile) {
       final overlay =
           Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -2348,9 +2576,15 @@ class _SidebarState extends State<_Sidebar> {
           Rect.fromCircle(center: point, radius: 0),
           Offset.zero & overlay.size,
         ),
-        items: const [
-          PopupMenuItem(value: 'rename', child: Text('Rename')),
-          PopupMenuItem(value: 'delete', child: Text('Delete')),
+        color: AppColors.surface1,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        shape: appMenuShape,
+        items: [
+          appMenuItem(value: 'rename', icon: 'edit', label: 'Rename'),
+          appMenuItem(
+              value: 'delete', icon: 'trash', label: 'Delete', danger: true),
         ],
       );
       if (selected == 'rename') {
@@ -2369,10 +2603,6 @@ class _SidebarState extends State<_Sidebar> {
             _sessionActionTile('edit', 'Rename', onTap: () {
               Navigator.pop(context);
               _beginRename(s);
-            }),
-            _sessionActionTile('check-check', 'Select', onTap: () {
-              Navigator.pop(context);
-              _enterSelect(seed: s.id);
             }),
             _sessionActionTile('trash', 'Delete', danger: true, onTap: () {
               Navigator.pop(context);
@@ -2404,6 +2634,7 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   void _enterSelect({String? seed}) {
+    if (seed != null && isDedicatedMcSession(seed)) return;
     setState(() {
       _selecting = true;
       _renamingId = null;
@@ -2419,12 +2650,14 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   void _toggleSelected(String id) {
+    if (isDedicatedMcSession(id)) return;
     setState(() {
       if (!_selected.add(id)) _selected.remove(id);
     });
   }
 
   void _beginRename(SessionInfo s) {
+    if (isDedicatedMcSession(s.id)) return;
     _renameCtl.text = s.title;
     _renameCtl.selection =
         TextSelection(baseOffset: 0, extentOffset: _renameCtl.text.length);
