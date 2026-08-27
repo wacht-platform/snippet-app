@@ -418,22 +418,32 @@ class _DesktopShellState extends State<DesktopShell>
     final client = _client;
     if (inst == null) return;
     if (client != null) unawaited(client.mcOpen());
-    final matches = <int>[];
-    for (var i = 0; i < _tabs.length; i++) {
-      final t = _tabs[i];
-      if (t.isMissionControl && t.instanceUrl == inst.url) matches.add(i);
+    var same = 0;
+    var foreign = 0;
+    var extras = 0;
+    var leftover = false;
+    for (final t in _tabs) {
+      if (!t.isMissionControl) continue;
+      if (t.instanceUrl != inst.url) {
+        foreign++;
+        continue;
+      }
+      if (same == 0) {
+        leftover = !isDedicatedMcSession(t.sessionId) ||
+            t.title != 'Mission Control';
+      } else {
+        extras++;
+      }
+      same++;
     }
-    final extras = matches.length > 1 ? matches.sublist(1) : const <int>[];
-    final existing = matches.isEmpty ? -1 : matches.first;
-    final current = existing >= 0 ? _tabs[existing] : null;
-    final leftover = current != null &&
-        (!isDedicatedMcSession(current.sessionId) ||
-            current.title != 'Mission Control');
-    // Only steal focus when a leftover MC composer is about to unmount.
-    if (extras.isNotEmpty || leftover) {
-      FocusManager.instance.primaryFocus?.unfocus();
-    }
-    if (existing == 0 && extras.isEmpty && !leftover) {
+    final alreadyPinned = same == 1 &&
+        extras == 0 &&
+        foreign == 0 &&
+        !leftover &&
+        _tabs.isNotEmpty &&
+        _tabs.first.isMissionControl &&
+        _tabs.first.instanceUrl == inst.url;
+    if (alreadyPinned) {
       if (_activeIndex < 0) {
         setState(() => _activeIndex = 0);
         _persistTabs();
@@ -441,40 +451,46 @@ class _DesktopShellState extends State<DesktopShell>
       }
       return;
     }
+    if (foreign > 0 || extras > 0 || leftover) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
     setState(() {
-      _ShellTab kept;
-      if (existing >= 0) {
-        kept = _tabs.removeAt(existing);
-        for (final i in extras.reversed) {
-          final drop = i > existing ? i - 1 : i;
-          if (drop >= 0 && drop < _tabs.length) {
-            final gone = _tabs.removeAt(drop);
-            _macSessionStatuses.remove(gone.key);
-            _macSessionControls.remove(gone.key);
-          }
+      final activeKey = (_activeIndex >= 0 && _activeIndex < _tabs.length)
+          ? _tabs[_activeIndex].key
+          : null;
+      SharedInbound? share;
+      _ShellTab? kept;
+      final next = <_ShellTab>[];
+      for (final t in _tabs) {
+        if (!t.isMissionControl) {
+          next.add(t);
+          continue;
         }
-        if (!isDedicatedMcSession(kept.sessionId) ||
-            kept.title != 'Mission Control') {
-          kept = _mcTabFor(inst)..inboundShare = kept.inboundShare;
+        if (t.instanceUrl != inst.url) {
+          _macSessionStatuses.remove(t.key);
+          _macSessionControls.remove(t.key);
+          continue;
         }
-      } else {
-        kept = _mcTabFor(inst);
-      }
-      var nextActive = _activeIndex;
-      if (existing >= 0 && nextActive > existing) nextActive--;
-      for (final i in extras) {
-        if (nextActive == i) {
-          nextActive = 0;
-        } else if (nextActive > i) {
-          nextActive--;
+        if (kept == null) {
+          kept = t;
+          share = t.inboundShare;
+        } else {
+          _macSessionStatuses.remove(t.key);
+          _macSessionControls.remove(t.key);
         }
       }
-      _tabs.insert(0, kept);
-      if (nextActive < 0 || existing == nextActive) {
-        _activeIndex = 0;
-      } else {
-        _activeIndex = nextActive + 1;
+      if (kept == null ||
+          !isDedicatedMcSession(kept.sessionId) ||
+          kept.title != 'Mission Control') {
+        kept = _mcTabFor(inst)..inboundShare = share ?? kept?.inboundShare;
       }
+      next.insert(0, kept);
+      _tabs
+        ..clear()
+        ..addAll(next);
+      final idx =
+          activeKey == null ? 0 : _tabs.indexWhere((t) => t.key == activeKey);
+      _activeIndex = idx >= 0 ? idx : 0;
     });
     _persistTabs();
     _syncPage();
@@ -494,7 +510,10 @@ class _DesktopShellState extends State<DesktopShell>
   void _closeOthers(int keep) {
     if (keep < 0 || keep >= _tabs.length) return;
     final kept = _tabs[keep];
-    final pinned = _tabs.where((tab) => tab.isMissionControl).toList();
+    final url = _active?.url;
+    final pinned = _tabs
+        .where((tab) => tab.isMissionControl && tab.instanceUrl == url)
+        .toList();
     final survivors = <_ShellTab>[
       ...pinned.where((tab) => !identical(tab, kept)),
       kept,
@@ -521,12 +540,15 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _closeAllTabs() {
+    final url = _active?.url;
     setState(() {
-      for (final tab in _tabs.where((t) => !t.isMissionControl)) {
+      for (final tab in _tabs.where((t) =>
+          !t.isMissionControl || (url != null && t.instanceUrl != url))) {
         _macSessionStatuses.remove(tab.key);
         _macSessionControls.remove(tab.key);
       }
-      _tabs.removeWhere((t) => !t.isMissionControl);
+      _tabs.removeWhere((t) =>
+          !t.isMissionControl || (url != null && t.instanceUrl != url));
       _activeIndex = _tabs.isEmpty ? -1 : 0;
     });
     _ensurePinnedMissionControl();
@@ -735,9 +757,16 @@ class _DesktopShellState extends State<DesktopShell>
       // A slow response for a PREVIOUS instance must not render under (or route
       // taps to) the one selected since.
       if (!identical(c, _client)) return;
-      // Mission Control is opened from the instance rail, never listed as a chat.
-      s.removeWhere(isMissionControlListRow);
-      s.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      // Mission Control stays pinned at the top of the list; leftover titled
+      // chats that alias it are still collapsed so it isn't listed twice.
+      s.removeWhere((row) =>
+          isMissionControlListRow(row) && !isDedicatedMcSession(row.id));
+      s.sort((a, b) {
+        final am = isDedicatedMcSession(a.id);
+        final bm = isDedicatedMcSession(b.id);
+        if (am != bm) return am ? -1 : 1;
+        return b.lastActive.compareTo(a.lastActive);
+      });
       if (mounted) {
         setState(() {
           _sessions = s;
