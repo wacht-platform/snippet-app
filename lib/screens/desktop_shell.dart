@@ -417,7 +417,7 @@ class _DesktopShellState extends State<DesktopShell>
     final inst = _active;
     final client = _client;
     if (inst == null) return;
-    if (client != null) unawaited(client.mcOpen());
+    if (client != null) unawaited(client.mcOpen().catchError((_) => ''));
     var same = 0;
     var foreign = 0;
     var extras = 0;
@@ -498,9 +498,7 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _openMissionControlTab() {
     final inst = _active;
-    final client = _client;
     if (inst == null) return;
-    if (client != null) unawaited(client.mcOpen());
     _ensurePinnedMissionControl();
     final i = _tabs
         .indexWhere((t) => t.isMissionControl && t.instanceUrl == inst.url);

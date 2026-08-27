@@ -655,8 +655,8 @@ class MissionControlTask {
         sessionId = j['session_id'] as String?,
         archived = j['archived'] as bool? ?? false,
         notifications = ((j['notifications'] as List?) ?? const [])
-            .map((e) => NotificationMarker.fromJson(
-                (e as Map).cast<String, dynamic>()))
+            .whereType<Map>()
+            .map((e) => NotificationMarker.fromJson(e.cast<String, dynamic>()))
             .toList();
 
   bool get isActive =>

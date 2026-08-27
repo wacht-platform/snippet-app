@@ -398,7 +398,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       staleError = '$e';
     } finally {
-      notifyListeners();
+      if (!_closed) notifyListeners();
     }
   }
 

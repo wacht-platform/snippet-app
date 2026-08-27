@@ -14,8 +14,54 @@ import '../widgets/activity_feed.dart';
 import '../widgets/mission_composer.dart';
 import '../widgets/task_inspector.dart';
 
-class DesktopMissionControl extends StatelessWidget {
+class DesktopMissionControl extends StatefulWidget {
   const DesktopMissionControl({super.key});
+
+  @override
+  State<DesktopMissionControl> createState() => _DesktopMissionControlState();
+}
+
+class _DesktopMissionControlState extends State<DesktopMissionControl> {
+  dynamic _task;
+  QuestionItem? _question;
+  dynamic _session;
+  String? _kind;
+
+  void _showTask(dynamic task) {
+    setState(() {
+      _task = task;
+      _question = null;
+      _session = null;
+      _kind = 'task';
+    });
+  }
+
+  void _showQuestion(QuestionItem q) {
+    setState(() {
+      _task = null;
+      _question = q;
+      _session = null;
+      _kind = 'question';
+    });
+  }
+
+  void _showSession(dynamic session) {
+    setState(() {
+      _task = null;
+      _question = null;
+      _session = session;
+      _kind = 'session';
+    });
+  }
+
+  void _clearInspector() {
+    setState(() {
+      _task = null;
+      _question = null;
+      _session = null;
+      _kind = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +75,11 @@ class DesktopMissionControl extends StatelessWidget {
             Expanded(
               child: Row(
                 children: [
-                  _LeftRail(state: state),
+                  _LeftRail(
+                    state: state,
+                    onTapTask: _showTask,
+                    onTapSession: _showSession,
+                  ),
                   VerticalDivider(width: 1, color: AppColors.border),
                   Expanded(
                     child: Column(
@@ -37,11 +87,8 @@ class DesktopMissionControl extends StatelessWidget {
                         Expanded(
                           child: ActivityFeed(
                             state: state,
-                            onTapTask: (task) =>
-                                _DesktopInspectorHost.of(context).show(task),
-                            onTapQuestion: (q) =>
-                                _DesktopInspectorHost.of(context)
-                                    .showQuestion(q),
+                            onTapTask: _showTask,
+                            onTapQuestion: _showQuestion,
                           ),
                         ),
                         Divider(height: 1, color: AppColors.border),
@@ -50,7 +97,14 @@ class DesktopMissionControl extends StatelessWidget {
                     ),
                   ),
                   VerticalDivider(width: 1, color: AppColors.border),
-                  _DesktopInspectorHost(state: state),
+                  _InspectorPane(
+                    state: state,
+                    kind: _kind,
+                    task: _task,
+                    question: _question,
+                    session: _session,
+                    onClear: _clearInspector,
+                  ),
                 ],
               ),
             ),
@@ -62,8 +116,14 @@ class DesktopMissionControl extends StatelessWidget {
 }
 
 class _LeftRail extends StatelessWidget {
-  const _LeftRail({required this.state});
+  const _LeftRail({
+    required this.state,
+    required this.onTapTask,
+    required this.onTapSession,
+  });
   final MissionControlState state;
+  final void Function(dynamic task) onTapTask;
+  final void Function(dynamic session) onTapSession;
 
   @override
   Widget build(BuildContext context) {
@@ -78,14 +138,16 @@ class _LeftRail extends StatelessWidget {
           if (state.activeTasks.isEmpty)
             _emptyHint('No active tasks')
           else
-            for (final t in state.activeTasks) _TaskRow(task: t),
+            for (final t in state.activeTasks)
+              _TaskRow(task: t, onTap: () => onTapTask(t)),
           const SizedBox(height: 24),
           const SectionLabel('Sessions'),
           const SizedBox(height: 8),
           if (state.sessions.isEmpty)
             _emptyHint('No sessions')
           else
-            for (final s in state.sessions) _SessionRow(session: s),
+            for (final s in state.sessions)
+              _SessionRow(session: s, onTap: () => onTapSession(s)),
         ],
       ),
     );
@@ -98,8 +160,9 @@ class _LeftRail extends StatelessWidget {
 }
 
 class _TaskRow extends StatelessWidget {
-  const _TaskRow({required this.task});
+  const _TaskRow({required this.task, required this.onTap});
   final dynamic task;
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -108,7 +171,7 @@ class _TaskRow extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () => _DesktopInspectorHost.of(context).show(task),
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(
@@ -156,8 +219,9 @@ class _TaskRow extends StatelessWidget {
 }
 
 class _SessionRow extends StatelessWidget {
-  const _SessionRow({required this.session});
+  const _SessionRow({required this.session, required this.onTap});
   final dynamic session;
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -166,7 +230,7 @@ class _SessionRow extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () => _DesktopInspectorHost.of(context).showSession(session),
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(
@@ -199,101 +263,87 @@ class _SessionRow extends StatelessWidget {
   }
 }
 
-/// Host for the right-hand inspector. Lives below the screen in a
-/// [InheritedNotifierProvider] so any child can read/write the current
-/// selection.
-class _DesktopInspectorHost extends StatefulWidget {
-  const _DesktopInspectorHost({this.state});
-  final MissionControlState? state;
-
-  /// Walk the widget tree to find a host; create one if missing. Cheaper than
-  /// a full inherited-widget dance for this single use site.
-  static _DesktopInspectorController of(BuildContext context) =>
-      _ControllerProvider.of(context);
-
-  @override
-  State<_DesktopInspectorHost> createState() => _DesktopInspectorHostState();
-}
-
-class _DesktopInspectorHostState extends State<_DesktopInspectorHost> {
-  dynamic _selected;
-  QuestionItem? _question;
-  dynamic _session;
-  String? _kind;
-
-  void show(dynamic task) {
-    setState(() {
-      _selected = task;
-      _question = null;
-      _session = null;
-      _kind = 'task';
-    });
-  }
-
-  void showQuestion(QuestionItem q) {
-    setState(() {
-      _selected = null;
-      _question = q;
-      _session = null;
-      _kind = 'question';
-    });
-  }
-
-  void showSession(dynamic session) {
-    setState(() {
-      _selected = null;
-      _question = null;
-      _session = session;
-      _kind = 'session';
-    });
-  }
+class _InspectorPane extends StatelessWidget {
+  const _InspectorPane({
+    required this.state,
+    required this.kind,
+    required this.task,
+    required this.question,
+    required this.session,
+    required this.onClear,
+  });
+  final MissionControlState state;
+  final String? kind;
+  final dynamic task;
+  final QuestionItem? question;
+  final dynamic session;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
-    final controller = _DesktopInspectorController(
-      show: show,
-      showQuestion: showQuestion,
-      showSession: showSession,
-    );
-    return _ControllerProvider(
-      controller: controller,
-      child: Container(
-        width: 320,
-        color: AppColors.surface1,
-        child: () {
-          switch (_kind) {
-            case 'task':
-              return TaskInspector(task: _selected, state: widget.state);
-            case 'question':
-              return _QuestionInspector(
-                  question: _question!, state: widget.state);
-            case 'session':
-              return _SessionInspector(session: _session);
-            default:
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text(
-                    'Select a task, session, or question to inspect.',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              );
-          }
-        }(),
-      ),
+    return Container(
+      width: 320,
+      color: AppColors.surface1,
+      child: switch (kind) {
+        'task' => TaskInspector(task: task, state: state),
+        'question' => _QuestionInspector(
+            question: question!,
+            state: state,
+            onSent: onClear,
+          ),
+        'session' => _SessionInspector(session: session),
+        _ => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Text(
+                'Select a task, session, or question to inspect.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      },
     );
   }
 }
 
-class _QuestionInspector extends StatelessWidget {
-  const _QuestionInspector({required this.question, required this.state});
+class _QuestionInspector extends StatefulWidget {
+  const _QuestionInspector({
+    required this.question,
+    required this.state,
+    required this.onSent,
+  });
   final QuestionItem question;
-  final MissionControlState? state;
+  final MissionControlState state;
+  final VoidCallback onSent;
+
+  @override
+  State<_QuestionInspector> createState() => _QuestionInspectorState();
+}
+
+class _QuestionInspectorState extends State<_QuestionInspector> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final reply = _controller.text.trim();
+    if (reply.isEmpty) return;
+    widget.onSent();
+    await widget.state.sendMessage(reply);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final controller = TextEditingController();
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -301,10 +351,10 @@ class _QuestionInspector extends StatelessWidget {
         children: [
           const SectionLabel('Agent is asking'),
           const SizedBox(height: 12),
-          Text(question.question, style: sans(14, color: AppColors.fg1)),
+          Text(widget.question.question, style: sans(14, color: AppColors.fg1)),
           const SizedBox(height: 16),
           TextField(
-            controller: controller,
+            controller: _controller,
             autofocus: true,
             maxLines: 4,
             minLines: 2,
@@ -317,12 +367,7 @@ class _QuestionInspector extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton(
-              onPressed: () async {
-                final reply = controller.text.trim();
-                if (reply.isEmpty) return;
-                Navigator.of(context).maybePop();
-                if (state != null) await state!.sendMessage(reply);
-              },
+              onPressed: _send,
               child: const Text('Send'),
             ),
           ),
@@ -363,30 +408,4 @@ class _SessionInspector extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DesktopInspectorController {
-  _DesktopInspectorController({
-    required this.show,
-    required this.showQuestion,
-    required this.showSession,
-  });
-  final void Function(dynamic task) show;
-  final void Function(QuestionItem q) showQuestion;
-  final void Function(dynamic session) showSession;
-}
-
-class _ControllerProvider extends InheritedWidget {
-  const _ControllerProvider({required this.controller, required super.child});
-  final _DesktopInspectorController controller;
-
-  static _DesktopInspectorController of(BuildContext context) {
-    final inh =
-        context.dependOnInheritedWidgetOfExactType<_ControllerProvider>();
-    assert(inh != null, 'No _ControllerProvider in context');
-    return inh!.controller;
-  }
-
-  @override
-  bool updateShouldNotify(_ControllerProvider oldWidget) => false;
 }
