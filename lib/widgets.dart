@@ -14,6 +14,42 @@ import 'theme.dart';
 OverlayEntry? _activeToast;
 Timer? _toastTimer;
 
+ShapeBorder get appMenuShape => RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(R.card),
+      side: BorderSide(color: AppColors.border),
+    );
+
+PopupMenuItem<T> appMenuItem<T>({
+  required T value,
+  required String label,
+  String? icon,
+  String? detail,
+  bool danger = false,
+  bool selected = false,
+  double height = 40,
+}) {
+  final color =
+      danger ? AppColors.danger : (selected ? AppColors.accent : AppColors.fg1);
+  return PopupMenuItem<T>(
+    value: value,
+    height: height,
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: Row(children: [
+      if (icon != null) ...[
+        AppIcon(icon, size: 14, color: color),
+        const SizedBox(width: 10),
+      ],
+      Expanded(
+        child: Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: sans(13, color: color)),
+      ),
+      if (detail != null) Text(detail, style: sans(11.5, color: AppColors.fg4)),
+    ]),
+  );
+}
+
 /// A slick, theme-styled toast rendered in the ROOT overlay — so it floats above
 /// panels/dialogs instead of a SnackBar buried behind a modal backdrop. A new one
 /// replaces the previous (no stacking). Use for transient feedback.
@@ -1742,7 +1778,8 @@ Future<T?> showAppSheet<T>(BuildContext context,
           borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
           border: Border(top: BorderSide(color: AppColors.border2)),
         ),
-        constraints: BoxConstraints(maxHeight: media.size.height * 0.92),
+        constraints: BoxConstraints(
+            maxHeight: (media.size.height - media.viewInsets.bottom) * 0.92),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 12),
           Center(
@@ -1771,7 +1808,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
               child: child,
             ),
           ),
-          SizedBox(height: media.padding.bottom),
+          SizedBox(height: media.padding.bottom + media.viewInsets.bottom),
         ]),
       );
     },

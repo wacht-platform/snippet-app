@@ -577,3 +577,114 @@ class GitCommit {
         date = j['date'] as String? ?? '',
         subject = j['subject'] as String? ?? '';
 }
+
+// ---- Mission Control ----
+
+/// Summary dashboard returned by GET /mission-control/overview.
+class MissionControlOverview {
+  final int activeTasks;
+  final int completedTasks;
+  final int totalTasks;
+  final int activeSessions;
+  final int totalSessions;
+  final List<MissionControlTask> recentTasks;
+  final List<ManagedSession> recentSessions;
+  /// Daemon-side id of the active Mission Control session, if one is open.
+  /// Resolved client-side from the settings sidecar; null when the user has
+  /// never opened Mission Control on this device.
+  final String? mcSessionId;
+
+  MissionControlOverview.fromJson(Map<String, dynamic> j)
+      : activeTasks = (j['active_tasks'] as num?)?.toInt() ?? 0,
+        completedTasks = (j['completed_tasks'] as num?)?.toInt() ?? 0,
+        totalTasks = (j['total_tasks'] as num?)?.toInt() ?? 0,
+        activeSessions = (j['active_sessions'] as num?)?.toInt() ?? 0,
+        totalSessions = (j['total_sessions'] as num?)?.toInt() ?? 0,
+        recentTasks = ((j['recent_tasks'] as List?) ?? const [])
+            .map((e) => MissionControlTask.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        recentSessions = ((j['recent_sessions'] as List?) ?? const [])
+            .map((e) => ManagedSession.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        mcSessionId = j['mc_session_id'] as String?;
+}
+
+/// A notification marker attached to a task (e.g. "dispatch failed 3 times",
+/// "waiting on dependency X"). The daemon emits these as part of the task
+/// payload; the UI surfaces unresolved ones in the inbox.
+class NotificationMarker {
+  final String target;
+  final String kind; // blocked | failed | info
+  final String message;
+  final bool delivered;
+
+  const NotificationMarker({
+    required this.target,
+    required this.kind,
+    required this.message,
+    required this.delivered,
+  });
+
+  NotificationMarker.fromJson(Map<String, dynamic> j)
+      : target = j['target'] as String? ?? '',
+        kind = j['kind'] as String? ?? 'info',
+        message = j['message'] as String? ?? '',
+        delivered = j['delivered'] as bool? ?? false;
+}
+
+/// A task tracked by Mission Control.
+class MissionControlTask {
+  final String id;
+  final String title;
+  final String description;
+  final String
+      status; // pending | in_progress | blocked | done | failed | cancelled
+  final int createdAt;
+  final int updatedAt;
+  final String? sessionId; // link to a managed session
+  final bool archived;
+  final List<NotificationMarker> notifications;
+
+  MissionControlTask.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        description = j['description'] as String? ?? '',
+        status = j['status'] as String? ?? 'pending',
+        createdAt = (j['created_at'] as num?)?.toInt() ?? 0,
+        updatedAt = (j['updated_at'] as num?)?.toInt() ?? 0,
+        sessionId = j['session_id'] as String?,
+        archived = j['archived'] as bool? ?? false,
+        notifications = ((j['notifications'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => NotificationMarker.fromJson(e.cast<String, dynamic>()))
+            .toList();
+
+  bool get isActive =>
+      !archived && (status == 'pending' || status == 'in_progress');
+}
+
+/// A managed session registered in Mission Control.
+class ManagedSession {
+  final String id;
+  final String sessionId; // links to the actual snippet session
+  final String folder;
+  final String title;
+  final String status; // active | archived
+  final int createdAt;
+  final int lastActiveAt;
+  final int taskCount;
+  final bool archived;
+
+  ManagedSession.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '',
+        folder = j['folder'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        status = j['status'] as String? ?? 'active',
+        createdAt = (j['created_at'] as num?)?.toInt() ?? 0,
+        lastActiveAt = (j['last_active_at'] as num?)?.toInt() ?? 0,
+        taskCount = (j['task_count'] as num?)?.toInt() ?? 0,
+        archived = j['archived'] as bool? ?? false;
+
+  bool get isActive => !archived && status == 'active';
+}

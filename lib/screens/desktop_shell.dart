@@ -9,6 +9,7 @@ import '../models.dart';
 import '../notifications.dart';
 import '../panel.dart';
 import '../platform.dart';
+import '../share_inbound.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -19,6 +20,7 @@ import 'git.dart';
 import 'models.dart';
 import 'vault.dart';
 import 'session.dart';
+import 'mission_control.dart';
 
 /// Desktop two-pane shell: a persistent left sidebar (instances + sessions) and
 /// a main pane showing the selected session. Tools (git/files/editor/models)
@@ -38,12 +40,14 @@ class _ShellTab {
   final String? filePath;
   String title;
   String? profile;
+  SharedInbound? inboundShare;
   _ShellTab.session({
     required this.client,
     required this.instanceUrl,
     required this.sessionId,
     required this.title,
     this.profile,
+    this.inboundShare,
   }) : filePath = null;
   _ShellTab.file({
     required this.client,
@@ -53,8 +57,13 @@ class _ShellTab {
   })  : sessionId = null,
         profile = null;
   bool get isFile => filePath != null;
-  String get key =>
-      isFile ? '$instanceUrl|file|$filePath' : '$instanceUrl|$sessionId';
+  bool get isMissionControl =>
+      !isFile && isMissionControlTab(sessionId: sessionId, title: title);
+  String get key => isFile
+      ? '$instanceUrl|file|$filePath'
+      : isMissionControl
+          ? '$instanceUrl|mission-control'
+          : '$instanceUrl|$sessionId';
 }
 
 class _MacSessionStatus {
@@ -69,7 +78,8 @@ class _MacSessionControls {
   const _MacSessionControls(this.stop, this.performAction);
 }
 
-class _DesktopShellState extends State<DesktopShell> {
+class _DesktopShellState extends State<DesktopShell>
+    with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final InstanceStore _store = InstanceStore();
   List<Instance> _instances = const [];
@@ -102,25 +112,24 @@ class _DesktopShellState extends State<DesktopShell> {
   String _macGitKey = '';
 
   Timer? _sessionsTicker;
+  bool _appForeground = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadInstances();
     // Tapping a session notification opens it in-place (consistent with the app),
     // not a separate full-screen route.
     if (kCanNotify) onNotifTap = _onNotif;
-    // Keep the sidebar live: status dots and model labels drift as sessions run,
-    // finish, or switch models — refresh on a gentle cadence.
-    _sessionsTicker = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted && !_sessionsLoading) _loadSessions();
-      if (mounted) _refreshHealth();
-    });
+    _startSessionsTicker();
     if (!kMobile) HardwareKeyboard.instance.addHandler(_handleGlobalShortcuts);
+    if (kMobile) ShareInbound.listen(_onInboundShare);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (!kMobile)
       HardwareKeyboard.instance.removeHandler(_handleGlobalShortcuts);
     _sessionsTicker?.cancel();
@@ -128,7 +137,31 @@ class _DesktopShellState extends State<DesktopShell> {
     _pageController.dispose();
     _stripController.dispose();
     if (onNotifTap == _onNotif) onNotifTap = null;
+    if (kMobile) ShareInbound.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final fg = state == AppLifecycleState.resumed;
+    _appForeground = fg;
+    if (fg) {
+      _startSessionsTicker();
+      if (mounted && !_sessionsLoading) _loadSessions();
+    } else {
+      _sessionsTicker?.cancel();
+      _sessionsTicker = null;
+    }
+  }
+
+  void _startSessionsTicker() {
+    _sessionsTicker?.cancel();
+    final period = Duration(seconds: kMobile ? 90 : 30);
+    _sessionsTicker = Timer.periodic(period, (_) {
+      if (!mounted || !_appForeground) return;
+      if (!_sessionsLoading) _loadSessions();
+      _refreshHealth();
+    });
   }
 
   bool _mod(LogicalKeyboardKey left, LogicalKeyboardKey right) {
@@ -339,61 +372,186 @@ class _DesktopShellState extends State<DesktopShell> {
           title: descriptor.title,
         ));
       } else if (descriptor.sessionId != null) {
+        final mc = isMissionControlTab(
+            sessionId: descriptor.sessionId, title: descriptor.title);
+        if (mc &&
+            restored
+                .any((t) => t.isMissionControl && t.instanceUrl == inst.url)) {
+          continue;
+        }
         restored.add(_ShellTab.session(
           client: client,
           instanceUrl: inst.url,
-          sessionId: descriptor.sessionId,
-          title: descriptor.title,
+          sessionId: mc ? 'mission-control' : descriptor.sessionId,
+          title: mc ? 'Mission Control' : descriptor.title,
           profile: descriptor.profile,
         ));
       }
     }
-    if (!mounted || restored.isEmpty) return;
+    if (!mounted) return;
     setState(() {
+      if (restored.isNotEmpty) {
+        _tabs
+          ..clear()
+          ..addAll(restored);
+        _activeIndex = saved.activeIndex.clamp(0, restored.length - 1);
+        final active = _tabs[_activeIndex];
+        _active = byUrl[active.instanceUrl];
+        _client =
+            _active == null ? null : DaemonClient(_active!.url, _active!.token);
+      }
+    });
+    _ensurePinnedMissionControl();
+    _persistTabs();
+    _syncPage();
+  }
+
+  _ShellTab _mcTabFor(Instance inst) => _ShellTab.session(
+        client: DaemonClient(inst.url, inst.token),
+        instanceUrl: inst.url,
+        sessionId: 'mission-control',
+        title: 'Mission Control',
+      );
+
+  void _ensurePinnedMissionControl() {
+    final inst = _active;
+    final client = _client;
+    if (inst == null) return;
+    if (client != null) unawaited(client.mcOpen().catchError((_) => ''));
+    var same = 0;
+    var foreign = 0;
+    var extras = 0;
+    var leftover = false;
+    for (final t in _tabs) {
+      if (!t.isMissionControl) continue;
+      if (t.instanceUrl != inst.url) {
+        foreign++;
+        continue;
+      }
+      if (same == 0) {
+        leftover = !isDedicatedMcSession(t.sessionId) ||
+            t.title != 'Mission Control';
+      } else {
+        extras++;
+      }
+      same++;
+    }
+    final alreadyPinned = same == 1 &&
+        extras == 0 &&
+        foreign == 0 &&
+        !leftover &&
+        _tabs.isNotEmpty &&
+        _tabs.first.isMissionControl &&
+        _tabs.first.instanceUrl == inst.url;
+    if (alreadyPinned) {
+      if (_activeIndex < 0) {
+        setState(() => _activeIndex = 0);
+        _persistTabs();
+        _syncPage();
+      }
+      return;
+    }
+    if (foreign > 0 || extras > 0 || leftover) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+    setState(() {
+      final activeKey = (_activeIndex >= 0 && _activeIndex < _tabs.length)
+          ? _tabs[_activeIndex].key
+          : null;
+      SharedInbound? share;
+      _ShellTab? kept;
+      final next = <_ShellTab>[];
+      for (final t in _tabs) {
+        if (!t.isMissionControl) {
+          next.add(t);
+          continue;
+        }
+        if (t.instanceUrl != inst.url) {
+          _macSessionStatuses.remove(t.key);
+          _macSessionControls.remove(t.key);
+          continue;
+        }
+        if (kept == null) {
+          kept = t;
+          share = t.inboundShare;
+        } else {
+          _macSessionStatuses.remove(t.key);
+          _macSessionControls.remove(t.key);
+        }
+      }
+      if (kept == null ||
+          !isDedicatedMcSession(kept.sessionId) ||
+          kept.title != 'Mission Control') {
+        kept = _mcTabFor(inst)..inboundShare = share ?? kept?.inboundShare;
+      }
+      next.insert(0, kept);
       _tabs
         ..clear()
-        ..addAll(restored);
-      _activeIndex = saved.activeIndex.clamp(0, restored.length - 1);
-      final active = _tabs[_activeIndex];
-      _active = byUrl[active.instanceUrl];
-      _client =
-          _active == null ? null : DaemonClient(_active!.url, _active!.token);
+        ..addAll(next);
+      final idx =
+          activeKey == null ? 0 : _tabs.indexWhere((t) => t.key == activeKey);
+      _activeIndex = idx >= 0 ? idx : 0;
     });
     _persistTabs();
     _syncPage();
+  }
+
+  void _openMissionControlTab() {
+    final inst = _active;
+    if (inst == null) return;
+    _ensurePinnedMissionControl();
+    final i = _tabs
+        .indexWhere((t) => t.isMissionControl && t.instanceUrl == inst.url);
+    if (i >= 0) _activateTab(i);
   }
 
   void _closeOthers(int keep) {
     if (keep < 0 || keep >= _tabs.length) return;
     final kept = _tabs[keep];
+    final url = _active?.url;
+    final pinned = _tabs
+        .where((tab) => tab.isMissionControl && tab.instanceUrl == url)
+        .toList();
+    final survivors = <_ShellTab>[
+      ...pinned.where((tab) => !identical(tab, kept)),
+      kept,
+    ];
+    final keptKeys = survivors.map((tab) => tab.key).toSet();
     final removedKeys = _tabs
-        .where((tab) => !identical(tab, kept))
+        .where((tab) => !keptKeys.contains(tab.key))
         .map((tab) => tab.key)
         .toList();
     setState(() {
       _tabs
         ..clear()
-        ..add(kept);
-      _activeIndex = 0;
+        ..addAll(survivors);
+      _activeIndex = _tabs.indexWhere((tab) => identical(tab, kept));
+      if (_activeIndex < 0) _activeIndex = 0;
       for (final key in removedKeys) {
         _macSessionStatuses.remove(key);
         _macSessionControls.remove(key);
       }
     });
+    _ensurePinnedMissionControl();
     _persistTabs();
     _syncPage();
   }
 
   void _closeAllTabs() {
+    final url = _active?.url;
     setState(() {
-      for (final tab in _tabs) {
+      for (final tab in _tabs.where((t) =>
+          !t.isMissionControl || (url != null && t.instanceUrl != url))) {
         _macSessionStatuses.remove(tab.key);
         _macSessionControls.remove(tab.key);
       }
-      _tabs.clear();
-      _activeIndex = -1;
+      _tabs.removeWhere((t) =>
+          !t.isMissionControl || (url != null && t.instanceUrl != url));
+      _activeIndex = _tabs.isEmpty ? -1 : 0;
     });
+    _ensurePinnedMissionControl();
     _persistTabs();
+    _syncPage();
   }
 
   void _tabMenu(int i) {
@@ -403,7 +561,8 @@ class _DesktopShellState extends State<DesktopShell> {
       context: context,
       backgroundColor: AppColors.surface1,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(R.card))),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Padding(
@@ -421,11 +580,12 @@ class _DesktopShellState extends State<DesktopShell> {
             ]),
           ),
           Divider(height: 1, color: AppColors.border),
-          _tabMenuItem(ctx, 'x', 'Close tab', () => _closeTab(i)),
-          if (_tabs.length > 1)
+          if (!t.isMissionControl)
+            _tabMenuItem(ctx, 'x', 'Close tab', () => _closeTab(i)),
+          if (_tabs.any((tab) => !tab.isMissionControl))
             _tabMenuItem(
                 ctx, 'copy', 'Close other tabs', () => _closeOthers(i)),
-          if (_tabs.length > 1)
+          if (_tabs.any((tab) => !tab.isMissionControl))
             _tabMenuItem(ctx, 'trash', 'Close all tabs', _closeAllTabs,
                 danger: true),
         ]),
@@ -454,6 +614,8 @@ class _DesktopShellState extends State<DesktopShell> {
   }
 
   void _closeTab(int i) {
+    if (i < 0 || i >= _tabs.length) return;
+    if (_tabs[i].isMissionControl) return;
     final key = _tabs[i].key;
     setState(() {
       _macSessionStatuses.remove(key);
@@ -569,6 +731,7 @@ class _DesktopShellState extends State<DesktopShell> {
       _loading = false;
     });
     await _restoreTabs(items);
+    _ensurePinnedMissionControl();
     _loadSessions();
     _refreshHealth();
   }
@@ -592,7 +755,16 @@ class _DesktopShellState extends State<DesktopShell> {
       // A slow response for a PREVIOUS instance must not render under (or route
       // taps to) the one selected since.
       if (!identical(c, _client)) return;
-      s.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      // Mission Control stays pinned at the top of the list; leftover titled
+      // chats that alias it are still collapsed so it isn't listed twice.
+      s.removeWhere((row) =>
+          isMissionControlListRow(row) && !isDedicatedMcSession(row.id));
+      s.sort((a, b) {
+        final am = isDedicatedMcSession(a.id);
+        final bm = isDedicatedMcSession(b.id);
+        if (am != bm) return am ? -1 : 1;
+        return b.lastActive.compareTo(a.lastActive);
+      });
       if (mounted) {
         setState(() {
           _sessions = s;
@@ -643,10 +815,17 @@ class _DesktopShellState extends State<DesktopShell> {
       _client = DaemonClient(inst.url, inst.token);
       _sessions = null;
     });
+    _ensurePinnedMissionControl();
     _loadSessions();
   }
 
-  void _openSession(String id, String title, String? profile) {
+  void _openSession(String id, String title, String? profile,
+      {SharedInbound? share}) {
+    if (isMissionControlTab(sessionId: id, title: title)) {
+      _openMissionControlTab();
+      _attachShareToActive(share);
+      return;
+    }
     final client = _client;
     final url = _active?.url;
     if (client == null || url == null) return;
@@ -656,6 +835,7 @@ class _DesktopShellState extends State<DesktopShell> {
       if (existing >= 0) {
         _tabs[existing].title = title;
         _tabs[existing].profile = profile;
+        if (share != null) _tabs[existing].inboundShare = share;
         _activeIndex = existing;
       } else {
         _tabs.add(_ShellTab.session(
@@ -663,11 +843,128 @@ class _DesktopShellState extends State<DesktopShell> {
             instanceUrl: url,
             sessionId: id,
             title: title,
-            profile: profile));
+            profile: profile,
+            inboundShare: share));
         _activeIndex = _tabs.length - 1;
       }
     });
+    _persistTabs();
     _syncPage();
+  }
+
+  void _attachShareToActive(SharedInbound? share) {
+    if (share == null) return;
+    final i = _activeIndex;
+    if (i < 0 || i >= _tabs.length) return;
+    setState(() => _tabs[i].inboundShare = share);
+  }
+
+  List<_ShellTab> _shareTargets() {
+    final url = _active?.url;
+    if (url == null) return const [];
+    final seen = <String>{};
+    final out = <_ShellTab>[];
+    for (final t in _tabs) {
+      if (t.isFile || t.instanceUrl != url || t.sessionId == null) continue;
+      if (!seen.add(t.key)) continue;
+      out.add(t);
+    }
+    return out;
+  }
+
+  Future<void> _onInboundShare(SharedInbound share) async {
+    if (!mounted || share.isEmpty) return;
+    final client = _client;
+    if (client == null) {
+      if (mounted) toast(context, 'Add a machine first.', danger: true);
+      return;
+    }
+    if (_sessions == null || _sessions!.isEmpty) {
+      await _loadSessions();
+      if (!mounted) return;
+    }
+    final cached = List<SessionInfo>.from(_sessions ?? const []);
+    final open = _shareTargets();
+    final openIds = {
+      for (final t in open)
+        if (!t.isMissionControl) t.sessionId,
+    };
+    final rest = cached.where((s) => !openIds.contains(s.id)).toList();
+    final picked = await showAppSheet<String>(
+      context,
+      title: 'Send to',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final t in open)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: AppIcon(t.isMissionControl ? 'layers' : 'terminal',
+                  size: 18,
+                  color:
+                      t.isMissionControl ? AppColors.accent : AppColors.fg3),
+              title: Text(
+                  t.isMissionControl
+                      ? 'Mission Control'
+                      : (t.title.trim().isEmpty ? '(untitled)' : t.title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(15,
+                      weight: t.isMissionControl ? FontWeight.w600 : FontWeight.w400,
+                      color: AppColors.fg1)),
+              subtitle: Text(
+                  t.isMissionControl
+                      ? (_active?.label ?? 'this machine')
+                      : 'Open tab',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12, color: AppColors.fg4)),
+              onTap: () => Navigator.pop(
+                  context, t.isMissionControl ? 'mission-control' : t.sessionId),
+            ),
+          if (open.isEmpty)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: AppIcon('layers', size: 18, color: AppColors.accent),
+              title: Text('Mission Control',
+                  style:
+                      sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+              subtitle: Text(_active?.label ?? 'this machine',
+                  style: sans(12, color: AppColors.fg4)),
+              onTap: () => Navigator.pop(context, 'mission-control'),
+            ),
+          for (final s in rest)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: AppIcon('terminal', size: 18, color: AppColors.fg3),
+              title: Text(
+                  s.title.trim().isEmpty ? '(untitled)' : s.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(15, color: AppColors.fg1)),
+              subtitle: Text(
+                  s.folder.trim().isEmpty ? 'session' : s.folder,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12, color: AppColors.fg4)),
+              onTap: () => Navigator.pop(context, s.id),
+            ),
+        ],
+      ),
+    );
+    if (!mounted || picked == null || picked.isEmpty) return;
+    if (picked == 'mission-control') {
+      _openSession('mission-control', 'Mission Control', null, share: share);
+      return;
+    }
+    SessionInfo? match;
+    for (final s in cached) {
+      if (s.id == picked) {
+        match = s;
+        break;
+      }
+    }
+    _openSession(picked, match?.title ?? 'session', match?.profile, share: share);
   }
 
   void _openFileTab(DaemonClient client, String url, String path, String name) {
@@ -745,6 +1042,7 @@ class _DesktopShellState extends State<DesktopShell> {
             _active != null ? DaemonClient(_active!.url, _active!.token) : null;
       }
     });
+    _ensurePinnedMissionControl();
     _syncPage();
   }
 
@@ -764,6 +1062,10 @@ class _DesktopShellState extends State<DesktopShell> {
           onAfterPick?.call();
         },
         onSelectInstance: _selectInstance,
+        onOpenMissionControl: () {
+          _openMissionControlTab();
+          onAfterPick?.call();
+        },
         onOpenSession: (id, title, profile) {
           _openSession(id, title, profile);
           onAfterPick?.call();
@@ -777,6 +1079,7 @@ class _DesktopShellState extends State<DesktopShell> {
       );
 
   void _onSessionDeleted(String id) {
+    if (isDedicatedMcSession(id)) return;
     final i = _tabs.indexWhere((t) => t.sessionId == id);
     if (i >= 0) _closeTab(i);
     _loadSessions();
@@ -891,8 +1194,9 @@ class _DesktopShellState extends State<DesktopShell> {
       rightActions.addAll([
         _macStatusAction(
             'folder', 'Files', () => controls.performAction('files')),
-        _macStatusAction(
-            'terminal', 'Shell', () => controls.performAction('shell')),
+        if (tab?.isMissionControl != true)
+          _macStatusAction(
+              'terminal', 'Shell', () => controls.performAction('shell')),
         _macStatusAction(
             'list', 'Processes', () => controls.performAction('processes')),
         _macStatusAction(
@@ -1261,6 +1565,7 @@ class _DesktopShellState extends State<DesktopShell> {
                   final t = _tabs[i];
                   return _KeepAlive(
                     key: ValueKey(t.key),
+                    keep: !kMobile || t.isMissionControl || i == _activeIndex,
                     child: t.isFile
                         ? FileViewer(
                             key: ValueKey(t.key),
@@ -1277,6 +1582,7 @@ class _DesktopShellState extends State<DesktopShell> {
                             title: t.title,
                             profile: t.profile,
                             embedded: true,
+                            inboundShare: t.inboundShare,
                             acceptDrops: i == _activeIndex,
                             onMenu: null,
                             onOpenFileTab: (path, name) => _openFileTab(
@@ -1380,7 +1686,11 @@ class _DesktopShellState extends State<DesktopShell> {
                   color: active ? AppColors.border : Colors.transparent),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (t.isFile)
+          if (t.isMissionControl)
+            AppIcon('layers',
+                size: mac ? 13 : 12,
+                color: active ? AppColors.accent : AppColors.fg4)
+          else if (t.isFile)
             AppIcon('file',
                 size: mac ? 13 : 12,
                 color: active ? AppColors.accent : AppColors.fg4)
@@ -1400,15 +1710,17 @@ class _DesktopShellState extends State<DesktopShell> {
                 style: sans(mac ? 12 : 12.5,
                     color: active ? AppColors.fg1 : AppColors.fg3)),
           ),
-          SizedBox(width: mac ? 3 : 4),
-          GestureDetector(
-            onTap: () => _closeTab(i),
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: EdgeInsets.all(mac ? 4 : 5),
-              child: AppIcon('x', size: mac ? 11 : 11, color: AppColors.fg4),
+          if (!t.isMissionControl) ...[
+            SizedBox(width: mac ? 3 : 4),
+            GestureDetector(
+              onTap: () => _closeTab(i),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: EdgeInsets.all(mac ? 4 : 5),
+                child: AppIcon('x', size: mac ? 11 : 11, color: AppColors.fg4),
+              ),
             ),
-          ),
+          ],
         ]),
       ),
     );
@@ -1558,7 +1870,8 @@ class _DesktopShellState extends State<DesktopShell> {
 /// survive switching between tabs.
 class _KeepAlive extends StatefulWidget {
   final Widget child;
-  const _KeepAlive({super.key, required this.child});
+  final bool keep;
+  const _KeepAlive({super.key, required this.child, this.keep = true});
   @override
   State<_KeepAlive> createState() => _KeepAliveState();
 }
@@ -1566,10 +1879,16 @@ class _KeepAlive extends StatefulWidget {
 class _KeepAliveState extends State<_KeepAlive>
     with AutomaticKeepAliveClientMixin {
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => widget.keep;
+  @override
+  void didUpdateWidget(covariant _KeepAlive oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.keep != widget.keep) updateKeepAlive();
+  }
+
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
+    Theme.of(context);
     super.build(context);
     return widget.child;
   }
@@ -1586,6 +1905,7 @@ class _Sidebar extends StatefulWidget {
   final VoidCallback onRefreshSessions;
   final VoidCallback onNewSession;
   final void Function(Instance) onSelectInstance;
+  final VoidCallback onOpenMissionControl;
   final void Function(String id, String title, String? profile) onOpenSession;
   final VoidCallback onAddInstance;
   final void Function(Instance, String) onRenameInstance;
@@ -1605,6 +1925,7 @@ class _Sidebar extends StatefulWidget {
     required this.onRefreshSessions,
     required this.onNewSession,
     required this.onSelectInstance,
+    required this.onOpenMissionControl,
     required this.onOpenSession,
     required this.onAddInstance,
     required this.onRenameInstance,
@@ -1634,6 +1955,11 @@ class _SidebarState extends State<_Sidebar> {
     _renameCtl.dispose();
     _renameFocus.dispose();
     super.dispose();
+  }
+
+  void _openMc() {
+    if (widget.client == null) return;
+    widget.onOpenMissionControl();
   }
 
   List<SessionInfo>? get _sessions => widget.sessions;
@@ -1693,6 +2019,7 @@ class _SidebarState extends State<_Sidebar> {
       sessions: _sessions ?? const [],
       onOpenChat: (s) => widget.onOpenSession(s.id, s.title, s.profile),
       commands: [
+        PaletteCommand('layers', 'Mission Control', '', _openMc),
         PaletteCommand('edit', 'New chat', '', widget.onNewSession),
         PaletteCommand('folder', 'Open folder', '', widget.onNewSession),
         PaletteCommand('settings', 'Settings', '', _openSettings),
@@ -1757,11 +2084,6 @@ class _SidebarState extends State<_Sidebar> {
                                       weight: FontWeight.w600,
                                       color: AppColors.fg1)),
                               const Spacer(),
-                              IconBtn('check-check',
-                                  size: 32,
-                                  iconSize: 16,
-                                  tooltip: 'Select',
-                                  onTap: _enterSelect),
                               GestureDetector(
                                 onTap: _showFilterSheet,
                                 child: Padding(
@@ -1792,34 +2114,32 @@ class _SidebarState extends State<_Sidebar> {
         ],
         if (!kMobile) ...[
           _machineHeader(),
-          // Desktop: nav rows above the session list.
+          _navRow('layers', 'Mission Control',
+              onTap: hasClient ? _openMc : null,
+              active: isDedicatedMcSession(widget.selectedSessionId)),
           _navRow('search', 'Search', onTap: hasClient ? _openSearch : null),
           _navRow('folder', 'Browse',
               sub: 'files · new chat',
               onTap: hasClient ? widget.onNewSession : null),
-          if (hasClient && (_sessions?.isNotEmpty ?? false))
-            _selecting
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
-                    child: Row(children: [
-                      Text('${_selected.length} selected',
-                          style: sans(11.5, color: AppColors.fg3)),
-                      const Spacer(),
-                      IconBtn('x',
-                          size: 28,
-                          iconSize: 15,
-                          tooltip: 'Cancel',
-                          onTap: _exitSelect),
-                      IconBtn('trash',
-                          size: 28,
-                          iconSize: 14,
-                          tooltip: 'Delete selected',
-                          onTap: _selected.isEmpty
-                              ? null
-                              : _confirmDeleteSelected),
-                    ]),
-                  )
-                : _navRow('check-check', 'Select', onTap: _enterSelect),
+          if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
+              child: Row(children: [
+                Text('${_selected.length} selected',
+                    style: sans(11.5, color: AppColors.fg3)),
+                const Spacer(),
+                IconBtn('x',
+                    size: 28,
+                    iconSize: 15,
+                    tooltip: 'Cancel',
+                    onTap: _exitSelect),
+                IconBtn('trash',
+                    size: 28,
+                    iconSize: 14,
+                    tooltip: 'Delete selected',
+                    onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
+              ]),
+            ),
           const SizedBox(height: 4),
           Expanded(
             child: !hasClient
@@ -1900,6 +2220,12 @@ class _SidebarState extends State<_Sidebar> {
         border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
       ),
       child: Row(children: [
+        IconBtn('layers',
+            size: 38,
+            iconSize: 19,
+            tooltip: 'Mission Control',
+            onTap: hasClient ? _openMc : null),
+        const SizedBox(width: 8),
         // Search pill.
         Expanded(
           child: GestureDetector(
@@ -2059,29 +2385,37 @@ class _SidebarState extends State<_Sidebar> {
     if (all.isEmpty) {
       // Offline ≠ empty: a failed fetch gets an explicit error + retry.
       if (widget.sessionsError != null) {
-        return Center(
-            child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon('wifi-off', size: 20, color: AppColors.fg4),
-                  const SizedBox(height: 10),
-                  Text(widget.sessionsError!,
-                      textAlign: TextAlign.center,
-                      style: sans(12.5, color: AppColors.fg3)),
-                  const SizedBox(height: 12),
-                  TextButton(
-                      onPressed: widget.onRefreshSessions,
-                      child: Text('Retry',
-                          style: sans(12.5, color: AppColors.accent))),
-                ])));
+        return ListView(
+            padding:
+                EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
+            children: [
+              Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    AppIcon('wifi-off', size: 20, color: AppColors.fg4),
+                    const SizedBox(height: 10),
+                    Text(widget.sessionsError!,
+                        textAlign: TextAlign.center,
+                        style: sans(12.5, color: AppColors.fg3)),
+                    const SizedBox(height: 12),
+                    TextButton(
+                        onPressed: widget.onRefreshSessions,
+                        child: Text('Retry',
+                            style: sans(12.5, color: AppColors.accent))),
+                  ])),
+            ]);
       }
-      return Center(
-          child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text('No chats yet.',
-                  style: sans(12.5, color: AppColors.fg4))));
+      return ListView(
+          padding:
+              EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
+          children: [
+            Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('No chats yet.',
+                    textAlign: TextAlign.center,
+                    style: sans(12.5, color: AppColors.fg4))),
+          ]);
     }
-    // Group by recency; the list is already recency-sorted, so buckets are contiguous.
     final list = all.where((s) => _statusMatch(_filter, s)).toList();
     final children = <Widget>[];
     String? bucket;
@@ -2089,8 +2423,6 @@ class _SidebarState extends State<_Sidebar> {
       final b = _bucket(s.lastActive);
       if (b != bucket) {
         bucket = b;
-        // Mobile: no per-bucket labels — the "Conversations" header above is
-        // the single section label. Desktop keeps recency bucket labels.
         if (!kMobile) {
           children.add(Padding(
               padding: const EdgeInsets.fromLTRB(10, 16, 4, 4),
@@ -2333,6 +2665,7 @@ class _SidebarState extends State<_Sidebar> {
 
   // Long-press / right-click a session → rename or delete.
   Future<void> _sessionActions(SessionInfo s, {Offset? position}) async {
+    if (isDedicatedMcSession(s.id)) return;
     if (!kMobile) {
       final overlay =
           Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -2343,9 +2676,15 @@ class _SidebarState extends State<_Sidebar> {
           Rect.fromCircle(center: point, radius: 0),
           Offset.zero & overlay.size,
         ),
-        items: const [
-          PopupMenuItem(value: 'rename', child: Text('Rename')),
-          PopupMenuItem(value: 'delete', child: Text('Delete')),
+        color: AppColors.surface1,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        shape: appMenuShape,
+        items: [
+          appMenuItem(value: 'rename', icon: 'edit', label: 'Rename'),
+          appMenuItem(
+              value: 'delete', icon: 'trash', label: 'Delete', danger: true),
         ],
       );
       if (selected == 'rename') {
@@ -2364,10 +2703,6 @@ class _SidebarState extends State<_Sidebar> {
             _sessionActionTile('edit', 'Rename', onTap: () {
               Navigator.pop(context);
               _beginRename(s);
-            }),
-            _sessionActionTile('check-check', 'Select', onTap: () {
-              Navigator.pop(context);
-              _enterSelect(seed: s.id);
             }),
             _sessionActionTile('trash', 'Delete', danger: true, onTap: () {
               Navigator.pop(context);
@@ -2399,6 +2734,7 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   void _enterSelect({String? seed}) {
+    if (seed != null && isDedicatedMcSession(seed)) return;
     setState(() {
       _selecting = true;
       _renamingId = null;
@@ -2414,12 +2750,14 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   void _toggleSelected(String id) {
+    if (isDedicatedMcSession(id)) return;
     setState(() {
       if (!_selected.add(id)) _selected.remove(id);
     });
   }
 
   void _beginRename(SessionInfo s) {
+    if (isDedicatedMcSession(s.id)) return;
     _renameCtl.text = s.title;
     _renameCtl.selection =
         TextSelection(baseOffset: 0, extentOffset: _renameCtl.text.length);

@@ -426,7 +426,9 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
             EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.75),
+              maxHeight: (MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).viewInsets.bottom) *
+                  0.75),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const SizedBox(height: 10),
             Container(
