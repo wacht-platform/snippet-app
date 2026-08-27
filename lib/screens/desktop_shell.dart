@@ -2416,8 +2416,14 @@ class _SidebarState extends State<_Sidebar> {
                     style: sans(12.5, color: AppColors.fg4))),
           ]);
     }
-    final list = all.where((s) => _statusMatch(_filter, s)).toList();
+    final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
+    final list = all
+        .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
+        .toList();
     final children = <Widget>[];
+    if (mc.isNotEmpty) {
+      children.add(_missionControlPin(mc.first));
+    }
     String? bucket;
     for (final s in list) {
       final b = _bucket(s.lastActive);
@@ -2425,7 +2431,7 @@ class _SidebarState extends State<_Sidebar> {
         bucket = b;
         if (!kMobile) {
           children.add(Padding(
-              padding: const EdgeInsets.fromLTRB(10, 16, 4, 4),
+              padding: EdgeInsets.fromLTRB(10, mc.isNotEmpty ? 10 : 16, 4, 4),
               child: Text(b,
                   style: sans(10.5,
                       weight: FontWeight.w500,
@@ -2440,7 +2446,7 @@ class _SidebarState extends State<_Sidebar> {
               padding: const EdgeInsets.only(bottom: 1),
               child: _sessionRow(s)));
     }
-    if (list.isEmpty) {
+    if (list.isEmpty && (mc.isEmpty || _filter != 'all')) {
       children.add(Padding(
           padding: const EdgeInsets.all(20),
           child: Text('Nothing here.',
@@ -2499,6 +2505,89 @@ class _SidebarState extends State<_Sidebar> {
               style: sans(12.5,
                   weight: FontWeight.w500,
                   color: sel ? AppColors.bg : AppColors.fg3)),
+        ),
+      ),
+    );
+  }
+
+  Widget _missionControlPin(SessionInfo s) {
+    final selected = s.id == widget.selectedSessionId;
+    final waiting = s.status == 'waiting_for_input';
+    final running = s.status == 'running';
+    void open() =>
+        widget.onOpenSession(s.id, 'Mission Control', s.profile);
+    final status = running || waiting
+        ? Container(
+            width: kMobile ? 8 : 6,
+            height: kMobile ? 8 : 6,
+            decoration: BoxDecoration(
+              color: waiting ? AppColors.accent : AppColors.run,
+              shape: BoxShape.circle,
+            ),
+          )
+        : null;
+    if (kMobile) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: GestureDetector(
+          onTap: open,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.accentBg : AppColors.surface1,
+              borderRadius: BorderRadius.circular(R.card),
+              border: Border.all(
+                color: selected ? AppColors.accentLine : AppColors.border,
+              ),
+            ),
+            child: Row(children: [
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surface3,
+                  borderRadius: BorderRadius.circular(R.sm),
+                ),
+                child: AppIcon('layers', size: 16, color: AppColors.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Mission Control',
+                    style: sans(16,
+                        weight: FontWeight.w600, color: AppColors.fg1)),
+              ),
+              if (status != null) status,
+            ]),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      child: Material(
+        color: selected ? AppColors.accentBg : AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.md),
+          onTap: open,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(R.md),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(children: [
+              AppIcon('layers', size: 15, color: AppColors.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Mission Control',
+                    style: sans(12.5,
+                        weight: FontWeight.w600, color: AppColors.fg1)),
+              ),
+              if (status != null) status,
+            ]),
+          ),
         ),
       ),
     );
