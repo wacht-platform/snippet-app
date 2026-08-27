@@ -425,12 +425,15 @@ class _DesktopShellState extends State<DesktopShell>
     }
     final extras = matches.length > 1 ? matches.sublist(1) : const <int>[];
     final existing = matches.isEmpty ? -1 : matches.first;
+    final current = existing >= 0 ? _tabs[existing] : null;
+    final leftover = current != null &&
+        (!isDedicatedMcSession(current.sessionId) ||
+            current.title != 'Mission Control');
     // Only steal focus when a leftover MC composer is about to unmount.
-    if (extras.isNotEmpty ||
-        (existing >= 0 && !isDedicatedMcSession(_tabs[existing].sessionId))) {
+    if (extras.isNotEmpty || leftover) {
       FocusManager.instance.primaryFocus?.unfocus();
     }
-    if (existing == 0 && extras.isEmpty) {
+    if (existing == 0 && extras.isEmpty && !leftover) {
       if (_activeIndex < 0) {
         setState(() => _activeIndex = 0);
         _persistTabs();
@@ -450,7 +453,8 @@ class _DesktopShellState extends State<DesktopShell>
             _macSessionControls.remove(gone.key);
           }
         }
-        if (!isDedicatedMcSession(kept.sessionId)) {
+        if (!isDedicatedMcSession(kept.sessionId) ||
+            kept.title != 'Mission Control') {
           kept = _mcTabFor(inst)..inboundShare = kept.inboundShare;
         }
       } else {
@@ -790,7 +794,7 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _openSession(String id, String title, String? profile,
       {SharedInbound? share}) {
-    if (isDedicatedMcSession(id)) {
+    if (isMissionControlTab(sessionId: id, title: title)) {
       _openMissionControlTab();
       _attachShareToActive(share);
       return;
@@ -828,6 +832,19 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() => _tabs[i].inboundShare = share);
   }
 
+  List<_ShellTab> _shareTargets() {
+    final url = _active?.url;
+    if (url == null) return const [];
+    final seen = <String>{};
+    final out = <_ShellTab>[];
+    for (final t in _tabs) {
+      if (t.isFile || t.instanceUrl != url || t.sessionId == null) continue;
+      if (!seen.add(t.key)) continue;
+      out.add(t);
+    }
+    return out;
+  }
+
   Future<void> _onInboundShare(SharedInbound share) async {
     if (!mounted || share.isEmpty) return;
     final client = _client;
@@ -835,23 +852,61 @@ class _DesktopShellState extends State<DesktopShell>
       if (mounted) toast(context, 'Add a machine first.', danger: true);
       return;
     }
+    if (_sessions == null || _sessions!.isEmpty) {
+      await _loadSessions();
+      if (!mounted) return;
+    }
     final cached = List<SessionInfo>.from(_sessions ?? const []);
+    final open = _shareTargets();
+    final openIds = {
+      for (final t in open)
+        if (!t.isMissionControl) t.sessionId,
+    };
+    final rest = cached.where((s) => !openIds.contains(s.id)).toList();
     final picked = await showAppSheet<String>(
       context,
       title: 'Send to',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: AppIcon('layers', size: 18, color: AppColors.accent),
-            title: Text('Mission Control',
-                style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
-            subtitle: Text(_active?.label ?? 'this machine',
-                style: sans(12, color: AppColors.fg4)),
-            onTap: () => Navigator.pop(context, 'mission-control'),
-          ),
-          for (final s in cached)
+          for (final t in open)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: AppIcon(t.isMissionControl ? 'layers' : 'terminal',
+                  size: 18,
+                  color:
+                      t.isMissionControl ? AppColors.accent : AppColors.fg3),
+              title: Text(
+                  t.isMissionControl
+                      ? 'Mission Control'
+                      : (t.title.trim().isEmpty ? '(untitled)' : t.title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(15,
+                      weight: t.isMissionControl ? FontWeight.w600 : FontWeight.w400,
+                      color: AppColors.fg1)),
+              subtitle: Text(
+                  t.isMissionControl
+                      ? (_active?.label ?? 'this machine')
+                      : 'Open tab',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12, color: AppColors.fg4)),
+              onTap: () => Navigator.pop(
+                  context, t.isMissionControl ? 'mission-control' : t.sessionId),
+            ),
+          if (open.isEmpty)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: AppIcon('layers', size: 18, color: AppColors.accent),
+              title: Text('Mission Control',
+                  style:
+                      sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+              subtitle: Text(_active?.label ?? 'this machine',
+                  style: sans(12, color: AppColors.fg4)),
+              onTap: () => Navigator.pop(context, 'mission-control'),
+            ),
+          for (final s in rest)
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: AppIcon('terminal', size: 18, color: AppColors.fg3),

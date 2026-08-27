@@ -443,7 +443,7 @@ class _SessionScreenState extends State<SessionScreen>
   @override
   void initState() {
     super.initState();
-    _title = widget.title;
+    _title = _isMissionControl ? 'Mission Control' : widget.title;
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
     WidgetsBinding.instance.addObserver(this);
@@ -498,7 +498,11 @@ class _SessionScreenState extends State<SessionScreen>
     super.didUpdateWidget(oldWidget);
     final sameSession = oldWidget.sessionId == widget.sessionId &&
         oldWidget.client.baseUrl == widget.client.baseUrl;
+    if (_isMissionControl && _title != 'Mission Control') {
+      _title = 'Mission Control';
+    }
     if (!sameSession) {
+      _title = _isMissionControl ? 'Mission Control' : widget.title;
       // PageView normally keys each session, but a parent may reuse this State
       // while switching tabs. Never carry composer/upload state across sessions.
       // Invalidate completions from an upload started by the previous session.
@@ -514,6 +518,11 @@ class _SessionScreenState extends State<SessionScreen>
       _input.clear();
       _lastInput = '';
       _consumedShare = null;
+      _state = null;
+      _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
+      _registeredOpenKey = _openKey;
+      reportOpenSession(_openKey);
+      unawaited(_startSession());
     }
     if (widget.inboundShare != null &&
         widget.inboundShare != oldWidget.inboundShare) {
@@ -809,7 +818,9 @@ class _SessionScreenState extends State<SessionScreen>
           if (eventsChanged) _transcriptDirty = true;
           setState(() {
             _state = next;
-            _title = next.title ?? widget.title;
+            if (!_isMissionControl) {
+              _title = next.title ?? widget.title;
+            }
             // Snapshot/delta commit durable events; drop the live answer so it
             // doesn't double-render against AssistantText once it lands.
             if (wire == 'snapshot' || wire == 'delta') {
@@ -2024,6 +2035,7 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Future<void> _renameCurrent() async {
+    if (_isMissionControl) return;
     final title = await promptText(context,
         title: 'Rename session',
         initial: _title,
@@ -2406,6 +2418,14 @@ class _SessionScreenState extends State<SessionScreen>
           label: label,
           detail: value,
         );
+    if (_isMissionControl) {
+      return [
+        item('shield', 'Approval mode', () => _setApproval(!manual),
+            value: manual ? 'Ask' : 'Auto'),
+        item('minimize', 'Compact history', _confirmCompact),
+        item('activity', 'Usage', _showUsage),
+      ];
+    }
     return [
       item('edit', 'Rename session', _renameCurrent),
       item('shield', 'Approval mode', () => _setApproval(!manual),
@@ -2418,7 +2438,7 @@ class _SessionScreenState extends State<SessionScreen>
         item('layers', 'Lanes', _showLanes,
             value: '${s!.lanes.where((l) => l.running).length} running'),
       const PopupMenuDivider(),
-      if (!_isMissionControl) item('terminal', 'Session shell', _openTerm),
+      item('terminal', 'Session shell', _openTerm),
       item(
           'git-branch',
           'Git',
@@ -2464,7 +2484,12 @@ class _SessionScreenState extends State<SessionScreen>
         child: _SessionActionsPanel(
           session: s,
           title: _title,
+          hideRename: _isMissionControl,
+          hideWorkspace: _isMissionControl,
+          hideGoal: _isMissionControl,
+          hideCheckpoints: _isMissionControl,
           onRename: (name) async {
+            if (_isMissionControl) return;
             try {
               await widget.client.renameSession(widget.sessionId, name);
               if (mounted) setState(() => _title = name);
@@ -4825,6 +4850,10 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onCheckpoints;
   final VoidCallback onUsage;
   final bool hideShell;
+  final bool hideRename;
+  final bool hideWorkspace;
+  final bool hideGoal;
+  final bool hideCheckpoints;
   const _SessionActionsPanel({
     required this.session,
     required this.title,
@@ -4841,6 +4870,10 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onCheckpoints,
     required this.onUsage,
     this.hideShell = false,
+    this.hideRename = false,
+    this.hideWorkspace = false,
+    this.hideGoal = false,
+    this.hideCheckpoints = false,
   });
 
   @override
@@ -4929,24 +4962,25 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _section('Session'),
-        _row(
-          icon: 'edit',
-          label: 'Rename',
-          id: 'rename',
-          value: widget.title.isEmpty ? null : widget.title,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AppField(
-                  controller: _titleCtl,
-                  hint: 'Session title',
-                  onSubmitted: (_) => _saveTitle()),
-              const SizedBox(height: 8),
-              Btn(_savingTitle ? 'Saving…' : 'Save title',
-                  disabled: _savingTitle, onTap: _saveTitle),
-            ],
+        if (!widget.hideRename)
+          _row(
+            icon: 'edit',
+            label: 'Rename',
+            id: 'rename',
+            value: widget.title.isEmpty ? null : widget.title,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppField(
+                    controller: _titleCtl,
+                    hint: 'Session title',
+                    onSubmitted: (_) => _saveTitle()),
+                const SizedBox(height: 8),
+                Btn(_savingTitle ? 'Saving…' : 'Save title',
+                    disabled: _savingTitle, onTap: _saveTitle),
+              ],
+            ),
           ),
-        ),
         if (!kMacOS)
           _row(
             icon: 'shield',
@@ -4973,7 +5007,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               ),
             ]),
           ),
-        if (!kMacOS)
+        if (!kMacOS && !widget.hideGoal)
           _row(
             icon: 'zap',
             label: goalOn ? 'Goal' : 'Set goal',
@@ -5000,26 +5034,31 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                     ],
                   ),
           ),
-        if (!kMacOS && (s?.lanes.isNotEmpty ?? false))
+        if (!kMacOS && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
           _row(
               icon: 'layers',
               label: 'Lanes',
               value: '${s!.lanes.where((l) => l.running).length} running',
               onTap: widget.onLanes),
-        _section('Workspace'),
-        if (!kMacOS)
-          _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
-        _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
-        if (!widget.hideShell)
-          _row(icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
-        _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
+        if (!widget.hideWorkspace) ...[
+          _section('Workspace'),
+          if (!kMacOS)
+            _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
+          _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
+          if (!widget.hideShell)
+            _row(icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
+          _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
+        ],
         _section('History'),
         _row(
             icon: 'minimize',
             label: 'Compact history',
             onTap: widget.onCompact),
-        _row(
-            icon: 'history', label: 'Checkpoints', onTap: widget.onCheckpoints),
+        if (!widget.hideCheckpoints)
+          _row(
+              icon: 'history',
+              label: 'Checkpoints',
+              onTap: widget.onCheckpoints),
         _row(icon: 'activity', label: 'Usage', onTap: widget.onUsage),
       ],
     );
