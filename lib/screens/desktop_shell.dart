@@ -2357,21 +2357,6 @@ class _SidebarState extends State<_Sidebar> {
         _ => true,
       };
 
-  // Claude-style recency buckets (from lastActive).
-  static String _bucket(int unixSec) {
-    if (unixSec == 0) return 'Older';
-    final now = DateTime.now();
-    final t = DateTime.fromMillisecondsSinceEpoch(unixSec * 1000);
-    final days = DateTime(now.year, now.month, now.day)
-        .difference(DateTime(t.year, t.month, t.day))
-        .inDays;
-    if (days <= 0) return 'Today';
-    if (days < 7) return 'This week';
-    if (days < 14) return 'Last week';
-    if (t.year == now.year) return 'This year';
-    return 'Older';
-  }
-
   Widget _sessionList() {
     if (_loading && _sessions == null) {
       return Center(
@@ -2424,27 +2409,39 @@ class _SidebarState extends State<_Sidebar> {
     if (mc.isNotEmpty) {
       children.add(_missionControlPin(mc.first));
     }
-    String? bucket;
-    for (final s in list) {
-      final b = _bucket(s.lastActive);
-      if (b != bucket) {
-        bucket = b;
-        if (!kMobile) {
-          children.add(Padding(
-              padding: EdgeInsets.fromLTRB(10, mc.isNotEmpty ? 10 : 16, 4, 4),
-              child: Text(b,
-                  style: sans(10.5,
-                      weight: FontWeight.w500,
-                      spacing: 0.4,
-                      color: AppColors.fg4))));
-        }
+    if (kMobile) {
+      for (final s in list) {
+        children.add(Padding(
+            padding: const EdgeInsets.only(bottom: 2), child: _sessionCard(s)));
       }
-      children.add(kMobile
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 2), child: _sessionCard(s))
-          : Padding(
-              padding: const EdgeInsets.only(bottom: 1),
-              child: _sessionRow(s)));
+    } else {
+      final newest = <String, int>{};
+      for (final s in list) {
+        final t = newest[s.folder];
+        if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
+      }
+      list.sort((a, b) {
+        final fa = newest[a.folder] ?? 0;
+        final fb = newest[b.folder] ?? 0;
+        if (fa != fb) return fb.compareTo(fa);
+        final byFolder = a.folder.compareTo(b.folder);
+        if (byFolder != 0) return byFolder;
+        return b.lastActive.compareTo(a.lastActive);
+      });
+      String? folderKey;
+      var firstFolder = true;
+      for (final s in list) {
+        final key = s.folder;
+        if (key != folderKey) {
+          folderKey = key;
+          children.add(_desktopFolderHeader(
+              key, first: firstFolder && mc.isEmpty));
+          firstFolder = false;
+        }
+        children.add(Padding(
+            padding: const EdgeInsets.only(bottom: 1),
+            child: _sessionRow(s)));
+      }
     }
     if (list.isEmpty && (mc.isEmpty || _filter != 'all')) {
       children.add(Padding(
@@ -2507,6 +2504,26 @@ class _SidebarState extends State<_Sidebar> {
                   color: sel ? AppColors.bg : AppColors.fg3)),
         ),
       ),
+    );
+  }
+
+  Widget _desktopFolderHeader(String folder, {required bool first}) {
+    final name = lastPathSegment(folder, ifEmpty: folder.isEmpty ? 'No folder' : folder);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(10, first ? 10 : 14, 4, 4),
+      child: Row(children: [
+        AppIcon('folder', size: 12, color: AppColors.fg4),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(10.5,
+                  weight: FontWeight.w500,
+                  spacing: 0.4,
+                  color: AppColors.fg4)),
+        ),
+      ]),
     );
   }
 
