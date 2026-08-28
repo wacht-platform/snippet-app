@@ -35,6 +35,7 @@ import 'git.dart';
 import 'lanes.dart';
 import 'mission_control/mission_control_state.dart'
     show isDedicatedMcSession, parseMissionEnvelope, MissionEnvelope;
+import 'mission_control/widgets/mission_control_tasks.dart';
 
 String formatCheckpointDate(String raw) {
   final parsed = DateTime.tryParse(raw)?.toLocal();
@@ -2100,6 +2101,8 @@ class _SessionScreenState extends State<SessionScreen>
         if (running)
           IconBtn('stop',
               tooltip: 'Stop', onTap: () => _send({'kind': 'interrupt'})),
+        if (_isMissionControl)
+          IconBtn('layers', tooltip: 'Tasks', onTap: _showTasks),
         if (!_isMissionControl)
           IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
       ]),
@@ -2275,6 +2278,9 @@ class _SessionScreenState extends State<SessionScreen>
               iconSize: 15,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
+        if (mac && _isMissionControl)
+          IconBtn('layers',
+              size: 30, iconSize: 15, tooltip: 'Tasks', onTap: _showTasks),
         if (mac && !_isMissionControl)
           IconBtn('terminal',
               size: 30, iconSize: 15, tooltip: 'Shell', onTap: _openTerm),
@@ -2291,6 +2297,9 @@ class _SessionScreenState extends State<SessionScreen>
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
         if (!mac) ...[
+          if (_isMissionControl)
+            IconBtn('layers',
+                size: 32, iconSize: 16, tooltip: 'Tasks', onTap: _showTasks),
           if (!_isMissionControl)
             IconBtn('terminal',
                 size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
@@ -2420,6 +2429,7 @@ class _SessionScreenState extends State<SessionScreen>
         );
     if (_isMissionControl) {
       return [
+        item('layers', 'Tasks', _showTasks),
         item('shield', 'Approval mode', () => _setApproval(!manual),
             value: manual ? 'Ask' : 'Auto'),
         item('minimize', 'Compact history', _confirmCompact),
@@ -2504,6 +2514,7 @@ class _SessionScreenState extends State<SessionScreen>
           },
           onCancelGoal: _cancelGoal,
           onLanes: () => run(_showLanes),
+          onTasks: _isMissionControl ? () => run(_showTasks) : null,
           onTerm: () => run(_openTerm),
           hideShell: _isMissionControl,
           onGit: () => run(() => presentScreen(context,
@@ -3324,6 +3335,24 @@ class _SessionScreenState extends State<SessionScreen>
       builder: (_, close) => LanesScreen(
         liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
         onClose: close,
+      ),
+    );
+  }
+
+  void _showTasks() {
+    if (!_isMissionControl) return;
+    presentScreen(
+      context,
+      builder: (_, close) => MissionControlTasksScreen(
+        client: widget.client,
+        onClose: close,
+        onAskTask: (task) {
+          final title = task.title.isEmpty ? task.id : task.title;
+          _input.text = 'Tell me about task "$title" — what\'s the current status?';
+          _input.selection =
+              TextSelection.collapsed(offset: _input.text.length);
+          _sendMessage();
+        },
       ),
     );
   }
@@ -4842,6 +4871,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final void Function(String text) onSetGoal;
   final VoidCallback onCancelGoal;
   final VoidCallback onLanes;
+  final VoidCallback? onTasks;
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
@@ -4862,6 +4892,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onSetGoal,
     required this.onCancelGoal,
     required this.onLanes,
+    this.onTasks,
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
@@ -5040,6 +5071,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               label: 'Lanes',
               value: '${s!.lanes.where((l) => l.running).length} running',
               onTap: widget.onLanes),
+        if (widget.onTasks != null)
+          _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
         if (!widget.hideWorkspace) ...[
           _section('Workspace'),
           if (!kMacOS)
