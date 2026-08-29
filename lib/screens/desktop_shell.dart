@@ -2425,19 +2425,25 @@ class _SidebarState extends State<_Sidebar> {
         if (byFolder != 0) return byFolder;
         return b.lastActive.compareTo(a.lastActive);
       });
-      String? folderKey;
-      var firstFolder = true;
+      final groups = <String, List<SessionInfo>>{};
+      final order = <String>[];
       for (final s in list) {
-        final key = s.folder;
-        if (key != folderKey) {
-          folderKey = key;
-          children.add(_desktopFolderHeader(
-              key, first: firstFolder && mc.isEmpty));
-          firstFolder = false;
+        final bucket = groups.putIfAbsent(s.folder, () {
+          order.add(s.folder);
+          return <SessionInfo>[];
+        });
+        bucket.add(s);
+      }
+      var firstFolder = true;
+      for (final key in order) {
+        final sessions = groups[key]!;
+        children.add(_desktopFolderHeader(
+            key, first: firstFolder && mc.isEmpty));
+        firstFolder = false;
+        for (var i = 0; i < sessions.length; i++) {
+          children.add(_desktopTreeRow(sessions[i],
+              last: i == sessions.length - 1));
         }
-        children.add(Padding(
-            padding: const EdgeInsets.only(bottom: 1, left: 10),
-            child: _sessionRow(s)));
       }
     }
     if (list.isEmpty && (mc.isEmpty || _filter != 'all')) {
@@ -2508,17 +2514,60 @@ class _SidebarState extends State<_Sidebar> {
     final name =
         lastPathSegment(folder, ifEmpty: folder.isEmpty ? 'No folder' : folder);
     return Padding(
-      padding: EdgeInsets.fromLTRB(10, first ? 8 : 16, 4, 2),
-      child: Row(children: [
-        AppIcon('folder', size: 13, color: AppColors.fg3),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: sans(11.5,
-                  weight: FontWeight.w600, color: AppColors.fg3)),
+      padding: EdgeInsets.fromLTRB(0, first ? 8 : 16, 4, 0),
+      child: SizedBox(
+        height: 28,
+        child: Stack(children: [
+          Positioned(
+            left: _treeX,
+            top: 20,
+            bottom: 0,
+            child: Container(width: 1, color: AppColors.border2),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Row(children: [
+              AppIcon('folder', size: 13, color: AppColors.fg3),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(11.5,
+                        weight: FontWeight.w600, color: AppColors.fg3)),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  static const double _treeGutter = 22;
+  static const double _treeX = 14;
+
+  Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
+    return SizedBox(
+      height: 32,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SizedBox(
+          width: _treeGutter,
+          child: Stack(children: [
+            Positioned(
+              left: _treeX,
+              top: 0,
+              bottom: last ? 16 : 0,
+              child: Container(width: 1, color: AppColors.border2),
+            ),
+            Positioned(
+              left: _treeX,
+              top: 15,
+              right: 0,
+              child: Container(height: 1, color: AppColors.border2),
+            ),
+          ]),
         ),
+        Expanded(child: _sessionRow(s)),
       ]),
     );
   }
