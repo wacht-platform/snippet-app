@@ -33,6 +33,7 @@ import 'files.dart';
 import 'processes.dart';
 import 'git.dart';
 import 'lanes.dart';
+import 'recurring.dart';
 import 'mission_control/mission_control_state.dart'
     show isDedicatedMcSession, parseMissionEnvelope, MissionEnvelope;
 import 'mission_control/widgets/mission_control_tasks.dart';
@@ -2350,6 +2351,15 @@ class _SessionScreenState extends State<SessionScreen>
     _toast('Cancelling the goal');
   }
 
+  void _openRecurring() {
+    presentScreen(context,
+        builder: (_, close) => RecurringScreen(
+            client: widget.client,
+            onClose: close,
+            defaultSessionId: widget.sessionId,
+            defaultSessionTitle: _title));
+  }
+
   void _setApproval(bool manual) {
     final mode = manual ? 'manual' : 'auto';
     final s = _state;
@@ -2404,6 +2414,9 @@ class _SessionScreenState extends State<SessionScreen>
                 sessionId: widget.sessionId,
                 onClose: close));
         return;
+      case 'recurring':
+        _openRecurring();
+        return;
       case 'compact':
         _confirmCompact();
         return;
@@ -2430,6 +2443,7 @@ class _SessionScreenState extends State<SessionScreen>
     if (_isMissionControl) {
       return [
         item('layers', 'Tasks', _showTasks),
+        item('clock', 'Recurring', _openRecurring),
         item('shield', 'Approval mode', () => _setApproval(!manual),
             value: manual ? 'Ask' : 'Auto'),
         item('minimize', 'Compact history', _confirmCompact),
@@ -2475,6 +2489,7 @@ class _SessionScreenState extends State<SessionScreen>
                   client: widget.client,
                   sessionId: widget.sessionId,
                   onClose: close))),
+      item('clock', 'Recurring', _openRecurring),
       const PopupMenuDivider(),
       item('minimize', 'Compact history', _confirmCompact),
       item('history', 'Checkpoints', _showCheckpoints),
@@ -2537,6 +2552,7 @@ class _SessionScreenState extends State<SessionScreen>
                   client: widget.client,
                   sessionId: widget.sessionId,
                   onClose: close))),
+          onRecurring: () => run(_openRecurring),
           onCompact: () => run(_confirmCompact),
           onCheckpoints: () => run(_showCheckpoints),
           onUsage: () => run(_showUsage),
@@ -4876,6 +4892,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onGit;
   final VoidCallback onFiles;
   final VoidCallback onProcesses;
+  final VoidCallback onRecurring;
   final VoidCallback onCompact;
   final VoidCallback onCheckpoints;
   final VoidCallback onUsage;
@@ -4897,6 +4914,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onGit,
     required this.onFiles,
     required this.onProcesses,
+    required this.onRecurring,
     required this.onCompact,
     required this.onCheckpoints,
     required this.onUsage,
@@ -5073,6 +5091,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               onTap: widget.onLanes),
         if (widget.onTasks != null)
           _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
+        _row(icon: 'clock', label: 'Recurring', onTap: widget.onRecurring),
         if (!widget.hideWorkspace) ...[
           _section('Workspace'),
           if (!kMacOS)

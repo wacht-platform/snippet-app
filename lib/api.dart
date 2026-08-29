@@ -654,31 +654,34 @@ class DaemonClient {
         .toList();
   }
 
-  /// POST /recurring — schedule a poke. [schedule] is `every 15m|1h|1d` or `daily HH:MM`.
+  /// POST /recurring — schedule a poke. [schedule] is `every 5m|1h|1d` or `daily HH:MM`.
   Future<RecurringJob> createRecurring({
     required String title,
     required String sessionId,
-    required String prompt,
+    String prompt = '',
+    String? planPath,
     required String schedule,
   }) async {
+    final body = <String, dynamic>{
+      'title': title,
+      'session_id': sessionId,
+      'prompt': prompt,
+      'schedule': schedule,
+    };
+    if (planPath != null) body['plan_path'] = planPath;
     final r = await http.post(_uri('/recurring'),
-        headers: _json,
-        body: jsonEncode({
-          'title': title,
-          'session_id': sessionId,
-          'prompt': prompt,
-          'schedule': schedule,
-        }));
+        headers: _json, body: jsonEncode(body));
     if (r.statusCode != 200) throw _err('create recurring job', r);
     return RecurringJob.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
-  /// PUT /recurring/{id} — update title/prompt/schedule/enabled (pause = enabled:false).
+  /// PUT /recurring/{id} — update title/prompt/plan/schedule/enabled (pause = enabled:false).
   Future<RecurringJob> updateRecurring(
     String id, {
     String? title,
     String? sessionId,
     String? prompt,
+    String? planPath,
     String? schedule,
     bool? enabled,
   }) async {
@@ -686,6 +689,7 @@ class DaemonClient {
     if (title != null) body['title'] = title;
     if (sessionId != null) body['session_id'] = sessionId;
     if (prompt != null) body['prompt'] = prompt;
+    if (planPath != null) body['plan_path'] = planPath;
     if (schedule != null) body['schedule'] = schedule;
     if (enabled != null) body['enabled'] = enabled;
     final r = await http.put(_uri('/recurring/$id'),

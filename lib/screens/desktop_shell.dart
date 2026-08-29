@@ -19,6 +19,7 @@ import 'files.dart';
 import 'git.dart';
 import 'models.dart';
 import 'vault.dart';
+import 'recurring.dart';
 import 'session.dart';
 import 'mission_control.dart';
 
@@ -3473,6 +3474,13 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                     'Secrets the agent can use',
                     () => presentScreen(context,
                         builder: (_, close) => VaultScreen(
+                            client: widget.client, onClose: close))),
+                _configTile(
+                    'clock',
+                    'Recurring',
+                    'Scheduled pokes for chats & Mission Control',
+                    () => presentScreen(context,
+                        builder: (_, close) => RecurringScreen(
                             client: widget.client, onClose: close))),
                 if (kCanNotify) _notifTile(),
               ],

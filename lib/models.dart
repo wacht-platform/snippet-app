@@ -695,6 +695,7 @@ class RecurringJob {
   final String title;
   final String sessionId;
   final String prompt;
+  final String? planPath;
   final String scheduleKind; // interval | daily
   final String scheduleLabel;
   final bool enabled;
@@ -710,6 +711,9 @@ class RecurringJob {
         title = j['title'] as String? ?? '',
         sessionId = j['session_id'] as String? ?? '',
         prompt = j['prompt'] as String? ?? '',
+        planPath = (j['plan_path'] as String?)?.trim().isEmpty == true
+            ? null
+            : j['plan_path'] as String?,
         scheduleKind = (j['schedule'] is Map
                 ? (j['schedule'] as Map)['kind'] as String?
                 : null) ??
