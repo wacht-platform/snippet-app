@@ -688,3 +688,56 @@ class ManagedSession {
 
   bool get isActive => !archived && status == 'active';
 }
+
+/// A scheduled poke that wakes Mission Control or any conversation.
+class RecurringJob {
+  final String id;
+  final String title;
+  final String sessionId;
+  final String prompt;
+  final String scheduleKind; // interval | daily
+  final String scheduleLabel;
+  final bool enabled;
+  final bool queued;
+  final int nextRunAt;
+  final int? lastRunAt;
+  final String? lastError;
+  final int createdAt;
+  final int updatedAt;
+
+  RecurringJob.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '',
+        prompt = j['prompt'] as String? ?? '',
+        scheduleKind = (j['schedule'] is Map
+                ? (j['schedule'] as Map)['kind'] as String?
+                : null) ??
+            '',
+        scheduleLabel = _scheduleLabel(j['schedule']),
+        enabled = j['enabled'] as bool? ?? true,
+        queued = j['queued'] as bool? ?? false,
+        nextRunAt = (j['next_run_at'] as num?)?.toInt() ?? 0,
+        lastRunAt = (j['last_run_at'] as num?)?.toInt(),
+        lastError = j['last_error'] as String?,
+        createdAt = (j['created_at'] as num?)?.toInt() ?? 0,
+        updatedAt = (j['updated_at'] as num?)?.toInt() ?? 0;
+
+  static String _scheduleLabel(dynamic raw) {
+    if (raw is! Map) return '';
+    final kind = raw['kind'] as String? ?? '';
+    if (kind == 'interval') {
+      final secs = (raw['every_secs'] as num?)?.toInt() ?? 0;
+      if (secs % 86400 == 0 && secs > 0) return 'every ${secs ~/ 86400}d';
+      if (secs % 3600 == 0 && secs > 0) return 'every ${secs ~/ 3600}h';
+      if (secs % 60 == 0 && secs > 0) return 'every ${secs ~/ 60}m';
+      return 'every ${secs}s';
+    }
+    if (kind == 'daily') {
+      final h = (raw['hour'] as num?)?.toInt() ?? 0;
+      final m = (raw['minute'] as num?)?.toInt() ?? 0;
+      return 'daily ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+    }
+    return kind;
+  }
+}

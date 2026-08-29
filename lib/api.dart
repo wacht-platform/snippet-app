@@ -642,6 +642,64 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('archive mission control session', r);
   }
 
+  // ---- Recurring jobs ----
+
+  /// GET /recurring — list scheduled pokes for Mission Control and sessions.
+  Future<List<RecurringJob>> recurringJobs() async {
+    final r = await http.get(_uri('/recurring'));
+    if (r.statusCode != 200) throw _err('list recurring jobs', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => RecurringJob.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /recurring — schedule a poke. [schedule] is `every 15m|1h|1d` or `daily HH:MM`.
+  Future<RecurringJob> createRecurring({
+    required String title,
+    required String sessionId,
+    required String prompt,
+    required String schedule,
+  }) async {
+    final r = await http.post(_uri('/recurring'),
+        headers: _json,
+        body: jsonEncode({
+          'title': title,
+          'session_id': sessionId,
+          'prompt': prompt,
+          'schedule': schedule,
+        }));
+    if (r.statusCode != 200) throw _err('create recurring job', r);
+    return RecurringJob.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// PUT /recurring/{id} — update title/prompt/schedule/enabled (pause = enabled:false).
+  Future<RecurringJob> updateRecurring(
+    String id, {
+    String? title,
+    String? sessionId,
+    String? prompt,
+    String? schedule,
+    bool? enabled,
+  }) async {
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (sessionId != null) body['session_id'] = sessionId;
+    if (prompt != null) body['prompt'] = prompt;
+    if (schedule != null) body['schedule'] = schedule;
+    if (enabled != null) body['enabled'] = enabled;
+    final r = await http.put(_uri('/recurring/$id'),
+        headers: _json, body: jsonEncode(body));
+    if (r.statusCode != 200) throw _err('update recurring job', r);
+    return RecurringJob.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// DELETE /recurring/{id}.
+  Future<void> deleteRecurring(String id) async {
+    final r = await http.delete(_uri('/recurring/$id'));
+    if (r.statusCode != 200) throw _err('delete recurring job', r);
+  }
+
   String _err(String what, http.Response r) =>
       'Failed to $what (HTTP ${r.statusCode})${r.body.isNotEmpty ? ': ${r.body}' : ''}';
 }
