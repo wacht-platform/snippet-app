@@ -2511,8 +2511,7 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   Widget _desktopFolderHeader(String folder, {required bool first}) {
-    final name =
-        lastPathSegment(folder, ifEmpty: folder.isEmpty ? 'No folder' : folder);
+    final path = folder.isEmpty ? 'No folder' : folder;
     return Padding(
       padding: EdgeInsets.fromLTRB(0, first ? 8 : 16, 4, 0),
       child: SizedBox(
@@ -2530,11 +2529,11 @@ class _SidebarState extends State<_Sidebar> {
               AppIcon('folder', size: 13, color: AppColors.fg3),
               const SizedBox(width: 7),
               Expanded(
-                child: Text(name,
+                child: Text(path,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(11.5,
-                        weight: FontWeight.w600, color: AppColors.fg3)),
+                    textAlign: TextAlign.left,
+                    style: mono(11, color: AppColors.fg3)),
               ),
             ]),
           ),
