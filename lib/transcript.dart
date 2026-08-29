@@ -19,9 +19,23 @@ class DenseToolRow extends StatefulWidget {
   final String tool;
   final dynamic args;
   final dynamic result; // null while running
-  const DenseToolRow({super.key, required this.tool, this.args, this.result});
+  final int count;
+  const DenseToolRow({
+    super.key,
+    required this.tool,
+    this.args,
+    this.result,
+    this.count = 1,
+  });
 
   bool get pending => result == null;
+
+  DenseToolRow withCount(int n) => DenseToolRow(
+        tool: tool,
+        args: args,
+        result: result,
+        count: n,
+      );
 
   @override
   State<DenseToolRow> createState() => _DenseToolRowState();
@@ -33,10 +47,18 @@ class _DenseToolRowState extends State<DenseToolRow> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final canExpand = toolIsExpandable(widget.tool, widget.args, widget.result);
-    final summary = widget.tool == 'bash'
-        ? 'shell command'
-        : toolArgSummary(widget.tool, widget.args);
+    final canExpand = widget.count <= 1 &&
+        toolIsExpandable(widget.tool, widget.args, widget.result);
+    final summary = widget.count > 1
+        ? ''
+        : (widget.tool == 'bash'
+            ? 'shell command'
+            : toolArgSummary(widget.tool, widget.args));
+    final title = widget.count > 1
+        ? (widget.tool == 'memory_read'
+            ? 'Recalled ${widget.count} times'
+            : '${toolTitle(widget.tool)} ×${widget.count}')
+        : toolTitle(widget.tool);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -48,7 +70,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
             child: Row(children: [
               AppIcon(toolIcon(widget.tool), size: 15, color: AppColors.fg3),
               const SizedBox(width: 8),
-              Text(toolTitle(widget.tool),
+              Text(title,
                   style:
                       sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
               if (summary.isNotEmpty) ...[
@@ -180,10 +202,18 @@ class _ToolRunState extends State<ToolRun> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final n = widget.rows.length;
+    final tools = widget.rows.whereType<DenseToolRow>().toList();
+    final invocations = tools.fold<int>(0, (n, r) => n + r.count);
+    final n = invocations > 0 ? invocations : widget.rows.length;
+    final allRecall =
+        tools.isNotEmpty && tools.every((r) => r.tool == 'memory_read');
     final label = widget.running
-        ? (n == 1 ? 'Running tool' : 'Running tools')
-        : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools');
+        ? (allRecall
+            ? (n == 1 ? 'Recalling' : 'Recalling $n times')
+            : (n == 1 ? 'Running tool' : 'Running tools'))
+        : (allRecall
+            ? (n == 1 ? 'Recalled' : 'Recalled $n times')
+            : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools'));
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

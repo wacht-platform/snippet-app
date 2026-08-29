@@ -2939,6 +2939,16 @@ class _SessionScreenState extends State<SessionScreen>
 
     void addToolRow(Widget child, String key) {
       runStartKey ??= key;
+      if (child is DenseToolRow &&
+          child.tool == 'memory_read' &&
+          run.isNotEmpty &&
+          run.last is DenseToolRow) {
+        final last = run.last as DenseToolRow;
+        if (last.tool == 'memory_read') {
+          run[run.length - 1] = last.withCount(last.count + 1);
+          return;
+        }
+      }
       run.add(child);
     }
 
