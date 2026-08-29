@@ -230,7 +230,6 @@ class _FileExplorerState extends State<FileExplorer> {
                   title: _selecting
                       ? '${_selected.length} selected'
                       : widget.title,
-                  subtitle: _selecting ? null : listing?.path,
                   onBack: _selecting
                       ? _exitSelect
                       : (widget.onClose ?? () => Navigator.pop(context)),
