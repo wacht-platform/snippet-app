@@ -2114,9 +2114,6 @@ class _SidebarState extends State<_Sidebar> {
         ],
         if (!kMobile) ...[
           _machineHeader(),
-          _navRow('layers', 'Mission Control',
-              onTap: hasClient ? _openMc : null,
-              active: isDedicatedMcSession(widget.selectedSessionId)),
           _navRow('search', 'Search', onTap: hasClient ? _openSearch : null),
           _navRow('folder', 'Browse',
               sub: 'files · new chat',
@@ -2439,7 +2436,7 @@ class _SidebarState extends State<_Sidebar> {
           firstFolder = false;
         }
         children.add(Padding(
-            padding: const EdgeInsets.only(bottom: 1),
+            padding: const EdgeInsets.only(bottom: 1, left: 10),
             child: _sessionRow(s)));
       }
     }
@@ -2508,20 +2505,19 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   Widget _desktopFolderHeader(String folder, {required bool first}) {
-    final name = lastPathSegment(folder, ifEmpty: folder.isEmpty ? 'No folder' : folder);
+    final name =
+        lastPathSegment(folder, ifEmpty: folder.isEmpty ? 'No folder' : folder);
     return Padding(
-      padding: EdgeInsets.fromLTRB(10, first ? 10 : 14, 4, 4),
+      padding: EdgeInsets.fromLTRB(10, first ? 8 : 16, 4, 2),
       child: Row(children: [
-        AppIcon('folder', size: 12, color: AppColors.fg4),
-        const SizedBox(width: 6),
+        AppIcon('folder', size: 13, color: AppColors.fg3),
+        const SizedBox(width: 7),
         Expanded(
           child: Text(name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: sans(10.5,
-                  weight: FontWeight.w500,
-                  spacing: 0.4,
-                  color: AppColors.fg4)),
+              style: sans(11.5,
+                  weight: FontWeight.w600, color: AppColors.fg3)),
         ),
       ]),
     );
