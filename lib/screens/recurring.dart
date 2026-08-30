@@ -15,11 +15,11 @@ import 'files.dart';
 class RecurringScreen extends StatefulWidget {
   final DaemonClient client;
   final VoidCallback? onClose;
-  /// Target session when creating (this chat). Settings uses [listOnly].
+  /// Target session when creating (this chat, or Mission Control itself).
+  /// Settings uses [listOnly]. Cross-session jobs are created by the MC agent
+  /// via `create_recurring_job` (job files), not this UI.
   final String? sessionId;
   final String? workspace;
-  /// Mission Control may pick another chat as the target. Regular chats cannot.
-  final bool allowSessionPick;
   /// Settings: list/pause/delete only — create from a chat menu.
   final bool listOnly;
   const RecurringScreen({
@@ -28,7 +28,6 @@ class RecurringScreen extends StatefulWidget {
     this.onClose,
     this.sessionId,
     this.workspace,
-    this.allowSessionPick = false,
     this.listOnly = false,
   });
   @override
@@ -37,7 +36,6 @@ class RecurringScreen extends StatefulWidget {
 
 class _RecurringScreenState extends State<RecurringScreen> {
   late Future<List<RecurringJob>> _future;
-  List<SessionInfo> _sessions = const [];
 
   String get _boundSessionId {
     final id = widget.sessionId?.trim() ?? '';
@@ -50,11 +48,6 @@ class _RecurringScreenState extends State<RecurringScreen> {
   void initState() {
     super.initState();
     _future = widget.client.recurringJobs();
-    if (widget.allowSessionPick) {
-      widget.client.sessions().then((s) {
-        if (mounted) setState(() => _sessions = s);
-      }).catchError((_) {});
-    }
   }
 
   void _refresh() {
@@ -120,28 +113,6 @@ class _RecurringScreenState extends State<RecurringScreen> {
                         label: 'Title',
                         controller: title,
                         hint: 'Nightly review'),
-                    if (widget.allowSessionPick) ...[
-                      const SizedBox(height: 12),
-                      Text('Target session',
-                          style: sans(12, color: AppColors.fg3)),
-                      const SizedBox(height: 6),
-                      Wrap(spacing: 8, runSpacing: 8, children: [
-                        _chip(
-                          'Mission Control',
-                          sessionId == 'mission-control',
-                          () => setSheet(
-                              () => sessionId = 'mission-control'),
-                        ),
-                        ..._sessions
-                            .where((s) => s.id != 'mission-control')
-                            .take(12)
-                            .map((s) => _chip(
-                                  s.title.trim().isEmpty ? s.id : s.title,
-                                  sessionId == s.id,
-                                  () => setSheet(() => sessionId = s.id),
-                                )),
-                      ]),
-                    ],
                     const SizedBox(height: 12),
                     Text('Schedule',
                         style: sans(12, color: AppColors.fg3)),
@@ -388,6 +359,25 @@ class _RecurringScreenState extends State<RecurringScreen> {
     );
   }
 
+  String _nextIn(RecurringJob job) {
+    if (!job.enabled) return 'paused';
+    if (job.queued) return 'queued — next after current goal';
+    if (job.nextRunAt <= 0) return '';
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final secs = job.nextRunAt - now;
+    if (secs <= 0) return 'due now';
+    if (secs < 60) return 'next in <1 min';
+    final mins = (secs + 59) ~/ 60;
+    if (mins < 60) return 'next in $mins min';
+    final hours = mins ~/ 60;
+    final rem = mins % 60;
+    if (hours < 24) {
+      return rem == 0 ? 'next in ${hours}h' : 'next in ${hours}h ${rem}m';
+    }
+    final days = hours ~/ 24;
+    return 'next in ${days}d';
+  }
+
   Widget _jobRow(RecurringJob job) {
     final paused = !job.enabled;
     final target = job.sessionId == 'mission-control'
@@ -396,19 +386,15 @@ class _RecurringScreenState extends State<RecurringScreen> {
     final bits = <String>[
       job.scheduleLabel,
       target,
-      if (job.queued) 'queued',
-      if (paused) 'paused',
+      _nextIn(job),
       if (job.planPath != null) job.planPath!,
     ];
     final sub = bits.where((s) => s.isNotEmpty).join(' · ');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: AppIcon('clock',
-              size: 16, color: paused ? AppColors.fg4 : AppColors.fg3),
-        ),
+      child: Row(children: [
+        AppIcon('clock',
+            size: 16, color: paused ? AppColors.fg4 : AppColors.fg3),
         const SizedBox(width: 12),
         Expanded(
           child:

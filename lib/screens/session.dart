@@ -2357,8 +2357,7 @@ class _SessionScreenState extends State<SessionScreen>
             client: widget.client,
             onClose: close,
             sessionId: widget.sessionId,
-            workspace: _state?.workspace,
-            allowSessionPick: _isMissionControl));
+            workspace: _state?.workspace));
   }
 
   void _setApproval(bool manual) {
