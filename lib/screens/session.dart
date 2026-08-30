@@ -2356,8 +2356,9 @@ class _SessionScreenState extends State<SessionScreen>
         builder: (_, close) => RecurringScreen(
             client: widget.client,
             onClose: close,
-            defaultSessionId: widget.sessionId,
-            defaultSessionTitle: _title));
+            sessionId: widget.sessionId,
+            workspace: _state?.workspace,
+            allowSessionPick: _isMissionControl));
   }
 
   void _setApproval(bool manual) {

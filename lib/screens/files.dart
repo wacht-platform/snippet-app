@@ -32,6 +32,8 @@ class FileExplorer extends StatefulWidget {
       onNewChat; // start a chat in the current folder
   final void Function(String path, String name)?
       onOpenFile; // open as a shell tab
+  /// When set, tapping a file pops this path instead of opening a viewer.
+  final void Function(String path)? onPickFile;
   const FileExplorer(
       {super.key,
       required this.client,
@@ -39,7 +41,8 @@ class FileExplorer extends StatefulWidget {
       this.start,
       this.onClose,
       this.onNewChat,
-      this.onOpenFile});
+      this.onOpenFile,
+      this.onPickFile});
   @override
   State<FileExplorer> createState() => _FileExplorerState();
 }
@@ -171,6 +174,12 @@ class _FileExplorerState extends State<FileExplorer> {
   }
 
   void _openFile(FsEntry e) {
+    final pick = widget.onPickFile;
+    if (pick != null) {
+      Navigator.of(context).pop(e.path);
+      pick(e.path);
+      return;
+    }
     final open = widget.onOpenFile;
     if (open != null) {
       (widget.onClose ?? () => Navigator.of(context).pop())();

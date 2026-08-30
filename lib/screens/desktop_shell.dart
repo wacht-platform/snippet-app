@@ -3478,10 +3478,12 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 _configTile(
                     'clock',
                     'Recurring',
-                    'Scheduled pokes for chats & Mission Control',
+                    'Scheduled goals across chats',
                     () => presentScreen(context,
                         builder: (_, close) => RecurringScreen(
-                            client: widget.client, onClose: close))),
+                            client: widget.client,
+                            onClose: close,
+                            listOnly: true))),
                 if (kCanNotify) _notifTile(),
               ],
             ),

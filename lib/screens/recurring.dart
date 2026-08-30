@@ -2,24 +2,34 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'files.dart';
 
-/// Recurring pokes — list, create, pause, and delete jobs that fire into
-/// Mission Control or any conversation as a normal scheduled chat turn.
+/// Recurring goals — list, create, pause, and delete jobs that SetGoal a
+/// session. The daemon detects `~/.snippet/recurring/<id>.json`. If that
+/// session is already on a goal, the fire queues and starts immediately after
+/// `complete_goal`.
 class RecurringScreen extends StatefulWidget {
   final DaemonClient client;
   final VoidCallback? onClose;
-  /// Prefills create-sheet session (current chat, or `mission-control`).
-  final String? defaultSessionId;
-  final String? defaultSessionTitle;
+  /// Target session when creating (this chat). Settings uses [listOnly].
+  final String? sessionId;
+  final String? workspace;
+  /// Mission Control may pick another chat as the target. Regular chats cannot.
+  final bool allowSessionPick;
+  /// Settings: list/pause/delete only — create from a chat menu.
+  final bool listOnly;
   const RecurringScreen({
     super.key,
     required this.client,
     this.onClose,
-    this.defaultSessionId,
-    this.defaultSessionTitle,
+    this.sessionId,
+    this.workspace,
+    this.allowSessionPick = false,
+    this.listOnly = false,
   });
   @override
   State<RecurringScreen> createState() => _RecurringScreenState();
@@ -27,16 +37,24 @@ class RecurringScreen extends StatefulWidget {
 
 class _RecurringScreenState extends State<RecurringScreen> {
   late Future<List<RecurringJob>> _future;
+  List<SessionInfo> _sessions = const [];
 
-  String get _defaultSessionId =>
-      (widget.defaultSessionId?.trim().isNotEmpty == true)
-          ? widget.defaultSessionId!.trim()
-          : 'mission-control';
+  String get _boundSessionId {
+    final id = widget.sessionId?.trim() ?? '';
+    return id.isEmpty ? 'mission-control' : id;
+  }
+
+  bool get _canAdd => !widget.listOnly;
 
   @override
   void initState() {
     super.initState();
     _future = widget.client.recurringJobs();
+    if (widget.allowSessionPick) {
+      widget.client.sessions().then((s) {
+        if (mounted) setState(() => _sessions = s);
+      }).catchError((_) {});
+    }
   }
 
   void _refresh() {
@@ -44,13 +62,15 @@ class _RecurringScreenState extends State<RecurringScreen> {
   }
 
   Future<void> _add() async {
+    if (!_canAdd) return;
     final title = TextEditingController();
     final prompt = TextEditingController();
     final plan = TextEditingController();
     final daily = TextEditingController(text: '09:00');
-    var sessionId = _defaultSessionId;
+    final customEvery = TextEditingController();
+    var sessionId = _boundSessionId;
     var schedule = 'every 1h';
-    var customDaily = false;
+    var mode = 'preset'; // preset | custom | daily
     final saved = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: AppColors.surface1,
@@ -61,6 +81,26 @@ class _RecurringScreenState extends State<RecurringScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
           final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+          Future<void> pickPlan() async {
+            final start = (widget.workspace?.trim().isNotEmpty == true)
+                ? widget.workspace
+                : null;
+            final picked = await presentScreen<String>(
+              context,
+              builder: (_, close) => FileExplorer(
+                client: widget.client,
+                title: 'Plan file',
+                start: start,
+                onClose: close,
+                onPickFile: (path) {},
+              ),
+            );
+            if (picked != null && picked.trim().isNotEmpty) {
+              plan.text = picked.trim();
+              setSheet(() {});
+            }
+          }
+
           return Padding(
             padding: EdgeInsets.fromLTRB(16, 18, 16, 16 + bottom),
             child: SingleChildScrollView(
@@ -68,11 +108,11 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Schedule a poke',
+                    Text('Schedule a goal',
                         style: sans(16, color: AppColors.fg1)),
                     const SizedBox(height: 6),
                     Text(
-                      'Fires as a normal chat turn. Minimum interval is 5 minutes. Optional plan file is read at fire time.',
+                      'Each fire sets an autonomous goal on this chat. Minimum interval is 5 minutes. If a goal is already running, the next fire waits and starts the moment it completes. A plan file is reread each fire.',
                       style: sans(12, height: 1.4, color: AppColors.fg3),
                     ),
                     const SizedBox(height: 14),
@@ -80,25 +120,28 @@ class _RecurringScreenState extends State<RecurringScreen> {
                         label: 'Title',
                         controller: title,
                         hint: 'Nightly review'),
-                    const SizedBox(height: 12),
-                    Text('Session',
-                        style: sans(12, color: AppColors.fg3)),
-                    const SizedBox(height: 6),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      _chip(
-                        'Mission Control',
-                        sessionId == 'mission-control',
-                        () => setSheet(() => sessionId = 'mission-control'),
-                      ),
-                      if (_defaultSessionId != 'mission-control')
+                    if (widget.allowSessionPick) ...[
+                      const SizedBox(height: 12),
+                      Text('Target session',
+                          style: sans(12, color: AppColors.fg3)),
+                      const SizedBox(height: 6),
+                      Wrap(spacing: 8, runSpacing: 8, children: [
                         _chip(
-                          widget.defaultSessionTitle?.trim().isNotEmpty == true
-                              ? widget.defaultSessionTitle!
-                              : 'This conversation',
-                          sessionId == _defaultSessionId,
-                          () => setSheet(() => sessionId = _defaultSessionId),
+                          'Mission Control',
+                          sessionId == 'mission-control',
+                          () => setSheet(
+                              () => sessionId = 'mission-control'),
                         ),
-                    ]),
+                        ..._sessions
+                            .where((s) => s.id != 'mission-control')
+                            .take(12)
+                            .map((s) => _chip(
+                                  s.title.trim().isEmpty ? s.id : s.title,
+                                  sessionId == s.id,
+                                  () => setSheet(() => sessionId = s.id),
+                                )),
+                      ]),
+                    ],
                     const SizedBox(height: 12),
                     Text('Schedule',
                         style: sans(12, color: AppColors.fg3)),
@@ -110,34 +153,40 @@ class _RecurringScreenState extends State<RecurringScreen> {
                         'every 1h',
                         'every 1d',
                       ])
-                        _chip(s, !customDaily && schedule == s, () {
+                        _chip(s, mode == 'preset' && schedule == s, () {
                           setSheet(() {
-                            customDaily = false;
+                            mode = 'preset';
                             schedule = s;
                           });
                         }),
-                      _chip('daily', customDaily, () {
-                        setSheet(() {
-                          customDaily = true;
-                          schedule = 'daily ${daily.text.trim()}';
-                        });
+                      _chip('custom', mode == 'custom', () {
+                        setSheet(() => mode = 'custom');
+                      }),
+                      _chip('daily', mode == 'daily', () {
+                        setSheet(() => mode = 'daily');
                       }),
                     ]),
-                    if (customDaily) ...[
+                    if (mode == 'custom') ...[
+                      const SizedBox(height: 10),
+                      AppField(
+                          label: 'Every (min 5m)',
+                          controller: customEvery,
+                          mono: true,
+                          hint: '5m  ·  90m  ·  2h  ·  300s'),
+                    ],
+                    if (mode == 'daily') ...[
                       const SizedBox(height: 10),
                       AppField(
                           label: 'Time (HH:MM)',
                           controller: daily,
                           mono: true,
-                          hint: '09:00',
-                          onSubmitted: (v) => setSheet(
-                              () => schedule = 'daily ${v.trim()}')),
+                          hint: '09:00'),
                     ],
                     const SizedBox(height: 12),
                     AppField(
-                        label: 'Prompt',
+                        label: 'Goal',
                         controller: prompt,
-                        hint: 'What should the agent do?',
+                        hint: 'The piece of work to complete',
                         minLines: 3,
                         maxLines: 6),
                     const SizedBox(height: 12),
@@ -145,7 +194,12 @@ class _RecurringScreenState extends State<RecurringScreen> {
                         label: 'Plan file (optional)',
                         controller: plan,
                         mono: true,
-                        hint: 'notes/plan.md — read at fire time'),
+                        hint: 'notes/plan.md — pick or type a path',
+                        rightSlot: IconBtn('folder',
+                            size: 32,
+                            iconSize: 16,
+                            tooltip: 'Pick file',
+                            onTap: pickPlan)),
                     const SizedBox(height: 16),
                     Btn('Save',
                         full: true, onTap: () => Navigator.pop(ctx, true)),
@@ -159,11 +213,16 @@ class _RecurringScreenState extends State<RecurringScreen> {
     final t = title.text.trim();
     final p = prompt.text.trim();
     final planPath = plan.text.trim();
-    final sched = customDaily ? 'daily ${daily.text.trim()}' : schedule;
+    final sched = switch (mode) {
+      'daily' => 'daily ${daily.text.trim()}',
+      'custom' => _customSchedule(customEvery.text),
+      _ => schedule,
+    };
     title.dispose();
     prompt.dispose();
     plan.dispose();
     daily.dispose();
+    customEvery.dispose();
     if (saved != true) return;
     if (t.isEmpty) {
       if (mounted) toast(context, 'Title is required', danger: true);
@@ -171,7 +230,14 @@ class _RecurringScreenState extends State<RecurringScreen> {
     }
     if (p.isEmpty && planPath.isEmpty) {
       if (mounted) {
-        toast(context, 'Prompt or plan file is required', danger: true);
+        toast(context, 'Goal or plan file is required', danger: true);
+      }
+      return;
+    }
+    if (sched == null) {
+      if (mounted) {
+        toast(context, 'Interval must be at least 5 minutes (e.g. 5m, 2h)',
+            danger: true);
       }
       return;
     }
@@ -187,6 +253,25 @@ class _RecurringScreenState extends State<RecurringScreen> {
     } catch (e) {
       if (mounted) toast(context, '$e', danger: true);
     }
+  }
+
+  String? _customSchedule(String raw) {
+    final t = raw.trim().toLowerCase().replaceAll(' ', '');
+    if (t.isEmpty) return null;
+    final m = RegExp(r'^(\d+)([smhd])$').firstMatch(t);
+    if (m == null) return null;
+    final n = int.tryParse(m.group(1)!) ?? 0;
+    if (n <= 0) return null;
+    final unit = m.group(2)!;
+    final secs = switch (unit) {
+      's' => n,
+      'm' => n * 60,
+      'h' => n * 3600,
+      'd' => n * 86400,
+      _ => 0,
+    };
+    if (secs < 300) return null;
+    return 'every $n$unit';
   }
 
   Future<void> _toggle(RecurringJob job) async {
@@ -259,7 +344,9 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
                   children: [
                     Text(
-                      'Scheduled pokes wake Mission Control or a conversation. Minimum interval is 5 minutes. A plan file is reread each fire.',
+                      widget.listOnly
+                          ? 'Scheduled goals across chats. Pause or delete here. Create from a chat or Mission Control menu. If a session is already on a goal, the next fire starts the moment it completes.'
+                          : 'Each fire sets an autonomous goal on this chat. Minimum 5 minutes. A plan file is reread each fire. If a goal is already running, the next one queues and starts immediately after.',
                       style: sans(12, height: 1.4, color: AppColors.fg3),
                     ),
                     const SizedBox(height: 10),
@@ -270,19 +357,21 @@ class _RecurringScreenState extends State<RecurringScreen> {
                             style: sans(13, color: AppColors.fg3)),
                       ),
                     ...jobs.map(_jobRow),
-                    const SizedBox(height: 4),
-                    InkWell(
-                      onTap: _add,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(children: [
-                          AppIcon('plus', size: 16, color: AppColors.fg3),
-                          const SizedBox(width: 12),
-                          Text('Add job',
-                              style: sans(14, color: AppColors.fg2)),
-                        ]),
+                    if (_canAdd) ...[
+                      const SizedBox(height: 4),
+                      InkWell(
+                        onTap: _add,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Row(children: [
+                            AppIcon('plus', size: 16, color: AppColors.fg3),
+                            const SizedBox(width: 12),
+                            Text('Add job',
+                                style: sans(14, color: AppColors.fg2)),
+                          ]),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 );
                 return kMobile
