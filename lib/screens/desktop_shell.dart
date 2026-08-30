@@ -1584,6 +1584,9 @@ class _DesktopShellState extends State<DesktopShell>
                             profile: t.profile,
                             embedded: true,
                             inboundShare: t.inboundShare,
+                            onShareConsumed: t.inboundShare == null
+                                ? null
+                                : () => setState(() => t.inboundShare = null),
                             acceptDrops: i == _activeIndex,
                             onMenu: null,
                             onOpenFileTab: (path, name) => _openFileTab(

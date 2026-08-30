@@ -116,6 +116,10 @@ class SessionScreen extends StatefulWidget {
   /// is connected. Consumed by the first visible session that matches.
   final SharedInbound? inboundShare;
 
+  /// Called once the share has been consumed so the host can drop it —
+  /// otherwise remounting this session (mobile tab switch) re-sends it.
+  final VoidCallback? onShareConsumed;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -129,7 +133,8 @@ class SessionScreen extends StatefulWidget {
       this.onMacStatus,
       this.onMacControls,
       this.acceptDrops = true,
-      this.inboundShare});
+      this.inboundShare,
+      this.onShareConsumed});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
 }
@@ -1602,6 +1607,9 @@ class _SessionScreenState extends State<SessionScreen>
   Future<void> _consumeInboundShare(SharedInbound share) async {
     if (_consumedShare == share || share.isEmpty) return;
     _consumedShare = share;
+    // Drop it at the source immediately: mobile destroys non-active session
+    // states, and a fresh state re-runs initState → consume → auto-send.
+    widget.onShareConsumed?.call();
     if (share.text.trim().isNotEmpty) {
       final existing = _input.text;
       _input.text = existing.isEmpty
