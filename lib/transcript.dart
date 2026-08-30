@@ -317,6 +317,10 @@ class SystemRow extends StatelessWidget {
       return _SystemDivider(label: label);
     }
 
+    final isGoal = step == 'goal_set' ||
+        step == 'goal_completed' ||
+        step == 'goal_paused' ||
+        step == 'goal_cancelled';
     final (glyph, color) = switch (step) {
       'watch_added' || 'watch_removed' => ('◉', AppColors.run),
       'file_watch' => ('◉', AppColors.accent),
@@ -327,18 +331,22 @@ class SystemRow extends StatelessWidget {
       'interrupted' => ('■', AppColors.danger),
       _ => ('·', AppColors.fg4),
     };
+    final glyphSize = isGoal ? 14.0 : 11.0;
+    final textSize = isGoal ? 15.0 : 11.5;
+    final textColor = isGoal ? AppColors.fg2 : AppColors.fg4;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: EdgeInsets.symmetric(vertical: isGoal ? 8 : 3),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
-            width: 16,
-            child: Center(child: Text(glyph, style: mono(11, color: color)))),
-        const SizedBox(width: 6),
+            width: isGoal ? 20 : 16,
+            child: Center(
+                child: Text(glyph, style: mono(glyphSize, color: color)))),
+        SizedBox(width: isGoal ? 8 : 6),
         Expanded(
           child: Text(reasoning,
-              maxLines: 3,
+              maxLines: isGoal ? 8 : 3,
               overflow: TextOverflow.ellipsis,
-              style: sans(11.5, height: 1.4, color: AppColors.fg4)),
+              style: sans(textSize, height: 1.4, color: textColor)),
         ),
       ]),
     );
