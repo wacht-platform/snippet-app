@@ -1,0 +1,50 @@
+name: windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build Windows exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze Dart code
+        run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
+
+      - name: Test Dart code
+        run: flutter test --no-pub
+
+      - name: Build Windows exe
+        run: flutter build windows --release
+
+      - name: Package exe
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "snippet-windows.zip"
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snippet-windows-${{ github.sha }}
+          path: snippet-windows.zip
+          if-no-files-found: error

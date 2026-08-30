@@ -638,8 +638,16 @@ class _FileViewerState extends State<FileViewer> {
                 ),
               ),
             )
-          else if (_isVideo)
+          else if (_isVideo && !kWindows)
             Expanded(child: _VideoView(url: widget.client.fileUrl(widget.path)))
+          else if (_isVideo)
+            Expanded(
+              child: EmptyState(
+                  icon: 'film',
+                  title: 'No video preview on Windows',
+                  body:
+                      'Download the file and play it with your media player.'),
+            )
           else if (_loading)
             Expanded(
                 child: Center(

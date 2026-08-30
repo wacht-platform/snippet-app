@@ -4,10 +4,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'platform.dart';
 
 /// Open a downloaded local file with the platform's default application.
-/// open_filex has no macOS implementation, so macOS uses Launch Services via
-/// a file URI instead.
+/// open_filex has no macOS or Windows implementation, so those use the OS
+/// file-URI handler (Launch Services / ShellExecute) via launchUrl instead.
 Future<bool> openLocalFile(String path) async {
-  if (kMacOS) {
+  if (kMacOS || kWindows) {
     return launchUrl(Uri.file(path), mode: LaunchMode.externalApplication);
   }
   final result = await OpenFilex.open(path);

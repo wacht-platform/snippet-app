@@ -27,6 +27,11 @@ bool get kCanNotify => kMobile || kDesktopNotify;
 /// controls overlay the top-left; the shell insets its top to clear them.
 bool get kMacOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 
+/// Windows desktop. The runner builds and core features work, but a few
+/// plugins have no Windows implementation (video_player, open_filex) — call
+/// sites guard on this to fall back instead of throwing MissingPluginException.
+bool get kWindows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
 /// Height to reserve at the top for the macOS window controls.
 const double kMacTitlebar = 28.0;
 const _windowStateChannel = MethodChannel('snippet/window_state');
