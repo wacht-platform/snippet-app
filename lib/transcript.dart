@@ -321,33 +321,69 @@ class SystemRow extends StatelessWidget {
         step == 'goal_completed' ||
         step == 'goal_paused' ||
         step == 'goal_cancelled';
+    if (isGoal) return _GoalCard(step: step, text: reasoning);
+
     final (glyph, color) = switch (step) {
       'watch_added' || 'watch_removed' => ('◉', AppColors.run),
       'file_watch' => ('◉', AppColors.accent),
-      'goal_set' || 'goal_completed' || 'goal_paused' || 'goal_cancelled' => (
-          '◇',
-          AppColors.accent
-        ),
       'interrupted' => ('■', AppColors.danger),
       _ => ('·', AppColors.fg4),
     };
-    final glyphSize = isGoal ? 14.0 : 11.0;
-    final textSize = isGoal ? 15.0 : 11.5;
-    final textColor = isGoal ? AppColors.fg2 : AppColors.fg4;
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: isGoal ? 8 : 3),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
-            width: isGoal ? 20 : 16,
-            child: Center(
-                child: Text(glyph, style: mono(glyphSize, color: color)))),
-        SizedBox(width: isGoal ? 8 : 6),
+            width: 16,
+            child: Center(child: Text(glyph, style: mono(11, color: color)))),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(reasoning,
-              maxLines: isGoal ? 8 : 3,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: sans(textSize, height: 1.4, color: textColor)),
+              style: sans(11.5, height: 1.4, color: AppColors.fg4)),
         ),
+      ]),
+    );
+  }
+}
+
+/// Full-width card for goal events in the chat canvas — a distinct block with
+/// an accent rail and a status label, instead of a faint one-liner.
+class _GoalCard extends StatelessWidget {
+  final String step;
+  final String text;
+  const _GoalCard({required this.step, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    final (label, icon, color) = switch (step) {
+      'goal_set' => ('Goal set', 'goal', AppColors.accent),
+      'goal_completed' => ('Goal completed', 'check', AppColors.ok),
+      'goal_paused' => ('Goal paused', 'pause', AppColors.run),
+      _ => ('Goal cancelled', 'x', AppColors.fg3),
+    };
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        border: Border(
+          left: BorderSide(width: 3, color: color),
+        ),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          AppIcon(icon, size: 14, color: color),
+          const SizedBox(width: 8),
+          Text(label,
+              style: sans(12,
+                  weight: FontWeight.w600, color: color)),
+        ]),
+        const SizedBox(height: 6),
+        Text(text,
+            style: sans(14.5, height: 1.45, color: AppColors.fg1)),
       ]),
     );
   }

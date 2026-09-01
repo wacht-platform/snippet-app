@@ -661,12 +661,14 @@ class DaemonClient {
     String prompt = '',
     String? planPath,
     required String schedule,
+    bool goal = true,
   }) async {
     final body = <String, dynamic>{
       'title': title,
       'session_id': sessionId,
       'prompt': prompt,
       'schedule': schedule,
+      'delivery': goal ? 'goal' : 'message',
     };
     if (planPath != null) body['plan_path'] = planPath;
     final r = await http.post(_uri('/recurring'),

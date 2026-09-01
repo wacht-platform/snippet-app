@@ -63,7 +63,8 @@ class _RecurringScreenState extends State<RecurringScreen> {
     final customEvery = TextEditingController();
     var sessionId = _boundSessionId;
     var schedule = 'every 1h';
-    var mode = 'preset'; // preset | custom | daily
+    var mode = 'preset'; // preset | custom | daily | onceAt | onceIn
+    var goal = true; // goal vs plain scheduled message
     final saved = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: AppColors.surface1,
@@ -101,11 +102,11 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Schedule a goal',
+                    Text('Schedule a goal or message',
                         style: sans(16, color: AppColors.fg1)),
                     const SizedBox(height: 6),
                     Text(
-                      'Each fire sets an autonomous goal on this chat. Minimum interval is 5 minutes. If a goal is already running, the next fire waits and starts the moment it completes. A plan file is reread each fire.',
+                      'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',
                       style: sans(12, height: 1.4, color: AppColors.fg3),
                     ),
                     const SizedBox(height: 14),
@@ -113,6 +114,14 @@ class _RecurringScreenState extends State<RecurringScreen> {
                         label: 'Title',
                         controller: title,
                         hint: 'Nightly review'),
+                    const SizedBox(height: 12),
+                    Text('Delivery',
+                        style: sans(12, color: AppColors.fg3)),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      _chip('Goal', goal, () => setSheet(() => goal = true)),
+                      _chip('Message', !goal, () => setSheet(() => goal = false)),
+                    ]),
                     const SizedBox(height: 12),
                     Text('Schedule',
                         style: sans(12, color: AppColors.fg3)),
@@ -136,6 +145,12 @@ class _RecurringScreenState extends State<RecurringScreen> {
                       _chip('daily', mode == 'daily', () {
                         setSheet(() => mode = 'daily');
                       }),
+                      _chip('once at', mode == 'onceAt', () {
+                        setSheet(() => mode = 'onceAt');
+                      }),
+                      _chip('once in', mode == 'onceIn', () {
+                        setSheet(() => mode = 'onceIn');
+                      }),
                     ]),
                     if (mode == 'custom') ...[
                       const SizedBox(height: 10),
@@ -153,11 +168,29 @@ class _RecurringScreenState extends State<RecurringScreen> {
                           mono: true,
                           hint: '09:00'),
                     ],
+                    if (mode == 'onceAt') ...[
+                      const SizedBox(height: 10),
+                      AppField(
+                          label: 'Time today/tomorrow (HH:MM)',
+                          controller: daily,
+                          mono: true,
+                          hint: '14:30'),
+                    ],
+                    if (mode == 'onceIn') ...[
+                      const SizedBox(height: 10),
+                      AppField(
+                          label: 'From now (e.g. 30m, 2h)',
+                          controller: customEvery,
+                          mono: true,
+                          hint: '30m'),
+                    ],
                     const SizedBox(height: 12),
                     AppField(
-                        label: 'Goal',
+                        label: goal ? 'Goal' : 'Message',
                         controller: prompt,
-                        hint: 'The piece of work to complete',
+                        hint: goal
+                            ? 'The piece of work to complete'
+                            : 'The message to send',
                         minLines: 3,
                         maxLines: 6),
                     const SizedBox(height: 12),
@@ -186,9 +219,12 @@ class _RecurringScreenState extends State<RecurringScreen> {
     final planPath = plan.text.trim();
     final sched = switch (mode) {
       'daily' => 'daily ${daily.text.trim()}',
+      'onceAt' => 'at ${daily.text.trim()}',
+      'onceIn' => 'in ${customEvery.text.trim()}',
       'custom' => _customSchedule(customEvery.text),
       _ => schedule,
     };
+    final label = goal ? 'Goal' : 'Message';
     title.dispose();
     prompt.dispose();
     plan.dispose();
@@ -201,7 +237,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
     }
     if (p.isEmpty && planPath.isEmpty) {
       if (mounted) {
-        toast(context, 'Goal or plan file is required', danger: true);
+        toast(context, '$label or plan file is required', danger: true);
       }
       return;
     }
@@ -219,6 +255,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
         prompt: p,
         planPath: planPath.isEmpty ? null : planPath,
         schedule: sched,
+        goal: goal,
       );
       _refresh();
     } catch (e) {
@@ -384,6 +421,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
         ? 'Mission Control'
         : job.sessionId;
     final bits = <String>[
+      if (!job.delivery) 'message',
       job.scheduleLabel,
       target,
       _nextIn(job),

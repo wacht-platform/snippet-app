@@ -696,8 +696,9 @@ class RecurringJob {
   final String sessionId;
   final String prompt;
   final String? planPath;
-  final String scheduleKind; // interval | daily
+  final String scheduleKind; // interval | daily | once
   final String scheduleLabel;
+  final bool delivery; // true = goal, false = plain message
   final bool enabled;
   final bool queued;
   final int nextRunAt;
@@ -719,6 +720,7 @@ class RecurringJob {
                 : null) ??
             '',
         scheduleLabel = _scheduleLabel(j['schedule']),
+        delivery = (j['delivery'] as String? ?? 'goal') != 'message',
         enabled = j['enabled'] as bool? ?? true,
         queued = j['queued'] as bool? ?? false,
         nextRunAt = (j['next_run_at'] as num?)?.toInt() ?? 0,
@@ -741,6 +743,20 @@ class RecurringJob {
       final h = (raw['hour'] as num?)?.toInt() ?? 0;
       final m = (raw['minute'] as num?)?.toInt() ?? 0;
       return 'daily ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+    }
+    if (kind == 'once') {
+      final at = (raw['at'] as num?)?.toInt() ?? 0;
+      if (at <= 0) return 'once';
+      final dt = DateTime.fromMillisecondsSinceEpoch(at * 1000);
+      final hh = dt.hour.toString().padLeft(2, '0');
+      final mm = dt.minute.toString().padLeft(2, '0');
+      final now = DateTime.now();
+      final day = DateTime(dt.year, dt.month, dt.day);
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+      if (day == today) return 'once today $hh:$mm';
+      if (day == tomorrow) return 'once tomorrow $hh:$mm';
+      return 'once ${dt.month}/${dt.day} $hh:$mm';
     }
     return kind;
   }
