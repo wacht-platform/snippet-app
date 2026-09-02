@@ -2941,6 +2941,26 @@ class _SessionScreenState extends State<SessionScreen>
     final laneRowsShown = <String>{}; // spawn cards already emitted (by id)
     final recentAssistant = <String>[];
 
+    // An assistant_text is "terminal" when no tool call follows it before the
+    // next user turn — i.e. it's the turn's actual reply, not intermediate
+    // narration. Terminal replies always render; only narration goes through
+    // the subset/repeat dedup, which would otherwise swallow legitimate
+    // turn-final messages (e.g. a recurring job repeating a similar prompt).
+    final terminalAssistant = <int>{};
+    for (var i = 0; i < events.length; i++) {
+      if ((events[i]['kind'] as String? ?? '') != 'assistant_text') continue;
+      var terminal = true;
+      for (var j = i + 1; j < events.length; j++) {
+        final k = events[j]['kind'] as String? ?? '';
+        if (k == 'tool_call') {
+          terminal = false;
+          break;
+        }
+        if (k == 'user_input' || k == 'steer') break;
+      }
+      if (terminal) terminalAssistant.add(i);
+    }
+
     String eventKey(Map<String, dynamic> event) {
       // Event indexes shift when the daemon compacts history. Use the event
       // payload plus its occurrence among identical events so Flutter keeps a
@@ -2997,7 +3017,8 @@ class _SessionScreenState extends State<SessionScreen>
       return null;
     }
 
-    for (final e in events) {
+    for (var ei = 0; ei < events.length; ei++) {
+      final e = events[ei];
       final key = eventKey(e);
       final k = e['kind'] as String? ?? '';
       switch (k) {
@@ -3054,7 +3075,12 @@ class _SessionScreenState extends State<SessionScreen>
         case 'assistant_text':
           endTools(key);
           final reply = _s(e['text']);
-          if (assistantTextIsRedundant(reply, recentAssistant)) break;
+          // Turn-final replies always render; only intermediate narration is
+          // deduped against recent text.
+          final terminal = terminalAssistant.contains(ei);
+          if (!terminal && assistantTextIsRedundant(reply, recentAssistant)) {
+            break;
+          }
           if (reply.trim().isNotEmpty) recentAssistant.add(reply);
           addEvent(
               key,
