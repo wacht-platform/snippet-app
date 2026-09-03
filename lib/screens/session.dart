@@ -1608,8 +1608,11 @@ class _SessionScreenState extends State<SessionScreen>
     if (_consumedShare == share || share.isEmpty) return;
     _consumedShare = share;
     // Drop it at the source immediately: mobile destroys non-active session
-    // states, and a fresh state re-runs initState → consume → auto-send.
+    // states, and a fresh state re-runs initState → consume → resend.
     widget.onShareConsumed?.call();
+    // Stage the share in the composer — text pre-filled, attachments attached
+    // — but never auto-send. The user writes their message around it and sends
+    // like they normally would.
     if (share.text.trim().isNotEmpty) {
       final existing = _input.text;
       _input.text = existing.isEmpty
@@ -1629,8 +1632,6 @@ class _SessionScreenState extends State<SessionScreen>
           ),
       ]);
     }
-    if (!mounted) return;
-    if (_canSend) await _sendMessage();
   }
 
   Future<void> _confirmCompact() async {
