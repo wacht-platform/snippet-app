@@ -2939,27 +2939,6 @@ class _SessionScreenState extends State<SessionScreen>
     String? pendingKey;
     final eventOccurrences = <String, int>{};
     final laneRowsShown = <String>{}; // spawn cards already emitted (by id)
-    final recentAssistant = <String>[];
-
-    // An assistant_text is "terminal" when no tool call follows it before the
-    // next user turn — i.e. it's the turn's actual reply, not intermediate
-    // narration. Terminal replies always render; only narration goes through
-    // the subset/repeat dedup, which would otherwise swallow legitimate
-    // turn-final messages (e.g. a recurring job repeating a similar prompt).
-    final terminalAssistant = <int>{};
-    for (var i = 0; i < events.length; i++) {
-      if ((events[i]['kind'] as String? ?? '') != 'assistant_text') continue;
-      var terminal = true;
-      for (var j = i + 1; j < events.length; j++) {
-        final k = events[j]['kind'] as String? ?? '';
-        if (k == 'tool_call') {
-          terminal = false;
-          break;
-        }
-        if (k == 'user_input' || k == 'steer') break;
-      }
-      if (terminal) terminalAssistant.add(i);
-    }
 
     String eventKey(Map<String, dynamic> event) {
       // Event indexes shift when the daemon compacts history. Use the event
@@ -3017,8 +2996,7 @@ class _SessionScreenState extends State<SessionScreen>
       return null;
     }
 
-    for (var ei = 0; ei < events.length; ei++) {
-      final e = events[ei];
+    for (final e in events) {
       final key = eventKey(e);
       final k = e['kind'] as String? ?? '';
       switch (k) {
@@ -3075,13 +3053,6 @@ class _SessionScreenState extends State<SessionScreen>
         case 'assistant_text':
           endTools(key);
           final reply = _s(e['text']);
-          // Turn-final replies always render; only intermediate narration is
-          // deduped against recent text.
-          final terminal = terminalAssistant.contains(ei);
-          if (!terminal && assistantTextIsRedundant(reply, recentAssistant)) {
-            break;
-          }
-          if (reply.trim().isNotEmpty) recentAssistant.add(reply);
           addEvent(
               key,
               Padding(
@@ -4150,39 +4121,6 @@ bool _looksLikeQuestionAnswer(String text) {
   if (t.isEmpty) return false;
   if (t == 'user skipped the question') return true;
   return t.contains('\n→ ') || t.startsWith('→ ');
-}
-
-String _normalizeAssistantText(String text) {
-  return text
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9\s]+'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
-}
-
-bool assistantTextIsRedundant(String text, List<String> recent) {
-  final next = _normalizeAssistantText(text);
-  if (next.isEmpty) return false;
-  final window =
-      recent.length <= 3 ? recent : recent.sublist(recent.length - 3);
-  for (final prior in window) {
-    final prev = _normalizeAssistantText(prior);
-    if (prev.isEmpty) continue;
-    if (next == prev) return true;
-    if (next.length >= 24 && prev.contains(next)) return true;
-    if (prev.length >= 24 && next.contains(prev)) return true;
-    if (_tokenOverlap(next, prev) >= 0.80) return true;
-  }
-  return false;
-}
-
-double _tokenOverlap(String a, String b) {
-  final as = a.split(' ').where((w) => w.length > 2).toSet();
-  final bs = b.split(' ').where((w) => w.length > 2).toSet();
-  if (as.isEmpty || bs.isEmpty) return 0;
-  final shared = as.intersection(bs).length;
-  final denom = as.length < bs.length ? as.length : bs.length;
-  return shared / denom;
 }
 
 class _MissionEnvelopeCard extends StatelessWidget {
