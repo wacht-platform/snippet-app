@@ -2452,7 +2452,7 @@ class _SessionScreenState extends State<SessionScreen>
     if (_isMissionControl) {
       return [
         item('layers', 'Tasks', _showTasks),
-        item('clock', 'Recurring', _openRecurring),
+        item('scheduled', 'Scheduled', _openRecurring),
         item('shield', 'Approval mode', () => _setApproval(!manual),
             value: manual ? 'Ask' : 'Auto'),
         item('minimize', 'Compact history', _confirmCompact),
@@ -2498,7 +2498,7 @@ class _SessionScreenState extends State<SessionScreen>
                   client: widget.client,
                   sessionId: widget.sessionId,
                   onClose: close))),
-      item('clock', 'Recurring', _openRecurring),
+      item('scheduled', 'Scheduled', _openRecurring),
       const PopupMenuDivider(),
       item('minimize', 'Compact history', _confirmCompact),
       item('history', 'Checkpoints', _showCheckpoints),
@@ -5064,7 +5064,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               onTap: widget.onLanes),
         if (widget.onTasks != null)
           _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
-        _row(icon: 'clock', label: 'Recurring', onTap: widget.onRecurring),
+        _row(icon: 'scheduled', label: 'Scheduled', onTap: widget.onRecurring),
         if (!widget.hideWorkspace) ...[
           _section('Workspace'),
           if (!kMacOS)

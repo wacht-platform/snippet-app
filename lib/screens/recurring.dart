@@ -326,7 +326,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
         bottom: false,
         child: Column(children: [
           SnAppBar(
-              title: 'Recurring',
+              title: 'Scheduled',
               onBack: widget.onClose ?? () => Navigator.pop(context)),
           Expanded(
             child: FutureBuilder<List<RecurringJob>>(
@@ -353,15 +353,15 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   children: [
                     Text(
                       widget.listOnly
-                          ? 'Scheduled goals across chats. Pause or delete here. Create from a chat or Mission Control menu. If a session is already on a goal, the next fire starts the moment it completes.'
-                          : 'Each fire sets an autonomous goal on this chat. Minimum 5 minutes. A plan file is reread each fire. If a goal is already running, the next one queues and starts immediately after.',
+                          ? 'Scheduled goals and messages across chats. Pause or delete here. Create from a chat or Mission Control menu. If a session is already on a goal, the next fire starts the moment it completes.'
+                          : 'The first run fires immediately. Goal fires set an autonomous goal; message fires send a chat turn. Minimum interval 5 minutes; a plan file is reread each fire.',
                       style: sans(12, height: 1.4, color: AppColors.fg3),
                     ),
                     const SizedBox(height: 10),
                     if (jobs.isEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
-                        child: Text('No recurring jobs yet.',
+                        child: Text('No scheduled jobs yet.',
                             style: sans(13, color: AppColors.fg3)),
                       ),
                     ...jobs.map(_jobRow),

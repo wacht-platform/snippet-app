@@ -3479,9 +3479,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                         builder: (_, close) => VaultScreen(
                             client: widget.client, onClose: close))),
                 _configTile(
-                    'clock',
-                    'Recurring',
-                    'Scheduled goals across chats',
+                    'scheduled',
+                    'Scheduled',
+                    'Scheduled goals and messages across chats',
                     () => presentScreen(context,
                         builder: (_, close) => RecurringScreen(
                             client: widget.client,

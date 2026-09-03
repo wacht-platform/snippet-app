@@ -523,6 +523,8 @@ IconData iconFor(String name) {
       return IconsaxPlusLinear.home_2;
     case 'clock':
       return IconsaxPlusLinear.clock;
+    case 'scheduled':
+      return IconsaxPlusLinear.calendar_tick;
     case 'sidebar':
       return IconsaxPlusLinear.menu;
     case 'menu':
