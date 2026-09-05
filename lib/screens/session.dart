@@ -4097,9 +4097,6 @@ class _GoalCard extends StatelessWidget {
               Text(paused ? 'Goal paused' : 'Working toward goal',
                   style: sans(12.5,
                       weight: FontWeight.w600, color: AppColors.fg1)),
-              const SizedBox(width: 7),
-              Text('${goal.autonomousTurns} turns',
-                  style: mono(10, color: AppColors.fg4)),
             ]),
             if (goal.text.trim().isNotEmpty) ...[
               const SizedBox(height: 3),

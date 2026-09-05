@@ -336,7 +336,24 @@ class SystemRow extends StatelessWidget {
         'goal_paused' => 'goal paused',
         _ => 'goal cancelled',
       };
-      return _SystemDivider(label: label);
+      // The completion summary (the agent's complete_goal report) is the
+      // outcome of the run — show it, not just a bare divider. Other end
+      // states stay quiet.
+      if (step != 'goal_completed') {
+        return _SystemDivider(label: label);
+      }
+      final detail = reasoning.trim();
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _SystemDivider(label: label),
+          if (detail.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: MarkdownPreview(data: detail, maxLines: 12),
+            ),
+        ]),
+      );
     }
 
     final (glyph, color) = switch (step) {
