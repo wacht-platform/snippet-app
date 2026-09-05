@@ -217,6 +217,7 @@ class _SessionScreenState extends State<SessionScreen>
   bool _sendingAudio = false;
   bool _sendingMessage = false;
   String? _recordingPath;
+  Uint8List? _recordingBytes;
   Duration _recordingElapsed = Duration.zero;
   Duration _playbackPosition = Duration.zero;
   Duration _playbackDuration = Duration.zero;
@@ -1276,7 +1277,9 @@ class _SessionScreenState extends State<SessionScreen>
     try {
       // Starting a new take replaces an unconfirmed take only after the user
       // explicitly chose to record again.
-      if (_recordingPath != null) await _discardRecording();
+      if (_recordingPath != null || _recordingBytes != null) {
+        await _discardRecording();
+      }
       final tempDir = await getTemporaryDirectory();
       final path =
           '${tempDir.path}/snippet-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
@@ -1340,17 +1343,43 @@ class _SessionScreenState extends State<SessionScreen>
         _toast('No recording was captured.');
         return;
       }
-      final file = File(path);
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) {
+      // macOS AVFoundation finishes the .m4a after stop() returns — wait
+      // for the file instead of racing PathNotFoundException on attach.
+      final bytes = await _waitForRecordingFile(path);
+      if (bytes == null || bytes.isEmpty) {
         await _discardRecording();
         _toast('The recording was empty.');
         return;
       }
-      if (mounted) setState(() => _recordingPath = path);
+      if (mounted) {
+        setState(() {
+          _recordingPath = path;
+          _recordingBytes = bytes;
+        });
+      } else {
+        _recordingPath = path;
+        _recordingBytes = bytes;
+      }
     } catch (e) {
       _toast('Could not finish recording: $e');
     }
+  }
+
+  /// Wait until [path] exists and is non-empty. AVCaptureAudioFileOutput on
+  /// macOS writes the container asynchronously after stopRecording().
+  Future<Uint8List?> _waitForRecordingFile(String path) async {
+    final file = File(path);
+    const attempts = 40; // ~2s
+    for (var i = 0; i < attempts; i++) {
+      try {
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          if (bytes.isNotEmpty) return bytes;
+        }
+      } catch (_) {}
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    return null;
   }
 
   Future<void> _toggleRecordingPlayback() async {
@@ -1372,14 +1401,21 @@ class _SessionScreenState extends State<SessionScreen>
   bool _confirmingRecording = false;
   Future<bool> _confirmRecording() async {
     final path = _recordingPath;
-    if (path == null || _isRecording || _confirmingRecording) return false;
+    var bytes = _recordingBytes;
+    if ((path == null && bytes == null) ||
+        _isRecording ||
+        _confirmingRecording) {
+      return false;
+    }
     _confirmingRecording = true;
-    // Clear path IMMEDIATELY (synchronously) to prevent a second concurrent
-    // call from the recording panel's confirm button racing through the guard.
+    // Clear immediately so a second confirm tap cannot race the first.
     _recordingPath = null;
+    _recordingBytes = null;
     try {
-      final bytes = await File(path).readAsBytes();
-      if (bytes.isEmpty) {
+      if (bytes == null || bytes.isEmpty) {
+        if (path != null) bytes = await _waitForRecordingFile(path);
+      }
+      if (bytes == null || bytes.isEmpty) {
         await _discardRecording();
         _toast('The recording was empty.');
         return false;
@@ -1387,13 +1423,17 @@ class _SessionScreenState extends State<SessionScreen>
       await _ingest([
         (
           name: 'voice-${DateTime.now().microsecondsSinceEpoch}.m4a',
-          localPath: path,
-          readBytes: () async => bytes,
+          localPath: null,
+          readBytes: () async => bytes!,
         )
       ]);
       await _audioPlayer.stop();
-      final file = File(path);
-      if (await file.exists()) await file.delete();
+      if (path != null) {
+        try {
+          final file = File(path);
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+      }
       if (mounted)
         setState(() {
           _waveform.clear();
@@ -1403,6 +1443,9 @@ class _SessionScreenState extends State<SessionScreen>
         });
       return true;
     } catch (e) {
+      // Put the take back so a failed upload can be retried.
+      _recordingPath = path;
+      _recordingBytes = bytes;
       _toast('Could not attach recording: $e');
       return false;
     } finally {
@@ -1429,6 +1472,7 @@ class _SessionScreenState extends State<SessionScreen>
       setState(() {
         _isRecording = false;
         _recordingPath = null;
+        _recordingBytes = null;
         _recordingElapsed = Duration.zero;
         _playbackPosition = Duration.zero;
         _playbackDuration = Duration.zero;
@@ -1699,6 +1743,7 @@ class _SessionScreenState extends State<SessionScreen>
       if (_isRecording) await _recorder.cancel();
     } catch (_) {}
     final pendingPath = _recordingPath;
+    _recordingBytes = null;
     if (pendingPath != null) {
       try {
         final file = File(pendingPath);
