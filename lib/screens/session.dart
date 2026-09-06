@@ -2443,6 +2443,12 @@ class _SessionScreenState extends State<SessionScreen>
         final manual = (s?.approvalMode ?? 'auto') == 'manual';
         _setApproval(!manual);
         return;
+      case 'approval_ask':
+        _setApproval(true);
+        return;
+      case 'approval_auto':
+        _setApproval(false);
+        return;
       case 'goal':
         if (s?.goal?.ongoing ?? false) {
           _cancelGoal();
@@ -2504,16 +2510,20 @@ class _SessionScreenState extends State<SessionScreen>
       return [
         item('layers', 'Tasks', _showTasks),
         item('scheduled', 'Scheduled', _openRecurring),
-        item('shield', 'Approval mode', () => _setApproval(!manual),
-            value: manual ? 'Ask' : 'Auto'),
+        item('shield', 'Approval: Auto', () => _setApproval(false),
+            value: manual ? null : 'on'),
+        item('shield', 'Approval: Ask', () => _setApproval(true),
+            value: manual ? 'on' : null),
         item('minimize', 'Compact history', _confirmCompact),
         item('activity', 'Usage', _showUsage),
       ];
     }
     return [
       item('edit', 'Rename session', _renameCurrent),
-      item('shield', 'Approval mode', () => _setApproval(!manual),
-          value: manual ? 'Ask' : 'Auto'),
+      item('shield', 'Approval: Auto', () => _setApproval(false),
+          value: manual ? null : 'on'),
+      item('shield', 'Approval: Ask', () => _setApproval(true),
+          value: manual ? 'on' : null),
       (s?.goal?.ongoing ?? false)
           ? item('zap', 'Cancel goal', _cancelGoal,
               value: s!.goal!.paused ? 'paused' : 'running')

@@ -1114,13 +1114,11 @@ class _DesktopShellState extends State<DesktopShell>
           _macTopIconAction('edit', 'Edit', () => _editActiveFile()),
         ] else if (controls != null) ...[
           Container(width: 1, height: 18, color: AppColors.border2),
-          _macTopAction(
-              'shield',
-              state?.approvalMode == 'manual' ? 'Ask' : 'Auto',
-              state?.approvalMode == 'manual'
-                  ? 'Ask before tool actions — click for Auto'
-                  : 'Auto-approve tools — click for Ask',
-              () => controls.performAction('approval')),
+          _macApprovalChip(
+            manual: state?.approvalMode == 'manual',
+            onPick: (manual) => controls.performAction(
+                manual ? 'approval_ask' : 'approval_auto'),
+          ),
           _macTopIconAction(
               'goal',
               state?.goal?.ongoing == true ? 'Cancel goal' : 'Set goal',
@@ -1144,6 +1142,84 @@ class _DesktopShellState extends State<DesktopShell>
         const SizedBox(width: 6),
       ]),
     );
+  }
+
+  Widget _macApprovalChip({
+    required bool manual,
+    required void Function(bool manual) onPick,
+  }) {
+    return Builder(builder: (chipCtx) {
+      return Tooltip(
+        message: manual
+            ? 'Ask before tool actions'
+            : 'Auto-approve tools',
+        child: InkWell(
+          onTap: () => _pickApprovalMode(chipCtx, manual, onPick),
+          borderRadius: BorderRadius.circular(R.xs),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon('shield', size: 12, color: AppColors.fg3),
+              const SizedBox(width: 5),
+              Text(manual ? 'Ask' : 'Auto',
+                  style: sans(10.5, color: AppColors.fg2)),
+              const SizedBox(width: 2),
+              AppIcon('chevron-down', size: 9, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+      );
+    });
+  }
+
+  Future<void> _pickApprovalMode(
+    BuildContext chipCtx,
+    bool manual,
+    void Function(bool manual) onPick,
+  ) async {
+    final box = chipCtx.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(chipCtx).context.findRenderObject() as RenderBox?;
+    RelativeRect position;
+    if (box != null && overlay != null) {
+      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+      position = RelativeRect.fromLTRB(
+        origin.dx,
+        origin.dy + box.size.height + 4,
+        overlay.size.width - origin.dx - box.size.width,
+        overlay.size.height - origin.dy,
+      );
+    } else {
+      position = const RelativeRect.fromLTRB(16, 48, 16, 16);
+    }
+    final picked = await showMenu<bool>(
+      context: chipCtx,
+      position: position,
+      color: AppColors.surface1,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shape: appMenuShape,
+      constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
+      items: [
+        appMenuItem(
+          value: false,
+          icon: 'zap',
+          label: 'Auto',
+          detail: 'Run tools without asking',
+          selected: !manual,
+        ),
+        appMenuItem(
+          value: true,
+          icon: 'shield',
+          label: 'Ask',
+          detail: 'Confirm each tool',
+          selected: manual,
+        ),
+      ],
+    );
+    if (picked == null || picked == manual) return;
+    onPick(picked);
   }
 
   Widget _macTopAction(
