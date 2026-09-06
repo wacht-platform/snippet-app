@@ -129,6 +129,17 @@ class SessionInfo {
         profile: profile,
       );
 
+  SessionInfo withStatus(String status) => SessionInfo._(
+        id: id,
+        folder: folder,
+        conversation: conversation,
+        title: title,
+        status: status,
+        lastActive: lastActive,
+        running: status == 'running',
+        profile: profile,
+      );
+
   const SessionInfo._({
     required this.id,
     required this.folder,
@@ -239,6 +250,9 @@ class HarnessState {
       compactingStartedAt; // RFC3339 when the current compact pass began
   final int watchCount; // active file watches (monitor meta-tool)
   final List<LaneInfo> lanes; // delegated background lanes (live status)
+  /// Messages typed while a run is in progress — held on the daemon until the
+  /// turn ends, then submitted. Shared across TUI and app clients.
+  final List<String> queuedInputs;
 
   HarnessState({
     required this.status,
@@ -263,6 +277,7 @@ class HarnessState {
     this.compactingStartedAt,
     this.watchCount = 0,
     this.lanes = const [],
+    this.queuedInputs = const [],
   });
 
   factory HarnessState.fromJson(Map<String, dynamic> j) {
@@ -330,6 +345,12 @@ class HarnessState {
       compactingStartedAt: asString(j['compacting_started_at']),
       watchCount: (j['watches'] is List) ? (j['watches'] as List).length : 0,
       lanes: mapList(j['lanes']).map(LaneInfo.fromJson).toList(),
+      queuedInputs: (j['queued_inputs'] is List)
+          ? (j['queued_inputs'] as List)
+              .map((e) => e?.toString() ?? '')
+              .where((s) => s.isNotEmpty)
+              .toList()
+          : const [],
     );
   }
 
@@ -372,6 +393,9 @@ class HarnessState {
       compactingStartedAt: base.compactingStartedAt,
       watchCount: base.watchCount,
       lanes: base.lanes,
+      queuedInputs: d.containsKey('queued_inputs')
+          ? base.queuedInputs
+          : queuedInputs,
     );
   }
 
@@ -398,6 +422,7 @@ class HarnessState {
         compactingStartedAt: compactingStartedAt,
         watchCount: watchCount,
         lanes: lanes,
+        queuedInputs: queuedInputs,
       );
 }
 

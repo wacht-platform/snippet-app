@@ -104,7 +104,8 @@ class SessionScreen extends StatefulWidget {
   /// Gives the macOS shell access to session actions after this state mounts,
   /// allowing the shell chrome to replace the duplicate in-session title bar.
   final void Function(
-          VoidCallback stop, void Function(String action) performAction)?
+          VoidCallback stop,
+          void Function(String action, [String? extra]) performAction)?
       onMacControls;
 
   /// Desktop PageView keeps every tab mounted. Only the visible session should
@@ -227,12 +228,10 @@ class _SessionScreenState extends State<SessionScreen>
   Duration _playbackPosition = Duration.zero;
   Duration _playbackDuration = Duration.zero;
   final List<double> _waveform = [];
-  // Held while status == running — not sent until the run ends (TUI/desktop parity).
-  // Cancel drops locally only; these never hit the daemon's pending_inputs.
-  final List<String> _queued = [];
-  // Queue nonces at the moment the user queues a message, so every later
-  // delivery path (flush, steer, dispose) remains idempotent across reconnects.
-  final List<String> _queuedNonce = [];
+  // Queue frames already sent but not yet in `state.queuedInputs` (the daemon
+  // parks them until the in-flight step ends). Shown immediately so the
+  // composer doesn't sit empty for a whole tool call.
+  final List<String> _optimisticQueued = [];
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
   final List<String> _pending = [];
@@ -453,8 +452,6 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   late String _title;
-  // Tracks the last status so we can detect running → paused and flush _queued.
-  String? _prevStatus;
 
   @override
   void initState() {
@@ -539,8 +536,7 @@ class _SessionScreenState extends State<SessionScreen>
       } else {
         _attachments.clear();
       }
-      _queued.clear();
-      _queuedNonce.clear();
+      _optimisticQueued.clear();
       _clearPendingAll();
       _input.clear();
       _lastInput = '';
@@ -780,32 +776,9 @@ class _SessionScreenState extends State<SessionScreen>
           // A reversed transcript is anchored at offset 0 (latest). No initial
           // jump is needed; preserve whether the user has scrolled into history.
           final follow = _stickToBottom;
-          // Auto-submit queued messages only when the run lands on IDLE. Flushing
-          // on any running→non-running edge also fired into waiting_for_input,
-          // where the queued text would "answer" the agent's own question. So
-          // flush on ANY running→not-running edge EXCEPT waiting_for_input —
-          // that covers idle (finished) AND interrupted (user paused/stopped the
-          // run), which previously left the queue stranded.
-          // Sent as a BURST of individual messages: the first opens the turn and
-          // the rest fold in as steers before the first model call — the agent
-          // sees the full set up front, while each message keeps its own frame
-          // (and its own attachments) instead of being joined into one blob.
-          if (_prevStatus == 'running' &&
-              next.status != 'running' &&
-              next.status != 'waiting_for_input' &&
-              _queued.isNotEmpty) {
-            for (var i = 0; i < _queued.length; i++) {
-              final m = _queued[i];
-              final nonce =
-                  i < _queuedNonce.length ? _queuedNonce[i] : _nextNonce();
-              _send({'kind': 'user_message', 'value': m, 'nonce': nonce},
-                  tracked: true);
-              _trackPending(m, nonce);
-            }
-            _queued.clear();
-            _queuedNonce.clear();
-          }
-          _prevStatus = next.status;
+          _syncOptimisticQueue(next.queuedInputs);
+          // Held messages live on the daemon (`queued_inputs`) and flush there
+          // when the run lands on idle. Clients only display / enqueue / cancel.
           // A pending approval/answer is acknowledged the moment the run leaves
           // waiting_for_input — clear it so its watchdog can't fire a needless
           // resync (and so a resent decision isn't double-applied).
@@ -1233,10 +1206,9 @@ class _SessionScreenState extends State<SessionScreen>
     final nonce = _nextNonce();
     setState(() {
       if (running) {
-        // Queue by default — flushes when the run pauses. Reserve the nonce now
-        // so a reconnect or screen disposal cannot turn one message into two.
-        _queued.add(msg);
-        _queuedNonce.add(nonce);
+        // Hold on the daemon so TUI/app/desktop all see the same queue.
+        _optimisticQueued.add(msg);
+        _send({'kind': 'queue', 'value': msg, 'nonce': nonce});
       } else {
         _send({'kind': 'user_message', 'value': msg, 'nonce': nonce},
             tracked: true);
@@ -1753,28 +1725,49 @@ class _SessionScreenState extends State<SessionScreen>
     _toast('Compacting history');
   }
 
-  // Held messages were never sent to the daemon — drop them locally only.
-  // (Daemon `drop_queued` is only for inputs already in pending_inputs.)
-  void _cancelQueuedAt(int i) => setState(() {
-        if (i >= 0 && i < _queued.length) {
-          _queued.removeAt(i);
-          if (i < _queuedNonce.length) _queuedNonce.removeAt(i);
-        }
-      });
+  List<String> get _heldQueue {
+    final live = _state?.queuedInputs ?? const <String>[];
+    if (_optimisticQueued.isEmpty) return live;
+    final extra = <String>[];
+    final consumed = List<String>.from(live);
+    for (final m in _optimisticQueued) {
+      final i = consumed.indexOf(m);
+      if (i >= 0) {
+        consumed.removeAt(i);
+      } else {
+        extra.add(m);
+      }
+    }
+    if (extra.isEmpty) return live;
+    return [...live, ...extra];
+  }
 
-  // Steer: send a queued message immediately while the agent is still running.
-  void _steerQueuedAt(int i) {
-    if (i < 0 || i >= _queued.length) return;
-    final msg = _queued.removeAt(i);
-    // Preserve the nonce reserved when the message was created. Reassigning a
-    // new nonce here misaligns every later queued item after a steer/cancel.
-    final nonce =
-        i < _queuedNonce.length ? _queuedNonce.removeAt(i) : _nextNonce();
-    _send({'kind': 'user_message', 'value': msg, 'nonce': nonce},
-        tracked: true);
-    setState(() {
-      _trackPending(msg, nonce);
+  void _syncOptimisticQueue(List<String> live) {
+    if (_optimisticQueued.isEmpty) return;
+    final consumed = List<String>.from(live);
+    _optimisticQueued.removeWhere((m) {
+      final i = consumed.indexOf(m);
+      if (i < 0) return false;
+      consumed.removeAt(i);
+      return true;
     });
+  }
+
+  void _cancelQueuedAt(int i) {
+    if (i < 0 || i >= _heldQueue.length) return;
+    final liveLen = _state?.queuedInputs.length ?? 0;
+    if (i >= liveLen) {
+      final oi = i - liveLen;
+      if (oi >= 0 && oi < _optimisticQueued.length) {
+        _optimisticQueued.removeAt(oi);
+      }
+    }
+    _send({'kind': 'unqueue', 'value': i, 'nonce': _nextNonce()});
+  }
+
+  void _steerQueuedAt(int i) {
+    if (i < 0 || i >= _heldQueue.length) return;
+    _send({'kind': 'steer_queued', 'value': i, 'nonce': _nextNonce()});
     _armAckWatchdog();
   }
 
@@ -1842,26 +1835,13 @@ class _SessionScreenState extends State<SessionScreen>
       _registeredOpenKey = '';
       reportOpenSession('');
     }
-    // Flush anything still queued so leaving the chat doesn't lose it — the daemon
-    // queues it server-side (pending_inputs) and applies it on the next turn. Give
-    // the frames a moment to flush before tearing the socket down.
+    // Held messages already live on the daemon. Flush only the reconnect outbox.
     final ch = _channel;
-    if ((_queued.isNotEmpty || _outbox.isNotEmpty) && ch != null) {
+    if (_outbox.isNotEmpty && ch != null) {
       for (final p in _outbox) {
         ch.sink.add(p);
       }
       _outbox.clear();
-      for (var i = 0; i < _queued.length; i++) {
-        final m = _queued[i];
-        final nonce = i < _queuedNonce.length ? _queuedNonce[i] : _nextNonce();
-        ch.sink.add(jsonEncode({
-          'kind': 'user_message',
-          'value': m,
-          'nonce': nonce,
-        }));
-      }
-      _queued.clear();
-      _queuedNonce.clear();
       Future.delayed(const Duration(milliseconds: 300), () => ch.sink.close());
     } else {
       ch?.sink.close();
@@ -1989,22 +1969,22 @@ class _SessionScreenState extends State<SessionScreen>
                                             ? ''
                                             : _liveThinking),
                                   ],
-                                  if (_queued.isNotEmpty) ...[
+                                  if (_heldQueue.isNotEmpty) ...[
                                     const SizedBox(height: 12),
-                                    for (var qi = 0; qi < _queued.length; qi++)
+                                    for (var qi = 0; qi < _heldQueue.length; qi++)
                                       KeyedSubtree(
                                         key: ValueKey(
-                                            'queued-$qi-${_queued[qi].hashCode}'),
+                                            'queued-$qi-${_heldQueue[qi].hashCode}'),
                                         child: _QueuedBubble(
-                                          text: _queuedText(_queued[qi]),
+                                          text: _queuedText(_heldQueue[qi]),
                                           audio:
-                                              _queuedAttachCounts(_queued[qi])
+                                              _queuedAttachCounts(_heldQueue[qi])
                                                   .$1,
                                           images:
-                                              _queuedAttachCounts(_queued[qi])
+                                              _queuedAttachCounts(_heldQueue[qi])
                                                   .$2,
                                           files:
-                                              _queuedAttachCounts(_queued[qi])
+                                              _queuedAttachCounts(_heldQueue[qi])
                                                   .$3,
                                           onCancel: () => _cancelQueuedAt(qi),
                                           onSteer: () => _steerQueuedAt(qi),
@@ -2487,7 +2467,7 @@ class _SessionScreenState extends State<SessionScreen>
     _toast(manual ? 'Approval: ask' : 'Approval: auto');
   }
 
-  void _performMacAction(String action) {
+  void _performMacAction(String action, [String? extra]) {
     final s = _state;
     switch (action) {
       case 'rename':
@@ -2507,7 +2487,11 @@ class _SessionScreenState extends State<SessionScreen>
         _setApproval(false);
         return;
       case 'goal':
-        if (s?.goal?.ongoing ?? false) {
+        final text = extra?.trim();
+        if (text != null && text.isNotEmpty) {
+          _send({'kind': 'set_goal', 'value': text});
+          _toast('Goal set — the agent will drive toward it');
+        } else if (s?.goal?.ongoing ?? false) {
           _cancelGoal();
         } else {
           _setGoal();
@@ -3649,42 +3633,15 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Future<void> _confirmRewind(Checkpoint c) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: AppColors.surface1,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.card),
-            side: BorderSide(color: AppColors.border2)),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Restore workspace?',
-                    style: sans(15,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-                const SizedBox(height: 6),
-                Text(
-                    'This rolls the workspace back to “${c.label.isEmpty ? c.id : c.label}”. Changes after this point are discarded.',
-                    style: sans(12.5, height: 1.5, color: AppColors.fg3)),
-                const SizedBox(height: 14),
-                Row(children: [
-                  Expanded(
-                      child: Btn('Cancel',
-                          variant: BtnVariant.ghost,
-                          onTap: () => Navigator.pop(context, false))),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: Btn('Restore',
-                          onTap: () => Navigator.pop(context, true))),
-                ]),
-              ]),
-        ),
-      ),
+    final ok = await confirmAction(
+      context,
+      title: 'Restore workspace?',
+      body:
+          'This rolls the workspace back to “${c.label.isEmpty ? c.id : c.label}”. Changes after this point are discarded.',
+      confirmLabel: 'Restore',
+      danger: false,
     );
-    if (ok != true) return;
+    if (!ok) return;
     if (mounted) Navigator.pop(context); // close the sheet
     try {
       await widget.client.rewind(widget.sessionId, c.id);
@@ -3806,43 +3763,15 @@ class _SessionScreenState extends State<SessionScreen>
   Future<void> _confirmFork(Checkpoint? c) async {
     final label =
         c == null ? 'full history' : (c.label.isEmpty ? c.id : c.label);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: AppColors.surface1,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.card),
-            side: BorderSide(color: AppColors.border2)),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Fork conversation?',
-                    style: sans(15,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-                const SizedBox(height: 6),
-                Text(
-                    'Opens a new session branched at “$label”. '
-                    'This chat stays as-is. Files on disk are shared.',
-                    style: sans(12.5, height: 1.5, color: AppColors.fg3)),
-                const SizedBox(height: 14),
-                Row(children: [
-                  Expanded(
-                      child: Btn('Cancel',
-                          variant: BtnVariant.ghost,
-                          onTap: () => Navigator.pop(context, false))),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: Btn('Fork',
-                          onTap: () => Navigator.pop(context, true))),
-                ]),
-              ]),
-        ),
-      ),
+    final ok = await confirmAction(
+      context,
+      title: 'Fork conversation?',
+      body:
+          'Opens a new session branched at “$label”. This chat stays as-is. Files on disk are shared.',
+      confirmLabel: 'Fork',
+      danger: false,
     );
-    if (ok != true) return;
+    if (!ok) return;
     if (mounted) Navigator.pop(context); // close the sheet
     try {
       final result = await widget.client.forkSession(
@@ -5051,44 +4980,34 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     Widget? child,
   }) {
     final open = id != null && _open == id;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Material(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            InkWell(
-              onTap: onTap ?? (id == null ? null : () => _toggle(id)),
-              borderRadius: BorderRadius.circular(R.md),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                child: Row(children: [
-                  AppIcon(icon, size: 16, color: AppColors.fg2),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child:
-                          Text(label, style: sans(13, color: AppColors.fg1))),
-                  if (value != null)
-                    Text(value, style: mono(11, color: AppColors.fg3)),
-                  if (id != null) ...[
-                    const SizedBox(width: 6),
-                    AppIcon(open ? 'chevron-down' : 'chevron-right',
-                        size: 14, color: AppColors.fg4),
-                  ],
-                ]),
-              ),
-            ),
-            if (open && child != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: child,
-              ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: onTap ?? (id == null ? null : () => _toggle(id)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+            child: Row(children: [
+              AppIcon(icon, size: 15, color: AppColors.fg3),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(label, style: sans(13, color: AppColors.fg1))),
+              if (value != null)
+                Text(value, style: sans(11.5, color: AppColors.fg4)),
+              if (id != null) ...[
+                const SizedBox(width: 6),
+                AppIcon(open ? 'chevron-down' : 'chevron-right',
+                    size: 13, color: AppColors.fg4),
+              ],
+            ]),
+          ),
         ),
-      ),
+        if (open && child != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(29, 0, 4, 10),
+            child: child,
+          ),
+      ],
     );
   }
 

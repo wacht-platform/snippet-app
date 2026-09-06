@@ -86,31 +86,14 @@ class _FileExplorerState extends State<FileExplorer> {
   Future<void> _deleteSelected(String cwd) async {
     final n = _selected.length;
     if (n == 0) return;
-    final ok = await showAppSheet<bool>(context,
-        title: 'Delete $n item${n == 1 ? '' : 's'}?',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-                'Permanently deletes the selected item${n == 1 ? '' : 's'} from the machine. Folders are removed with their contents.',
-                style: sans(12, height: 1.45, color: AppColors.fg3)),
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(
-                  child: Btn('Cancel',
-                      variant: BtnVariant.secondary,
-                      onTap: () => Navigator.pop(context, false))),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Btn('Delete',
-                      variant: BtnVariant.danger,
-                      icon: 'trash',
-                      onTap: () => Navigator.pop(context, true))),
-            ]),
-          ],
-        ));
-    if (ok != true) return;
+    final ok = await confirmAction(
+      context,
+      title: 'Delete $n item${n == 1 ? '' : 's'}?',
+      body:
+          'Permanently deletes the selected item${n == 1 ? '' : 's'} from the machine. Folders are removed with their contents.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok) return;
     if (mounted)
       setState(() => _busy = 'Deleting $n item${n == 1 ? '' : 's'}…');
     var failed = 0;
@@ -307,8 +290,16 @@ class _FileExplorerState extends State<FileExplorer> {
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 16),
                                 child: Row(children: [
-                                  Text('/',
-                                      style: mono(11.5, color: AppColors.fg4)),
+                                  GestureDetector(
+                                    onTap: listing?.parent == null
+                                        ? null
+                                        : () => _go('/'),
+                                    child: Text('/',
+                                        style: mono(11.5,
+                                            color: listing?.parent == null
+                                                ? AppColors.fg4
+                                                : AppColors.fg3)),
+                                  ),
                                   for (var i = 0; i < segs.length; i++) ...[
                                     if (i > 0)
                                       Padding(
@@ -316,11 +307,17 @@ class _FileExplorerState extends State<FileExplorer> {
                                               horizontal: 2),
                                           child: AppIcon('chevron-right',
                                               size: 13, color: AppColors.fg4)),
-                                    Text(segs[i],
-                                        style: mono(11.5,
-                                            color: i == segs.length - 1
-                                                ? AppColors.fg1
-                                                : AppColors.fg3)),
+                                    GestureDetector(
+                                      onTap: i == segs.length - 1
+                                          ? null
+                                          : () => _go(
+                                              '/${segs.sublist(0, i + 1).join('/')}'),
+                                      child: Text(segs[i],
+                                          style: mono(11.5,
+                                              color: i == segs.length - 1
+                                                  ? AppColors.fg1
+                                                  : AppColors.fg3)),
+                                    ),
                                   ],
                                 ]),
                               ),

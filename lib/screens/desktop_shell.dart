@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
 import '../command_palette.dart';
@@ -75,7 +77,7 @@ class _MacSessionStatus {
 
 class _MacSessionControls {
   final VoidCallback stop;
-  final void Function(String action) performAction;
+  final void Function(String action, [String? extra]) performAction;
   const _MacSessionControls(this.stop, this.performAction);
 }
 
@@ -114,6 +116,12 @@ class _DesktopShellState extends State<DesktopShell>
 
   Timer? _sessionsTicker;
   bool _appForeground = true;
+  WebSocketChannel? _eventsChannel;
+  StreamSubscription? _eventsSub;
+  Timer? _eventsReconnect;
+  // Live status from /events (and open-tab callbacks). Survives a slow
+  // /sessions refetch so the list doesn't flicker back to stale.
+  final Map<String, String> _liveStatus = {};
 
   @override
   void initState() {
@@ -134,6 +142,7 @@ class _DesktopShellState extends State<DesktopShell>
     if (!kMobile)
       HardwareKeyboard.instance.removeHandler(_handleGlobalShortcuts);
     _sessionsTicker?.cancel();
+    _stopEventsWatch();
     _persistTabsDebounce?.cancel();
     _pageController.dispose();
     _stripController.dispose();
@@ -148,6 +157,7 @@ class _DesktopShellState extends State<DesktopShell>
     _appForeground = fg;
     if (fg) {
       _startSessionsTicker();
+      _connectEventsWatch();
       if (mounted && !_sessionsLoading) _loadSessions();
     } else {
       _sessionsTicker?.cancel();
@@ -245,11 +255,94 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _setMacSessionStatus(String key, HarnessState? state, bool running) {
     _macSessionStatuses[key] = _MacSessionStatus(state, running);
-    if (mounted && _activeTab?.key == key) setState(() {});
+    final status = state?.status ?? (running ? 'running' : 'idle');
+    String? sessionId;
+    for (final t in _tabs) {
+      if (t.key == key) {
+        sessionId = t.sessionId;
+        break;
+      }
+    }
+    if (sessionId != null) _patchSessionStatus(sessionId, status);
+    if (mounted) setState(() {});
+  }
+
+  void _patchSessionStatus(String sessionId, String status) {
+    if (sessionId.isEmpty || status.isEmpty) return;
+    _liveStatus[sessionId] = status;
+    final sessions = _sessions;
+    if (sessions == null) return;
+    final i = sessions.indexWhere((s) => s.id == sessionId);
+    if (i < 0 || sessions[i].status == status) return;
+    _sessions = [
+      for (var n = 0; n < sessions.length; n++)
+        n == i ? sessions[n].withStatus(status) : sessions[n],
+    ];
+  }
+
+  void _applyLiveStatus(List<SessionInfo> sessions) {
+    if (_liveStatus.isEmpty) return;
+    for (var i = 0; i < sessions.length; i++) {
+      final live = _liveStatus[sessions[i].id];
+      if (live != null && live.isNotEmpty && sessions[i].status != live) {
+        sessions[i] = sessions[i].withStatus(live);
+      }
+    }
+  }
+
+  void _stopEventsWatch() {
+    _eventsReconnect?.cancel();
+    _eventsReconnect = null;
+    _eventsSub?.cancel();
+    _eventsSub = null;
+    _eventsChannel?.sink.close();
+    _eventsChannel = null;
+  }
+
+  void _connectEventsWatch() {
+    final c = _client;
+    if (c == null) {
+      _stopEventsWatch();
+      return;
+    }
+    _stopEventsWatch();
+    try {
+      final ch = c.events();
+      _eventsChannel = ch;
+      _eventsSub = ch.stream.listen(
+        (msg) {
+          Map<String, dynamic> e;
+          try {
+            e = jsonDecode(msg as String) as Map<String, dynamic>;
+          } catch (_) {
+            return;
+          }
+          final session = e['session']?.toString() ?? '';
+          final status = e['status']?.toString() ?? '';
+          if (session.isEmpty || status.isEmpty) return;
+          if (!mounted) return;
+          _patchSessionStatus(session, status);
+          setState(() {});
+        },
+        onDone: _scheduleEventsReconnect,
+        onError: (_) => _scheduleEventsReconnect(),
+        cancelOnError: true,
+      );
+    } catch (_) {
+      _scheduleEventsReconnect();
+    }
+  }
+
+  void _scheduleEventsReconnect() {
+    if (!mounted || !_appForeground || _client == null) return;
+    _eventsReconnect?.cancel();
+    _eventsReconnect = Timer(const Duration(seconds: 3), () {
+      if (mounted && _appForeground) _connectEventsWatch();
+    });
   }
 
   void _setMacSessionControls(String key, VoidCallback stop,
-      void Function(String action) performAction) {
+      void Function(String action, [String? extra]) performAction) {
     _macSessionControls[key] = _MacSessionControls(stop, performAction);
     if (mounted && _activeTab?.key == key) setState(() {});
   }
@@ -716,7 +809,9 @@ class _DesktopShellState extends State<DesktopShell>
       _active = resolved;
       _client = DaemonClient(resolved.url, resolved.token);
       _sessions = null;
+      _liveStatus.clear();
     });
+    _connectEventsWatch();
     _openSession(sid, '${m['title'] ?? 'session'}', null);
     _loadSessions();
   }
@@ -733,6 +828,7 @@ class _DesktopShellState extends State<DesktopShell>
     });
     await _restoreTabs(items);
     _ensurePinnedMissionControl();
+    _connectEventsWatch();
     _loadSessions();
     _refreshHealth();
   }
@@ -747,7 +843,7 @@ class _DesktopShellState extends State<DesktopShell>
   Future<void> _loadSessions() async {
     final c = _client;
     if (c == null) {
-      setState(() => _sessions = const []);
+      setState(() => _sessions = <SessionInfo>[]);
       return;
     }
     setState(() => _sessionsLoading = true);
@@ -766,6 +862,7 @@ class _DesktopShellState extends State<DesktopShell>
         if (am != bm) return am ? -1 : 1;
         return b.lastActive.compareTo(a.lastActive);
       });
+      _applyLiveStatus(s);
       if (mounted) {
         setState(() {
           _sessions = s;
@@ -815,8 +912,10 @@ class _DesktopShellState extends State<DesktopShell>
       _active = inst;
       _client = DaemonClient(inst.url, inst.token);
       _sessions = null;
+      _liveStatus.clear();
     });
     _ensurePinnedMissionControl();
+    _connectEventsWatch();
     _loadSessions();
   }
 
@@ -1064,9 +1163,11 @@ class _DesktopShellState extends State<DesktopShell>
         _active = items.isNotEmpty ? items.first : null;
         _client =
             _active != null ? DaemonClient(_active!.url, _active!.token) : null;
+        _liveStatus.clear();
       }
     });
     _ensurePinnedMissionControl();
+    _connectEventsWatch();
     _syncPage();
   }
 
@@ -1142,10 +1243,12 @@ class _DesktopShellState extends State<DesktopShell>
             onPick: (manual) => controls.performAction(
                 manual ? 'approval_ask' : 'approval_auto'),
           ),
-          _macTopIconAction(
-              'goal',
-              state?.goal?.ongoing == true ? 'Cancel goal' : 'Set goal',
-              () => controls.performAction('goal')),
+          _macGoalChip(
+            active: state?.goal?.ongoing == true,
+            paused: state?.goal?.paused == true,
+            onSet: (text) => controls.performAction('goal', text),
+            onCancel: () => controls.performAction('goal'),
+          ),
           if (state?.lanes.isNotEmpty ?? false)
             _macTopAction(
                 'layers',
@@ -1243,6 +1346,91 @@ class _DesktopShellState extends State<DesktopShell>
     );
     if (picked == null || picked == manual) return;
     onPick(picked);
+  }
+
+  Widget _macGoalChip({
+    required bool active,
+    required bool paused,
+    required void Function(String text) onSet,
+    required VoidCallback onCancel,
+  }) {
+    return Builder(builder: (chipCtx) {
+      return Tooltip(
+        message: active
+            ? (paused ? 'Goal paused — tap to cancel' : 'Goal running — tap to cancel')
+            : 'Set an autonomous goal',
+        child: InkWell(
+          onTap: () {
+            if (active) {
+              onCancel();
+              return;
+            }
+            _pickGoal(chipCtx, onSet);
+          },
+          borderRadius: BorderRadius.circular(R.xs),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon('zap',
+                  size: 12,
+                  color: active ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 5),
+              Text(active ? (paused ? 'Paused' : 'Goal') : 'Goal',
+                  style: sans(10.5,
+                      color: active ? AppColors.accent : AppColors.fg2)),
+              if (!active) ...[
+                const SizedBox(width: 2),
+                AppIcon('chevron-down', size: 9, color: AppColors.fg4),
+              ],
+            ]),
+          ),
+        ),
+      );
+    });
+  }
+
+  Future<void> _pickGoal(
+    BuildContext chipCtx,
+    void Function(String text) onSet,
+  ) async {
+    final box = chipCtx.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(chipCtx).context.findRenderObject() as RenderBox?;
+    Offset origin = Offset.zero;
+    Size size = Size.zero;
+    if (box != null && overlay != null) {
+      origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+      size = box.size;
+    }
+    final text = await showDialog<String>(
+      context: chipCtx,
+      barrierColor: Colors.transparent,
+      builder: (ctx) {
+        return Stack(children: [
+          Positioned(
+            left: origin.dx.clamp(12.0, overlay == null
+                ? origin.dx
+                : (overlay.size.width - 280).clamp(12.0, overlay.size.width)),
+            top: origin.dy + size.height + 4,
+            child: Material(
+              color: AppColors.surface1,
+              elevation: 0,
+              shape: appMenuShape,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 240, maxWidth: 280),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: _GoalPopover(onSet: (t) => Navigator.pop(ctx, t)),
+                ),
+              ),
+            ),
+          ),
+        ]);
+      },
+    );
+    final t = text?.trim();
+    if (t == null || t.isEmpty) return;
+    onSet(t);
   }
 
   Widget _macTopAction(
@@ -1694,10 +1882,8 @@ class _DesktopShellState extends State<DesktopShell>
                             onOpenFileTab: (path, name) => _openFileTab(
                                 t.client, t.instanceUrl, path, name),
                             onOpenSession: _openSession,
-                            onMacStatus: kMacOS
-                                ? (state, running) =>
-                                    _setMacSessionStatus(t.key, state, running)
-                                : null,
+                            onMacStatus: (state, running) =>
+                                _setMacSessionStatus(t.key, state, running),
                             onMacControls: !kMobile
                                 ? (stop, performAction) =>
                                     _setMacSessionControls(
@@ -1968,6 +2154,61 @@ class _DesktopShellState extends State<DesktopShell>
               ]),
         ),
       ),
+    );
+  }
+}
+
+class _GoalPopover extends StatefulWidget {
+  final void Function(String text) onSet;
+  const _GoalPopover({required this.onSet});
+
+  @override
+  State<_GoalPopover> createState() => _GoalPopoverState();
+}
+
+class _GoalPopoverState extends State<_GoalPopover> {
+  final _ctl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final t = _ctl.text.trim();
+    if (t.isEmpty) return;
+    widget.onSet(t);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Set goal',
+            style: sans(12.5, weight: FontWeight.w600, color: AppColors.fg1)),
+        const SizedBox(height: 8),
+        AppField(
+          controller: _ctl,
+          hint: 'What should the agent work toward?',
+          autofocus: true,
+          minLines: 2,
+          maxLines: 4,
+          onSubmitted: (_) => _submit(),
+        ),
+        const SizedBox(height: 8),
+        Row(children: [
+          const Spacer(),
+          Btn('Cancel',
+              variant: BtnVariant.ghost,
+              small: true,
+              onTap: () => Navigator.pop(context)),
+          const SizedBox(width: 6),
+          Btn('Set goal', small: true, onTap: _submit),
+        ]),
+      ],
     );
   }
 }
@@ -2512,41 +2753,39 @@ class _SidebarState extends State<_Sidebar> {
     if (mc.isNotEmpty) {
       children.add(_missionControlPin(mc.first));
     }
-    if (kMobile) {
-      for (final s in list) {
-        children.add(Padding(
-            padding: const EdgeInsets.only(bottom: 2), child: _sessionCard(s)));
-      }
-    } else {
-      final newest = <String, int>{};
-      for (final s in list) {
-        final t = newest[s.folder];
-        if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
-      }
-      list.sort((a, b) {
-        final fa = newest[a.folder] ?? 0;
-        final fb = newest[b.folder] ?? 0;
-        if (fa != fb) return fb.compareTo(fa);
-        final byFolder = a.folder.compareTo(b.folder);
-        if (byFolder != 0) return byFolder;
-        return b.lastActive.compareTo(a.lastActive);
+    final newest = <String, int>{};
+    for (final s in list) {
+      final t = newest[s.folder];
+      if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
+    }
+    list.sort((a, b) {
+      final fa = newest[a.folder] ?? 0;
+      final fb = newest[b.folder] ?? 0;
+      if (fa != fb) return fb.compareTo(fa);
+      final byFolder = a.folder.compareTo(b.folder);
+      if (byFolder != 0) return byFolder;
+      return b.lastActive.compareTo(a.lastActive);
+    });
+    final groups = <String, List<SessionInfo>>{};
+    final order = <String>[];
+    for (final s in list) {
+      final bucket = groups.putIfAbsent(s.folder, () {
+        order.add(s.folder);
+        return <SessionInfo>[];
       });
-      final groups = <String, List<SessionInfo>>{};
-      final order = <String>[];
-      for (final s in list) {
-        final bucket = groups.putIfAbsent(s.folder, () {
-          order.add(s.folder);
-          return <SessionInfo>[];
-        });
-        bucket.add(s);
-      }
-      var firstFolder = true;
-      for (final key in order) {
-        final sessions = groups[key]!;
-        children.add(_desktopFolderHeader(
-            key, first: firstFolder && mc.isEmpty));
-        firstFolder = false;
-        for (var i = 0; i < sessions.length; i++) {
+      bucket.add(s);
+    }
+    var firstFolder = true;
+    for (final key in order) {
+      final sessions = groups[key]!;
+      children.add(_folderHeader(key, first: firstFolder && mc.isEmpty));
+      firstFolder = false;
+      for (var i = 0; i < sessions.length; i++) {
+        if (kMobile) {
+          children.add(Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: _sessionCard(sessions[i])));
+        } else {
           children.add(_desktopTreeRow(sessions[i],
               last: i == sessions.length - 1));
         }
@@ -2616,8 +2855,25 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  Widget _desktopFolderHeader(String folder, {required bool first}) {
-    final path = folder.isEmpty ? 'No folder' : folder;
+  Widget _folderHeader(String folder, {required bool first}) {
+    final name = folder.isEmpty
+        ? 'No folder'
+        : lastPathSegment(folder, ifEmpty: folder);
+    if (kMobile) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 6),
+        child: Row(children: [
+          AppIcon('folder', size: 13, color: AppColors.fg4),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(12, weight: FontWeight.w500, color: AppColors.fg3)),
+          ),
+        ]),
+      );
+    }
     return Padding(
       padding: EdgeInsets.fromLTRB(0, first ? 8 : 16, 4, 0),
       child: SizedBox(
@@ -2635,11 +2891,11 @@ class _SidebarState extends State<_Sidebar> {
               AppIcon('folder', size: 13, color: AppColors.fg3),
               const SizedBox(width: 7),
               Expanded(
-                child: Text(path,
+                child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.left,
-                    style: mono(11, color: AppColors.fg3)),
+                    style: sans(11.5, color: AppColors.fg3)),
               ),
             ]),
           ),
@@ -2881,17 +3137,8 @@ class _SidebarState extends State<_Sidebar> {
                         style: sans(16, color: AppColors.fg1),
                       ),
                 const SizedBox(height: 4),
-                Row(children: [
-                  Text(relativeTime(s.lastActive),
-                      style: sans(12, color: AppColors.fg4)),
-                  if (s.folder.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Text(s.folder,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg3)),
-                  ],
-                ]),
+                Text(relativeTime(s.lastActive),
+                    style: sans(12, color: AppColors.fg4)),
               ],
             ),
           ),
@@ -3324,33 +3571,14 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   Future<void> _confirmRemoveMachine(Instance i) async {
-    final ok = await showAppSheet<bool>(context,
-        title: 'Remove machine?',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(i.label, style: sans(13.5, color: AppColors.fg1)),
-            const SizedBox(height: 6),
-            Text(
-                'Removes the saved connection from this app. The machine and its sessions are untouched.',
-                style: sans(12, height: 1.45, color: AppColors.fg3)),
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(
-                  child: Btn('Cancel',
-                      variant: BtnVariant.secondary,
-                      onTap: () => Navigator.pop(context, false))),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Btn('Remove',
-                      variant: BtnVariant.danger,
-                      icon: 'trash',
-                      onTap: () => Navigator.pop(context, true))),
-            ]),
-          ],
-        ));
-    if (ok == true) widget.onRemoveInstance(i);
+    final ok = await confirmAction(
+      context,
+      title: 'Remove machine?',
+      body:
+          '${i.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
+      confirmLabel: 'Remove',
+    );
+    if (ok) widget.onRemoveInstance(i);
   }
 }
 
@@ -3512,33 +3740,14 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   }
 
   Future<void> _confirmRemove(Instance inst) async {
-    final ok = await showAppSheet<bool>(context,
-        title: 'Remove instance?',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(inst.label, style: sans(13.5, color: AppColors.fg1)),
-            const SizedBox(height: 6),
-            Text(
-                'Removes the saved connection from this app. The machine and its sessions are untouched.',
-                style: sans(12, height: 1.45, color: AppColors.fg3)),
-            const SizedBox(height: 16),
-            Row(children: [
-              Expanded(
-                  child: Btn('Cancel',
-                      variant: BtnVariant.secondary,
-                      onTap: () => Navigator.pop(context, false))),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Btn('Remove',
-                      variant: BtnVariant.danger,
-                      icon: 'trash',
-                      onTap: () => Navigator.pop(context, true))),
-            ]),
-          ],
-        ));
-    if (ok != true) return;
+    final ok = await confirmAction(
+      context,
+      title: 'Remove instance?',
+      body:
+          '${inst.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
+      confirmLabel: 'Remove',
+    );
+    if (!ok) return;
     widget.onRemove(inst);
     setState(() => _instances.removeWhere((e) => e.url == inst.url));
   }

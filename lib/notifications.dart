@@ -468,6 +468,8 @@ class _DesktopWatcher {
     } catch (_) {
       return;
     }
+    if (e['notify'] == false) return;
+    if (e['kind']?.toString() == 'running') return;
     final session = e['session']?.toString() ?? '';
     if (_fg && '${inst.url}|$session' == _open) return; // already on screen
     final c = _notifContent(inst, e);
@@ -535,6 +537,8 @@ class _NotifTaskHandler extends TaskHandler {
     } catch (_) {
       return;
     }
+    if (e['notify'] == false) return;
+    if (e['kind']?.toString() == 'running') return;
     final session = e['session']?.toString() ?? '';
     if (_fg && '${inst.url}|$session' == _open) return; // already on screen
     final c = _notifContent(inst, e);
