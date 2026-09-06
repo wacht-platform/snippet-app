@@ -22,6 +22,9 @@ class DaemonClient {
   final String baseUrl; // e.g. https://abc.trycloudflare.com
   final String token;
 
+  ServerConfig? _configCache;
+  Future<ServerConfig>? _configInFlight;
+
   DaemonClient(this.baseUrl, this.token);
 
   Uri _uri(String path, [Map<String, String>? extra]) {
@@ -121,10 +124,28 @@ class DaemonClient {
 
   // ---- model configuration (shared with the TUI's config.toml) ----
 
-  Future<ServerConfig> getConfig() async {
-    final r = await http.get(_uri('/config'));
-    if (r.statusCode != 200) throw _err('load config', r);
-    return ServerConfig.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  Future<ServerConfig> getConfig({bool force = false}) async {
+    if (!force && _configCache != null) return _configCache!;
+    if (!force && _configInFlight != null) return _configInFlight!;
+    final pending = () async {
+      final r = await http.get(_uri('/config'));
+      if (r.statusCode != 200) throw _err('load config', r);
+      final cfg =
+          ServerConfig.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+      _configCache = cfg;
+      return cfg;
+    }();
+    _configInFlight = pending;
+    try {
+      return await pending;
+    } finally {
+      if (identical(_configInFlight, pending)) _configInFlight = null;
+    }
+  }
+
+  void invalidateConfig() {
+    _configCache = null;
+    _configInFlight = null;
   }
 
   Future<String> putProfile({
@@ -160,6 +181,7 @@ class DaemonClient {
     final r = await http.put(_uri('/config/profile'),
         headers: _json, body: jsonEncode(body));
     if (r.statusCode != 200) throw _err('save profile', r);
+    invalidateConfig();
     return (jsonDecode(r.body) as Map<String, dynamic>)['name'] as String;
   }
 
@@ -167,6 +189,7 @@ class DaemonClient {
     final r = await http.post(_uri('/config/active'),
         headers: _json, body: jsonEncode({'name': name}));
     if (r.statusCode != 200) throw _err('set active', r);
+    invalidateConfig();
   }
 
   /// Live model catalog from the provider's own models API (the key stays on
@@ -236,11 +259,13 @@ class DaemonClient {
     final r = await http.post(_uri('/config/delegate'),
         headers: _json, body: jsonEncode({'name': name ?? ''}));
     if (r.statusCode != 200) throw _err('set delegate', r);
+    invalidateConfig();
   }
 
   Future<void> deleteProfile(String name) async {
     final r = await http.delete(_uri('/config/profile', {'name': name}));
     if (r.statusCode != 200) throw _err('delete profile', r);
+    invalidateConfig();
   }
 
   Future<void> setSessionModel(String sessionId, String profile) async {

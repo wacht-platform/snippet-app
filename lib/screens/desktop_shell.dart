@@ -1114,11 +1114,12 @@ class _DesktopShellState extends State<DesktopShell>
           _macTopIconAction('edit', 'Edit', () => _editActiveFile()),
         ] else if (controls != null) ...[
           Container(width: 1, height: 18, color: AppColors.border2),
-          _macTopIconAction(
+          _macTopAction(
               'shield',
+              state?.approvalMode == 'manual' ? 'Ask' : 'Auto',
               state?.approvalMode == 'manual'
-                  ? 'Switch to auto approval'
-                  : 'Ask before tool actions',
+                  ? 'Ask before tool actions — click for Auto'
+                  : 'Auto-approve tools — click for Ask',
               () => controls.performAction('approval')),
           _macTopIconAction(
               'goal',

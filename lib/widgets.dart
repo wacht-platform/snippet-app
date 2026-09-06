@@ -1658,31 +1658,31 @@ Future<bool> confirmAction(
       return Dialog(
         backgroundColor: AppColors.surface1,
         elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(R.sm),
           side: BorderSide(color: AppColors.border2),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
+          constraints: const BoxConstraints(maxWidth: 280),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(title,
-                    style: sans(15,
+                    style: sans(13.5,
                         weight: FontWeight.w600, color: AppColors.fg1)),
-                const SizedBox(height: 8),
-                Text(body, style: sans(13, height: 1.45, color: AppColors.fg3)),
-                const SizedBox(height: 16),
+                const SizedBox(height: 6),
+                Text(body, style: sans(12, height: 1.35, color: AppColors.fg3)),
+                const SizedBox(height: 12),
                 Row(children: [
                   const Spacer(),
                   Btn('Cancel',
                       variant: BtnVariant.ghost,
                       onTap: () => Navigator.pop(ctx, false)),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Btn(confirmLabel,
                       variant: danger ? BtnVariant.danger : BtnVariant.primary,
                       onTap: () => Navigator.pop(ctx, true)),

@@ -479,6 +479,7 @@ class _SessionScreenState extends State<SessionScreen>
     });
     _startSession();
     _loadModel();
+    unawaited(widget.client.getConfig());
     _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
     _registeredOpenKey = _openKey;
     reportOpenSession(_openKey);
@@ -1047,6 +1048,11 @@ class _SessionScreenState extends State<SessionScreen>
 
   void _openTerm({bool fresh = false}) {
     if (_isMissionControl) return;
+    // Second click on Shell hides the drawer — keep the pty so reopening is instant.
+    if (!fresh && _termOpen && _terms.isNotEmpty) {
+      setState(() => _termOpen = false);
+      return;
+    }
     if (!fresh && _terms.isNotEmpty) {
       setState(() => _termOpen = true);
       final t = _terms[_termFocus.clamp(0, _terms.length - 1)];
@@ -3816,11 +3822,10 @@ String _activityElapsed(String? startedAt, DateTime fallback) {
   final parsed = DateTime.tryParse(startedAt ?? '');
   final start = parsed?.toLocal() ?? fallback;
   final d = DateTime.now().difference(start);
-  final total = d.inMilliseconds / 1000;
-  if (total < 0) return '0.0s';
-  final m = total ~/ 60;
-  final s = total - m * 60;
-  return m > 0 ? '${m}m ${s.toStringAsFixed(1)}s' : '${s.toStringAsFixed(1)}s';
+  final secs = d.inSeconds.clamp(0, 24 * 3600);
+  final m = secs ~/ 60;
+  final s = secs % 60;
+  return m > 0 ? '${m}m ${s}s' : '${s}s';
 }
 
 class _CompactingStatus extends StatefulWidget {
@@ -3838,7 +3843,7 @@ class _CompactingStatusState extends State<_CompactingStatus> {
   @override
   void initState() {
     super.initState();
-    _tick = Timer.periodic(const Duration(milliseconds: 100), (_) {
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
   }
@@ -3932,7 +3937,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
   @override
   void initState() {
     super.initState();
-    _tick = Timer.periodic(const Duration(milliseconds: 100), (_) {
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
     _scheduleSwap();
