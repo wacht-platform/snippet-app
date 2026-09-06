@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web_socket_channel/io.dart' as ws_io;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'file_actions.dart';
@@ -445,7 +446,10 @@ class _DesktopWatcher {
     for (final inst in _instances) {
       if (_channels.containsKey(inst.url)) continue;
       try {
-        final ch = WebSocketChannel.connect(eventsUri(inst.url, inst.token));
+        final ch = ws_io.IOWebSocketChannel.connect(
+          eventsUri(inst.url, inst.token),
+          pingInterval: const Duration(seconds: 45),
+        );
         _channels[inst.url] = ch;
         ch.stream.listen(
           (msg) => _onEvent(inst, msg),
@@ -509,7 +513,10 @@ class _NotifTaskHandler extends TaskHandler {
     for (final inst in _instances) {
       if (_channels.containsKey(inst.url)) continue;
       try {
-        final ch = WebSocketChannel.connect(eventsUri(inst.url, inst.token));
+        final ch = ws_io.IOWebSocketChannel.connect(
+          eventsUri(inst.url, inst.token),
+          pingInterval: const Duration(seconds: 45),
+        );
         _channels[inst.url] = ch;
         ch.stream.listen(
           (msg) => _onEvent(inst, msg),
