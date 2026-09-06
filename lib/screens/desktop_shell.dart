@@ -2446,6 +2446,7 @@ class _SidebarState extends State<_Sidebar> {
                               ),
                             ]),
                     ),
+                  if (hasClient && !_selecting) _stickyMissionControl(),
                   Expanded(
                     child: !hasClient
                         ? Center(
@@ -2548,6 +2549,17 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
+  Widget _stickyMissionControl() {
+    final mc = (_sessions ?? const <SessionInfo>[])
+        .where((s) => isDedicatedMcSession(s.id))
+        .toList();
+    if (mc.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: _missionControlPin(mc.first),
+    );
+  }
+
   /// Bottom bar on mobile: full-width search pill + settings + new-chat.
   Widget _mobileBottomBar() {
     final hasClient = widget.client != null;
@@ -2566,12 +2578,6 @@ class _SidebarState extends State<_Sidebar> {
         border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
       ),
       child: Row(children: [
-        IconBtn('layers',
-            size: 38,
-            iconSize: 19,
-            tooltip: 'Mission Control',
-            onTap: hasClient ? _openMc : null),
-        const SizedBox(width: 8),
         // Search pill.
         Expanded(
           child: GestureDetector(
@@ -2752,7 +2758,7 @@ class _SidebarState extends State<_Sidebar> {
         .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
         .toList();
     final children = <Widget>[];
-    if (mc.isNotEmpty) {
+    if (!kMobile && mc.isNotEmpty) {
       children.add(_missionControlPin(mc.first));
     }
     final newest = <String, int>{};
@@ -2952,39 +2958,25 @@ class _SidebarState extends State<_Sidebar> {
           )
         : null;
     if (kMobile) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: GestureDetector(
-          onTap: open,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.accentBg : AppColors.surface1,
-              borderRadius: BorderRadius.circular(R.md),
-              border: Border.all(
-                color: selected ? AppColors.accentLine : AppColors.border,
-              ),
+      return GestureDetector(
+        onTap: open,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.accentBg : AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(
+              color: selected ? AppColors.accentLine : AppColors.border,
             ),
-            child: Row(children: [
-              Container(
-                width: 30,
-                height: 30,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surface3,
-                  borderRadius: BorderRadius.circular(R.sm),
-                ),
-                child: AppIcon('layers', size: 16, color: AppColors.accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('Mission Control',
-                    style: sans(15.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-              ),
-              if (status != null) status,
-            ]),
           ),
+          child: Row(children: [
+            Expanded(
+              child: Text('Mission Control',
+                  style: sans(15.5,
+                      weight: FontWeight.w600, color: AppColors.fg1)),
+            ),
+            if (status != null) status,
+          ]),
         ),
       );
     }

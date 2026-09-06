@@ -232,6 +232,9 @@ class _SessionScreenState extends State<SessionScreen>
   // parks them until the in-flight step ends). Shown immediately so the
   // composer doesn't sit empty for a whole tool call.
   final List<String> _optimisticQueued = [];
+  // Indices the user already cancelled/steered. Hidden immediately so the
+  // bubble doesn't wait for the in-flight step to drain the daemon queue.
+  final Set<int> _queueHidden = {};
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
   final List<String> _pending = [];
@@ -537,6 +540,7 @@ class _SessionScreenState extends State<SessionScreen>
         _attachments.clear();
       }
       _optimisticQueued.clear();
+      _queueHidden.clear();
       _clearPendingAll();
       _input.clear();
       _lastInput = '';
@@ -777,6 +781,7 @@ class _SessionScreenState extends State<SessionScreen>
           // jump is needed; preserve whether the user has scrolled into history.
           final follow = _stickToBottom;
           _syncOptimisticQueue(next.queuedInputs);
+          _queueHidden.removeWhere((i) => i >= next.queuedInputs.length);
           // Held messages live on the daemon (`queued_inputs`) and flush there
           // when the run lands on idle. Clients only display / enqueue / cancel.
           // A pending approval/answer is acknowledged the moment the run leaves
@@ -1727,19 +1732,39 @@ class _SessionScreenState extends State<SessionScreen>
 
   List<String> get _heldQueue {
     final live = _state?.queuedInputs ?? const <String>[];
-    if (_optimisticQueued.isEmpty) return live;
     final extra = <String>[];
-    final consumed = List<String>.from(live);
-    for (final m in _optimisticQueued) {
-      final i = consumed.indexOf(m);
-      if (i >= 0) {
-        consumed.removeAt(i);
-      } else {
-        extra.add(m);
+    if (_optimisticQueued.isNotEmpty) {
+      final consumed = List<String>.from(live);
+      for (final m in _optimisticQueued) {
+        final i = consumed.indexOf(m);
+        if (i >= 0) {
+          consumed.removeAt(i);
+        } else {
+          extra.add(m);
+        }
       }
     }
-    if (extra.isEmpty) return live;
-    return [...live, ...extra];
+    final all = extra.isEmpty ? live : [...live, ...extra];
+    if (_queueHidden.isEmpty) return all;
+    return [
+      for (var i = 0; i < all.length; i++)
+        if (!_queueHidden.contains(i)) all[i]
+    ];
+  }
+
+  int _daemonQueueIndex(int visible) {
+    var seen = 0;
+    final n = (_state?.queuedInputs.length ?? 0) + _optimisticQueued.length;
+    for (var i = 0; i < n; i++) {
+      if (_queueHidden.contains(i)) continue;
+      if (seen == visible) return i;
+      seen++;
+    }
+    return visible;
+  }
+
+  void _hideQueuedAt(int visible) {
+    _queueHidden.add(_daemonQueueIndex(visible));
   }
 
   void _syncOptimisticQueue(List<String> live) {
@@ -1753,20 +1778,21 @@ class _SessionScreenState extends State<SessionScreen>
     });
   }
 
-  void _cancelQueuedAt(int i) {
-    if (i < 0 || i >= _heldQueue.length) return;
-    final liveLen = _state?.queuedInputs.length ?? 0;
-    if (i >= liveLen) {
-      final oi = i - liveLen;
-      if (oi >= 0 && oi < _optimisticQueued.length) {
-        _optimisticQueued.removeAt(oi);
-      }
-    }
+  void _cancelQueuedAt(int visible) {
+    if (visible < 0 || visible >= _heldQueue.length) return;
+    final i = _daemonQueueIndex(visible);
+    setState(() => _hideQueuedAt(visible));
     _send({'kind': 'unqueue', 'value': i, 'nonce': _nextNonce()});
   }
 
-  void _steerQueuedAt(int i) {
-    if (i < 0 || i >= _heldQueue.length) return;
+  void _steerQueuedAt(int visible) {
+    if (visible < 0 || visible >= _heldQueue.length) return;
+    final i = _daemonQueueIndex(visible);
+    final text = _heldQueue[visible];
+    setState(() {
+      _hideQueuedAt(visible);
+      _trackPending(text, _nextNonce());
+    });
     _send({'kind': 'steer_queued', 'value': i, 'nonce': _nextNonce()});
     _armAckWatchdog();
   }
@@ -4072,51 +4098,59 @@ class _QueuedBubble extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-              width: 5,
-              height: 5,
-              decoration:
-                  BoxDecoration(color: AppColors.fg4, shape: BoxShape.circle)),
-          const SizedBox(width: 7),
-          Text('QUEUED', style: sans(10, color: AppColors.fg4, spacing: 0.8)),
-          const Spacer(),
-          if (onSteer != null)
-            GestureDetector(
-              onTap: onSteer,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+    return Align(
+      alignment: Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
                 decoration: BoxDecoration(
-                  color: AppColors.accentBg,
-                  borderRadius: BorderRadius.circular(R.sm),
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(R.md),
                 ),
-                child: Text('Steer', style: sans(11, color: AppColors.accent)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (text.isNotEmpty)
+                      Text(text,
+                          style: sans(15.5, height: 1.5, color: AppColors.fg1)),
+                    if (images + files + audio > 0) ...[
+                      if (text.isNotEmpty) const SizedBox(height: 8),
+                      AttachmentPill(
+                          audio: audio, images: images, files: files),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          if (onSteer != null) const SizedBox(width: 6),
-          IconBtn('x',
-              size: 26, iconSize: 14, tooltip: 'Cancel', onTap: onCancel),
-        ]),
-        if (text.isNotEmpty) ...[
-          const SizedBox(height: 3),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Text(text,
-                style: sans(13.5, height: 1.5, color: AppColors.fg3)),
+              const SizedBox(height: 4),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Queued', style: sans(11, color: AppColors.fg4)),
+                if (onSteer != null) ...[
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: onSteer,
+                    child: Text('Steer',
+                        style: sans(12, color: AppColors.accent)),
+                  ),
+                ],
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: onCancel,
+                  child: Text('Cancel',
+                      style: sans(12, color: AppColors.fg3)),
+                ),
+              ]),
+            ],
           ),
-        ],
-        if (images + files + audio > 0) ...[
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: AttachmentPill(audio: audio, images: images, files: files),
-          ),
-        ],
-      ]),
+        ),
+      ),
     );
   }
 }

@@ -23,16 +23,32 @@ class VaultScreen extends StatefulWidget {
 }
 
 class _VaultScreenState extends State<VaultScreen> {
-  late Future<List<String>> _future;
+  List<String>? _names;
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _future = widget.client.vaultList();
+    _load();
   }
 
-  void _refresh() {
-    if (mounted) setState(() => _future = widget.client.vaultList());
+  Future<void> _load() async {
+    try {
+      final names = await widget.client.vaultList();
+      if (!mounted) return;
+      setState(() {
+        _names = names;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = '$e';
+      });
+    }
   }
 
   Future<void> _add() async {
@@ -75,80 +91,99 @@ class _VaultScreenState extends State<VaultScreen> {
     if (saved != true) return;
     final n = name.text.trim().toUpperCase();
     final v = value.text;
-    if (n.isEmpty || v.trim().isEmpty) return;
+    if (n.isEmpty || v.trim().isEmpty) {
+      if (mounted) toast(context, 'Name and value are required', danger: true);
+      return;
+    }
+    final prev = [...?_names];
+    setState(() {
+      _names ??= [];
+      if (!_names!.contains(n)) _names!.add(n);
+      _names!.sort();
+    });
     try {
       await widget.client.vaultSet(n, v);
-      _refresh();
+      if (mounted) toast(context, 'Saved $n');
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+      if (!mounted) return;
+      setState(() => _names = prev);
+      toast(context, '$e', danger: true);
     }
   }
 
   Future<void> _remove(String name) async {
+    final prev = [...?_names];
+    setState(() => _names?.remove(name));
     try {
       await widget.client.vaultDelete(name);
-      _refresh();
+      if (mounted) toast(context, 'Removed $name');
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+      if (!mounted) return;
+      setState(() => _names = prev);
+      toast(context, '$e', danger: true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final body = FutureBuilder<List<String>>(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return Center(
-              child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.fg3)));
-        }
-        final names = snap.data ?? const [];
-        final list = ListView(
-          padding: EdgeInsets.fromLTRB(
-              widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
-          children: [
-            Text(
-              'The agent can use these as \$NAME in shell commands. Values stay on the daemon and never appear in chat.',
-              style: sans(12, height: 1.4, color: AppColors.fg3),
+    Widget body;
+    if (_loading && _names == null) {
+      body = Center(
+          child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.fg3)));
+    } else if (_error != null && _names == null) {
+      body = Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+        child: Text(_error!, style: sans(13, color: AppColors.danger)),
+      );
+    } else {
+      final names = _names ?? const [];
+      final list = ListView(
+        padding: EdgeInsets.fromLTRB(
+            widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
+        children: [
+          Text(
+            'The agent can use these as \$NAME in shell commands. Values stay on the daemon and never appear in chat.',
+            style: sans(12, height: 1.4, color: AppColors.fg3),
+          ),
+          const SizedBox(height: 10),
+          if (names.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+              child: Text('No secrets yet.',
+                  style: sans(13, color: AppColors.fg3)),
             ),
-            const SizedBox(height: 10),
-            if (names.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
-                child: Text('No secrets yet.',
-                    style: sans(13, color: AppColors.fg3)),
-              ),
-            ...names.map(_secretRow),
-            const SizedBox(height: 4),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _add,
-                borderRadius: BorderRadius.circular(R.md),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                  child: Row(children: [
-                    AppIcon('plus', size: 16, color: AppColors.fg3),
-                    const SizedBox(width: 12),
-                    Text('Add secret', style: sans(14, color: AppColors.fg2)),
-                  ]),
-                ),
+          ...names.map(_secretRow),
+          const SizedBox(height: 4),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _add,
+              borderRadius: BorderRadius.circular(R.md),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                child: Row(children: [
+                  AppIcon('plus', size: 16, color: AppColors.fg3),
+                  const SizedBox(width: 12),
+                  Text('Add secret', style: sans(14, color: AppColors.fg2)),
+                ]),
               ),
             ),
-          ],
-        );
-        if (widget.embedded || kMobile) return list;
-        return Center(
-            child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 680), child: list));
-      },
-    );
+          ),
+        ],
+      );
+      body = widget.embedded || kMobile
+          ? list
+          : Center(
+              child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 680),
+                  child: list));
+    }
     if (widget.embedded) return body;
     return Scaffold(
       body: SafeArea(
