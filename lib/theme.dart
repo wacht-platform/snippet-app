@@ -358,7 +358,7 @@ ThemeData buildAppTheme() {
       surfaceTintColor: Colors.transparent,
       menuPadding: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.card),
+          borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(color: c.border)),
     ),
     textTheme: _allRegular(GoogleFonts.interTextTheme(base.textTheme)

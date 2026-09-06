@@ -15,6 +15,8 @@ Future<T?> presentScreen<T>(
   required Widget Function(BuildContext context, VoidCallback close) builder,
   PanelStyle style = PanelStyle.dialog,
   bool dismissible = true,
+  double maxWidth = 720,
+  double maxHeight = 640,
 }) {
   return showGeneralDialog<T>(
     context: context,
@@ -38,7 +40,7 @@ Future<T?> presentScreen<T>(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                   constraints:
-                      const BoxConstraints(maxWidth: 720, maxHeight: 640),
+                      BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
                   child: _frame(content, rounded: true)),
             ),
           );
@@ -122,11 +124,11 @@ Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
   final color = panel ? AppColors.surface1 : AppColors.bg;
   return Material(
     color: color,
-    borderRadius: rounded ? BorderRadius.circular(R.card) : null,
+    borderRadius: rounded ? BorderRadius.circular(R.md) : null,
     clipBehavior: Clip.antiAlias,
     child: Container(
       decoration: BoxDecoration(
-        borderRadius: rounded ? BorderRadius.circular(R.card) : null,
+        borderRadius: rounded ? BorderRadius.circular(R.md) : null,
         border: rounded
             ? Border.all(color: AppColors.border2)
             : (edge ? Border(left: BorderSide(color: AppColors.border)) : null),

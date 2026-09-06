@@ -2378,6 +2378,8 @@ class _SidebarState extends State<_Sidebar> {
     final c = widget.client;
     if (c == null) return;
     presentScreen(context,
+        maxWidth: 860,
+        maxHeight: 620,
         builder: (_, close) => _SettingsPanel(
               client: c,
               instances: widget.instances,
@@ -3517,13 +3519,13 @@ class _SidebarState extends State<_Sidebar> {
           width: box.size.width - 20,
           child: Material(
             color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.card),
+            borderRadius: BorderRadius.circular(R.md),
             elevation: 12,
             shadowColor: Colors.black87,
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.card),
+                borderRadius: BorderRadius.circular(R.md),
                 border: Border.all(color: AppColors.border2),
               ),
               child: ConstrainedBox(
@@ -3697,7 +3699,8 @@ class _MachineListState extends State<_MachineList> {
   }
 }
 
-/// Desktop settings drawer: manage saved instances (remove) + Models.
+/// Settings dialog: Zed-style sidebar + content pane. Models / vault /
+/// scheduled swap in-place so they never stack a second dialog.
 class _SettingsPanel extends StatefulWidget {
   final DaemonClient client;
   final List<Instance> instances;
@@ -3715,10 +3718,20 @@ class _SettingsPanel extends StatefulWidget {
   State<_SettingsPanel> createState() => _SettingsPanelState();
 }
 
+enum _SettingsPage { general, models, vault, scheduled }
+
 class _SettingsPanelState extends State<_SettingsPanel> {
   late final List<Instance> _instances = [...widget.instances];
   bool _notif = false;
   bool _notifBusy = false;
+  _SettingsPage _page = _SettingsPage.general;
+
+  static const _nav = [
+    (_SettingsPage.general, 'settings', 'General'),
+    (_SettingsPage.models, 'cpu', 'Models'),
+    (_SettingsPage.vault, 'key', 'Vault'),
+    (_SettingsPage.scheduled, 'scheduled', 'Scheduled'),
+  ];
 
   @override
   void initState() {
@@ -3755,136 +3768,209 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    final wide = !kMobile;
     return Scaffold(
+      backgroundColor: AppColors.surface1,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          SnAppBar(title: 'Settings', onBack: widget.onClose),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+            child: Row(children: [
+              Expanded(
+                  child: Text('Settings',
+                      style: sans(15,
+                          weight: FontWeight.w600, color: AppColors.fg1))),
+              IconBtn('x',
+                  size: 32,
+                  iconSize: 16,
+                  tooltip: 'Close',
+                  onTap: widget.onClose),
+            ]),
+          ),
+          Divider(height: 1, color: AppColors.border),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              children: [
-                _sectionLabel('Instances'),
-                if (_instances.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
-                    child: Text('No saved connections.',
-                        style: sans(13, color: AppColors.fg3)),
-                  )
-                else
-                  for (final inst in _instances) _instanceRow(inst),
-                const SizedBox(height: 18),
-                _sectionLabel('Configuration'),
-                _configTile(
-                    'cpu',
-                    'Models',
-                    'Providers & active model',
-                    () => presentScreen(context,
-                        builder: (_, close) => ModelsScreen(
-                            client: widget.client, onClose: close))),
-                _configTile(
-                    'key',
-                    'Vault',
-                    'Secrets the agent can use',
-                    () => presentScreen(context,
-                        builder: (_, close) => VaultScreen(
-                            client: widget.client, onClose: close))),
-                _configTile(
-                    'scheduled',
-                    'Scheduled',
-                    'Scheduled goals and messages across chats',
-                    () => presentScreen(context,
-                        builder: (_, close) => RecurringScreen(
-                            client: widget.client,
-                            onClose: close,
-                            listOnly: true))),
-                if (kCanNotify) _notifTile(),
-              ],
-            ),
+            child: wide
+                ? Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    SizedBox(width: 188, child: _navList()),
+                    VerticalDivider(width: 1, color: AppColors.border),
+                    Expanded(child: _pageBody()),
+                  ])
+                : Column(children: [
+                    SizedBox(height: 44, child: _navChips()),
+                    Divider(height: 1, color: AppColors.border),
+                    Expanded(child: _pageBody()),
+                  ]),
           ),
         ]),
       ),
     );
   }
 
-  Widget _sectionLabel(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 10, 2, 6),
-        child: Text(t,
+  Widget _navList() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 16),
+      children: [
+        for (final (page, icon, label) in _nav)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Material(
+              color: _page == page ? AppColors.surface2 : Colors.transparent,
+              borderRadius: BorderRadius.circular(R.sm),
+              child: InkWell(
+                onTap: () => setState(() => _page = page),
+                borderRadius: BorderRadius.circular(R.sm),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Row(children: [
+                    AppIcon(icon,
+                        size: 15,
+                        color: _page == page ? AppColors.fg1 : AppColors.fg3),
+                    const SizedBox(width: 10),
+                    Text(label,
+                        style: sans(13,
+                            color:
+                                _page == page ? AppColors.fg1 : AppColors.fg2)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _navChips() {
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      children: [
+        for (final (page, icon, label) in _nav)
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Material(
+              color: _page == page ? AppColors.surface2 : Colors.transparent,
+              borderRadius: BorderRadius.circular(R.sm),
+              child: InkWell(
+                onTap: () => setState(() => _page = page),
+                borderRadius: BorderRadius.circular(R.sm),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(children: [
+                    AppIcon(icon,
+                        size: 14,
+                        color: _page == page ? AppColors.fg1 : AppColors.fg3),
+                    const SizedBox(width: 6),
+                    Text(label,
+                        style: sans(12.5,
+                            color:
+                                _page == page ? AppColors.fg1 : AppColors.fg2)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _pageBody() {
+    return switch (_page) {
+      _SettingsPage.general => _generalPage(),
+      _SettingsPage.models =>
+        ModelsScreen(client: widget.client, embedded: true),
+      _SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
+      _SettingsPage.scheduled => RecurringScreen(
+          client: widget.client, listOnly: true, embedded: true),
+    };
+  }
+
+  Widget _generalPage() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+      children: [
+        Text('Machines',
             style: sans(11.5,
                 weight: FontWeight.w600, color: AppColors.fg3, spacing: 0.3)),
-      );
+        const SizedBox(height: 8),
+        if (_instances.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
+            child: Text('No saved connections.',
+                style: sans(13, color: AppColors.fg3)),
+          )
+        else
+          for (final inst in _instances) _instanceRow(inst),
+        if (kCanNotify) ...[
+          const SizedBox(height: 18),
+          Text('Notifications',
+              style: sans(11.5,
+                  weight: FontWeight.w600, color: AppColors.fg3, spacing: 0.3)),
+          const SizedBox(height: 8),
+          _notifTile(),
+        ],
+      ],
+    );
+  }
 
   Widget _instanceRow(Instance i) {
     final isActive = i.url == widget.active?.url;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(children: [
-        AppIcon('cpu',
-            size: 16, color: isActive ? AppColors.accent : AppColors.fg3),
-        const SizedBox(width: 12),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(i.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(14, color: AppColors.fg1)),
-            const SizedBox(height: 2),
-            Text(hostOf(i.url),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: mono(11.5, color: AppColors.fg4)),
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
+          child: Row(children: [
+            AppIcon('cpu',
+                size: 16, color: isActive ? AppColors.accent : AppColors.fg3),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(i.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(14, color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Text(hostOf(i.url),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: mono(11.5, color: AppColors.fg4)),
+                  ]),
+            ),
+            if (isActive)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child:
+                    Text('active', style: sans(11, color: AppColors.accent)),
+              ),
+            IconBtn('trash',
+                size: 32,
+                iconSize: 16,
+                tooltip: 'Remove',
+                onTap: () => _confirmRemove(i)),
           ]),
         ),
-        if (isActive)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text('active', style: sans(11, color: AppColors.accent)),
-          ),
-        IconBtn('trash',
-            size: 32,
-            iconSize: 16,
-            tooltip: 'Remove',
-            onTap: () => _confirmRemove(i)),
-      ]),
-    );
-  }
-
-  Widget _configTile(
-      String icon, String label, String sub, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(children: [
-          AppIcon(icon, size: 16, color: AppColors.fg3),
-          const SizedBox(width: 12),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label, style: sans(14, color: AppColors.fg1)),
-              const SizedBox(height: 2),
-              Text(sub, style: sans(12, color: AppColors.fg4)),
-            ]),
-          ),
-          AppIcon('chevron-right', size: 15, color: AppColors.fg4),
-        ]),
       ),
     );
   }
 
   Widget _notifTile() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(children: [
         AppIcon('zap', size: 16, color: AppColors.fg3),
         const SizedBox(width: 12),
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Notifications', style: sans(14, color: AppColors.fg1)),
+            Text('Alerts', style: sans(14, color: AppColors.fg1)),
             const SizedBox(height: 2),
-            Text('Alert when a session needs input',
+            Text('Notify when a session needs input',
                 style: sans(12, color: AppColors.fg4)),
           ]),
         ),

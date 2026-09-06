@@ -10,7 +10,14 @@ import '../widgets.dart';
 class VaultScreen extends StatefulWidget {
   final DaemonClient client;
   final VoidCallback? onClose;
-  const VaultScreen({super.key, required this.client, this.onClose});
+  /// When true, skip the app bar and fill the parent (settings dialog pane).
+  final bool embedded;
+  const VaultScreen({
+    super.key,
+    required this.client,
+    this.onClose,
+    this.embedded = false,
+  });
   @override
   State<VaultScreen> createState() => _VaultScreenState();
 }
@@ -89,6 +96,60 @@ class _VaultScreenState extends State<VaultScreen> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    final body = FutureBuilder<List<String>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return Center(
+              child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.fg3)));
+        }
+        final names = snap.data ?? const [];
+        final list = ListView(
+          padding: EdgeInsets.fromLTRB(
+              widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
+          children: [
+            Text(
+              'The agent can use these as \$NAME in shell commands. Values stay on the daemon and never appear in chat.',
+              style: sans(12, height: 1.4, color: AppColors.fg3),
+            ),
+            const SizedBox(height: 10),
+            if (names.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+                child: Text('No secrets yet.',
+                    style: sans(13, color: AppColors.fg3)),
+              ),
+            ...names.map(_secretRow),
+            const SizedBox(height: 4),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _add,
+                borderRadius: BorderRadius.circular(R.md),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                  child: Row(children: [
+                    AppIcon('plus', size: 16, color: AppColors.fg3),
+                    const SizedBox(width: 12),
+                    Text('Add secret', style: sans(14, color: AppColors.fg2)),
+                  ]),
+                ),
+              ),
+            ),
+          ],
+        );
+        if (widget.embedded || kMobile) return list;
+        return Center(
+            child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680), child: list));
+      },
+    );
+    if (widget.embedded) return body;
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -96,58 +157,7 @@ class _VaultScreenState extends State<VaultScreen> {
           SnAppBar(
               title: 'Vault',
               onBack: widget.onClose ?? () => Navigator.pop(context)),
-          Expanded(
-            child: FutureBuilder<List<String>>(
-              future: _future,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return Center(
-                      child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.fg3)));
-                }
-                final names = snap.data ?? const [];
-                final list = ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-                  children: [
-                    Text(
-                      'The agent can use these as \$NAME in shell commands. Values stay on the daemon and never appear in chat.',
-                      style: sans(12, height: 1.4, color: AppColors.fg3),
-                    ),
-                    const SizedBox(height: 10),
-                    if (names.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
-                        child: Text('No secrets yet.',
-                            style: sans(13, color: AppColors.fg3)),
-                      ),
-                    ...names.map(_secretRow),
-                    const SizedBox(height: 4),
-                    InkWell(
-                      onTap: _add,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(children: [
-                          AppIcon('plus', size: 16, color: AppColors.fg3),
-                          const SizedBox(width: 12),
-                          Text('Add secret',
-                              style: sans(14, color: AppColors.fg2)),
-                        ]),
-                      ),
-                    ),
-                  ],
-                );
-                return kMobile
-                    ? list
-                    : Center(
-                        child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 680),
-                            child: list));
-              },
-            ),
-          ),
+          Expanded(child: body),
         ]),
       ),
     );

@@ -1532,7 +1532,7 @@ class _SessionScreenState extends State<SessionScreen>
       child: Row(children: [
         InkWell(
           onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(99),
           child: SizedBox(
             width: 32,
             height: 32,
@@ -2516,6 +2516,7 @@ class _SessionScreenState extends State<SessionScreen>
         return;
       case 'processes':
         presentScreen(context,
+            style: PanelStyle.drawer,
             builder: (_, close) => ProcessesScreen(
                 client: widget.client,
                 sessionId: widget.sessionId,
@@ -2663,6 +2664,7 @@ class _SessionScreenState extends State<SessionScreen>
                     onOpenFile: widget.onOpenFileTab));
           }),
           onProcesses: () => run(() => presentScreen(context,
+              style: PanelStyle.drawer,
               builder: (_, close) => ProcessesScreen(
                   client: widget.client,
                   sessionId: widget.sessionId,
@@ -2838,7 +2840,7 @@ class _SessionScreenState extends State<SessionScreen>
             Container(
               decoration: BoxDecoration(
                 color: AppColors.bg,
-                borderRadius: BorderRadius.circular(R.card),
+                borderRadius: BorderRadius.circular(R.md),
                 border: Border.all(color: AppColors.border),
               ),
               padding: const EdgeInsets.fromLTRB(18, 20, 12, 14),
@@ -3569,6 +3571,7 @@ class _SessionScreenState extends State<SessionScreen>
       showAppSheet(context, title: 'Usage', child: body);
     } else {
       presentScreen(context,
+          style: PanelStyle.drawer,
           builder: (_, close) =>
               _SessionActionPanel(title: 'Usage', onClose: close, child: body));
     }
@@ -3595,7 +3598,7 @@ class _SessionScreenState extends State<SessionScreen>
                     height: 34,
                     decoration: BoxDecoration(
                         color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(9)),
+                        borderRadius: BorderRadius.circular(R.md)),
                     child: AppIcon('history', size: 17, color: AppColors.fg3)),
                 const SizedBox(width: 12),
                 Expanded(
@@ -3627,6 +3630,7 @@ class _SessionScreenState extends State<SessionScreen>
       showAppSheet(context, title: 'Checkpoints', child: content);
     } else {
       presentScreen(context,
+          style: PanelStyle.drawer,
           builder: (_, close) => _SessionActionPanel(
               title: 'Checkpoints', onClose: close, child: content));
     }
@@ -3695,7 +3699,7 @@ class _SessionScreenState extends State<SessionScreen>
                     height: 34,
                     decoration: BoxDecoration(
                       color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(R.md),
                     ),
                     child: AppIcon('git-branch',
                         size: 17, color: AppColors.accent),
@@ -3729,7 +3733,7 @@ class _SessionScreenState extends State<SessionScreen>
                         height: 34,
                         decoration: BoxDecoration(
                           color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(R.md),
                         ),
                         child: AppIcon('git-branch',
                             size: 17, color: AppColors.fg3),
@@ -4677,7 +4681,7 @@ class _QuestionBarState extends State<_QuestionBar> {
         color:
             sel ? AppColors.accent.withValues(alpha: 0.14) : Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(
             color: sel ? AppColors.accent : AppColors.border2,
             width: sel ? 1.2 : 1,
@@ -4685,7 +4689,7 @@ class _QuestionBarState extends State<_QuestionBar> {
         ),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(R.md),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(children: [
