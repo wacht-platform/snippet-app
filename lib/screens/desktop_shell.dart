@@ -853,6 +853,29 @@ class _DesktopShellState extends State<DesktopShell>
     _syncPage();
   }
 
+  void _onSessionTitle(String sessionId, String title) {
+    if (title.trim().isEmpty) return;
+    var changed = false;
+    for (final t in _tabs) {
+      if (t.sessionId == sessionId && t.title != title) {
+        t.title = title;
+        changed = true;
+      }
+    }
+    final sessions = _sessions;
+    if (sessions != null) {
+      for (var i = 0; i < sessions.length; i++) {
+        if (sessions[i].id == sessionId && sessions[i].title != title) {
+          sessions[i] = sessions[i].withTitle(title);
+          changed = true;
+        }
+      }
+    }
+    if (!changed) return;
+    if (mounted) setState(() {});
+    _persistTabs();
+  }
+
   void _attachShareToActive(SharedInbound? share) {
     if (share == null) return;
     final i = _activeIndex;
@@ -1665,6 +1688,8 @@ class _DesktopShellState extends State<DesktopShell>
                                 ? null
                                 : () => setState(() => t.inboundShare = null),
                             acceptDrops: i == _activeIndex,
+                            onTitle: (title) =>
+                                _onSessionTitle(t.sessionId!, title),
                             onMenu: null,
                             onOpenFileTab: (path, name) => _openFileTab(
                                 t.client, t.instanceUrl, path, name),

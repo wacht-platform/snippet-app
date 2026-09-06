@@ -120,6 +120,10 @@ class SessionScreen extends StatefulWidget {
   /// otherwise remounting this session (mobile tab switch) re-sends it.
   final VoidCallback? onShareConsumed;
 
+  /// Title changed (agent rename or user rename) — shell uses this to keep
+  /// tabs, the session list, and the status bar in sync.
+  final void Function(String title)? onTitle;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -134,7 +138,8 @@ class SessionScreen extends StatefulWidget {
       this.onMacControls,
       this.acceptDrops = true,
       this.inboundShare,
-      this.onShareConsumed});
+      this.onShareConsumed,
+      this.onTitle});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
 }
@@ -398,6 +403,9 @@ class _SessionScreenState extends State<SessionScreen>
   // (1) a fresh connection resends anything still unacked against the authoritative
   // snapshot; (2) a watchdog forces a resync if _pending doesn't clear in time.
   bool _freshConn = false;
+  /// Hidden / backgrounded: no attach socket. Background watching is the
+  /// per-instance `/events` notify path, not a live transcript attach.
+  bool _parked = false;
   Timer? _ackTimer;
 
   // An approve/deny/answer decision can die on a dead socket exactly like a
@@ -477,6 +485,7 @@ class _SessionScreenState extends State<SessionScreen>
     _durationSub = _audioPlayer.onDurationChanged.listen((duration) {
       if (mounted) setState(() => _playbackDuration = duration);
     });
+    if (!widget.acceptDrops) _parked = true;
     _startSession();
     _loadModel();
     unawaited(widget.client.getConfig());
@@ -510,7 +519,16 @@ class _SessionScreenState extends State<SessionScreen>
     if (_isMissionControl && _title != 'Mission Control') {
       _title = 'Mission Control';
     }
+    if (sameSession &&
+        widget.acceptDrops != oldWidget.acceptDrops) {
+      if (widget.acceptDrops) {
+        _unpark();
+      } else {
+        _park();
+      }
+    }
     if (!sameSession) {
+      _parked = !widget.acceptDrops;
       _title = _isMissionControl ? 'Mission Control' : widget.title;
       // PageView normally keys each session, but a parent may reuse this State
       // while switching tabs. Never carry composer/upload state across sessions.
@@ -543,21 +561,19 @@ class _SessionScreenState extends State<SessionScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Reconnect on resume ONLY if the socket actually died while backgrounded
-    // (_scheduleReconnect nulls _channel). Unconditionally reconnecting tore
-    // down a healthy socket and forced a full-snapshot reload + scroll jump
-    // after even a momentary backgrounding. If the OS silently killed the
-    // socket without an event, the next write fails → onError → reconnect.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      // Drop the live attach while backgrounded. The per-instance `/events`
+      // watcher is what notifies — not a transcript socket per open chat.
+      _park();
+      return;
+    }
     if (state == AppLifecycleState.resumed && !_closed) {
-      if (_channel == null) {
-        _reconnectAttempt = 0;
-        _connect();
-        // Re-sync the model label from the daemon after a real reconnect: it may
-        // have changed while backgrounded (from the TUI or another device).
+      if (widget.acceptDrops) {
+        _unpark();
         _loadModel();
       }
-      // Backgrounding cleared the suppression key (so notifications fire while
-      // away); restore it — this session is visible again.
       _registeredOpenKey = _openKey;
       reportOpenSession(_openKey);
     }
@@ -620,8 +636,38 @@ class _SessionScreenState extends State<SessionScreen>
     } catch (_) {}
   }
 
-  void _connect() {
+  void _publishTitle(String title) {
+    if (_isMissionControl) return;
+    if (title == _title) {
+      widget.onTitle?.call(title);
+      return;
+    }
+    _title = title;
+    widget.onTitle?.call(title);
+  }
+
+  void _park() {
+    if (_parked) return;
+    _parked = true;
+    _reconnectTimer?.cancel();
+    _bannerTimer?.cancel();
+    _connectionWatchdog?.cancel();
+    _sub?.cancel();
+    _sub = null;
+    _channel?.sink.close();
+    _channel = null;
+  }
+
+  void _unpark() {
+    if (!_parked) return;
+    _parked = false;
     if (_closed) return;
+    _reconnectAttempt = 0;
+    _connect();
+  }
+
+  void _connect() {
+    if (_closed || _parked) return;
     _reconnectTimer?.cancel();
     _bannerTimer
         ?.cancel(); // suppress "Reconnecting…" if we reconnect before 60s
@@ -633,6 +679,7 @@ class _SessionScreenState extends State<SessionScreen>
     _connectionWatchdog?.cancel();
     _channel?.sink.close();
     if (mounted) setState(() => _connError = null);
+    _freshConn = true;
     final ch = widget.client.attach(widget.sessionId);
     _channel = ch;
     _connectionWatchdog?.cancel();
@@ -828,7 +875,11 @@ class _SessionScreenState extends State<SessionScreen>
           setState(() {
             _state = next;
             if (!_isMissionControl) {
-              _title = next.title ?? widget.title;
+              final nextTitle = next.title ?? widget.title;
+              if (nextTitle != _title && nextTitle.isNotEmpty) {
+                _title = nextTitle;
+                widget.onTitle?.call(nextTitle);
+              }
             }
             // Snapshot/delta commit durable events; drop the live answer so it
             // doesn't double-render against AssistantText once it lands.
@@ -880,7 +931,7 @@ class _SessionScreenState extends State<SessionScreen>
   // on brief network hiccups (WiFi→cellular, backgrounding, etc.).
   Timer? _bannerTimer;
   void _scheduleReconnect(WebSocketChannel ch) {
-    if (_closed) return;
+    if (_closed || _parked) return;
     if (!identical(ch, _channel)) return; // stale socket
     if (_reconnectTimer?.isActive ?? false) return; // already pending
     _channel = null;
@@ -2106,7 +2157,11 @@ class _SessionScreenState extends State<SessionScreen>
     if (title == null) return;
     try {
       await widget.client.renameSession(widget.sessionId, title);
-      if (mounted) setState(() => _title = title);
+      if (mounted) {
+        setState(() => _publishTitle(title));
+      } else {
+        _publishTitle(title);
+      }
     } catch (e) {
       if (mounted) _toast('$e');
     }
@@ -2587,7 +2642,11 @@ class _SessionScreenState extends State<SessionScreen>
             if (_isMissionControl) return;
             try {
               await widget.client.renameSession(widget.sessionId, name);
-              if (mounted) setState(() => _title = name);
+              if (mounted) {
+                setState(() => _publishTitle(name));
+              } else {
+                _publishTitle(name);
+              }
             } catch (e) {
               if (mounted) _toast('$e');
             }

@@ -117,6 +117,28 @@ class SessionInfo {
         lastActive = (j['last_active'] as num?)?.toInt() ?? 0,
         running = j['running'] == true,
         profile = j['profile'] as String?;
+
+  SessionInfo withTitle(String title) => SessionInfo._(
+        id: id,
+        folder: folder,
+        conversation: conversation,
+        title: title,
+        status: status,
+        lastActive: lastActive,
+        running: running,
+        profile: profile,
+      );
+
+  const SessionInfo._({
+    required this.id,
+    required this.folder,
+    required this.conversation,
+    required this.title,
+    required this.status,
+    required this.lastActive,
+    required this.running,
+    required this.profile,
+  });
 }
 
 class FsEntry {
