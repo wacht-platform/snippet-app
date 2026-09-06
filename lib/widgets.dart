@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'highlight.dart';
 import 'platform.dart';
-import 'panel.dart';
 import 'theme.dart';
 
 OverlayEntry? _activeToast;
@@ -62,7 +61,7 @@ void toast(BuildContext context, String message, {bool danger = false}) {
     builder: (ctx) => Positioned(
       left: 0,
       right: 0,
-      bottom: MediaQuery.of(ctx).padding.bottom + 28,
+      bottom: MediaQuery.of(ctx).padding.bottom + (kMobile ? 16 : 22),
       child: IgnorePointer(
           child: Center(child: _ToastCard(message: message, danger: danger))),
     ),
@@ -101,7 +100,7 @@ void actionToast(BuildContext context, String message,
     builder: (ctx) => Positioned(
       left: 0,
       right: 0,
-      bottom: MediaQuery.of(ctx).padding.bottom + 28,
+      bottom: MediaQuery.of(ctx).padding.bottom + (kMobile ? 16 : 22),
       child: Center(
         child: _ToastCard(
           message: message,
@@ -152,7 +151,7 @@ class _ToastCardState extends State<_ToastCard>
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final curve = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
-    final accent = widget.danger ? AppColors.danger : AppColors.accent;
+    final fg = widget.danger ? AppColors.danger : AppColors.fg1;
     // Material ancestor: without it, text floating in the root Overlay falls back
     // to the debug default style (the yellow underline). It also gives clean ink.
     return Material(
@@ -160,39 +159,24 @@ class _ToastCardState extends State<_ToastCard>
       child: FadeTransition(
         opacity: curve,
         child: SlideTransition(
-          position: Tween(begin: const Offset(0, 0.18), end: Offset.zero)
+          position: Tween(begin: const Offset(0, 0.12), end: Offset.zero)
               .animate(curve),
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: const BoxConstraints(maxWidth: 360),
             margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
             decoration: BoxDecoration(
               color: AppColors.surface1,
-              borderRadius: BorderRadius.circular(R.card),
-              border: Border.all(color: AppColors.border),
-              boxShadow: const [
-                BoxShadow(
-                    color: Color(0x66000000),
-                    blurRadius: 28,
-                    offset: Offset(0, 10))
-              ],
+              borderRadius: BorderRadius.circular(R.md),
+              border: Border.all(color: AppColors.border2),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                    child: AppIcon(widget.danger ? 'alert-triangle' : 'check',
-                        size: 14, color: accent)),
-              ),
-              const SizedBox(width: 11),
+              AppIcon(widget.danger ? 'alert-triangle' : 'check',
+                  size: 13, color: fg),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(widget.message,
-                    style: sans(13, height: 1.3, color: AppColors.fg1)
+                    style: sans(12.5, height: 1.3, color: fg)
                         .copyWith(decoration: TextDecoration.none)),
               ),
               for (final a in widget.actions) ...[
@@ -200,22 +184,13 @@ class _ToastCardState extends State<_ToastCard>
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: a.onTap,
-                  child: Container(
+                  child: Padding(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(R.sm),
-                      border: Border.all(color: AppColors.border2),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      AppIcon(a.icon, size: 13, color: AppColors.fg1),
-                      const SizedBox(width: 6),
-                      Text(a.label,
-                          style: sans(12.5,
-                                  weight: FontWeight.w600, color: AppColors.fg1)
-                              .copyWith(decoration: TextDecoration.none)),
-                    ]),
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Text(a.label,
+                        style: sans(12,
+                                weight: FontWeight.w600, color: AppColors.accent)
+                            .copyWith(decoration: TextDecoration.none)),
                   ),
                 ),
               ],
@@ -1658,13 +1633,14 @@ Future<bool> confirmAction(
       return Dialog(
         backgroundColor: AppColors.surface1,
         elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+        insetPadding: EdgeInsets.symmetric(
+            horizontal: kMobile ? 28 : 40, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(R.sm),
           side: BorderSide(color: AppColors.border2),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 280),
+          constraints: const BoxConstraints(maxWidth: 300),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
             child: Column(
@@ -1681,10 +1657,12 @@ Future<bool> confirmAction(
                   const Spacer(),
                   Btn('Cancel',
                       variant: BtnVariant.ghost,
+                      small: true,
                       onTap: () => Navigator.pop(ctx, false)),
                   const SizedBox(width: 6),
                   Btn(confirmLabel,
                       variant: danger ? BtnVariant.danger : BtnVariant.primary,
+                      small: true,
                       onTap: () => Navigator.pop(ctx, true)),
                 ]),
               ],
@@ -1818,14 +1796,59 @@ class _TextPromptSheetState extends State<_TextPromptSheet> {
 Future<T?> showAppSheet<T>(BuildContext context,
     {required String title, required Widget child}) {
   if (!kMobile) {
-    return showModal<T>(context, _DesktopSheet(title: title, child: child));
+    return showDialog<T>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: AppColors.surface1,
+          elevation: 0,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(R.sm),
+            side: BorderSide(color: AppColors.border2),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 340, maxHeight: 520),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    Expanded(
+                        child: Text(title,
+                            style: sans(13.5,
+                                weight: FontWeight.w600,
+                                color: AppColors.fg1))),
+                    IconBtn('x',
+                        size: 28,
+                        iconSize: 14,
+                        tooltip: 'Close',
+                        onTap: () => Navigator.pop(ctx)),
+                  ]),
+                  const SizedBox(height: 6),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+                      child: child,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
   return showModalBottomSheet<T>(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    // Centered, width-capped on desktop (phones are narrower than this → unchanged).
-    constraints: const BoxConstraints(maxWidth: 560),
+    constraints: const BoxConstraints(maxWidth: 480),
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
       return Container(
@@ -1835,32 +1858,32 @@ Future<T?> showAppSheet<T>(BuildContext context,
           border: Border(top: BorderSide(color: AppColors.border2)),
         ),
         constraints: BoxConstraints(
-            maxHeight: (media.size.height - media.viewInsets.bottom) * 0.92),
+            maxHeight: (media.size.height - media.viewInsets.bottom) * 0.88),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Center(
               child: Container(
-                  width: 38,
-                  height: 4,
+                  width: 32,
+                  height: 3,
                   decoration: BoxDecoration(
                       color: AppColors.border2,
                       borderRadius: BorderRadius.circular(99)))),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+            padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
             child: Row(children: [
               Expanded(
                   child: Text(title,
-                      style: sans(16,
+                      style: sans(14.5,
                           weight: FontWeight.w600, color: AppColors.fg1))),
               IconBtn('x',
                   size: 32,
-                  iconSize: 18,
+                  iconSize: 16,
                   onTap: () => Navigator.pop(sheetContext)),
             ]),
           ),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
               child: child,
             ),
           ),
@@ -1869,42 +1892,6 @@ Future<T?> showAppSheet<T>(BuildContext context,
       );
     },
   );
-}
-
-class _DesktopSheet extends StatelessWidget {
-  final String title;
-  final Widget child;
-  const _DesktopSheet({required this.title, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 620),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
-          child: Row(children: [
-            Expanded(
-                child: Text(title,
-                    style: sans(16,
-                        weight: FontWeight.w600, color: AppColors.fg1))),
-            IconBtn('x',
-                size: 32,
-                iconSize: 18,
-                tooltip: 'Close',
-                onTap: () => Navigator.pop(context)),
-          ]),
-        ),
-        Divider(height: 1, color: AppColors.border),
-        Flexible(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: child,
-          ),
-        ),
-      ]),
-    );
-  }
 }
 
 class AppToggle extends StatelessWidget {

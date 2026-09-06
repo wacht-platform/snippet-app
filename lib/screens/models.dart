@@ -160,14 +160,13 @@ class _ModelsScreenState extends State<ModelsScreen> {
                   style: mono(11.5, color: AppColors.fg4)),
             ]),
           ),
-          _overflowMenu(p, isDelegate),
+          _overflowMenu(p),
         ]),
       ),
     );
   }
 
-  Widget _overflowMenu(ModelProfile p, bool isDelegate) =>
-      PopupMenuButton<String>(
+  Widget _overflowMenu(ModelProfile p) => PopupMenuButton<String>(
         tooltip: '',
         color: AppColors.surface1,
         elevation: 0,
@@ -177,32 +176,11 @@ class _ModelsScreenState extends State<ModelsScreen> {
         shape: appMenuShape,
         icon: AppIcon('more-vertical', size: 16, color: AppColors.fg3),
         onSelected: (v) {
-          switch (v) {
-            case 'activate':
-              _run(() => widget.client.setActiveProfile(p.name), 'activate');
-              break;
-            case 'delegate':
-              _run(() => widget.client.setDelegateProfile(p.name),
-                  'set delegate');
-              break;
-            case 'undelegate':
-              _run(() => widget.client.setDelegateProfile(null),
-                  'clear delegate');
-              break;
-            case 'delete':
-              _run(() => widget.client.deleteProfile(p.name), 'delete');
-              break;
+          if (v == 'delete') {
+            _run(() => widget.client.deleteProfile(p.name), 'delete');
           }
         },
         itemBuilder: (_) => [
-          if (p.usable && !p.active)
-            appMenuItem(value: 'activate', label: 'Set as active'),
-          appMenuItem(
-            value: isDelegate ? 'undelegate' : 'delegate',
-            label: isDelegate
-                ? 'Stop delegating to this'
-                : 'Use for delegated lanes',
-          ),
           appMenuItem(value: 'delete', label: 'Delete profile', danger: true),
         ],
       );

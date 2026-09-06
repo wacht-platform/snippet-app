@@ -169,25 +169,13 @@ class _EditorScreenState extends State<EditorScreen> {
       _exit();
       return;
     }
-    final discard = await showAppSheet<bool>(context,
-        title: 'Discard changes?',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('You have unsaved edits to this file.',
-                style: sans(13, color: AppColors.fg2)),
-            const SizedBox(height: 16),
-            Btn('Discard',
-                variant: BtnVariant.danger,
-                onTap: () => Navigator.pop(context, true)),
-            const SizedBox(height: 8),
-            Btn('Keep editing',
-                variant: BtnVariant.secondary,
-                onTap: () => Navigator.pop(context, false)),
-          ],
-        ));
-    if (discard == true && mounted) _exit();
+    final discard = await confirmAction(
+      context,
+      title: 'Discard changes?',
+      body: 'You have unsaved edits to this file.',
+      confirmLabel: 'Discard',
+    );
+    if (discard && mounted) _exit();
   }
 
   @override

@@ -122,6 +122,23 @@ class DaemonClient {
     );
   }
 
+  /// Device-wide `/events` firehose (status + terminal bells). Independent of
+  /// the notification watcher so the session list can update live even when
+  /// OS banners are off.
+  WebSocketChannel events() {
+    final base = Uri.parse(baseUrl);
+    final uri = base.replace(
+      scheme: base.scheme == 'https' ? 'wss' : 'ws',
+      path: '/events',
+      queryParameters: {'token': token},
+    );
+    return ws_io.IOWebSocketChannel.connect(
+      uri,
+      connectTimeout: const Duration(seconds: 10),
+      pingInterval: const Duration(seconds: 45),
+    );
+  }
+
   // ---- model configuration (shared with the TUI's config.toml) ----
 
   Future<ServerConfig> getConfig({bool force = false}) async {

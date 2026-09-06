@@ -13,7 +13,7 @@ enum PanelStyle { drawer, dialog }
 Future<T?> presentScreen<T>(
   BuildContext context, {
   required Widget Function(BuildContext context, VoidCallback close) builder,
-  PanelStyle style = PanelStyle.drawer,
+  PanelStyle style = PanelStyle.dialog,
   bool dismissible = true,
 }) {
   return showGeneralDialog<T>(
@@ -38,7 +38,7 @@ Future<T?> presentScreen<T>(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                   constraints:
-                      const BoxConstraints(maxWidth: 1040, maxHeight: 860),
+                      const BoxConstraints(maxWidth: 720, maxHeight: 640),
                   child: _frame(content, rounded: true)),
             ),
           );
