@@ -1850,7 +1850,6 @@ Future<T?> showAppSheet<T>(BuildContext context,
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    constraints: const BoxConstraints(maxWidth: 480),
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
       return Container(
@@ -1871,7 +1870,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                       color: AppColors.border2,
                       borderRadius: BorderRadius.circular(99)))),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+            padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
             child: Row(children: [
               Expanded(
                   child: Text(title,
@@ -1885,7 +1884,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
           ),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
               child: child,
             ),
           ),

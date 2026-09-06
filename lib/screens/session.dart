@@ -4971,7 +4971,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   void _toggle(String id) => setState(() => _open = _open == id ? null : id);
 
   Widget _section(String label) => Padding(
-        padding: const EdgeInsets.only(top: 14, bottom: 4),
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
         child: SectionLabel(label),
       );
 
@@ -4991,30 +4991,34 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           onTap: onTap ?? (id == null ? null : () => _toggle(id)),
           borderRadius: BorderRadius.circular(R.sm),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
             child: Row(children: [
               AppIcon(icon, size: 18, color: AppColors.fg2),
               const SizedBox(width: 12),
-              Expanded(
-                  child: Text(label, style: sans(15, color: AppColors.fg1))),
-              if (value != null)
-                Flexible(
+              Text(label, style: sans(15, color: AppColors.fg1)),
+              const Spacer(),
+              if (value != null) ...[
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
                   child: Text(value,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
                       style: sans(12.5, color: AppColors.fg4)),
                 ),
-              if (id != null) ...[
-                const SizedBox(width: 8),
-                AppIcon(open ? 'chevron-down' : 'chevron-right',
-                    size: 15, color: AppColors.fg4),
+                const SizedBox(width: 6),
               ],
+              if (id != null)
+                AppIcon(open ? 'chevron-down' : 'chevron-right',
+                    size: 15, color: AppColors.fg4)
+              else
+                const SizedBox(width: 15),
             ]),
           ),
         ),
         if (open && child != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(29, 0, 4, 10),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: child,
           ),
       ],
@@ -5037,18 +5041,22 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Rename',
             id: 'rename',
             value: widget.title.isEmpty ? null : widget.title,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AppField(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Expanded(
+                child: AppField(
                     controller: _titleCtl,
                     hint: 'Session title',
                     onSubmitted: (_) => _saveTitle()),
-                const SizedBox(height: 8),
-                Btn(_savingTitle ? 'Saving…' : 'Save title',
-                    disabled: _savingTitle, onTap: _saveTitle),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 1),
+                child: Btn(_savingTitle ? '…' : 'Save',
+                    small: true,
+                    disabled: _savingTitle,
+                    onTap: _saveTitle),
+              ),
+            ]),
           ),
         if (!kMacOS)
           _row(
