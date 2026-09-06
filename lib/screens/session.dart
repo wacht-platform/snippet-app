@@ -4971,7 +4971,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   void _toggle(String id) => setState(() => _open = _open == id ? null : id);
 
   Widget _section(String label) => Padding(
-        padding: const EdgeInsets.only(top: 10, bottom: 6),
+        padding: const EdgeInsets.only(top: 14, bottom: 4),
         child: SectionLabel(label),
       );
 
@@ -4989,19 +4989,25 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
       children: [
         InkWell(
           onTap: onTap ?? (id == null ? null : () => _toggle(id)),
+          borderRadius: BorderRadius.circular(R.sm),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
             child: Row(children: [
-              AppIcon(icon, size: 15, color: AppColors.fg3),
-              const SizedBox(width: 10),
+              AppIcon(icon, size: 18, color: AppColors.fg2),
+              const SizedBox(width: 12),
               Expanded(
-                  child: Text(label, style: sans(13, color: AppColors.fg1))),
+                  child: Text(label, style: sans(15, color: AppColors.fg1))),
               if (value != null)
-                Text(value, style: sans(11.5, color: AppColors.fg4)),
+                Flexible(
+                  child: Text(value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12.5, color: AppColors.fg4)),
+                ),
               if (id != null) ...[
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 AppIcon(open ? 'chevron-down' : 'chevron-right',
-                    size: 13, color: AppColors.fg4),
+                    size: 15, color: AppColors.fg4),
               ],
             ]),
           ),

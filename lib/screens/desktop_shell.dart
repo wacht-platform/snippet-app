@@ -2863,7 +2863,7 @@ class _SidebarState extends State<_Sidebar> {
         : lastPathSegment(folder, ifEmpty: folder);
     if (kMobile) {
       return Padding(
-        padding: EdgeInsets.fromLTRB(4, first ? 4 : 12, 4, 4),
+        padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 8),
         child: Row(children: [
           AppIcon('folder', size: 13, color: AppColors.fg4),
           const SizedBox(width: 8),
@@ -2953,11 +2953,11 @@ class _SidebarState extends State<_Sidebar> {
         : null;
     if (kMobile) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.only(bottom: 8),
         child: GestureDetector(
           onTap: open,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: selected ? AppColors.accentBg : AppColors.surface1,
               borderRadius: BorderRadius.circular(R.md),
@@ -2967,19 +2967,19 @@ class _SidebarState extends State<_Sidebar> {
             ),
             child: Row(children: [
               Container(
-                width: 26,
-                height: 26,
+                width: 30,
+                height: 30,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: AppColors.surface3,
                   borderRadius: BorderRadius.circular(R.sm),
                 ),
-                child: AppIcon('layers', size: 14, color: AppColors.accent),
+                child: AppIcon('layers', size: 16, color: AppColors.accent),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text('Mission Control',
-                    style: sans(14,
+                    style: sans(15.5,
                         weight: FontWeight.w600, color: AppColors.fg1)),
               ),
               if (status != null) status,
@@ -3114,8 +3114,8 @@ class _SidebarState extends State<_Sidebar> {
               }
             },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
         decoration: BoxDecoration(
           color: checked ? AppColors.accentBg : AppColors.surface2,
           borderRadius: BorderRadius.circular(R.md),
@@ -3123,29 +3123,29 @@ class _SidebarState extends State<_Sidebar> {
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           if (_selecting) ...[
             AppIcon(checked ? 'check' : 'plus',
-                size: 15, color: checked ? AppColors.accent : AppColors.fg4),
-            const SizedBox(width: 8),
+                size: 16, color: checked ? AppColors.accent : AppColors.fg4),
+            const SizedBox(width: 10),
           ],
           Expanded(
             child: renaming
-                ? _inlineRenameField(s, compact: true)
+                ? _inlineRenameField(s, compact: false)
                 : Text(
                     s.title.isEmpty ? '(untitled)' : s.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(14, color: AppColors.fg1),
+                    style: sans(15.5, color: AppColors.fg1),
                   ),
           ),
           if (!renaming) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Text(relativeTime(s.lastActive),
-                style: sans(11, color: AppColors.fg4)),
+                style: sans(12, color: AppColors.fg4)),
           ],
           if (!_selecting && (running || waiting)) ...[
             const SizedBox(width: 8),
             Container(
-              width: 7,
-              height: 7,
+              width: 8,
+              height: 8,
               decoration: BoxDecoration(
                 color: running ? AppColors.run : AppColors.accent,
                 shape: BoxShape.circle,
@@ -3153,10 +3153,10 @@ class _SidebarState extends State<_Sidebar> {
             ),
           ],
           if (!_selecting && !renaming) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: 2),
             IconBtn('more-vertical',
-                size: 24,
-                iconSize: 14,
+                size: 32,
+                iconSize: 16,
                 tooltip: 'Options',
                 onTap: () => _sessionActions(s)),
           ],
