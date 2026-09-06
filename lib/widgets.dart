@@ -1701,19 +1701,72 @@ Future<String?> promptText(BuildContext context,
     {required String title,
     String initial = '',
     String? hint,
-    String saveLabel = 'Save'}) {
+    String saveLabel = 'Save',
+    int minLines = 1,
+    int maxLines = 1}) {
+  if (!kMobile) {
+    return showDialog<String>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: AppColors.surface1,
+          elevation: 0,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(R.sm),
+            side: BorderSide(color: AppColors.border2),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(title,
+                      style: sans(13.5,
+                          weight: FontWeight.w600, color: AppColors.fg1)),
+                  const SizedBox(height: 10),
+                  _TextPromptSheet(
+                      initial: initial,
+                      hint: hint,
+                      saveLabel: saveLabel,
+                      minLines: minLines,
+                      maxLines: maxLines),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
   return showAppSheet<String>(context,
       title: title,
-      child:
-          _TextPromptSheet(initial: initial, hint: hint, saveLabel: saveLabel));
+      child: _TextPromptSheet(
+          initial: initial,
+          hint: hint,
+          saveLabel: saveLabel,
+          minLines: minLines,
+          maxLines: maxLines));
 }
 
 class _TextPromptSheet extends StatefulWidget {
   final String initial;
   final String? hint;
   final String saveLabel;
-  const _TextPromptSheet(
-      {required this.initial, required this.hint, required this.saveLabel});
+  final int minLines;
+  final int maxLines;
+  const _TextPromptSheet({
+    required this.initial,
+    required this.hint,
+    required this.saveLabel,
+    this.minLines = 1,
+    this.maxLines = 1,
+  });
 
   @override
   State<_TextPromptSheet> createState() => _TextPromptSheetState();
@@ -1744,15 +1797,18 @@ class _TextPromptSheetState extends State<_TextPromptSheet> {
                 controller: _controller,
                 hint: widget.hint,
                 autofocus: true,
+                minLines: widget.minLines,
+                maxLines: widget.maxLines,
                 onSubmitted: (_) => _done()),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Row(children: [
-              Expanded(
-                  child: Btn('Cancel',
-                      variant: BtnVariant.secondary,
-                      onTap: () => Navigator.pop(context))),
-              const SizedBox(width: 10),
-              Expanded(child: Btn(widget.saveLabel, onTap: _done)),
+              const Spacer(),
+              Btn('Cancel',
+                  variant: BtnVariant.ghost,
+                  small: true,
+                  onTap: () => Navigator.pop(context)),
+              const SizedBox(width: 6),
+              Btn(widget.saveLabel, small: true, onTap: _done),
             ]),
           ]),
     );

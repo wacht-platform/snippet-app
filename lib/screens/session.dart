@@ -2452,9 +2452,11 @@ class _SessionScreenState extends State<SessionScreen>
   // done, you cancel, or it's rate-limited. Sent as a LoopInput over the socket.
   Future<void> _setGoal() async {
     final text = await promptText(context,
-        title: 'Set an autonomous goal',
-        hint: 'What should the agent work toward on its own?',
-        saveLabel: 'Set goal');
+        title: 'Set goal',
+        hint: 'What should the agent work toward?',
+        saveLabel: 'Set goal',
+        minLines: 2,
+        maxLines: 4);
     final t = text?.trim();
     if (t == null || t.isEmpty) return;
     _send({'kind': 'set_goal', 'value': t});
