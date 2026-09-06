@@ -3127,23 +3127,20 @@ class _SidebarState extends State<_Sidebar> {
             const SizedBox(width: 8),
           ],
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                renaming
-                    ? _inlineRenameField(s, compact: true)
-                    : Text(
-                        s.title.isEmpty ? '(untitled)' : s.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(14, color: AppColors.fg1),
-                      ),
-                const SizedBox(height: 1),
-                Text(relativeTime(s.lastActive),
-                    style: sans(11, color: AppColors.fg4)),
-              ],
-            ),
+            child: renaming
+                ? _inlineRenameField(s, compact: true)
+                : Text(
+                    s.title.isEmpty ? '(untitled)' : s.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(14, color: AppColors.fg1),
+                  ),
           ),
+          if (!renaming) ...[
+            const SizedBox(width: 8),
+            Text(relativeTime(s.lastActive),
+                style: sans(11, color: AppColors.fg4)),
+          ],
           if (!_selecting && (running || waiting)) ...[
             const SizedBox(width: 8),
             Container(
@@ -3156,7 +3153,7 @@ class _SidebarState extends State<_Sidebar> {
             ),
           ],
           if (!_selecting && !renaming) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             IconBtn('more-vertical',
                 size: 24,
                 iconSize: 14,
