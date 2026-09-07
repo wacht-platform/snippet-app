@@ -102,13 +102,29 @@ class _ModelsScreenState extends State<ModelsScreen> {
           padding: EdgeInsets.fromLTRB(
               widget.embedded ? 16 : 16, widget.embedded ? 14 : 14, 16, 20),
           children: [
-            Text('Models',
-                style: sans(widget.embedded ? 14 : 18,
-                    weight: FontWeight.w600, color: AppColors.fg1)),
-            const SizedBox(height: 3),
-            Text('Choose the model used for new sessions and delegated work.',
-                style:
-                    sans(widget.embedded ? 11.5 : 12.5, color: AppColors.fg3)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Models',
+                          style: sans(widget.embedded ? 14 : 18,
+                              weight: FontWeight.w600, color: AppColors.fg1)),
+                      const SizedBox(height: 3),
+                      Text(
+                          'Choose the model used for new sessions and delegated work.',
+                          style: sans(widget.embedded ? 11.5 : 12.5,
+                              color: AppColors.fg3)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Btn('Add model',
+                    icon: 'plus', small: true, onTap: () => _edit(null)),
+              ],
+            ),
             SizedBox(height: widget.embedded ? 12 : 16),
             if (profiles.isEmpty)
               Padding(
@@ -120,9 +136,10 @@ class _ModelsScreenState extends State<ModelsScreen> {
               )
             else
               Container(
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: AppColors.surface2,
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: AppColors.border2),
                   borderRadius:
                       BorderRadius.circular(widget.embedded ? R.sm : R.md),
                 ),
@@ -131,14 +148,11 @@ class _ModelsScreenState extends State<ModelsScreen> {
                     for (var i = 0; i < profiles.length; i++) ...[
                       _profileCard(profiles[i], snap.data?.delegate),
                       if (i < profiles.length - 1)
-                        Divider(height: 1, color: AppColors.border),
+                        Divider(height: 1, color: AppColors.border2),
                     ],
                   ],
                 ),
               ),
-            const SizedBox(height: 10),
-            Btn('Add model',
-                icon: 'plus', small: true, onTap: () => _edit(null)),
           ],
         );
         if (widget.embedded || kMobile) return list;

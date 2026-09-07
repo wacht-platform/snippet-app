@@ -3876,7 +3876,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.border2),
             borderRadius: BorderRadius.circular(R.sm),
           ),
           child: _instances.isEmpty
@@ -3890,7 +3890,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                     for (var i = 0; i < _instances.length; i++) ...[
                       _instanceRow(_instances[i]),
                       if (i < _instances.length - 1)
-                        Divider(height: 1, color: AppColors.border),
+                        Divider(height: 1, color: AppColors.border2),
                     ],
                   ],
                 ),
@@ -3905,7 +3905,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: AppColors.surface2,
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.border2),
               borderRadius: BorderRadius.circular(R.sm),
             ),
             child: Padding(
