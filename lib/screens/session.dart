@@ -2922,6 +2922,34 @@ class _SessionScreenState extends State<SessionScreen>
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (_state?.goal?.ongoing == true) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface2,
+                            borderRadius: BorderRadius.circular(R.sm),
+                          ),
+                          child: Row(children: [
+                            AppIcon('goal', size: 14, color: AppColors.accent),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(_state!.goal!.text,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: sans(12, color: AppColors.fg2)),
+                            ),
+                            Text(_state!.goal!.paused ? 'paused' : 'active',
+                                style: mono(9.5, color: AppColors.accent)),
+                            const SizedBox(width: 5),
+                            IconBtn('x',
+                                size: 26,
+                                iconSize: 13,
+                                tooltip: 'Cancel goal',
+                                onTap: _cancelGoal),
+                          ]),
+                        ),
+                      ],
                       CallbackShortcuts(
                         bindings: {
                           const SingleActivator(LogicalKeyboardKey.enter): () {
