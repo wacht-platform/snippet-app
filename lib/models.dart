@@ -238,6 +238,8 @@ class QueuedInput {
     return QueuedInput(
         id: j['id'] as String? ?? '', text: j['text'] as String? ?? '');
   }
+
+  Map<String, dynamic> toJson() => {'id': id, 'text': text};
 }
 
 class HarnessState {
