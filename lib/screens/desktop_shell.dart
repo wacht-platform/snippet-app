@@ -124,6 +124,7 @@ class _DesktopShellState extends State<DesktopShell>
   // Live status from /events (and open-tab callbacks). Survives a slow
   // /sessions refetch so the list doesn't flicker back to stale.
   final Map<String, String> _liveStatus = {};
+  bool _sidebarGit = false;
 
   @override
   void initState() {
@@ -1186,37 +1187,55 @@ class _DesktopShellState extends State<DesktopShell>
     _syncPage();
   }
 
-  Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) =>
-      _Sidebar(
-        topInset: topInset,
-        instances: _instances,
-        active: _active,
-        client: _client,
-        selectedSessionId: _sessionId,
-        sessions: _sessions,
-        sessionsLoading: _sessionsLoading,
-        sessionsError: _sessionsError,
-        onRefreshSessions: _loadSessions,
-        onNewSession: () {
-          _newSessionFlow();
-          onAfterPick?.call();
-        },
-        onSelectInstance: _selectInstance,
-        onOpenMissionControl: () {
-          _openMissionControlTab();
-          onAfterPick?.call();
-        },
-        onOpenSession: (id, title, profile) {
-          _openSession(id, title, profile);
-          onAfterPick?.call();
-        },
-        onAddInstance: _addInstanceFlow,
-        onRenameInstance: _renameInstance,
-        onRemoveInstance: _removeInstance,
-        onSessionDeleted: _onSessionDeleted,
-        health: _health,
-        onRefreshHealth: _refreshHealth,
+  Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) {
+    final tab = _activeTab;
+    if (_sidebarGit && tab != null && !tab.isFile) {
+      final path = tab.filePath;
+      final slash = path?.lastIndexOf('/') ?? -1;
+      final folder =
+          path != null && slash > 0 ? path.substring(0, slash) : null;
+      return Container(
+        color: AppColors.surface1,
+        child: GitScreen(
+          client: tab.client,
+          sessionId: tab.sessionId ?? '',
+          folder: folder,
+          embedded: true,
+          onClose: () => setState(() => _sidebarGit = false),
+        ),
       );
+    }
+    return _Sidebar(
+      topInset: topInset,
+      instances: _instances,
+      active: _active,
+      client: _client,
+      selectedSessionId: _sessionId,
+      sessions: _sessions,
+      sessionsLoading: _sessionsLoading,
+      sessionsError: _sessionsError,
+      onRefreshSessions: _loadSessions,
+      onNewSession: () {
+        _newSessionFlow();
+        onAfterPick?.call();
+      },
+      onSelectInstance: _selectInstance,
+      onOpenMissionControl: () {
+        _openMissionControlTab();
+        onAfterPick?.call();
+      },
+      onOpenSession: (id, title, profile) {
+        _openSession(id, title, profile);
+        onAfterPick?.call();
+      },
+      onAddInstance: _addInstanceFlow,
+      onRenameInstance: _renameInstance,
+      onRemoveInstance: _removeInstance,
+      onSessionDeleted: _onSessionDeleted,
+      health: _health,
+      onRefreshHealth: _refreshHealth,
+    );
+  }
 
   void _onSessionDeleted(String id) {
     if (isDedicatedMcSession(id)) return;
@@ -1641,9 +1660,13 @@ class _DesktopShellState extends State<DesktopShell>
               child: InkWell(
                 borderRadius: BorderRadius.circular(R.sm),
                 onTap: _openMacGit,
-                child: Padding(
+                child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _sidebarGit ? AppColors.accentBg : Colors.transparent,
+                    borderRadius: BorderRadius.circular(R.sm),
+                  ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     AppIcon('folder-open', size: 13, color: AppColors.fg3),
                     const SizedBox(width: 7),
@@ -1718,20 +1741,7 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _openMacGit() {
-    final tab = _activeTab;
-    if (tab == null) return;
-    final path = tab.filePath;
-    final slash = path?.lastIndexOf('/') ?? -1;
-    final folder = path != null && slash > 0 ? path.substring(0, slash) : null;
-    presentScreen(
-      context,
-      builder: (_, close) => GitScreen(
-        client: tab.client,
-        sessionId: tab.sessionId ?? '',
-        folder: folder,
-        onClose: close,
-      ),
-    );
+    setState(() => _sidebarGit = !_sidebarGit);
   }
 
   @override

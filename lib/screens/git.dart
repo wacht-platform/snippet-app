@@ -19,12 +19,16 @@ class GitScreen extends StatefulWidget {
 
   /// When hosted in a desktop panel, dismisses the panel from the root bar.
   final VoidCallback? onClose;
+
+  /// When true, render embedded in a sidebar (no Scaffold / SnAppBar).
+  final bool embedded;
   const GitScreen(
       {super.key,
       required this.client,
       this.sessionId = '',
       this.folder,
-      this.onClose});
+      this.onClose,
+      this.embedded = false});
   @override
   State<GitScreen> createState() => _GitScreenState();
 }
@@ -155,37 +159,74 @@ class _GitScreenState extends State<GitScreen> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final st = _st;
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          SnAppBar(
-            title: 'Git',
-            subtitle: st != null && st.ok ? st.branch : null,
-            onBack: widget.onClose ?? () => Navigator.pop(context),
-            actions: [IconBtn('refresh', onTap: _busy ? null : _load)],
+    final content = Column(children: [
+      if (widget.embedded)
+        Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
-          if (_busy)
-            LinearProgressIndicator(
-                minHeight: 2,
-                backgroundColor: AppColors.surface2,
-                color: AppColors.accent),
-          if (_loading)
+          child: Row(children: [
+            AppIcon('git-branch', size: 14, color: AppColors.accent),
+            const SizedBox(width: 8),
             Expanded(
-                child: Center(
-                    child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3))))
-          else if (_error != null && (st == null || !st.ok))
-            Expanded(
-                child: EmptyState(
-                    icon: 'git-branch', title: 'No git here', body: _error!))
-          else
-            Expanded(child: _body(st!)),
-        ]),
-      ),
+              child: Text(
+                st != null && st.ok && st.branch.isNotEmpty
+                    ? 'Git · ${st.branch}'
+                    : 'Source Control',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(12,
+                    weight: FontWeight.w600, color: AppColors.fg1),
+              ),
+            ),
+            IconBtn('refresh',
+                size: 26,
+                iconSize: 13,
+                tooltip: 'Refresh',
+                onTap: _busy ? null : _load),
+            if (widget.onClose != null) ...[
+              const SizedBox(width: 2),
+              IconBtn('x',
+                  size: 26,
+                  iconSize: 13,
+                  tooltip: 'Close to sessions',
+                  onTap: widget.onClose),
+            ],
+          ]),
+        )
+      else
+        SnAppBar(
+          title: 'Git',
+          subtitle: st != null && st.ok ? st.branch : null,
+          onBack: widget.onClose ?? () => Navigator.pop(context),
+          actions: [IconBtn('refresh', onTap: _busy ? null : _load)],
+        ),
+      if (_busy)
+        LinearProgressIndicator(
+            minHeight: 2,
+            backgroundColor: AppColors.surface2,
+            color: AppColors.accent),
+      if (_loading)
+        Expanded(
+            child: Center(
+                child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.fg3))))
+      else if (_error != null && (st == null || !st.ok))
+        Expanded(
+            child: EmptyState(
+                icon: 'git-branch', title: 'No git here', body: _error!))
+      else
+        Expanded(child: _body(st!)),
+    ]);
+    if (widget.embedded) return content;
+    return Scaffold(
+      body: SafeArea(bottom: false, child: content),
     );
   }
 

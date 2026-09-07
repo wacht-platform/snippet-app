@@ -486,7 +486,7 @@ class _SessionScreenState extends State<SessionScreen>
     _durationSub = _audioPlayer.onDurationChanged.listen((duration) {
       if (mounted) setState(() => _playbackDuration = duration);
     });
-    if (!widget.acceptDrops) _parked = true;
+    if (!widget.acceptDrops && _state != null) _parked = true;
     _startSession();
     _loadModel();
     modelsRevision.addListener(_loadModel);
@@ -527,6 +527,9 @@ class _SessionScreenState extends State<SessionScreen>
       } else {
         _park();
       }
+    }
+    if (widget.acceptDrops && (_channel == null || _parked)) {
+      _unpark();
     }
     if (!sameSession) {
       _parked = !widget.acceptDrops;
@@ -684,7 +687,7 @@ class _SessionScreenState extends State<SessionScreen>
     final ch = widget.client.attach(widget.sessionId);
     _channel = ch;
     _connectionWatchdog?.cancel();
-    _connectionWatchdog = Timer(const Duration(seconds: 12), () {
+    _connectionWatchdog = Timer(Duration(seconds: _state == null ? 4 : 12), () {
       if (!_closed && identical(ch, _channel)) {
         _resync(ch);
       }
@@ -1788,6 +1791,18 @@ class _SessionScreenState extends State<SessionScreen>
     _send({'kind': 'unqueue', 'value': i, 'nonce': _nextNonce()});
   }
 
+  void _steerAllQueued() {
+    final count = _heldQueue.length;
+    for (var i = 0; i < count; i++) {
+      _steerQueuedAt(0);
+    }
+  }
+
+  void _cancelAllQueued() {
+    setState(() => _queueHidden.addAll(_heldQueue));
+    _send({'kind': 'drop_queued'});
+  }
+
   void _steerQueuedAt(int visible) {
     if (visible < 0 || visible >= _heldQueue.length) return;
     final i = _daemonQueueIndex(visible);
@@ -1977,28 +1992,36 @@ class _SessionScreenState extends State<SessionScreen>
                                                 text: _pending[pi],
                                                 selectable: false))),
                                   if (_heldQueue.isNotEmpty) ...[
-                                    const SizedBox(height: 10),
-                                    for (var qi = 0;
-                                        qi < _heldQueue.length;
-                                        qi++)
-                                      KeyedSubtree(
-                                        key: ValueKey(
-                                            'queued-$qi-${_heldQueue[qi].hashCode}'),
-                                        child: _QueuedBubble(
-                                          text: _queuedText(_heldQueue[qi]),
-                                          audio: _queuedAttachCounts(
-                                                  _heldQueue[qi])
-                                              .$1,
-                                          images: _queuedAttachCounts(
-                                                  _heldQueue[qi])
-                                              .$2,
-                                          files: _queuedAttachCounts(
-                                                  _heldQueue[qi])
-                                              .$3,
-                                          onCancel: () => _cancelQueuedAt(qi),
-                                          onSteer: () => _steerQueuedAt(qi),
-                                        ),
-                                      ),
+                                    const SizedBox(height: 8),
+                                    _QueuedSection(
+                                      count: _heldQueue.length,
+                                      onSendAll: _steerAllQueued,
+                                      onCancelAll: _cancelAllQueued,
+                                      children: [
+                                        for (var qi = 0;
+                                            qi < _heldQueue.length;
+                                            qi++)
+                                          KeyedSubtree(
+                                            key: ValueKey(
+                                                'queued-$qi-${_heldQueue[qi].hashCode}'),
+                                            child: _QueuedBubble(
+                                              text: _queuedText(_heldQueue[qi]),
+                                              audio: _queuedAttachCounts(
+                                                      _heldQueue[qi])
+                                                  .$1,
+                                              images: _queuedAttachCounts(
+                                                      _heldQueue[qi])
+                                                  .$2,
+                                              files: _queuedAttachCounts(
+                                                      _heldQueue[qi])
+                                                  .$3,
+                                              onCancel: () =>
+                                                  _cancelQueuedAt(qi),
+                                              onSteer: () => _steerQueuedAt(qi),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ],
                                   if (_liveTextVisible &&
                                       _liveText.trim().isNotEmpty)
@@ -4203,6 +4226,73 @@ class _QueuedBubble extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _QueuedSection extends StatelessWidget {
+  final int count;
+  final VoidCallback onSendAll;
+  final VoidCallback onCancelAll;
+  final List<Widget> children;
+  const _QueuedSection({
+    required this.count,
+    required this.onSendAll,
+    required this.onCancelAll,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
+            child: Row(children: [
+              Text('QUEUED ($count)',
+                  style: sans(10.5,
+                      weight: FontWeight.w600,
+                      spacing: 0.6,
+                      color: AppColors.fg4)),
+              const Spacer(),
+              Material(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(R.xs),
+                child: InkWell(
+                  onTap: onSendAll,
+                  borderRadius: BorderRadius.circular(R.xs),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    child: Text('Send all',
+                        style: sans(10.5,
+                            weight: FontWeight.w600, color: AppColors.accent)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(R.xs),
+                child: InkWell(
+                  onTap: onCancelAll,
+                  borderRadius: BorderRadius.circular(R.xs),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    child: Text('Cancel all',
+                        style: sans(10.5, color: AppColors.fg4)),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+          ...children,
+        ],
       ),
     );
   }
