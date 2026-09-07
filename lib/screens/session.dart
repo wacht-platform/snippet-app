@@ -3515,7 +3515,9 @@ class _SessionScreenState extends State<SessionScreen>
       elevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-      shape: appMenuShape,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(R.sm),
+      ),
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
       items: [
         for (final p in cfg.profiles)
