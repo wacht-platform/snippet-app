@@ -121,6 +121,7 @@ class _DesktopShellState extends State<DesktopShell>
   WebSocketChannel? _eventsChannel;
   StreamSubscription? _eventsSub;
   Timer? _eventsReconnect;
+  int _eventsGeneration = 0;
   // Live status from /events (and open-tab callbacks). Survives a slow
   // /sessions refetch so the list doesn't flicker back to stale.
   final Map<String, String> _liveStatus = {};
@@ -294,6 +295,7 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _stopEventsWatch() {
+    _eventsGeneration++;
     _eventsReconnect?.cancel();
     _eventsReconnect = null;
     _eventsSub?.cancel();
@@ -309,11 +311,14 @@ class _DesktopShellState extends State<DesktopShell>
       return;
     }
     _stopEventsWatch();
+    final generation = _eventsGeneration;
     try {
       final ch = c.events();
       _eventsChannel = ch;
       _eventsSub = ch.stream.listen(
         (msg) {
+          if (generation != _eventsGeneration || !identical(ch, _eventsChannel))
+            return;
           Map<String, dynamic> e;
           try {
             e = jsonDecode(msg as String) as Map<String, dynamic>;
