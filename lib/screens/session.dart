@@ -2879,7 +2879,7 @@ class _SessionScreenState extends State<SessionScreen>
                   borderRadius: BorderRadius.circular(R.md),
                   border: Border.all(color: AppColors.border),
                 ),
-                padding: const EdgeInsets.fromLTRB(18, 20, 12, 14),
+                padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2905,15 +2905,15 @@ class _SessionScreenState extends State<SessionScreen>
                           maxLines: 8,
                           cursorColor: AppColors.fg1,
                           onSubmitted: (_) => _sendMessage(),
-                          style: sans(16, height: 1.45, color: AppColors.fg1),
+                          style: sans(15, height: 1.4, color: AppColors.fg1),
                           decoration: InputDecoration(
                             isCollapsed: true,
                             contentPadding:
-                                const EdgeInsets.fromLTRB(2, 4, 8, 14),
+                                const EdgeInsets.fromLTRB(2, 0, 8, 10),
                             border: InputBorder.none,
                             hintText: 'Ask anything',
                             hintStyle:
-                                sans(16, height: 1.45, color: AppColors.fg4),
+                                sans(15, height: 1.4, color: AppColors.fg4),
                           ),
                         ),
                       ),
