@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
-import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -11,6 +10,7 @@ import 'model_editor.dart';
 class ModelsScreen extends StatefulWidget {
   final DaemonClient client;
   final VoidCallback? onClose;
+
   /// When true, skip the app bar and fill the parent (settings dialog pane).
   final bool embedded;
   const ModelsScreen({
@@ -25,6 +25,9 @@ class ModelsScreen extends StatefulWidget {
 
 class _ModelsScreenState extends State<ModelsScreen> {
   late Future<ServerConfig> _future;
+  bool _inEditor = false;
+  ModelProfile? _editProfile;
+  String? _delegate;
 
   @override
   void initState() {
@@ -54,22 +57,35 @@ class _ModelsScreenState extends State<ModelsScreen> {
       delegate = (await widget.client.getConfig()).delegate;
     } catch (_) {}
     if (!mounted) return;
-    final saved = await presentScreen<bool>(
-      context,
-      maxWidth: 680,
-      maxHeight: 760,
-      builder: (_, close) => ModelEditorScreen(
-          client: widget.client,
-          existing: p,
-          delegateName: delegate,
-          onClose: close),
-    );
-    if (saved == true) _refresh();
+    setState(() {
+      _inEditor = true;
+      _editProfile = p;
+      _delegate = delegate;
+    });
+  }
+
+  void _closeEditor({bool saved = false}) {
+    if (!mounted) return;
+    setState(() {
+      _inEditor = false;
+      _editProfile = null;
+    });
+    if (saved) _refresh();
   }
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    if (_inEditor) {
+      return ModelEditorScreen(
+        client: widget.client,
+        existing: _editProfile,
+        delegateName: _delegate,
+        embedded: widget.embedded,
+        onClose: () => _closeEditor(),
+        onSaved: () => _closeEditor(saved: true),
+      );
+    }
     final body = FutureBuilder<ServerConfig>(
       future: _future,
       builder: (context, snap) {

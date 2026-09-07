@@ -35,14 +35,22 @@ class ModelEditorScreen extends StatefulWidget {
   final ModelProfile? existing;
   final String? delegateName;
 
+  /// Skip Scaffold / app bar and fill the parent (settings Models pane).
+  final bool embedded;
+
   /// Dismiss when hosted in a responsive panel (desktop drawer / phone full-screen).
   final VoidCallback? onClose;
+
+  /// Called after a successful save, before [onClose].
+  final VoidCallback? onSaved;
   const ModelEditorScreen(
       {super.key,
       required this.client,
       this.existing,
       this.delegateName,
-      this.onClose});
+      this.embedded = false,
+      this.onClose,
+      this.onSaved});
   @override
   State<ModelEditorScreen> createState() => _ModelEditorScreenState();
 }
@@ -159,6 +167,18 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     if (picked != null) _applyPick(picked);
   }
 
+  void _dismiss({bool saved = false}) {
+    if (saved) {
+      widget.onSaved?.call();
+      if (widget.onSaved != null) return;
+    }
+    if (widget.onClose != null) {
+      widget.onClose!();
+      return;
+    }
+    Navigator.pop(context, saved);
+  }
+
   Future<void> _save() async {
     setState(() {
       _busy = true;
@@ -192,7 +212,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
       } else if (widget.delegateName == savedName) {
         await widget.client.setDelegateProfile(null);
       }
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) _dismiss(saved: true);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -210,198 +230,211 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     final pills = [..._providers];
     if (!pills.any((p) => p.$1 == _provider))
       pills.insert(0, (_provider, _provider));
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          SnAppBar(
-              title: _isEdit ? 'Edit model' : 'Add model',
-              onBack: widget.onClose ?? () => Navigator.pop(context)),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text('Provider',
-                    style: sans(12,
-                        weight: FontWeight.w500, color: AppColors.fg2)),
-                const SizedBox(height: 7),
-                if (_isEdit)
-                  Text(_providerLabel(_provider),
-                      style: sans(15, color: AppColors.fg1))
-                else
-                  Pills<String>(
-                    items: pills,
-                    selected: _provider,
-                    onSelect: (val) => setState(() {
-                      _provider = val;
-                      _images = _defaultImages(val);
-                    }),
-                  ),
-                const SizedBox(height: 16),
-                if (!_isEdit) ...[
-                  AppField(
-                      label: 'Profile name',
-                      controller: _name,
-                      hint: 'optional — defaults to the provider'),
-                  const SizedBox(height: 16),
-                ],
-                if (_needsBaseUrl(_provider)) ...[
-                  AppField(
-                      label: 'Base URL',
-                      controller: _baseUrl,
-                      mono: true,
-                      hint: 'https://api.example.com/v1'),
-                  const SizedBox(height: 16),
-                ],
-                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Expanded(
-                      child: AppField(
-                          label: 'Model',
-                          controller: _model,
-                          mono: true,
-                          hint: _isChatgpt
-                              ? 'gpt-5.1-codex'
-                              : 'claude-sonnet-4.5')),
-                  const SizedBox(width: 8),
-                  IconBtn('list',
-                      size: 44,
-                      iconSize: 18,
-                      onTap: _busy ? null : _browseModels),
-                ]),
-                if (_modelHint != null) ...[
-                  const SizedBox(height: 6),
-                  Text(_modelHint!,
-                      style: mono(11, height: 1.4, color: AppColors.fg3)),
-                ],
-                const SizedBox(height: 16),
-                AppField(
-                  label: 'Context window (tokens)',
-                  controller: _ctx,
-                  mono: true,
-                  keyboardType: TextInputType.number,
-                  hint: 'e.g. 200000 — blank keeps the default',
-                  helper:
-                      'Sets the % context gauge and the point where the agent compacts history.',
-                ),
-                const SizedBox(height: 16),
-                Text('Reasoning effort',
-                    style: sans(12,
-                        weight: FontWeight.w500, color: AppColors.fg2)),
-                const SizedBox(height: 7),
-                Pills<String>(
-                  items: const [
-                    ('', 'Default'),
-                    ('off', 'Off'),
-                    ('low', 'Low'),
-                    ('medium', 'Medium'),
-                    ('high', 'High'),
-                    ('xhigh', 'X-High'),
-                    ('max', 'Max')
-                  ],
-                  selected: _effort,
-                  onSelect: (val) => setState(() => _effort = val),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                    "Higher means more thinking — better on hard problems, more tokens. Default uses the provider's own; Off disables reasoning. X-High/Max are the top tiers (gpt-5.1-codex-max, gpt-5.6, Claude). If a model rejects a tier, snippet steps down automatically instead of failing.",
-                    style: sans(11.5, height: 1.4, color: AppColors.fg4)),
-                const SizedBox(height: 16),
-                if (_isChatgpt)
-                  _SubSignIn(
-                    client: widget.client,
-                    signedInLabel: 'Signed in to ChatGPT',
-                    blurb:
-                        'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
-                    buttonLabel: 'Sign in with ChatGPT',
-                    signedIn: (c) => c.chatgptSignedIn(),
-                    begin: (c) => c.chatgptLoginBegin(),
-                    signOut: (c) => c.chatgptLogout(),
-                  )
-                else if (_isXai)
-                  _SubSignIn(
-                    client: widget.client,
-                    signedInLabel: 'Signed in to xAI',
-                    blurb:
-                        'Grok uses your SuperGrok / X Premium subscription — no API key.',
-                    buttonLabel: 'Sign in with SuperGrok / X Premium',
-                    signedIn: (c) => c.xaiSignedIn(),
-                    begin: (c) => c.xaiLoginBegin(),
-                    signOut: (c) => c.xaiLogout(),
-                  )
-                else
-                  AppField(
-                    label: 'API key',
-                    controller: _key,
-                    mono: true,
-                    obscure: !_showKey,
-                    icon: 'key',
-                    hint: _isEdit && widget.existing!.hasKey
-                        ? 'leave blank to keep current key'
-                        : 'sk-…',
-                    helper:
-                        'Stored on the machine running snippet. Never sent to snippet servers.',
-                    rightSlot: GestureDetector(
-                      onTap: () => setState(() => _showKey = !_showKey),
-                      child: Padding(
-                          padding: EdgeInsets.all(4),
-                          child: Text(_showKey ? 'Hide' : 'Show',
-                              style: sans(11, color: AppColors.fg3))),
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                AppToggle(
-                    on: _images,
-                    onChanged: (v) => setState(() => _images = v),
-                    label: 'Supports images',
-                    sub: 'Send screenshots and diagrams to this model'),
-                if (_usesOpenAiAdapter(_provider)) ...[
-                  const SizedBox(height: 8),
-                  AppToggle(
-                      on: _stream,
-                      onChanged: (v) => setState(() => _stream = v),
-                      label: 'Stream responses',
-                      sub:
-                          'Turn on for models that return nothing otherwise (e.g. MiniMax on NVIDIA NIM)'),
-                ],
-                const SizedBox(height: 8),
-                AppToggle(
-                    on: _active,
-                    onChanged: (v) => setState(() => _active = v),
-                    label: 'Set as active',
-                    sub: 'Use this model for new sessions'),
-                const SizedBox(height: 8),
-                AppToggle(
-                    on: _delegate,
-                    onChanged: (v) => setState(() => _delegate = v),
-                    label: 'Use for delegated lanes',
-                    sub:
-                        'Lanes run on this profile instead of the active model'),
-                if (_error != null) ...[
-                  const SizedBox(height: 14),
-                  Text(_error!, style: sans(12, color: AppColors.danger)),
-                ],
-              ],
+    final title = _isEdit ? 'Edit model' : 'Add model';
+    final form = Expanded(
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+            widget.embedded ? 20 : 16, widget.embedded ? 8 : 16, 20, 24),
+        children: [
+          Text('Provider',
+              style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+          const SizedBox(height: 7),
+          if (_isEdit)
+            Text(_providerLabel(_provider),
+                style: sans(15, color: AppColors.fg1))
+          else
+            Pills<String>(
+              items: pills,
+              selected: _provider,
+              onSelect: (val) => setState(() {
+                _provider = val;
+                _images = _defaultImages(val);
+              }),
             ),
+          const SizedBox(height: 16),
+          if (!_isEdit) ...[
+            AppField(
+                label: 'Profile name',
+                controller: _name,
+                hint: 'optional — defaults to the provider'),
+            const SizedBox(height: 16),
+          ],
+          if (_needsBaseUrl(_provider)) ...[
+            AppField(
+                label: 'Base URL',
+                controller: _baseUrl,
+                mono: true,
+                hint: 'https://api.example.com/v1'),
+            const SizedBox(height: 16),
+          ],
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(
+                child: AppField(
+                    label: 'Model',
+                    controller: _model,
+                    mono: true,
+                    hint: _isChatgpt ? 'gpt-5.1-codex' : 'claude-sonnet-4.5')),
+            const SizedBox(width: 8),
+            IconBtn('list',
+                size: 44, iconSize: 18, onTap: _busy ? null : _browseModels),
+          ]),
+          if (_modelHint != null) ...[
+            const SizedBox(height: 6),
+            Text(_modelHint!,
+                style: mono(11, height: 1.4, color: AppColors.fg3)),
+          ],
+          const SizedBox(height: 16),
+          AppField(
+            label: 'Context window (tokens)',
+            controller: _ctx,
+            mono: true,
+            keyboardType: TextInputType.number,
+            hint: 'e.g. 200000 — blank keeps the default',
+            helper:
+                'Sets the % context gauge and the point where the agent compacts history.',
           ),
-          Container(
-            padding: EdgeInsets.fromLTRB(
-                16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
-            decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.border))),
-            child: Row(children: [
-              Btn('Cancel',
-                  variant: BtnVariant.ghost,
-                  onTap: widget.onClose ?? () => Navigator.pop(context)),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: Btn(_busy ? 'Saving…' : 'Save',
-                      full: true,
-                      disabled: _busy || _model.text.trim().isEmpty,
-                      onTap: _save)),
-            ]),
+          const SizedBox(height: 16),
+          Text('Reasoning effort',
+              style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+          const SizedBox(height: 7),
+          Pills<String>(
+            items: const [
+              ('', 'Default'),
+              ('off', 'Off'),
+              ('low', 'Low'),
+              ('medium', 'Medium'),
+              ('high', 'High'),
+              ('xhigh', 'X-High'),
+              ('max', 'Max')
+            ],
+            selected: _effort,
+            onSelect: (val) => setState(() => _effort = val),
           ),
-        ]),
+          const SizedBox(height: 6),
+          Text(
+              "Higher means more thinking — better on hard problems, more tokens. Default uses the provider's own; Off disables reasoning. X-High/Max are the top tiers (gpt-5.1-codex-max, gpt-5.6, Claude). If a model rejects a tier, snippet steps down automatically instead of failing.",
+              style: sans(11.5, height: 1.4, color: AppColors.fg4)),
+          const SizedBox(height: 16),
+          if (_isChatgpt)
+            _SubSignIn(
+              client: widget.client,
+              signedInLabel: 'Signed in to ChatGPT',
+              blurb:
+                  'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
+              buttonLabel: 'Sign in with ChatGPT',
+              signedIn: (c) => c.chatgptSignedIn(),
+              begin: (c) => c.chatgptLoginBegin(),
+              signOut: (c) => c.chatgptLogout(),
+            )
+          else if (_isXai)
+            _SubSignIn(
+              client: widget.client,
+              signedInLabel: 'Signed in to xAI',
+              blurb:
+                  'Grok uses your SuperGrok / X Premium subscription — no API key.',
+              buttonLabel: 'Sign in with SuperGrok / X Premium',
+              signedIn: (c) => c.xaiSignedIn(),
+              begin: (c) => c.xaiLoginBegin(),
+              signOut: (c) => c.xaiLogout(),
+            )
+          else
+            AppField(
+              label: 'API key',
+              controller: _key,
+              mono: true,
+              obscure: !_showKey,
+              icon: 'key',
+              hint: _isEdit && widget.existing!.hasKey
+                  ? 'leave blank to keep current key'
+                  : 'sk-…',
+              helper:
+                  'Stored on the machine running snippet. Never sent to snippet servers.',
+              rightSlot: GestureDetector(
+                onTap: () => setState(() => _showKey = !_showKey),
+                child: Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Text(_showKey ? 'Hide' : 'Show',
+                        style: sans(11, color: AppColors.fg3))),
+              ),
+            ),
+          const SizedBox(height: 16),
+          AppToggle(
+              on: _images,
+              onChanged: (v) => setState(() => _images = v),
+              label: 'Supports images',
+              sub: 'Send screenshots and diagrams to this model'),
+          if (_usesOpenAiAdapter(_provider)) ...[
+            const SizedBox(height: 8),
+            AppToggle(
+                on: _stream,
+                onChanged: (v) => setState(() => _stream = v),
+                label: 'Stream responses',
+                sub:
+                    'Turn on for models that return nothing otherwise (e.g. MiniMax on NVIDIA NIM)'),
+          ],
+          const SizedBox(height: 8),
+          AppToggle(
+              on: _active,
+              onChanged: (v) => setState(() => _active = v),
+              label: 'Set as active',
+              sub: 'Use this model for new sessions'),
+          const SizedBox(height: 8),
+          AppToggle(
+              on: _delegate,
+              onChanged: (v) => setState(() => _delegate = v),
+              label: 'Use for delegated lanes',
+              sub: 'Lanes run on this profile instead of the active model'),
+          if (_error != null) ...[
+            const SizedBox(height: 14),
+            Text(_error!, style: sans(12, color: AppColors.danger)),
+          ],
+        ],
       ),
+    );
+    final footer = Container(
+      padding: EdgeInsets.fromLTRB(
+          widget.embedded ? 20 : 16,
+          12,
+          widget.embedded ? 20 : 16,
+          widget.embedded ? 16 : 16 + MediaQuery.of(context).padding.bottom),
+      decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.border))),
+      child: Row(children: [
+        Btn('Cancel', variant: BtnVariant.ghost, onTap: _dismiss),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Btn(_busy ? 'Saving…' : 'Save',
+                full: true,
+                disabled: _busy || _model.text.trim().isEmpty,
+                onTap: _save)),
+      ]),
+    );
+    final body = Column(children: [
+      if (widget.embedded)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+          child: Row(children: [
+            IconBtn('chevron-left',
+                size: 36,
+                iconSize: 20,
+                tooltip: 'Back to models',
+                onTap: _dismiss),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(title,
+                  style:
+                      sans(18, weight: FontWeight.w600, color: AppColors.fg1)),
+            ),
+          ]),
+        )
+      else
+        SnAppBar(title: title, onBack: _dismiss),
+      form,
+      footer,
+    ]);
+    if (widget.embedded) return body;
+    return Scaffold(
+      body: SafeArea(bottom: false, child: body),
     );
   }
 }
