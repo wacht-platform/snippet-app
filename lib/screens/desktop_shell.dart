@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1298,7 +1299,8 @@ class _DesktopShellState extends State<DesktopShell>
       final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
       final openUp = origin.dy > overlay.size.height / 2;
       position = RelativeRect.fromLTRB(
-        origin.dx.clamp(12.0, math.max(12.0, overlay.size.width - 280)),
+        origin.dx
+            .clamp(12.0, math.max(12.0, overlay.size.width - 280).toDouble()),
         openUp ? (origin.dy - 110) : (origin.dy + box.size.height + 4),
         overlay.size.width - origin.dx - box.size.width,
         openUp ? (overlay.size.height - origin.dy + 4) : 0,
@@ -1402,7 +1404,7 @@ class _DesktopShellState extends State<DesktopShell>
                 12.0,
                 overlay == null
                     ? origin.dx
-                    : math.max(12.0, overlay.size.width - 292)),
+                    : math.max(12.0, overlay.size.width - 292).toDouble()),
             top: openUp ? null : origin.dy + size.height + 4,
             bottom: openUp
                 ? (overlay == null ? 40.0 : overlay.size.height - origin.dy + 4)
