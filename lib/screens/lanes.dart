@@ -54,7 +54,8 @@ class _LanesScreenState extends State<LanesScreen> {
         child: Column(children: [
           SnAppBar(
             title: 'Delegated lanes',
-            titleSize: 15,
+            titleSize: 14,
+            compact: true,
             subtitle: _subtitle(lanes, running.length, failed),
             onBack: widget.onClose ?? () => Navigator.pop(context),
           ),
@@ -172,7 +173,11 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(status, style: mono(10.5, color: color)),
+              Align(
+                alignment: Alignment.topRight,
+                child: Text(status,
+                    textAlign: TextAlign.right, style: mono(10, color: color)),
+              ),
             ]),
             if (activity != null && activity.isNotEmpty && lane.running) ...[
               const SizedBox(height: 10),
