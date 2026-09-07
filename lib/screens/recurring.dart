@@ -49,27 +49,46 @@ class _RecurringScreenState extends State<RecurringScreen> {
   List<SessionInfo>? _sessions;
   StreamSubscription<dynamic>? _eventsSub;
   Timer? _refreshDebounce;
+  Timer? _eventsReconnect;
+  bool _closed = false;
 
   @override
   void dispose() {
+    _closed = true;
     _refreshDebounce?.cancel();
+    _eventsReconnect?.cancel();
     _eventsSub?.cancel();
     super.dispose();
   }
 
+  void _scheduleEventsReconnect() {
+    if (_closed || !mounted || (_eventsReconnect?.isActive ?? false)) return;
+    _eventsReconnect = Timer(const Duration(seconds: 3), () {
+      if (!_closed && mounted) _watchEvents();
+    });
+  }
+
   void _watchEvents() {
-    _eventsSub = widget.client.events().stream.listen((msg) {
-      try {
-        final raw = msg is String ? msg : msg.toString();
-        final event = jsonDecode(raw);
-        if (event is Map && event['kind'] == 'recurring') {
-          _refreshDebounce?.cancel();
-          _refreshDebounce = Timer(const Duration(milliseconds: 150), _refresh);
+    _eventsSub?.cancel();
+    try {
+      _eventsSub = widget.client.events().stream.listen((msg) {
+        try {
+          final raw = msg is String ? msg : msg.toString();
+          final event = jsonDecode(raw);
+          if (event is Map && event['kind'] == 'recurring') {
+            _refreshDebounce?.cancel();
+            _refreshDebounce =
+                Timer(const Duration(milliseconds: 150), _refresh);
+          }
+        } catch (_) {
+          // The schedule list remains usable if an unrelated event is malformed.
         }
-      } catch (_) {
-        // The session list remains usable if an unrelated event is malformed.
-      }
-    }, onError: (_) {});
+      },
+          onError: (_) => _scheduleEventsReconnect(),
+          onDone: _scheduleEventsReconnect);
+    } catch (_) {
+      _scheduleEventsReconnect();
+    }
   }
 
   String get _boundSessionId {
