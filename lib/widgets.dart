@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1631,44 +1632,49 @@ Future<bool> confirmAction(
 }) async {
   final result = await showDialog<bool>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.45),
+    barrierColor: Colors.black.withValues(alpha: 0.58),
     builder: (ctx) {
-      return Dialog(
-        backgroundColor: AppColors.surface1,
-        elevation: 0,
-        insetPadding:
-            EdgeInsets.symmetric(horizontal: kMobile ? 28 : 40, vertical: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
-          side: BorderSide(color: AppColors.border2),
-        ),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(title,
-                    style: sans(15,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-                const SizedBox(height: 8),
-                Text(body, style: sans(13, height: 1.45, color: AppColors.fg3)),
-                const SizedBox(height: 16),
-                Row(children: [
-                  const Spacer(),
-                  Btn('Cancel',
-                      variant: BtnVariant.ghost,
-                      small: true,
-                      onTap: () => Navigator.pop(ctx, false)),
-                  const SizedBox(width: 8),
-                  Btn(confirmLabel,
-                      variant: danger ? BtnVariant.danger : BtnVariant.primary,
-                      small: true,
-                      onTap: () => Navigator.pop(ctx, true)),
-                ]),
-              ],
+      return BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Dialog(
+          backgroundColor: AppColors.surface1,
+          elevation: 0,
+          insetPadding:
+              EdgeInsets.symmetric(horizontal: kMobile ? 28 : 40, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(R.md),
+            side: BorderSide(color: AppColors.border2),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(title,
+                      style: sans(15,
+                          weight: FontWeight.w600, color: AppColors.fg1)),
+                  const SizedBox(height: 8),
+                  Text(body,
+                      style: sans(13, height: 1.45, color: AppColors.fg3)),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    const Spacer(),
+                    Btn('Cancel',
+                        variant: BtnVariant.ghost,
+                        small: true,
+                        onTap: () => Navigator.pop(ctx, false)),
+                    const SizedBox(width: 8),
+                    Btn(confirmLabel,
+                        variant:
+                            danger ? BtnVariant.danger : BtnVariant.primary,
+                        small: true,
+                        onTap: () => Navigator.pop(ctx, true)),
+                  ]),
+                ],
+              ),
             ),
           ),
         ),
@@ -1688,36 +1694,39 @@ Future<String?> promptText(BuildContext context,
   if (!kMobile) {
     return showDialog<String>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.58),
       builder: (ctx) {
-        return Dialog(
-          backgroundColor: AppColors.surface1,
-          elevation: 0,
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.md),
-            side: BorderSide(color: AppColors.border2),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 320),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(title,
-                      style: sans(13.5,
-                          weight: FontWeight.w600, color: AppColors.fg1)),
-                  const SizedBox(height: 10),
-                  _TextPromptSheet(
-                      initial: initial,
-                      hint: hint,
-                      saveLabel: saveLabel,
-                      minLines: minLines,
-                      maxLines: maxLines),
-                ],
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Dialog(
+            backgroundColor: AppColors.surface1,
+            elevation: 0,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(R.md),
+              side: BorderSide(color: AppColors.border2),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(title,
+                        style: sans(13.5,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const SizedBox(height: 10),
+                    _TextPromptSheet(
+                        initial: initial,
+                        hint: hint,
+                        saveLabel: saveLabel,
+                        minLines: minLines,
+                        maxLines: maxLines),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1801,45 +1810,48 @@ Future<T?> showAppSheet<T>(BuildContext context,
   if (!kMobile) {
     return showDialog<T>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.58),
       builder: (ctx) {
-        return Dialog(
-          backgroundColor: AppColors.surface1,
-          elevation: 0,
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.md),
-            side: BorderSide(color: AppColors.border2),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 340, maxHeight: 520),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(children: [
-                    Expanded(
-                        child: Text(title,
-                            style: sans(13.5,
-                                weight: FontWeight.w600,
-                                color: AppColors.fg1))),
-                    IconBtn('x',
-                        size: 28,
-                        iconSize: 14,
-                        tooltip: 'Close',
-                        onTap: () => Navigator.pop(ctx)),
-                  ]),
-                  const SizedBox(height: 6),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
-                      child: child,
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Dialog(
+            backgroundColor: AppColors.surface1,
+            elevation: 0,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(R.md),
+              side: BorderSide(color: AppColors.border2),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340, maxHeight: 520),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text(title,
+                              style: sans(13.5,
+                                  weight: FontWeight.w600,
+                                  color: AppColors.fg1))),
+                      IconBtn('x',
+                          size: 28,
+                          iconSize: 14,
+                          tooltip: 'Close',
+                          onTap: () => Navigator.pop(ctx)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+                        child: child,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1850,47 +1862,52 @@ Future<T?> showAppSheet<T>(BuildContext context,
   return showModalBottomSheet<T>(
     context: context,
     backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.62),
     isScrollControlled: true,
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
-      return Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-          border: Border(top: BorderSide(color: AppColors.border2)),
-        ),
-        constraints: BoxConstraints(
-            maxHeight: (media.size.height - media.viewInsets.bottom) * 0.88),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 10),
-          Center(
-              child: Container(
-                  width: 32,
-                  height: 3,
-                  decoration: BoxDecoration(
-                      color: AppColors.border2,
-                      borderRadius: BorderRadius.circular(99)))),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
-            child: Row(children: [
-              Expanded(
-                  child: Text(title,
-                      style: sans(14.5,
-                          weight: FontWeight.w600, color: AppColors.fg1))),
-              IconBtn('x',
-                  size: 32,
-                  iconSize: 16,
-                  onTap: () => Navigator.pop(sheetContext)),
-            ]),
+      return BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+            border: Border(top: BorderSide(color: AppColors.border2)),
           ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
-              child: child,
+          constraints: BoxConstraints(
+              maxHeight: (media.size.height - media.viewInsets.bottom) * 0.88),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 10),
+            Center(
+                child: Container(
+                    width: 32,
+                    height: 3,
+                    decoration: BoxDecoration(
+                        color: AppColors.border2,
+                        borderRadius: BorderRadius.circular(99)))),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
+              child: Row(children: [
+                Expanded(
+                    child: Text(title,
+                        style: sans(14.5,
+                            weight: FontWeight.w600, color: AppColors.fg1))),
+                IconBtn('x',
+                    size: 32,
+                    iconSize: 16,
+                    onTap: () => Navigator.pop(sheetContext)),
+              ]),
             ),
-          ),
-          SizedBox(height: media.padding.bottom + media.viewInsets.bottom),
-        ]),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
+                child: child,
+              ),
+            ),
+            SizedBox(height: media.padding.bottom + media.viewInsets.bottom),
+          ]),
+        ),
       );
     },
   );
