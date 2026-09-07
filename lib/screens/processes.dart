@@ -121,6 +121,8 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
         child: Column(children: [
           SnAppBar(
             title: 'Processes',
+            titleSize: 14,
+            compact: true,
             onBack: widget.onClose ?? () => Navigator.pop(context),
             actions: [IconBtn('refresh', onTap: () => _load())],
           ),

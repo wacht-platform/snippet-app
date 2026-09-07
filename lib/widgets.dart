@@ -724,16 +724,16 @@ class Btn extends StatelessWidget {
       opacity: disabled ? 0.45 : 1,
       child: Material(
         color: bg,
-        borderRadius: BorderRadius.circular(R.md),
+        borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           onTap: disabled ? null : onTap,
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(R.sm),
           child: Container(
             height: h,
             width: full ? double.infinity : null,
             padding: EdgeInsets.symmetric(horizontal: small ? 12 : 16),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(R.md),
+              borderRadius: BorderRadius.circular(R.sm),
               border: bd != null ? Border.all(color: bd) : null,
             ),
             child: child,
@@ -1454,6 +1454,7 @@ class SnAppBar extends StatelessWidget {
   final Widget? leading;
   final List<Widget> actions;
   final double titleSize;
+  final bool compact;
   const SnAppBar(
       {super.key,
       required this.title,
@@ -1461,13 +1462,14 @@ class SnAppBar extends StatelessWidget {
       this.onBack,
       this.leading,
       this.actions = const [],
-      this.titleSize = 17});
+      this.titleSize = 17,
+      this.compact = false});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     return Container(
-      height: 64,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+      height: compact ? 52 : 64,
+      padding: EdgeInsets.fromLTRB(compact ? 10 : 12, 0, compact ? 10 : 12, 0),
       decoration: BoxDecoration(
         // Follows the ambient shell surface — desktop panels re-theme this to
         // surface1 so the bar never reads as a darker strip (mobile: still bg).

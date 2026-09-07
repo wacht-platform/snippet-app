@@ -247,8 +247,8 @@ class _FileExplorerState extends State<FileExplorer> {
               child: Column(children: [
                 if (!kMobile)
                   Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    height: 52,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     decoration: BoxDecoration(
                       color: AppColors.surface1,
                       border:
