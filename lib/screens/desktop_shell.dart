@@ -3565,9 +3565,15 @@ class _SidebarState extends State<_Sidebar> {
           ),
         ),
       ]),
-      transitionBuilder: (_, anim, __, child) => FadeTransition(
-          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-          child: child),
+      transitionBuilder: (_, anim, __, child) {
+        final curved =
+            CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return BackdropFilter(
+          filter: ImageFilter.blur(
+              sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
+          child: FadeTransition(opacity: curved, child: child),
+        );
+      },
     );
   }
 
