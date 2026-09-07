@@ -1897,7 +1897,7 @@ class _DesktopShellState extends State<DesktopShell>
                   final t = _tabs[i];
                   return _KeepAlive(
                     key: ValueKey(t.key),
-                    keep: !kMobile || t.isMissionControl || i == _activeIndex,
+                    keep: t.isMissionControl || i == _activeIndex,
                     child: t.isFile
                         ? FileViewer(
                             key: ValueKey(t.key),
