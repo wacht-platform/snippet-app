@@ -2917,74 +2917,92 @@ class _SessionScreenState extends State<SessionScreen>
                           ),
                         ),
                       ),
-                      Row(children: [
-                        GestureDetector(
-                          onTap: _onAttachTap,
-                          child: SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: Center(
-                              child: AppIcon('plus',
-                                  size: 22, color: AppColors.fg3),
+                      Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(R.sm),
+                              child: InkWell(
+                                onTap: _onAttachTap,
+                                borderRadius: BorderRadius.circular(R.sm),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: AppIcon('plus',
+                                      size: 18, color: AppColors.fg3),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 2),
-                        Builder(builder: (chipCtx) {
-                          return GestureDetector(
-                            onTap: () => _switchModel(chipCtx),
-                            child: Container(
-                              padding: const EdgeInsets.fromLTRB(6, 3, 6, 3),
-                              decoration: BoxDecoration(
+                            const SizedBox(width: 4),
+                            Builder(builder: (chipCtx) {
+                              return Material(
                                 color: AppColors.surface2,
                                 borderRadius: BorderRadius.circular(R.sm),
+                                child: InkWell(
+                                  onTap: () => _switchModel(chipCtx),
+                                  borderRadius: BorderRadius.circular(R.sm),
+                                  child: Container(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(8, 4, 7, 4),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(R.sm),
+                                      border: Border.all(
+                                          color: AppColors.border2
+                                              .withValues(alpha: 0.6)),
+                                    ),
+                                    child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          AppIcon('sparkles',
+                                              size: 11, color: AppColors.fg2),
+                                          const SizedBox(width: 5),
+                                          Text(_modelLabel ?? 'Auto',
+                                              style: sans(11.5,
+                                                  weight: FontWeight.w500,
+                                                  color: AppColors.fg2)),
+                                          const SizedBox(width: 3),
+                                          AppIcon('chevron-down',
+                                              size: 10, color: AppColors.fg4),
+                                        ]),
+                                  ),
+                                ),
+                              );
+                            }),
+                            const Spacer(),
+                            if (kCanRecord) ...[
+                              Material(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(R.sm),
+                                child: InkWell(
+                                  onTap: _onMicTap,
+                                  borderRadius: BorderRadius.circular(R.sm),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: AppIcon(
+                                        _isRecording ? 'mic-off' : 'mic',
+                                        size: 18,
+                                        color: _isRecording
+                                            ? AppColors.danger
+                                            : AppColors.fg3),
+                                  ),
+                                ),
                               ),
-                              child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    AppIcon('sparkles',
-                                        size: 11, color: AppColors.fg2),
-                                    const SizedBox(width: 4),
-                                    Text(_modelLabel ?? 'Auto',
-                                        style:
-                                            sans(11.5, color: AppColors.fg2)),
-                                    const SizedBox(width: 1),
-                                    AppIcon('chevron-down',
-                                        size: 10, color: AppColors.fg4),
-                                  ]),
+                              const SizedBox(width: 6),
+                            ],
+                            ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: _input,
+                              builder: (_, __, ___) {
+                                final queue = running && _canSend;
+                                final stop = running && !queue;
+                                return _SendBtn(
+                                    enabled: stop || _canSend,
+                                    running: stop,
+                                    onTap: stop
+                                        ? () => _send({'kind': 'interrupt'})
+                                        : (_canSend ? _sendMessage : null));
+                              },
                             ),
-                          );
-                        }),
-                        const Spacer(),
-                        if (kCanRecord)
-                          GestureDetector(
-                            onTap: _onMicTap,
-                            child: SizedBox(
-                              width: 40,
-                              height: 40,
-                              child: Center(
-                                child: AppIcon(_isRecording ? 'mic-off' : 'mic',
-                                    size: 18,
-                                    color: _isRecording
-                                        ? AppColors.danger
-                                        : AppColors.fg3),
-                              ),
-                            ),
-                          ),
-                        ValueListenableBuilder<TextEditingValue>(
-                          valueListenable: _input,
-                          builder: (_, __, ___) {
-                            final queue = running && _canSend;
-                            final stop = running && !queue;
-                            return _SendBtn(
-                                enabled: stop || _canSend,
-                                running: stop,
-                                onTap: stop
-                                    ? () => _send({'kind': 'interrupt'})
-                                    : (_canSend ? _sendMessage : null));
-                          },
-                        ),
-                      ]),
+                          ]),
                     ]),
               ),
             ]),

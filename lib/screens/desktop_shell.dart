@@ -1962,24 +1962,29 @@ class _DesktopShellState extends State<DesktopShell>
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         key: key,
-        margin: EdgeInsets.only(
-            top: mac ? 0 : (kMobile ? 7 : 6),
-            bottom: mac ? 0 : (kMobile ? 7 : 6),
-            left: mac ? 0 : 3,
-            right: mac ? 0 : 3),
-        padding: EdgeInsets.only(
-            left: mac ? 10 : (kMobile ? 13 : 11), right: mac ? 7 : 5),
-        constraints: BoxConstraints(maxWidth: active ? 230 : 180),
+        margin: desktop
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
+        padding:
+            EdgeInsets.only(left: desktop ? 12 : 13, right: desktop ? 8 : 5),
+        constraints: BoxConstraints(maxWidth: active ? 240 : 180),
         decoration: BoxDecoration(
-          color: mac
+          color: desktop
               ? (active ? AppColors.surface1 : Colors.transparent)
               : (active ? AppColors.surface2 : Colors.transparent),
-          borderRadius: mac ? BorderRadius.zero : BorderRadius.circular(R.xs),
-          border: mac
+          borderRadius:
+              desktop ? BorderRadius.zero : BorderRadius.circular(R.xs),
+          border: desktop
               ? Border(
                   bottom: BorderSide(
                       color: active ? AppColors.accent : Colors.transparent,
-                      width: 2))
+                      width: 2),
+                  right: BorderSide(
+                      color: active
+                          ? AppColors.border
+                          : AppColors.border2.withValues(alpha: 0.5),
+                      width: 1),
+                )
               : Border.all(
                   color: active ? AppColors.border : Colors.transparent),
         ),
@@ -3052,19 +3057,26 @@ class _SidebarState extends State<_Sidebar> {
           height: 32,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(children: [
-            if (_selecting) ...[
-              AppIcon(checked ? 'check' : 'plus',
-                  size: 13, color: checked ? AppColors.accent : AppColors.fg4),
-              const SizedBox(width: 8),
-            ] else if (waiting || running) ...[
-              Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                      color: waiting ? AppColors.accent : AppColors.run,
-                      shape: BoxShape.circle)),
-              const SizedBox(width: 8),
-            ],
+            SizedBox(
+              width: 14,
+              child: _selecting
+                  ? AppIcon(checked ? 'check' : 'plus',
+                      size: 13,
+                      color: checked ? AppColors.accent : AppColors.fg4)
+                  : (waiting || running)
+                      ? Center(
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: waiting ? AppColors.accent : AppColors.run,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : null,
+            ),
+            const SizedBox(width: 8),
             Expanded(
                 child: renaming
                     ? _inlineRenameField(s, compact: true)
