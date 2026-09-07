@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -44,6 +47,30 @@ class RecurringScreen extends StatefulWidget {
 class _RecurringScreenState extends State<RecurringScreen> {
   late Future<List<RecurringJob>> _future;
   List<SessionInfo>? _sessions;
+  StreamSubscription<dynamic>? _eventsSub;
+  Timer? _refreshDebounce;
+
+  @override
+  void dispose() {
+    _refreshDebounce?.cancel();
+    _eventsSub?.cancel();
+    super.dispose();
+  }
+
+  void _watchEvents() {
+    _eventsSub = widget.client.events().stream.listen((msg) {
+      try {
+        final raw = msg is String ? msg : msg.toString();
+        final event = jsonDecode(raw);
+        if (event is Map && event['kind'] == 'recurring') {
+          _refreshDebounce?.cancel();
+          _refreshDebounce = Timer(const Duration(milliseconds: 150), _refresh);
+        }
+      } catch (_) {
+        // The session list remains usable if an unrelated event is malformed.
+      }
+    }, onError: (_) {});
+  }
 
   String get _boundSessionId {
     final id = widget.sessionId?.trim() ?? '';
@@ -56,6 +83,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
   void initState() {
     super.initState();
     _future = widget.client.recurringJobs();
+    _watchEvents();
     widget.client.sessions().then((s) {
       if (mounted) setState(() => _sessions = s);
     }).catchError((_) {});
