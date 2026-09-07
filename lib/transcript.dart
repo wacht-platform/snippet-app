@@ -249,38 +249,43 @@ class LaneNotice extends StatelessWidget {
         : failed
             ? 'failed'
             : 'complete';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
-        onTap: onOpen,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(children: [
-                AppIcon('layers', size: 15, color: color),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12.5,
-                        weight: FontWeight.w600, color: AppColors.fg2),
+    return Semantics(
+      button: true,
+      label: '$title, $status. Open delegated lanes.',
+      onTap: onOpen,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.sm),
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [
+                  AppIcon('layers', size: 15, color: color),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12.5,
+                          weight: FontWeight.w600, color: AppColors.fg2),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 9),
-                Text(status, style: mono(9.5, color: color)),
-                const SizedBox(width: 5),
-                AppIcon('chevron-right', size: 13, color: AppColors.fg4),
-              ]),
-              if (summary != null && summary!.trim().isNotEmpty) ...[
-                const SizedBox(height: 6),
-                MarkdownPreview(data: summary!, maxLines: 2),
+                  const SizedBox(width: 9),
+                  Text(status, style: mono(9.5, color: color)),
+                  const SizedBox(width: 5),
+                  AppIcon('chevron-right', size: 13, color: AppColors.fg4),
+                ]),
+                if (summary != null && summary!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  MarkdownPreview(data: summary!, maxLines: 2),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
