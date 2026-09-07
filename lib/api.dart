@@ -18,20 +18,6 @@ class DownloadCancelled implements Exception {
 /// Talks to one snippet `serve` daemon. The token is passed as a `?token=` query
 /// param on every request (matching the daemon's auth) and the session id (a
 /// path with a `/`) is URL-encoded automatically by [Uri].
-class SessionEventsPage {
-  final List<Map<String, dynamic>> events;
-  final int start;
-  final int end;
-  final bool hasOlder;
-
-  const SessionEventsPage({
-    required this.events,
-    required this.start,
-    required this.end,
-    required this.hasOlder,
-  });
-}
-
 class DaemonClient {
   final String baseUrl; // e.g. https://abc.trycloudflare.com
   final String token;
@@ -322,25 +308,6 @@ class DaemonClient {
     final r = await http.delete(_uri('/config/profile', {'name': name}));
     if (r.statusCode != 200) throw _err('delete profile', r);
     invalidateConfig();
-  }
-
-  Future<SessionEventsPage> sessionEvents(String sessionId,
-      {int? before, int limit = 160}) async {
-    final q = <String, String>{'session': sessionId, 'limit': '$limit'};
-    if (before != null) q['before'] = '$before';
-    final r = await http.get(_uri('/session/events', q));
-    if (r.statusCode != 200) throw _err('load session events', r);
-    final body = jsonDecode(r.body) as Map<String, dynamic>;
-    final raw = body['events'];
-    final events = raw is List
-        ? raw.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList()
-        : const <Map<String, dynamic>>[];
-    return SessionEventsPage(
-      events: events,
-      start: (body['start'] as num?)?.toInt() ?? 0,
-      end: (body['end'] as num?)?.toInt() ?? 0,
-      hasOlder: body['has_older'] == true,
-    );
   }
 
   Future<void> setSessionModel(String sessionId, String profile) async {
