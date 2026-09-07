@@ -1449,7 +1449,9 @@ class _DesktopShellState extends State<DesktopShell>
               child: Material(
                 color: AppColors.surface1,
                 elevation: 0,
-                shape: appMenuShape,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(R.sm),
+                ),
                 child: ConstrainedBox(
                   constraints:
                       const BoxConstraints(minWidth: 240, maxWidth: 280),
