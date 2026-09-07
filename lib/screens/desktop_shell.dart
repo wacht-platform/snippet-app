@@ -2378,6 +2378,8 @@ class _SidebarState extends State<_Sidebar> {
     final c = widget.client;
     if (c == null) return;
     presentScreen(context,
+        maxWidth: 860,
+        maxHeight: 620,
         builder: (_, close) => _SettingsPanel(
               client: c,
               instances: widget.instances,
@@ -2444,6 +2446,7 @@ class _SidebarState extends State<_Sidebar> {
                               ),
                             ]),
                     ),
+                  if (hasClient && !_selecting) _stickyMissionControl(),
                   Expanded(
                     child: !hasClient
                         ? Center(
@@ -2546,6 +2549,17 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
+  Widget _stickyMissionControl() {
+    final mc = (_sessions ?? const <SessionInfo>[])
+        .where((s) => isDedicatedMcSession(s.id))
+        .toList();
+    if (mc.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: _missionControlPin(mc.first),
+    );
+  }
+
   /// Bottom bar on mobile: full-width search pill + settings + new-chat.
   Widget _mobileBottomBar() {
     final hasClient = widget.client != null;
@@ -2564,12 +2578,6 @@ class _SidebarState extends State<_Sidebar> {
         border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
       ),
       child: Row(children: [
-        IconBtn('layers',
-            size: 38,
-            iconSize: 19,
-            tooltip: 'Mission Control',
-            onTap: hasClient ? _openMc : null),
-        const SizedBox(width: 8),
         // Search pill.
         Expanded(
           child: GestureDetector(
@@ -2750,7 +2758,7 @@ class _SidebarState extends State<_Sidebar> {
         .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
         .toList();
     final children = <Widget>[];
-    if (mc.isNotEmpty) {
+    if (!kMobile && mc.isNotEmpty) {
       children.add(_missionControlPin(mc.first));
     }
     final newest = <String, int>{};
@@ -2861,7 +2869,7 @@ class _SidebarState extends State<_Sidebar> {
         : lastPathSegment(folder, ifEmpty: folder);
     if (kMobile) {
       return Padding(
-        padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 6),
+        padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 8),
         child: Row(children: [
           AppIcon('folder', size: 13, color: AppColors.fg4),
           const SizedBox(width: 8),
@@ -2950,39 +2958,25 @@ class _SidebarState extends State<_Sidebar> {
           )
         : null;
     if (kMobile) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: GestureDetector(
-          onTap: open,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: selected ? AppColors.accentBg : AppColors.surface1,
-              borderRadius: BorderRadius.circular(R.card),
-              border: Border.all(
-                color: selected ? AppColors.accentLine : AppColors.border,
-              ),
+      return GestureDetector(
+        onTap: open,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.accentBg : AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(
+              color: selected ? AppColors.accentLine : AppColors.border,
             ),
-            child: Row(children: [
-              Container(
-                width: 32,
-                height: 32,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surface3,
-                  borderRadius: BorderRadius.circular(R.sm),
-                ),
-                child: AppIcon('layers', size: 16, color: AppColors.accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('Mission Control',
-                    style: sans(16,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-              ),
-              if (status != null) status,
-            ]),
           ),
+          child: Row(children: [
+            Expanded(
+              child: Text('Mission Control',
+                  style: sans(15.5,
+                      weight: FontWeight.w600, color: AppColors.fg1)),
+            ),
+            if (status != null) status,
+          ]),
         ),
       );
     }
@@ -3113,7 +3107,7 @@ class _SidebarState extends State<_Sidebar> {
             },
       child: Container(
         margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
         decoration: BoxDecoration(
           color: checked ? AppColors.accentBg : AppColors.surface2,
           borderRadius: BorderRadius.circular(R.md),
@@ -3125,23 +3119,20 @@ class _SidebarState extends State<_Sidebar> {
             const SizedBox(width: 10),
           ],
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                renaming
-                    ? _inlineRenameField(s, compact: false)
-                    : Text(
-                        s.title.isEmpty ? '(untitled)' : s.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(16, color: AppColors.fg1),
-                      ),
-                const SizedBox(height: 4),
-                Text(relativeTime(s.lastActive),
-                    style: sans(12, color: AppColors.fg4)),
-              ],
-            ),
+            child: renaming
+                ? _inlineRenameField(s, compact: false)
+                : Text(
+                    s.title.isEmpty ? '(untitled)' : s.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(15.5, color: AppColors.fg1),
+                  ),
           ),
+          if (!renaming) ...[
+            const SizedBox(width: 10),
+            Text(relativeTime(s.lastActive),
+                style: sans(12, color: AppColors.fg4)),
+          ],
           if (!_selecting && (running || waiting)) ...[
             const SizedBox(width: 8),
             Container(
@@ -3154,9 +3145,9 @@ class _SidebarState extends State<_Sidebar> {
             ),
           ],
           if (!_selecting && !renaming) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: 2),
             IconBtn('more-vertical',
-                size: 28,
+                size: 32,
                 iconSize: 16,
                 tooltip: 'Options',
                 onTap: () => _sessionActions(s)),
@@ -3517,13 +3508,13 @@ class _SidebarState extends State<_Sidebar> {
           width: box.size.width - 20,
           child: Material(
             color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.card),
+            borderRadius: BorderRadius.circular(R.md),
             elevation: 12,
             shadowColor: Colors.black87,
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.card),
+                borderRadius: BorderRadius.circular(R.md),
                 border: Border.all(color: AppColors.border2),
               ),
               child: ConstrainedBox(
@@ -3697,7 +3688,8 @@ class _MachineListState extends State<_MachineList> {
   }
 }
 
-/// Desktop settings drawer: manage saved instances (remove) + Models.
+/// Settings dialog: Zed-style sidebar + content pane. Models / vault /
+/// scheduled swap in-place so they never stack a second dialog.
 class _SettingsPanel extends StatefulWidget {
   final DaemonClient client;
   final List<Instance> instances;
@@ -3715,10 +3707,20 @@ class _SettingsPanel extends StatefulWidget {
   State<_SettingsPanel> createState() => _SettingsPanelState();
 }
 
+enum _SettingsPage { general, models, vault, scheduled }
+
 class _SettingsPanelState extends State<_SettingsPanel> {
   late final List<Instance> _instances = [...widget.instances];
   bool _notif = false;
   bool _notifBusy = false;
+  _SettingsPage _page = _SettingsPage.general;
+
+  static const _nav = [
+    (_SettingsPage.general, 'settings', 'General'),
+    (_SettingsPage.models, 'cpu', 'Models'),
+    (_SettingsPage.vault, 'key', 'Vault'),
+    (_SettingsPage.scheduled, 'scheduled', 'Scheduled'),
+  ];
 
   @override
   void initState() {
@@ -3755,136 +3757,209 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    final wide = !kMobile;
     return Scaffold(
+      backgroundColor: AppColors.surface1,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          SnAppBar(title: 'Settings', onBack: widget.onClose),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+            child: Row(children: [
+              Expanded(
+                  child: Text('Settings',
+                      style: sans(15,
+                          weight: FontWeight.w600, color: AppColors.fg1))),
+              IconBtn('x',
+                  size: 32,
+                  iconSize: 16,
+                  tooltip: 'Close',
+                  onTap: widget.onClose),
+            ]),
+          ),
+          Divider(height: 1, color: AppColors.border),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              children: [
-                _sectionLabel('Instances'),
-                if (_instances.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
-                    child: Text('No saved connections.',
-                        style: sans(13, color: AppColors.fg3)),
-                  )
-                else
-                  for (final inst in _instances) _instanceRow(inst),
-                const SizedBox(height: 18),
-                _sectionLabel('Configuration'),
-                _configTile(
-                    'cpu',
-                    'Models',
-                    'Providers & active model',
-                    () => presentScreen(context,
-                        builder: (_, close) => ModelsScreen(
-                            client: widget.client, onClose: close))),
-                _configTile(
-                    'key',
-                    'Vault',
-                    'Secrets the agent can use',
-                    () => presentScreen(context,
-                        builder: (_, close) => VaultScreen(
-                            client: widget.client, onClose: close))),
-                _configTile(
-                    'scheduled',
-                    'Scheduled',
-                    'Scheduled goals and messages across chats',
-                    () => presentScreen(context,
-                        builder: (_, close) => RecurringScreen(
-                            client: widget.client,
-                            onClose: close,
-                            listOnly: true))),
-                if (kCanNotify) _notifTile(),
-              ],
-            ),
+            child: wide
+                ? Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    SizedBox(width: 188, child: _navList()),
+                    VerticalDivider(width: 1, color: AppColors.border),
+                    Expanded(child: _pageBody()),
+                  ])
+                : Column(children: [
+                    SizedBox(height: 44, child: _navChips()),
+                    Divider(height: 1, color: AppColors.border),
+                    Expanded(child: _pageBody()),
+                  ]),
           ),
         ]),
       ),
     );
   }
 
-  Widget _sectionLabel(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 10, 2, 6),
-        child: Text(t,
+  Widget _navList() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 16),
+      children: [
+        for (final (page, icon, label) in _nav)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Material(
+              color: _page == page ? AppColors.surface2 : Colors.transparent,
+              borderRadius: BorderRadius.circular(R.sm),
+              child: InkWell(
+                onTap: () => setState(() => _page = page),
+                borderRadius: BorderRadius.circular(R.sm),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Row(children: [
+                    AppIcon(icon,
+                        size: 15,
+                        color: _page == page ? AppColors.fg1 : AppColors.fg3),
+                    const SizedBox(width: 10),
+                    Text(label,
+                        style: sans(13,
+                            color:
+                                _page == page ? AppColors.fg1 : AppColors.fg2)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _navChips() {
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      children: [
+        for (final (page, icon, label) in _nav)
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Material(
+              color: _page == page ? AppColors.surface2 : Colors.transparent,
+              borderRadius: BorderRadius.circular(R.sm),
+              child: InkWell(
+                onTap: () => setState(() => _page = page),
+                borderRadius: BorderRadius.circular(R.sm),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(children: [
+                    AppIcon(icon,
+                        size: 14,
+                        color: _page == page ? AppColors.fg1 : AppColors.fg3),
+                    const SizedBox(width: 6),
+                    Text(label,
+                        style: sans(12.5,
+                            color:
+                                _page == page ? AppColors.fg1 : AppColors.fg2)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _pageBody() {
+    return switch (_page) {
+      _SettingsPage.general => _generalPage(),
+      _SettingsPage.models =>
+        ModelsScreen(client: widget.client, embedded: true),
+      _SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
+      _SettingsPage.scheduled => RecurringScreen(
+          client: widget.client, listOnly: true, embedded: true),
+    };
+  }
+
+  Widget _generalPage() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+      children: [
+        Text('Machines',
             style: sans(11.5,
                 weight: FontWeight.w600, color: AppColors.fg3, spacing: 0.3)),
-      );
+        const SizedBox(height: 8),
+        if (_instances.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
+            child: Text('No saved connections.',
+                style: sans(13, color: AppColors.fg3)),
+          )
+        else
+          for (final inst in _instances) _instanceRow(inst),
+        if (kCanNotify) ...[
+          const SizedBox(height: 18),
+          Text('Notifications',
+              style: sans(11.5,
+                  weight: FontWeight.w600, color: AppColors.fg3, spacing: 0.3)),
+          const SizedBox(height: 8),
+          _notifTile(),
+        ],
+      ],
+    );
+  }
 
   Widget _instanceRow(Instance i) {
     final isActive = i.url == widget.active?.url;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(children: [
-        AppIcon('cpu',
-            size: 16, color: isActive ? AppColors.accent : AppColors.fg3),
-        const SizedBox(width: 12),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(i.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(14, color: AppColors.fg1)),
-            const SizedBox(height: 2),
-            Text(hostOf(i.url),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: mono(11.5, color: AppColors.fg4)),
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
+          child: Row(children: [
+            AppIcon('cpu',
+                size: 16, color: isActive ? AppColors.accent : AppColors.fg3),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(i.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(14, color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Text(hostOf(i.url),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: mono(11.5, color: AppColors.fg4)),
+                  ]),
+            ),
+            if (isActive)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child:
+                    Text('active', style: sans(11, color: AppColors.accent)),
+              ),
+            IconBtn('trash',
+                size: 32,
+                iconSize: 16,
+                tooltip: 'Remove',
+                onTap: () => _confirmRemove(i)),
           ]),
         ),
-        if (isActive)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Text('active', style: sans(11, color: AppColors.accent)),
-          ),
-        IconBtn('trash',
-            size: 32,
-            iconSize: 16,
-            tooltip: 'Remove',
-            onTap: () => _confirmRemove(i)),
-      ]),
-    );
-  }
-
-  Widget _configTile(
-      String icon, String label, String sub, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(children: [
-          AppIcon(icon, size: 16, color: AppColors.fg3),
-          const SizedBox(width: 12),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label, style: sans(14, color: AppColors.fg1)),
-              const SizedBox(height: 2),
-              Text(sub, style: sans(12, color: AppColors.fg4)),
-            ]),
-          ),
-          AppIcon('chevron-right', size: 15, color: AppColors.fg4),
-        ]),
       ),
     );
   }
 
   Widget _notifTile() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(children: [
         AppIcon('zap', size: 16, color: AppColors.fg3),
         const SizedBox(width: 12),
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Notifications', style: sans(14, color: AppColors.fg1)),
+            Text('Alerts', style: sans(14, color: AppColors.fg1)),
             const SizedBox(height: 2),
-            Text('Alert when a session needs input',
+            Text('Notify when a session needs input',
                 style: sans(12, color: AppColors.fg4)),
           ]),
         ),

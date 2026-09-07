@@ -14,7 +14,7 @@ OverlayEntry? _activeToast;
 Timer? _toastTimer;
 
 ShapeBorder get appMenuShape => RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(R.card),
+      borderRadius: BorderRadius.circular(R.md),
       side: BorderSide(color: AppColors.border),
     );
 
@@ -1570,6 +1570,8 @@ class _AppFieldState extends State<AppField> {
         decoration: BoxDecoration(
           color: AppColors.surface2,
           borderRadius: BorderRadius.circular(R.md),
+          border: Border.all(
+              color: _focus.hasFocus ? AppColors.accentLine : AppColors.border),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           if (widget.icon != null) ...[
@@ -1636,7 +1638,7 @@ Future<bool> confirmAction(
         insetPadding: EdgeInsets.symmetric(
             horizontal: kMobile ? 28 : 40, vertical: 24),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(color: AppColors.border2),
         ),
         child: ConstrainedBox(
@@ -1693,7 +1695,7 @@ Future<String?> promptText(BuildContext context,
           insetPadding:
               const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(R.md),
             side: BorderSide(color: AppColors.border2),
           ),
           child: ConstrainedBox(
@@ -1806,7 +1808,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
           insetPadding:
               const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(R.md),
             side: BorderSide(color: AppColors.border2),
           ),
           child: ConstrainedBox(
@@ -1848,7 +1850,6 @@ Future<T?> showAppSheet<T>(BuildContext context,
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    constraints: const BoxConstraints(maxWidth: 480),
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
       return Container(
@@ -1869,7 +1870,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                       color: AppColors.border2,
                       borderRadius: BorderRadius.circular(99)))),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+            padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
             child: Row(children: [
               Expanded(
                   child: Text(title,
@@ -1883,7 +1884,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
           ),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
               child: child,
             ),
           ),

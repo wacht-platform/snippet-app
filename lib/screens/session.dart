@@ -232,6 +232,9 @@ class _SessionScreenState extends State<SessionScreen>
   // parks them until the in-flight step ends). Shown immediately so the
   // composer doesn't sit empty for a whole tool call.
   final List<String> _optimisticQueued = [];
+  // Indices the user already cancelled/steered. Hidden immediately so the
+  // bubble doesn't wait for the in-flight step to drain the daemon queue.
+  final Set<int> _queueHidden = {};
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
   final List<String> _pending = [];
@@ -537,6 +540,7 @@ class _SessionScreenState extends State<SessionScreen>
         _attachments.clear();
       }
       _optimisticQueued.clear();
+      _queueHidden.clear();
       _clearPendingAll();
       _input.clear();
       _lastInput = '';
@@ -777,6 +781,7 @@ class _SessionScreenState extends State<SessionScreen>
           // jump is needed; preserve whether the user has scrolled into history.
           final follow = _stickToBottom;
           _syncOptimisticQueue(next.queuedInputs);
+          _queueHidden.removeWhere((i) => i >= next.queuedInputs.length);
           // Held messages live on the daemon (`queued_inputs`) and flush there
           // when the run lands on idle. Clients only display / enqueue / cancel.
           // A pending approval/answer is acknowledged the moment the run leaves
@@ -1532,7 +1537,7 @@ class _SessionScreenState extends State<SessionScreen>
       child: Row(children: [
         InkWell(
           onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(99),
           child: SizedBox(
             width: 32,
             height: 32,
@@ -1727,19 +1732,39 @@ class _SessionScreenState extends State<SessionScreen>
 
   List<String> get _heldQueue {
     final live = _state?.queuedInputs ?? const <String>[];
-    if (_optimisticQueued.isEmpty) return live;
     final extra = <String>[];
-    final consumed = List<String>.from(live);
-    for (final m in _optimisticQueued) {
-      final i = consumed.indexOf(m);
-      if (i >= 0) {
-        consumed.removeAt(i);
-      } else {
-        extra.add(m);
+    if (_optimisticQueued.isNotEmpty) {
+      final consumed = List<String>.from(live);
+      for (final m in _optimisticQueued) {
+        final i = consumed.indexOf(m);
+        if (i >= 0) {
+          consumed.removeAt(i);
+        } else {
+          extra.add(m);
+        }
       }
     }
-    if (extra.isEmpty) return live;
-    return [...live, ...extra];
+    final all = extra.isEmpty ? live : [...live, ...extra];
+    if (_queueHidden.isEmpty) return all;
+    return [
+      for (var i = 0; i < all.length; i++)
+        if (!_queueHidden.contains(i)) all[i]
+    ];
+  }
+
+  int _daemonQueueIndex(int visible) {
+    var seen = 0;
+    final n = (_state?.queuedInputs.length ?? 0) + _optimisticQueued.length;
+    for (var i = 0; i < n; i++) {
+      if (_queueHidden.contains(i)) continue;
+      if (seen == visible) return i;
+      seen++;
+    }
+    return visible;
+  }
+
+  void _hideQueuedAt(int visible) {
+    _queueHidden.add(_daemonQueueIndex(visible));
   }
 
   void _syncOptimisticQueue(List<String> live) {
@@ -1753,20 +1778,21 @@ class _SessionScreenState extends State<SessionScreen>
     });
   }
 
-  void _cancelQueuedAt(int i) {
-    if (i < 0 || i >= _heldQueue.length) return;
-    final liveLen = _state?.queuedInputs.length ?? 0;
-    if (i >= liveLen) {
-      final oi = i - liveLen;
-      if (oi >= 0 && oi < _optimisticQueued.length) {
-        _optimisticQueued.removeAt(oi);
-      }
-    }
+  void _cancelQueuedAt(int visible) {
+    if (visible < 0 || visible >= _heldQueue.length) return;
+    final i = _daemonQueueIndex(visible);
+    setState(() => _hideQueuedAt(visible));
     _send({'kind': 'unqueue', 'value': i, 'nonce': _nextNonce()});
   }
 
-  void _steerQueuedAt(int i) {
-    if (i < 0 || i >= _heldQueue.length) return;
+  void _steerQueuedAt(int visible) {
+    if (visible < 0 || visible >= _heldQueue.length) return;
+    final i = _daemonQueueIndex(visible);
+    final text = _heldQueue[visible];
+    setState(() {
+      _hideQueuedAt(visible);
+      _trackPending(text, _nextNonce());
+    });
     _send({'kind': 'steer_queued', 'value': i, 'nonce': _nextNonce()});
     _armAckWatchdog();
   }
@@ -2516,6 +2542,7 @@ class _SessionScreenState extends State<SessionScreen>
         return;
       case 'processes':
         presentScreen(context,
+            style: PanelStyle.drawer,
             builder: (_, close) => ProcessesScreen(
                 client: widget.client,
                 sessionId: widget.sessionId,
@@ -2663,6 +2690,7 @@ class _SessionScreenState extends State<SessionScreen>
                     onOpenFile: widget.onOpenFileTab));
           }),
           onProcesses: () => run(() => presentScreen(context,
+              style: PanelStyle.drawer,
               builder: (_, close) => ProcessesScreen(
                   client: widget.client,
                   sessionId: widget.sessionId,
@@ -2838,7 +2866,7 @@ class _SessionScreenState extends State<SessionScreen>
             Container(
               decoration: BoxDecoration(
                 color: AppColors.bg,
-                borderRadius: BorderRadius.circular(R.card),
+                borderRadius: BorderRadius.circular(R.md),
                 border: Border.all(color: AppColors.border),
               ),
               padding: const EdgeInsets.fromLTRB(18, 20, 12, 14),
@@ -3569,6 +3597,7 @@ class _SessionScreenState extends State<SessionScreen>
       showAppSheet(context, title: 'Usage', child: body);
     } else {
       presentScreen(context,
+          style: PanelStyle.drawer,
           builder: (_, close) =>
               _SessionActionPanel(title: 'Usage', onClose: close, child: body));
     }
@@ -3595,7 +3624,7 @@ class _SessionScreenState extends State<SessionScreen>
                     height: 34,
                     decoration: BoxDecoration(
                         color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(9)),
+                        borderRadius: BorderRadius.circular(R.md)),
                     child: AppIcon('history', size: 17, color: AppColors.fg3)),
                 const SizedBox(width: 12),
                 Expanded(
@@ -3627,6 +3656,7 @@ class _SessionScreenState extends State<SessionScreen>
       showAppSheet(context, title: 'Checkpoints', child: content);
     } else {
       presentScreen(context,
+          style: PanelStyle.drawer,
           builder: (_, close) => _SessionActionPanel(
               title: 'Checkpoints', onClose: close, child: content));
     }
@@ -3695,7 +3725,7 @@ class _SessionScreenState extends State<SessionScreen>
                     height: 34,
                     decoration: BoxDecoration(
                       color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(R.md),
                     ),
                     child: AppIcon('git-branch',
                         size: 17, color: AppColors.accent),
@@ -3729,7 +3759,7 @@ class _SessionScreenState extends State<SessionScreen>
                         height: 34,
                         decoration: BoxDecoration(
                           color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(R.md),
                         ),
                         child: AppIcon('git-branch',
                             size: 17, color: AppColors.fg3),
@@ -4068,51 +4098,59 @@ class _QueuedBubble extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-              width: 5,
-              height: 5,
-              decoration:
-                  BoxDecoration(color: AppColors.fg4, shape: BoxShape.circle)),
-          const SizedBox(width: 7),
-          Text('QUEUED', style: sans(10, color: AppColors.fg4, spacing: 0.8)),
-          const Spacer(),
-          if (onSteer != null)
-            GestureDetector(
-              onTap: onSteer,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+    return Align(
+      alignment: Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
                 decoration: BoxDecoration(
-                  color: AppColors.accentBg,
-                  borderRadius: BorderRadius.circular(R.sm),
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(R.md),
                 ),
-                child: Text('Steer', style: sans(11, color: AppColors.accent)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (text.isNotEmpty)
+                      Text(text,
+                          style: sans(15.5, height: 1.5, color: AppColors.fg1)),
+                    if (images + files + audio > 0) ...[
+                      if (text.isNotEmpty) const SizedBox(height: 8),
+                      AttachmentPill(
+                          audio: audio, images: images, files: files),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          if (onSteer != null) const SizedBox(width: 6),
-          IconBtn('x',
-              size: 26, iconSize: 14, tooltip: 'Cancel', onTap: onCancel),
-        ]),
-        if (text.isNotEmpty) ...[
-          const SizedBox(height: 3),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Text(text,
-                style: sans(13.5, height: 1.5, color: AppColors.fg3)),
+              const SizedBox(height: 4),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Queued', style: sans(11, color: AppColors.fg4)),
+                if (onSteer != null) ...[
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: onSteer,
+                    child: Text('Steer',
+                        style: sans(12, color: AppColors.accent)),
+                  ),
+                ],
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: onCancel,
+                  child: Text('Cancel',
+                      style: sans(12, color: AppColors.fg3)),
+                ),
+              ]),
+            ],
           ),
-        ],
-        if (images + files + audio > 0) ...[
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: AttachmentPill(audio: audio, images: images, files: files),
-          ),
-        ],
-      ]),
+        ),
+      ),
     );
   }
 }
@@ -4677,7 +4715,7 @@ class _QuestionBarState extends State<_QuestionBar> {
         color:
             sel ? AppColors.accent.withValues(alpha: 0.14) : Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(
             color: sel ? AppColors.accent : AppColors.border2,
             width: sel ? 1.2 : 1,
@@ -4685,7 +4723,7 @@ class _QuestionBarState extends State<_QuestionBar> {
         ),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(R.md),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(children: [
@@ -4967,7 +5005,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   void _toggle(String id) => setState(() => _open = _open == id ? null : id);
 
   Widget _section(String label) => Padding(
-        padding: const EdgeInsets.only(top: 10, bottom: 6),
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
         child: SectionLabel(label),
       );
 
@@ -4985,26 +5023,36 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
       children: [
         InkWell(
           onTap: onTap ?? (id == null ? null : () => _toggle(id)),
+          borderRadius: BorderRadius.circular(R.sm),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
             child: Row(children: [
-              AppIcon(icon, size: 15, color: AppColors.fg3),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: Text(label, style: sans(13, color: AppColors.fg1))),
-              if (value != null)
-                Text(value, style: sans(11.5, color: AppColors.fg4)),
-              if (id != null) ...[
+              AppIcon(icon, size: 18, color: AppColors.fg2),
+              const SizedBox(width: 12),
+              Text(label, style: sans(15, color: AppColors.fg1)),
+              const Spacer(),
+              if (value != null) ...[
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: sans(12.5, color: AppColors.fg4)),
+                ),
                 const SizedBox(width: 6),
-                AppIcon(open ? 'chevron-down' : 'chevron-right',
-                    size: 13, color: AppColors.fg4),
               ],
+              if (id != null)
+                AppIcon(open ? 'chevron-down' : 'chevron-right',
+                    size: 15, color: AppColors.fg4)
+              else
+                const SizedBox(width: 15),
             ]),
           ),
         ),
         if (open && child != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(29, 0, 4, 10),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
             child: child,
           ),
       ],
@@ -5027,18 +5075,22 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Rename',
             id: 'rename',
             value: widget.title.isEmpty ? null : widget.title,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                AppField(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Expanded(
+                child: AppField(
                     controller: _titleCtl,
                     hint: 'Session title',
                     onSubmitted: (_) => _saveTitle()),
-                const SizedBox(height: 8),
-                Btn(_savingTitle ? 'Saving…' : 'Save title',
-                    disabled: _savingTitle, onTap: _saveTitle),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 1),
+                child: Btn(_savingTitle ? '…' : 'Save',
+                    small: true,
+                    disabled: _savingTitle,
+                    onTap: _saveTitle),
+              ),
+            ]),
           ),
         if (!kMacOS)
           _row(

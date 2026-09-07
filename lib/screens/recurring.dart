@@ -22,6 +22,8 @@ class RecurringScreen extends StatefulWidget {
   final String? workspace;
   /// Settings: list/pause/delete only — create from a chat menu.
   final bool listOnly;
+  /// When true, skip the app bar and fill the parent (settings dialog pane).
+  final bool embedded;
   const RecurringScreen({
     super.key,
     required this.client,
@@ -29,6 +31,7 @@ class RecurringScreen extends StatefulWidget {
     this.sessionId,
     this.workspace,
     this.listOnly = false,
+    this.embedded = false,
   });
   @override
   State<RecurringScreen> createState() => _RecurringScreenState();
@@ -310,6 +313,71 @@ class _RecurringScreenState extends State<RecurringScreen> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    final body = FutureBuilder<List<RecurringJob>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return Center(
+              child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.fg3)));
+        }
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+            child: Text('${snap.error}',
+                style: sans(13, height: 1.4, color: AppColors.danger)),
+          );
+        }
+        final jobs = snap.data ?? const [];
+        final list = ListView(
+          padding: EdgeInsets.fromLTRB(
+              widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
+          children: [
+            Text(
+              widget.listOnly
+                  ? 'Scheduled goals and messages across chats. Pause or delete here. Create from a chat or Mission Control menu. If a session is already on a goal, the next fire starts the moment it completes.'
+                  : 'The first run fires immediately. Goal fires set an autonomous goal; message fires send a chat turn. Minimum interval 5 minutes; a plan file is reread each fire.',
+              style: sans(12, height: 1.4, color: AppColors.fg3),
+            ),
+            const SizedBox(height: 10),
+            if (jobs.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+                child: Text('No scheduled jobs yet.',
+                    style: sans(13, color: AppColors.fg3)),
+              ),
+            ...jobs.map(_jobRow),
+            if (_canAdd) ...[
+              const SizedBox(height: 4),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _add,
+                  borderRadius: BorderRadius.circular(R.md),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 10),
+                    child: Row(children: [
+                      AppIcon('plus', size: 16, color: AppColors.fg3),
+                      const SizedBox(width: 12),
+                      Text('Add job', style: sans(14, color: AppColors.fg2)),
+                    ]),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+        if (widget.embedded || kMobile) return list;
+        return Center(
+            child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680), child: list));
+      },
+    );
+    if (widget.embedded) return body;
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -317,69 +385,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
           SnAppBar(
               title: 'Scheduled',
               onBack: widget.onClose ?? () => Navigator.pop(context)),
-          Expanded(
-            child: FutureBuilder<List<RecurringJob>>(
-              future: _future,
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return Center(
-                      child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.fg3)));
-                }
-                if (snap.hasError) {
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-                    child: Text('${snap.error}',
-                        style: sans(13, height: 1.4, color: AppColors.danger)),
-                  );
-                }
-                final jobs = snap.data ?? const [];
-                final list = ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-                  children: [
-                    Text(
-                      widget.listOnly
-                          ? 'Scheduled goals and messages across chats. Pause or delete here. Create from a chat or Mission Control menu. If a session is already on a goal, the next fire starts the moment it completes.'
-                          : 'The first run fires immediately. Goal fires set an autonomous goal; message fires send a chat turn. Minimum interval 5 minutes; a plan file is reread each fire.',
-                      style: sans(12, height: 1.4, color: AppColors.fg3),
-                    ),
-                    const SizedBox(height: 10),
-                    if (jobs.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
-                        child: Text('No scheduled jobs yet.',
-                            style: sans(13, color: AppColors.fg3)),
-                      ),
-                    ...jobs.map(_jobRow),
-                    if (_canAdd) ...[
-                      const SizedBox(height: 4),
-                      InkWell(
-                        onTap: _add,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Row(children: [
-                            AppIcon('plus', size: 16, color: AppColors.fg3),
-                            const SizedBox(width: 12),
-                            Text('Add job',
-                                style: sans(14, color: AppColors.fg2)),
-                          ]),
-                        ),
-                      ),
-                    ],
-                  ],
-                );
-                return kMobile
-                    ? list
-                    : Center(
-                        child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 680),
-                            child: list));
-              },
-            ),
-          ),
+          Expanded(child: body),
         ]),
       ),
     );

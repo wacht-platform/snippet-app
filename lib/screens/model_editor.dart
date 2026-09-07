@@ -16,7 +16,11 @@ const _providers = [
   ('anthropic-compatible', 'Anthropic-compatible'),
   ('openrouter', 'OpenRouter'),
   ('xai', 'xAI (Grok)'),
+  ('chatgpt', 'ChatGPT'),
 ];
+
+String _providerLabel(String p) =>
+    _providers.where((e) => e.$1 == p).map((e) => e.$2).firstOrNull ?? p;
 
 bool _needsBaseUrl(String p) =>
     p == 'openai-compatible' || p == 'anthropic-compatible';
@@ -221,16 +225,18 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
                     style: sans(12,
                         weight: FontWeight.w500, color: AppColors.fg2)),
                 const SizedBox(height: 7),
-                Pills<String>(
-                  items: pills,
-                  selected: _provider,
-                  onSelect: _isEdit
-                      ? null
-                      : (val) => setState(() {
-                            _provider = val;
-                            _images = _defaultImages(val);
-                          }),
-                ),
+                if (_isEdit)
+                  Text(_providerLabel(_provider),
+                      style: sans(15, color: AppColors.fg1))
+                else
+                  Pills<String>(
+                    items: pills,
+                    selected: _provider,
+                    onSelect: (val) => setState(() {
+                      _provider = val;
+                      _images = _defaultImages(val);
+                    }),
+                  ),
                 const SizedBox(height: 16),
                 if (!_isEdit) ...[
                   AppField(
@@ -253,14 +259,14 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
                           label: 'Model',
                           controller: _model,
                           mono: true,
-                          hint: 'claude-sonnet-4.5')),
-                  if (!_isChatgpt) ...[
-                    const SizedBox(width: 8),
-                    IconBtn('list',
-                        size: 44,
-                        iconSize: 18,
-                        onTap: _busy ? null : _browseModels),
-                  ],
+                          hint: _isChatgpt
+                              ? 'gpt-5.1-codex'
+                              : 'claude-sonnet-4.5')),
+                  const SizedBox(width: 8),
+                  IconBtn('list',
+                      size: 44,
+                      iconSize: 18,
+                      onTap: _busy ? null : _browseModels),
                 ]),
                 if (_modelHint != null) ...[
                   const SizedBox(height: 6),
@@ -301,11 +307,27 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
                     style: sans(11.5, height: 1.4, color: AppColors.fg4)),
                 const SizedBox(height: 16),
                 if (_isChatgpt)
-                  Text(
-                      'ChatGPT uses the subscription login set up in the TUI — no API key here.',
-                      style: sans(12, height: 1.4, color: AppColors.fg3))
+                  _SubSignIn(
+                    client: widget.client,
+                    signedInLabel: 'Signed in to ChatGPT',
+                    blurb:
+                        'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
+                    buttonLabel: 'Sign in with ChatGPT',
+                    signedIn: (c) => c.chatgptSignedIn(),
+                    begin: (c) => c.chatgptLoginBegin(),
+                    signOut: (c) => c.chatgptLogout(),
+                  )
                 else if (_isXai)
-                  _XaiSignIn(client: widget.client)
+                  _SubSignIn(
+                    client: widget.client,
+                    signedInLabel: 'Signed in to xAI',
+                    blurb:
+                        'Grok uses your SuperGrok / X Premium subscription — no API key.',
+                    buttonLabel: 'Sign in with SuperGrok / X Premium',
+                    signedIn: (c) => c.xaiSignedIn(),
+                    begin: (c) => c.xaiLoginBegin(),
+                    signOut: (c) => c.xaiLogout(),
+                  )
                 else
                   AppField(
                     label: 'API key',
@@ -496,16 +518,31 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
   }
 }
 
-/// xAI subscription (SuperGrok / X Premium) sign-in via the daemon's device-code
-/// flow: shows the code + verification URL, then polls until the token is stored.
-class _XaiSignIn extends StatefulWidget {
+/// Subscription sign-in (ChatGPT / xAI) via the daemon's device-code flow:
+/// shows the code + verification URL, then polls until the token is stored.
+class _SubSignIn extends StatefulWidget {
   final DaemonClient client;
-  const _XaiSignIn({required this.client});
+  final String signedInLabel;
+  final String blurb;
+  final String buttonLabel;
+  final Future<bool> Function(DaemonClient) signedIn;
+  final Future<({String userCode, String verificationUri})> Function(
+      DaemonClient) begin;
+  final Future<void> Function(DaemonClient) signOut;
+  const _SubSignIn({
+    required this.client,
+    required this.signedInLabel,
+    required this.blurb,
+    required this.buttonLabel,
+    required this.signedIn,
+    required this.begin,
+    required this.signOut,
+  });
   @override
-  State<_XaiSignIn> createState() => _XaiSignInState();
+  State<_SubSignIn> createState() => _SubSignInState();
 }
 
-class _XaiSignInState extends State<_XaiSignIn> {
+class _SubSignInState extends State<_SubSignIn> {
   bool _loading = true;
   bool _signedIn = false;
   String? _code;
@@ -526,7 +563,7 @@ class _XaiSignInState extends State<_XaiSignIn> {
   }
 
   Future<void> _refresh() async {
-    final on = await widget.client.xaiSignedIn();
+    final on = await widget.signedIn(widget.client);
     if (mounted)
       setState(() {
         _signedIn = on;
@@ -540,7 +577,7 @@ class _XaiSignInState extends State<_XaiSignIn> {
       _loading = true;
     });
     try {
-      final d = await widget.client.xaiLoginBegin();
+      final d = await widget.begin(widget.client);
       if (!mounted) return;
       setState(() {
         _code = d.userCode;
@@ -549,7 +586,7 @@ class _XaiSignInState extends State<_XaiSignIn> {
       });
       _poll?.cancel();
       _poll = Timer.periodic(const Duration(seconds: 3), (_) async {
-        if (await widget.client.xaiSignedIn()) {
+        if (await widget.signedIn(widget.client)) {
           _poll?.cancel();
           if (mounted)
             setState(() {
@@ -569,13 +606,13 @@ class _XaiSignInState extends State<_XaiSignIn> {
   }
 
   Future<void> _signOut() async {
-    await widget.client.xaiLogout();
+    await widget.signOut(widget.client);
     if (mounted) setState(() => _signedIn = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
+    Theme.of(context);
     if (_loading && _code == null) {
       return SizedBox(
           height: 20,
@@ -587,7 +624,7 @@ class _XaiSignInState extends State<_XaiSignIn> {
       return Row(children: [
         AppIcon('check', size: 16, color: AppColors.ok),
         const SizedBox(width: 8),
-        Text('Signed in to xAI', style: sans(13, color: AppColors.fg2)),
+        Text(widget.signedInLabel, style: sans(13, color: AppColors.fg2)),
         const Spacer(),
         GestureDetector(
             onTap: _signOut,
@@ -623,11 +660,9 @@ class _XaiSignInState extends State<_XaiSignIn> {
       ]);
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Grok uses your SuperGrok / X Premium subscription — no API key.',
-          style: sans(12, height: 1.4, color: AppColors.fg3)),
+      Text(widget.blurb, style: sans(12, height: 1.4, color: AppColors.fg3)),
       const SizedBox(height: 10),
-      Btn('Sign in with SuperGrok / X Premium',
-          icon: 'key', small: true, onTap: _begin),
+      Btn(widget.buttonLabel, icon: 'key', small: true, onTap: _begin),
       if (_err != null) ...[
         SizedBox(height: 8),
         Text(_err!, style: sans(12, color: AppColors.danger))

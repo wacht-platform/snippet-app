@@ -270,6 +270,27 @@ class DaemonClient {
     await http.post(_uri('/xai/logout'), headers: _json);
   }
 
+  /// ChatGPT Plus/Pro/Team device-code sign-in — same shape as xAI.
+  Future<({String userCode, String verificationUri})> chatgptLoginBegin() async {
+    final r = await http.post(_uri('/chatgpt/login'), headers: _json);
+    if (r.statusCode != 200) throw _err('chatgpt login', r);
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    return (
+      userCode: j['user_code'] as String,
+      verificationUri: j['verification_uri'] as String
+    );
+  }
+
+  Future<bool> chatgptSignedIn() async {
+    final r = await http.get(_uri('/chatgpt/status'));
+    if (r.statusCode != 200) return false;
+    return (jsonDecode(r.body) as Map<String, dynamic>)['signed_in'] == true;
+  }
+
+  Future<void> chatgptLogout() async {
+    await http.post(_uri('/chatgpt/logout'), headers: _json);
+  }
+
   /// Set the profile delegated lanes run on. Pass null/'' to clear (delegation
   /// falls back to the active model).
   Future<void> setDelegateProfile(String? name) async {
