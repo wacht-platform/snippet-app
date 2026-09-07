@@ -2015,7 +2015,7 @@ class _SessionScreenState extends State<SessionScreen>
                                             qi++)
                                           KeyedSubtree(
                                             key: ValueKey(
-                                                'queued-$qi-${_heldQueue[qi].hashCode}'),
+                                                'queued-$qi-${_heldQueue[qi].id}'),
                                             child: _QueuedBubble(
                                               text: _queuedText(
                                                   _heldQueue[qi].text),
