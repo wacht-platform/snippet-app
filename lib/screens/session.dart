@@ -231,10 +231,8 @@ class _SessionScreenState extends State<SessionScreen>
   // Queue frames already sent but not yet in `state.queuedInputs` (the daemon
   // parks them until the in-flight step ends). Shown immediately so the
   // composer doesn't sit empty for a whole tool call.
-  final List<String> _optimisticQueued = [];
-  // Messages the user already cancelled/steered. Hide by message rather than
-  // queue index: daemon snapshots can reorder or shrink the queue before the
-  // action is applied, which used to make a steered bubble reappear.
+  final List<QueuedInput> _optimisticQueued = [];
+  // Queue IDs hidden after a local cancel/steer until the daemon confirms them.
   final Set<String> _queueHidden = {};
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
@@ -1220,8 +1218,9 @@ class _SessionScreenState extends State<SessionScreen>
     setState(() {
       if (running) {
         // Hold on the daemon so TUI/app/desktop all see the same queue.
-        _optimisticQueued.add(msg);
-        _send({'kind': 'queue', 'value': msg, 'nonce': nonce});
+        final item = QueuedInput(id: _nextNonce(), text: msg);
+        _optimisticQueued.add(item);
+        _send({'kind': 'queue', 'value': item, 'nonce': nonce});
       } else {
         _send({'kind': 'user_message', 'value': msg, 'nonce': nonce},
             tracked: true);
@@ -1738,60 +1737,35 @@ class _SessionScreenState extends State<SessionScreen>
     _toast('Compacting history');
   }
 
-  List<String> get _heldQueue {
-    final live = _state?.queuedInputs ?? const <String>[];
-    final extra = <String>[];
-    if (_optimisticQueued.isNotEmpty) {
-      final consumed = List<String>.from(live);
-      for (final m in _optimisticQueued) {
-        final i = consumed.indexOf(m);
-        if (i >= 0) {
-          consumed.removeAt(i);
-        } else {
-          extra.add(m);
-        }
-      }
+  List<QueuedInput> get _heldQueue {
+    final live = _state?.queuedInputs ?? const <QueuedInput>[];
+    final extra = <QueuedInput>[];
+    for (final item in _optimisticQueued) {
+      if (!live.any((liveItem) => liveItem.id == item.id)) extra.add(item);
     }
     final all = extra.isEmpty ? live : [...live, ...extra];
-    if (_queueHidden.isEmpty) return all;
-    return all.where((m) => !_queueHidden.contains(m)).toList();
+    return _queueHidden.isEmpty
+        ? all
+        : all.where((item) => !_queueHidden.contains(item.id)).toList();
   }
 
-  int _daemonQueueIndex(int visible) {
-    var seen = 0;
-    final all = [
-      ...?_state?.queuedInputs,
-      ..._optimisticQueued,
-    ];
-    for (var i = 0; i < all.length; i++) {
-      if (_queueHidden.contains(all[i])) continue;
-      if (seen == visible) return i;
-      seen++;
-    }
-    return visible;
+  void _syncOptimisticQueue(List<QueuedInput> live) {
+    _optimisticQueued
+        .removeWhere((item) => live.any((liveItem) => liveItem.id == item.id));
   }
 
   void _hideQueuedAt(int visible) {
     final held = _heldQueue;
-    if (visible >= 0 && visible < held.length) _queueHidden.add(held[visible]);
-  }
-
-  void _syncOptimisticQueue(List<String> live) {
-    if (_optimisticQueued.isEmpty) return;
-    final consumed = List<String>.from(live);
-    _optimisticQueued.removeWhere((m) {
-      final i = consumed.indexOf(m);
-      if (i < 0) return false;
-      consumed.removeAt(i);
-      return true;
-    });
+    if (visible >= 0 && visible < held.length) {
+      _queueHidden.add(held[visible].id);
+    }
   }
 
   void _cancelQueuedAt(int visible) {
     if (visible < 0 || visible >= _heldQueue.length) return;
-    final i = _daemonQueueIndex(visible);
+    final item = _heldQueue[visible];
     setState(() => _hideQueuedAt(visible));
-    _send({'kind': 'unqueue', 'value': i, 'nonce': _nextNonce()});
+    _send({'kind': 'unqueue', 'value': item.id, 'nonce': _nextNonce()});
   }
 
   void _steerAllQueued() {
@@ -1802,20 +1776,19 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _cancelAllQueued() {
-    setState(() => _queueHidden.addAll(_heldQueue));
+    setState(() => _queueHidden.addAll(_heldQueue.map((item) => item.id)));
     _send({'kind': 'drop_queued'});
   }
 
   void _steerQueuedAt(int visible) {
     if (visible < 0 || visible >= _heldQueue.length) return;
-    final i = _daemonQueueIndex(visible);
-    final text = _heldQueue[visible];
+    final item = _heldQueue[visible];
     final nonce = _nextNonce();
     setState(() {
       _hideQueuedAt(visible);
-      _trackPending(text, nonce);
+      _trackPending(item.text, nonce);
     });
-    _send({'kind': 'steer_queued', 'value': i, 'nonce': nonce});
+    _send({'kind': 'steer_queued', 'value': item.id, 'nonce': nonce});
     _armAckWatchdog();
   }
 
@@ -2010,15 +1983,16 @@ class _SessionScreenState extends State<SessionScreen>
                                             key: ValueKey(
                                                 'queued-$qi-${_heldQueue[qi].hashCode}'),
                                             child: _QueuedBubble(
-                                              text: _queuedText(_heldQueue[qi]),
+                                              text: _queuedText(
+                                                  _heldQueue[qi].text),
                                               audio: _queuedAttachCounts(
-                                                      _heldQueue[qi])
+                                                      _heldQueue[qi].text)
                                                   .$1,
                                               images: _queuedAttachCounts(
-                                                      _heldQueue[qi])
+                                                      _heldQueue[qi].text)
                                                   .$2,
                                               files: _queuedAttachCounts(
-                                                      _heldQueue[qi])
+                                                      _heldQueue[qi].text)
                                                   .$3,
                                               onCancel: () =>
                                                   _cancelQueuedAt(qi),
