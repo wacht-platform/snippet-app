@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1398,33 +1399,39 @@ class _DesktopShellState extends State<DesktopShell>
     final openUp = origin.dy > (overlay?.size.height ?? 600) / 2;
     final text = await showDialog<String>(
       context: chipCtx,
-      barrierColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (ctx) {
-        return Stack(children: [
-          Positioned(
-            left: origin.dx.clamp(
-                12.0,
-                overlay == null
-                    ? origin.dx
-                    : math.max(12.0, overlay.size.width - 292).toDouble()),
-            top: openUp ? null : origin.dy + size.height + 4,
-            bottom: openUp
-                ? (overlay == null ? 40.0 : overlay.size.height - origin.dy + 4)
-                : null,
-            child: Material(
-              color: AppColors.surface1,
-              elevation: 0,
-              shape: appMenuShape,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 240, maxWidth: 280),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  child: _GoalPopover(onSet: (t) => Navigator.pop(ctx, t)),
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Stack(children: [
+            Positioned(
+              left: origin.dx.clamp(
+                  12.0,
+                  overlay == null
+                      ? origin.dx
+                      : math.max(12.0, overlay.size.width - 292).toDouble()),
+              top: openUp ? null : origin.dy + size.height + 4,
+              bottom: openUp
+                  ? (overlay == null
+                      ? 40.0
+                      : overlay.size.height - origin.dy + 4)
+                  : null,
+              child: Material(
+                color: AppColors.surface1,
+                elevation: 0,
+                shape: appMenuShape,
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(minWidth: 240, maxWidth: 280),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    child: _GoalPopover(onSet: (t) => Navigator.pop(ctx, t)),
+                  ),
                 ),
               ),
             ),
-          ),
-        ]);
+          ]),
+        );
       },
     );
     final t = text?.trim();
@@ -3020,7 +3027,7 @@ class _SidebarState extends State<_Sidebar> {
                     _enterSelect(seed: s.id);
                   }
                 },
-          onSecondaryTapDown: renaming
+          onSecondaryTapDown: (renaming || !kMobile)
               ? null
               : (details) =>
                   _sessionActions(s, position: details.globalPosition),

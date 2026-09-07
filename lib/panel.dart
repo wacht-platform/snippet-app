@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import 'platform.dart';
@@ -22,7 +24,7 @@ Future<T?> presentScreen<T>(
     context: context,
     barrierDismissible: dismissible,
     barrierLabel: 'panel',
-    barrierColor: Colors.black.withValues(alpha: 0.5),
+    barrierColor: Colors.black.withValues(alpha: 0.58),
     transitionDuration: const Duration(milliseconds: 180),
     pageBuilder: (ctx, _, __) {
       void close() => Navigator.of(ctx).pop();
@@ -56,18 +58,22 @@ Future<T?> presentScreen<T>(
     },
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-      if (style == PanelStyle.dialog) {
-        return FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-              scale: Tween(begin: 0.98, end: 1.0).animate(curved),
-              child: child),
-        );
-      }
-      return SlideTransition(
-        position:
-            Tween(begin: const Offset(1, 0), end: Offset.zero).animate(curved),
-        child: child,
+      final transition = (style == PanelStyle.dialog)
+          ? FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                  scale: Tween(begin: 0.98, end: 1.0).animate(curved),
+                  child: child),
+            )
+          : SlideTransition(
+              position: Tween(begin: const Offset(1, 0), end: Offset.zero)
+                  .animate(curved),
+              child: child,
+            );
+      return BackdropFilter(
+        filter: ImageFilter.blur(
+            sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
+        child: transition,
       );
     },
   );
@@ -93,7 +99,7 @@ Future<T?> showModal<T>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'modal',
-    barrierColor: Colors.black.withValues(alpha: 0.5),
+    barrierColor: Colors.black.withValues(alpha: 0.58),
     transitionDuration: const Duration(milliseconds: 160),
     pageBuilder: (ctx, _, __) => Center(
       child: Padding(
@@ -106,10 +112,15 @@ Future<T?> showModal<T>(
     ),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-      return FadeTransition(
-        opacity: curved,
-        child: ScaleTransition(
-            scale: Tween(begin: 0.98, end: 1.0).animate(curved), child: child),
+      return BackdropFilter(
+        filter: ImageFilter.blur(
+            sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
+        child: FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+              scale: Tween(begin: 0.98, end: 1.0).animate(curved),
+              child: child),
+        ),
       );
     },
   );
