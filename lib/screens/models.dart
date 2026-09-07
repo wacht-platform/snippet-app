@@ -32,7 +32,21 @@ class _ModelsScreenState extends State<ModelsScreen> {
   @override
   void initState() {
     super.initState();
+    modelsRevision.addListener(_onModelsChanged);
     _future = widget.client.getConfig();
+  }
+
+  void _onModelsChanged() {
+    if (!mounted || _inEditor) return;
+    setState(() {
+      _future = widget.client.getConfig(force: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    modelsRevision.removeListener(_onModelsChanged);
+    super.dispose();
   }
 
   void _refresh() {
