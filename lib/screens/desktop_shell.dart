@@ -1614,7 +1614,7 @@ class _DesktopShellState extends State<DesktopShell>
         onTap: onTap,
         borderRadius: BorderRadius.circular(R.xs),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             AppIcon(icon, size: 11, color: AppColors.fg4),
             const SizedBox(width: 5),
