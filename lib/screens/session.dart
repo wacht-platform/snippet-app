@@ -390,6 +390,7 @@ class _SessionScreenState extends State<SessionScreen>
   List<Widget>? _transcriptCache;
   static const _transcriptPageSize = 160;
   int _transcriptStart = 0;
+  bool _loadingOlderTranscript = false;
   final List<_UserMark> _userMarks = [];
   final Map<String, GlobalKey> _userMarkKeys = {};
   double _jumpCacheExtent = 400;
@@ -1936,13 +1937,27 @@ class _SessionScreenState extends State<SessionScreen>
     return 0;
   }
 
-  void _loadOlderTranscript() {
+  Future<void> _loadOlderTranscript() async {
     final state = _state;
-    if (state == null || _transcriptStart == 0) return;
-    setState(() {
-      _transcriptStart = math.max(0, _transcriptStart - _transcriptPageSize);
-      _transcriptDirty = true;
-    });
+    if (state == null || _transcriptStart == 0 || _loadingOlderTranscript)
+      return;
+    setState(() => _loadingOlderTranscript = true);
+    try {
+      final page = await widget.client.sessionEvents(widget.sessionId,
+          before: _transcriptStart, limit: _transcriptPageSize);
+      if (!mounted) return;
+      if (page.events.isNotEmpty) {
+        setState(() {
+          _state = _state!.prependEvents(page.events);
+          _transcriptStart = page.start;
+          _transcriptDirty = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) _toast('$e');
+    } finally {
+      if (mounted) setState(() => _loadingOlderTranscript = false);
+    }
   }
 
   @override
@@ -2003,11 +2018,23 @@ class _SessionScreenState extends State<SessionScreen>
                                         padding:
                                             const EdgeInsets.only(bottom: 12),
                                         child: TextButton.icon(
-                                          onPressed: _loadOlderTranscript,
-                                          icon: const Icon(Icons.history,
-                                              size: 16),
-                                          label:
-                                              const Text('Load older messages'),
+                                          onPressed: _loadingOlderTranscript
+                                              ? null
+                                              : _loadOlderTranscript,
+                                          icon: _loadingOlderTranscript
+                                              ? const SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                  ),
+                                                )
+                                              : const Icon(Icons.history,
+                                                  size: 16),
+                                          label: Text(_loadingOlderTranscript
+                                              ? 'Loading older messages…'
+                                              : 'Load older messages'),
                                         ),
                                       ),
                                     ),

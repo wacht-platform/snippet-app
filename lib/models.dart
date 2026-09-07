@@ -414,6 +414,35 @@ class HarnessState {
     );
   }
 
+  HarnessState prependEvents(List<Map<String, dynamic>> older) {
+    if (older.isEmpty) return this;
+    return HarnessState(
+      status: status,
+      workspace: workspace,
+      title: title,
+      events: [...older, ...events],
+      finalText: finalText,
+      approvalMode: approvalMode,
+      pendingQuestion: pendingQuestion,
+      totalTokens: totalTokens,
+      promptTokens: promptTokens,
+      completionTokens: completionTokens,
+      cacheReadTokens: cacheReadTokens,
+      lastPromptTokens: lastPromptTokens,
+      contextWindow: contextWindow,
+      ratePrimary: ratePrimary,
+      rateSecondary: rateSecondary,
+      checkpoints: checkpoints,
+      goal: goal,
+      compacting: compacting,
+      turnStartedAt: turnStartedAt,
+      compactingStartedAt: compactingStartedAt,
+      watchCount: watchCount,
+      lanes: lanes,
+      queuedInputs: queuedInputs,
+    );
+  }
+
   HarnessState withApprovalMode(String mode) => HarnessState(
         status: status,
         workspace: workspace,
