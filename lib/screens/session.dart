@@ -2506,6 +2506,7 @@ class _SessionScreenState extends State<SessionScreen>
 
   void _openRecurring() {
     presentScreen(context,
+        style: PanelStyle.drawer,
         builder: (_, close) => RecurringScreen(
             client: widget.client,
             onClose: close,
