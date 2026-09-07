@@ -810,8 +810,9 @@ class _SessionScreenState extends State<SessionScreen>
           // jump is needed; preserve whether the user has scrolled into history.
           final follow = _stickToBottom;
           _syncOptimisticQueue(next.queuedInputs);
-          _queueHidden.removeWhere((m) =>
-              !next.queuedInputs.contains(m) && !_optimisticQueued.contains(m));
+          _queueHidden.removeWhere((id) =>
+              !next.queuedInputs.any((item) => item.id == id) &&
+              !_optimisticQueued.any((item) => item.id == id));
           // Held messages live on the daemon (`queued_inputs`) and flush there
           // when the run lands on idle. Clients only display / enqueue / cancel.
           // A pending approval/answer is acknowledged the moment the run leaves
