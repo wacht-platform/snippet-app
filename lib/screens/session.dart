@@ -2129,18 +2129,23 @@ class _SessionScreenState extends State<SessionScreen>
                                         _latestCompactionDetail(events),
                                   ),
                                 ];
-                                return ListView.builder(
-                                  controller: _scroll,
-                                  reverse: true,
-                                  scrollCacheExtent: ScrollCacheExtent.pixels(
-                                      _jumpCacheExtent),
-                                  padding:
-                                      const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                                  itemCount: timeline.length,
-                                  itemBuilder: (context, index) => _centerWide(
-                                    RepaintBoundary(
-                                      child:
-                                          timeline[timeline.length - 1 - index],
+                                return ScrollConfiguration(
+                                  behavior: ScrollConfiguration.of(context)
+                                      .copyWith(scrollbars: false),
+                                  child: ListView.builder(
+                                    controller: _scroll,
+                                    reverse: true,
+                                    scrollCacheExtent: ScrollCacheExtent.pixels(
+                                        _jumpCacheExtent),
+                                    padding: const EdgeInsets.fromLTRB(
+                                        20, 16, 20, 24),
+                                    itemCount: timeline.length,
+                                    itemBuilder: (context, index) =>
+                                        _centerWide(
+                                      RepaintBoundary(
+                                        child: timeline[
+                                            timeline.length - 1 - index],
+                                      ),
                                     ),
                                   ),
                                 );
