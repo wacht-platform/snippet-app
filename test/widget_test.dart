@@ -12,6 +12,26 @@ import 'package:snippet/tool_views.dart';
 import 'package:snippet/widgets.dart';
 
 void main() {
+  test('QueuedInput preserves stable identity and text', () {
+    final item = QueuedInput.fromJson({'id': 'queue-1', 'text': 'duplicate'});
+    expect(item.id, 'queue-1');
+    expect(item.text, 'duplicate');
+    expect(item.toJson(), {'id': 'queue-1', 'text': 'duplicate'});
+  });
+
+  test('HarnessState parses queued inputs by stable identity', () {
+    final state = HarnessState.fromJson({
+      'status': 'running',
+      'workspace': '/workspace',
+      'queued_inputs': [
+        {'id': 'one', 'text': 'same'},
+        {'id': 'two', 'text': 'same'},
+      ],
+    });
+    expect(state.queuedInputs.map((item) => item.id), ['one', 'two']);
+    expect(state.queuedInputs.map((item) => item.text), ['same', 'same']);
+  });
+
   test('HarnessState preserves title fallback and checkpoints', () {
     final state = HarnessState.fromJson({
       'status': 'idle',
