@@ -318,8 +318,11 @@ List<Widget> _editView(Map? a, Map? d,
         : 'Pending'));
   }
   if (d != null && d['note'] != null) {
-    out.add(const SizedBox(height: 10));
-    out.add(_Hint(d['note'].toString()));
+    final note = d['note'].toString();
+    if (!note.contains('whitespace normalization')) {
+      out.add(const SizedBox(height: 10));
+      out.add(_Hint(note));
+    }
   }
   return out;
 }
