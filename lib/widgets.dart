@@ -1101,7 +1101,13 @@ class Bubble extends StatelessWidget {
     final images = matches.where((m) => m.group(1) == 'image').length;
     final files = matches.length - images - audio;
     final textBody = shown.isNotEmpty
-        ? Text(shown, style: sans(15.5, height: 1.5, color: AppColors.fg1))
+        ? MarkdownBody(
+            data: shown,
+            selectable: false,
+            styleSheet: markdownStyle(context),
+            builders: {'pre': PreBlockBuilder()},
+            onTapLink: (txt, href, title) => openMarkdownLink(href),
+          )
         : null;
     final voice = <Widget>[
       if (audio > 0) AttachmentPill(audio: audio, images: 0, files: 0),
