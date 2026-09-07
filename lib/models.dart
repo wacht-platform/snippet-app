@@ -403,7 +403,7 @@ class HarnessState {
       // missing field deserializes to [] and would wipe history after rewind.
       checkpoints:
           d.containsKey('checkpoints') ? base.checkpoints : checkpoints,
-      goal: base.goal,
+      goal: d.containsKey('goal') ? base.goal : goal,
       compacting: base.compacting,
       turnStartedAt: base.turnStartedAt,
       compactingStartedAt: base.compactingStartedAt,
