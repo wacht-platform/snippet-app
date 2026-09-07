@@ -1453,19 +1453,21 @@ class SnAppBar extends StatelessWidget {
   final VoidCallback? onBack;
   final Widget? leading;
   final List<Widget> actions;
+  final double titleSize;
   const SnAppBar(
       {super.key,
       required this.title,
       this.subtitle,
       this.onBack,
       this.leading,
-      this.actions = const []});
+      this.actions = const [],
+      this.titleSize = 17});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     return Container(
-      height: 58,
-      padding: const EdgeInsets.fromLTRB(6, 0, 8, 0),
+      height: 64,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
       decoration: BoxDecoration(
         // Follows the ambient shell surface — desktop panels re-theme this to
         // surface1 so the bar never reads as a darker strip (mobile: still bg).
@@ -1491,7 +1493,7 @@ class SnAppBar extends StatelessWidget {
                 Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: display(17)),
+                    style: display(titleSize)),
                 if (subtitle != null)
                   Text(subtitle!,
                       maxLines: 1,
