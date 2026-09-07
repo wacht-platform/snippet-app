@@ -1648,7 +1648,7 @@ Future<bool> confirmAction(
             side: BorderSide(color: AppColors.border2),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 380),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
               child: Column(
