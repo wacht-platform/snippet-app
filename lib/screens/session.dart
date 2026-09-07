@@ -2545,6 +2545,7 @@ class _SessionScreenState extends State<SessionScreen>
         final ws = s?.workspace ?? '';
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
+            style: PanelStyle.drawer,
             maxWidth: 1060,
             maxHeight: 760,
             builder: (_, close) => FileExplorer(
@@ -2629,6 +2630,7 @@ class _SessionScreenState extends State<SessionScreen>
       item('folder', 'Browse', () {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
+            style: PanelStyle.drawer,
             maxWidth: 1060,
             maxHeight: 760,
             builder: (_, close) => FileExplorer(
@@ -3526,6 +3528,7 @@ class _SessionScreenState extends State<SessionScreen>
     if ((_state?.lanes ?? const <LaneInfo>[]).isEmpty) return;
     presentScreen(
       context,
+      style: PanelStyle.drawer,
       builder: (_, close) => LanesScreen(
         liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
         onClose: close,

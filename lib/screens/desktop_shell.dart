@@ -898,6 +898,7 @@ class _DesktopShellState extends State<DesktopShell>
     if (c == null) return;
     await presentScreen(
       context,
+      style: PanelStyle.drawer,
       maxWidth: 1060,
       maxHeight: 760,
       builder: (_, close) => FileExplorer(
