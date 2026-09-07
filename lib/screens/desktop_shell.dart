@@ -2906,10 +2906,7 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: _sessionRow(s),
-    );
+    return _sessionRow(s);
   }
 
   Widget _missionControlPin(SessionInfo s) {
@@ -3014,28 +3011,23 @@ class _SidebarState extends State<_Sidebar> {
             : (details) => _sessionActions(s, position: details.globalPosition),
         child: Container(
           height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(children: [
-            SizedBox(
-              width: 14,
-              child: _selecting
-                  ? AppIcon(checked ? 'check' : 'plus',
-                      size: 13,
-                      color: checked ? AppColors.accent : AppColors.fg4)
-                  : (waiting || running)
-                      ? Center(
-                          child: Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: waiting ? AppColors.accent : AppColors.run,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        )
-                      : null,
-            ),
-            const SizedBox(width: 8),
+            if (_selecting) ...[
+              AppIcon(checked ? 'check' : 'plus',
+                  size: 13, color: checked ? AppColors.accent : AppColors.fg4),
+              const SizedBox(width: 6),
+            ] else if (waiting || running) ...[
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: waiting ? AppColors.accent : AppColors.run,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
             Expanded(
                 child: renaming
                     ? _inlineRenameField(s, compact: true)
