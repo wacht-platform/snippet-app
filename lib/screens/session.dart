@@ -4129,9 +4129,9 @@ class _QueuedBubble extends StatelessWidget {
           maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
         child: Padding(
-          padding: const EdgeInsets.only(left: 48, top: 2, bottom: 8),
+          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 8),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(14, 7, 6, 10),
+            padding: const EdgeInsets.fromLTRB(14, 10, 12, 12),
             decoration: BoxDecoration(
               color: AppColors.surface2,
               borderRadius: BorderRadius.circular(R.md),
@@ -4141,30 +4141,60 @@ class _QueuedBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  Text('QUEUED',
-                      style: sans(10,
-                          weight: FontWeight.w600,
-                          spacing: 0.7,
-                          color: AppColors.fg4)),
+                  AppIcon('clock', size: 12, color: AppColors.fg4),
+                  const SizedBox(width: 5),
+                  Text('Queued',
+                      style: sans(11,
+                          weight: FontWeight.w500, color: AppColors.fg3)),
                   const Spacer(),
-                  if (onSteer != null)
-                    IconBtn('arrow-right',
-                        size: 26,
-                        iconSize: 13,
-                        tooltip: 'Steer into current run',
-                        onTap: onSteer),
-                  IconBtn('x',
-                      size: 26,
-                      iconSize: 13,
-                      tooltip: 'Remove from queue',
-                      onTap: onCancel),
+                  if (onSteer != null) ...[
+                    Material(
+                      color: AppColors.surface3,
+                      borderRadius: BorderRadius.circular(R.xs),
+                      child: InkWell(
+                        onTap: onSteer,
+                        borderRadius: BorderRadius.circular(R.xs),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            AppIcon('zap', size: 11, color: AppColors.accent),
+                            const SizedBox(width: 4),
+                            Text('Send now',
+                                style: sans(10.5,
+                                    weight: FontWeight.w500,
+                                    color: AppColors.accent)),
+                          ]),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(R.xs),
+                    child: InkWell(
+                      onTap: onCancel,
+                      borderRadius: BorderRadius.circular(R.xs),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          AppIcon('x', size: 11, color: AppColors.fg4),
+                          const SizedBox(width: 3),
+                          Text('Cancel',
+                              style: sans(10.5, color: AppColors.fg4)),
+                        ]),
+                      ),
+                    ),
+                  ),
                 ]),
                 if (text.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.only(right: 4),
                     child: Text(text,
-                        style: sans(15.5, height: 1.5, color: AppColors.fg1)),
+                        style: sans(15, height: 1.45, color: AppColors.fg1)),
                   ),
                 ],
                 if (images + files + audio > 0) ...[
