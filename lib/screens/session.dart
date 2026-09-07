@@ -4105,61 +4105,53 @@ class _QueuedBubble extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.84,
+          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
         child: Padding(
-          padding: const EdgeInsets.only(left: 36, top: 2, bottom: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 9),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(R.md),
-                    border: Border.all(color: AppColors.border),
+          padding: const EdgeInsets.only(left: 48, top: 2, bottom: 8),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 7, 6, 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(R.md),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Text('QUEUED',
+                      style: sans(10,
+                          weight: FontWeight.w600,
+                          spacing: 0.7,
+                          color: AppColors.fg4)),
+                  const Spacer(),
+                  if (onSteer != null)
+                    IconBtn('arrow-right',
+                        size: 26,
+                        iconSize: 13,
+                        tooltip: 'Steer into current run',
+                        onTap: onSteer),
+                  IconBtn('x',
+                      size: 26,
+                      iconSize: 13,
+                      tooltip: 'Remove from queue',
+                      onTap: onCancel),
+                ]),
+                if (text.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(text,
+                        style: sans(15.5, height: 1.5, color: AppColors.fg1)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('QUEUED',
-                          style: sans(10,
-                              weight: FontWeight.w600,
-                              spacing: 0.7,
-                              color: AppColors.fg4)),
-                      if (text.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(text,
-                            style: sans(15.5,
-                                height: 1.5, color: AppColors.fg1)),
-                      ],
-                      if (images + files + audio > 0) ...[
-                        const SizedBox(height: 8),
-                        AttachmentPill(
-                            audio: audio, images: images, files: files),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Column(mainAxisSize: MainAxisSize.min, children: [
-                if (onSteer != null)
-                  IconBtn('arrow-right',
-                      size: 28,
-                      iconSize: 14,
-                      tooltip: 'Steer now',
-                      onTap: onSteer),
-                const SizedBox(height: 4),
-                IconBtn('x',
-                    size: 28,
-                    iconSize: 14,
-                    tooltip: 'Cancel queued message',
-                    onTap: onCancel),
-              ]),
-            ],
+                ],
+                if (images + files + audio > 0) ...[
+                  const SizedBox(height: 8),
+                  AttachmentPill(audio: audio, images: images, files: files),
+                ],
+              ],
+            ),
           ),
         ),
       ),
