@@ -1995,6 +1995,8 @@ class _SessionScreenState extends State<SessionScreen>
                                     const SizedBox(height: 8),
                                     _QueuedSection(
                                       count: _heldQueue.length,
+                                      showBulkActions:
+                                          !kMobile || _heldQueue.length > 1,
                                       onSendAll: _steerAllQueued,
                                       onCancelAll: _cancelAllQueued,
                                       children: [
@@ -4234,11 +4236,13 @@ class _QueuedBubble extends StatelessWidget {
 
 class _QueuedSection extends StatelessWidget {
   final int count;
+  final bool showBulkActions;
   final VoidCallback onSendAll;
   final VoidCallback onCancelAll;
   final List<Widget> children;
   const _QueuedSection({
     required this.count,
+    required this.showBulkActions,
     required this.onSendAll,
     required this.onCancelAll,
     required this.children,
@@ -4260,36 +4264,39 @@ class _QueuedSection extends StatelessWidget {
                       spacing: 0.6,
                       color: AppColors.fg4)),
               const Spacer(),
-              Material(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.xs),
-                child: InkWell(
-                  onTap: onSendAll,
+              if (showBulkActions) ...[
+                Material(
+                  color: AppColors.surface2,
                   borderRadius: BorderRadius.circular(R.xs),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('Send all',
-                        style: sans(10.5,
-                            weight: FontWeight.w600, color: AppColors.accent)),
+                  child: InkWell(
+                    onTap: onSendAll,
+                    borderRadius: BorderRadius.circular(R.xs),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      child: Text('Send all',
+                          style: sans(10.5,
+                              weight: FontWeight.w600,
+                              color: AppColors.accent)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(R.xs),
-                child: InkWell(
-                  onTap: onCancelAll,
+                const SizedBox(width: 8),
+                Material(
+                  color: Colors.transparent,
                   borderRadius: BorderRadius.circular(R.xs),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    child: Text('Cancel all',
-                        style: sans(10.5, color: AppColors.fg4)),
+                  child: InkWell(
+                    onTap: onCancelAll,
+                    borderRadius: BorderRadius.circular(R.xs),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 3),
+                      child: Text('Cancel all',
+                          style: sans(10.5, color: AppColors.fg4)),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ]),
           ),
           ...children,
