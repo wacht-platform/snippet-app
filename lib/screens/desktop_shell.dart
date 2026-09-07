@@ -317,6 +317,10 @@ class _DesktopShellState extends State<DesktopShell>
           } catch (_) {
             return;
           }
+          final kind = e['kind']?.toString() ?? '';
+          if (kind == 'models' || kind == 'config') {
+            modelsRevision.value++;
+          }
           final session = e['session']?.toString() ?? '';
           final status = e['status']?.toString() ?? '';
           if (session.isEmpty || status.isEmpty) return;
@@ -523,8 +527,8 @@ class _DesktopShellState extends State<DesktopShell>
         continue;
       }
       if (same == 0) {
-        leftover = !isDedicatedMcSession(t.sessionId) ||
-            t.title != 'Mission Control';
+        leftover =
+            !isDedicatedMcSession(t.sessionId) || t.title != 'Mission Control';
       } else {
         extras++;
       }
@@ -639,8 +643,8 @@ class _DesktopShellState extends State<DesktopShell>
         _macSessionStatuses.remove(tab.key);
         _macSessionControls.remove(tab.key);
       }
-      _tabs.removeWhere((t) =>
-          !t.isMissionControl || (url != null && t.instanceUrl != url));
+      _tabs.removeWhere(
+          (t) => !t.isMissionControl || (url != null && t.instanceUrl != url));
       _activeIndex = _tabs.isEmpty ? -1 : 0;
     });
     _ensurePinnedMissionControl();
@@ -1024,8 +1028,7 @@ class _DesktopShellState extends State<DesktopShell>
               contentPadding: EdgeInsets.zero,
               leading: AppIcon(t.isMissionControl ? 'layers' : 'terminal',
                   size: 18,
-                  color:
-                      t.isMissionControl ? AppColors.accent : AppColors.fg3),
+                  color: t.isMissionControl ? AppColors.accent : AppColors.fg3),
               title: Text(
                   t.isMissionControl
                       ? 'Mission Control'
@@ -1033,7 +1036,9 @@ class _DesktopShellState extends State<DesktopShell>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(15,
-                      weight: t.isMissionControl ? FontWeight.w600 : FontWeight.w400,
+                      weight: t.isMissionControl
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                       color: AppColors.fg1)),
               subtitle: Text(
                   t.isMissionControl
@@ -1042,8 +1047,8 @@ class _DesktopShellState extends State<DesktopShell>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(12, color: AppColors.fg4)),
-              onTap: () => Navigator.pop(
-                  context, t.isMissionControl ? 'mission-control' : t.sessionId),
+              onTap: () => Navigator.pop(context,
+                  t.isMissionControl ? 'mission-control' : t.sessionId),
             ),
           if (open.isEmpty)
             ListTile(
@@ -1060,13 +1065,11 @@ class _DesktopShellState extends State<DesktopShell>
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: AppIcon('terminal', size: 18, color: AppColors.fg3),
-              title: Text(
-                  s.title.trim().isEmpty ? '(untitled)' : s.title,
+              title: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(15, color: AppColors.fg1)),
-              subtitle: Text(
-                  s.folder.trim().isEmpty ? 'session' : s.folder,
+              subtitle: Text(s.folder.trim().isEmpty ? 'session' : s.folder,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(12, color: AppColors.fg4)),
@@ -1087,7 +1090,8 @@ class _DesktopShellState extends State<DesktopShell>
         break;
       }
     }
-    _openSession(picked, match?.title ?? 'session', match?.profile, share: share);
+    _openSession(picked, match?.title ?? 'session', match?.profile,
+        share: share);
   }
 
   void _openFileTab(DaemonClient client, String url, String path, String name) {
@@ -1240,8 +1244,8 @@ class _DesktopShellState extends State<DesktopShell>
           Container(width: 1, height: 18, color: AppColors.border2),
           _macApprovalChip(
             manual: state?.approvalMode == 'manual',
-            onPick: (manual) => controls.performAction(
-                manual ? 'approval_ask' : 'approval_auto'),
+            onPick: (manual) => controls
+                .performAction(manual ? 'approval_ask' : 'approval_auto'),
           ),
           _macGoalChip(
             active: state?.goal?.ongoing == true,
@@ -1276,9 +1280,7 @@ class _DesktopShellState extends State<DesktopShell>
   }) {
     return Builder(builder: (chipCtx) {
       return Tooltip(
-        message: manual
-            ? 'Ask before tool actions'
-            : 'Auto-approve tools',
+        message: manual ? 'Ask before tool actions' : 'Auto-approve tools',
         child: InkWell(
           onTap: () => _pickApprovalMode(chipCtx, manual, onPick),
           borderRadius: BorderRadius.circular(R.xs),
@@ -1357,7 +1359,9 @@ class _DesktopShellState extends State<DesktopShell>
     return Builder(builder: (chipCtx) {
       return Tooltip(
         message: active
-            ? (paused ? 'Goal paused — tap to cancel' : 'Goal running — tap to cancel')
+            ? (paused
+                ? 'Goal paused — tap to cancel'
+                : 'Goal running — tap to cancel')
             : 'Set an autonomous goal',
         child: InkWell(
           onTap: () {
@@ -1372,8 +1376,7 @@ class _DesktopShellState extends State<DesktopShell>
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               AppIcon('zap',
-                  size: 12,
-                  color: active ? AppColors.accent : AppColors.fg3),
+                  size: 12, color: active ? AppColors.accent : AppColors.fg3),
               const SizedBox(width: 5),
               Text(active ? (paused ? 'Paused' : 'Goal') : 'Goal',
                   style: sans(10.5,
@@ -1408,9 +1411,12 @@ class _DesktopShellState extends State<DesktopShell>
       builder: (ctx) {
         return Stack(children: [
           Positioned(
-            left: origin.dx.clamp(12.0, overlay == null
-                ? origin.dx
-                : (overlay.size.width - 280).clamp(12.0, overlay.size.width)),
+            left: origin.dx.clamp(
+                12.0,
+                overlay == null
+                    ? origin.dx
+                    : (overlay.size.width - 280)
+                        .clamp(12.0, overlay.size.width)),
             top: origin.dy + size.height + 4,
             child: Material(
               color: AppColors.surface1,
@@ -1956,24 +1962,29 @@ class _DesktopShellState extends State<DesktopShell>
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         key: key,
-        margin: EdgeInsets.only(
-            top: mac ? 0 : (kMobile ? 7 : 6),
-            bottom: mac ? 0 : (kMobile ? 7 : 6),
-            left: mac ? 0 : 3,
-            right: mac ? 0 : 3),
-        padding: EdgeInsets.only(
-            left: mac ? 10 : (kMobile ? 13 : 11), right: mac ? 7 : 5),
-        constraints: BoxConstraints(maxWidth: active ? 230 : 180),
+        margin: desktop
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
+        padding:
+            EdgeInsets.only(left: desktop ? 12 : 13, right: desktop ? 8 : 5),
+        constraints: BoxConstraints(maxWidth: active ? 240 : 180),
         decoration: BoxDecoration(
-          color: mac
+          color: desktop
               ? (active ? AppColors.surface1 : Colors.transparent)
               : (active ? AppColors.surface2 : Colors.transparent),
-          borderRadius: mac ? BorderRadius.zero : BorderRadius.circular(R.xs),
-          border: mac
+          borderRadius:
+              desktop ? BorderRadius.zero : BorderRadius.circular(R.xs),
+          border: desktop
               ? Border(
                   bottom: BorderSide(
                       color: active ? AppColors.accent : Colors.transparent,
-                      width: 2))
+                      width: 2),
+                  right: BorderSide(
+                      color: active
+                          ? AppColors.border
+                          : AppColors.border2.withValues(alpha: 0.5),
+                      width: 1),
+                )
               : Border.all(
                   color: active ? AppColors.border : Colors.transparent),
         ),
@@ -2794,8 +2805,8 @@ class _SidebarState extends State<_Sidebar> {
               padding: const EdgeInsets.only(bottom: 2),
               child: _sessionCard(sessions[i])));
         } else {
-          children.add(_desktopTreeRow(sessions[i],
-              last: i == sessions.length - 1));
+          children.add(
+              _desktopTreeRow(sessions[i], last: i == sessions.length - 1));
         }
       }
     }
@@ -2864,9 +2875,8 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   Widget _folderHeader(String folder, {required bool first}) {
-    final name = folder.isEmpty
-        ? 'No folder'
-        : lastPathSegment(folder, ifEmpty: folder);
+    final name =
+        folder.isEmpty ? 'No folder' : lastPathSegment(folder, ifEmpty: folder);
     if (kMobile) {
       return Padding(
         padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 8),
@@ -2945,8 +2955,7 @@ class _SidebarState extends State<_Sidebar> {
     final selected = s.id == widget.selectedSessionId;
     final waiting = s.status == 'waiting_for_input';
     final running = s.status == 'running';
-    void open() =>
-        widget.onOpenSession(s.id, 'Mission Control', s.profile);
+    void open() => widget.onOpenSession(s.id, 'Mission Control', s.profile);
     final status = running || waiting
         ? Container(
             width: kMobile ? 8 : 6,
@@ -3048,19 +3057,26 @@ class _SidebarState extends State<_Sidebar> {
           height: 32,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(children: [
-            if (_selecting) ...[
-              AppIcon(checked ? 'check' : 'plus',
-                  size: 13, color: checked ? AppColors.accent : AppColors.fg4),
-              const SizedBox(width: 8),
-            ] else if (waiting || running) ...[
-              Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                      color: waiting ? AppColors.accent : AppColors.run,
-                      shape: BoxShape.circle)),
-              const SizedBox(width: 8),
-            ],
+            SizedBox(
+              width: 14,
+              child: _selecting
+                  ? AppIcon(checked ? 'check' : 'plus',
+                      size: 13,
+                      color: checked ? AppColors.accent : AppColors.fg4)
+                  : (waiting || running)
+                      ? Center(
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: waiting ? AppColors.accent : AppColors.run,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : null,
+            ),
+            const SizedBox(width: 8),
             Expanded(
                 child: renaming
                     ? _inlineRenameField(s, compact: true)
@@ -3818,7 +3834,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                   child: Row(children: [
                     AppIcon(icon,
                         size: 14,
-                        color: _page == page ? AppColors.accent : AppColors.fg3),
+                        color:
+                            _page == page ? AppColors.accent : AppColors.fg3),
                     const SizedBox(width: 6),
                     Text(label,
                         style: sans(12.5,
@@ -3843,8 +3860,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       _SettingsPage.models =>
         ModelsScreen(client: widget.client, embedded: true),
       _SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
-      _SettingsPage.scheduled => RecurringScreen(
-          client: widget.client, listOnly: true, embedded: true),
+      _SettingsPage.scheduled =>
+        RecurringScreen(client: widget.client, listOnly: true, embedded: true),
     };
   }
 
@@ -3888,9 +3905,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           const SizedBox(height: 20),
           Text('NOTIFICATIONS',
               style: sans(11,
-                  weight: FontWeight.w600,
-                  color: AppColors.fg4,
-                  spacing: 0.6)),
+                  weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.6)),
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
