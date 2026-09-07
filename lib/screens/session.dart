@@ -1805,11 +1805,13 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _steerQueuedAt(int visible) {
-    if (visible < 0 || visible >= _heldQueue.length) return;
-    final item = _heldQueue[visible];
+    final held = _heldQueue;
+    if (visible < 0 || visible >= held.length) return;
+    final item = held[visible];
     final nonce = _nextNonce();
     setState(() {
-      _hideQueuedAt(visible);
+      _queueHidden.add(item.id);
+      _optimisticQueued.removeWhere((queued) => queued.id == item.id);
       _trackPending(item.text, nonce);
     });
     _send({'kind': 'steer_queued', 'value': item.id, 'nonce': nonce});
