@@ -218,102 +218,60 @@ class _FileExplorerState extends State<FileExplorer> {
                 }
               },
               child: Column(children: [
-                SnAppBar(
-                  title: _selecting
-                      ? '${_selected.length} selected'
-                      : widget.title,
-                  onBack: _selecting
-                      ? _exitSelect
-                      : (widget.onClose ?? () => Navigator.pop(context)),
-                  actions: _selecting
-                      ? [
-                          IconBtn('trash',
-                              tooltip: 'Delete',
-                              onTap: (_busy != null ||
-                                      listing == null ||
-                                      _selected.isEmpty)
-                                  ? null
-                                  : () => _deleteSelected(listing.path)),
-                          IconBtn('x', tooltip: 'Cancel', onTap: _exitSelect),
-                        ]
-                      : [
-                          if (listing != null)
-                            IconBtn('git-branch',
-                                tooltip: 'Git',
-                                onTap: () => _openGit(listing.path)),
-                          if (listing != null)
-                            IconBtn('upload',
-                                tooltip: 'Upload files',
-                                onTap: _busy != null
-                                    ? null
-                                    : () => _upload(listing.path)),
-                          if (listing != null)
-                            IconBtn('folder-plus',
-                                tooltip: 'New folder',
-                                onTap: _busy != null
-                                    ? null
-                                    : () => _newFolder(listing.path)),
-                        ],
-                ),
-                if (_busy != null)
+                if (!kMobile)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
-                        border: Border(
-                            bottom: BorderSide(color: AppColors.border))),
+                      color: AppColors.surface1,
+                      border:
+                          Border(bottom: BorderSide(color: AppColors.border)),
+                    ),
                     child: Row(children: [
-                      SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.accent)),
-                      const SizedBox(width: 10),
-                      Text(_busy!, style: sans(12, color: AppColors.fg2)),
-                    ]),
-                  ),
-                if (segs.isNotEmpty ||
-                    (!_selecting &&
-                        listing != null &&
-                        widget.onNewChat != null))
-                  Container(
-                    height: 40,
-                    decoration: BoxDecoration(
-                        border: Border(
-                            bottom: BorderSide(color: AppColors.border))),
-                    child: Row(children: [
+                      IconBtn('chevron-left',
+                          size: 30,
+                          iconSize: 18,
+                          tooltip: _selecting ? 'Exit select' : 'Back',
+                          onTap: _selecting
+                              ? _exitSelect
+                              : (listing?.parent != null &&
+                                      listing?.path != _root
+                                  ? () => _go(listing!.parent!)
+                                  : (widget.onClose ??
+                                      () => Navigator.pop(context)))),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: segs.isEmpty
-                            ? const SizedBox.shrink()
+                            ? Text(widget.title,
+                                style: sans(13,
+                                    weight: FontWeight.w600,
+                                    color: AppColors.fg1))
                             : SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
                                 child: Row(children: [
                                   GestureDetector(
                                     onTap: listing?.parent == null
                                         ? null
                                         : () => _go('/'),
-                                    child: Text('/',
-                                        style: mono(11.5,
-                                            color: listing?.parent == null
-                                                ? AppColors.fg4
-                                                : AppColors.fg3)),
+                                    child: AppIcon('folder',
+                                        size: 14, color: AppColors.fg3),
                                   ),
+                                  const SizedBox(width: 4),
                                   for (var i = 0; i < segs.length; i++) ...[
                                     if (i > 0)
                                       Padding(
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: 2),
-                                          child: AppIcon('chevron-right',
-                                              size: 13, color: AppColors.fg4)),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 3),
+                                        child: AppIcon('chevron-right',
+                                            size: 11, color: AppColors.fg4),
+                                      ),
                                     GestureDetector(
                                       onTap: i == segs.length - 1
                                           ? null
                                           : () => _go(
                                               '/${segs.sublist(0, i + 1).join('/')}'),
                                       child: Text(segs[i],
-                                          style: mono(11.5,
+                                          style: mono(12,
                                               color: i == segs.length - 1
                                                   ? AppColors.fg1
                                                   : AppColors.fg3)),
@@ -322,34 +280,206 @@ class _FileExplorerState extends State<FileExplorer> {
                                 ]),
                               ),
                       ),
-                      if (!_selecting &&
-                          listing != null &&
-                          widget.onNewChat != null)
-                        InkWell(
-                          onTap: () => widget.onNewChat!(listing.path),
-                          borderRadius: BorderRadius.circular(R.xs),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: AppColors.accentBg,
-                              borderRadius: BorderRadius.circular(R.xs),
-                              border: Border.all(color: AppColors.accentLine),
+                      const SizedBox(width: 8),
+                      if (_selecting) ...[
+                        Text('${_selected.length} selected',
+                            style: sans(12, color: AppColors.accent)),
+                        const SizedBox(width: 8),
+                        IconBtn('trash',
+                            size: 28,
+                            iconSize: 14,
+                            tooltip: 'Delete',
+                            onTap: (_busy != null ||
+                                    listing == null ||
+                                    _selected.isEmpty)
+                                ? null
+                                : () => _deleteSelected(listing.path)),
+                        IconBtn('x',
+                            size: 28,
+                            iconSize: 14,
+                            tooltip: 'Cancel',
+                            onTap: _exitSelect),
+                      ] else ...[
+                        if (!_selecting &&
+                            listing != null &&
+                            widget.onNewChat != null)
+                          InkWell(
+                            onTap: () => widget.onNewChat!(listing.path),
+                            borderRadius: BorderRadius.circular(R.xs),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentBg,
+                                borderRadius: BorderRadius.circular(R.xs),
+                                border: Border.all(color: AppColors.accentLine),
+                              ),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    AppIcon('plus',
+                                        size: 11, color: AppColors.accent),
+                                    const SizedBox(width: 4),
+                                    Text('New chat here',
+                                        style: sans(11,
+                                            weight: FontWeight.w600,
+                                            color: AppColors.accent)),
+                                  ]),
                             ),
-                            child:
-                                Row(mainAxisSize: MainAxisSize.min, children: [
-                              AppIcon('plus',
-                                  size: 11, color: AppColors.accent),
-                              const SizedBox(width: 5),
-                              Text('New chat here',
-                                  style: sans(11.5,
-                                      weight: FontWeight.w600,
-                                      color: AppColors.accent)),
-                            ]),
                           ),
-                        ),
+                        if (listing != null) ...[
+                          const SizedBox(width: 4),
+                          IconBtn('git-branch',
+                              size: 28,
+                              iconSize: 14,
+                              tooltip: 'Git',
+                              onTap: () => _openGit(listing.path)),
+                          IconBtn('upload',
+                              size: 28,
+                              iconSize: 14,
+                              tooltip: 'Upload files',
+                              onTap: _busy != null
+                                  ? null
+                                  : () => _upload(listing.path)),
+                          IconBtn('folder-plus',
+                              size: 28,
+                              iconSize: 14,
+                              tooltip: 'New folder',
+                              onTap: _busy != null
+                                  ? null
+                                  : () => _newFolder(listing.path)),
+                        ],
+                        if (widget.onClose != null) ...[
+                          const SizedBox(width: 4),
+                          IconBtn('x',
+                              size: 28,
+                              iconSize: 14,
+                              tooltip: 'Close',
+                              onTap: widget.onClose),
+                        ],
+                      ],
                     ]),
+                  )
+                else ...[
+                  SnAppBar(
+                    title: _selecting
+                        ? '${_selected.length} selected'
+                        : widget.title,
+                    onBack: _selecting
+                        ? _exitSelect
+                        : (widget.onClose ?? () => Navigator.pop(context)),
+                    actions: _selecting
+                        ? [
+                            IconBtn('trash',
+                                tooltip: 'Delete',
+                                onTap: (_busy != null ||
+                                        listing == null ||
+                                        _selected.isEmpty)
+                                    ? null
+                                    : () => _deleteSelected(listing.path)),
+                            IconBtn('x', tooltip: 'Cancel', onTap: _exitSelect),
+                          ]
+                        : [
+                            if (listing != null)
+                              IconBtn('git-branch',
+                                  tooltip: 'Git',
+                                  onTap: () => _openGit(listing.path)),
+                            if (listing != null)
+                              IconBtn('upload',
+                                  tooltip: 'Upload files',
+                                  onTap: _busy != null
+                                      ? null
+                                      : () => _upload(listing.path)),
+                            if (listing != null)
+                              IconBtn('folder-plus',
+                                  tooltip: 'New folder',
+                                  onTap: _busy != null
+                                      ? null
+                                      : () => _newFolder(listing.path)),
+                          ],
                   ),
+                  if (segs.isNotEmpty ||
+                      (!_selecting &&
+                          listing != null &&
+                          widget.onNewChat != null))
+                    Container(
+                      height: 38,
+                      decoration: BoxDecoration(
+                          border: Border(
+                              bottom: BorderSide(color: AppColors.border))),
+                      child: Row(children: [
+                        Expanded(
+                          child: segs.isEmpty
+                              ? const SizedBox.shrink()
+                              : SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14),
+                                  child: Row(children: [
+                                    GestureDetector(
+                                      onTap: listing?.parent == null
+                                          ? null
+                                          : () => _go('/'),
+                                      child: Text('/',
+                                          style: mono(11.5,
+                                              color: listing?.parent == null
+                                                  ? AppColors.fg4
+                                                  : AppColors.fg3)),
+                                    ),
+                                    for (var i = 0; i < segs.length; i++) ...[
+                                      if (i > 0)
+                                        Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 2),
+                                            child: AppIcon('chevron-right',
+                                                size: 13,
+                                                color: AppColors.fg4)),
+                                      GestureDetector(
+                                        onTap: i == segs.length - 1
+                                            ? null
+                                            : () => _go(
+                                                '/${segs.sublist(0, i + 1).join('/')}'),
+                                        child: Text(segs[i],
+                                            style: mono(11.5,
+                                                color: i == segs.length - 1
+                                                    ? AppColors.fg1
+                                                    : AppColors.fg3)),
+                                      ),
+                                    ],
+                                  ]),
+                                ),
+                        ),
+                        if (!_selecting &&
+                            listing != null &&
+                            widget.onNewChat != null)
+                          InkWell(
+                            onTap: () => widget.onNewChat!(listing.path),
+                            borderRadius: BorderRadius.circular(R.xs),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 10),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentBg,
+                                borderRadius: BorderRadius.circular(R.xs),
+                                border: Border.all(color: AppColors.accentLine),
+                              ),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    AppIcon('plus',
+                                        size: 11, color: AppColors.accent),
+                                    const SizedBox(width: 4),
+                                    Text('New chat',
+                                        style: sans(11,
+                                            weight: FontWeight.w600,
+                                            color: AppColors.accent)),
+                                  ]),
+                            ),
+                          ),
+                      ]),
+                    ),
+                ],
                 Expanded(
                   child: snap.connectionState == ConnectionState.waiting
                       ? Center(
