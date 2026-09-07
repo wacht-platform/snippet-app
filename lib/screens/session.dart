@@ -1794,10 +1794,17 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _steerAllQueued() {
-    final count = _heldQueue.length;
-    for (var i = 0; i < count; i++) {
-      _steerQueuedAt(0);
+    final items = List<QueuedInput>.from(_heldQueue);
+    for (final item in items) {
+      final nonce = _nextNonce();
+      setState(() {
+        _queueHidden.add(item.id);
+        _optimisticQueued.removeWhere((queued) => queued.id == item.id);
+        _trackPending(item.text, nonce);
+      });
+      _send({'kind': 'steer_queued', 'value': item.id, 'nonce': nonce});
     }
+    if (items.isNotEmpty) _armAckWatchdog();
   }
 
   void _cancelAllQueued() {
