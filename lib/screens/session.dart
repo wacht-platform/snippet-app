@@ -654,6 +654,11 @@ class _SessionScreenState extends State<SessionScreen>
   void _park() {
     if (_parked) return;
     _parked = true;
+    // Android can restore the activity with the previous EditableText still
+    // focused after a bottom-swipe app switch. Release the focus before the
+    // route is resized again so the IME cannot remain visually stuck on resume.
+    _inputFocus.unfocus();
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     _reconnectTimer?.cancel();
     _bannerTimer?.cancel();
     _connectionWatchdog?.cancel();
