@@ -317,6 +317,10 @@ class _DesktopShellState extends State<DesktopShell>
           } catch (_) {
             return;
           }
+          final kind = e['kind']?.toString() ?? '';
+          if (kind == 'models' || kind == 'config') {
+            modelsRevision.value++;
+          }
           final session = e['session']?.toString() ?? '';
           final status = e['status']?.toString() ?? '';
           if (session.isEmpty || status.isEmpty) return;
@@ -523,8 +527,8 @@ class _DesktopShellState extends State<DesktopShell>
         continue;
       }
       if (same == 0) {
-        leftover = !isDedicatedMcSession(t.sessionId) ||
-            t.title != 'Mission Control';
+        leftover =
+            !isDedicatedMcSession(t.sessionId) || t.title != 'Mission Control';
       } else {
         extras++;
       }
@@ -639,8 +643,8 @@ class _DesktopShellState extends State<DesktopShell>
         _macSessionStatuses.remove(tab.key);
         _macSessionControls.remove(tab.key);
       }
-      _tabs.removeWhere((t) =>
-          !t.isMissionControl || (url != null && t.instanceUrl != url));
+      _tabs.removeWhere(
+          (t) => !t.isMissionControl || (url != null && t.instanceUrl != url));
       _activeIndex = _tabs.isEmpty ? -1 : 0;
     });
     _ensurePinnedMissionControl();
@@ -1024,8 +1028,7 @@ class _DesktopShellState extends State<DesktopShell>
               contentPadding: EdgeInsets.zero,
               leading: AppIcon(t.isMissionControl ? 'layers' : 'terminal',
                   size: 18,
-                  color:
-                      t.isMissionControl ? AppColors.accent : AppColors.fg3),
+                  color: t.isMissionControl ? AppColors.accent : AppColors.fg3),
               title: Text(
                   t.isMissionControl
                       ? 'Mission Control'
@@ -1033,7 +1036,9 @@ class _DesktopShellState extends State<DesktopShell>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(15,
-                      weight: t.isMissionControl ? FontWeight.w600 : FontWeight.w400,
+                      weight: t.isMissionControl
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                       color: AppColors.fg1)),
               subtitle: Text(
                   t.isMissionControl
@@ -1042,8 +1047,8 @@ class _DesktopShellState extends State<DesktopShell>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(12, color: AppColors.fg4)),
-              onTap: () => Navigator.pop(
-                  context, t.isMissionControl ? 'mission-control' : t.sessionId),
+              onTap: () => Navigator.pop(context,
+                  t.isMissionControl ? 'mission-control' : t.sessionId),
             ),
           if (open.isEmpty)
             ListTile(
@@ -1060,13 +1065,11 @@ class _DesktopShellState extends State<DesktopShell>
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: AppIcon('terminal', size: 18, color: AppColors.fg3),
-              title: Text(
-                  s.title.trim().isEmpty ? '(untitled)' : s.title,
+              title: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(15, color: AppColors.fg1)),
-              subtitle: Text(
-                  s.folder.trim().isEmpty ? 'session' : s.folder,
+              subtitle: Text(s.folder.trim().isEmpty ? 'session' : s.folder,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(12, color: AppColors.fg4)),
@@ -1087,7 +1090,8 @@ class _DesktopShellState extends State<DesktopShell>
         break;
       }
     }
-    _openSession(picked, match?.title ?? 'session', match?.profile, share: share);
+    _openSession(picked, match?.title ?? 'session', match?.profile,
+        share: share);
   }
 
   void _openFileTab(DaemonClient client, String url, String path, String name) {
@@ -1240,8 +1244,8 @@ class _DesktopShellState extends State<DesktopShell>
           Container(width: 1, height: 18, color: AppColors.border2),
           _macApprovalChip(
             manual: state?.approvalMode == 'manual',
-            onPick: (manual) => controls.performAction(
-                manual ? 'approval_ask' : 'approval_auto'),
+            onPick: (manual) => controls
+                .performAction(manual ? 'approval_ask' : 'approval_auto'),
           ),
           _macGoalChip(
             active: state?.goal?.ongoing == true,
@@ -1276,9 +1280,7 @@ class _DesktopShellState extends State<DesktopShell>
   }) {
     return Builder(builder: (chipCtx) {
       return Tooltip(
-        message: manual
-            ? 'Ask before tool actions'
-            : 'Auto-approve tools',
+        message: manual ? 'Ask before tool actions' : 'Auto-approve tools',
         child: InkWell(
           onTap: () => _pickApprovalMode(chipCtx, manual, onPick),
           borderRadius: BorderRadius.circular(R.xs),
@@ -1357,7 +1359,9 @@ class _DesktopShellState extends State<DesktopShell>
     return Builder(builder: (chipCtx) {
       return Tooltip(
         message: active
-            ? (paused ? 'Goal paused — tap to cancel' : 'Goal running — tap to cancel')
+            ? (paused
+                ? 'Goal paused — tap to cancel'
+                : 'Goal running — tap to cancel')
             : 'Set an autonomous goal',
         child: InkWell(
           onTap: () {
@@ -1372,8 +1376,7 @@ class _DesktopShellState extends State<DesktopShell>
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               AppIcon('zap',
-                  size: 12,
-                  color: active ? AppColors.accent : AppColors.fg3),
+                  size: 12, color: active ? AppColors.accent : AppColors.fg3),
               const SizedBox(width: 5),
               Text(active ? (paused ? 'Paused' : 'Goal') : 'Goal',
                   style: sans(10.5,
@@ -1408,9 +1411,12 @@ class _DesktopShellState extends State<DesktopShell>
       builder: (ctx) {
         return Stack(children: [
           Positioned(
-            left: origin.dx.clamp(12.0, overlay == null
-                ? origin.dx
-                : (overlay.size.width - 280).clamp(12.0, overlay.size.width)),
+            left: origin.dx.clamp(
+                12.0,
+                overlay == null
+                    ? origin.dx
+                    : (overlay.size.width - 280)
+                        .clamp(12.0, overlay.size.width)),
             top: origin.dy + size.height + 4,
             child: Material(
               color: AppColors.surface1,
@@ -2794,8 +2800,8 @@ class _SidebarState extends State<_Sidebar> {
               padding: const EdgeInsets.only(bottom: 2),
               child: _sessionCard(sessions[i])));
         } else {
-          children.add(_desktopTreeRow(sessions[i],
-              last: i == sessions.length - 1));
+          children.add(
+              _desktopTreeRow(sessions[i], last: i == sessions.length - 1));
         }
       }
     }
@@ -2864,9 +2870,8 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   Widget _folderHeader(String folder, {required bool first}) {
-    final name = folder.isEmpty
-        ? 'No folder'
-        : lastPathSegment(folder, ifEmpty: folder);
+    final name =
+        folder.isEmpty ? 'No folder' : lastPathSegment(folder, ifEmpty: folder);
     if (kMobile) {
       return Padding(
         padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 8),
@@ -2945,8 +2950,7 @@ class _SidebarState extends State<_Sidebar> {
     final selected = s.id == widget.selectedSessionId;
     final waiting = s.status == 'waiting_for_input';
     final running = s.status == 'running';
-    void open() =>
-        widget.onOpenSession(s.id, 'Mission Control', s.profile);
+    void open() => widget.onOpenSession(s.id, 'Mission Control', s.profile);
     final status = running || waiting
         ? Container(
             width: kMobile ? 8 : 6,
@@ -3818,7 +3822,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                   child: Row(children: [
                     AppIcon(icon,
                         size: 14,
-                        color: _page == page ? AppColors.accent : AppColors.fg3),
+                        color:
+                            _page == page ? AppColors.accent : AppColors.fg3),
                     const SizedBox(width: 6),
                     Text(label,
                         style: sans(12.5,
@@ -3843,8 +3848,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       _SettingsPage.models =>
         ModelsScreen(client: widget.client, embedded: true),
       _SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
-      _SettingsPage.scheduled => RecurringScreen(
-          client: widget.client, listOnly: true, embedded: true),
+      _SettingsPage.scheduled =>
+        RecurringScreen(client: widget.client, listOnly: true, embedded: true),
     };
   }
 
@@ -3888,9 +3893,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           const SizedBox(height: 20),
           Text('NOTIFICATIONS',
               style: sans(11,
-                  weight: FontWeight.w600,
-                  color: AppColors.fg4,
-                  spacing: 0.6)),
+                  weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.6)),
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(

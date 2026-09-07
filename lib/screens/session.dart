@@ -103,8 +103,7 @@ class SessionScreen extends StatefulWidget {
 
   /// Gives the macOS shell access to session actions after this state mounts,
   /// allowing the shell chrome to replace the duplicate in-session title bar.
-  final void Function(
-          VoidCallback stop,
+  final void Function(VoidCallback stop,
           void Function(String action, [String? extra]) performAction)?
       onMacControls;
 
@@ -406,6 +405,7 @@ class _SessionScreenState extends State<SessionScreen>
   // (1) a fresh connection resends anything still unacked against the authoritative
   // snapshot; (2) a watchdog forces a resync if _pending doesn't clear in time.
   bool _freshConn = false;
+
   /// Hidden / backgrounded: no attach socket. Background watching is the
   /// per-instance `/events` notify path, not a live transcript attach.
   bool _parked = false;
@@ -489,6 +489,7 @@ class _SessionScreenState extends State<SessionScreen>
     if (!widget.acceptDrops) _parked = true;
     _startSession();
     _loadModel();
+    modelsRevision.addListener(_loadModel);
     unawaited(widget.client.getConfig());
     _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
     _registeredOpenKey = _openKey;
@@ -520,8 +521,7 @@ class _SessionScreenState extends State<SessionScreen>
     if (_isMissionControl && _title != 'Mission Control') {
       _title = 'Mission Control';
     }
-    if (sameSession &&
-        widget.acceptDrops != oldWidget.acceptDrops) {
+    if (sameSession && widget.acceptDrops != oldWidget.acceptDrops) {
       if (widget.acceptDrops) {
         _unpark();
       } else {
@@ -1849,6 +1849,7 @@ class _SessionScreenState extends State<SessionScreen>
   @override
   void dispose() {
     _closed = true;
+    modelsRevision.removeListener(_loadModel);
     _input.removeListener(_interceptBigPaste);
     _inputFocus.unfocus();
     _reconnectTimer?.cancel();
@@ -1977,21 +1978,23 @@ class _SessionScreenState extends State<SessionScreen>
                                                 selectable: false))),
                                   if (_heldQueue.isNotEmpty) ...[
                                     const SizedBox(height: 10),
-                                    for (var qi = 0; qi < _heldQueue.length; qi++)
+                                    for (var qi = 0;
+                                        qi < _heldQueue.length;
+                                        qi++)
                                       KeyedSubtree(
                                         key: ValueKey(
                                             'queued-$qi-${_heldQueue[qi].hashCode}'),
                                         child: _QueuedBubble(
                                           text: _queuedText(_heldQueue[qi]),
-                                          audio:
-                                              _queuedAttachCounts(_heldQueue[qi])
-                                                  .$1,
-                                          images:
-                                              _queuedAttachCounts(_heldQueue[qi])
-                                                  .$2,
-                                          files:
-                                              _queuedAttachCounts(_heldQueue[qi])
-                                                  .$3,
+                                          audio: _queuedAttachCounts(
+                                                  _heldQueue[qi])
+                                              .$1,
+                                          images: _queuedAttachCounts(
+                                                  _heldQueue[qi])
+                                              .$2,
+                                          files: _queuedAttachCounts(
+                                                  _heldQueue[qi])
+                                              .$3,
                                           onCancel: () => _cancelQueuedAt(qi),
                                           onSteer: () => _steerQueuedAt(qi),
                                         ),
@@ -2859,128 +2862,133 @@ class _SessionScreenState extends State<SessionScreen>
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: keyboard),
       child: Container(
-      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 8,
-          widget.embedded ? 0 : 20, 10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
-      child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_attachments.isNotEmpty) _attachmentBar(),
-            if (_isRecording || _recordingPath != null) _recordingPanel(),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.bg,
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border),
-              ),
-              padding: const EdgeInsets.fromLTRB(18, 20, 12, 14),
-              child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    CallbackShortcuts(
-                      bindings: {
-                        const SingleActivator(LogicalKeyboardKey.enter): () {
-                          if (!kMobile && _canSend) _sendMessage();
+        padding: EdgeInsets.fromLTRB(
+            widget.embedded ? 0 : 20,
+            8,
+            widget.embedded ? 0 : 20,
+            10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_attachments.isNotEmpty) _attachmentBar(),
+              if (_isRecording || _recordingPath != null) _recordingPanel(),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.bg,
+                  borderRadius: BorderRadius.circular(R.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                padding: const EdgeInsets.fromLTRB(18, 20, 12, 14),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      CallbackShortcuts(
+                        bindings: {
+                          const SingleActivator(LogicalKeyboardKey.enter): () {
+                            if (!kMobile && _canSend) _sendMessage();
+                          },
+                          const SingleActivator(LogicalKeyboardKey.enter,
+                              meta: true): () {
+                            if (_canSend) _sendMessage();
+                          },
+                          const SingleActivator(LogicalKeyboardKey.enter,
+                              control: true): () {
+                            if (_canSend) _sendMessage();
+                          },
                         },
-                        const SingleActivator(LogicalKeyboardKey.enter,
-                            meta: true): () {
-                          if (_canSend) _sendMessage();
-                        },
-                        const SingleActivator(LogicalKeyboardKey.enter,
-                            control: true): () {
-                          if (_canSend) _sendMessage();
-                        },
-                      },
-                      child: TextField(
-                        controller: _input,
-                        focusNode: _inputFocus,
-                        minLines: 1,
-                        maxLines: 8,
-                        cursorColor: AppColors.fg1,
-                        onSubmitted: (_) => _sendMessage(),
-                        style: sans(16, height: 1.45, color: AppColors.fg1),
-                        decoration: InputDecoration(
-                          isCollapsed: true,
-                          contentPadding:
-                              const EdgeInsets.fromLTRB(2, 4, 8, 14),
-                          border: InputBorder.none,
-                          hintText: 'Ask anything',
-                          hintStyle:
-                              sans(16, height: 1.45, color: AppColors.fg4),
-                        ),
-                      ),
-                    ),
-                    Row(children: [
-                      GestureDetector(
-                        onTap: _onAttachTap,
-                        child: SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: Center(
-                            child:
-                                AppIcon('plus', size: 22, color: AppColors.fg3),
+                        child: TextField(
+                          controller: _input,
+                          focusNode: _inputFocus,
+                          minLines: 1,
+                          maxLines: 8,
+                          cursorColor: AppColors.fg1,
+                          onSubmitted: (_) => _sendMessage(),
+                          style: sans(16, height: 1.45, color: AppColors.fg1),
+                          decoration: InputDecoration(
+                            isCollapsed: true,
+                            contentPadding:
+                                const EdgeInsets.fromLTRB(2, 4, 8, 14),
+                            border: InputBorder.none,
+                            hintText: 'Ask anything',
+                            hintStyle:
+                                sans(16, height: 1.45, color: AppColors.fg4),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 2),
-                      Builder(builder: (chipCtx) {
-                        return GestureDetector(
-                          onTap: () => _switchModel(chipCtx),
-                          child: Container(
-                            padding: const EdgeInsets.fromLTRB(6, 3, 6, 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface2,
-                              borderRadius: BorderRadius.circular(R.sm),
-                            ),
-                            child:
-                                Row(mainAxisSize: MainAxisSize.min, children: [
-                              AppIcon('sparkles',
-                                  size: 11, color: AppColors.fg2),
-                              const SizedBox(width: 4),
-                              Text(_modelLabel ?? 'Auto',
-                                  style: sans(11.5, color: AppColors.fg2)),
-                              const SizedBox(width: 1),
-                              AppIcon('chevron-down',
-                                  size: 10, color: AppColors.fg4),
-                            ]),
-                          ),
-                        );
-                      }),
-                      const Spacer(),
-                      if (kCanRecord)
+                      Row(children: [
                         GestureDetector(
-                          onTap: _onMicTap,
+                          onTap: _onAttachTap,
                           child: SizedBox(
-                            width: 40,
-                            height: 40,
+                            width: 48,
+                            height: 48,
                             child: Center(
-                              child: AppIcon(_isRecording ? 'mic-off' : 'mic',
-                                  size: 18,
-                                  color: _isRecording
-                                      ? AppColors.danger
-                                      : AppColors.fg3),
+                              child: AppIcon('plus',
+                                  size: 22, color: AppColors.fg3),
                             ),
                           ),
                         ),
-                      ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: _input,
-                        builder: (_, __, ___) {
-                          final queue = running && _canSend;
-                          final stop = running && !queue;
-                          return _SendBtn(
-                              enabled: stop || _canSend,
-                              running: stop,
-                              onTap: stop
-                                  ? () => _send({'kind': 'interrupt'})
-                                  : (_canSend ? _sendMessage : null));
-                        },
-                      ),
+                        const SizedBox(width: 2),
+                        Builder(builder: (chipCtx) {
+                          return GestureDetector(
+                            onTap: () => _switchModel(chipCtx),
+                            child: Container(
+                              padding: const EdgeInsets.fromLTRB(6, 3, 6, 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface2,
+                                borderRadius: BorderRadius.circular(R.sm),
+                              ),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    AppIcon('sparkles',
+                                        size: 11, color: AppColors.fg2),
+                                    const SizedBox(width: 4),
+                                    Text(_modelLabel ?? 'Auto',
+                                        style:
+                                            sans(11.5, color: AppColors.fg2)),
+                                    const SizedBox(width: 1),
+                                    AppIcon('chevron-down',
+                                        size: 10, color: AppColors.fg4),
+                                  ]),
+                            ),
+                          );
+                        }),
+                        const Spacer(),
+                        if (kCanRecord)
+                          GestureDetector(
+                            onTap: _onMicTap,
+                            child: SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: Center(
+                                child: AppIcon(_isRecording ? 'mic-off' : 'mic',
+                                    size: 18,
+                                    color: _isRecording
+                                        ? AppColors.danger
+                                        : AppColors.fg3),
+                              ),
+                            ),
+                          ),
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _input,
+                          builder: (_, __, ___) {
+                            final queue = running && _canSend;
+                            final stop = running && !queue;
+                            return _SendBtn(
+                                enabled: stop || _canSend,
+                                running: stop,
+                                onTap: stop
+                                    ? () => _send({'kind': 'interrupt'})
+                                    : (_canSend ? _sendMessage : null));
+                          },
+                        ),
+                      ]),
                     ]),
-                  ]),
-            ),
-          ]),
-    ),
+              ),
+            ]),
+      ),
     );
   }
 
@@ -3508,7 +3516,8 @@ class _SessionScreenState extends State<SessionScreen>
         onClose: close,
         onAskTask: (task) {
           final title = task.title.isEmpty ? task.id : task.title;
-          _input.text = 'Tell me about task "$title" — what\'s the current status?';
+          _input.text =
+              'Tell me about task "$title" — what\'s the current status?';
           _input.selection =
               TextSelection.collapsed(offset: _input.text.length);
           _sendMessage();
@@ -4132,8 +4141,8 @@ class _QueuedBubble extends StatelessWidget {
                       if (text.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(text,
-                            style: sans(15.5,
-                                height: 1.5, color: AppColors.fg1)),
+                            style:
+                                sans(15.5, height: 1.5, color: AppColors.fg1)),
                       ],
                       if (images + files + audio > 0) ...[
                         const SizedBox(height: 8),
@@ -5098,9 +5107,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 1),
                 child: Btn(_savingTitle ? '…' : 'Save',
-                    small: true,
-                    disabled: _savingTitle,
-                    onTap: _saveTitle),
+                    small: true, disabled: _savingTitle, onTap: _saveTitle),
               ),
             ]),
           ),
@@ -5172,7 +5179,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
           _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
           if (!widget.hideShell)
-            _row(icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
+            _row(
+                icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
           _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
         ],
         _section('History'),

@@ -1,6 +1,8 @@
 // Dart models mirroring the snippet `serve` daemon wire shapes. Fields the daemon
 // omits when empty/None are treated as optional here.
 
+import 'package:flutter/foundation.dart';
+
 /// A saved daemon connection (one `snippet serve` instance).
 class Instance {
   final String name;
@@ -393,9 +395,8 @@ class HarnessState {
       compactingStartedAt: base.compactingStartedAt,
       watchCount: base.watchCount,
       lanes: base.lanes,
-      queuedInputs: d.containsKey('queued_inputs')
-          ? base.queuedInputs
-          : queuedInputs,
+      queuedInputs:
+          d.containsKey('queued_inputs') ? base.queuedInputs : queuedInputs,
     );
   }
 
@@ -636,6 +637,7 @@ class MissionControlOverview {
   final int totalSessions;
   final List<MissionControlTask> recentTasks;
   final List<ManagedSession> recentSessions;
+
   /// Daemon-side id of the active Mission Control session, if one is open.
   /// Resolved client-side from the settings sidecar; null when the user has
   /// never opened Mission Control on this device.
@@ -808,3 +810,7 @@ class RecurringJob {
     return kind;
   }
 }
+
+/// Global notifier bumped whenever model profiles are added, updated, or deleted
+/// so open session views, composers, and settings can refresh their pickers live.
+final ValueNotifier<int> modelsRevision = ValueNotifier<int>(0);
