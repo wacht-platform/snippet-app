@@ -3730,24 +3730,24 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         bottom: false,
         child: Column(children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
             child: Row(children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Settings',
-                        style: sans(18,
+                        style: sans(14.5,
                             weight: FontWeight.w600, color: AppColors.fg1)),
                     const SizedBox(height: 2),
                     Text('Configure this workspace and its models.',
-                        style: sans(12, color: AppColors.fg3)),
+                        style: sans(11.5, color: AppColors.fg3)),
                   ],
                 ),
               ),
               IconBtn('x',
-                  size: 32,
-                  iconSize: 16,
+                  size: 26,
+                  iconSize: 13,
                   tooltip: 'Close',
                   onTap: widget.onClose),
             ]),
@@ -3755,7 +3755,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           Divider(height: 1, color: AppColors.border),
           Expanded(
             child: Column(children: [
-              SizedBox(height: 48, child: _navChips()),
+              SizedBox(height: 38, child: _navChips()),
               Divider(height: 1, color: AppColors.border),
               Expanded(child: _pageBody()),
             ]),
@@ -3768,7 +3768,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   Widget _navChips() {
     return ListView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(18, 7, 18, 7),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       children: [
         for (final (page, icon, label) in _nav)
           Padding(
@@ -3781,15 +3781,15 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 borderRadius: BorderRadius.circular(R.sm),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   child: Row(children: [
                     AppIcon(icon,
-                        size: 14,
+                        size: 13,
                         color:
                             _page == page ? AppColors.accent : AppColors.fg3),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Text(label,
-                        style: sans(12.5,
+                        style: sans(11.5,
                             weight: _page == page
                                 ? FontWeight.w600
                                 : FontWeight.w400,
@@ -3818,29 +3818,29 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   Widget _generalPage() {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
       children: [
         Text('General',
-            style: sans(18, weight: FontWeight.w600, color: AppColors.fg1)),
-        const SizedBox(height: 4),
+            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+        const SizedBox(height: 3),
         Text('Manage the machine this app connects to and its alerts.',
-            style: sans(12.5, color: AppColors.fg3)),
-        const SizedBox(height: 18),
+            style: sans(11.5, color: AppColors.fg3)),
+        const SizedBox(height: 14),
         Text('MACHINES',
-            style: sans(11,
-                weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.6)),
-        const SizedBox(height: 8),
+            style: sans(10,
+                weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
+        const SizedBox(height: 6),
         Container(
           decoration: BoxDecoration(
             color: AppColors.surface2,
             border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(R.md),
+            borderRadius: BorderRadius.circular(R.sm),
           ),
           child: _instances.isEmpty
               ? Padding(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
                   child: Text('No saved connections.',
-                      style: sans(13, color: AppColors.fg3)),
+                      style: sans(12, color: AppColors.fg3)),
                 )
               : Column(
                   children: [
@@ -3853,19 +3853,19 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 ),
         ),
         if (kCanNotify) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Text('NOTIFICATIONS',
-              style: sans(11,
-                  weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.6)),
-          const SizedBox(height: 8),
+              style: sans(10,
+                  weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
+          const SizedBox(height: 6),
           Container(
             decoration: BoxDecoration(
               color: AppColors.surface2,
               border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(R.md),
+              borderRadius: BorderRadius.circular(R.sm),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               child: _notifTile(),
             ),
           ),
@@ -3879,11 +3879,11 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return Material(
       color: Colors.transparent,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+        padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
         child: Row(children: [
           AppIcon('cpu',
-              size: 16, color: isActive ? AppColors.accent : AppColors.fg3),
-          const SizedBox(width: 12),
+              size: 14, color: isActive ? AppColors.accent : AppColors.fg3),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3891,23 +3891,24 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 Text(i.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(14, color: AppColors.fg1)),
-                const SizedBox(height: 2),
+                    style: sans(12.5,
+                        weight: FontWeight.w500, color: AppColors.fg1)),
+                const SizedBox(height: 1),
                 Text(hostOf(i.url),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: mono(11.5, color: AppColors.fg4)),
+                    style: mono(10.5, color: AppColors.fg4)),
               ],
             ),
           ),
           if (isActive)
             Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: Text('active', style: sans(11, color: AppColors.accent)),
+              child: Text('active', style: sans(10, color: AppColors.accent)),
             ),
           IconBtn('trash',
-              size: 32,
-              iconSize: 16,
+              size: 26,
+              iconSize: 13,
               tooltip: 'Remove',
               onTap: () => _confirmRemove(i)),
         ]),
@@ -3917,27 +3918,29 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   Widget _notifTile() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(children: [
-        AppIcon('zap', size: 16, color: AppColors.fg3),
-        const SizedBox(width: 12),
+        AppIcon('zap', size: 14, color: AppColors.fg3),
+        const SizedBox(width: 10),
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Alerts', style: sans(14, color: AppColors.fg1)),
-            const SizedBox(height: 2),
+            Text('Alerts',
+                style:
+                    sans(12.5, weight: FontWeight.w500, color: AppColors.fg1)),
+            const SizedBox(height: 1),
             Text('Notify when a session needs input',
-                style: sans(12, color: AppColors.fg4)),
+                style: sans(11, color: AppColors.fg4)),
           ]),
         ),
         _notifBusy
             ? SizedBox(
-                width: 18,
-                height: 18,
+                width: 16,
+                height: 16,
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: AppColors.fg3))
             : Transform.scale(
-                scale: 0.78,
+                scale: 0.72,
                 child: Switch(
                   value: _notif,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
