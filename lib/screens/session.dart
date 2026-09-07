@@ -388,10 +388,6 @@ class _SessionScreenState extends State<SessionScreen>
   static const int _maxAttachments = 5;
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
-  static const _transcriptPageSize = 160;
-  int _transcriptStart = 0;
-  bool _loadingOlderTranscript = false;
-
   // Stream frame throttle: store the latest pending stream payload and flush
   // at most every 50ms to avoid rebuilding the full widget tree on every token.
   String _pendingLiveText = '';
@@ -740,41 +736,6 @@ class _SessionScreenState extends State<SessionScreen>
           // fromJson wiped the transcript to empty until the next real state
           // frame (often only after a TUI-side persist).
           final wire = j['wire'] as String? ?? 'snapshot';
-          if (wire == 'history') {
-            final rawEvents = j['events'];
-            final older = rawEvents is List
-                ? rawEvents
-                    .whereType<Map>()
-                    .map((e) => e.cast<String, dynamic>())
-                    .toList()
-                : const <Map<String, dynamic>>[];
-            if (older.isNotEmpty) {
-              final beforePixels =
-                  _scroll.hasClients ? _scroll.position.pixels : 0.0;
-              final beforeMax =
-                  _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
-              setState(() {
-                _state = _state?.prependEvents(older);
-                _transcriptStart = (j['start'] as num?)?.toInt() ?? 0;
-                _transcriptDirty = true;
-              });
-              // Older rows are inserted at the far end of this reversed list.
-              // Restore the old viewport after layout so the scrollbar thumb does
-              // not jump while the user is dragging through history.
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted || !_scroll.hasClients) return;
-                final addedExtent =
-                    _scroll.position.maxScrollExtent - beforeMax;
-                final target = (beforePixels + addedExtent)
-                    .clamp(0.0, _scroll.position.maxScrollExtent);
-                if ((target - _scroll.position.pixels).abs() > 0.5) {
-                  _scroll.jumpTo(target);
-                }
-              });
-            }
-            _loadingOlderTranscript = false;
-            return;
-          }
           if (wire == 'term') {
             _applyTermFrame(j);
             return;
@@ -1078,17 +1039,9 @@ class _SessionScreenState extends State<SessionScreen>
     } else if (n is ScrollEndNotification) {
       _stickToBottom = _atBottom();
     }
-    // In the reversed transcript, the older-history edge is the maximum scroll
-    // extent. Start the next page as it enters the viewport instead of requiring
-    // a button tap; the loading guard prevents duplicate requests during a drag.
-    if (n is ScrollUpdateNotification || n is ScrollEndNotification) {
-      final m = n.metrics;
-      if (m.maxScrollExtent > 0 &&
-          m.pixels >= m.maxScrollExtent - 320 &&
-          _transcriptStart > 0) {
-        _loadOlderTranscript();
-      }
-    }
+    // User scrolling only updates pinning; history pages are not fetched from
+    // scroll notifications because changing the list extent during a gesture
+    // causes the viewport and thumb to jump.
     // Repaint only on the pinned/unpinned EDGE — it toggles the floating
     // "jump to latest" button over the transcript.
     if (was != _stickToBottom && mounted) setState(() {});
@@ -1981,19 +1934,6 @@ class _SessionScreenState extends State<SessionScreen>
     return 0;
   }
 
-  Future<void> _loadOlderTranscript() async {
-    final state = _state;
-    if (state == null || _transcriptStart == 0 || _loadingOlderTranscript) {
-      return;
-    }
-    _loadingOlderTranscript = true;
-    _send({
-      'kind': 'history',
-      'before': _transcriptStart,
-      'limit': _transcriptPageSize,
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     // Depend on Theme so this rebuilds when the user switches palettes.
@@ -2003,12 +1943,7 @@ class _SessionScreenState extends State<SessionScreen>
     final running = status == 'running';
     final waiting = status == 'waiting_for_input';
     final allEvents = s?.events ?? const [];
-    if (_transcriptStart == 0 && allEvents.length > _transcriptPageSize) {
-      _transcriptStart = allEvents.length - _transcriptPageSize;
-    } else if (_transcriptStart > allEvents.length) {
-      _transcriptStart = 0;
-    }
-    final events = allEvents.sublist(_transcriptStart);
+    final events = allEvents;
     if (_transcriptDirty || _transcriptCache == null) {
       _transcriptCache = _transcript(events);
       _transcriptDirty = false;
@@ -3369,7 +3304,6 @@ class _SessionScreenState extends State<SessionScreen>
           break;
       }
     }
-    endTools('transcript-end');
     return out;
   }
 
