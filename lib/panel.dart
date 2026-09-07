@@ -123,28 +123,37 @@ Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
   final panel = rounded || edge;
   final color = panel ? AppColors.surface1 : AppColors.bg;
   final radius = BorderRadius.circular(R.card);
-  return ClipRRect(
-    borderRadius: rounded ? radius : BorderRadius.zero,
-    child: Material(
+
+  Widget themedBody = !panel
+      ? child
+      : Builder(
+          builder: (ctx) => Theme(
+            data: Theme.of(ctx).copyWith(scaffoldBackgroundColor: color),
+            child: child,
+          ),
+        );
+
+  if (rounded) {
+    return Material(
       color: color,
-      borderRadius: rounded ? radius : null,
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: rounded ? radius : null,
-          border: rounded
-              ? Border.all(color: AppColors.border2)
-              : (edge ? Border(left: BorderSide(color: AppColors.border)) : null),
-        ),
-        child: !panel
-            ? child
-            : Builder(
-                builder: (ctx) => Theme(
-                  data: Theme.of(ctx).copyWith(scaffoldBackgroundColor: color),
-                  child: child,
-                ),
-              ),
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(color: AppColors.border2),
       ),
-    ),
-  );
+      clipBehavior: Clip.antiAlias,
+      child: themedBody,
+    );
+  }
+
+  if (edge) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        border: Border(left: BorderSide(color: AppColors.border)),
+      ),
+      child: themedBody,
+    );
+  }
+
+  return themedBody;
 }
