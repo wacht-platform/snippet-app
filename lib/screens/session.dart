@@ -751,10 +751,27 @@ class _SessionScreenState extends State<SessionScreen>
                     .toList()
                 : const <Map<String, dynamic>>[];
             if (older.isNotEmpty) {
+              final beforePixels =
+                  _scroll.hasClients ? _scroll.position.pixels : 0.0;
+              final beforeMax =
+                  _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
               setState(() {
                 _state = _state?.prependEvents(older);
                 _transcriptStart = (j['start'] as num?)?.toInt() ?? 0;
                 _transcriptDirty = true;
+              });
+              // Older rows are inserted at the far end of this reversed list.
+              // Restore the old viewport after layout so the scrollbar thumb does
+              // not jump while the user is dragging through history.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted || !_scroll.hasClients) return;
+                final addedExtent =
+                    _scroll.position.maxScrollExtent - beforeMax;
+                final target = (beforePixels + addedExtent)
+                    .clamp(0.0, _scroll.position.maxScrollExtent);
+                if ((target - _scroll.position.pixels).abs() > 0.5) {
+                  _scroll.jumpTo(target);
+                }
               });
             }
             _loadingOlderTranscript = false;
