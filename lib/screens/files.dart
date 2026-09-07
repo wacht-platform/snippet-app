@@ -55,6 +55,8 @@ class _FileExplorerState extends State<FileExplorer> {
       _busy; // non-null while uploading/deleting (label shown in a progress strip)
   String?
       _root; // the folder we opened at — the OS back button climbs no higher
+  String? _viewingPath;
+  String? _viewingName;
 
   @override
   void initState() {
@@ -169,11 +171,10 @@ class _FileExplorerState extends State<FileExplorer> {
       open(e.path, e.name);
       return;
     }
-    presentScreen(
-      context,
-      builder: (_, close) => FileViewer(
-          client: widget.client, path: e.path, name: e.name, onClose: close),
-    );
+    setState(() {
+      _viewingPath = e.path;
+      _viewingName = e.name;
+    });
   }
 
   // Git for the current folder directly — no session required (the daemon runs
@@ -187,6 +188,17 @@ class _FileExplorerState extends State<FileExplorer> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    if (_viewingPath != null) {
+      return FileViewer(
+        client: widget.client,
+        path: _viewingPath!,
+        name: _viewingName ?? '',
+        onClose: () => setState(() {
+          _viewingPath = null;
+          _viewingName = null;
+        }),
+      );
+    }
     return Scaffold(
       body: SafeArea(
         bottom: false,

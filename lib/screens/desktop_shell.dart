@@ -892,6 +892,7 @@ class _DesktopShellState extends State<DesktopShell>
   // "New chat here" — the explorer doubles as the new-chat picker.
   Future<void> _newSessionFlow() async {
     final c = _client;
+    final active = _active;
     if (c == null) return;
     await presentScreen(
       context,
@@ -899,8 +900,14 @@ class _DesktopShellState extends State<DesktopShell>
       maxHeight: 760,
       builder: (_, close) => FileExplorer(
         client: c,
-        title: _active?.label ?? 'Files',
+        title: active?.label ?? 'Files',
         onClose: close,
+        onOpenFile: (path, name) {
+          close();
+          if (active != null) {
+            _openFileTab(c, active.url, path, name);
+          }
+        },
         onNewChat: (folder) async {
           try {
             final id = await c.openSession(folder, newConversation: true);
