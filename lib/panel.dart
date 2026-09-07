@@ -122,25 +122,29 @@ Future<T?> showModal<T>(
 Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
   final panel = rounded || edge;
   final color = panel ? AppColors.surface1 : AppColors.bg;
-  return Material(
-    color: color,
-    borderRadius: rounded ? BorderRadius.circular(R.md) : null,
-    clipBehavior: Clip.antiAlias,
-    child: Container(
-      decoration: BoxDecoration(
-        borderRadius: rounded ? BorderRadius.circular(R.md) : null,
-        border: rounded
-            ? Border.all(color: AppColors.border2)
-            : (edge ? Border(left: BorderSide(color: AppColors.border)) : null),
-      ),
-      child: !panel
-          ? child
-          : Builder(
-              builder: (ctx) => Theme(
-                data: Theme.of(ctx).copyWith(scaffoldBackgroundColor: color),
-                child: child,
+  final radius = BorderRadius.circular(R.card);
+  return ClipRRect(
+    borderRadius: rounded ? radius : BorderRadius.zero,
+    child: Material(
+      color: color,
+      borderRadius: rounded ? radius : null,
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: rounded ? radius : null,
+          border: rounded
+              ? Border.all(color: AppColors.border2)
+              : (edge ? Border(left: BorderSide(color: AppColors.border)) : null),
+        ),
+        child: !panel
+            ? child
+            : Builder(
+                builder: (ctx) => Theme(
+                  data: Theme.of(ctx).copyWith(scaffoldBackgroundColor: color),
+                  child: child,
+                ),
               ),
-            ),
+      ),
     ),
   );
 }

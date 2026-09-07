@@ -232,9 +232,10 @@ class _SessionScreenState extends State<SessionScreen>
   // parks them until the in-flight step ends). Shown immediately so the
   // composer doesn't sit empty for a whole tool call.
   final List<String> _optimisticQueued = [];
-  // Indices the user already cancelled/steered. Hidden immediately so the
-  // bubble doesn't wait for the in-flight step to drain the daemon queue.
-  final Set<int> _queueHidden = {};
+  // Messages the user already cancelled/steered. Hide by message rather than
+  // queue index: daemon snapshots can reorder or shrink the queue before the
+  // action is applied, which used to make a steered bubble reappear.
+  final Set<String> _queueHidden = {};
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
   final List<String> _pending = [];
@@ -781,7 +782,8 @@ class _SessionScreenState extends State<SessionScreen>
           // jump is needed; preserve whether the user has scrolled into history.
           final follow = _stickToBottom;
           _syncOptimisticQueue(next.queuedInputs);
-          _queueHidden.removeWhere((i) => i >= next.queuedInputs.length);
+          _queueHidden.removeWhere((m) =>
+              !next.queuedInputs.contains(m) && !_optimisticQueued.contains(m));
           // Held messages live on the daemon (`queued_inputs`) and flush there
           // when the run lands on idle. Clients only display / enqueue / cancel.
           // A pending approval/answer is acknowledged the moment the run leaves
@@ -1746,17 +1748,17 @@ class _SessionScreenState extends State<SessionScreen>
     }
     final all = extra.isEmpty ? live : [...live, ...extra];
     if (_queueHidden.isEmpty) return all;
-    return [
-      for (var i = 0; i < all.length; i++)
-        if (!_queueHidden.contains(i)) all[i]
-    ];
+    return all.where((m) => !_queueHidden.contains(m)).toList();
   }
 
   int _daemonQueueIndex(int visible) {
     var seen = 0;
-    final n = (_state?.queuedInputs.length ?? 0) + _optimisticQueued.length;
-    for (var i = 0; i < n; i++) {
-      if (_queueHidden.contains(i)) continue;
+    final all = [
+      ...?_state?.queuedInputs,
+      ..._optimisticQueued,
+    ];
+    for (var i = 0; i < all.length; i++) {
+      if (_queueHidden.contains(all[i])) continue;
       if (seen == visible) return i;
       seen++;
     }
@@ -1764,7 +1766,8 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _hideQueuedAt(int visible) {
-    _queueHidden.add(_daemonQueueIndex(visible));
+    final held = _heldQueue;
+    if (visible >= 0 && visible < held.length) _queueHidden.add(held[visible]);
   }
 
   void _syncOptimisticQueue(List<String> live) {
@@ -1789,11 +1792,12 @@ class _SessionScreenState extends State<SessionScreen>
     if (visible < 0 || visible >= _heldQueue.length) return;
     final i = _daemonQueueIndex(visible);
     final text = _heldQueue[visible];
+    final nonce = _nextNonce();
     setState(() {
       _hideQueuedAt(visible);
-      _trackPending(text, _nextNonce());
+      _trackPending(text, nonce);
     });
-    _send({'kind': 'steer_queued', 'value': i, 'nonce': _nextNonce()});
+    _send({'kind': 'steer_queued', 'value': i, 'nonce': nonce});
     _armAckWatchdog();
   }
 
@@ -1971,6 +1975,28 @@ class _SessionScreenState extends State<SessionScreen>
                                                 mine: true,
                                                 text: _pending[pi],
                                                 selectable: false))),
+                                  if (_heldQueue.isNotEmpty) ...[
+                                    const SizedBox(height: 10),
+                                    for (var qi = 0; qi < _heldQueue.length; qi++)
+                                      KeyedSubtree(
+                                        key: ValueKey(
+                                            'queued-$qi-${_heldQueue[qi].hashCode}'),
+                                        child: _QueuedBubble(
+                                          text: _queuedText(_heldQueue[qi]),
+                                          audio:
+                                              _queuedAttachCounts(_heldQueue[qi])
+                                                  .$1,
+                                          images:
+                                              _queuedAttachCounts(_heldQueue[qi])
+                                                  .$2,
+                                          files:
+                                              _queuedAttachCounts(_heldQueue[qi])
+                                                  .$3,
+                                          onCancel: () => _cancelQueuedAt(qi),
+                                          onSteer: () => _steerQueuedAt(qi),
+                                        ),
+                                      ),
+                                  ],
                                   if (_liveTextVisible &&
                                       _liveText.trim().isNotEmpty)
                                     Padding(
@@ -1994,28 +2020,6 @@ class _SessionScreenState extends State<SessionScreen>
                                         thinking: _turnHasVisibleAction(events)
                                             ? ''
                                             : _liveThinking),
-                                  ],
-                                  if (_heldQueue.isNotEmpty) ...[
-                                    const SizedBox(height: 12),
-                                    for (var qi = 0; qi < _heldQueue.length; qi++)
-                                      KeyedSubtree(
-                                        key: ValueKey(
-                                            'queued-$qi-${_heldQueue[qi].hashCode}'),
-                                        child: _QueuedBubble(
-                                          text: _queuedText(_heldQueue[qi]),
-                                          audio:
-                                              _queuedAttachCounts(_heldQueue[qi])
-                                                  .$1,
-                                          images:
-                                              _queuedAttachCounts(_heldQueue[qi])
-                                                  .$2,
-                                          files:
-                                              _queuedAttachCounts(_heldQueue[qi])
-                                                  .$3,
-                                          onCancel: () => _cancelQueuedAt(qi),
-                                          onSteer: () => _steerQueuedAt(qi),
-                                        ),
-                                      ),
                                   ],
                                 ];
                                 return ListView.builder(
@@ -4016,20 +4020,19 @@ class _ChurningStatusState extends State<_ChurningStatus> {
                     child:
                         Center(child: BrailleSpinner(color: AppColors.accent))),
                 const SizedBox(width: 8),
-                Flexible(
-                  child: Text.rich(TextSpan(children: [
-                    TextSpan(
-                        text: _verb,
-                        style: sans(13,
-                            weight: FontWeight.w600, color: AppColors.accent)),
-                    TextSpan(
-                        text: ' $_elapsed',
-                        style: sans(13,
-                            color: AppColors.accent.withValues(alpha: 0.72))),
-                  ])),
+                Expanded(
+                  child: Text(_verb,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13,
+                          weight: FontWeight.w600, color: AppColors.accent)),
                 ),
+                const SizedBox(width: 8),
+                Text(_elapsed,
+                    style: mono(11.5,
+                        color: AppColors.accent.withValues(alpha: 0.72))),
                 if (thought.isNotEmpty) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   AppIcon(_open ? 'chevron-down' : 'chevron-right',
                       size: 13, color: AppColors.accent.withValues(alpha: 0.7)),
                 ],
@@ -4102,50 +4105,59 @@ class _QueuedBubble extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+          maxWidth: MediaQuery.sizeOf(context).width * 0.84,
         ),
         child: Padding(
-          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 8),
-          child: Column(
+          padding: const EdgeInsets.only(left: 36, top: 2, bottom: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.md),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (text.isNotEmpty)
-                      Text(text,
-                          style: sans(15.5, height: 1.5, color: AppColors.fg1)),
-                    if (images + files + audio > 0) ...[
-                      if (text.isNotEmpty) const SizedBox(height: 8),
-                      AttachmentPill(
-                          audio: audio, images: images, files: files),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 9),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(R.md),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('QUEUED',
+                          style: sans(10,
+                              weight: FontWeight.w600,
+                              spacing: 0.7,
+                              color: AppColors.fg4)),
+                      if (text.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(text,
+                            style: sans(15.5,
+                                height: 1.5, color: AppColors.fg1)),
+                      ],
+                      if (images + files + audio > 0) ...[
+                        const SizedBox(height: 8),
+                        AttachmentPill(
+                            audio: audio, images: images, files: files),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Text('Queued', style: sans(11, color: AppColors.fg4)),
-                if (onSteer != null) ...[
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: onSteer,
-                    child: Text('Steer',
-                        style: sans(12, color: AppColors.accent)),
-                  ),
-                ],
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: onCancel,
-                  child: Text('Cancel',
-                      style: sans(12, color: AppColors.fg3)),
-                ),
+              const SizedBox(width: 6),
+              Column(mainAxisSize: MainAxisSize.min, children: [
+                if (onSteer != null)
+                  IconBtn('arrow-right',
+                      size: 28,
+                      iconSize: 14,
+                      tooltip: 'Steer now',
+                      onTap: onSteer),
+                const SizedBox(height: 4),
+                IconBtn('x',
+                    size: 28,
+                    iconSize: 14,
+                    tooltip: 'Cancel queued message',
+                    onTap: onCancel),
               ]),
             ],
           ),
