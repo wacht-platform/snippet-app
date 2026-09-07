@@ -2697,7 +2697,7 @@ class _SidebarState extends State<_Sidebar> {
     // Desktop: flat rounded rows matching the thread list (no sub line).
     if (!kMobile) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 1),
+        padding: const EdgeInsets.fromLTRB(6, 0, 6, 1),
         child: Material(
           color: active ? AppColors.accentBg : Colors.transparent,
           borderRadius: BorderRadius.circular(R.sm),
