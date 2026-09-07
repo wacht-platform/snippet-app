@@ -939,7 +939,6 @@ class _SessionScreenState extends State<SessionScreen>
           if (eventsChanged) _transcriptDirty = true;
           setState(() {
             _state = next;
-            _scheduleHistoryPrefetch();
             if (!_isMissionControl) {
               final nextTitle = next.title ?? widget.title;
               if (nextTitle != _title && nextTitle.isNotEmpty) {
@@ -964,6 +963,7 @@ class _SessionScreenState extends State<SessionScreen>
               }
             }
           });
+          if (eventsChanged) _scheduleHistoryPrefetch();
           widget.onMacStatus?.call(next, next.status == 'running');
           widget.onMacControls
               ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
