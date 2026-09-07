@@ -388,6 +388,8 @@ class _SessionScreenState extends State<SessionScreen>
   static const int _maxAttachments = 5;
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
+  static const _transcriptPageSize = 160;
+  int _transcriptStart = 0;
   final List<_UserMark> _userMarks = [];
   final Map<String, GlobalKey> _userMarkKeys = {};
   double _jumpCacheExtent = 400;
@@ -1934,6 +1936,15 @@ class _SessionScreenState extends State<SessionScreen>
     return 0;
   }
 
+  void _loadOlderTranscript() {
+    final state = _state;
+    if (state == null || _transcriptStart == 0) return;
+    setState(() {
+      _transcriptStart = math.max(0, _transcriptStart - _transcriptPageSize);
+      _transcriptDirty = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Depend on Theme so this rebuilds when the user switches palettes.
@@ -1942,7 +1953,13 @@ class _SessionScreenState extends State<SessionScreen>
     final status = s?.status ?? 'connecting';
     final running = status == 'running';
     final waiting = status == 'waiting_for_input';
-    final events = s?.events ?? const [];
+    final allEvents = s?.events ?? const [];
+    if (_transcriptStart == 0 && allEvents.length > _transcriptPageSize) {
+      _transcriptStart = allEvents.length - _transcriptPageSize;
+    } else if (_transcriptStart > allEvents.length) {
+      _transcriptStart = 0;
+    }
+    final events = allEvents.sublist(_transcriptStart);
     if (_transcriptDirty || _transcriptCache == null) {
       _transcriptCache = _transcript(events);
       _transcriptDirty = false;
@@ -1978,6 +1995,22 @@ class _SessionScreenState extends State<SessionScreen>
                               onNotification: _onScroll,
                               child: Builder(builder: (context) {
                                 final timeline = <Widget>[
+                                  if (_transcriptStart > 0)
+                                    Semantics(
+                                      button: true,
+                                      label: 'Load older transcript messages',
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 12),
+                                        child: TextButton.icon(
+                                          onPressed: _loadOlderTranscript,
+                                          icon: const Icon(Icons.history,
+                                              size: 16),
+                                          label:
+                                              const Text('Load older messages'),
+                                        ),
+                                      ),
+                                    ),
                                   if (items.isEmpty && !running)
                                     const EmptyState(
                                         icon: 'terminal',
