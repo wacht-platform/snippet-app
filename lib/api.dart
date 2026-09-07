@@ -24,6 +24,7 @@ class DaemonClient {
 
   ServerConfig? _configCache;
   Future<ServerConfig>? _configInFlight;
+  int _configGeneration = 0;
 
   DaemonClient(this.baseUrl, this.token);
 
@@ -147,9 +148,10 @@ class DaemonClient {
     final pending = () async {
       final r = await http.get(_uri('/config'));
       if (r.statusCode != 200) throw _err('load config', r);
+      final generation = _configGeneration;
       final cfg =
           ServerConfig.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
-      _configCache = cfg;
+      if (generation == _configGeneration) _configCache = cfg;
       return cfg;
     }();
     _configInFlight = pending;
@@ -161,6 +163,7 @@ class DaemonClient {
   }
 
   void invalidateConfig() {
+    _configGeneration++;
     _configCache = null;
     _configInFlight = null;
   }
@@ -271,7 +274,8 @@ class DaemonClient {
   }
 
   /// ChatGPT Plus/Pro/Team device-code sign-in — same shape as xAI.
-  Future<({String userCode, String verificationUri})> chatgptLoginBegin() async {
+  Future<({String userCode, String verificationUri})>
+      chatgptLoginBegin() async {
     final r = await http.post(_uri('/chatgpt/login'), headers: _json);
     if (r.statusCode != 200) throw _err('chatgpt login', r);
     final j = jsonDecode(r.body) as Map<String, dynamic>;
