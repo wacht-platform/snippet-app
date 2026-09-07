@@ -278,7 +278,14 @@ class LaneNotice extends StatelessWidget {
                   const SizedBox(width: 9),
                   Text(status, style: mono(9.5, color: color)),
                   const SizedBox(width: 5),
-                  AppIcon('chevron-right', size: 13, color: AppColors.fg4),
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Center(
+                      child: AppIcon('chevron-right',
+                          size: 11, color: AppColors.fg4),
+                    ),
+                  ),
                 ]),
                 if (summary != null && summary!.trim().isNotEmpty) ...[
                   const SizedBox(height: 6),
