@@ -327,14 +327,24 @@ class _FileExplorerState extends State<FileExplorer> {
                           widget.onNewChat != null)
                         InkWell(
                           onTap: () => widget.onNewChat!(listing.path),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(8, 0, 14, 0),
+                          borderRadius: BorderRadius.circular(R.xs),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentBg,
+                              borderRadius: BorderRadius.circular(R.xs),
+                              border: Border.all(color: AppColors.accentLine),
+                            ),
                             child:
                                 Row(mainAxisSize: MainAxisSize.min, children: [
-                              AppIcon('edit', size: 13, color: AppColors.fg3),
-                              const SizedBox(width: 6),
-                              Text('New chat',
-                                  style: sans(12.5, color: AppColors.fg2)),
+                              AppIcon('plus',
+                                  size: 11, color: AppColors.accent),
+                              const SizedBox(width: 5),
+                              Text('New chat here',
+                                  style: sans(11.5,
+                                      weight: FontWeight.w600,
+                                      color: AppColors.accent)),
                             ]),
                           ),
                         ),
@@ -361,14 +371,15 @@ class _FileExplorerState extends State<FileExplorer> {
                                 if (listing!.parent != null && !_selecting)
                                   _Row(
                                       icon: 'folder-open',
-                                      name: '..',
+                                      name: '.. (parent directory)',
                                       muted: true,
                                       onTap: () => _go(listing.parent)),
                                 ...listing.entries.map((e) => _Row(
-                                      icon: e.isDir ? 'folder' : 'file',
+                                      icon: _entryIcon(e.name, e.isDir),
                                       name: e.name,
                                       git: e.git,
-                                      chevron: e.isDir && !_selecting,
+                                      chevron:
+                                          e.isDir && kMobile && !_selecting,
                                       selecting: _selecting,
                                       selected: _selected.contains(e.path),
                                       onTap: _selecting
@@ -390,6 +401,44 @@ class _FileExplorerState extends State<FileExplorer> {
       ),
     );
   }
+
+  static String _entryIcon(String name, bool isDir) {
+    if (isDir) return 'folder';
+    final l = name.toLowerCase();
+    if (l.endsWith('.rs') ||
+        l.endsWith('.dart') ||
+        l.endsWith('.py') ||
+        l.endsWith('.js') ||
+        l.endsWith('.ts') ||
+        l.endsWith('.tsx') ||
+        l.endsWith('.jsx') ||
+        l.endsWith('.go') ||
+        l.endsWith('.c') ||
+        l.endsWith('.cpp') ||
+        l.endsWith('.h') ||
+        l.endsWith('.sh') ||
+        l.endsWith('.html') ||
+        l.endsWith('.css')) {
+      return 'code';
+    }
+    if (l.endsWith('.png') ||
+        l.endsWith('.jpg') ||
+        l.endsWith('.jpeg') ||
+        l.endsWith('.webp') ||
+        l.endsWith('.svg') ||
+        l.endsWith('.gif')) {
+      return 'image';
+    }
+    if (l.endsWith('.json') ||
+        l.endsWith('.toml') ||
+        l.endsWith('.yaml') ||
+        l.endsWith('.yml') ||
+        l.endsWith('.lock') ||
+        l.endsWith('.env')) {
+      return 'settings';
+    }
+    return 'file-text';
+  }
 }
 
 class _Row extends StatelessWidget {
@@ -410,7 +459,7 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final isFile = icon == 'file';
+    final isFolder = icon == 'folder' || icon == 'folder-open';
     return Material(
       color: selected ? AppColors.accentBg : Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
@@ -419,17 +468,18 @@ class _Row extends StatelessWidget {
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(R.sm),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          padding: EdgeInsets.symmetric(
+              horizontal: 12, vertical: kMobile ? 11 : 6.5),
           child: Row(children: [
             if (selecting) ...[_checkbox(selected), const SizedBox(width: 11)],
             AppIcon(icon,
-                size: 18, color: isFile ? AppColors.fg3 : AppColors.accent),
-            const SizedBox(width: 11),
+                size: 16, color: isFolder ? AppColors.accent : AppColors.fg3),
+            const SizedBox(width: 10),
             Expanded(
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: mono(13,
+                    style: mono(kMobile ? 13 : 12.5,
                         color: muted ? AppColors.fg3 : AppColors.fg1))),
             if (git) ...[
               AppIcon('git-branch', size: 12, color: AppColors.ok),

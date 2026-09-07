@@ -2537,6 +2537,8 @@ class _SessionScreenState extends State<SessionScreen>
         final ws = s?.workspace ?? '';
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
+            maxWidth: 1060,
+            maxHeight: 760,
             builder: (_, close) => FileExplorer(
                 client: widget.client,
                 title: name,
@@ -2619,6 +2621,8 @@ class _SessionScreenState extends State<SessionScreen>
       item('folder', 'Browse', () {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
+            maxWidth: 1060,
+            maxHeight: 760,
             builder: (_, close) => FileExplorer(
                 client: widget.client,
                 title: name,
@@ -2689,6 +2693,8 @@ class _SessionScreenState extends State<SessionScreen>
           onFiles: () => run(() {
             final name = lastPathSegment(ws, ifEmpty: 'Files');
             presentScreen(context,
+                maxWidth: 1060,
+                maxHeight: 760,
                 builder: (_, close) => FileExplorer(
                     client: widget.client,
                     title: name,
