@@ -228,6 +228,18 @@ class Checkpoint {
             : int.tryParse('${j['message_index'] ?? ''}') ?? 0;
 }
 
+class QueuedInput {
+  final String id;
+  final String text;
+  const QueuedInput({required this.id, required this.text});
+
+  factory QueuedInput.fromJson(dynamic raw) {
+    final j = (raw as Map).cast<String, dynamic>();
+    return QueuedInput(
+        id: j['id'] as String? ?? '', text: j['text'] as String? ?? '');
+  }
+}
+
 class HarnessState {
   final String status;
   final String workspace;
@@ -254,7 +266,7 @@ class HarnessState {
   final List<LaneInfo> lanes; // delegated background lanes (live status)
   /// Messages typed while a run is in progress — held on the daemon until the
   /// turn ends, then submitted. Shared across TUI and app clients.
-  final List<String> queuedInputs;
+  final List<QueuedInput> queuedInputs;
 
   HarnessState({
     required this.status,
@@ -349,8 +361,8 @@ class HarnessState {
       lanes: mapList(j['lanes']).map(LaneInfo.fromJson).toList(),
       queuedInputs: (j['queued_inputs'] is List)
           ? (j['queued_inputs'] as List)
-              .map((e) => e?.toString() ?? '')
-              .where((s) => s.isNotEmpty)
+              .map(QueuedInput.fromJson)
+              .where((item) => item.id.isNotEmpty && item.text.isNotEmpty)
               .toList()
           : const [],
     );
