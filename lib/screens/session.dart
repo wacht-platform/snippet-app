@@ -4145,8 +4145,6 @@ class _QueuedBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.surface2,
                   borderRadius: BorderRadius.circular(R.card),
-                  border: Border.all(
-                      color: AppColors.border2.withValues(alpha: 0.5)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -4169,24 +4167,35 @@ class _QueuedBubble extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Queued', style: sans(10.5, color: AppColors.fg4)),
-                    const SizedBox(width: 8),
+                    Text('Queued',
+                        style:
+                            sans(kMobile ? 11.5 : 10.5, color: AppColors.fg4)),
+                    const SizedBox(width: 10),
                     if (onSteer != null) ...[
                       GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: onSteer,
-                        child: Text('Send now',
-                            style: sans(10.5,
-                                weight: FontWeight.w500,
-                                color: AppColors.accent)),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 3),
+                          child: Text('Send now',
+                              style: sans(kMobile ? 12 : 10.5,
+                                  weight: FontWeight.w600,
+                                  color: AppColors.accent)),
+                        ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                     ],
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: onCancel,
-                      child: Text('Cancel',
-                          style: sans(10.5, color: AppColors.fg4)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
+                        child: Text('Cancel',
+                            style: sans(kMobile ? 12 : 10.5,
+                                color: AppColors.fg4)),
+                      ),
                     ),
                   ],
                 ),
@@ -4962,6 +4971,9 @@ class _SendBtn extends StatelessWidget {
   const _SendBtn({required this.enabled, this.running = false, this.onTap});
   @override
   Widget build(BuildContext context) {
+    final size = kMobile ? 42.0 : 34.0;
+    final iconSize =
+        running ? (kMobile ? 16.0 : 13.0) : (kMobile ? 18.0 : 15.0);
     return Material(
       color: enabled ? AppColors.fg1 : AppColors.surface2,
       shape: const CircleBorder(),
@@ -4969,11 +4981,11 @@ class _SendBtn extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: SizedBox(
-          width: 36,
-          height: 36,
+          width: size,
+          height: size,
           child: Center(
               child: AppIcon(running ? 'stop' : 'arrow-up',
-                  size: running ? 15 : 16,
+                  size: iconSize,
                   color: enabled ? AppColors.bg : AppColors.fg4)),
         ),
       ),
