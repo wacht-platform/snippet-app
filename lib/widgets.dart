@@ -189,7 +189,8 @@ class _ToastCardState extends State<_ToastCard>
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(a.label,
                         style: sans(12,
-                                weight: FontWeight.w600, color: AppColors.accent)
+                                weight: FontWeight.w600,
+                                color: AppColors.accent)
                             .copyWith(decoration: TextDecoration.none)),
                   ),
                 ),
@@ -1635,33 +1636,33 @@ Future<bool> confirmAction(
       return Dialog(
         backgroundColor: AppColors.surface1,
         elevation: 0,
-        insetPadding: EdgeInsets.symmetric(
-            horizontal: kMobile ? 28 : 40, vertical: 24),
+        insetPadding:
+            EdgeInsets.symmetric(horizontal: kMobile ? 28 : 40, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(color: AppColors.border2),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 300),
+          constraints: const BoxConstraints(maxWidth: 380),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(title,
-                    style: sans(13.5,
+                    style: sans(15,
                         weight: FontWeight.w600, color: AppColors.fg1)),
-                const SizedBox(height: 6),
-                Text(body, style: sans(12, height: 1.35, color: AppColors.fg3)),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                Text(body, style: sans(13, height: 1.45, color: AppColors.fg3)),
+                const SizedBox(height: 16),
                 Row(children: [
                   const Spacer(),
                   Btn('Cancel',
                       variant: BtnVariant.ghost,
                       small: true,
                       onTap: () => Navigator.pop(ctx, false)),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Btn(confirmLabel,
                       variant: danger ? BtnVariant.danger : BtnVariant.primary,
                       small: true,

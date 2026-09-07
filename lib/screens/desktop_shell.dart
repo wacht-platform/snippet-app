@@ -1296,11 +1296,12 @@ class _DesktopShellState extends State<DesktopShell>
     RelativeRect position;
     if (box != null && overlay != null) {
       final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+      final openUp = origin.dy > overlay.size.height / 2;
       position = RelativeRect.fromLTRB(
-        origin.dx,
-        origin.dy + box.size.height + 4,
+        origin.dx.clamp(12.0, math.max(12.0, overlay.size.width - 280)),
+        openUp ? (origin.dy - 110) : (origin.dy + box.size.height + 4),
         overlay.size.width - origin.dx - box.size.width,
-        overlay.size.height - origin.dy,
+        openUp ? (overlay.size.height - origin.dy + 4) : 0,
       );
     } else {
       position = const RelativeRect.fromLTRB(16, 48, 16, 16);
@@ -1390,6 +1391,7 @@ class _DesktopShellState extends State<DesktopShell>
       origin = box.localToGlobal(Offset.zero, ancestor: overlay);
       size = box.size;
     }
+    final openUp = origin.dy > (overlay?.size.height ?? 600) / 2;
     final text = await showDialog<String>(
       context: chipCtx,
       barrierColor: Colors.transparent,
@@ -1400,9 +1402,11 @@ class _DesktopShellState extends State<DesktopShell>
                 12.0,
                 overlay == null
                     ? origin.dx
-                    : (overlay.size.width - 280)
-                        .clamp(12.0, overlay.size.width)),
-            top: origin.dy + size.height + 4,
+                    : math.max(12.0, overlay.size.width - 292)),
+            top: openUp ? null : origin.dy + size.height + 4,
+            bottom: openUp
+                ? (overlay == null ? 40.0 : overlay.size.height - origin.dy + 4)
+                : null,
             child: Material(
               color: AppColors.surface1,
               elevation: 0,
@@ -2301,6 +2305,7 @@ class _SidebarState extends State<_Sidebar> {
   bool _selecting = false;
   final Set<String> _selected = {};
   String? _renamingId;
+  String? _hoveredId;
   final TextEditingController _renameCtl = TextEditingController();
   final FocusNode _renameFocus = FocusNode();
 
@@ -2982,66 +2987,104 @@ class _SidebarState extends State<_Sidebar> {
     final running = s.status == 'running';
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
-    return Material(
-      color: selected || checked ? AppColors.surface2 : Colors.transparent,
-      borderRadius: BorderRadius.circular(R.sm),
-      child: InkWell(
+    final hovered = !kMobile && _hoveredId == s.id;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hoveredId = s.id),
+      onExit: (_) {
+        if (_hoveredId == s.id) setState(() => _hoveredId = null);
+      },
+      child: Material(
+        color: selected || checked ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),
-        onTap: renaming
-            ? null
-            : () {
-                if (_selecting) {
-                  _toggleSelected(s.id);
-                } else {
-                  widget.onOpenSession(s.id, s.title, s.profile);
-                }
-              },
-        onLongPress: renaming
-            ? null
-            : () {
-                if (_selecting) {
-                  _toggleSelected(s.id);
-                } else {
-                  _enterSelect(seed: s.id);
-                }
-              },
-        onSecondaryTapDown: renaming
-            ? null
-            : (details) => _sessionActions(s, position: details.globalPosition),
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(children: [
-            if (_selecting) ...[
-              AppIcon(checked ? 'check' : 'plus',
-                  size: 13, color: checked ? AppColors.accent : AppColors.fg4),
-              const SizedBox(width: 6),
-            ] else if (waiting || running) ...[
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: waiting ? AppColors.accent : AppColors.run,
-                  shape: BoxShape.circle,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.sm),
+          onTap: renaming
+              ? null
+              : () {
+                  if (_selecting) {
+                    _toggleSelected(s.id);
+                  } else {
+                    widget.onOpenSession(s.id, s.title, s.profile);
+                  }
+                },
+          onLongPress: renaming
+              ? null
+              : () {
+                  if (_selecting) {
+                    _toggleSelected(s.id);
+                  } else {
+                    _enterSelect(seed: s.id);
+                  }
+                },
+          onSecondaryTapDown: renaming
+              ? null
+              : (details) =>
+                  _sessionActions(s, position: details.globalPosition),
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(children: [
+              if (_selecting) ...[
+                AppIcon(checked ? 'check' : 'plus',
+                    size: 13,
+                    color: checked ? AppColors.accent : AppColors.fg4),
+                const SizedBox(width: 6),
+              ] else if (waiting || running) ...[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: waiting ? AppColors.accent : AppColors.run,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-            ],
-            Expanded(
-                child: renaming
-                    ? _inlineRenameField(s, compact: true)
-                    : Text(s.title.isEmpty ? '(untitled)' : s.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(12.5,
-                            color: selected ? AppColors.fg1 : AppColors.fg2))),
-            if (!renaming) ...[
-              const SizedBox(width: 8),
-              Text(relativeTime(s.lastActive),
-                  style: mono(10,
-                      color: waiting ? AppColors.accent : AppColors.fg4)),
-            ],
-          ]),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                  child: renaming
+                      ? _inlineRenameField(s, compact: true)
+                      : Text(s.title.isEmpty ? '(untitled)' : s.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(12.5,
+                              color:
+                                  selected ? AppColors.fg1 : AppColors.fg2))),
+              if (!renaming) ...[
+                if (hovered && !_selecting && !isDedicatedMcSession(s.id)) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: 'Rename',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(R.xs),
+                      onTap: () => _beginRename(s),
+                      child: Padding(
+                        padding: const EdgeInsets.all(3),
+                        child: AppIcon('edit', size: 12, color: AppColors.fg3),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Tooltip(
+                    message: 'Delete',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(R.xs),
+                      onTap: () => _confirmDeleteSessions([s]),
+                      child: Padding(
+                        padding: const EdgeInsets.all(3),
+                        child:
+                            AppIcon('trash', size: 12, color: AppColors.danger),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(width: 8),
+                  Text(relativeTime(s.lastActive),
+                      style: mono(10,
+                          color: waiting ? AppColors.accent : AppColors.fg4)),
+                ],
+              ],
+            ]),
+          ),
         ),
       ),
     );
@@ -3830,6 +3873,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
         const SizedBox(height: 6),
         Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: AppColors.surface2,
             border: Border.all(color: AppColors.border),
@@ -3858,6 +3902,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                   weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
           const SizedBox(height: 6),
           Container(
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: AppColors.surface2,
               border: Border.all(color: AppColors.border),
