@@ -3757,19 +3757,27 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final wide = !kMobile;
     return Scaffold(
       backgroundColor: AppColors.surface1,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+            padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
             child: Row(children: [
               Expanded(
-                  child: Text('Settings',
-                      style: sans(15,
-                          weight: FontWeight.w600, color: AppColors.fg1))),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Settings',
+                        style: sans(18,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Text('Configure this workspace and its models.',
+                        style: sans(12, color: AppColors.fg3)),
+                  ],
+                ),
+              ),
               IconBtn('x',
                   size: 32,
                   iconSize: 16,
@@ -3779,83 +3787,47 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           ),
           Divider(height: 1, color: AppColors.border),
           Expanded(
-            child: wide
-                ? Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    SizedBox(width: 188, child: _navList()),
-                    VerticalDivider(width: 1, color: AppColors.border),
-                    Expanded(child: _pageBody()),
-                  ])
-                : Column(children: [
-                    SizedBox(height: 44, child: _navChips()),
-                    Divider(height: 1, color: AppColors.border),
-                    Expanded(child: _pageBody()),
-                  ]),
+            child: Column(children: [
+              SizedBox(height: 48, child: _navChips()),
+              Divider(height: 1, color: AppColors.border),
+              Expanded(child: _pageBody()),
+            ]),
           ),
         ]),
       ),
     );
   }
 
-  Widget _navList() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 16),
-      children: [
-        for (final (page, icon, label) in _nav)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Material(
-              color: _page == page ? AppColors.surface2 : Colors.transparent,
-              borderRadius: BorderRadius.circular(R.sm),
-              child: InkWell(
-                onTap: () => setState(() => _page = page),
-                borderRadius: BorderRadius.circular(R.sm),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Row(children: [
-                    AppIcon(icon,
-                        size: 15,
-                        color: _page == page ? AppColors.fg1 : AppColors.fg3),
-                    const SizedBox(width: 10),
-                    Text(label,
-                        style: sans(13,
-                            color:
-                                _page == page ? AppColors.fg1 : AppColors.fg2)),
-                  ]),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
   Widget _navChips() {
     return ListView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+      padding: const EdgeInsets.fromLTRB(18, 7, 18, 7),
       children: [
         for (final (page, icon, label) in _nav)
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Material(
-              color: _page == page ? AppColors.surface2 : Colors.transparent,
+              color: _page == page ? AppColors.accentBg : Colors.transparent,
               borderRadius: BorderRadius.circular(R.sm),
               child: InkWell(
                 onTap: () => setState(() => _page = page),
                 borderRadius: BorderRadius.circular(R.sm),
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   child: Row(children: [
                     AppIcon(icon,
                         size: 14,
-                        color: _page == page ? AppColors.fg1 : AppColors.fg3),
+                        color: _page == page ? AppColors.accent : AppColors.fg3),
                     const SizedBox(width: 6),
                     Text(label,
                         style: sans(12.5,
-                            color:
-                                _page == page ? AppColors.fg1 : AppColors.fg2)),
+                            weight: _page == page
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                            color: _page == page
+                                ? AppColors.accent
+                                : AppColors.fg2)),
                   ]),
                 ),
               ),
@@ -3878,27 +3850,59 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   Widget _generalPage() {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       children: [
-        Text('Machines',
-            style: sans(11.5,
-                weight: FontWeight.w600, color: AppColors.fg3, spacing: 0.3)),
+        Text('General',
+            style: sans(18, weight: FontWeight.w600, color: AppColors.fg1)),
+        const SizedBox(height: 4),
+        Text('Manage the machine this app connects to and its alerts.',
+            style: sans(12.5, color: AppColors.fg3)),
+        const SizedBox(height: 18),
+        Text('MACHINES',
+            style: sans(11,
+                weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.6)),
         const SizedBox(height: 8),
-        if (_instances.isEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
-            child: Text('No saved connections.',
-                style: sans(13, color: AppColors.fg3)),
-          )
-        else
-          for (final inst in _instances) _instanceRow(inst),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(R.md),
+          ),
+          child: _instances.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Text('No saved connections.',
+                      style: sans(13, color: AppColors.fg3)),
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < _instances.length; i++) ...[
+                      _instanceRow(_instances[i]),
+                      if (i < _instances.length - 1)
+                        Divider(height: 1, color: AppColors.border),
+                    ],
+                  ],
+                ),
+        ),
         if (kCanNotify) ...[
-          const SizedBox(height: 18),
-          Text('Notifications',
-              style: sans(11.5,
-                  weight: FontWeight.w600, color: AppColors.fg3, spacing: 0.3)),
+          const SizedBox(height: 20),
+          Text('NOTIFICATIONS',
+              style: sans(11,
+                  weight: FontWeight.w600,
+                  color: AppColors.fg4,
+                  spacing: 0.6)),
           const SizedBox(height: 8),
-          _notifTile(),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface2,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(R.md),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: _notifTile(),
+            ),
+          ),
         ],
       ],
     );
@@ -3906,44 +3910,41 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   Widget _instanceRow(Instance i) {
     final isActive = i.url == widget.active?.url;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
-          child: Row(children: [
-            AppIcon('cpu',
-                size: 16, color: isActive ? AppColors.accent : AppColors.fg3),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(i.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(14, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text(hostOf(i.url),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: mono(11.5, color: AppColors.fg4)),
-                  ]),
+    return Material(
+      color: Colors.transparent,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+        child: Row(children: [
+          AppIcon('cpu',
+              size: 16, color: isActive ? AppColors.accent : AppColors.fg3),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(i.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(14, color: AppColors.fg1)),
+                const SizedBox(height: 2),
+                Text(hostOf(i.url),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(11.5, color: AppColors.fg4)),
+              ],
             ),
-            if (isActive)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child:
-                    Text('active', style: sans(11, color: AppColors.accent)),
-              ),
-            IconBtn('trash',
-                size: 32,
-                iconSize: 16,
-                tooltip: 'Remove',
-                onTap: () => _confirmRemove(i)),
-          ]),
-        ),
+          ),
+          if (isActive)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Text('active', style: sans(11, color: AppColors.accent)),
+            ),
+          IconBtn('trash',
+              size: 32,
+              iconSize: 16,
+              tooltip: 'Remove',
+              onTap: () => _confirmRemove(i)),
+        ]),
       ),
     );
   }
