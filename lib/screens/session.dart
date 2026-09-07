@@ -3513,7 +3513,7 @@ class _SessionScreenState extends State<SessionScreen>
               foregroundColor: AppColors.accentFg,
               backgroundColor: AppColors.accent,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(R.sm)),
+                  borderRadius: BorderRadius.circular(4)),
             ),
             child: Text('Download',
                 style: sans(12,
