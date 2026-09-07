@@ -1964,7 +1964,7 @@ class _DesktopShellState extends State<DesktopShell>
         curve: Curves.easeOutCubic,
         key: key,
         margin: desktop
-            ? const EdgeInsets.only(top: 2, bottom: 2, right: 2)
+            ? EdgeInsets.zero
             : const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
         padding:
             EdgeInsets.only(left: desktop ? 12 : 13, right: desktop ? 8 : 5),
@@ -1973,9 +1973,8 @@ class _DesktopShellState extends State<DesktopShell>
           color: desktop
               ? (active ? AppColors.surface1 : Colors.transparent)
               : (active ? AppColors.surface2 : Colors.transparent),
-          borderRadius: desktop
-              ? BorderRadius.circular(R.xs)
-              : BorderRadius.circular(R.xs),
+          borderRadius:
+              desktop ? BorderRadius.zero : BorderRadius.circular(R.xs),
           border: desktop
               ? Border(
                   bottom: BorderSide(
