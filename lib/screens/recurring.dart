@@ -7,6 +7,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'files.dart';
+import 'mission_control.dart';
 
 /// Recurring goals — list, create, pause, and delete jobs that SetGoal a
 /// session. The daemon detects `~/.snippet/recurring/<id>.json`. If that
@@ -15,13 +16,16 @@ import 'files.dart';
 class RecurringScreen extends StatefulWidget {
   final DaemonClient client;
   final VoidCallback? onClose;
+
   /// Target session when creating (this chat, or Mission Control itself).
   /// Settings uses [listOnly]. Cross-session jobs are created by the MC agent
   /// via `create_recurring_job` (job files), not this UI.
   final String? sessionId;
   final String? workspace;
+
   /// Settings: list/pause/delete only — create from a chat menu.
   final bool listOnly;
+
   /// When true, skip the app bar and fill the parent (settings dialog pane).
   final bool embedded;
   const RecurringScreen({
@@ -39,6 +43,7 @@ class RecurringScreen extends StatefulWidget {
 
 class _RecurringScreenState extends State<RecurringScreen> {
   late Future<List<RecurringJob>> _future;
+  List<SessionInfo>? _sessions;
 
   String get _boundSessionId {
     final id = widget.sessionId?.trim() ?? '';
@@ -51,6 +56,9 @@ class _RecurringScreenState extends State<RecurringScreen> {
   void initState() {
     super.initState();
     _future = widget.client.recurringJobs();
+    widget.client.sessions().then((s) {
+      if (mounted) setState(() => _sessions = s);
+    }).catchError((_) {});
   }
 
   void _refresh() {
@@ -117,8 +125,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
                         controller: title,
                         hint: 'Nightly review'),
                     const SizedBox(height: 12),
-                    Text('Schedule',
-                        style: sans(12, color: AppColors.fg3)),
+                    Text('Schedule', style: sans(12, color: AppColors.fg3)),
                     const SizedBox(height: 6),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final s in const [
@@ -299,10 +306,11 @@ class _RecurringScreenState extends State<RecurringScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: on ? AppColors.accent.withValues(alpha: 0.16) : AppColors.surface2,
+          color: on
+              ? AppColors.accent.withValues(alpha: 0.16)
+              : AppColors.surface2,
           borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(
-              color: on ? AppColors.accent : AppColors.border),
+          border: Border.all(color: on ? AppColors.accent : AppColors.border),
         ),
         child: Text(label,
             style: sans(12, color: on ? AppColors.accent : AppColors.fg2)),
@@ -331,18 +339,21 @@ class _RecurringScreenState extends State<RecurringScreen> {
                 style: sans(13, height: 1.4, color: AppColors.danger)),
           );
         }
-        final jobs = snap.data ?? const [];
+        final allJobs = snap.data ?? const [];
+        final bound = widget.sessionId?.trim();
+        final jobs = (bound != null && bound.isNotEmpty)
+            ? allJobs.where((j) {
+                if (isDedicatedMcSession(bound) || bound == 'mission-control') {
+                  return j.sessionId == 'mission-control' ||
+                      isDedicatedMcSession(j.sessionId);
+                }
+                return j.sessionId == bound || j.sessionId.contains(bound);
+              }).toList()
+            : allJobs;
         final list = ListView(
           padding: EdgeInsets.fromLTRB(
               widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
           children: [
-            Text(
-              widget.listOnly
-                  ? 'Scheduled goals and messages across chats. Pause or delete here. Create from a chat or Mission Control menu. If a session is already on a goal, the next fire starts the moment it completes.'
-                  : 'The first run fires immediately. Goal fires set an autonomous goal; message fires send a chat turn. Minimum interval 5 minutes; a plan file is reread each fire.',
-              style: sans(12, height: 1.4, color: AppColors.fg3),
-            ),
-            const SizedBox(height: 10),
             if (jobs.isEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
@@ -358,8 +369,8 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   onTap: _add,
                   borderRadius: BorderRadius.circular(R.md),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 10),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                     child: Row(children: [
                       AppIcon('plus', size: 16, color: AppColors.fg3),
                       const SizedBox(width: 12),
@@ -410,11 +421,30 @@ class _RecurringScreenState extends State<RecurringScreen> {
     return 'next in ${days}d';
   }
 
+  String _targetLabel(RecurringJob job) {
+    if (job.sessionId == 'mission-control' ||
+        isDedicatedMcSession(job.sessionId)) {
+      return 'Mission Control';
+    }
+    final match = _sessions
+        ?.where((s) => s.id == job.sessionId || job.sessionId.contains(s.id))
+        .firstOrNull;
+    if (match != null && match.folder.isNotEmpty) {
+      return lastPathSegment(match.folder, ifEmpty: match.title);
+    }
+    final clean = job.sessionId.replaceAll('.json', '');
+    if (clean.contains('/conversations/')) {
+      final parts = clean.split('/conversations/');
+      if (parts.length == 2 && parts[1].isNotEmpty) {
+        return parts[1].length > 8 ? parts[1].substring(0, 8) : parts[1];
+      }
+    }
+    return lastPathSegment(clean, ifEmpty: clean);
+  }
+
   Widget _jobRow(RecurringJob job) {
     final paused = !job.enabled;
-    final target = job.sessionId == 'mission-control'
-        ? 'Mission Control'
-        : job.sessionId;
+    final target = _targetLabel(job);
     final bits = <String>[
       if (!job.delivery) 'message',
       job.scheduleLabel,
