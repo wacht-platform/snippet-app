@@ -171,6 +171,21 @@ class _FileExplorerState extends State<FileExplorer> {
       open(e.path, e.name);
       return;
     }
+    // On phones the explorer is commonly hosted inside a general-dialog route.
+    // Replacing that dialog's child with a second Scaffold can leave the dialog
+    // route with an invalid/black surface on Android. Push the viewer as a real
+    // page instead; the explorer remains safely below it and back returns here.
+    if (kMobile) {
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => FileViewer(
+          client: widget.client,
+          path: e.path,
+          name: e.name,
+          onClose: () => Navigator.of(context).pop(),
+        ),
+      ));
+      return;
+    }
     setState(() {
       _viewingPath = e.path;
       _viewingName = e.name;
