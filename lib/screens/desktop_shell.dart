@@ -1217,10 +1217,9 @@ class _DesktopShellState extends State<DesktopShell>
   Widget _macNavigationBar() {
     final tab = _activeTab;
     final controls = tab == null ? null : _macSessionControls[tab.key];
-    final state = _macSessionStatuses[tab?.key]?.state;
     final running = _macSessionStatuses[tab?.key]?.running ?? false;
     return Container(
-      height: 42,
+      height: 40,
       decoration: BoxDecoration(
         color: AppColors.bg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
@@ -1230,46 +1229,32 @@ class _DesktopShellState extends State<DesktopShell>
           child: ListView.builder(
             controller: _stripController,
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             itemCount: _tabs.length,
             itemBuilder: (_, i) => _tabChip(i),
           ),
         ),
         if (tab != null && tab.isFile) ...[
-          Container(width: 1, height: 18, color: AppColors.border2),
           _macTopIconAction(
               'download', 'Download', () => _downloadActiveFile()),
           _macTopIconAction('edit', 'Edit', () => _editActiveFile()),
         ] else if (controls != null) ...[
-          Container(width: 1, height: 18, color: AppColors.border2),
-          _macApprovalChip(
-            manual: state?.approvalMode == 'manual',
-            onPick: (manual) => controls
-                .performAction(manual ? 'approval_ask' : 'approval_auto'),
-          ),
-          _macGoalChip(
-            active: state?.goal?.ongoing == true,
-            paused: state?.goal?.paused == true,
-            onSet: (text) => controls.performAction('goal', text),
-            onCancel: () => controls.performAction('goal'),
-          ),
-          if (state?.lanes.isNotEmpty ?? false)
-            _macTopAction(
-                'layers',
-                '${state!.lanes.where((lane) => lane.running).length}',
-                'Open lanes',
-                () => controls.performAction('lanes')),
           if (running)
-            IconBtn('stop',
-                size: 26, iconSize: 12, tooltip: 'Stop', onTap: controls.stop),
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: IconBtn('stop',
+                  size: 26,
+                  iconSize: 12,
+                  tooltip: 'Stop running task',
+                  onTap: controls.stop),
+            ),
         ],
-        Container(width: 1, height: 18, color: AppColors.border2),
         IconBtn('plus',
             size: 26,
-            iconSize: 12,
+            iconSize: 13,
             tooltip: 'New session',
             onTap: _newSessionFlow),
-        const SizedBox(width: 6),
+        const SizedBox(width: 8),
       ]),
     );
   }
@@ -1487,6 +1472,22 @@ class _DesktopShellState extends State<DesktopShell>
     final rightActions = <Widget>[];
     if (controls != null) {
       rightActions.addAll([
+        _macApprovalChip(
+          manual: state?.approvalMode == 'manual',
+          onPick: (manual) =>
+              controls.performAction(manual ? 'approval_ask' : 'approval_auto'),
+        ),
+        _macGoalChip(
+          active: state?.goal?.ongoing == true,
+          paused: state?.goal?.paused == true,
+          onSet: (text) => controls.performAction('goal', text),
+          onCancel: () => controls.performAction('goal'),
+        ),
+        if (state?.lanes.isNotEmpty ?? false)
+          _macStatusAction(
+              'layers',
+              'Lanes (${state!.lanes.where((lane) => lane.running).length})',
+              () => controls.performAction('lanes')),
         _macStatusAction(
             'folder', 'Files', () => controls.performAction('files')),
         if (tab?.isMissionControl != true)
@@ -1963,7 +1964,7 @@ class _DesktopShellState extends State<DesktopShell>
         curve: Curves.easeOutCubic,
         key: key,
         margin: desktop
-            ? EdgeInsets.zero
+            ? const EdgeInsets.only(top: 2, bottom: 2, right: 2)
             : const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
         padding:
             EdgeInsets.only(left: desktop ? 12 : 13, right: desktop ? 8 : 5),
@@ -1972,18 +1973,14 @@ class _DesktopShellState extends State<DesktopShell>
           color: desktop
               ? (active ? AppColors.surface1 : Colors.transparent)
               : (active ? AppColors.surface2 : Colors.transparent),
-          borderRadius:
-              desktop ? BorderRadius.zero : BorderRadius.circular(R.xs),
+          borderRadius: desktop
+              ? BorderRadius.circular(R.xs)
+              : BorderRadius.circular(R.xs),
           border: desktop
               ? Border(
                   bottom: BorderSide(
                       color: active ? AppColors.accent : Colors.transparent,
                       width: 2),
-                  right: BorderSide(
-                      color: active
-                          ? AppColors.border
-                          : AppColors.border2.withValues(alpha: 0.5),
-                      width: 1),
                 )
               : Border.all(
                   color: active ? AppColors.border : Colors.transparent),
@@ -2893,61 +2890,25 @@ class _SidebarState extends State<_Sidebar> {
       );
     }
     return Padding(
-      padding: EdgeInsets.fromLTRB(0, first ? 8 : 16, 4, 0),
-      child: SizedBox(
-        height: 28,
-        child: Stack(children: [
-          Positioned(
-            left: _treeX,
-            top: 20,
-            bottom: 0,
-            child: Container(width: 1, color: AppColors.border2),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Row(children: [
-              AppIcon('folder', size: 13, color: AppColors.fg3),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.left,
-                    style: sans(11.5, color: AppColors.fg3)),
-              ),
-            ]),
-          ),
-        ]),
-      ),
+      padding: EdgeInsets.fromLTRB(6, first ? 10 : 16, 6, 4),
+      child: Row(children: [
+        AppIcon('folder', size: 13, color: AppColors.fg4),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.left,
+              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+        ),
+      ]),
     );
   }
 
-  static const double _treeGutter = 22;
-  static const double _treeX = 14;
-
   Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
-    return SizedBox(
-      height: 32,
-      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(
-          width: _treeGutter,
-          child: Stack(children: [
-            Positioned(
-              left: _treeX,
-              top: 0,
-              bottom: last ? 16 : 0,
-              child: Container(width: 1, color: AppColors.border2),
-            ),
-            Positioned(
-              left: _treeX,
-              top: 15,
-              right: 0,
-              child: Container(height: 1, color: AppColors.border2),
-            ),
-          ]),
-        ),
-        Expanded(child: _sessionRow(s)),
-      ]),
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: _sessionRow(s),
     );
   }
 
@@ -2990,26 +2951,24 @@ class _SidebarState extends State<_Sidebar> {
       );
     }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
       child: Material(
-        color: selected ? AppColors.accentBg : AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
+        color: selected ? AppColors.accentBg : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(R.sm),
           onTap: open,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(R.md),
-              border: Border.all(color: AppColors.border),
-            ),
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(children: [
-              AppIcon('layers', size: 15, color: AppColors.accent),
-              const SizedBox(width: 10),
+              AppIcon('layers', size: 14, color: AppColors.accent),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text('Mission Control',
                     style: sans(12.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                        weight: FontWeight.w600,
+                        color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
               if (status != null) status,
             ]),
