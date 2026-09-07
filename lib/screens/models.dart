@@ -135,23 +135,14 @@ class _ModelsScreenState extends State<ModelsScreen> {
                         height: 1.4, color: AppColors.fg3)),
               )
             else
-              Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  border: Border.all(color: AppColors.border2),
-                  borderRadius:
-                      BorderRadius.circular(widget.embedded ? R.sm : R.md),
-                ),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < profiles.length; i++) ...[
-                      _profileCard(profiles[i], snap.data?.delegate),
-                      if (i < profiles.length - 1)
-                        Divider(height: 1, color: AppColors.border2),
-                    ],
+              Column(
+                children: [
+                  for (var i = 0; i < profiles.length; i++) ...[
+                    _profileCard(profiles[i], snap.data?.delegate),
+                    if (i < profiles.length - 1)
+                      Divider(height: 1, color: AppColors.border),
                   ],
-                ),
+                ],
               ),
           ],
         );
