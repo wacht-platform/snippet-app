@@ -4020,20 +4020,19 @@ class _ChurningStatusState extends State<_ChurningStatus> {
                     child:
                         Center(child: BrailleSpinner(color: AppColors.accent))),
                 const SizedBox(width: 8),
-                Flexible(
-                  child: Text.rich(TextSpan(children: [
-                    TextSpan(
-                        text: _verb,
-                        style: sans(13,
-                            weight: FontWeight.w600, color: AppColors.accent)),
-                    TextSpan(
-                        text: ' $_elapsed',
-                        style: sans(13,
-                            color: AppColors.accent.withValues(alpha: 0.72))),
-                  ])),
+                Expanded(
+                  child: Text(_verb,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13,
+                          weight: FontWeight.w600, color: AppColors.accent)),
                 ),
+                const SizedBox(width: 8),
+                Text(_elapsed,
+                    style: mono(11.5,
+                        color: AppColors.accent.withValues(alpha: 0.72))),
                 if (thought.isNotEmpty) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   AppIcon(_open ? 'chevron-down' : 'chevron-right',
                       size: 13, color: AppColors.accent.withValues(alpha: 0.7)),
                 ],
