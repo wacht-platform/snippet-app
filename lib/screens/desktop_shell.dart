@@ -3883,47 +3883,29 @@ class _SettingsPanelState extends State<_SettingsPanel> {
             style: sans(10,
                 weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
         const SizedBox(height: 6),
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.border2),
-            borderRadius: BorderRadius.circular(R.sm),
+        if (_instances.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text('No saved connections.',
+                style: sans(12, color: AppColors.fg3)),
+          )
+        else
+          Column(
+            children: [
+              for (var i = 0; i < _instances.length; i++) ...[
+                _instanceRow(_instances[i]),
+                if (i < _instances.length - 1)
+                  Divider(height: 1, color: AppColors.border),
+              ],
+            ],
           ),
-          child: _instances.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text('No saved connections.',
-                      style: sans(12, color: AppColors.fg3)),
-                )
-              : Column(
-                  children: [
-                    for (var i = 0; i < _instances.length; i++) ...[
-                      _instanceRow(_instances[i]),
-                      if (i < _instances.length - 1)
-                        Divider(height: 1, color: AppColors.border2),
-                    ],
-                  ],
-                ),
-        ),
         if (kCanNotify) ...[
           const SizedBox(height: 16),
           Text('NOTIFICATIONS',
               style: sans(10,
                   weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
           const SizedBox(height: 6),
-          Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              border: Border.all(color: AppColors.border2),
-              borderRadius: BorderRadius.circular(R.sm),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              child: _notifTile(),
-            ),
-          ),
+          _notifTile(),
         ],
       ],
     );
