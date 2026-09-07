@@ -2498,6 +2498,7 @@ class _SessionScreenState extends State<SessionScreen>
         maxLines: 4);
     final t = text?.trim();
     if (t == null || t.isEmpty) return;
+    _toast('Submitting goal…');
     _send({'kind': 'set_goal', 'value': t});
     _toast('Goal set — the agent will drive toward it');
   }
@@ -4254,6 +4255,7 @@ class _QueuedSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showBulk = showBulkActions && count > 1;
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 4),
       child: Column(
@@ -4268,7 +4270,7 @@ class _QueuedSection extends StatelessWidget {
                       spacing: 0.6,
                       color: AppColors.fg4)),
               const Spacer(),
-              if (showBulkActions) ...[
+              if (showBulk) ...[
                 Material(
                   color: AppColors.surface2,
                   borderRadius: BorderRadius.circular(R.xs),
@@ -5302,11 +5304,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                   ),
           ),
         if (!kMacOS && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
-          _row(
-              icon: 'layers',
-              label: 'Lanes',
-              value: '${s!.lanes.where((l) => l.running).length} running',
-              onTap: widget.onLanes),
+          _row(icon: 'layers', label: 'Lanes', onTap: widget.onLanes),
         if (widget.onTasks != null)
           _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
         _row(icon: 'scheduled', label: 'Scheduled', onTap: widget.onRecurring),

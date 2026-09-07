@@ -255,7 +255,7 @@ class LaneNotice extends StatelessWidget {
         borderRadius: BorderRadius.circular(R.sm),
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -272,7 +272,7 @@ class LaneNotice extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 9),
-                Text(status, style: mono(10.5, color: color)),
+                Text(status, style: mono(9.5, color: color)),
                 const SizedBox(width: 5),
                 AppIcon('chevron-right', size: 13, color: AppColors.fg4),
               ]),
