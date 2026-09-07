@@ -1965,14 +1965,6 @@ class _SessionScreenState extends State<SessionScreen>
                   // Desktop keeps the detailed chip strip.
                   if (!kMobile && !kMacOS) _statusStrip(s, running),
                   if (_connError != null) _disconnectedBanner(),
-                  if (s?.goal?.ongoing == true)
-                    _centerWide(Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-                      child: _GoalCard(
-                        goal: s!.goal!,
-                        onCancel: _cancelGoal,
-                      ),
-                    )),
                   Expanded(
                     child: Stack(children: [
                       s == null
