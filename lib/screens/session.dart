@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -199,6 +200,8 @@ class _SessionScreenState extends State<SessionScreen>
   String _liveText = '';
   String _liveThinking = '';
   bool _liveTextVisible = false;
+  final ValueNotifier<_LiveFrame> _liveFrame =
+      ValueNotifier(const _LiveFrame());
   String? _connError;
   bool _termOpen = false;
   final List<_LiveTerm> _terms = [];
@@ -1010,11 +1013,11 @@ class _SessionScreenState extends State<SessionScreen>
         ? ''
         : _mergeLiveThinking(_liveThinking, _pendingLiveThinking);
     final visible = _pendingLiveTextVisible;
-    setState(() {
-      _liveText = text;
-      _liveThinking = thinking;
-      _liveTextVisible = visible;
-    });
+    _liveFrame.value = _LiveFrame(
+      text: text,
+      thinking: thinking,
+      visible: visible,
+    );
     if (_stickToBottom && (text.isNotEmpty || thinking.isNotEmpty)) {
       _scheduleBottom();
     }
@@ -1882,6 +1885,7 @@ class _SessionScreenState extends State<SessionScreen>
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
     _streamFlushTimer?.cancel();
+    _liveFrame.dispose();
     _sub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Only clear the suppression key if this screen still owns it — on a session
@@ -2036,30 +2040,17 @@ class _SessionScreenState extends State<SessionScreen>
                                       ],
                                     ),
                                   ],
-                                  if (_liveTextVisible &&
-                                      _liveText.trim().isNotEmpty)
-                                    Padding(
-                                      key: const ValueKey('live-text'),
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Bubble(
-                                          mine: false,
-                                          text: _liveText.trim(),
-                                          selectable: false),
-                                    ),
-                                  if (s.compacting) ...[
-                                    const SizedBox(height: 10),
-                                    _CompactingStatus(
-                                      startedAt: s.compactingStartedAt,
-                                      detail: _latestCompactionDetail(events),
-                                    ),
-                                  ] else if (running) ...[
-                                    const SizedBox(height: 10),
-                                    _ChurningStatus(
-                                        startedAt: s.turnStartedAt,
-                                        thinking: _turnHasVisibleAction(events)
-                                            ? ''
-                                            : _liveThinking),
-                                  ],
+                                  _LiveStreamRow(
+                                    key: const ValueKey('live-stream-row'),
+                                    frame: _liveFrame,
+                                    running: running,
+                                    compacting: s.compacting,
+                                    startedAt: s.turnStartedAt,
+                                    hasVisibleAction:
+                                        _turnHasVisibleAction(events),
+                                    compactionDetail:
+                                        _latestCompactionDetail(events),
+                                  ),
                                 ];
                                 return ListView.builder(
                                   controller: _scroll,
@@ -4169,6 +4160,75 @@ class _ClearScrollTerminal extends Terminal {
     buffer.eraseDisplay();
     buffer.setCursor(0, 0);
   }
+}
+
+class _LiveStreamRow extends StatelessWidget {
+  final ValueListenable<_LiveFrame> frame;
+  final bool running;
+  final bool compacting;
+  final String? startedAt;
+  final bool hasVisibleAction;
+  final String? compactionDetail;
+
+  const _LiveStreamRow({
+    super.key,
+    required this.frame,
+    required this.running,
+    required this.compacting,
+    required this.startedAt,
+    required this.hasVisibleAction,
+    required this.compactionDetail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<_LiveFrame>(
+      valueListenable: frame,
+      builder: (context, value, _) {
+        final children = <Widget>[];
+        if (value.visible && value.text.trim().isNotEmpty) {
+          children.add(Padding(
+            key: const ValueKey('live-text'),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Bubble(
+              mine: false,
+              text: value.text.trim(),
+              selectable: false,
+            ),
+          ));
+        }
+        if (compacting) {
+          children.addAll([
+            const SizedBox(height: 10),
+            _CompactingStatus(
+              startedAt: startedAt,
+              detail: compactionDetail,
+            ),
+          ]);
+        } else if (running) {
+          children.addAll([
+            const SizedBox(height: 10),
+            _ChurningStatus(
+              startedAt: startedAt,
+              thinking: hasVisibleAction ? '' : value.thinking,
+            ),
+          ]);
+        }
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        );
+      },
+    );
+  }
+}
+
+class _LiveFrame {
+  final String text;
+  final String thinking;
+  final bool visible;
+  const _LiveFrame({this.text = '', this.thinking = '', this.visible = false});
 }
 
 class _LiveTerm {
