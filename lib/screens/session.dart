@@ -2941,7 +2941,7 @@ class _SessionScreenState extends State<SessionScreen>
                   borderRadius: BorderRadius.circular(R.md),
                   border: Border.all(color: AppColors.border),
                 ),
-                padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
+                padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
