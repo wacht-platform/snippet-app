@@ -50,21 +50,6 @@ void main() {
     expect(merged.workspace, '/workspace');
   });
 
-  test('session event page response metadata parses bounded cursors', () {
-    const page = SessionEventsPage(
-      events: [
-        {'kind': 'user_input', 'text': 'older'},
-      ],
-      start: 4,
-      end: 5,
-      hasOlder: true,
-    );
-    expect(page.start, 4);
-    expect(page.end, 5);
-    expect(page.hasOlder, isTrue);
-    expect(page.events.single['text'], 'older');
-  });
-
   test('HarnessState preserves title fallback and checkpoints', () {
     final state = HarnessState.fromJson({
       'status': 'idle',

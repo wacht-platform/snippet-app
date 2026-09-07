@@ -742,6 +742,24 @@ class _SessionScreenState extends State<SessionScreen>
           // fromJson wiped the transcript to empty until the next real state
           // frame (often only after a TUI-side persist).
           final wire = j['wire'] as String? ?? 'snapshot';
+          if (wire == 'history') {
+            final rawEvents = j['events'];
+            final older = rawEvents is List
+                ? rawEvents
+                    .whereType<Map>()
+                    .map((e) => e.cast<String, dynamic>())
+                    .toList()
+                : const <Map<String, dynamic>>[];
+            if (older.isNotEmpty) {
+              setState(() {
+                _state = _state?.prependEvents(older);
+                _transcriptStart = (j['start'] as num?)?.toInt() ?? 0;
+                _transcriptDirty = true;
+              });
+            }
+            _loadingOlderTranscript = false;
+            return;
+          }
           if (wire == 'term') {
             _applyTermFrame(j);
             return;
@@ -1950,25 +1968,15 @@ class _SessionScreenState extends State<SessionScreen>
 
   Future<void> _loadOlderTranscript() async {
     final state = _state;
-    if (state == null || _transcriptStart == 0 || _loadingOlderTranscript)
+    if (state == null || _transcriptStart == 0 || _loadingOlderTranscript) {
       return;
-    setState(() => _loadingOlderTranscript = true);
-    try {
-      final page = await widget.client.sessionEvents(widget.sessionId,
-          before: _transcriptStart, limit: _transcriptPageSize);
-      if (!mounted) return;
-      if (page.events.isNotEmpty) {
-        setState(() {
-          _state = _state!.prependEvents(page.events);
-          _transcriptStart = page.start;
-          _transcriptDirty = true;
-        });
-      }
-    } catch (e) {
-      if (mounted) _toast('$e');
-    } finally {
-      if (mounted) setState(() => _loadingOlderTranscript = false);
     }
+    _loadingOlderTranscript = true;
+    _send({
+      'kind': 'history',
+      'before': _transcriptStart,
+      'limit': _transcriptPageSize,
+    });
   }
 
   @override
