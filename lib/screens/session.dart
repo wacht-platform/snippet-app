@@ -4147,8 +4147,6 @@ class _QueuedBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  AppIcon('clock', size: 12, color: AppColors.fg4),
-                  const SizedBox(width: 5),
                   Text('Queued',
                       style: sans(11,
                           weight: FontWeight.w500, color: AppColors.fg3)),
@@ -4163,14 +4161,10 @@ class _QueuedBubble extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            AppIcon('zap', size: 11, color: AppColors.accent),
-                            const SizedBox(width: 4),
-                            Text('Send now',
-                                style: sans(10.5,
-                                    weight: FontWeight.w500,
-                                    color: AppColors.accent)),
-                          ]),
+                          child: Text('Send now',
+                              style: sans(10.5,
+                                  weight: FontWeight.w500,
+                                  color: AppColors.accent)),
                         ),
                       ),
                     ),
@@ -4185,12 +4179,8 @@ class _QueuedBubble extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 3),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          AppIcon('x', size: 11, color: AppColors.fg4),
-                          const SizedBox(width: 3),
-                          Text('Cancel',
-                              style: sans(10.5, color: AppColors.fg4)),
-                        ]),
+                        child: Text('Cancel',
+                            style: sans(10.5, color: AppColors.fg4)),
                       ),
                     ),
                   ),
