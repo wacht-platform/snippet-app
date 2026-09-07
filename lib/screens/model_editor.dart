@@ -393,37 +393,40 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     );
     final footer = Container(
       padding: EdgeInsets.fromLTRB(
-          widget.embedded ? 20 : 16,
-          12,
-          widget.embedded ? 20 : 16,
-          widget.embedded ? 16 : 16 + MediaQuery.of(context).padding.bottom),
+          widget.embedded ? 16 : 16,
+          10,
+          widget.embedded ? 16 : 16,
+          widget.embedded ? 12 : 12 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.border))),
-      child: Row(children: [
-        Btn('Cancel', variant: BtnVariant.ghost, onTap: _dismiss),
-        const SizedBox(width: 8),
-        Expanded(
-            child: Btn(_busy ? 'Saving…' : 'Save',
-                full: true,
-                disabled: _busy || _model.text.trim().isEmpty,
-                onTap: _save)),
-      ]),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Btn('Cancel',
+              variant: BtnVariant.ghost, small: true, onTap: _dismiss),
+          const SizedBox(width: 8),
+          Btn(_busy ? 'Saving…' : 'Save',
+              small: true,
+              disabled: _busy || _model.text.trim().isEmpty,
+              onTap: _save),
+        ],
+      ),
     );
     final body = Column(children: [
       if (widget.embedded)
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+          padding: const EdgeInsets.fromLTRB(6, 6, 16, 4),
           child: Row(children: [
             IconBtn('chevron-left',
-                size: 36,
-                iconSize: 20,
+                size: 30,
+                iconSize: 18,
                 tooltip: 'Back to models',
                 onTap: _dismiss),
             const SizedBox(width: 4),
             Expanded(
               child: Text(title,
-                  style:
-                      sans(18, weight: FontWeight.w600, color: AppColors.fg1)),
+                  style: sans(14.5,
+                      weight: FontWeight.w600, color: AppColors.fg1)),
             ),
           ]),
         )
