@@ -881,7 +881,7 @@ class _SessionScreenState extends State<SessionScreen>
           // Only rebuild the transcript widget list when events actually
           // changed — status-only deltas waste a full transcript rebuild.
           final eventsChanged = cur == null ||
-              identical(next.events, cur.events) ||
+              !identical(next.events, cur.events) ||
               next.events.length != cur.events.length ||
               (next.events.isNotEmpty &&
                   cur.events.isNotEmpty &&
