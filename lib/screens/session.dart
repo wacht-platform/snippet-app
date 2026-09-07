@@ -391,24 +391,7 @@ class _SessionScreenState extends State<SessionScreen>
   static const _transcriptPageSize = 160;
   int _transcriptStart = 0;
   bool _loadingOlderTranscript = false;
-  Timer? _historyPrefetchTimer;
 
-  void _scheduleHistoryPrefetch() {
-    _historyPrefetchTimer?.cancel();
-    if (_closed || _loadingOlderTranscript || _transcriptStart == 0) return;
-    _historyPrefetchTimer = Timer(const Duration(milliseconds: 700), () {
-      if (!_closed &&
-          mounted &&
-          !_loadingOlderTranscript &&
-          _transcriptStart > 0) {
-        _loadOlderTranscript();
-      }
-    });
-  }
-
-  final List<_UserMark> _userMarks = [];
-  final Map<String, GlobalKey> _userMarkKeys = {};
-  double _jumpCacheExtent = 400;
   // Stream frame throttle: store the latest pending stream payload and flush
   // at most every 50ms to avoid rebuilding the full widget tree on every token.
   String _pendingLiveText = '';
@@ -963,7 +946,6 @@ class _SessionScreenState extends State<SessionScreen>
               }
             }
           });
-          if (eventsChanged) _scheduleHistoryPrefetch();
           widget.onMacStatus?.call(next, next.status == 'running');
           widget.onMacControls
               ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
@@ -1949,7 +1931,6 @@ class _SessionScreenState extends State<SessionScreen>
     _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
-    _historyPrefetchTimer?.cancel();
     _streamFlushTimer?.cancel();
     _liveFrame.dispose();
     _sub?.cancel();
@@ -2135,8 +2116,8 @@ class _SessionScreenState extends State<SessionScreen>
                                   child: ListView.builder(
                                     controller: _scroll,
                                     reverse: true,
-                                    scrollCacheExtent: ScrollCacheExtent.pixels(
-                                        _jumpCacheExtent),
+                                    scrollCacheExtent:
+                                        ScrollCacheExtent.pixels(400),
                                     padding: const EdgeInsets.fromLTRB(
                                         20, 16, 20, 24),
                                     itemCount: timeline.length,
@@ -2150,18 +2131,6 @@ class _SessionScreenState extends State<SessionScreen>
                                   ),
                                 );
                               })),
-                      // Floating "jump to latest": scrolling up unpins auto-follow, and a
-                      // streaming reply then grows silently — give a one-tap way back.
-                      if (!kMobile && _userMarks.length >= 2)
-                        Positioned(
-                          top: 10,
-                          right: 6,
-                          bottom: 10,
-                          child: _MessageJumpRail(
-                            marks: List<_UserMark>.from(_userMarks),
-                            onJump: _jumpToUserMark,
-                          ),
-                        ),
                       if (!_stickToBottom && s != null)
                         Positioned(
                           right: 16,
@@ -2232,41 +2201,6 @@ class _SessionScreenState extends State<SessionScreen>
             child: scaffold,
           )
         : scaffold;
-  }
-
-  void _jumpToUserMark(GlobalKey key) {
-    _stickToBottom = false;
-    if (mounted) setState(() {});
-    void reveal() {
-      final ctx = key.currentContext;
-      if (ctx == null || !ctx.mounted) return;
-      final box = ctx.findRenderObject();
-      if (box is! RenderBox || !box.hasSize) return;
-      final scrollable = Scrollable.maybeOf(ctx);
-      if (scrollable == null) return;
-      final viewport = RenderAbstractViewport.maybeOf(box);
-      if (viewport == null) return;
-      final target = viewport.getOffsetToReveal(box, 0.18).offset;
-      final pos = scrollable.position;
-      pos.animateTo(
-        target.clamp(pos.minScrollExtent, pos.maxScrollExtent),
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (key.currentContext != null) {
-        reveal();
-        return;
-      }
-      // Off-screen builder items have no context until they're in cache.
-      setState(() => _jumpCacheExtent = 400000);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) reveal();
-      });
-    });
   }
 
   Future<void> _renameCurrent() async {
@@ -3236,8 +3170,6 @@ class _SessionScreenState extends State<SessionScreen>
 
   // ---- event → widget (pairs tool_call with its tool_result) ----
   List<Widget> _transcript(List<Map<String, dynamic>> events) {
-    _userMarks.clear();
-    final seen = <String>{};
     final out = <Widget>[];
     Map<String, dynamic>? pending;
     final run = <Widget>[]; // consecutive dense tool rows
@@ -3344,14 +3276,9 @@ class _SessionScreenState extends State<SessionScreen>
             addEvent(key, _MissionEnvelopeCard(envelope: envelope));
             break;
           }
-          final markKey = _userMarkKeys.putIfAbsent(key, GlobalKey.new);
-          final preview = _jumpPreview(text);
-          _userMarks.add(_UserMark(key: markKey, preview: preview));
-          seen.add(key);
           addEvent(
               key,
               KeyedSubtree(
-                key: markKey,
                 child: Padding(
                     padding: const EdgeInsets.only(top: 4, bottom: 20),
                     child: Bubble(mine: true, text: text)),
@@ -3443,7 +3370,6 @@ class _SessionScreenState extends State<SessionScreen>
       }
     }
     endTools('transcript-end');
-    _userMarkKeys.removeWhere((k, _) => !seen.contains(k));
     return out;
   }
 
@@ -4609,27 +4535,6 @@ class _MissionEnvelopeCard extends StatelessWidget {
   }
 }
 
-/// One-line preview for the desktop jump rail. Voice notes often have no
-/// leftover body after markers are stripped — use the transcript instead.
-String _jumpPreview(String text) {
-  final leftover = hideAttachmentMarkers(text).trim();
-  if (leftover.isNotEmpty) {
-    return leftover.replaceAll(RegExp(r'\s+'), ' ');
-  }
-  final items = audioTranscriptItems(text);
-  for (final item in items) {
-    final t = item.text.trim();
-    if (t.isNotEmpty && !item.unavailable) {
-      return t.replaceAll(RegExp(r'\s+'), ' ');
-    }
-  }
-  if (items.any((i) => i.unavailable)) return 'Voice note (no transcript)';
-  if (RegExp(r'\[attached (image|file) —').hasMatch(text)) {
-    return 'Attachment';
-  }
-  return leftover.isEmpty ? 'Message' : leftover;
-}
-
 /// Transcript card for a past `ask_user` turn: the prompt plus the user's
 /// answer (parsed from the following `user_input` that `_QuestionBar` sent).
 class _QuestionRecord extends StatelessWidget {
@@ -5523,97 +5428,5 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     } finally {
       if (mounted) setState(() => _savingTitle = false);
     }
-  }
-}
-
-class _UserMark {
-  final GlobalKey key;
-  final String preview;
-  const _UserMark({required this.key, required this.preview});
-}
-
-class _MessageJumpRail extends StatefulWidget {
-  final List<_UserMark> marks;
-  final void Function(GlobalKey key) onJump;
-  const _MessageJumpRail({required this.marks, required this.onJump});
-
-  @override
-  State<_MessageJumpRail> createState() => _MessageJumpRailState();
-}
-
-class _MessageJumpRailState extends State<_MessageJumpRail> {
-  int? _hover;
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final marks = widget.marks;
-    if (marks.length < 2) return const SizedBox.shrink();
-    return SizedBox(
-      width: 18,
-      child: MouseRegion(
-        onExit: (_) => setState(() => _hover = null),
-        child: LayoutBuilder(builder: (context, c) {
-          final n = marks.length;
-          const tickH = 2.5;
-          final usable = math.max(0.0, c.maxHeight - tickH);
-          return Stack(clipBehavior: Clip.none, children: [
-            for (var i = 0; i < n; i++)
-              Positioned(
-                top: n == 1 ? 0 : i * usable / (n - 1),
-                right: 0,
-                child: MouseRegion(
-                  onEnter: (_) => setState(() => _hover = i),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => widget.onJump(marks[i].key),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 3, horizontal: 4),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 120),
-                        width: _hover == i ? 14 : 8,
-                        height: 2.5,
-                        decoration: BoxDecoration(
-                          color: _hover == i
-                              ? AppColors.accent
-                              : AppColors.fg4.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            if (_hover != null)
-              Positioned(
-                top: (_hover! * usable / math.max(1, n - 1) - 10)
-                    .clamp(0.0, math.max(0.0, c.maxHeight - 36)),
-                right: 22,
-                child: IgnorePointer(
-                  child: Material(
-                    color: AppColors.surface1,
-                    elevation: 6,
-                    borderRadius: BorderRadius.circular(R.sm),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 240),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 7),
-                        child: Text(
-                          marks[_hover!].preview,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12, height: 1.35, color: AppColors.fg1),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ]);
-        }),
-      ),
-    );
   }
 }
