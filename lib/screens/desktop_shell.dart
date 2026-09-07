@@ -1528,9 +1528,7 @@ class _DesktopShellState extends State<DesktopShell>
         ),
         if (state?.lanes.isNotEmpty ?? false)
           _macStatusAction(
-              'layers',
-              'Lanes (${state!.lanes.where((lane) => lane.running).length})',
-              () => controls.performAction('lanes')),
+              'layers', 'Lanes', () => controls.performAction('lanes')),
         _macStatusAction('scheduled', 'Scheduled',
             () => controls.performAction('recurring')),
         _macStatusAction(
