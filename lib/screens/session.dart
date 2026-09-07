@@ -398,6 +398,7 @@ class _SessionScreenState extends State<SessionScreen>
   Timer? _reconnectTimer;
   Timer? _connectionWatchdog;
   int _reconnectAttempt = 0;
+  int _lastAttachRevision = 0;
   bool _closed = false;
   // A message can silently die on a socket that looks alive (dropped network, no
   // onError/onDone) — it sits in _pending, shown as "sending", forever. Guard:
@@ -782,6 +783,18 @@ class _SessionScreenState extends State<SessionScreen>
           // Drift check: our event log must line up with the server's count — a
           // mismatch (dropped/bad frame) resyncs via reconnect, since a fresh
           // socket's first frame is always a full snapshot.
+          final revision = j['revision'];
+          if (revision is int) {
+            if (wire == 'snapshot') {
+              _lastAttachRevision = revision;
+            } else if (_lastAttachRevision != 0 &&
+                revision != _lastAttachRevision + 1) {
+              _resync(ch);
+              return;
+            } else {
+              _lastAttachRevision = revision;
+            }
+          }
           final ec = j['event_count'];
           if (wire == 'delta' && ec is int && next.events.length != ec) {
             _resync(ch);
