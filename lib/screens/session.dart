@@ -777,16 +777,16 @@ class _SessionScreenState extends State<SessionScreen>
           }
           if (wire != 'snapshot' && wire != 'delta') return;
           final cur = _state;
-          final next = (wire == 'delta' && cur != null)
-              ? cur.applyDelta(j)
-              : HarnessState.fromJson(j);
-          // Drift check: our event log must line up with the server's count — a
-          // mismatch (dropped/bad frame) resyncs via reconnect, since a fresh
-          // socket's first frame is always a full snapshot.
+          // Reject duplicate/out-of-order attach frames before applying them.
+          // Replayed equal revisions are harmless and should not churn a healthy
+          // socket; only a non-consecutive newer revision requires resync.
           final revision = j['revision'];
           if (revision is int) {
             if (wire == 'snapshot') {
               _lastAttachRevision = revision;
+            } else if (_lastAttachRevision != 0 &&
+                revision == _lastAttachRevision) {
+              return;
             } else if (_lastAttachRevision != 0 &&
                 revision != _lastAttachRevision + 1) {
               _resync(ch);
@@ -795,6 +795,12 @@ class _SessionScreenState extends State<SessionScreen>
               _lastAttachRevision = revision;
             }
           }
+          final next = (wire == 'delta' && cur != null)
+              ? cur.applyDelta(j)
+              : HarnessState.fromJson(j);
+          // Drift check: our event log must line up with the server's count — a
+          // mismatch (dropped/bad frame) resyncs via reconnect, since a fresh
+          // socket's first frame is always a full snapshot.
           final ec = j['event_count'];
           if (wire == 'delta' && ec is int && next.events.length != ec) {
             _resync(ch);
