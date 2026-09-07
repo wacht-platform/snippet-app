@@ -1045,6 +1045,17 @@ class _SessionScreenState extends State<SessionScreen>
     } else if (n is ScrollEndNotification) {
       _stickToBottom = _atBottom();
     }
+    // In the reversed transcript, the older-history edge is the maximum scroll
+    // extent. Start the next page as it enters the viewport instead of requiring
+    // a button tap; the loading guard prevents duplicate requests during a drag.
+    if (n is ScrollUpdateNotification || n is ScrollEndNotification) {
+      final m = n.metrics;
+      if (m.maxScrollExtent > 0 &&
+          m.pixels >= m.maxScrollExtent - 320 &&
+          _transcriptStart > 0) {
+        _loadOlderTranscript();
+      }
+    }
     // Repaint only on the pinned/unpinned EDGE — it toggles the floating
     // "jump to latest" button over the transcript.
     if (was != _stickToBottom && mounted) setState(() {});
@@ -2010,34 +2021,6 @@ class _SessionScreenState extends State<SessionScreen>
                               onNotification: _onScroll,
                               child: Builder(builder: (context) {
                                 final timeline = <Widget>[
-                                  if (_transcriptStart > 0)
-                                    Semantics(
-                                      button: true,
-                                      label: 'Load older transcript messages',
-                                      child: Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 12),
-                                        child: TextButton.icon(
-                                          onPressed: _loadingOlderTranscript
-                                              ? null
-                                              : _loadOlderTranscript,
-                                          icon: _loadingOlderTranscript
-                                              ? const SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                  ),
-                                                )
-                                              : const Icon(Icons.history,
-                                                  size: 16),
-                                          label: Text(_loadingOlderTranscript
-                                              ? 'Loading older messages…'
-                                              : 'Load older messages'),
-                                        ),
-                                      ),
-                                    ),
                                   if (items.isEmpty && !running)
                                     const EmptyState(
                                         icon: 'terminal',
