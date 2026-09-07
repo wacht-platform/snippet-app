@@ -2010,16 +2010,14 @@ class _DesktopShellState extends State<DesktopShell>
           color: desktop
               ? (active ? AppColors.surface1 : Colors.transparent)
               : (active ? AppColors.surface2 : Colors.transparent),
-          borderRadius:
-              desktop ? BorderRadius.zero : BorderRadius.circular(R.xs),
+          borderRadius: BorderRadius.zero,
           border: desktop
               ? Border(
                   bottom: BorderSide(
                       color: active ? AppColors.accent : Colors.transparent,
                       width: 2),
                 )
-              : Border.all(
-                  color: active ? AppColors.border : Colors.transparent),
+              : null,
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (t.isMissionControl)
