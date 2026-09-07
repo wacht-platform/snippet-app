@@ -54,6 +54,7 @@ class _LanesScreenState extends State<LanesScreen> {
         child: Column(children: [
           SnAppBar(
             title: 'Delegated lanes',
+            titleSize: 15,
             subtitle: _subtitle(lanes, running.length, failed),
             onBack: widget.onClose ?? () => Navigator.pop(context),
           ),

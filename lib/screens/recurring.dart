@@ -396,6 +396,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
         child: Column(children: [
           SnAppBar(
               title: 'Scheduled',
+              titleSize: 15,
               onBack: widget.onClose ?? () => Navigator.pop(context)),
           Expanded(child: body),
         ]),
