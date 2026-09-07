@@ -936,8 +936,8 @@ class _SessionScreenState extends State<SessionScreen>
   // Reconnect with exponential backoff (1,2,4,8,15,30s). Deduped so onError+onDone
   // don't double-schedule; reset to 0 on any healthy frame or app-resume. Only the
   // CURRENT channel may schedule — a detached socket's late onDone is ignored.
-  // The "Reconnecting…" banner is suppressed for the first 60s to avoid flicker
-  // on brief network hiccups (WiFi→cellular, backgrounding, etc.).
+  // The "Reconnecting…" banner is delayed briefly so a transient handoff does
+  // not flash, while a real outage becomes visible quickly.
   Timer? _bannerTimer;
   void _scheduleReconnect(WebSocketChannel ch) {
     if (_closed || _parked) return;
@@ -947,9 +947,9 @@ class _SessionScreenState extends State<SessionScreen>
     const steps = [1, 2, 4, 8, 15, 30];
     final delay = steps[_reconnectAttempt.clamp(0, steps.length - 1)];
     _reconnectAttempt++;
-    // Delay the banner by 60s so brief disconnects don't flash a warning.
+    // Delay the banner briefly so transient handoffs do not flash a warning.
     _bannerTimer?.cancel();
-    _bannerTimer = Timer(const Duration(seconds: 60), () {
+    _bannerTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && !_closed && _channel == null) {
         setState(() => _connError = 'Reconnecting…');
       }
