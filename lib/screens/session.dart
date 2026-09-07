@@ -205,6 +205,7 @@ class _SessionScreenState extends State<SessionScreen>
   int _termFocus = 0;
   int _termSeq = 0;
   double _termHeight = 280;
+  int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _currentProfile;
   final _input = TextEditingController();
@@ -584,8 +585,10 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Future<void> _loadModel() async {
+    final generation = ++_modelLoadGeneration;
     try {
       final cfg = await widget.client.getConfig();
+      if (!mounted || generation != _modelLoadGeneration) return;
 
       // Resolve which profile this session is on, most authoritative first:
       //   1. an in-session pick the user just made (optimistic, same screen);
@@ -632,10 +635,10 @@ class _SessionScreenState extends State<SessionScreen>
           }
         }
       }
+
+      if (!mounted || generation != _modelLoadGeneration) return;
       if (mounted) {
-        setState(() {
-          _modelLabel = p?.name;
-        });
+        setState(() => _modelLabel = p?.name);
       }
     } catch (_) {}
   }
