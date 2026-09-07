@@ -2879,7 +2879,7 @@ class _SessionScreenState extends State<SessionScreen>
                   borderRadius: BorderRadius.circular(R.md),
                   border: Border.all(color: AppColors.border),
                 ),
-                padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+                padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2905,15 +2905,15 @@ class _SessionScreenState extends State<SessionScreen>
                           maxLines: 8,
                           cursorColor: AppColors.fg1,
                           onSubmitted: (_) => _sendMessage(),
-                          style: sans(15, height: 1.4, color: AppColors.fg1),
+                          style: sans(15.5, height: 1.45, color: AppColors.fg1),
                           decoration: InputDecoration(
                             isCollapsed: true,
                             contentPadding:
-                                const EdgeInsets.fromLTRB(2, 0, 8, 10),
+                                const EdgeInsets.fromLTRB(2, 2, 8, 14),
                             border: InputBorder.none,
                             hintText: 'Ask anything',
                             hintStyle:
-                                sans(15, height: 1.4, color: AppColors.fg4),
+                                sans(15.5, height: 1.45, color: AppColors.fg4),
                           ),
                         ),
                       ),
@@ -2941,15 +2941,9 @@ class _SessionScreenState extends State<SessionScreen>
                                 child: InkWell(
                                   onTap: () => _switchModel(chipCtx),
                                   borderRadius: BorderRadius.circular(R.sm),
-                                  child: Container(
+                                  child: Padding(
                                     padding:
-                                        const EdgeInsets.fromLTRB(8, 4, 7, 4),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(R.sm),
-                                      border: Border.all(
-                                          color: AppColors.border2
-                                              .withValues(alpha: 0.6)),
-                                    ),
+                                        const EdgeInsets.fromLTRB(8, 5, 7, 5),
                                     child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
