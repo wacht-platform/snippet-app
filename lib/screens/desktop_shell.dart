@@ -9,6 +9,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
 import '../command_palette.dart';
+import '../device_events.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../panel.dart';
@@ -319,19 +320,15 @@ class _DesktopShellState extends State<DesktopShell>
         (msg) {
           if (generation != _eventsGeneration || !identical(ch, _eventsChannel))
             return;
-          Map<String, dynamic> e;
-          try {
-            e = jsonDecode(msg as String) as Map<String, dynamic>;
-          } catch (_) {
-            return;
-          }
-          final kind = e['kind']?.toString() ?? '';
+          final event = DeviceEvent.decode(msg);
+          if (event == null) return;
+          final kind = event.kind;
           if (kind == 'models' || kind == 'config') {
             c.invalidateConfig();
             modelsRevision.value++;
           }
-          final session = e['session']?.toString() ?? '';
-          final status = e['status']?.toString() ?? '';
+          final session = event.session;
+          final status = event.status;
           if (session.isEmpty || status.isEmpty) return;
           if (!mounted) return;
           _patchSessionStatus(session, status);
