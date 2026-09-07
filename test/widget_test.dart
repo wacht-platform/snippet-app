@@ -32,6 +32,39 @@ void main() {
     expect(state.queuedInputs.map((item) => item.text), ['same', 'same']);
   });
 
+  test(
+      'HarnessState prepends older transcript events without losing current events',
+      () {
+    final state = HarnessState.fromJson({
+      'status': 'idle',
+      'workspace': '/workspace',
+      'events': [
+        {'kind': 'assistant_text', 'text': 'current'},
+      ],
+    });
+    final merged = state.prependEvents([
+      {'kind': 'user_input', 'text': 'older'},
+    ]);
+    expect(merged.events.map((event) => event['text']), ['older', 'current']);
+    expect(merged.status, 'idle');
+    expect(merged.workspace, '/workspace');
+  });
+
+  test('session event page response metadata parses bounded cursors', () {
+    const page = SessionEventsPage(
+      events: [
+        {'kind': 'user_input', 'text': 'older'},
+      ],
+      start: 4,
+      end: 5,
+      hasOlder: true,
+    );
+    expect(page.start, 4);
+    expect(page.end, 5);
+    expect(page.hasOlder, isTrue);
+    expect(page.events.single['text'], 'older');
+  });
+
   test('HarnessState preserves title fallback and checkpoints', () {
     final state = HarnessState.fromJson({
       'status': 'idle',
