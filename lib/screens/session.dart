@@ -4135,70 +4135,63 @@ class _QueuedBubble extends StatelessWidget {
           maxWidth: MediaQuery.sizeOf(context).width * 0.78,
         ),
         child: Padding(
-          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 8),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(14, 10, 12, 12),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.md),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Text('Queued',
-                      style: sans(11,
-                          weight: FontWeight.w500, color: AppColors.fg3)),
-                  const Spacer(),
-                  if (onSteer != null) ...[
-                    Material(
-                      color: AppColors.surface3,
-                      borderRadius: BorderRadius.circular(R.xs),
-                      child: InkWell(
-                        onTap: onSteer,
-                        borderRadius: BorderRadius.circular(R.xs),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          child: Text('Send now',
-                              style: sans(10.5,
-                                  weight: FontWeight.w500,
-                                  color: AppColors.accent)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
+          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(R.card),
+                  border: Border.all(
+                      color: AppColors.border2.withValues(alpha: 0.5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (text.isNotEmpty)
+                      Text(text,
+                          style: sans(15.5, height: 1.5, color: AppColors.fg1)),
+                    if (images + files + audio > 0) ...[
+                      if (text.isNotEmpty) const SizedBox(height: 6),
+                      AttachmentPill(
+                          audio: audio, images: images, files: files),
+                    ],
                   ],
-                  Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(R.xs),
-                    child: InkWell(
-                      onTap: onCancel,
-                      borderRadius: BorderRadius.circular(R.xs),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                        child: Text('Cancel',
-                            style: sans(10.5, color: AppColors.fg4)),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(right: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Queued', style: sans(10.5, color: AppColors.fg4)),
+                    const SizedBox(width: 8),
+                    if (onSteer != null) ...[
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onSteer,
+                        child: Text('Send now',
+                            style: sans(10.5,
+                                weight: FontWeight.w500,
+                                color: AppColors.accent)),
                       ),
+                      const SizedBox(width: 8),
+                    ],
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onCancel,
+                      child: Text('Cancel',
+                          style: sans(10.5, color: AppColors.fg4)),
                     ),
-                  ),
-                ]),
-                if (text.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Text(text,
-                        style: sans(15, height: 1.45, color: AppColors.fg1)),
-                  ),
-                ],
-                if (images + files + audio > 0) ...[
-                  const SizedBox(height: 8),
-                  AttachmentPill(audio: audio, images: images, files: files),
-                ],
-              ],
-            ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
