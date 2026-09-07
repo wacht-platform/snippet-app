@@ -391,6 +391,21 @@ class _SessionScreenState extends State<SessionScreen>
   static const _transcriptPageSize = 160;
   int _transcriptStart = 0;
   bool _loadingOlderTranscript = false;
+  Timer? _historyPrefetchTimer;
+
+  void _scheduleHistoryPrefetch() {
+    _historyPrefetchTimer?.cancel();
+    if (_closed || _loadingOlderTranscript || _transcriptStart == 0) return;
+    _historyPrefetchTimer = Timer(const Duration(milliseconds: 700), () {
+      if (!_closed &&
+          mounted &&
+          !_loadingOlderTranscript &&
+          _transcriptStart > 0) {
+        _loadOlderTranscript();
+      }
+    });
+  }
+
   final List<_UserMark> _userMarks = [];
   final Map<String, GlobalKey> _userMarkKeys = {};
   double _jumpCacheExtent = 400;
@@ -924,6 +939,7 @@ class _SessionScreenState extends State<SessionScreen>
           if (eventsChanged) _transcriptDirty = true;
           setState(() {
             _state = next;
+            _scheduleHistoryPrefetch();
             if (!_isMissionControl) {
               final nextTitle = next.title ?? widget.title;
               if (nextTitle != _title && nextTitle.isNotEmpty) {
@@ -1933,6 +1949,7 @@ class _SessionScreenState extends State<SessionScreen>
     _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
+    _historyPrefetchTimer?.cancel();
     _streamFlushTimer?.cancel();
     _liveFrame.dispose();
     _sub?.cancel();
