@@ -113,8 +113,9 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text('Schedule a goal or message',
-                        style: sans(16, color: AppColors.fg1)),
-                    const SizedBox(height: 6),
+                        style: sans(14,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const SizedBox(height: 10),
                     Text(
                       'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',
                       style: sans(12, height: 1.4, color: AppColors.fg3),
@@ -456,7 +457,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(children: [
-        AppIcon('clock',
+        AppIcon('scheduled',
             size: 16, color: paused ? AppColors.fg4 : AppColors.fg3),
         const SizedBox(width: 12),
         Expanded(

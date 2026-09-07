@@ -1531,8 +1531,8 @@ class _DesktopShellState extends State<DesktopShell>
               'layers',
               'Lanes (${state!.lanes.where((lane) => lane.running).length})',
               () => controls.performAction('lanes')),
-        _macStatusAction(
-            'clock', 'Scheduled', () => controls.performAction('recurring')),
+        _macStatusAction('scheduled', 'Scheduled',
+            () => controls.performAction('recurring')),
         _macStatusAction(
             'folder', 'Files', () => controls.performAction('files')),
         if (tab?.isMissionControl != true)
