@@ -205,6 +205,7 @@ class _SessionScreenState extends State<SessionScreen>
   int _termFocus = 0;
   int _termSeq = 0;
   double _termHeight = 280;
+  int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _currentProfile;
   final _input = TextEditingController();
@@ -584,8 +585,10 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Future<void> _loadModel() async {
+    final generation = ++_modelLoadGeneration;
     try {
       final cfg = await widget.client.getConfig();
+      if (!mounted || generation != _modelLoadGeneration) return;
 
       // Resolve which profile this session is on, most authoritative first:
       //   1. an in-session pick the user just made (optimistic, same screen);
@@ -632,10 +635,10 @@ class _SessionScreenState extends State<SessionScreen>
           }
         }
       }
+
+      if (!mounted || generation != _modelLoadGeneration) return;
       if (mounted) {
-        setState(() {
-          _modelLabel = p?.name;
-        });
+        setState(() => _modelLabel = p?.name);
       }
     } catch (_) {}
   }
@@ -1995,6 +1998,8 @@ class _SessionScreenState extends State<SessionScreen>
                                     const SizedBox(height: 8),
                                     _QueuedSection(
                                       count: _heldQueue.length,
+                                      showBulkActions:
+                                          !kMobile || _heldQueue.length > 1,
                                       onSendAll: _steerAllQueued,
                                       onCancelAll: _cancelAllQueued,
                                       children: [
@@ -4234,11 +4239,13 @@ class _QueuedBubble extends StatelessWidget {
 
 class _QueuedSection extends StatelessWidget {
   final int count;
+  final bool showBulkActions;
   final VoidCallback onSendAll;
   final VoidCallback onCancelAll;
   final List<Widget> children;
   const _QueuedSection({
     required this.count,
+    required this.showBulkActions,
     required this.onSendAll,
     required this.onCancelAll,
     required this.children,
@@ -4260,36 +4267,39 @@ class _QueuedSection extends StatelessWidget {
                       spacing: 0.6,
                       color: AppColors.fg4)),
               const Spacer(),
-              Material(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.xs),
-                child: InkWell(
-                  onTap: onSendAll,
+              if (showBulkActions) ...[
+                Material(
+                  color: AppColors.surface2,
                   borderRadius: BorderRadius.circular(R.xs),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    child: Text('Send all',
-                        style: sans(10.5,
-                            weight: FontWeight.w600, color: AppColors.accent)),
+                  child: InkWell(
+                    onTap: onSendAll,
+                    borderRadius: BorderRadius.circular(R.xs),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      child: Text('Send all',
+                          style: sans(10.5,
+                              weight: FontWeight.w600,
+                              color: AppColors.accent)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(R.xs),
-                child: InkWell(
-                  onTap: onCancelAll,
+                const SizedBox(width: 8),
+                Material(
+                  color: Colors.transparent,
                   borderRadius: BorderRadius.circular(R.xs),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    child: Text('Cancel all',
-                        style: sans(10.5, color: AppColors.fg4)),
+                  child: InkWell(
+                    onTap: onCancelAll,
+                    borderRadius: BorderRadius.circular(R.xs),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 3),
+                      child: Text('Cancel all',
+                          style: sans(10.5, color: AppColors.fg4)),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ]),
           ),
           ...children,

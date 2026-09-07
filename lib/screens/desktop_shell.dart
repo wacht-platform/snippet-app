@@ -322,6 +322,7 @@ class _DesktopShellState extends State<DesktopShell>
           }
           final kind = e['kind']?.toString() ?? '';
           if (kind == 'models' || kind == 'config') {
+            c.invalidateConfig();
             modelsRevision.value++;
           }
           final session = e['session']?.toString() ?? '';
@@ -1664,7 +1665,8 @@ class _DesktopShellState extends State<DesktopShell>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _sidebarGit ? AppColors.accentBg : Colors.transparent,
+                    color:
+                        _sidebarGit ? AppColors.accentBg : Colors.transparent,
                     borderRadius: BorderRadius.circular(R.sm),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
