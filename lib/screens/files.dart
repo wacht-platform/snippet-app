@@ -625,8 +625,8 @@ class _Row extends StatelessWidget {
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(R.sm),
         child: Padding(
-          padding: EdgeInsets.symmetric(
-              horizontal: 12, vertical: kMobile ? 11 : 6.5),
+          padding:
+              EdgeInsets.symmetric(horizontal: 14, vertical: kMobile ? 12 : 9),
           child: Row(children: [
             if (selecting) ...[_checkbox(selected), const SizedBox(width: 11)],
             AppIcon(icon,
