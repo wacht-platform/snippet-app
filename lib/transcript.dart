@@ -169,17 +169,16 @@ class _BrailleSpinnerState extends State<BrailleSpinner> {
 class ToolRun extends StatefulWidget {
   final List<Widget> rows;
   final bool running;
-  const ToolRun(this.rows, {super.key, this.running = false});
+  final bool open;
+  final ValueChanged<bool>? onOpenChanged;
+  const ToolRun(this.rows,
+      {super.key, this.running = false, this.open = false, this.onOpenChanged});
   @override
   State<ToolRun> createState() => _ToolRunState();
 }
 
 class _ToolRunState extends State<ToolRun> {
-  bool _open = false;
-
-  void _toggle() {
-    setState(() => _open = !_open);
-  }
+  void _toggle() => widget.onOpenChanged?.call(!widget.open);
 
   @override
   Widget build(BuildContext context) {
@@ -202,11 +201,11 @@ class _ToolRunState extends State<ToolRun> {
             const SizedBox(width: 8),
             Text(label, style: sans(13, color: AppColors.fg3)),
             const SizedBox(width: 4),
-            AppIcon(_open ? 'chevron-down' : 'chevron-right',
+            AppIcon(widget.open ? 'chevron-down' : 'chevron-right',
                 size: 13, color: AppColors.fg4),
           ]),
         ),
-        if (_open) ...[
+        if (widget.open) ...[
           const SizedBox(height: 8),
           for (var i = 0; i < widget.rows.length; i++) ...[
             if (i > 0) const SizedBox(height: 2),

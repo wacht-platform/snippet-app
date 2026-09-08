@@ -386,6 +386,7 @@ class _SessionScreenState extends State<SessionScreen>
   bool _draggingFiles = false;
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   static const int _maxAttachments = 5;
+  final Map<String, bool> _toolRunOpen = {};
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
   static const _transcriptPageSize = 160;
@@ -2118,8 +2119,8 @@ class _SessionScreenState extends State<SessionScreen>
                                         20, 16, 20, 24),
                                     itemCount: timeline.length,
                                     itemBuilder: (context, index) {
-                                      final child = timeline[
-                                          timeline.length - 1 - index];
+                                      final child =
+                                          timeline[timeline.length - 1 - index];
                                       return KeyedSubtree(
                                         key: child.key ??
                                             ValueKey('timeline-$index'),
@@ -3228,11 +3229,16 @@ class _SessionScreenState extends State<SessionScreen>
       if (run.isEmpty) return;
       final start = runStartKey ?? fallbackKey;
       final running = run.any((w) => w is DenseToolRow && w.pending);
+      final toolKey = 'transcript-tools-$start';
       out.add(KeyedSubtree(
-        key: ValueKey('transcript-tools-$start'),
+        key: ValueKey(toolKey),
         child: ToolRun(
           List.of(run),
           running: running,
+          open: _toolRunOpen[toolKey] ?? false,
+          onOpenChanged: (open) {
+            _toolRunOpen[toolKey] = open;
+          },
         ),
       ));
       run.clear();
