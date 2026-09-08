@@ -3232,7 +3232,6 @@ class _SessionScreenState extends State<SessionScreen>
         key: ValueKey('transcript-tools-$start'),
         child: ToolRun(
           List.of(run),
-          key: PageStorageKey('transcript-tools-$start'),
           running: running,
         ),
       ));

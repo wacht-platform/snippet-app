@@ -177,18 +177,8 @@ class ToolRun extends StatefulWidget {
 class _ToolRunState extends State<ToolRun> {
   bool _open = false;
 
-  @override
-  void initState() {
-    super.initState();
-    final stored = PageStorage.maybeOf(context)?.readState(context);
-    if (stored is bool) _open = stored;
-  }
-
   void _toggle() {
-    setState(() {
-      _open = !_open;
-      PageStorage.maybeOf(context)?.writeState(context, _open);
-    });
+    setState(() => _open = !_open);
   }
 
   @override
