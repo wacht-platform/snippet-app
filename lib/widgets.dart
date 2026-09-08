@@ -165,7 +165,7 @@ class _ToastCardState extends State<_ToastCard>
           child: Container(
             constraints: const BoxConstraints(maxWidth: 360),
             margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+            padding: const EdgeInsets.fromLTRB(16, 9, 16, 9),
             decoration: BoxDecoration(
               color: AppColors.surface1,
               borderRadius: BorderRadius.circular(R.md),
@@ -1860,7 +1860,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                     const SizedBox(height: 6),
                     Flexible(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+                        padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
                         child: child,
                       ),
                     ),
@@ -1915,7 +1915,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
             ),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
                 child: child,
               ),
             ),
