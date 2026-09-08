@@ -2423,7 +2423,7 @@ class _SidebarState extends State<_Sidebar> {
     final c = widget.client;
     if (c == null) return;
     presentScreen(context,
-        maxWidth: 860,
+        maxWidth: 640,
         maxHeight: 620,
         builder: (_, close) => _SettingsPanel(
               client: c,
