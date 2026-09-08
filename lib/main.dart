@@ -49,6 +49,10 @@ void main() async {
   if (kCanNotify) {
     try {
       await initNotifications();
+      // Mark the app foreground before starting the background watcher. Otherwise
+      // the watcher can deliver a notification during startup before the first
+      // frame reports the active lifecycle state.
+      reportForeground(true);
       await resumeWatchingIfEnabled();
       await scheduleAndroidReconciliation();
     } catch (_) {}
