@@ -2117,13 +2117,17 @@ class _SessionScreenState extends State<SessionScreen>
                                     padding: const EdgeInsets.fromLTRB(
                                         20, 16, 20, 24),
                                     itemCount: timeline.length,
-                                    itemBuilder: (context, index) =>
-                                        _centerWide(
-                                      RepaintBoundary(
-                                        child: timeline[
-                                            timeline.length - 1 - index],
-                                      ),
-                                    ),
+                                    itemBuilder: (context, index) {
+                                      final child = timeline[
+                                          timeline.length - 1 - index];
+                                      return KeyedSubtree(
+                                        key: child.key ??
+                                            ValueKey('timeline-$index'),
+                                        child: _centerWide(
+                                          RepaintBoundary(child: child),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 );
                               })),
@@ -3226,7 +3230,11 @@ class _SessionScreenState extends State<SessionScreen>
       final running = run.any((w) => w is DenseToolRow && w.pending);
       out.add(KeyedSubtree(
         key: ValueKey('transcript-tools-$start'),
-        child: ToolRun(List.of(run), running: running),
+        child: ToolRun(
+          List.of(run),
+          key: PageStorageKey('transcript-tools-$start'),
+          running: running,
+        ),
       ));
       run.clear();
       runStartKey = null;
