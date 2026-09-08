@@ -239,11 +239,30 @@ class UsageProvider {
         promptTokens = (j['prompt_tokens'] as num?)?.toInt() ?? 0,
         completionTokens = (j['completion_tokens'] as num?)?.toInt() ?? 0,
         cacheReadTokens = (j['cache_read_tokens'] as num?)?.toInt() ?? 0,
-        rateLimits = ((j['rate_limits'] as List?) ?? const [])
-            .whereType<Map>()
-            .map((e) => RateWindow.fromJson(e.cast<String, dynamic>()))
-            .where((window) => window.isReported)
-            .toList();
+        rateLimits = _reportedRateWindows(j['rate_limits']);
+
+  static List<RateWindow> _reportedRateWindows(dynamic raw) {
+    if (raw is! List) return const [];
+    final out = <RateWindow>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      final snapshot = item.cast<String, dynamic>();
+      // The service returns snapshots shaped as {primary, secondary}; accept
+      // both that wire shape and a direct window for backward compatibility.
+      final nested = <dynamic>[snapshot['primary'], snapshot['secondary']];
+      final windows = nested.whereType<Map>();
+      if (windows.isEmpty) {
+        final window = RateWindow.fromJson(snapshot);
+        if (window.isReported) out.add(window);
+      } else {
+        for (final value in windows) {
+          final window = RateWindow.fromJson(value.cast<String, dynamic>());
+          if (window.isReported) out.add(window);
+        }
+      }
+    }
+    return out;
+  }
 }
 
 class UsageSummary {
