@@ -15,6 +15,8 @@ const _providers = [
   ('openai-compatible', 'OpenAI-compatible'),
   ('anthropic-compatible', 'Anthropic-compatible'),
   ('openrouter', 'OpenRouter'),
+  ('opencode-zen', 'OpenCode Zen'),
+  ('opencode-go', 'OpenCode Go'),
   ('xai', 'xAI (Grok)'),
   ('chatgpt', 'ChatGPT'),
 ];
@@ -28,7 +30,11 @@ bool _defaultImages(String p) =>
     p == 'anthropic' || p == 'gemini' || p == 'openai' || p == 'chatgpt';
 // Providers that go through the OpenAI-compatible adapter, where `stream` applies.
 bool _usesOpenAiAdapter(String p) =>
-    p == 'openai' || p == 'openai-compatible' || p == 'openrouter';
+    p == 'openai' ||
+    p == 'openai-compatible' ||
+    p == 'openrouter' ||
+    p == 'opencode-zen' ||
+    p == 'opencode-go';
 
 class ModelEditorScreen extends StatefulWidget {
   final DaemonClient client;
