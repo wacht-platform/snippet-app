@@ -73,6 +73,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
   bool _active = false;
   bool _delegate = false;
   bool _stream = false;
+  bool _xSearch = false;
   String _effort = ''; // '' = provider default
   bool _busy = false;
   String? _error;
@@ -103,6 +104,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
         (widget.delegateName ?? '').isNotEmpty &&
         widget.delegateName == e.name;
     _stream = e?.stream ?? false;
+    _xSearch = e?.xSearch ?? false;
     _effort = e?.reasoningEffort ?? '';
     // The Save button's enabled state depends on this field; without a listener
     // typing never rebuilt, leaving Save stuck disabled on desktop.
@@ -206,6 +208,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
         supportsImages: _images,
         contextWindow: int.tryParse(_ctx.text.trim()),
         stream: _stream,
+        xSearch: _isXai ? _xSearch : null,
         setActive: _active,
       );
       final savedName = _isEdit
@@ -377,6 +380,15 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
                 label: 'Stream responses',
                 sub:
                     'Turn on for models that return nothing otherwise (e.g. MiniMax on NVIDIA NIM)'),
+          ],
+          if (_isXai) ...[
+            const SizedBox(height: 8),
+            AppToggle(
+                on: _xSearch,
+                onChanged: (v) => setState(() => _xSearch = v),
+                label: 'X search',
+                sub:
+                    'Let Grok search X via xAI’s server-side tool (Responses API)'),
           ],
           const SizedBox(height: 8),
           AppToggle(

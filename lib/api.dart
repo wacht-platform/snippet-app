@@ -188,6 +188,7 @@ class DaemonClient {
     bool? supportsImages,
     int? contextWindow,
     bool? stream,
+    bool? xSearch,
     bool setActive = false,
   }) async {
     final body = <String, dynamic>{
@@ -208,6 +209,7 @@ class DaemonClient {
       body['context_window'] = contextWindow;
     }
     if (stream != null) body['stream'] = stream;
+    if (xSearch != null) body['x_search'] = xSearch;
     final r = await http.put(_uri('/config/profile'),
         headers: _json, body: jsonEncode(body));
     if (r.statusCode != 200) throw _err('save profile', r);
