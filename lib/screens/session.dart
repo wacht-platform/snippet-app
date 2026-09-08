@@ -387,6 +387,7 @@ class _SessionScreenState extends State<SessionScreen>
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   static const int _maxAttachments = 5;
   final Map<String, bool> _toolRunOpen = {};
+  bool _activeToolRunOpen = false;
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
   static const _transcriptPageSize = 160;
@@ -3230,16 +3231,22 @@ class _SessionScreenState extends State<SessionScreen>
       final start = runStartKey ?? fallbackKey;
       final running = run.any((w) => w is DenseToolRow && w.pending);
       final toolKey = 'transcript-tools-$start';
+      final open =
+          running ? _activeToolRunOpen : (_toolRunOpen[toolKey] ?? false);
       out.add(KeyedSubtree(
         key: ValueKey(toolKey),
         child: ToolRun(
           List.of(run),
           running: running,
-          open: _toolRunOpen[toolKey] ?? false,
-          onOpenChanged: (open) {
+          open: open,
+          onOpenChanged: (nextOpen) {
             if (!mounted) return;
             setState(() {
-              _toolRunOpen[toolKey] = open;
+              if (running) {
+                _activeToolRunOpen = nextOpen;
+              } else {
+                _toolRunOpen[toolKey] = nextOpen;
+              }
               // The transcript is normally cached between event updates. Rebuild
               // it now so ToolRun receives the new open value immediately.
               _transcriptDirty = true;
