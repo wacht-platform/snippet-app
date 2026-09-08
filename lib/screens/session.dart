@@ -3113,10 +3113,19 @@ class _SessionScreenState extends State<SessionScreen>
     final laneRowsShown = <String>{}; // spawn cards already emitted (by id)
 
     String eventKey(Map<String, dynamic> event) {
-      // Event indexes shift when the daemon compacts history. Use the event
-      // payload plus its occurrence among identical events so Flutter keeps a
-      // message's State/SelectionArea attached to that message after compaction.
-      final fingerprint = jsonEncode(event);
+      // Use the stable fields that identify a transcript event instead of
+      // JSON-serializing the entire historical event on every delta. The old
+      // fingerprint became O(history) work for each new tool event and made
+      // a burst of tool calls wait behind repeated full-list rebuilds.
+      final fingerprint = Object.hash(
+        event['kind'],
+        event['tool_name'],
+        event['text'],
+        event['id'],
+        event['path'],
+        event['step'],
+        event['created_at'],
+      ).toString();
       final occurrence = eventOccurrences.update(
         fingerprint,
         (count) => count + 1,
