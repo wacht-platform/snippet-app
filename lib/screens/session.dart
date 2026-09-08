@@ -3237,7 +3237,8 @@ class _SessionScreenState extends State<SessionScreen>
           running: running,
           open: _toolRunOpen[toolKey] ?? false,
           onOpenChanged: (open) {
-            _toolRunOpen[toolKey] = open;
+            if (!mounted) return;
+            setState(() => _toolRunOpen[toolKey] = open);
           },
         ),
       ));
