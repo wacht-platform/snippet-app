@@ -37,6 +37,7 @@ class SessionTermView extends StatefulWidget {
 
 class _SessionTermViewState extends State<SessionTermView> {
   final _termView = GlobalKey<TerminalViewState>();
+  final _termController = TerminalController();
   late Terminal _host;
   int _lastC = 0;
   int _lastR = 0;
@@ -102,6 +103,7 @@ class _SessionTermViewState extends State<SessionTermView> {
   @override
   void dispose() {
     _unbind(_host);
+    _termController.dispose();
     super.dispose();
   }
 
@@ -253,6 +255,7 @@ class _SessionTermViewState extends State<SessionTermView> {
         child: TerminalView(
           widget.terminal,
           key: _termView,
+          controller: _termController,
           theme: _theme,
           backgroundOpacity: 1,
           autofocus: true,
