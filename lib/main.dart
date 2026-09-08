@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'notifications.dart';
+import 'android_reconciliation.dart';
 import 'platform.dart';
 import 'screens/adaptive_home.dart';
 import 'theme.dart';
@@ -49,6 +50,7 @@ void main() async {
     try {
       await initNotifications();
       await resumeWatchingIfEnabled();
+      await scheduleAndroidReconciliation();
     } catch (_) {}
   }
   runApp(const SnippetApp());

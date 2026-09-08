@@ -177,11 +177,60 @@ Future<void> notifyDownload(String name, String filePath, {int? id}) async {
   });
 }
 
+Future<void> notifySessionEvent({
+  required String title,
+  required String body,
+  required String payload,
+  required String kind,
+  int? notificationId,
+  FlutterLocalNotificationsPlugin? plugin,
+}) async {
+  if (!kCanNotify || !kMobile) return;
+  final important = kind == 'waiting' || kind == 'error';
+  await (plugin ?? _mainNotif).show(
+    id: notificationId ?? (DateTime.now().millisecondsSinceEpoch & 0x7fffffff),
+    title: title,
+    body: body,
+    notificationDetails: NotificationDetails(
+      android: AndroidNotificationDetails(
+        _alertChannel,
+        'Session activity',
+        channelDescription: 'Important activity on connected machines',
+        importance: important ? Importance.high : Importance.defaultImportance,
+        priority: important ? Priority.high : Priority.defaultPriority,
+        category: AndroidNotificationCategory.message,
+        onlyAlertOnce: true,
+      ),
+    ),
+    payload: payload,
+  );
+}
+
 /// Routed from a tapped notification (set by main with a navigator).
 void Function(Map<String, dynamic> payload)? onNotifTap;
 
 final FlutterLocalNotificationsPlugin _mainNotif =
     FlutterLocalNotificationsPlugin();
+
+bool _notificationsInitialized = false;
+
+Future<void> _initializeAndroidNotifications(
+    FlutterLocalNotificationsPlugin plugin) async {
+  await plugin.initialize(
+    settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+  );
+}
+
+/// Initialize the notification plugin in whichever isolate is running. Android
+/// WorkManager callbacks run in a background isolate and cannot use the main
+/// isolate's initialization state.
+Future<void> initializeNotificationBackgroundIsolate(
+    [FlutterLocalNotificationsPlugin? plugin]) async {
+  if (!kMobile) return;
+  await _initializeAndroidNotifications(plugin ?? _mainNotif);
+  _notificationsInitialized = true;
+}
 
 /// Build the device-wide events WebSocket URI for an instance.
 Uri eventsUri(String baseUrl, String token) {
@@ -261,7 +310,7 @@ Future<void> initNotifications() async {
 
 /// Head/body/payload for a /events frame — shared by the mobile task handler and
 /// the desktop watcher so they stay in sync.
-({String head, String body, String payload}) _notifContent(
+({String head, String body, String payload}) notificationContent(
     Instance inst, Map<String, dynamic> e) {
   final session = e['session']?.toString() ?? '';
   final title = e['title']?.toString() ?? 'session';
@@ -397,6 +446,7 @@ void reportOpenSession(String? key) {
 _DesktopWatcher? _watcher;
 
 class _DesktopWatcher {
+  final Map<String, int> _lastEventIds = {};
   final Map<String, WebSocketChannel> _channels = {};
   List<Instance> _instances = const [];
   bool _fg = true;
@@ -468,11 +518,16 @@ class _DesktopWatcher {
     } catch (_) {
       return;
     }
-    if (e['notify'] == false) return;
-    if (e['kind']?.toString() == 'running') return;
+    final eventId = e['event_id'];
+    if (eventId is num) {
+      final id = eventId.toInt();
+      final previous = _lastEventIds[inst.url] ?? 0;
+      if (id <= previous) return;
+      _lastEventIds[inst.url] = id;
+    }
     final session = e['session']?.toString() ?? '';
     if (_fg && '${inst.url}|$session' == _open) return; // already on screen
-    final c = _notifContent(inst, e);
+    final c = notificationContent(inst, e);
     _mainNotif.show(
       id: _nid++,
       title: c.head,
@@ -495,6 +550,7 @@ void startNotificationCallback() =>
 
 class _NotifTaskHandler extends TaskHandler {
   final _notif = FlutterLocalNotificationsPlugin();
+  final Map<String, int> _lastEventIds = {};
   final Map<String, WebSocketChannel> _channels = {};
   List<Instance> _instances = const [];
   bool _fg = false;
@@ -539,9 +595,16 @@ class _NotifTaskHandler extends TaskHandler {
     }
     if (e['notify'] == false) return;
     if (e['kind']?.toString() == 'running') return;
+    final eventId = e['event_id'];
+    if (eventId is num) {
+      final id = eventId.toInt();
+      final previous = _lastEventIds[inst.url] ?? 0;
+      if (id <= previous) return;
+      _lastEventIds[inst.url] = id;
+    }
     final session = e['session']?.toString() ?? '';
     if (_fg && '${inst.url}|$session' == _open) return; // already on screen
-    final c = _notifContent(inst, e);
+    final c = notificationContent(inst, e);
     _notif.show(
       id: _nid++,
       title: c.head,
