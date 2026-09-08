@@ -23,6 +23,7 @@ import 'editor.dart';
 import 'files.dart';
 import 'git.dart';
 import 'models.dart';
+import 'usage.dart';
 import 'vault.dart';
 import 'recurring.dart';
 import 'session.dart';
@@ -3755,7 +3756,7 @@ class _SettingsPanel extends StatefulWidget {
   State<_SettingsPanel> createState() => _SettingsPanelState();
 }
 
-enum _SettingsPage { general, models, vault, scheduled }
+enum _SettingsPage { general, models, usage, vault, scheduled }
 
 class _SettingsPanelState extends State<_SettingsPanel> {
   late final List<Instance> _instances = [...widget.instances];
@@ -3766,6 +3767,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   static const _nav = [
     (_SettingsPage.general, 'settings', 'General'),
     (_SettingsPage.models, 'cpu', 'Models'),
+    (_SettingsPage.usage, 'activity', 'Usage'),
     (_SettingsPage.vault, 'key', 'Vault'),
     (_SettingsPage.scheduled, 'scheduled', 'Scheduled'),
   ];
@@ -3891,6 +3893,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       _SettingsPage.general => _generalPage(),
       _SettingsPage.models =>
         ModelsScreen(client: widget.client, embedded: true),
+      _SettingsPage.usage => UsageScreen(client: widget.client, embedded: true),
       _SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
       _SettingsPage.scheduled =>
         RecurringScreen(client: widget.client, listOnly: true, embedded: true),
