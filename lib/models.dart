@@ -653,7 +653,7 @@ String? rateResetLabel(int resetsAt) {
   if (resetsAt <= 0) return null;
   final reset = DateTime.fromMillisecondsSinceEpoch(resetsAt * 1000);
   final d = reset.difference(DateTime.now());
-  if (d.isNegative) return 'resetting…';
+  if (d.isNegative) return 'awaiting update';
   final days = d.inDays, h = d.inHours % 24, m = d.inMinutes % 60;
   if (days > 0) return 'resets in ${h > 0 ? '${days}d ${h}h' : '${days}d'}';
   final rel = d.inHours > 0

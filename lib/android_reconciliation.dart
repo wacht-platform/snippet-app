@@ -68,6 +68,13 @@ Future<void> reconcileAndroidNotificationState() async {
       final eventId = (event['event_id'] as num?)?.toInt() ?? 0;
       if (eventId <= 0) continue;
       final kind = event['kind']?.toString() ?? '';
+      // Idle/stopped is a transient low-value state. Never resurrect it as a
+      // notification during deferred replay; old idle records are exactly what
+      // caused stale "stopped" banners after Android was backgrounded.
+      if (kind == 'idle') {
+        await advanceNotificationCursor(prefs, instance.url, eventId);
+        continue;
+      }
       final content = notificationContent(instance, event);
       await notifySessionEvent(
         title: content.head,
