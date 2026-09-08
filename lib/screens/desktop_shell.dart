@@ -1205,6 +1205,8 @@ class _DesktopShellState extends State<DesktopShell>
           sessionId: tab.sessionId ?? '',
           folder: folder,
           embedded: true,
+          onOpenFile: (path, name) =>
+              _openFileTab(tab.client, tab.instanceUrl, path, name),
           onClose: () => setState(() => _sidebarGit = false),
         ),
       );
