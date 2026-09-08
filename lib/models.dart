@@ -209,6 +209,13 @@ class RateWindow {
       : usedPercent = (j['used_percent'] as num?)?.toDouble() ?? 0,
         windowMinutes = (j['window_minutes'] as num?)?.toInt() ?? 0,
         resetsAt = (j['resets_at'] as num?)?.toInt() ?? 0;
+
+  /// Empty/default snapshots are not provider-reported usage.
+  bool get isReported =>
+      windowMinutes > 0 ||
+      resetsAt > 0 ||
+      usedPercent.isFinite && usedPercent > 0;
+
   double get leftPercent => (100 - usedPercent).clamp(0, 100).toDouble();
 }
 
@@ -235,6 +242,7 @@ class UsageProvider {
         rateLimits = ((j['rate_limits'] as List?) ?? const [])
             .whereType<Map>()
             .map((e) => RateWindow.fromJson(e.cast<String, dynamic>()))
+            .where((window) => window.isReported)
             .toList();
 }
 
