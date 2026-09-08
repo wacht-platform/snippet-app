@@ -668,11 +668,7 @@ class _SubSignInState extends State<_SubSignIn> {
   Widget build(BuildContext context) {
     Theme.of(context);
     if (_loading && _code == null) {
-      return SizedBox(
-          height: 20,
-          width: 20,
-          child:
-              CircularProgressIndicator(strokeWidth: 2, color: AppColors.fg3));
+      return const SizedBox(height: 20);
     }
     if (_signedIn) {
       return Row(children: [
@@ -702,15 +698,7 @@ class _SubSignInState extends State<_SubSignIn> {
           ),
         ]),
         const SizedBox(height: 8),
-        Row(children: [
-          SizedBox(
-              height: 14,
-              width: 14,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.fg3)),
-          const SizedBox(width: 8),
-          Text('Waiting for approval…', style: sans(12, color: AppColors.fg3)),
-        ]),
+        Text('Waiting for approval…', style: sans(12, color: AppColors.fg3)),
       ]);
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
