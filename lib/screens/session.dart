@@ -3312,6 +3312,10 @@ class _SessionScreenState extends State<SessionScreen>
           break;
       }
     }
+    // Trailing tool_call/tool_result events stay in `run` until a later
+    // user/assistant message would flush them. Without this, live tools
+    // remain invisible until the next chat message.
+    endTools('transcript-tools-tail');
     return out;
   }
 
