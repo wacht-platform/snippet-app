@@ -43,6 +43,7 @@ class ModelProfile {
   final String reasoningEffort; // '' = provider default
   final bool stream; // force the streaming wire protocol (stream-only models)
   final bool? supportsImages; // null on daemons that don't report it yet
+  final bool xSearch; // xAI server-side X search
 
   ModelProfile.fromJson(Map<String, dynamic> j)
       : name = j['name'] as String? ?? '',
@@ -55,7 +56,8 @@ class ModelProfile {
         reasoningEffort = j['reasoning_effort'] as String? ?? '',
         stream = j['stream'] == true,
         supportsImages =
-            j['supports_images'] is bool ? j['supports_images'] as bool : null;
+            j['supports_images'] is bool ? j['supports_images'] as bool : null,
+        xSearch = j['x_search'] == true;
 
   /// Whether this profile is ready to use. Most providers need an API key, but
   /// ChatGPT authenticates via an OAuth login (no key), so a keyless chatgpt
