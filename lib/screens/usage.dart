@@ -53,7 +53,14 @@ class _UsageScreenState extends State<UsageScreen> {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Text('Unable to load usage',
                   style: sans(13, color: AppColors.fg1)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text('${snap.error}',
+                    textAlign: TextAlign.center,
+                    style: mono(10.5, color: AppColors.fg4)),
+              ),
+              const SizedBox(height: 10),
               Btn('Retry', small: true, onTap: _refresh),
             ]),
           );
