@@ -38,6 +38,7 @@ dependencies:
   chewie: ^1.13.1
   audioplayers: ^6.8.1
   xterm: ^4.0.0
+  pasteboard: ^0.5.0
 
 dev_dependencies:
   flutter_test:
