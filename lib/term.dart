@@ -170,7 +170,7 @@ class _SessionTermViewState extends State<SessionTermView> {
       onTap: tap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: on ? AppColors.accent.withValues(alpha: 0.18) : null,
           border: Border.all(color: on ? AppColors.accent : AppColors.border2),
@@ -187,9 +187,9 @@ class _SessionTermViewState extends State<SessionTermView> {
       onTap: tap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        constraints: BoxConstraints(minWidth: minWidth, minHeight: 24),
+        constraints: BoxConstraints(minWidth: minWidth, minHeight: 34),
         alignment: minWidth > 0 ? Alignment.center : null,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.border2),
           borderRadius: BorderRadius.circular(R.sm),
@@ -209,7 +209,7 @@ class _SessionTermViewState extends State<SessionTermView> {
             ],
           ],
         );
-    const w = 28.0;
+    const w = 36.0;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
