@@ -152,6 +152,12 @@ class DaemonClient {
 
   // ---- model configuration (shared with the TUI's config.toml) ----
 
+  Future<UsageSummary> getUsage() async {
+    final r = await http.get(_uri('/usage'));
+    if (r.statusCode != 200) throw _err('load usage', r);
+    return UsageSummary.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
   Future<ServerConfig> getConfig({bool force = false}) async {
     if (!force && _configCache != null) return _configCache!;
     if (!force && _configInFlight != null) return _configInFlight!;

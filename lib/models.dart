@@ -212,6 +212,41 @@ class RateWindow {
   double get leftPercent => (100 - usedPercent).clamp(0, 100).toDouble();
 }
 
+class UsageProvider {
+  final String provider;
+  final String? profile;
+  final String model;
+  final int sessions;
+  final int totalTokens;
+  final int promptTokens;
+  final int completionTokens;
+  final int cacheReadTokens;
+  final List<RateWindow> rateLimits;
+
+  UsageProvider.fromJson(Map<String, dynamic> j)
+      : provider = j['provider'] as String? ?? '',
+        profile = j['profile'] as String?,
+        model = j['model'] as String? ?? '',
+        sessions = (j['sessions'] as num?)?.toInt() ?? 0,
+        totalTokens = (j['total_tokens'] as num?)?.toInt() ?? 0,
+        promptTokens = (j['prompt_tokens'] as num?)?.toInt() ?? 0,
+        completionTokens = (j['completion_tokens'] as num?)?.toInt() ?? 0,
+        cacheReadTokens = (j['cache_read_tokens'] as num?)?.toInt() ?? 0,
+        rateLimits = ((j['rate_limits'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => RateWindow.fromJson(e.cast<String, dynamic>()))
+            .toList();
+}
+
+class UsageSummary {
+  final List<UsageProvider> providers;
+  UsageSummary.fromJson(Map<String, dynamic> j)
+      : providers = ((j['providers'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => UsageProvider.fromJson(e.cast<String, dynamic>()))
+            .toList();
+}
+
 class Checkpoint {
   final String id;
   final String label;
