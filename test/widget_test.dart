@@ -10,8 +10,8 @@ import 'package:snippet/android_reconciliation.dart';
 import 'package:snippet/notifications.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/mission_control/mission_control_state.dart';
-import 'package:snippet/screens/session.dart';
 import 'package:snippet/tool_views.dart';
+import 'package:snippet/transcript.dart';
 import 'package:snippet/widgets.dart';
 
 void main() {
@@ -461,6 +461,72 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('tool run stays expanded when live rows grow', (tester) async {
+    final open = ValueNotifier(false);
+    addTearDown(open.dispose);
+    final rows = ValueNotifier<List<Widget>>([const Text('first tool')]);
+    addTearDown(rows.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ValueListenableBuilder<bool>(
+          valueListenable: open,
+          builder: (_, isOpen, __) => ValueListenableBuilder<List<Widget>>(
+            valueListenable: rows,
+            builder: (_, currentRows, __) => ToolRun(
+              currentRows,
+              running: true,
+              open: isOpen,
+              onOpenChanged: (next) => open.value = next,
+            ),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('Running tool'));
+    await tester.pump();
+    expect(find.text('first tool'), findsOneWidget);
+
+    rows.value = [const Text('first tool'), const Text('second tool')];
+    await tester.pump();
+    expect(find.text('first tool'), findsOneWidget);
+    expect(find.text('second tool'), findsOneWidget);
+  });
+  testWidgets('completed tool run inherits the live expansion state',
+      (tester) async {
+    final running = ValueNotifier(true);
+    final open = ValueNotifier(false);
+    addTearDown(running.dispose);
+    addTearDown(open.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ValueListenableBuilder<bool>(
+          valueListenable: running,
+          builder: (_, isRunning, __) => ValueListenableBuilder<bool>(
+            valueListenable: open,
+            builder: (_, isOpen, __) => ToolRun(
+              const [Text('tool detail')],
+              key: ValueKey(isRunning ? 'transcript-tools-live' : 'tool-1'),
+              running: isRunning,
+              open: isOpen,
+              onOpenChanged: (next) => open.value = next,
+            ),
+          ),
+        ),
+      ),
+    ));
+
+    await tester.tap(find.text('Running tool'));
+    await tester.pump();
+    expect(find.text('tool detail'), findsOneWidget);
+
+    running.value = false;
+    await tester.pump();
+    expect(find.text('tool detail'), findsOneWidget);
   });
 
   testWidgets('tool panels tolerate null optional fields', (tester) async {

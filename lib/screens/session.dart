@@ -3230,7 +3230,11 @@ class _SessionScreenState extends State<SessionScreen>
       if (run.isEmpty) return;
       final start = runStartKey ?? fallbackKey;
       final running = run.any((w) => w is DenseToolRow && w.pending);
-      final toolKey = 'transcript-tools-$start';
+      final completedToolKey = 'transcript-tools-$start';
+      // A live batch grows as calls/results stream in. It must keep one fixed
+      // identity, otherwise a new first/pending event replaces the accordion
+      // and discards the user's expanded state mid-run.
+      final toolKey = running ? 'transcript-tools-live' : completedToolKey;
       final open =
           running ? _activeToolRunOpen : (_toolRunOpen[toolKey] ?? false);
       out.add(KeyedSubtree(
@@ -3244,6 +3248,10 @@ class _SessionScreenState extends State<SessionScreen>
             setState(() {
               if (running) {
                 _activeToolRunOpen = nextOpen;
+                // The live row has a temporary key. Mirror the preference onto
+                // its final batch key so finishing a tool cannot replace an
+                // expanded running accordion with a closed completed one.
+                _toolRunOpen[completedToolKey] = nextOpen;
               } else {
                 _toolRunOpen[toolKey] = nextOpen;
               }
