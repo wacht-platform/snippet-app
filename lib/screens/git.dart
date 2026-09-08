@@ -20,14 +20,19 @@ class GitScreen extends StatefulWidget {
   /// When hosted in a desktop panel, dismisses the panel from the root bar.
   final VoidCallback? onClose;
 
+  /// When provided, tapping a file opens it in the desktop editor tab.
+  final void Function(String path, String name)? onOpenFile;
+
   /// When true, render embedded in a sidebar (no Scaffold / SnAppBar).
   final bool embedded;
+
   const GitScreen(
       {super.key,
       required this.client,
       this.sessionId = '',
       this.folder,
       this.onClose,
+      this.onOpenFile,
       this.embedded = false});
   @override
   State<GitScreen> createState() => _GitScreenState();
@@ -110,6 +115,12 @@ class _GitScreenState extends State<GitScreen> {
   }
 
   void _openDiff(GitFile f) {
+    final open = widget.onOpenFile;
+    if (open != null) {
+      (widget.onClose ?? () => Navigator.pop(context))();
+      open(f.path, f.path.split('/').last);
+      return;
+    }
     Navigator.push(
         context,
         MaterialPageRoute(
@@ -178,8 +189,7 @@ class _GitScreenState extends State<GitScreen> {
                     : 'Source Control',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(12,
-                    weight: FontWeight.w600, color: AppColors.fg1),
+                style: sans(12, weight: FontWeight.w600, color: AppColors.fg1),
               ),
             ),
             IconBtn('refresh',
