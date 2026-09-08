@@ -388,6 +388,36 @@ class _SessionScreenState extends State<SessionScreen>
   static const int _maxAttachments = 5;
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
+  static const _transcriptPageSize = 160;
+  int _transcriptStart = 0;
+  bool _loadingOlderTranscript = false;
+  Timer? _historyPrefetchTimer;
+
+  void _scheduleHistoryPrefetch() {
+    _historyPrefetchTimer?.cancel();
+    if (_closed || _loadingOlderTranscript || _transcriptStart == 0) return;
+    _historyPrefetchTimer = Timer(const Duration(milliseconds: 700), () {
+      if (!_closed &&
+          mounted &&
+          !_loadingOlderTranscript &&
+          _transcriptStart > 0) {
+        _loadOlderTranscript();
+      }
+    });
+  }
+
+  Future<void> _loadOlderTranscript() async {
+    if (_state == null || _transcriptStart == 0 || _loadingOlderTranscript) {
+      return;
+    }
+    _loadingOlderTranscript = true;
+    _send({
+      'kind': 'history',
+      'before': _transcriptStart,
+      'limit': _transcriptPageSize,
+    });
+  }
+
   // Stream frame throttle: store the latest pending stream payload and flush
   // at most every 50ms to avoid rebuilding the full widget tree on every token.
   String _pendingLiveText = '';
@@ -736,6 +766,27 @@ class _SessionScreenState extends State<SessionScreen>
           // fromJson wiped the transcript to empty until the next real state
           // frame (often only after a TUI-side persist).
           final wire = j['wire'] as String? ?? 'snapshot';
+          if (wire == 'history') {
+            final rawEvents = j['events'];
+            final older = rawEvents is List
+                ? rawEvents
+                    .whereType<Map>()
+                    .map((e) => e.cast<String, dynamic>())
+                    .toList()
+                : const <Map<String, dynamic>>[];
+            if (older.isNotEmpty) {
+              setState(() {
+                _state = _state?.prependEvents(older);
+                _transcriptStart = (j['start'] as num?)?.toInt() ?? 0;
+                _transcriptDirty = true;
+              });
+            } else {
+              _transcriptStart = 0;
+            }
+            _loadingOlderTranscript = false;
+            if (_transcriptStart > 0) _scheduleHistoryPrefetch();
+            return;
+          }
           if (wire == 'term') {
             _applyTermFrame(j);
             return;
@@ -880,6 +931,13 @@ class _SessionScreenState extends State<SessionScreen>
                   cur.events.isNotEmpty &&
                   next.events.last != cur.events.last);
           if (eventsChanged) _transcriptDirty = true;
+          if (wire == 'snapshot') {
+            final offset = (j['event_offset'] as num?)?.toInt();
+            _transcriptStart = offset ??
+                (next.events.length > _transcriptPageSize
+                    ? next.events.length - _transcriptPageSize
+                    : 0);
+          }
           setState(() {
             _state = next;
             if (!_isMissionControl) {
@@ -906,6 +964,9 @@ class _SessionScreenState extends State<SessionScreen>
               }
             }
           });
+          if (wire == 'snapshot' && _transcriptStart > 0) {
+            _scheduleHistoryPrefetch();
+          }
           widget.onMacStatus?.call(next, next.status == 'running');
           widget.onMacControls
               ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
@@ -1883,6 +1944,7 @@ class _SessionScreenState extends State<SessionScreen>
     _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
+    _historyPrefetchTimer?.cancel();
     _streamFlushTimer?.cancel();
     _liveFrame.dispose();
     _sub?.cancel();
