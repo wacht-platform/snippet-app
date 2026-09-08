@@ -17,6 +17,18 @@ const _fgChannel = 'snippet_fg';
 const _alertChannel = 'snippet_alerts';
 const _downloadChannel = 'snippet_downloads';
 const _prefEnabled = 'notif_enabled';
+const _notificationCursorPrefix = 'android_reconciliation_cursor:';
+
+String notificationCursorKey(String instanceUrl) =>
+    '$_notificationCursorPrefix$instanceUrl';
+
+Future<void> advanceNotificationCursor(
+    SharedPreferences prefs, String instanceUrl, int eventId) async {
+  if (eventId <= 0) return;
+  final key = notificationCursorKey(instanceUrl);
+  final current = prefs.getInt(key) ?? 0;
+  if (eventId > current) await prefs.setInt(key, eventId);
+}
 
 int _downloadNotifId = 7000;
 const _cancelDownloadAction = 'cancel_download';
@@ -502,7 +514,9 @@ class _DesktopWatcher {
         );
         _channels[inst.url] = ch;
         ch.stream.listen(
-          (msg) => _onEvent(inst, msg),
+          (msg) {
+            unawaited(_onEvent(inst, msg));
+          },
           onDone: () => _channels.remove(inst.url),
           onError: (_) => _channels.remove(inst.url),
           cancelOnError: true,
@@ -511,7 +525,7 @@ class _DesktopWatcher {
     }
   }
 
-  void _onEvent(Instance inst, dynamic msg) {
+  Future<void> _onEvent(Instance inst, dynamic msg) async {
     Map<String, dynamic> e;
     try {
       e = jsonDecode(msg as String) as Map<String, dynamic>;
@@ -524,6 +538,8 @@ class _DesktopWatcher {
       final previous = _lastEventIds[inst.url] ?? 0;
       if (id <= previous) return;
       _lastEventIds[inst.url] = id;
+      final prefs = await SharedPreferences.getInstance();
+      await advanceNotificationCursor(prefs, inst.url, id);
     }
     final session = e['session']?.toString() ?? '';
     if (_fg && '${inst.url}|$session' == _open) return; // already on screen
@@ -577,7 +593,9 @@ class _NotifTaskHandler extends TaskHandler {
         );
         _channels[inst.url] = ch;
         ch.stream.listen(
-          (msg) => _onEvent(inst, msg),
+          (msg) {
+            unawaited(_onEvent(inst, msg));
+          },
           onDone: () => _channels.remove(inst.url),
           onError: (_) => _channels.remove(inst.url),
           cancelOnError: true,
@@ -586,7 +604,7 @@ class _NotifTaskHandler extends TaskHandler {
     }
   }
 
-  void _onEvent(Instance inst, dynamic msg) {
+  Future<void> _onEvent(Instance inst, dynamic msg) async {
     Map<String, dynamic> e;
     try {
       e = jsonDecode(msg as String) as Map<String, dynamic>;
@@ -601,6 +619,8 @@ class _NotifTaskHandler extends TaskHandler {
       final previous = _lastEventIds[inst.url] ?? 0;
       if (id <= previous) return;
       _lastEventIds[inst.url] = id;
+      final prefs = await SharedPreferences.getInstance();
+      await advanceNotificationCursor(prefs, inst.url, id);
     }
     final session = e['session']?.toString() ?? '';
     if (_fg && '${inst.url}|$session' == _open) return; // already on screen

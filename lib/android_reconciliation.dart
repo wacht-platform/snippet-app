@@ -13,18 +13,6 @@ final _backgroundNotifications = FlutterLocalNotificationsPlugin();
 const androidReconciliationTask = 'snippet.android.deferred_reconciliation';
 const _reconciliationWorkName = 'snippet_android_deferred_reconciliation';
 const _snapshotPrefix = 'android_reconciliation_snapshot:';
-const _cursorPrefix = 'android_reconciliation_cursor:';
-
-String notificationCursorKey(String instanceUrl) =>
-    '$_cursorPrefix$instanceUrl';
-
-Future<void> advanceNotificationCursor(
-    SharedPreferences prefs, String instanceUrl, int eventId) async {
-  if (eventId <= 0) return;
-  final key = notificationCursorKey(instanceUrl);
-  final current = prefs.getInt(key) ?? 0;
-  if (eventId > current) await prefs.setInt(key, eventId);
-}
 
 /// WorkManager's minimum periodic interval is 15 minutes. Thirty minutes is
 /// deliberate: this is a deferred catch-up path, not a replacement for the
