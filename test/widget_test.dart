@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:snippet/api.dart';
+import 'package:snippet/android_reconciliation.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/mission_control/mission_control_state.dart';
 import 'package:snippet/screens/session.dart';
@@ -12,6 +14,23 @@ import 'package:snippet/tool_views.dart';
 import 'package:snippet/widgets.dart';
 
 void main() {
+  test('Android reconciliation cursor only advances', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final url = 'https://daemon.example';
+    await prefs.remove(notificationCursorKey(url));
+    await advanceNotificationCursor(prefs, url, 9);
+    await advanceNotificationCursor(prefs, url, 4);
+    expect(prefs.getInt(notificationCursorKey(url)), 9);
+  });
+
+  test('Android reconciliation diff only returns newly observed ids', () {
+    expect(
+      newlyObservedSessionIds(['old', 'shared'], ['shared', 'new']),
+      {'new'},
+    );
+  });
+
   test('QueuedInput preserves stable identity and text', () {
     final item = QueuedInput.fromJson({'id': 'queue-1', 'text': 'duplicate'});
     expect(item.id, 'queue-1');
