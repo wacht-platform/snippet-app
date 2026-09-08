@@ -69,10 +69,12 @@ Future<void> _ensureDownloadPermission() async {
 }
 
 /// Start a native download-progress notification. Returns its stable id.
-Future<int?> notifyDownloadStarted(String name) async {
+Future<int?> notifyDownloadStarted(String name,
+    {VoidCallback? onCancel}) async {
   if (!kCanNotify || !kMobile) return null;
   await _ensureDownloadPermission();
   final id = _downloadNotifId++ & 0x7fffffff;
+  if (onCancel != null) registerDownloadCancel(id, onCancel);
   await _enqueueDownloadNotification(() => _mainNotif.show(
         id: id,
         title: 'Downloading',
