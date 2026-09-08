@@ -9,7 +9,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:pasteboard/pasteboard.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -1636,37 +1635,6 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
-  Future<void> _pasteClipboardAttachment() async {
-    try {
-      final image = await Pasteboard.image;
-      if (image != null && image.isNotEmpty) {
-        final dir = await getTemporaryDirectory();
-        final file = File(
-            '${dir.path}/paste-${DateTime.now().microsecondsSinceEpoch}.png');
-        await file.writeAsBytes(image, flush: true);
-        await _ingest([
-          (
-            name: file.uri.pathSegments.last,
-            localPath: file.path,
-            readBytes: file.readAsBytes
-          )
-        ]);
-        _toast('Pasted image attached');
-        return;
-      }
-      final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
-      if (text == null || text.isEmpty) return;
-      _input.value = TextEditingValue(
-        text: '${_input.text}$text',
-        selection:
-            TextSelection.collapsed(offset: _input.text.length + text.length),
-      );
-      _inputFocus.requestFocus();
-    } catch (e) {
-      _toast('Could not read clipboard');
-    }
-  }
-
   Future<void> _pickFiles() async {
     List<PickedLocalFile> files;
     try {
@@ -2978,20 +2946,6 @@ class _SessionScreenState extends State<SessionScreen>
                                   padding: const EdgeInsets.all(6),
                                   child: AppIcon('plus',
                                       size: 18, color: AppColors.fg3),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(R.sm),
-                              child: InkWell(
-                                onTap: _pasteClipboardAttachment,
-                                borderRadius: BorderRadius.circular(R.sm),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: AppIcon('clipboard',
-                                      size: 17, color: AppColors.fg3),
                                 ),
                               ),
                             ),
