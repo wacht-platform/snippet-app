@@ -1663,12 +1663,16 @@ Future<bool> confirmAction(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(title,
-                      style: sans(15,
-                          weight: FontWeight.w600, color: AppColors.fg1)),
-                  const SizedBox(height: 8),
-                  Text(body,
-                      style: sans(13, height: 1.45, color: AppColors.fg3)),
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(title,
+                        style: sans(15,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(body,
+                          style: sans(13, height: 1.45, color: AppColors.fg3)),
+                    ),
+                  ]),
                   const SizedBox(height: 16),
                   Row(children: [
                     const Spacer(),
@@ -1836,7 +1840,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 340, maxHeight: 520),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
