@@ -2195,7 +2195,7 @@ class _SessionScreenState extends State<SessionScreen>
   Widget _centerWide(Widget child) => widget.embedded
       ? Center(
           child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 820), child: child))
+              constraints: const BoxConstraints(maxWidth: 1060), child: child))
       : child;
 
   // Mobile chat header: a back button that returns to the session list, the
