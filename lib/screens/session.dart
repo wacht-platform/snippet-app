@@ -3238,7 +3238,12 @@ class _SessionScreenState extends State<SessionScreen>
           open: _toolRunOpen[toolKey] ?? false,
           onOpenChanged: (open) {
             if (!mounted) return;
-            setState(() => _toolRunOpen[toolKey] = open);
+            setState(() {
+              _toolRunOpen[toolKey] = open;
+              // The transcript is normally cached between event updates. Rebuild
+              // it now so ToolRun receives the new open value immediately.
+              _transcriptDirty = true;
+            });
           },
         ),
       ));
