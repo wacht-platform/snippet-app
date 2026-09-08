@@ -178,6 +178,20 @@ class _ToolRunState extends State<ToolRun> {
   bool _open = false;
 
   @override
+  void initState() {
+    super.initState();
+    final stored = PageStorage.maybeOf(context)?.readState(context);
+    if (stored is bool) _open = stored;
+  }
+
+  void _toggle() {
+    setState(() {
+      _open = !_open;
+      PageStorage.maybeOf(context)?.writeState(context, _open);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     Theme.of(context);
     final n = widget.rows.length;
@@ -189,7 +203,7 @@ class _ToolRunState extends State<ToolRun> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => setState(() => _open = !_open),
+          onTap: _toggle,
           child: Row(children: [
             if (widget.running)
               const SizedBox(width: 16, child: Center(child: BrailleSpinner()))
