@@ -75,8 +75,8 @@ class _DenseToolRowState extends State<DenseToolRow> {
         if (_open && canExpand)
           Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 6),
-            child: SizedBox(
-              height: 220,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220),
               child: SingleChildScrollView(
                 child: DefaultTextStyle(
                   style: mono(11.5, height: 1.4, color: AppColors.fg3),
