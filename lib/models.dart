@@ -788,6 +788,110 @@ class NotificationMarker {
         delivered = j['delivered'] as bool? ?? false;
 }
 
+/// A specialized worker identity in the SQLite coordination directory.
+class CoordinationAgent {
+  final String id;
+  final String displayName;
+  final String handle;
+  final String kind;
+  final String status;
+  final String role;
+  final List<String> capabilities;
+  final int maxConcurrentAssignments;
+  final int maxConcurrentSessions;
+  final int version;
+
+  CoordinationAgent.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        displayName = j['display_name'] as String? ?? '',
+        handle = j['handle'] as String? ?? '',
+        kind = j['kind'] as String? ?? 'worker',
+        status = j['status'] as String? ?? 'active',
+        role = j['role'] as String? ?? 'implementer',
+        capabilities =
+            ((j['capabilities'] as List?) ?? const []).cast<String>(),
+        maxConcurrentAssignments =
+            (j['max_concurrent_assignments'] as num?)?.toInt() ?? 0,
+        maxConcurrentSessions =
+            (j['max_concurrent_sessions'] as num?)?.toInt() ?? 0,
+        version = (j['version'] as num?)?.toInt() ?? 0;
+
+  bool get available => status == 'active';
+}
+
+class CoordinationAssignment {
+  final String id;
+  final String goalId;
+  final String sessionId;
+  final String agentId;
+  final String status;
+  final String scope;
+  final String definitionOfDone;
+
+  CoordinationAssignment.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        goalId = j['goal_id'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '',
+        agentId = j['agent_id'] as String? ?? '',
+        status = j['status'] as String? ?? 'offered',
+        scope = j['scope'] as String? ?? '',
+        definitionOfDone = j['definition_of_done'] as String? ?? '';
+}
+
+class CoordinationLease {
+  final String sessionId;
+  final String leaseId;
+  final String assignmentId;
+  final String agentId;
+  final int fencingToken;
+  final String acquiredAt;
+  final String renewedAt;
+  final String expiresAt;
+
+  CoordinationLease.fromJson(Map<String, dynamic> j)
+      : sessionId = j['session_id'] as String? ?? '',
+        leaseId = j['lease_id'] as String? ?? '',
+        assignmentId = j['assignment_id'] as String? ?? '',
+        agentId = j['agent_id'] as String? ?? '',
+        fencingToken = (j['fencing_token'] as num?)?.toInt() ?? 0,
+        acquiredAt = j['acquired_at'] as String? ?? '',
+        renewedAt = j['renewed_at'] as String? ?? '',
+        expiresAt = j['expires_at'] as String? ?? '';
+}
+
+class CoordinationEvent {
+  final String eventId;
+  final String threadId;
+  final String partitionKey;
+  final int sequence;
+  final String eventType;
+  final String actorKind;
+  final String actorId;
+  final int payloadVersion;
+  final Map<String, dynamic> payload;
+  final String? causationId;
+  final String? correlationId;
+  final String idempotencyKey;
+  final String createdAt;
+
+  CoordinationEvent.fromJson(Map<String, dynamic> j)
+      : eventId = j['event_id'] as String? ?? '',
+        threadId = j['thread_id'] as String? ?? '',
+        partitionKey = j['partition_key'] as String? ?? '',
+        sequence = (j['sequence'] as num?)?.toInt() ?? 0,
+        eventType = j['event_type'] as String? ?? '',
+        actorKind = j['actor_kind'] as String? ?? '',
+        actorId = j['actor_id'] as String? ?? '',
+        payloadVersion = (j['payload_version'] as num?)?.toInt() ?? 1,
+        payload = (j['payload'] as Map?)?.cast<String, dynamic>() ?? const {},
+        causationId = j['causation_id'] as String?,
+        correlationId = j['correlation_id'] as String?,
+        idempotencyKey = j['idempotency_key'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '';
+
+  String get body => payload['body'] as String? ?? '';
+}
+
 /// A task tracked by Mission Control.
 class MissionControlTask {
   final String id;

@@ -727,6 +727,196 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('archive mission control session', r);
   }
 
+  // ---- Coordination agents ----
+
+  /// GET /coordination/agents — list specialized agent identities.
+  Future<List<CoordinationAgent>> coordinationAgents() async {
+    final r = await http.get(_uri('/coordination/agents'));
+    if (r.statusCode != 200) throw _err('list coordination agents', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => CoordinationAgent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/agents — create a specialized local agent.
+  Future<CoordinationAgent> createCoordinationAgent({
+    required String id,
+    required String displayName,
+    required String handle,
+    String kind = 'worker',
+    String status = 'active',
+    String role = 'implementer',
+    List<String> capabilities = const [],
+    int maxConcurrentAssignments = 1,
+    int maxConcurrentSessions = 1,
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/agents'),
+      headers: _json,
+      body: jsonEncode({
+        'id': id,
+        'display_name': displayName,
+        'handle': handle,
+        'kind': kind,
+        'status': status,
+        'role': role,
+        'capabilities': capabilities,
+        'max_concurrent_assignments': maxConcurrentAssignments,
+        'max_concurrent_sessions': maxConcurrentSessions,
+      }),
+    );
+    if (r.statusCode != 201) throw _err('create coordination agent', r);
+    return CoordinationAgent.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/assignments — offer work to a specialized agent.
+  Future<CoordinationAssignment> createCoordinationAssignment({
+    required String id,
+    required String goalId,
+    required String sessionId,
+    required String agentId,
+    required String scope,
+    required String definitionOfDone,
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/assignments'),
+      headers: _json,
+      body: jsonEncode({
+        'id': id,
+        'goal_id': goalId,
+        'session_id': sessionId,
+        'agent_id': agentId,
+        'scope': scope,
+        'definition_of_done': definitionOfDone,
+      }),
+    );
+    if (r.statusCode != 201) throw _err('create coordination assignment', r);
+    return CoordinationAssignment.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/sessions/{sessionId}/lease — acquire a fenced turn lease.
+  Future<CoordinationLease> acquireCoordinationLease({
+    required String sessionId,
+    required String leaseId,
+    required String assignmentId,
+    required String agentId,
+    required String expiresAt,
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/sessions/${Uri.encodeComponent(sessionId)}/lease'),
+      headers: _json,
+      body: jsonEncode({
+        'lease_id': leaseId,
+        'assignment_id': assignmentId,
+        'agent_id': agentId,
+        'expires_at': expiresAt,
+      }),
+    );
+    if (r.statusCode != 201) throw _err('acquire coordination lease', r);
+    return CoordinationLease.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// DELETE /coordination/sessions/{sessionId}/lease/{leaseId}.
+  Future<void> releaseCoordinationLease({
+    required String sessionId,
+    required String leaseId,
+  }) async {
+    final uri = _uri(
+      '/coordination/sessions/${Uri.encodeComponent(sessionId)}/lease/${Uri.encodeComponent(leaseId)}',
+    );
+    final r = await http.delete(uri);
+    if (r.statusCode != 204) throw _err('release coordination lease', r);
+  }
+
+  /// POST /coordination/sessions/{sessionId}/lease/{leaseId}/renew.
+  Future<CoordinationLease> renewCoordinationLease({
+    required String sessionId,
+    required String leaseId,
+    required int fencingToken,
+    required String expiresAt,
+  }) async {
+    final r = await http.post(
+      _uri(
+          '/coordination/sessions/${Uri.encodeComponent(sessionId)}/lease/${Uri.encodeComponent(leaseId)}/renew'),
+      headers: _json,
+      body:
+          jsonEncode({'fencing_token': fencingToken, 'expires_at': expiresAt}),
+    );
+    if (r.statusCode != 200) throw _err('renew coordination lease', r);
+    return CoordinationLease.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/handoffs/{handoffId}/acknowledge.
+  Future<void> acknowledgeCoordinationHandoff(String handoffId) async {
+    final r = await http.post(
+      _uri(
+          '/coordination/handoffs/${Uri.encodeComponent(handoffId)}/acknowledge'),
+      headers: _json,
+    );
+    if (r.statusCode != 204) throw _err('acknowledge coordination handoff', r);
+  }
+
+  /// GET /coordination/threads/{threadId}/events — cursor-paged board events.
+  Future<List<CoordinationEvent>> coordinationEvents(
+    String threadId, {
+    int afterSequence = 0,
+    int limit = 100,
+  }) async {
+    final r = await http.get(_uri(
+      '/coordination/threads/${Uri.encodeComponent(threadId)}/events',
+      {'after_sequence': '$afterSequence', 'limit': '$limit'},
+    ));
+    if (r.statusCode != 200) throw _err('list coordination events', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => CoordinationEvent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/threads/{threadId}/messages — append a board message.
+  Future<CoordinationEvent> postCoordinationMessage(
+    String threadId, {
+    required String actorKind,
+    required String actorId,
+    required String body,
+    String? idempotencyKey,
+  }) async {
+    final payload = <String, dynamic>{
+      'actor_kind': actorKind,
+      'actor_id': actorId,
+      'body': body,
+    };
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+      payload['idempotency_key'] = idempotencyKey;
+    }
+    final r = await http.post(
+      _uri('/coordination/threads/${Uri.encodeComponent(threadId)}/messages'),
+      headers: _json,
+      body: jsonEncode(payload),
+    );
+    if (r.statusCode != 200) throw _err('post coordination message', r);
+    return CoordinationEvent.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// Opens the live coordination event stream. Events are also persisted and can
+  /// be replayed with [coordinationEvents] after reconnect.
+  WebSocketChannel attachCoordinationEvents() {
+    final base = Uri.parse(baseUrl);
+    final wsScheme = base.scheme == 'https' ? 'wss' : 'ws';
+    final uri = base.replace(
+      scheme: wsScheme,
+      path: '/coordination/events',
+      queryParameters: {'token': token},
+    );
+    return ws_io.IOWebSocketChannel.connect(uri);
+  }
+
   // ---- Recurring jobs ----
 
   /// GET /recurring — list scheduled pokes for Mission Control and sessions.

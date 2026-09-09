@@ -1377,18 +1377,23 @@ class _DesktopShellState extends State<DesktopShell>
     required bool paused,
     required void Function(String text) onSet,
     required VoidCallback onCancel,
+    required VoidCallback onResume,
   }) {
     return Builder(builder: (chipCtx) {
       return Tooltip(
         message: active
             ? (paused
-                ? 'Goal paused — tap to cancel'
+                ? 'Goal paused — tap to resume'
                 : 'Goal running — tap to cancel')
             : 'Set an autonomous goal',
         child: InkWell(
           onTap: () {
             if (active) {
-              onCancel();
+              if (paused) {
+                onResume();
+              } else {
+                onCancel();
+              }
               return;
             }
             _pickGoal(chipCtx, onSet);
@@ -1530,6 +1535,7 @@ class _DesktopShellState extends State<DesktopShell>
           paused: state?.goal?.paused == true,
           onSet: (text) => controls.performAction('goal', text),
           onCancel: () => controls.performAction('goal'),
+          onResume: () => controls.performAction('resume_goal'),
         ),
         if (state?.lanes.isNotEmpty ?? false)
           _macStatusAction(

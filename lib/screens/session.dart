@@ -2540,6 +2540,11 @@ class _SessionScreenState extends State<SessionScreen>
     _toast('Goal set — the agent will drive toward it');
   }
 
+  void _resumeGoal() {
+    _send({'kind': 'resume_goal'});
+    _toast('Resuming the goal');
+  }
+
   void _cancelGoal() {
     _send({'kind': 'cancel_goal'});
     _toast('Cancelling the goal');
@@ -2594,6 +2599,9 @@ class _SessionScreenState extends State<SessionScreen>
         } else {
           _setGoal();
         }
+        return;
+      case 'resume_goal':
+        _resumeGoal();
         return;
       case 'lanes':
         _showLanes();
@@ -2668,8 +2676,9 @@ class _SessionScreenState extends State<SessionScreen>
       item('shield', 'Approval: Ask', () => _setApproval(true),
           value: manual ? 'on' : null),
       (s?.goal?.ongoing ?? false)
-          ? item('zap', 'Cancel goal', _cancelGoal,
-              value: s!.goal!.paused ? 'paused' : 'running')
+          ? (s!.goal!.paused
+              ? item('play', 'Resume goal', _resumeGoal, value: 'paused')
+              : item('zap', 'Cancel goal', _cancelGoal, value: 'running'))
           : item('zap', 'Set goal', _setGoal),
       if ((s?.lanes.isNotEmpty ?? false))
         item('layers', 'Lanes', _showLanes,
