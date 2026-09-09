@@ -463,6 +463,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('audio attachment echo retires optimistic pending message', () {
+    // The daemon appends the transcript after the marker, so exact text matching
+    // cannot acknowledge this local optimistic bubble. Attachment path matching
+    // is the stable correlation key.
+    final original =
+        '[attached file — read it at this exact path: /tmp/voice.m4a]';
+    final echoed =
+        '$original\n\n[Audio transcript for /tmp/voice.m4a]\nhello there';
+    expect(
+      RegExp(
+        r'\[attached (?:image|file) —[^\]]*exact path: ([^\]]+)\]',
+      )
+          .allMatches(echoed)
+          .map((m) => m.group(1)?.trim())
+          .contains('/tmp/voice.m4a'),
+      isTrue,
+    );
+  });
+
   testWidgets('tool run stays expanded when live rows grow', (tester) async {
     final open = ValueNotifier(false);
     addTearDown(open.dispose);
