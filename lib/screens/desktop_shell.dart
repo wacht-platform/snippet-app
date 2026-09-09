@@ -1018,14 +1018,6 @@ class _DesktopShellState extends State<DesktopShell>
 
   Future<void> _onInboundShare(SharedInbound share) async {
     if (!mounted || share.isEmpty) return;
-    final active = _activeTab;
-    // If a chat is already visible, the share belongs there. Do not interrupt
-    // the user with a destination picker; updating the tab also triggers the
-    // existing composer attachment flow.
-    if (active != null && !active.isFile && active.sessionId != null) {
-      _attachShareToActive(share);
-      return;
-    }
     final client = _client;
     if (client == null) {
       if (mounted) toast(context, 'Add a machine first.', danger: true);
