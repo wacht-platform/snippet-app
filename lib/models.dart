@@ -808,8 +808,9 @@ class CoordinationAgent {
         kind = j['kind'] as String? ?? 'worker',
         status = j['status'] as String? ?? 'active',
         role = j['role'] as String? ?? 'implementer',
-        capabilities =
-            ((j['capabilities'] as List?) ?? const []).cast<String>(),
+        capabilities = ((j['capabilities'] as List?) ?? const [])
+            .whereType<String>()
+            .toList(),
         maxConcurrentAssignments =
             (j['max_concurrent_assignments'] as num?)?.toInt() ?? 0,
         maxConcurrentSessions =
@@ -889,7 +890,7 @@ class CoordinationEvent {
         idempotencyKey = j['idempotency_key'] as String? ?? '',
         createdAt = j['created_at'] as String? ?? '';
 
-  String get body => payload['body'] as String? ?? '';
+  String get body => payload['body'] is String ? payload['body'] as String : '';
 }
 
 /// A task tracked by Mission Control.

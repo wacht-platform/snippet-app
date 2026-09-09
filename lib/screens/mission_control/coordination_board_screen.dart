@@ -27,14 +27,20 @@ class _CoordinationBoardScreenState extends State<CoordinationBoardScreen> {
     super.initState();
     state = CoordinationThreadState(
         client: widget.client, threadId: widget.threadId);
+    state.addListener(_onStateChanged);
     state.attachLive();
     state.refresh().whenComplete(() {
       if (mounted) setState(() {});
     });
   }
 
+  void _onStateChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    state.removeListener(_onStateChanged);
     state.dispose();
     composer.dispose();
     super.dispose();
@@ -44,11 +50,12 @@ class _CoordinationBoardScreenState extends State<CoordinationBoardScreen> {
     final text = composer.text.trim();
     if (text.isEmpty) return;
     composer.clear();
-    await state.send(
+    final event = await state.send(
         actorKind: 'human',
         actorId: widget.actorId,
         body: text,
         idempotencyKey: 'mobile-${DateTime.now().microsecondsSinceEpoch}');
+    if (event == null) composer.text = text;
     if (mounted) setState(() {});
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
@@ -8,13 +9,12 @@ import '../models.dart';
 
 /// Cursor-backed state for one coordination thread. The daemon remains the
 /// source of truth; this class only owns paging, deduplication, and send state.
-class CoordinationThreadState {
+class CoordinationThreadState extends ChangeNotifier {
   CoordinationThreadState({required this.client, required this.threadId});
 
   final DaemonClient client;
   final String threadId;
   final List<CoordinationEvent> events = [];
-  int _cursor = 0;
   StreamSubscription<dynamic>? _coordinationSubscription;
   WebSocketChannel? _coordinationSocket;
 
@@ -32,7 +32,8 @@ class CoordinationThreadState {
           final event = CoordinationEvent.fromJson(
               frame['event'] as Map<String, dynamic>);
           if (event.threadId != threadId) return;
-          _merge([event]);
+          _merge([event], advanceReplayCursor: false);
+          notifyListeners();
         } catch (_) {
           // Persisted replay remains authoritative when a malformed frame arrives.
         }
@@ -42,16 +43,19 @@ class CoordinationThreadState {
     }
   }
 
+  @override
   void dispose() {
     _coordinationSubscription?.cancel();
     _coordinationSocket?.sink.close();
+    super.dispose();
   }
 
   bool loading = false;
   bool sending = false;
   String? error;
 
-  int get cursor => _cursor;
+  int _replayCursor = 0;
+  int get cursor => _replayCursor;
   List<CoordinationEvent> get visibleEvents => List.unmodifiable(events);
 
   Future<void> refresh() async {
@@ -59,9 +63,15 @@ class CoordinationThreadState {
     loading = true;
     error = null;
     try {
-      final incoming = await client.coordinationEvents(threadId,
-          afterSequence: _cursor, limit: 100);
-      _merge(incoming);
+      const pageSize = 100;
+      while (true) {
+        final incoming = await client.coordinationEvents(threadId,
+            afterSequence: _replayCursor, limit: pageSize);
+        if (incoming.isEmpty) break;
+        _merge(incoming, advanceReplayCursor: true);
+        if (incoming.length < pageSize) break;
+      }
+      notifyListeners();
     } catch (e) {
       error = '$e';
     } finally {
@@ -84,7 +94,8 @@ class CoordinationThreadState {
           actorId: actorId,
           body: body,
           idempotencyKey: idempotencyKey);
-      _merge([event]);
+      _merge([event], advanceReplayCursor: false);
+      notifyListeners();
       return event;
     } catch (e) {
       error = '$e';
@@ -94,13 +105,16 @@ class CoordinationThreadState {
     }
   }
 
-  void _merge(Iterable<CoordinationEvent> incoming) {
+  void _merge(Iterable<CoordinationEvent> incoming,
+      {required bool advanceReplayCursor}) {
     final byId = <String, CoordinationEvent>{
       for (final event in events) event.eventId: event,
     };
     for (final event in incoming) {
       byId[event.eventId] = event;
-      if (event.sequence > _cursor) _cursor = event.sequence;
+      if (advanceReplayCursor && event.sequence > _replayCursor) {
+        _replayCursor = event.sequence;
+      }
     }
     events
       ..clear()

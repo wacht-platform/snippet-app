@@ -914,7 +914,11 @@ class DaemonClient {
       path: '/coordination/events',
       queryParameters: {'token': token},
     );
-    return ws_io.IOWebSocketChannel.connect(uri);
+    return ws_io.IOWebSocketChannel.connect(
+      uri,
+      connectTimeout: const Duration(seconds: 10),
+      pingInterval: const Duration(seconds: 45),
+    );
   }
 
   // ---- Recurring jobs ----

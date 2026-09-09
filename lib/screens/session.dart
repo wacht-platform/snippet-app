@@ -296,7 +296,7 @@ class _SessionScreenState extends State<SessionScreen>
   void _retirePendingAlreadyEchoed(List<Map<String, dynamic>> events) {
     if (_pending.isEmpty) return;
     Iterable<String> attachmentPaths(String text) => RegExp(
-          r'\[attached (?:image|file) —[^\]]*exact path: ([^\]]+)\]',
+          r'\[attached (?:image|file) —[^\]]*exact path(?: to view it)?: ([^\]]+)\]',
         )
             .allMatches(text)
             .map((m) => m.group(1)?.trim() ?? '')
@@ -2757,6 +2757,7 @@ class _SessionScreenState extends State<SessionScreen>
             _toast('Goal set — the agent will drive toward it');
           },
           onCancelGoal: _cancelGoal,
+          onResumeGoal: _resumeGoal,
           onLanes: () => run(_showLanes),
           onTasks: _isMissionControl ? () => run(_showTasks) : null,
           onTerm: () => run(_openTerm),
@@ -5259,6 +5260,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final void Function(bool manual) onApproval;
   final void Function(String text) onSetGoal;
   final VoidCallback onCancelGoal;
+  final VoidCallback onResumeGoal;
   final VoidCallback onLanes;
   final VoidCallback? onTasks;
   final VoidCallback onTerm;
@@ -5281,6 +5283,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onApproval,
     required this.onSetGoal,
     required this.onCancelGoal,
+    required this.onResumeGoal,
     required this.onLanes,
     this.onTasks,
     required this.onTerm,
@@ -5431,15 +5434,18 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               ),
             ]),
           ),
-        if (!kMacOS && !widget.hideGoal)
+        if (!widget.hideGoal)
           _row(
             icon: 'zap',
             label: goalOn ? 'Goal' : 'Set goal',
             id: 'goal',
             value: goalOn ? (s!.goal!.paused ? 'paused' : 'running') : null,
             child: goalOn
-                ? Btn('Cancel goal',
-                    variant: BtnVariant.secondary, onTap: widget.onCancelGoal)
+                ? Btn(s!.goal!.paused ? 'Resume goal' : 'Cancel goal',
+                    variant: BtnVariant.secondary,
+                    onTap: s.goal!.paused
+                        ? widget.onResumeGoal
+                        : widget.onCancelGoal)
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
