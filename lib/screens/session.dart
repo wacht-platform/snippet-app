@@ -37,6 +37,8 @@ import 'lanes.dart';
 import 'recurring.dart';
 import 'mission_control/mission_control_state.dart'
     show isDedicatedMcSession, parseMissionEnvelope, MissionEnvelope;
+import 'mission_control/coordination_agent_directory.dart';
+import 'mission_control/coordination_board_screen.dart';
 import 'mission_control/widgets/mission_control_tasks.dart';
 
 String formatCheckpointDate(String raw) {
@@ -2760,6 +2762,20 @@ class _SessionScreenState extends State<SessionScreen>
           onResumeGoal: _resumeGoal,
           onLanes: () => run(_showLanes),
           onTasks: _isMissionControl ? () => run(_showTasks) : null,
+          onAgents: _isMissionControl
+              ? () => run(() => presentScreen(context,
+                  style: PanelStyle.drawer,
+                  builder: (_, close) =>
+                      CoordinationAgentDirectory(client: widget.client)))
+              : null,
+          onCoordination: _isMissionControl
+              ? () => run(() => presentScreen(context,
+                  style: PanelStyle.drawer,
+                  builder: (_, close) => CoordinationBoardScreen(
+                      client: widget.client,
+                      threadId: 'system',
+                      actorId: 'human')))
+              : null,
           onTerm: () => run(_openTerm),
           hideShell: _isMissionControl,
           onGit: () => run(() => presentScreen(context,
@@ -5263,6 +5279,8 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onResumeGoal;
   final VoidCallback onLanes;
   final VoidCallback? onTasks;
+  final VoidCallback? onAgents;
+  final VoidCallback? onCoordination;
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
@@ -5286,6 +5304,8 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onResumeGoal,
     required this.onLanes,
     this.onTasks,
+    this.onAgents,
+    this.onCoordination,
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
@@ -5468,6 +5488,13 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           _row(icon: 'layers', label: 'Lanes', onTap: widget.onLanes),
         if (widget.onTasks != null)
           _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
+        if (widget.onAgents != null)
+          _row(icon: 'users', label: 'Agents', onTap: widget.onAgents),
+        if (widget.onCoordination != null)
+          _row(
+              icon: 'message-text',
+              label: 'Coordination board',
+              onTap: widget.onCoordination),
         _row(icon: 'scheduled', label: 'Scheduled', onTap: widget.onRecurring),
         if (!widget.hideWorkspace) ...[
           _section('Workspace'),
