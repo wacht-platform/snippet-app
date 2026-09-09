@@ -405,7 +405,10 @@ IconData iconFor(String name) {
     case 'alert-circle':
       return IconsaxPlusLinear.info_circle;
     case 'message':
+    case 'message-text':
       return IconsaxPlusLinear.message_text_1;
+    case 'users':
+      return IconsaxPlusLinear.profile_2user;
     case 'archive':
       return IconsaxPlusLinear.archive;
     case 'chevron-down':

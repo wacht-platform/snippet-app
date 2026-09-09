@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 
 import '../../../theme.dart';
 import '../../../widgets.dart';
+import '../../../panel.dart';
+import '../../mission_control/coordination_agent_directory.dart';
+import '../../mission_control/coordination_board_screen.dart';
 import '../mission_control_state.dart';
 import '../mobile/mobile_mc.dart' show showNotificationInbox;
 
@@ -80,6 +83,33 @@ class MissionControlHeader extends StatelessWidget {
                   ),
                 ]),
               ],
+            ),
+          ),
+        ),
+        IconBtn(
+          'users',
+          size: 40,
+          iconSize: 18,
+          tooltip: 'Agents',
+          onTap: () => presentScreen(
+            context,
+            style: PanelStyle.drawer,
+            builder: (_, close) =>
+                CoordinationAgentDirectory(client: state.client),
+          ),
+        ),
+        IconBtn(
+          'message-text',
+          size: 40,
+          iconSize: 18,
+          tooltip: 'Coordination board',
+          onTap: () => presentScreen(
+            context,
+            style: PanelStyle.drawer,
+            builder: (_, close) => CoordinationBoardScreen(
+              client: state.client,
+              threadId: 'system',
+              actorId: 'human',
             ),
           ),
         ),
