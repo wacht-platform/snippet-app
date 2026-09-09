@@ -53,24 +53,55 @@ class _CoordinationAgentDirectoryState
                   ? ListView(children: [
                       Padding(
                           padding: const EdgeInsets.all(20),
-                          child: Text(error!))
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Could not load agents',
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 8),
+                                Text(error!),
+                                const SizedBox(height: 16),
+                                FilledButton(
+                                    onPressed: refresh,
+                                    child: const Text('Retry')),
+                              ]))
                     ])
-                  : ListView.builder(
-                      itemCount: agents.length,
-                      itemBuilder: (_, index) {
-                        final agent = agents[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                              child: Text(agent.displayName.isEmpty
-                                  ? '?'
-                                  : agent.displayName[0])),
-                          title: Text(agent.displayName),
-                          subtitle: Text(
-                              '@${agent.handle} · ${agent.role} · ${agent.capabilities.join(', ')}'),
-                          trailing: Text(agent.status),
-                        );
-                      },
-                    ),
+                  : agents.isEmpty
+                      ? ListView(children: const [
+                          Padding(
+                              padding: EdgeInsets.fromLTRB(24, 72, 24, 24),
+                              child: Column(children: [
+                                Icon(Icons.groups_outlined, size: 48),
+                                SizedBox(height: 16),
+                                Text('No agents registered',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600)),
+                                SizedBox(height: 8),
+                                Text(
+                                    'Specialized agents will appear here after they are registered with Mission Control.',
+                                    textAlign: TextAlign.center),
+                              ])),
+                        ])
+                      : ListView.builder(
+                          itemCount: agents.length,
+                          itemBuilder: (_, index) {
+                            final agent = agents[index];
+                            return ListTile(
+                              leading: CircleAvatar(
+                                  child: Text(agent.displayName.isEmpty
+                                      ? '?'
+                                      : agent.displayName[0])),
+                              title: Text(agent.displayName),
+                              subtitle: Text(
+                                  '@${agent.handle} · ${agent.role} · ${agent.capabilities.join(', ')}'),
+                              trailing: Text(agent.status),
+                            );
+                          },
+                        ),
         ),
       );
 }
