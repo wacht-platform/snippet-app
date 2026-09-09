@@ -295,17 +295,35 @@ class _SessionScreenState extends State<SessionScreen>
   /// (e.g. late snapshot after a missed delta, or reconnect race).
   void _retirePendingAlreadyEchoed(List<Map<String, dynamic>> events) {
     if (_pending.isEmpty) return;
+    Iterable<String> attachmentPaths(String text) => RegExp(
+          r'\[attached (?:image|file) —[^\]]*exact path: ([^\]]+)\]',
+        )
+            .allMatches(text)
+            .map((m) => m.group(1)?.trim() ?? '')
+            .where((path) => path.isNotEmpty);
     final echoed = <String>{};
+    final echoedAttachments = <String>{};
     for (final e in events) {
       final kind = e['kind'];
       if (kind != 'user_input' && kind != 'steer') continue;
       final t = e['text'];
-      if (t is String && t.trim().isNotEmpty) echoed.add(_normEchoText(t));
+      if (t is String && t.trim().isNotEmpty) {
+        echoed.add(_normEchoText(t));
+        for (final path in attachmentPaths(t)) {
+          echoedAttachments.add(path);
+        }
+      }
     }
     if (echoed.isEmpty) return;
+    bool attachmentEchoed(String pending) {
+      final paths = attachmentPaths(pending).toList();
+      return paths.isNotEmpty && paths.every(echoedAttachments.contains);
+    }
+
     var i = 0;
     while (i < _pending.length) {
-      if (echoed.contains(_normEchoText(_pending[i]))) {
+      if (echoed.contains(_normEchoText(_pending[i])) ||
+          attachmentEchoed(_pending[i])) {
         _removePendingAt(i);
       } else {
         i++;
