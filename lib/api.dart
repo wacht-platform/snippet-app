@@ -739,7 +739,17 @@ class DaemonClient {
         .toList();
   }
 
-  /// POST /agents — create a specialized local agent.
+  /// POST /agents/build — ask the runtime to research and build an agent from one prompt.
+  Future<void> buildCoordinationAgent(String prompt) async {
+    final r = await http.post(
+      _uri('/agents/build'),
+      headers: _json,
+      body: jsonEncode({'prompt': prompt}),
+    );
+    if (r.statusCode != 202) throw _err('build coordination agent', r);
+  }
+
+  /// POST /agents — direct registration for trusted/system callers.
   Future<CoordinationAgent> createCoordinationAgent({
     required String id,
     required String displayName,

@@ -166,39 +166,20 @@ class _CreateAgentForm extends StatefulWidget {
 }
 
 class _CreateAgentFormState extends State<_CreateAgentForm> {
-  final _name = TextEditingController();
-  final _handle = TextEditingController();
-  final _capabilities = TextEditingController();
-  String _role = 'implementer';
+  final _prompt = TextEditingController();
   bool _busy = false;
   String? _error;
 
   @override
   void dispose() {
-    _name.dispose();
-    _handle.dispose();
-    _capabilities.dispose();
+    _prompt.dispose();
     super.dispose();
   }
 
-  String _slug(String value) => value
-      .trim()
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9_-]+'), '-')
-      .replaceAll(RegExp(r'^-+'), '')
-      .replaceAll(RegExp(r'-+$'), '');
-
   Future<void> _submit() async {
-    final name = _name.text.trim();
-    final handle = _handle.text.trim().toLowerCase();
-    final id = _slug(handle.isEmpty ? name : handle);
-    if (name.isEmpty || id.isEmpty) {
-      setState(() => _error = 'Enter a display name and handle.');
-      return;
-    }
-    if (!RegExp(r'^[a-z0-9_-]+$').hasMatch(id)) {
-      setState(() =>
-          _error = 'Handle may contain lowercase letters, numbers, - or _.');
+    final prompt = _prompt.text.trim();
+    if (prompt.length < 12) {
+      setState(() => _error = 'Describe the agent you want it to become.');
       return;
     }
     setState(() {
@@ -206,21 +187,7 @@ class _CreateAgentFormState extends State<_CreateAgentForm> {
       _error = null;
     });
     try {
-      final capabilities = _capabilities.text
-          .split(',')
-          .map((value) => value.trim())
-          .where((value) => value.isNotEmpty)
-          .toSet()
-          .toList();
-      await widget.client.createCoordinationAgent(
-        id: id,
-        displayName: name,
-        handle: handle.isEmpty ? id : handle,
-        role: _role,
-        capabilities: capabilities,
-        maxConcurrentAssignments: 1,
-        maxConcurrentSessions: 1,
-      );
+      await widget.client.buildCoordinationAgent(prompt);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
@@ -235,55 +202,41 @@ class _CreateAgentFormState extends State<_CreateAgentForm> {
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(
-              'Give this agent a durable identity. You can add tools and research later.',
-              style: sans(13, color: AppColors.fg3, height: 1.4)),
-          const SizedBox(height: 18),
-          AppField(
-              controller: _name,
-              label: 'Display name',
-              hint: 'e.g. Rust reviewer',
-              autofocus: true),
-          const SizedBox(height: 12),
-          AppField(
-              controller: _handle,
-              label: 'Handle',
-              hint: 'e.g. rust-reviewer',
-              mono: true),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _role,
-            decoration: const InputDecoration(labelText: 'Role'),
-            items: const [
-              'implementer',
-              'reviewer',
-              'tester',
-              'researcher',
-              'release',
-              'coordinator'
-            ]
-                .map((role) => DropdownMenuItem(value: role, child: Text(role)))
-                .toList(),
-            onChanged: _busy
-                ? null
-                : (value) {
-                    if (value != null) setState(() => _role = value);
-                  },
-          ),
-          const SizedBox(height: 12),
-          AppField(
-              controller: _capabilities,
-              label: 'Capabilities',
-              hint: 'rust, security, testing'),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: sans(12, color: AppColors.danger)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Describe the agent in plain language. It will research the role, create its identity, and propose the tools it needs.',
+              style: sans(13, color: AppColors.fg3, height: 1.45),
+            ),
+            const SizedBox(height: 18),
+            AppField(
+              controller: _prompt,
+              label: 'What should this agent become?',
+              hint:
+                  'Create a Rust security reviewer that researches current dependency auditing practices and can inspect repositories without modifying them.',
+              minLines: 5,
+              maxLines: 8,
+              autofocus: true,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'The agent chooses its name, personality, capabilities, and initial tool proposals from this brief.',
+              style: sans(12, color: AppColors.fg4, height: 1.4),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 14),
+              Text(_error!, style: sans(12, color: AppColors.danger)),
+            ],
+            const SizedBox(height: 20),
+            Btn(
+              _busy ? 'Starting build…' : 'Build agent',
+              full: true,
+              disabled: _busy,
+              icon: 'sparkles',
+              onTap: _submit,
+            ),
           ],
-          const SizedBox(height: 20),
-          Btn(_busy ? 'Creating…' : 'Create agent',
-              full: true, disabled: _busy, icon: 'add', onTap: _submit),
-        ]),
+        ),
       );
 }
