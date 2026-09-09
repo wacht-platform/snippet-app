@@ -729,9 +729,9 @@ class DaemonClient {
 
   // ---- Coordination agents ----
 
-  /// GET /coordination/agents — list specialized agent identities.
+  /// GET /agents — list specialized agent identities.
   Future<List<CoordinationAgent>> coordinationAgents() async {
-    final r = await http.get(_uri('/coordination/agents'));
+    final r = await http.get(_uri('/agents'));
     if (r.statusCode != 200) throw _err('list coordination agents', r);
     final list = jsonDecode(r.body) as List;
     return list
@@ -739,7 +739,7 @@ class DaemonClient {
         .toList();
   }
 
-  /// POST /coordination/agents — create a specialized local agent.
+  /// POST /agents — create a specialized local agent.
   Future<CoordinationAgent> createCoordinationAgent({
     required String id,
     required String displayName,
@@ -752,7 +752,7 @@ class DaemonClient {
     int maxConcurrentSessions = 1,
   }) async {
     final r = await http.post(
-      _uri('/coordination/agents'),
+      _uri('/agents'),
       headers: _json,
       body: jsonEncode({
         'id': id,
