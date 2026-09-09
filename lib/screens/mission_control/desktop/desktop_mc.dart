@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 
 import '../../../theme.dart';
 import '../../../widgets.dart';
+import '../../../panel.dart';
+import '../coordination_agent_directory.dart';
+import '../coordination_board_screen.dart';
 import '../mission_control_screen.dart' show ChangeNotifierProvider;
 import '../mission_control_state.dart';
 import '../widgets/mission_control_header.dart';
@@ -133,6 +136,41 @@ class _LeftRail extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
         children: [
+          const SectionLabel('Active tasks'),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Btn('Agents',
+                    small: true,
+                    icon: 'users',
+                    full: true,
+                    onTap: () => presentScreen(
+                          context,
+                          style: PanelStyle.drawer,
+                          builder: (_, close) =>
+                              CoordinationAgentDirectory(client: state.client),
+                        )),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Btn('Board',
+                    small: true,
+                    icon: 'message-text',
+                    full: true,
+                    onTap: () => presentScreen(
+                          context,
+                          style: PanelStyle.drawer,
+                          builder: (_, close) => CoordinationBoardScreen(
+                            client: state.client,
+                            threadId: 'system',
+                            actorId: 'human',
+                          ),
+                        )),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           const SectionLabel('Active tasks'),
           const SizedBox(height: 8),
           if (state.activeTasks.isEmpty)
