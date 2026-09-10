@@ -48,8 +48,17 @@ class DesktopShell extends StatefulWidget {
   State<DesktopShell> createState() => _DesktopShellState();
 }
 
-/// One open tab in the shell — a live chat session, an opened file, or a single
-/// git change, on a given instance.
+/// Which pane a tab lives in. Both panes are tab containers, so this is a
+/// property OF a tab, not of the shell — dragging a tab across the divider is
+/// what moves it.
+enum _Pane { left, right }
+
+/// One open tab in the shell — a live chat session, an opened file, a single git
+/// change, or a terminal, on a given instance.
+///
+/// Terminals are tabs like anything else, because the nested space is a tab
+/// container: opening a second terminal gives you a second tab, not a second
+/// app-wide pane.
 class _ShellTab {
   final DaemonClient client;
   final String instanceUrl;
@@ -59,11 +68,20 @@ class _ShellTab {
   String? profile;
   SharedInbound? inboundShare;
 
+  /// Which pane this tab is shown in. Mutable: this is what a drag changes.
+  _Pane pane;
+
   /// Set only for a diff tab: the changed file plus the view it should show.
   /// A staged-only file reads the index diff; an untracked one shows as an add.
   final String? diffPath;
   final bool diffStaged;
   final bool diffUntracked;
+
+  /// Set only for a terminal tab. [termSessionKey] is the shell key of the
+  /// session that owns the pty, whose `TerminalHost` renders it. The pty itself
+  /// belongs to the session — the tab is only a placement.
+  final String? termId;
+  final String? termSessionKey;
 
   _ShellTab.session({
     required this.client,
@@ -72,20 +90,26 @@ class _ShellTab {
     required this.title,
     this.profile,
     this.inboundShare,
+    this.pane = _Pane.left,
   })  : filePath = null,
         diffPath = null,
         diffStaged = false,
-        diffUntracked = false;
+        diffUntracked = false,
+        termId = null,
+        termSessionKey = null;
   _ShellTab.file({
     required this.client,
     required this.instanceUrl,
     required this.filePath,
     required this.title,
+    this.pane = _Pane.left,
   })  : sessionId = null,
         profile = null,
         diffPath = null,
         diffStaged = false,
-        diffUntracked = false;
+        diffUntracked = false,
+        termId = null,
+        termSessionKey = null;
   _ShellTab.diff({
     required this.client,
     required this.instanceUrl,
@@ -94,22 +118,42 @@ class _ShellTab {
     required this.title,
     required this.diffStaged,
     required this.diffUntracked,
+    this.pane = _Pane.left,
   })  : filePath = null,
-        profile = null;
+        profile = null,
+        termId = null,
+        termSessionKey = null;
+  _ShellTab.terminal({
+    required this.client,
+    required this.instanceUrl,
+    required this.termSessionKey,
+    required this.termId,
+    required this.title,
+    this.pane = _Pane.right,
+  })  : sessionId = null,
+        filePath = null,
+        profile = null,
+        diffPath = null,
+        diffStaged = false,
+        diffUntracked = false;
 
   bool get isFile => filePath != null;
   bool get isDiff => diffPath != null;
+  bool get isTerminal => termId != null;
   bool get isMissionControl =>
       !isFile &&
       !isDiff &&
+      !isTerminal &&
       isMissionControlTab(sessionId: sessionId, title: title);
-  String get key => isDiff
-      ? '$instanceUrl|diff|$diffPath|$diffStaged'
-      : isFile
-          ? '$instanceUrl|file|$filePath'
-          : isMissionControl
-              ? '$instanceUrl|mission-control'
-              : '$instanceUrl|$sessionId';
+  String get key => isTerminal
+      ? '$instanceUrl|term|$termSessionKey|$termId'
+      : isDiff
+          ? '$instanceUrl|diff|$diffPath|$diffStaged'
+          : isFile
+              ? '$instanceUrl|file|$filePath'
+              : isMissionControl
+                  ? '$instanceUrl|mission-control'
+                  : '$instanceUrl|$sessionId';
 }
 
 /// Icon for a tab, by kind. One helper so the four call sites that render a
@@ -141,7 +185,6 @@ class _MacSessionControls {
 /// belong beside it, and tapping the same band button again closes the pane.
 enum _RightPanel {
   none('', ''),
-  terminal('Terminal', 'terminal'),
   lanes('Lanes', 'layers'),
   checkpoints('Checkpoints', 'history'),
   usage('Usage', 'activity');
@@ -194,11 +237,6 @@ class _DesktopShellState extends State<DesktopShell>
   /// independently without killing the pty.
   final Map<String, bool> _termPaneOpen = {};
 
-  /// The user collapsed the terminal pane. Kept separate from the session's
-  /// `_termOpen` so minimizing never destroys a shell — only the sidebar's
-  /// terminal panel closes one.
-  bool _termMinimized = false;
-
   GitStatus? _macGit;
   String _macGitKey = '';
 
@@ -230,59 +268,38 @@ class _DesktopShellState extends State<DesktopShell>
   /// present would cost space even when nothing needs inspecting.
   CoordinationAgent? _rightAgent;
 
-  /// A tab dragged out of the strip into the secondary pane. Null = a single
-  /// pane, which is the default.
-  ///
-  /// There is deliberately no split *toggle*: splitting is a consequence of
-  /// moving something there, not a mode you switch into. Dragging a tab out
-  /// creates the second pane; closing the pane returns to one.
-  _ShellTab? _splitTab;
-
   /// Session readouts that render in the secondary pane instead of a drawer.
   ///
   /// Lanes, Checkpoints and Usage are things you glance at WHILE reading the
   /// transcript, so a modal was the wrong shape for them — it covered the very
-  /// context you were checking against.
+  /// context you were checking against. A readout is exclusive with a
+  /// right-pane TAB: opening one yields the pane, and dropping a tab there
+  /// dismisses the readout.
   _RightPanel _rightPanel = _RightPanel.none;
 
-  /// Is the secondary pane showing anything at all?
-  bool get _rightPaneOpen {
-    // The terminal pane can be MINIMIZED, which hides it without touching the
-    // pty — the shell survives so reopening is instant and focus is preserved.
-    // Only the sidebar's terminal panel destroys a shell.
-    if (_rightPanel == _RightPanel.terminal) {
-      final key = _activeTab?.key;
-      final host = key == null ? null : _termHosts[key];
-      if (host == null || host.terms.isEmpty) return false;
-      if (_termMinimized) return false;
-    }
-    return _rightAgent != null ||
-        _splitTab != null ||
-        _rightPanel != _RightPanel.none;
-  }
+  /// The user collapsed the right pane. Hiding the pane is always a view
+  /// action and never destroys anything — a terminal tab lives on in the
+  /// sidebar, and its pty stays alive.
+  bool _rightCollapsed = false;
 
   /// Show a session panel in the pane, or close it if it is already showing.
   void _toggleRightPanel(_RightPanel p) {
     setState(() {
       _rightAgent = null;
-      _splitTab = null;
+      _rightCollapsed = false;
       _rightPanel = _rightPanel == p ? _RightPanel.none : p;
     });
   }
 
-  /// Move a tab into the secondary pane (called when it is dropped there).
-  void _splitWith(_ShellTab tab) {
-    if (tab.key == _activeTab?.key && _tabs.length == 1) return;
-    setState(() {
-      _rightAgent = null;
-      _splitTab = tab;
-    });
-  }
-
+  /// Collapse the right pane without touching whatever is in it.
+  ///
+  /// Never destroys: a terminal tab lives on in the sidebar and its pty stays
+  /// alive, so re-opening is instant and loses no scrollback.
   void _closeSplitPane() {
     setState(() {
-      _splitTab = null;
+      _rightCollapsed = true;
       _rightAgent = null;
+      _rightPanel = _RightPanel.none;
     });
   }
 
@@ -677,27 +694,106 @@ class _DesktopShellState extends State<DesktopShell>
     final wasOpen = _termPaneOpen[key] ?? false;
     _termPaneOpen[key] = open;
 
-    // A terminal created from the SIDEBAR must reveal the pane: creating is the
-    // sidebar's job, showing the result is the shell's. Only auto-open on the
-    // 0 -> n transition so a deliberate minimize is not undone by the next
-    // publish (publishes also fire on alive/live transitions).
+    // A terminal is a TAB like anything else: reconcile the strip against the
+    // session's live list so a new pty gets a tab and an exited one loses it.
+    final tabsChanged = _reconcileTermTabs(key, host);
+
+    // A terminal created from the SIDEBAR must reveal its pane: creating is the
+    // sidebar's job, showing the result is the shell's.
     if (prevTerms.isEmpty && hostTerms.isNotEmpty) {
-      _termMinimized = false;
-      _rightPanel = _RightPanel.terminal;
+      _rightCollapsed = false;
+      _showTabPane(key, host);
     }
-    // An explicit open from the sidebar (false -> true) un-minimizes. Without
-    // this, tapping a terminal in the sidebar would flip the session's open flag
-    // but the shell would keep showing a minimized pane.
+    // An explicit open from the sidebar un-minimizes. Without this, tapping a
+    // terminal in the sidebar would flip the session's flag while the shell kept
+    // showing nothing.
     if (open && !wasOpen && hostTerms.isNotEmpty) {
-      _termMinimized = false;
-      _rightPanel = _RightPanel.terminal;
+      _rightCollapsed = false;
+      _showTabPane(key, host);
     }
-    // Every shell gone: the pane has nothing left to show.
-    if (hostTerms.isEmpty && _rightPanel == _RightPanel.terminal) {
-      _rightPanel = _RightPanel.none;
-      _termMinimized = false;
+    if ((changed || tabsChanged) && mounted) setState(() {});
+  }
+
+  /// Reveal the pane holding a session's terminal tab.
+  void _showTabPane(String sessionKey, TerminalHost host) {
+    final id = host.activeId;
+    if (id == null) return;
+    for (final t in _tabs) {
+      if (t.isTerminal && t.termSessionKey == sessionKey && t.termId == id) {
+        _activeIndex = _tabs.indexOf(t);
+        return;
+      }
     }
-    if (changed && mounted) setState(() {});
+  }
+
+  /// Add tabs for new terminals and drop tabs whose pty is gone.
+  ///
+  /// Returns true when the tab list changed, so the caller can repaint.
+  bool _reconcileTermTabs(String sessionKey, TerminalHost host) {
+    final live = {for (final t in host.terms) t.id: t};
+    var changed = false;
+
+    // Gone: the pty exited or the sidebar destroyed it. Remove the TAB only —
+    // never `_clearTabState`, which is keyed by session and would wipe the host
+    // shared with this session's other terminals.
+    final stale = [
+      for (final t in _tabs)
+        if (t.isTerminal &&
+            t.termSessionKey == sessionKey &&
+            !live.containsKey(t.termId))
+          t,
+    ];
+    for (final t in stale) {
+      final i = _tabs.indexOf(t);
+      if (i < 0) continue;
+      _tabs.removeAt(i);
+      if (_tabs.isEmpty) {
+        _activeIndex = -1;
+      } else if (_activeIndex >= _tabs.length) {
+        _activeIndex = _tabs.length - 1;
+      } else if (i < _activeIndex) {
+        _activeIndex--;
+      }
+      changed = true;
+    }
+
+    // New: give each live pty a tab, on the RIGHT so a terminal never displaces
+    // the conversation you are reading.
+    _ShellTab? owner;
+    for (final t in _tabs) {
+      if (t.key == sessionKey) {
+        owner = t;
+        break;
+      }
+    }
+    if (owner == null) return changed;
+    for (final info in host.terms) {
+      final exists = _tabs.any((t) =>
+          t.isTerminal &&
+          t.termSessionKey == sessionKey &&
+          t.termId == info.id);
+      if (exists) continue;
+      _tabs.add(_ShellTab.terminal(
+        client: owner.client,
+        instanceUrl: owner.instanceUrl,
+        termSessionKey: sessionKey,
+        termId: info.id,
+        title: info.title,
+      ));
+      changed = true;
+    }
+
+    // Renames: the sidebar can retitle a terminal, and the tab follows.
+    for (final t in _tabs) {
+      if (t.isTerminal && t.termSessionKey == sessionKey) {
+        final info = live[t.termId];
+        if (info != null && info.title != t.title) {
+          t.title = info.title;
+          changed = true;
+        }
+      }
+    }
+    return changed;
   }
 
   void _patchSessionStatus(String sessionId, String status) {
@@ -898,6 +994,11 @@ class _DesktopShellState extends State<DesktopShell>
                   diffPath: t.diffPath,
                   diffStaged: t.diffStaged,
                   diffUntracked: t.diffUntracked,
+                  // Which pane a tab sits in is a property OF the tab, so a
+                  // restart must not collapse every split back to the left.
+                  pane: t.pane.name,
+                  termSessionKey: t.termSessionKey,
+                  termId: t.termId,
                 ))
             .toList(),
         _activeIndex,
@@ -914,7 +1015,15 @@ class _DesktopShellState extends State<DesktopShell>
       final inst = byUrl[descriptor.instanceUrl];
       if (inst == null) continue;
       final client = DaemonClient(inst.url, inst.token);
-      if (descriptor.isDiff) {
+      // Restore the pane a tab was in, so a restart does not collapse the split.
+      // Terminal tabs are NOT restored: a pty does not outlive the daemon
+      // connection, so the sidebar re-offers the live set once a session
+      // publishes again.
+      final pane =
+          descriptor.pane == _Pane.right.name ? _Pane.right : _Pane.left;
+      if (descriptor.isTerminal) {
+        continue;
+      } else if (descriptor.isDiff) {
         restored.add(_ShellTab.diff(
           client: client,
           instanceUrl: inst.url,
@@ -923,6 +1032,7 @@ class _DesktopShellState extends State<DesktopShell>
           title: descriptor.title,
           diffStaged: descriptor.diffStaged,
           diffUntracked: descriptor.diffUntracked,
+          pane: pane,
         ));
       } else if (descriptor.isFile) {
         restored.add(_ShellTab.file(
@@ -930,6 +1040,7 @@ class _DesktopShellState extends State<DesktopShell>
           instanceUrl: inst.url,
           filePath: descriptor.filePath!,
           title: descriptor.title,
+          pane: pane,
         ));
       } else if (descriptor.sessionId != null) {
         final mc = isMissionControlTab(
@@ -945,6 +1056,7 @@ class _DesktopShellState extends State<DesktopShell>
           sessionId: mc ? 'mission-control' : descriptor.sessionId,
           title: mc ? 'Mission Control' : descriptor.title,
           profile: descriptor.profile,
+          pane: pane,
         ));
       }
     }
@@ -1169,15 +1281,19 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
+  /// Whether a tab may be destroyed from a strip.
+  ///
+  /// Mission Control is pinned. A TERMINAL may not: a shell is created and
+  /// destroyed only from the sidebar's terminal panel, so collapsing a view can
+  /// never take a running pty with it. The pane offers minimize instead.
+  bool _canCloseTab(_ShellTab t) => !t.isMissionControl && !t.isTerminal;
+
   void _closeTab(int i) {
     if (i < 0 || i >= _tabs.length) return;
-    if (_tabs[i].isMissionControl) return;
+    if (!_canCloseTab(_tabs[i])) return;
     final key = _tabs[i].key;
     setState(() {
       _clearTabState(key);
-      // The pane holds a tab by reference; without this it would keep rendering
-      // a tab that no longer exists in the strip.
-      if (_splitTab?.key == key) _splitTab = null;
       _tabs.removeAt(i);
       if (_tabs.isEmpty) {
         _activeIndex = -1;
@@ -2178,7 +2294,7 @@ class _DesktopShellState extends State<DesktopShell>
                 ),
               ),
             ),
-            if (!t.isMissionControl) ...[
+            if (_canCloseTab(t)) ...[
               const SizedBox(width: 6),
               GestureDetector(
                 onTap: () => _closeTab(i),
@@ -2381,31 +2497,6 @@ class _DesktopShellState extends State<DesktopShell>
         child: child,
       );
 
-  /// Header for the secondary pane: the tab's icon + title, and a close.
-  Widget _splitHeader(_ShellTab t) => Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(children: [
-          AppIcon(_tabIconKind(t), size: 13, color: AppColors.accent),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              t.title.isEmpty ? '(untitled)' : t.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: sans(12.5, weight: W.label, color: AppColors.fg1),
-            ),
-          ),
-          IconBtn(
-            'x',
-            size: 24,
-            iconSize: 12,
-            tooltip: 'Close pane',
-            onTap: _closeSplitPane,
-          ),
-        ]),
-      );
-
   /// Body for one tab.
   ///
   /// Shared by the main pane and the secondary pane so a tab kind cannot render
@@ -2413,6 +2504,16 @@ class _DesktopShellState extends State<DesktopShell>
   /// the focused pane should own — file drops and inbound shares — since two
   /// mounted copies would both ingest the same drop.
   Widget _tabBody(_ShellTab t, {required bool primary}) {
+    if (t.isTerminal) {
+      // The session owns the pty and the view wiring; this tab is only a
+      // placement. Rendering goes through its host so the terminal cannot be
+      // captured twice.
+      final host = _termHosts[t.termSessionKey];
+      if (host == null || !host.terms.any((x) => x.id == t.termId)) {
+        return _emptyPaneHint();
+      }
+      return host.buildView(t.termId!, mobileKeys: kMobile);
+    }
     if (t.isDiff) {
       return GitFileDiffView(
         key: ValueKey('body-${t.key}'),
@@ -2468,43 +2569,237 @@ class _DesktopShellState extends State<DesktopShell>
   /// dragged onto the right-hand side, which is where the second pane appears)
   /// moves it into the secondary pane. Shared by the macOS and plain layouts so
   /// the two cannot diverge.
+  /// Tabs assigned to a pane, in strip order.
+  List<_ShellTab> _tabsIn(_Pane p) => [
+        for (final t in _tabs)
+          if (t.pane == p) t,
+      ];
+
+  /// The tab a pane is showing: the focused one if it lives here, else the
+  /// pane's first tab.
+  _ShellTab? _activeIn(_Pane p) {
+    final i = _activeIndex;
+    if (i >= 0 && i < _tabs.length && _tabs[i].pane == p) return _tabs[i];
+    final list = _tabsIn(p);
+    return list.isEmpty ? null : list.first;
+  }
+
+  /// Make a tab its pane's active tab, and the shell's focused tab.
+  void _activateIn(_Pane p, _ShellTab tab) {
+    final i = _tabs.indexOf(tab);
+    if (i < 0) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _activeIndex = i);
+    _persistTabs();
+    _syncPage();
+  }
+
+  /// Move a tab into a pane — what a drop on that pane does.
+  ///
+  /// Refuses to empty a pane: dragging a pane's last tab to the pane it is
+  /// already in is a no-op, not a way to blank a container.
+  void _moveTo(_Pane p, _ShellTab tab) {
+    final i = _tabs.indexOf(tab);
+    if (i < 0) return;
+    if (tab.pane == p) return;
+    setState(() {
+      tab.pane = p;
+      _activeIndex = i;
+      // A tab now occupies the pane, so the readout yields to it.
+      if (p == _Pane.right) {
+        _rightPanel = _RightPanel.none;
+        _rightAgent = null;
+      }
+    });
+    _persistTabs();
+  }
+
+  /// Close a tab by identity, from either pane's strip.
+  void _closePaneTab(_ShellTab t) {
+    final i = _tabs.indexOf(t);
+    if (i >= 0) _closeTab(i);
+  }
+
+  /// Sidebar + the two pane containers. Both are tab containers; which tabs they
+  /// hold is a property of each tab (`_ShellTab.pane`), so a drop is all it
+  /// takes to move one across.
   Widget _bodyRow({required bool topInset}) {
-    final multi = _rightPaneOpen;
-    // Width-driven, not flex-driven: a fixed flex ratio cannot be dragged, and
-    // the pane has a natural width (a terminal needs columns; a readout does
-    // not stretch to 45% of a 4K window).
-    final row = Row(children: [
-      SizedBox(
-        width: kSidebarWidth,
-        child: _sidebar(topInset: topInset),
-      ),
-      // No divider: the sidebar (bg) and the chat canvas are different
-      // surfaces, which is the separation.
-      Expanded(
-        child: _paneSurface(
-          roundRight: !multi,
-          child: _mainPane(),
-        ),
-      ),
-      if (multi) ...[
-        _paneResizeHandle(),
-        SizedBox(
-          width: _paneWidth.clamp(kPaneMinWidth, double.infinity),
-          child: _rightPane(),
-        ),
-      ],
-    ]);
+    final rightTabs = _tabsIn(_Pane.right);
+    final showRight = rightTabs.isNotEmpty ||
+        _rightPanel != _RightPanel.none ||
+        _rightAgent != null;
     return Expanded(
-      child: DragTarget<_ShellTab>(
-        onWillAcceptWithDetails: (d) =>
-            // A lone tab cannot be split from itself: there would be nothing
-            // left in the primary pane.
-            !(d.data.key == _activeTab?.key && _tabs.length == 1),
-        onAcceptWithDetails: (d) => _splitWith(d.data),
-        builder: (_, __, ___) => row,
-      ),
+      child: Row(children: [
+        SizedBox(
+          width: kSidebarWidth,
+          child: _sidebar(topInset: topInset),
+        ),
+        Expanded(
+          child: _dropOn(
+            _Pane.left,
+            _paneView(_Pane.left, roundRight: !showRight),
+          ),
+        ),
+        if (showRight) ...[
+          _paneResizeHandle(),
+          SizedBox(
+            width: _paneWidth.clamp(kPaneMinWidth, double.infinity),
+            child:
+                _dropOn(_Pane.right, _paneView(_Pane.right, roundRight: true)),
+          ),
+        ],
+      ]),
     );
   }
+
+  /// A pane is a drop target for a tab dragged out of any strip.
+  Widget _dropOn(_Pane p, Widget child) => DragTarget<_ShellTab>(
+        onWillAcceptWithDetails: (d) => d.data.pane != p,
+        onAcceptWithDetails: (d) => _moveTo(p, d.data),
+        builder: (_, __, ___) => child,
+      );
+
+  /// One pane: its own tab strip, then the active tab's body.
+  Widget _paneView(_Pane p, {required bool roundRight}) {
+    final list = _tabsIn(p);
+
+    Widget body;
+    if (list.isEmpty) {
+      if (p == _Pane.right && _rightPanel != _RightPanel.none) {
+        body = _rightPanelView();
+      } else if (p == _Pane.right && _rightAgent != null) {
+        body = CoordinationAgentDetail(
+          agent: _rightAgent!,
+          embedded: true,
+          onClose: _closeSplitPane,
+        );
+      } else if (p == _Pane.left) {
+        body = _client == null ? _welcome() : _recentPlaceholder();
+      } else {
+        body = _emptyPaneHint();
+      }
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _paneStrip(p, list),
+          Expanded(child: _paneBody(p, list)),
+        ],
+      );
+    }
+
+    return _paneSurface(
+      child: body,
+      roundRight: roundRight,
+    );
+  }
+
+  /// A pane's tab strip: one chip per tab, plus the pane's actions.
+  Widget _paneStrip(_Pane p, List<_ShellTab> list) {
+    final active = _activeIn(p);
+    return Container(
+      height: kPaneHeaderHeight,
+      padding: const EdgeInsets.only(left: 4),
+      child: Row(children: [
+        Expanded(
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 2),
+            itemBuilder: (_, i) => _paneTabChip(p, list[i], list[i] == active),
+          ),
+        ),
+        if (p == _Pane.right)
+          // Collapse, never destroy: a terminal tab lives on in the sidebar, so
+          // collapsing the pane cannot take a running pty with it.
+          IconBtn('minimize',
+              size: 24,
+              iconSize: 12,
+              tooltip: 'Collapse pane',
+              onTap: () => setState(() => _rightCollapsed = true))
+        else if (false)
+          IconBtn('x',
+              size: 24,
+              iconSize: 12,
+              tooltip: 'Close pane',
+              onTap: _closeSplitPane),
+        const SizedBox(width: 4),
+      ]),
+    );
+  }
+
+  Widget _paneTabChip(_Pane p, _ShellTab t, bool active) {
+    final chip = GestureDetector(
+      onTap: () => _activateIn(p, t),
+      child: Container(
+        height: kPaneTabHeight,
+        padding: const EdgeInsets.only(left: 10, right: 4),
+        decoration: BoxDecoration(
+          // Active tab takes the band's own colour so it merges into the body
+          // below, the same browser-tab logic as the window strip.
+          color: active ? AppColors.bg : Colors.transparent,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          AppIcon(_tabIconKind(t),
+              size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
+          const SizedBox(width: 7),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 150),
+            child: Text(
+              t.title.isEmpty ? '(untitled)' : t.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(kPaneTabText,
+                  weight: active ? W.label : W.body,
+                  color: active ? AppColors.fg1 : AppColors.fg3),
+            ),
+          ),
+          if (_canCloseTab(t)) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => _closePaneTab(t),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(3),
+                child: AppIcon('x', size: 11, color: AppColors.fg4),
+              ),
+            ),
+          ],
+        ]),
+      ),
+    );
+
+    // Dragging a chip to the other pane moves the tab. Long-press because the
+    // strip scrolls horizontally and a plain drag would fight that gesture.
+    return LongPressDraggable<_ShellTab>(
+      data: t,
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedback: _tabDragFeedback(t),
+      childWhenDragging: Opacity(opacity: 0.4, child: chip),
+      child: chip,
+    );
+  }
+
+  /// Every tab in a pane, mounted, with only the active one laid out — so
+  /// switching tabs keeps a session's socket and scroll position.
+  Widget _paneBody(_Pane p, List<_ShellTab> list) {
+    final active = _activeIn(p);
+    if (active == null) return _emptyPaneHint();
+    return Stack(children: [
+      for (final t in list)
+        Offstage(
+          offstage: t != active,
+          child: _tabBody(t, primary: p == _Pane.left),
+        ),
+    ]);
+  }
+
+  Widget _emptyPaneHint() => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Text('Drag a tab here, or open a terminal from the sidebar.',
+            style: sans(12.5, color: AppColors.fg4)),
+      );
 
   /// 6px grab zone between the panes. The reference has no drawn divider — the
   /// surface step separates them — so the rule only appears on hover.
@@ -2534,40 +2829,6 @@ class _DesktopShellState extends State<DesktopShell>
         ),
       );
 
-  /// Contents of the secondary pane. The caller supplies the flex, so this
-  /// returns content only.
-  ///
-  /// Default state is a SINGLE pane: nothing here unless something was
-  /// deliberately moved across. There is no split toggle — dragging a tab out
-  /// of the strip is what creates this pane (`_splitWith`).
-  Widget _rightPane() {
-    if (_rightAgent != null) {
-      return CoordinationAgentDetail(
-        agent: _rightAgent!,
-        embedded: true,
-        onClose: _closeSplitPane,
-      );
-    }
-    if (_rightPanel != _RightPanel.none) return _rightPanelView();
-    final t = _splitTab;
-    if (t == null) return const SizedBox.shrink();
-    return Container(
-      // Floor surface, rounded on the TOP-RIGHT only. The reference leaves the
-      // bottom-right square: the pane is flush to the window's bottom edge, so
-      // a bottom curve would cut a notch out of the window frame.
-      decoration: BoxDecoration(
-        color: AppColors.floor,
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(R.sheetTop),
-        ),
-      ),
-      child: Column(children: [
-        _splitHeader(t),
-        Expanded(child: _tabBody(t, primary: false)),
-      ]),
-    );
-  }
-
   /// A session readout in the pane: Lanes, Checkpoints or Usage.
   ///
   /// Content comes from the shared panel widgets so the pane and the session's
@@ -2595,16 +2856,6 @@ class _DesktopShellState extends State<DesktopShell>
         body =
             s == null ? const SizedBox.shrink() : SessionUsagePanel(state: s);
         break;
-      case _RightPanel.terminal:
-        final host = tab == null ? null : _termHosts[tab.key];
-        body = host == null || host.terms.isEmpty
-            ? Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text('No terminals. Create one from the sidebar.',
-                    style: sans(12.5, color: AppColors.fg3)),
-              )
-            : host.buildView(host.activeId!, mobileKeys: false);
-        break;
       case _RightPanel.none:
         body = const SizedBox.shrink();
     }
@@ -2621,52 +2872,17 @@ class _DesktopShellState extends State<DesktopShell>
           tabs: [PaneTab(label: _rightPanel.label, icon: _rightPanel.icon)],
           activeIndex: 0,
           actions: [
-            // A terminal MINIMIZES; it is never destroyed here. Destroying is
-            // the sidebar panel's job, so a collapsed view can never take a
-            // running pty with it.
-            if (_rightPanel == _RightPanel.terminal)
-              IconBtn('minimize',
-                  size: 24,
-                  iconSize: 12,
-                  tooltip: 'Minimize pane',
-                  onTap: () => setState(() => _termMinimized = true))
-            else
-              IconBtn('x',
-                  size: 24,
-                  iconSize: 12,
-                  tooltip: 'Close pane',
-                  onTap: _closeSplitPane),
+            // A readout closes. A terminal TAB does not — see `_canCloseTab`.
+            IconBtn('x',
+                size: 24,
+                iconSize: 12,
+                tooltip: 'Close pane',
+                onTap: _closeSplitPane),
           ],
         ),
         Expanded(child: body),
       ]),
     );
-  }
-
-  /// Open the active session's terminal from the terminal sidebar panel.
-  void _openActiveShell() {
-    final key = _activeTab?.key;
-    if (key == null) return;
-    _macSessionControls[key]?.performAction('shell');
-  }
-
-  /// Settings, opened from the shell's status line. The sidebar has its own
-  /// opener for the machine popover; this one exists so the status bar does not
-  /// have to reach into a child's state.
-  void _openShellSettings() {
-    final c = _client;
-    if (c == null) return;
-    final inst = _active;
-    presentScreen(context,
-        maxWidth: 640,
-        maxHeight: 620,
-        builder: (_, close) => _SettingsPanel(
-              client: c,
-              instances: _instances,
-              active: inst,
-              onRemove: _removeInstance,
-              onClose: close,
-            ));
   }
 
   Widget _mainPane({VoidCallback? onMenu}) {
@@ -2717,56 +2933,10 @@ class _DesktopShellState extends State<DesktopShell>
                   return _KeepAlive(
                     key: ValueKey(t.key),
                     keep: t.isMissionControl || i == _activeIndex,
-                    child: t.isDiff
-                        ? GitFileDiffView(
-                            key: ValueKey(t.key),
-                            client: t.client,
-                            sessionId: t.sessionId ?? '',
-                            file: t.diffPath!,
-                            staged: t.diffStaged,
-                            untracked: t.diffUntracked,
-                            embedded: true,
-                          )
-                        : t.isFile
-                            ? FileViewer(
-                                key: ValueKey(t.key),
-                                client: t.client,
-                                path: t.filePath!,
-                                name: t.title,
-                                embedded: true,
-                                onClose: () => _closeTabByKey(t.key),
-                              )
-                            : SessionScreen(
-                                key: ValueKey(t.key),
-                                client: t.client,
-                                sessionId: t.sessionId!,
-                                title: t.title,
-                                profile: t.profile,
-                                embedded: true,
-                                inboundShare: t.inboundShare,
-                                onShareConsumed: t.inboundShare == null
-                                    ? null
-                                    : () =>
-                                        setState(() => t.inboundShare = null),
-                                acceptDrops: i == _activeIndex,
-                                onTitle: (title) =>
-                                    _onSessionTitle(t.sessionId!, title),
-                                onMenu: null,
-                                onOpenFileTab: (path, name) => _openFileTab(
-                                    t.client, t.instanceUrl, path, name),
-                                onOpenSession: _openSession,
-                                onMacStatus: (state, running) =>
-                                    _setMacSessionStatus(t.key, state, running),
-                                onMacControls: !kMobile
-                                    ? (stop, performAction) =>
-                                        _setMacSessionControls(
-                                            t.key, stop, performAction)
-                                    : null,
-                                onTerminalHost: !kMobile
-                                    ? (host, open) =>
-                                        _setTerminalHost(t.key, host, open)
-                                    : null,
-                              ),
+                    // Same body builder as the split panes, so a terminal
+                    // or a diff renders identically whether it is in a pane or
+                    // the narrow single-column layout.
+                    child: _tabBody(t, primary: i == _activeIndex),
                   );
                 },
               ),
@@ -2775,6 +2945,32 @@ class _DesktopShellState extends State<DesktopShell>
         }),
       ),
     ]);
+  }
+
+  /// Open the active session's terminal from the terminal sidebar panel.
+  void _openActiveShell() {
+    final key = _activeTab?.key;
+    if (key == null) return;
+    _macSessionControls[key]?.performAction('shell');
+  }
+
+  /// Settings, opened from the shell's status line. The sidebar has its own
+  /// opener for the machine popover; this one exists so the status bar does not
+  /// have to reach into a child's state.
+  void _openShellSettings() {
+    final c = _client;
+    if (c == null) return;
+    final inst = _active;
+    presentScreen(context,
+        maxWidth: 640,
+        maxHeight: 620,
+        builder: (_, close) => _SettingsPanel(
+              client: c,
+              instances: _instances,
+              active: inst,
+              onRemove: _removeInstance,
+              onClose: close,
+            ));
   }
 
   /// The tab strip:
@@ -2891,7 +3087,7 @@ class _DesktopShellState extends State<DesktopShell>
                     sans(12.5, color: active ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
-            if (!t.isMissionControl) ...[
+            if (_canCloseTab(t)) ...[
               const SizedBox(width: 4),
               GestureDetector(
                 onTap: () => _closeTab(i),
@@ -2957,7 +3153,7 @@ class _DesktopShellState extends State<DesktopShell>
                 ],
               ),
             ),
-            if (!t.isMissionControl) ...[
+            if (_canCloseTab(t)) ...[
               const SizedBox(width: 4),
               GestureDetector(
                 onTap: () => _closeTab(i),
