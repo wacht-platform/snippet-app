@@ -330,7 +330,7 @@ TextStyle sans(double size,
     );
 
 TextStyle display(double size,
-        {FontWeight weight = W.strong, Color? color, double? height}) =>
+        {FontWeight weight = W.title, Color? color, double? height}) =>
     GoogleFonts.geist(
       fontSize: size,
       fontWeight: weight,
