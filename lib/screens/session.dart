@@ -42,9 +42,7 @@ import 'mission_control/mission_control_state.dart'
         parseBoardMessage,
         BoardMessage,
         MissionEnvelope;
-import 'mission_control/coordination_activity_screen.dart';
-import 'mission_control/coordination_agent_directory.dart';
-import 'mission_control/coordination_board_screen.dart';
+import 'mission_control/coordination_hub.dart';
 import 'mission_control/coordination_session_agents.dart';
 import 'mission_control/widgets/mission_control_tasks.dart';
 
@@ -2776,25 +2774,14 @@ class _SessionScreenState extends State<SessionScreen>
               builder: (_, close) => SessionAgentsPanel(
                   client: widget.client, sessionId: widget.sessionId))),
           onTasks: _isMissionControl ? () => run(_showTasks) : null,
-          onAgents: _isMissionControl
-              ? () => run(() => presentScreen(context,
-                  style: PanelStyle.drawer,
-                  builder: (_, close) =>
-                      CoordinationAgentDirectory(client: widget.client)))
-              : null,
+          // One coordination destination instead of three sibling drawers with
+          // handoffs nested inside the board. Device-wide, so Mission-Control
+          // gated.
           onCoordination: _isMissionControl
               ? () => run(() => presentScreen(context,
                   style: PanelStyle.drawer,
-                  builder: (_, close) => CoordinationBoardScreen(
-                      client: widget.client,
-                      threadId: 'system',
-                      actorId: 'human')))
-              : null,
-          onActivity: _isMissionControl
-              ? () => run(() => presentScreen(context,
-                  style: PanelStyle.drawer,
                   builder: (_, close) =>
-                      CoordinationActivityScreen(client: widget.client)))
+                      CoordinationHub(client: widget.client)))
               : null,
           onTerm: () => run(_openTerm),
           hideShell: _isMissionControl,
@@ -5364,9 +5351,7 @@ class _SessionActionsPanel extends StatefulWidget {
   /// Which agents are (and were) active in THIS session. Present for every
   /// session, not just Mission Control.
   final VoidCallback? onSessionAgents;
-  final VoidCallback? onAgents;
   final VoidCallback? onCoordination;
-  final VoidCallback? onActivity;
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
@@ -5391,9 +5376,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onLanes,
     this.onTasks,
     this.onSessionAgents,
-    this.onAgents,
     this.onCoordination,
-    this.onActivity,
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
@@ -5583,18 +5566,11 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               icon: 'cpu',
               label: 'Agents in session',
               onTap: widget.onSessionAgents),
-        if (widget.onAgents != null)
-          _row(icon: 'users', label: 'Agents', onTap: widget.onAgents),
         if (widget.onCoordination != null)
           _row(
               icon: 'message-text',
-              label: 'Coordination board',
+              label: 'Coordination',
               onTap: widget.onCoordination),
-        if (widget.onActivity != null)
-          _row(
-              icon: 'activity',
-              label: 'Coordination activity',
-              onTap: widget.onActivity),
         _row(icon: 'scheduled', label: 'Scheduled', onTap: widget.onRecurring),
         if (!widget.hideWorkspace) ...[
           _section('Workspace'),

@@ -9,8 +9,21 @@ import '../../widgets.dart';
 import 'coordination_agent_detail.dart';
 
 class CoordinationAgentDirectory extends StatefulWidget {
-  const CoordinationAgentDirectory({super.key, required this.client});
+  const CoordinationAgentDirectory({
+    super.key,
+    required this.client,
+    this.embedded = false,
+    this.refreshSignal,
+  });
+
   final DaemonClient client;
+
+  /// When embedded in the hub, suppress our own Scaffold/AppBar and let the
+  /// host supply chrome.
+  final bool embedded;
+
+  /// Bumped by the host to request a refetch.
+  final ValueNotifier<int>? refreshSignal;
 
   @override
   State<CoordinationAgentDirectory> createState() =>
@@ -27,7 +40,16 @@ class _CoordinationAgentDirectoryState
   void initState() {
     super.initState();
     refresh();
+    widget.refreshSignal?.addListener(_onRefreshSignal);
   }
+
+  @override
+  void dispose() {
+    widget.refreshSignal?.removeListener(_onRefreshSignal);
+    super.dispose();
+  }
+
+  void _onRefreshSignal() => refresh();
 
   Future<void> refresh() async {
     if (mounted) {
@@ -54,19 +76,8 @@ class _CoordinationAgentDirectoryState
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Agents'),
-          actions: [
-            IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _create,
-          icon: const Icon(Icons.add),
-          label: const Text('Create agent'),
-        ),
-        body: RefreshIndicator(
+  Widget build(BuildContext context) {
+    final body = RefreshIndicator(
           onRefresh: refresh,
           child: loading
               ? const Center(child: CircularProgressIndicator())
@@ -92,8 +103,37 @@ class _CoordinationAgentDirectoryState
                               Divider(color: AppColors.border, height: 1),
                           itemBuilder: (_, index) => _AgentRow(agents[index]),
                         ),
+        );
+
+    // Embedded in the hub: no app bar (the host owns chrome), but keep the
+    // create affordance where users expect it via a transparent nested Scaffold
+    // — a FAB otherwise has nowhere to live without nesting one anyway.
+    if (widget.embedded) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _create,
+          icon: const Icon(Icons.add),
+          label: const Text('Build agent'),
         ),
+        body: body,
       );
+    }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Agents'),
+        actions: [
+          IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _create,
+        icon: const Icon(Icons.add),
+        label: const Text('Create agent'),
+      ),
+      body: body,
+    );
+  }
 }
 
 class _AgentRow extends StatelessWidget {

@@ -9,9 +9,20 @@ import '../../widgets.dart';
 /// until it acknowledges the exact recorded context, so this is where a human
 /// reviews what is waiting and clears it.
 class CoordinationHandoffsScreen extends StatefulWidget {
-  const CoordinationHandoffsScreen({super.key, required this.client});
+  const CoordinationHandoffsScreen({
+    super.key,
+    required this.client,
+    this.embedded = false,
+    this.refreshSignal,
+  });
 
   final DaemonClient client;
+
+  /// When embedded in the hub, suppress our own Scaffold/AppBar.
+  final bool embedded;
+
+  /// Bumped by the host to request a refetch.
+  final ValueNotifier<int>? refreshSignal;
 
   @override
   State<CoordinationHandoffsScreen> createState() =>
@@ -32,7 +43,16 @@ class _CoordinationHandoffsScreenState
   void initState() {
     super.initState();
     refresh();
+    widget.refreshSignal?.addListener(_onRefreshSignal);
   }
+
+  @override
+  void dispose() {
+    widget.refreshSignal?.removeListener(_onRefreshSignal);
+    super.dispose();
+  }
+
+  void _onRefreshSignal() => refresh();
 
   Future<void> refresh() async {
     if (mounted) {
@@ -66,14 +86,8 @@ class _CoordinationHandoffsScreenState
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Handoffs'),
-          actions: [
-            IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
-          ],
-        ),
-        body: RefreshIndicator(
+  Widget build(BuildContext context) {
+    final body = RefreshIndicator(
           onRefresh: refresh,
           child: loading
               ? const Center(child: CircularProgressIndicator())
@@ -124,8 +138,20 @@ class _CoordinationHandoffsScreenState
                             onAcknowledge: () => _acknowledge(handoffs[index]),
                           ),
                         ),
-        ),
-      );
+        );
+
+    // Embedded in the hub: the host owns the chrome.
+    if (widget.embedded) return body;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Handoffs'),
+        actions: [
+          IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
+        ],
+      ),
+      body: body,
+    );
+  }
 }
 
 class _HandoffCard extends StatelessWidget {

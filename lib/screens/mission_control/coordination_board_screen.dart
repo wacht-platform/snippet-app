@@ -8,14 +8,24 @@ import '../../panel.dart';
 import 'coordination_handoffs_screen.dart';
 
 class CoordinationBoardScreen extends StatefulWidget {
-  const CoordinationBoardScreen(
-      {super.key,
-      required this.client,
-      required this.threadId,
-      required this.actorId});
+  const CoordinationBoardScreen({
+    super.key,
+    required this.client,
+    required this.threadId,
+    required this.actorId,
+    this.embedded = false,
+    this.refreshSignal,
+  });
   final DaemonClient client;
   final String threadId;
   final String actorId;
+
+  /// When embedded in the hub, suppress our own Scaffold/AppBar.
+  final bool embedded;
+
+  /// Bumped by the host to request a refetch.
+  final ValueNotifier<int>? refreshSignal;
+
   @override
   State<CoordinationBoardScreen> createState() =>
       _CoordinationBoardScreenState();
@@ -35,18 +45,26 @@ class _CoordinationBoardScreenState extends State<CoordinationBoardScreen> {
     state.refresh().whenComplete(() {
       if (mounted) setState(() {});
     });
-  }
-
-  void _onStateChanged() {
-    if (mounted) setState(() {});
+    widget.refreshSignal?.addListener(_onRefreshSignal);
   }
 
   @override
   void dispose() {
+    widget.refreshSignal?.removeListener(_onRefreshSignal);
     state.removeListener(_onStateChanged);
     state.dispose();
     composer.dispose();
     super.dispose();
+  }
+
+  void _onRefreshSignal() {
+    state.refresh().whenComplete(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _onStateChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> send() async {
@@ -63,23 +81,8 @@ class _CoordinationBoardScreenState extends State<CoordinationBoardScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Coordination board'),
-          actions: [
-            IconButton(
-              tooltip: 'Handoffs',
-              icon: const Icon(Icons.swap_horiz),
-              onPressed: () => presentScreen(
-                context,
-                style: PanelStyle.drawer,
-                builder: (_, __) =>
-                    CoordinationHandoffsScreen(client: widget.client),
-              ),
-            ),
-          ],
-        ),
-        body: Column(children: [
+  Widget build(BuildContext context) {
+    final body = Column(children: [
           Expanded(
               child: RefreshIndicator(
             onRefresh: () async {
@@ -113,8 +116,30 @@ class _CoordinationBoardScreenState extends State<CoordinationBoardScreen> {
                         onPressed: state.sending ? null : send,
                         icon: const Icon(Icons.send)),
                   ]))),
-        ]),
-      );
+        ]);
+
+    // Embedded in the hub: the host owns the chrome, so the board contributes
+    // only its transcript and composer.
+    if (widget.embedded) return body;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Coordination board'),
+        actions: [
+          IconButton(
+            tooltip: 'Handoffs',
+            icon: const Icon(Icons.swap_horiz),
+            onPressed: () => presentScreen(
+              context,
+              style: PanelStyle.drawer,
+              builder: (_, __) =>
+                  CoordinationHandoffsScreen(client: widget.client),
+            ),
+          ),
+        ],
+      ),
+      body: body,
+    );
+  }
 }
 
 class _EventBubble extends StatelessWidget {

@@ -9,9 +9,21 @@ import '../../widgets.dart';
 /// the outstanding assignments. Answers the question a chat reply can't — which
 /// agent is working in which session right now, and what work is queued.
 class CoordinationActivityScreen extends StatefulWidget {
-  const CoordinationActivityScreen({super.key, required this.client});
+  const CoordinationActivityScreen({
+    super.key,
+    required this.client,
+    this.embedded = false,
+    this.refreshSignal,
+  });
 
   final DaemonClient client;
+
+  /// When embedded in the hub, suppress our own Scaffold/AppBar and let the
+  /// host supply chrome.
+  final bool embedded;
+
+  /// Bumped by the host to request a refetch.
+  final ValueNotifier<int>? refreshSignal;
 
   @override
   State<CoordinationActivityScreen> createState() =>
@@ -31,7 +43,17 @@ class _CoordinationActivityScreenState
   void initState() {
     super.initState();
     refresh();
+    // Host-driven refresh (the hub's toolbar button).
+    widget.refreshSignal?.addListener(_onRefreshSignal);
   }
+
+  @override
+  void dispose() {
+    widget.refreshSignal?.removeListener(_onRefreshSignal);
+    super.dispose();
+  }
+
+  void _onRefreshSignal() => refresh();
 
   Future<void> refresh() async {
     if (mounted) {
@@ -65,14 +87,8 @@ class _CoordinationActivityScreenState
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Coordination'),
-          actions: [
-            IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
-          ],
-        ),
-        body: RefreshIndicator(
+  Widget build(BuildContext context) {
+    final body = RefreshIndicator(
           onRefresh: refresh,
           child: loading
               ? const Center(child: CircularProgressIndicator())
@@ -121,8 +137,20 @@ class _CoordinationActivityScreenState
                             ),
                       ],
                     ),
-        ),
-      );
+        );
+
+    // Embedded in the hub: the host owns the chrome.
+    if (widget.embedded) return body;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Active'),
+        actions: [
+          IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
+        ],
+      ),
+      body: body,
+    );
+  }
 }
 
 class _SectionHeader extends StatelessWidget {
