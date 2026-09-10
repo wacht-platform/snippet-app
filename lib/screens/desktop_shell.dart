@@ -30,6 +30,7 @@ import 'agents_sidebar_panel.dart';
 import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'session.dart';
+import 'shell_nav.dart';
 import 'shell_rail.dart';
 import 'mission_control.dart';
 
@@ -2443,6 +2444,20 @@ class _KeepAliveState extends State<_KeepAlive>
   }
 }
 
+/// Quiet empty state used inside the sectioned sidebar.
+class _SidebarEmpty extends StatelessWidget {
+  const _SidebarEmpty(this.message);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+        child: Text(message,
+            textAlign: TextAlign.center,
+            style: sans(12.5, color: AppColors.fg4, height: 1.45)),
+      );
+}
+
 class _Sidebar extends StatefulWidget {
   final List<Instance> instances;
   final Instance? active;
@@ -2498,6 +2513,9 @@ class _SidebarState extends State<_Sidebar> {
   /// Folder groups the user has collapsed. Keyed by folder path; a group is
   /// expanded by default, so a fresh session list is fully visible.
   final Set<String> _collapsed = {};
+
+  /// Collapse key for the whole CHATS section — distinct from any folder path.
+  static const String _chatsKey = '__chats__';
   String? _renamingId;
   String? _hoveredId;
   final TextEditingController _renameCtl = TextEditingController();
@@ -2670,10 +2688,6 @@ class _SidebarState extends State<_Sidebar> {
         ],
         if (!kMobile) ...[
           _machineHeader(),
-          _navRow('search', 'Search', onTap: hasClient ? _openSearch : null),
-          _navRow('folder', 'Browse',
-              sub: 'files · new chat',
-              onTap: hasClient ? widget.onNewSession : null),
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
@@ -2693,17 +2707,8 @@ class _SidebarState extends State<_Sidebar> {
                     onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
               ]),
             ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: !hasClient
-                ? Center(
-                    child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Text('Add a machine to begin.',
-                            textAlign: TextAlign.center,
-                            style: sans(12.5, color: AppColors.fg4))))
-                : _sessionList(),
-          ),
+          // Sectioned, collapsible sidebar — the reference's left column.
+          Expanded(child: _sectionedSidebar()),
         ],
       ]),
     );
@@ -3025,6 +3030,138 @@ class _SidebarState extends State<_Sidebar> {
       backgroundColor: AppColors.surface2,
       onRefresh: () async => widget.onRefreshSessions(),
       child: listView,
+    );
+  }
+
+  /// Desktop sidebar as stacked, collapsible sections — the reference's left
+  /// column: an UPPERCASE section header with an action cluster, then nested
+  /// collapsible folder groups, then compact rows.
+  ///
+  /// Separate from `_sessionList()` because mobile keeps its card list; only the
+  /// wide layout uses this density.
+  Widget _sectionedSidebar() {
+    final hasClient = widget.client != null;
+    final all = _sessions ?? const <SessionInfo>[];
+    final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
+    final list = all
+        .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
+        .toList();
+
+    // Newest folder first, then newest session within it.
+    final newest = <String, int>{};
+    for (final s in list) {
+      final t = newest[s.folder];
+      if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
+    }
+    list.sort((a, b) {
+      final fa = newest[a.folder] ?? 0;
+      final fb = newest[b.folder] ?? 0;
+      if (fa != fb) return fb.compareTo(fa);
+      final byFolder = a.folder.compareTo(b.folder);
+      if (byFolder != 0) return byFolder;
+      return b.lastActive.compareTo(a.lastActive);
+    });
+
+    final groups = <String, List<SessionInfo>>{};
+    final order = <String>[];
+    for (final s in list) {
+      groups.putIfAbsent(s.folder, () {
+        order.add(s.folder);
+        return <SessionInfo>[];
+      }).add(s);
+    }
+
+    final chatsOpen = !_collapsed.contains(_chatsKey);
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 16),
+      children: [
+        ShellSectionHeader(
+          label: 'Chats',
+          expanded: chatsOpen,
+          onToggle: () => setState(() => _toggleCollapsed(_chatsKey)),
+          actions: [
+            ShellSectionAction(
+              icon: 'sliders',
+              tooltip: 'Filter',
+              onTap: _showFilterSheet,
+            ),
+            ShellSectionAction(
+              icon: 'refresh',
+              tooltip: 'Refresh',
+              onTap: widget.onRefreshSessions,
+            ),
+            ShellSectionAction(
+              icon: 'plus',
+              tooltip: 'New chat',
+              onTap: hasClient ? widget.onNewSession : null,
+            ),
+          ],
+        ),
+        if (!chatsOpen)
+          const SizedBox.shrink()
+        else if (!hasClient)
+          const _SidebarEmpty('Add a machine to begin.')
+        else ...[
+          if (mc.isNotEmpty) _missionControlPin(mc.first),
+          if (list.isEmpty && mc.isEmpty)
+            const _SidebarEmpty('No chats yet.')
+          else
+            for (final folder in order) ...[
+              ShellGroupHeader(
+                label: folder.isEmpty
+                    ? 'No folder'
+                    : lastPathSegment(folder, ifEmpty: folder),
+                icon: 'folder',
+                tone: ShellTone.artifact,
+                expanded: !_collapsed.contains(folder),
+                onToggle: () => setState(() => _toggleCollapsed(folder)),
+                // A folded group still shows how much is inside it.
+                trailing: _collapsed.contains(folder)
+                    ? Text('${groups[folder]!.length}',
+                        style: sans(10.5, color: AppColors.fg4))
+                    : null,
+              ),
+              if (!_collapsed.contains(folder))
+                for (final s in groups[folder]!) _sidebarSessionRow(s),
+            ],
+        ],
+      ],
+    );
+  }
+
+  void _toggleCollapsed(String key) {
+    if (_collapsed.contains(key)) {
+      _collapsed.remove(key);
+    } else {
+      _collapsed.add(key);
+    }
+  }
+
+  /// One chat row. The folder is already conveyed by its group header, so the
+  /// row stays a single line; the trailing dot carries run/needs-input state.
+  Widget _sidebarSessionRow(SessionInfo s) {
+    final selected = s.id == widget.selectedSessionId;
+    final running = s.status == 'running';
+    final waiting = s.status == 'waiting_for_input';
+    return ShellNavRow(
+      id: s.id,
+      label: s.title.trim().isEmpty ? '(untitled)' : s.title,
+      icon: 'message-text',
+      tone: ShellTone.chat,
+      selected: selected,
+      onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
+      trailing: Container(
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: waiting
+              ? AppColors.accent
+              : running
+                  ? AppColors.run
+                  : Colors.transparent,
+        ),
+      ),
     );
   }
 
