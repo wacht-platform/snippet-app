@@ -329,6 +329,13 @@ class M {
   static const minTarget = 44.0;
 }
 
+/// Inset between a pane's edge and the composer card.
+///
+/// Measured: the reference's card sits at x274 inside a pane starting at x258 —
+/// 16px a side. The composer was previously full-bleed when embedded, which is
+/// why it stuck to the sides of the shell.
+const double kComposerGutter = 16;
+
 // ---------------------------------------------------------------------------
 // Typography — Geist for UI, JetBrains Mono for code.
 //

@@ -3086,10 +3086,12 @@ class _SessionScreenState extends State<SessionScreen>
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: keyboard),
       child: Container(
+        // Inset from the pane on EVERY layout. Embedded used to be 0, which is
+        // why the composer stuck to the sides of the shell.
         padding: EdgeInsets.fromLTRB(
-            widget.embedded ? 0 : 20,
+            widget.embedded ? kComposerGutter : 20,
             8,
-            widget.embedded ? 0 : 20,
+            widget.embedded ? kComposerGutter : 20,
             10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
         child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -3106,7 +3108,10 @@ class _SessionScreenState extends State<SessionScreen>
                   color: AppColors.bg,
                   borderRadius: BorderRadius.circular(R.md),
                 ),
-                padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
+                // 12 all round, matching the reference's card inset. The card
+                // owns the inset and the rows sit inside it, so there is no
+                // per-row vertical padding to keep in sync.
+                padding: const EdgeInsets.all(12),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3163,8 +3168,10 @@ class _SessionScreenState extends State<SessionScreen>
                           style: sans(15.5, height: 1.45, color: AppColors.fg1),
                           decoration: InputDecoration(
                             isCollapsed: true,
+                            // The card supplies the inset; this only adds the gap
+                            // between the text and the control row beneath it.
                             contentPadding:
-                                const EdgeInsets.fromLTRB(2, 2, 8, 14),
+                                const EdgeInsets.fromLTRB(2, 2, 8, 10),
                             border: InputBorder.none,
                             hintText: 'Ask anything',
                             hintStyle:
@@ -3192,13 +3199,15 @@ class _SessionScreenState extends State<SessionScreen>
                             Builder(builder: (chipCtx) {
                               return Material(
                                 color: AppColors.surface2,
-                                borderRadius: BorderRadius.circular(R.sm),
+                                // Measured: the reference's chips are 4px radius
+                                // with a much tighter inset than ours had.
+                                borderRadius: BorderRadius.circular(R.xs),
                                 child: InkWell(
                                   onTap: () => _switchModel(chipCtx),
-                                  borderRadius: BorderRadius.circular(R.sm),
+                                  borderRadius: BorderRadius.circular(R.xs),
                                   child: Padding(
                                     padding:
-                                        const EdgeInsets.fromLTRB(8, 5, 7, 5),
+                                        const EdgeInsets.fromLTRB(6, 3, 5, 3),
                                     child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -5462,9 +5471,10 @@ class _SendBtn extends StatelessWidget {
   const _SendBtn({required this.enabled, this.running = false, this.onTap});
   @override
   Widget build(BuildContext context) {
-    final size = kMobile ? 42.0 : 34.0;
-    final iconSize =
-        running ? (kMobile ? 16.0 : 13.0) : (kMobile ? 18.0 : 15.0);
+    // Measured: the reference's send control is 28x28. Ours was 34, which made
+    // the whole control row taller than the 52px the reference allots it.
+    final size = kMobile ? M.minTarget : 28.0;
+    final iconSize = running ? 14.0 : 15.0;
     return Material(
       color: enabled ? AppColors.fg1 : AppColors.surface2,
       shape: const CircleBorder(),
