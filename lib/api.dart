@@ -881,6 +881,36 @@ class DaemonClient {
     if (r.statusCode != 204) throw _err('acknowledge coordination handoff', r);
   }
 
+  /// GET /coordination/leases — sessions that currently have a turn holder, i.e.
+  /// which agent is active where.
+  Future<List<CoordinationLease>> coordinationActiveLeases() async {
+    final r = await http.get(_uri('/coordination/leases'));
+    if (r.statusCode != 200) throw _err('list coordination leases', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => CoordinationLease.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /coordination/assignments — outstanding and past work, optionally
+  /// narrowed to one agent or one session.
+  Future<List<CoordinationAssignment>> coordinationAssignments({
+    String? agentId,
+    String? sessionId,
+    int limit = 200,
+  }) async {
+    final r = await http.get(_uri('/coordination/assignments', {
+      'limit': '$limit',
+      if (agentId != null && agentId.isNotEmpty) 'agent_id': agentId,
+      if (sessionId != null && sessionId.isNotEmpty) 'session_id': sessionId,
+    }));
+    if (r.statusCode != 200) throw _err('list coordination assignments', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => CoordinationAssignment.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// GET /coordination/threads/{threadId}/events — cursor-paged board events.
   Future<List<CoordinationEvent>> coordinationEvents(
     String threadId, {

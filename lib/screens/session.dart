@@ -42,6 +42,7 @@ import 'mission_control/mission_control_state.dart'
         parseBoardMessage,
         BoardMessage,
         MissionEnvelope;
+import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_agent_directory.dart';
 import 'mission_control/coordination_board_screen.dart';
 import 'mission_control/widgets/mission_control_tasks.dart';
@@ -2781,6 +2782,12 @@ class _SessionScreenState extends State<SessionScreen>
                       threadId: 'system',
                       actorId: 'human')))
               : null,
+          onActivity: _isMissionControl
+              ? () => run(() => presentScreen(context,
+                  style: PanelStyle.drawer,
+                  builder: (_, close) =>
+                      CoordinationActivityScreen(client: widget.client)))
+              : null,
           onTerm: () => run(_openTerm),
           hideShell: _isMissionControl,
           onGit: () => run(() => presentScreen(context,
@@ -5348,6 +5355,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback? onTasks;
   final VoidCallback? onAgents;
   final VoidCallback? onCoordination;
+  final VoidCallback? onActivity;
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
@@ -5373,6 +5381,7 @@ class _SessionActionsPanel extends StatefulWidget {
     this.onTasks,
     this.onAgents,
     this.onCoordination,
+    this.onActivity,
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
@@ -5562,6 +5571,11 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               icon: 'message-text',
               label: 'Coordination board',
               onTap: widget.onCoordination),
+        if (widget.onActivity != null)
+          _row(
+              icon: 'activity',
+              label: 'Coordination activity',
+              onTap: widget.onActivity),
         _row(icon: 'scheduled', label: 'Scheduled', onTap: widget.onRecurring),
         if (!widget.hideWorkspace) ...[
           _section('Workspace'),
