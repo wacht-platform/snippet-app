@@ -15,6 +15,7 @@ class ThemePreset {
   // Surfaces (darkest → lightest)
   final Color bg;
   final Color canvas;
+  final Color floor;
   final Color surface1;
   final Color surface2;
   final Color surface3;
@@ -57,6 +58,7 @@ class ThemePreset {
     required this.label,
     required this.bg,
     required this.canvas,
+    required this.floor,
     required this.surface1,
     required this.surface2,
     required this.surface3,
@@ -101,22 +103,26 @@ ThemePreset _dark({
   required Color danger,
   required Color warn,
 }) {
-  // Surfaces are split by ROLE, not by brightness alone:
-  //   canvas  — the chat/content area, deliberately the darkest thing on screen
-  //   bg      — the chrome around it (top bar, sidebar, status line), a grey
-  //             that lifts away from the content so the reading pane recedes
-  //   surface1-3 — cards → active rows → hover, each one step brighter than bg
-  final canvas = const Color(0xFF0B0B0E); // chat / reader — darkest
-  final bg = const Color(0xFF17171C); // chrome: top bar, sidebar, status line
-  final surface1 = const Color(0xFF1E1E24); // cards, panels
-  final surface2 = const Color(0xFF26262D); // active tab / active row card
-  final surface3 = const Color(0xFF2E2E36); // dropdowns, popovers, hover
+  // Measured surface ladder. Depth is expressed by darkening, and the reading
+  // surface is the darkest thing on screen — not a raised card.
+  //   canvas  — chat / editor / viewer; content recedes into near-black
+  //   bg      — ALL chrome: window, top bar, strip, sidebar, status line
+  //   surface1-3 — cards → active row → popover, each one step lighter
+  // Separation comes from these steps, not from drawn lines: the reference uses
+  // zero borders anywhere in its tree.
+  final canvas = const Color(0xFF010101); // chat / reader — darkest
+  final bg = const Color(0xFF171717); // chrome: rail, sidebar, body
+  final floor = const Color(0xFF0D0D0D); // window + secondary pane
+  final surface1 = const Color(0xFF222222); // cards, selected row
+  final surface2 = const Color(0xFF2A2A2A); // hover, secondary active
+  final surface3 = const Color(0xFF2D2D2D); // chips, popovers, inputs
 
   return ThemePreset(
     name: name,
     label: label,
     bg: bg,
     canvas: canvas,
+    floor: floor,
     surface1: surface1,
     surface2: surface2,
     surface3: surface3,
@@ -124,9 +130,10 @@ ThemePreset _dark({
     fg2: inkMuted,
     fg3: inkSubtle,
     fg4: inkFaint,
-    // Hairlines:
-    border: const Color(0xFF2A2A33),
-    border2: const Color(0xFF3A3A45),
+    // Hairlines stay a single step off their surface, so a border reads as a
+    // soft edge rather than a drawn line.
+    border: const Color(0xFF262626),
+    border2: const Color(0xFF333333),
     accent: accent,
     accentHover: _lighten(accent, 0.10),
     accentFg: const Color(0xFFFFFFFF),
@@ -152,13 +159,13 @@ final _amoled = _dark(
   name: 'amoled',
   label: 'Dark',
   accent: const Color(0xFF4E88FF), // vibrant blue
-  ink: const Color(0xFFF2F2F6), // near-white
-  inkMuted: const Color(0xFF9EA0B0), // secondary
-  inkSubtle: const Color(0xFF686A78), // tertiary
-  inkFaint: const Color(0xFF4A4C58), // disabled
-  success: const Color(0xFF22C55E), // green status
+  ink: const Color(0xFFFFFFFF), // white — emphasis only
+  inkMuted: const Color(0xFFC1C1C1), // DEFAULT body text
+  inkSubtle: const Color(0xFF8F8F8F), // muted
+  inkFaint: const Color(0xFF5F5F5F), // placeholder / disabled
+  success: const Color(0xFF3EAF3F), // online green
   danger: const Color(0xFFEF4444), // red danger
-  warn: const Color(0xFFF59E0B), // amber
+  warn: const Color(0xFFAF8D3E), // amber
 );
 
 List<ThemePreset> get allPresets => [_amoled];
@@ -224,6 +231,7 @@ class AppColors {
   // Surfaces
   static Color get bg => currentTheme.bg;
   static Color get canvas => currentTheme.canvas;
+  static Color get floor => currentTheme.floor;
   static Color get surface1 => currentTheme.surface1;
   static Color get surface2 => currentTheme.surface2;
   static Color get surface3 => currentTheme.surface3;
@@ -273,29 +281,24 @@ Color get readingBg => AppColors.canvas;
 // ---------------------------------------------------------------------------
 
 class R {
-  static const card = 8.0;
-  static const md = 6.0;
-  static const sm = 4.0;
-  static const xs = 4.0;
-  static const sheetTop = 12.0;
+  static const card = 8.0; // rows, cards, inputs — the dominant radius
+  static const md = 8.0;
+  static const sm = 8.0;
+  static const xs = 4.0; // small inline marks
+  static const chip = 6.0;
+  static const sheetTop = 10.0; // window + section corners
 }
 
 // ---------------------------------------------------------------------------
-// Typography — Inter for UI, JetBrains Mono for code.
+// Typography — Geist for UI, JetBrains Mono for code.
 //
-// Weights are a real ramp, NOT capped. Capping every call at 400 removed all
-// weight-based hierarchy: 119 call sites asked for emphasis and every one
-// rendered regular, leaving size as the only differentiator, which reads flat.
-// 400 body · 500 labels/emphasis · 600 titles/active.
+// The ceiling is 500. `600` exists as `strong` only for the single large page
+// title; everything else is 400 with 500 reserved for controls and row titles,
+// so weight reads as meaning rather than decoration.
 // ---------------------------------------------------------------------------
 
 /// Role weights — prefer these over raw `FontWeight.wNNN` so the ramp stays
 /// consistent across the app.
-///
-/// Deliberately narrow: almost everything is `body` (400). `label` (500) is the
-/// ceiling for ordinary UI text — section headers, row titles, buttons — so
-/// weight reads as *meaning* rather than decoration. `strong` is reserved for
-/// the rare element that must outrank its surroundings.
 class W {
   static const body = FontWeight.w400;
   static const label = FontWeight.w500;
@@ -303,15 +306,14 @@ class W {
   static const strong = FontWeight.w600;
 }
 
-/// Optical tracking: tighter as type grows. Large text needs negative tracking
-/// to avoid looking loose; small text must stay open to remain legible.
+/// Optical tracking. The reference sits slightly tight at every size
+/// (-0.05px at 12–13px, -0.3px at 20px).
 double _tracking(double size) {
-  if (size >= 32) return -0.8;
-  if (size >= 24) return -0.5;
-  if (size >= 17) return -0.2;
-  if (size >= 14) return -0.05;
-  if (size >= 13) return 0;
-  return 0.1;
+  if (size >= 32) return -0.6;
+  if (size >= 24) return -0.4;
+  if (size >= 17) return -0.3;
+  if (size >= 14) return -0.1;
+  return -0.05;
 }
 
 TextStyle sans(double size,
@@ -319,20 +321,20 @@ TextStyle sans(double size,
         double? height,
         double? spacing,
         Color? color}) =>
-    GoogleFonts.dmSans(
+    GoogleFonts.geist(
       fontSize: size,
       fontWeight: weight,
-      height: height ?? 1.4,
+      height: height ?? 1.33,
       letterSpacing: spacing ?? _tracking(size),
-      color: color ?? AppColors.fg1,
+      color: color ?? AppColors.fg2,
     );
 
 TextStyle display(double size,
-        {FontWeight weight = W.title, Color? color, double? height}) =>
-    GoogleFonts.dmSans(
+        {FontWeight weight = W.strong, Color? color, double? height}) =>
+    GoogleFonts.geist(
       fontSize: size,
       fontWeight: weight,
-      height: height ?? 1.16,
+      height: height ?? 1.15,
       letterSpacing: _tracking(size),
       color: color ?? AppColors.fg1,
     );

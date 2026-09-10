@@ -1420,11 +1420,10 @@ class _DesktopShellState extends State<DesktopShell>
 
     return Container(
       height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      // The status line sits on the floor surface. No top border: the step
+      // between this and the body above is the separation.
+      color: AppColors.floor,
       child: Row(children: [
         StatusDot(status: connected ? 'online' : 'offline', size: 6),
         const SizedBox(width: 7),
@@ -1481,36 +1480,37 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _macWindowBarContent({required bool hasWindowControls}) {
     return SizedBox(
+      // Matches AppKit's own titlebar band so the native traffic lights sit
+      // vertically centred rather than stranded near the top.
       height: kMacTitlebar,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.bg,
-          border: Border(bottom: BorderSide(color: AppColors.border)),
-        ),
+      child: ColoredBox(
+        // The window/title bar sits on the floor surface (#0D0D0D) while the
+        // body below is the lighter chrome (#171717) — that step is what makes
+        // the active tab read as connected to the strip.
+        color: AppColors.floor,
         child: Padding(
           padding: EdgeInsets.only(
-            left: hasWindowControls ? 88 : 14,
-            right: 14,
+            left: hasWindowControls ? 84 : 12,
+            right: 12,
           ),
           child: Row(
             children: [
               // Back/Forward navigation arrows
               IconBtn(
                 'chevron-left',
-                size: 26,
-                iconSize: 15,
+                size: 24,
+                iconSize: 16,
                 tooltip: 'Back',
                 onTap: _canNavigateBack ? _navigateBack : null,
               ),
-              const SizedBox(width: 4),
               IconBtn(
                 'chevron-right',
-                size: 26,
-                iconSize: 15,
+                size: 24,
+                iconSize: 16,
                 tooltip: 'Forward',
                 onTap: _canNavigateForward ? _navigateForward : null,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               // Top Workspace / Session Tabs
               Expanded(
                 child: Row(
@@ -1522,8 +1522,8 @@ class _DesktopShellState extends State<DesktopShell>
                     const SizedBox(width: 2),
                     IconBtn(
                       'plus',
-                      size: 28,
-                      iconSize: 15,
+                      size: 24,
+                      iconSize: 16,
                       tooltip: 'New session',
                       onTap: _newSessionFlow,
                     ),
@@ -1534,15 +1534,15 @@ class _DesktopShellState extends State<DesktopShell>
               // machine avatar. The avatar is also the machine switcher.
               IconBtn(
                 'history',
-                size: 28,
+                size: 24,
                 iconSize: 16,
                 tooltip: 'History & Checkpoints',
                 onTap: _showCheckpointsDrawer,
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 2),
               IconBtn(
                 'settings',
-                size: 28,
+                size: 24,
                 iconSize: 16,
                 tooltip: 'Settings',
                 onTap: _openShellSettings,
@@ -1735,24 +1735,24 @@ class _DesktopShellState extends State<DesktopShell>
     return GestureDetector(
       onTap: () => _activateTab(i),
       child: Container(
-        height: 24,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.surface2 : Colors.transparent,
-          borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(
-            color: isActive ? AppColors.border2 : Colors.transparent,
-          ),
+          // A browser-style tab: rounded at the top only, filled with the same
+          // chrome colour as the strip beneath it, so the active tab visually
+          // merges into the body. No border — the fill does the work.
+          color: isActive ? AppColors.bg : Colors.transparent,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             AppIcon(
               icon,
-              size: 13,
-              color: isActive ? AppColors.accent : AppColors.fg4,
+              size: 16,
+              color: isActive ? AppColors.fg2 : AppColors.fg4,
             ),
-            const SizedBox(width: 7),
+            const SizedBox(width: 8),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 160),
               child: Text(
@@ -1772,7 +1772,7 @@ class _DesktopShellState extends State<DesktopShell>
                 onTap: () => _closeTab(i),
                 child: Padding(
                   padding: const EdgeInsets.all(2),
-                  child: AppIcon('x', size: 10, color: AppColors.fg4),
+                  child: AppIcon('x', size: 12, color: AppColors.fg4),
                 ),
               ),
             ],
@@ -1886,34 +1886,27 @@ class _DesktopShellState extends State<DesktopShell>
           body: SafeArea(
             child: Column(children: [
               _macWindowBar(),
-              // The nested strip sits directly over the sidebar at exactly the
-              // sidebar's width, so the two read as one column.
-              Row(children: [
-                SizedBox(
-                  width: kSidebarWidth,
-                  child: ShellRail(
-                    section: _section,
-                    onSelect: (s) => setState(() => _section = s),
-                  ),
-                ),
-                const Expanded(child: SizedBox()),
-              ]),
+              // The navigation band is a shell-level row: full window width,
+              // directly between the title bar and the body.
+              ShellRail(
+                section: _section,
+                onSelect: (s) => setState(() => _section = s),
+              ),
               Expanded(
                 child: Row(children: [
-                  // The sidebar is only the selected panel's full-width body;
-                  // the strip above already owns the navigation row.
                   SizedBox(
                     width: kSidebarWidth,
                     child: _sidebar(topInset: false),
                   ),
-                  VerticalDivider(
-                      width: 1, thickness: 1, color: AppColors.border),
-                  Expanded(child: _mainPane()),
-                  if (_isSplit || _rightAgent != null) ...[
-                    VerticalDivider(
-                        width: 1, thickness: 1, color: AppColors.border),
-                    _rightPane(),
-                  ],
+                  // No divider: the sidebar (bg) and the chat canvas are
+                  // different surfaces, which is the separation.
+                  Expanded(
+                    child: _paneSurface(
+                      roundRight: !(_isSplit || _rightAgent != null),
+                      child: _mainPane(),
+                    ),
+                  ),
+                  if (_isSplit || _rightAgent != null) _rightPane(),
                 ]),
               ),
               _macStatusBar(),
@@ -1926,32 +1919,27 @@ class _DesktopShellState extends State<DesktopShell>
         backgroundColor: readingBg,
         body: SafeArea(
           child: Column(children: [
-            // The nested strip sits directly over the sidebar at exactly the
-            // sidebar's width, so the two read as one column.
-            Row(children: [
-              SizedBox(
-                width: kSidebarWidth,
-                child: ShellRail(
-                  section: _section,
-                  onSelect: (s) => setState(() => _section = s),
-                ),
-              ),
-              const Expanded(child: SizedBox()),
-            ]),
+            // The navigation band is a shell-level row: full window width,
+            // directly above the body.
+            ShellRail(
+              section: _section,
+              onSelect: (s) => setState(() => _section = s),
+            ),
             Expanded(
               child: Row(children: [
                 SizedBox(
                   width: kSidebarWidth,
                   child: _sidebar(topInset: true),
                 ),
-                VerticalDivider(
-                    width: 1, thickness: 1, color: AppColors.border),
-                Expanded(child: _mainPane()),
-                if (_isSplit || _rightAgent != null) ...[
-                  VerticalDivider(
-                      width: 1, thickness: 1, color: AppColors.border),
-                  _rightPane(),
-                ],
+                // No divider: the sidebar (bg) and the chat canvas are
+                // different surfaces, which is the separation.
+                Expanded(
+                  child: _paneSurface(
+                    roundRight: !(_isSplit || _rightAgent != null),
+                    child: _mainPane(),
+                  ),
+                ),
+                if (_isSplit || _rightAgent != null) _rightPane(),
               ]),
             ),
           ]),
@@ -1959,6 +1947,24 @@ class _DesktopShellState extends State<DesktopShell>
       );
     }));
   }
+
+  /// The chat / content pane. Sits on the darkest canvas surface with a
+  /// rounded top-left corner where it meets the chrome, matching the
+  /// reference's `radius: 10 0 0 0` on the reading surface. No divider is
+  /// drawn against the sidebar — the surface step is the separation.
+  Widget _paneSurface({required Widget child, bool roundRight = false}) =>
+      Container(
+        decoration: BoxDecoration(
+          color: AppColors.canvas,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(R.sheetTop),
+            topRight:
+                roundRight ? const Radius.circular(R.sheetTop) : Radius.zero,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      );
 
   /// Detail / split pane on the right. When `_rightAgent` is set, displays the
   /// agent detail. When split view is toggled via [|], displays the split
@@ -1983,25 +1989,28 @@ class _DesktopShellState extends State<DesktopShell>
       final t = _tabs[secondIdx];
       return Expanded(
         child: Container(
-          color: AppColors.canvas,
+          // Secondary pane sits on the floor surface with a rounded outer
+          // corner, mirroring the chat pane opposite it.
+          decoration: BoxDecoration(
+            color: AppColors.floor,
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(R.sheetTop),
+              bottomRight: Radius.circular(R.sheetTop),
+            ),
+          ),
           child: Column(
             children: [
               Container(
-                height: 38,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.bg,
-                  border: Border(bottom: BorderSide(color: AppColors.border)),
-                ),
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(R.sm),
-                        border: Border.all(color: AppColors.border2),
+                        color: AppColors.surface3,
+                        borderRadius: BorderRadius.circular(R.chip),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

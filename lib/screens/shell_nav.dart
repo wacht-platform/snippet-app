@@ -5,10 +5,13 @@ import '../widgets.dart';
 
 /// Design-language primitives for the shell sidebar.
 ///
-/// Three levels, exactly as the reference does it:
-///   1. SECTION header — UPPERCASE, muted, with an action cluster on the right
-///   2. GROUP header   — title case, chevron, collapsible, indented one step
-///   3. ROW            — compact, icon + label, indented under its group
+/// Metrics are measured from the reference, not eyeballed:
+///   1. SECTION header — 32px tall, 8px/12px padding, uppercase, muted
+///   2. GROUP header   — 26px tall, same padding, collapsible
+///   3. ROW            — 26px tall, 8px radius, icon + label
+///
+/// Separation comes from the surface ladder, never from drawn lines: the
+/// reference contains no borders at all.
 ///
 /// Kept in one file so the sidebar's look is reviewable in one place rather
 /// than scattered through a 4k-line screen.
@@ -24,22 +27,26 @@ Color toneColor(ShellTone tone) => switch (tone) {
       ShellTone.review => AppColors.ok,
       ShellTone.artifact => AppColors.fg3,
       ShellTone.agent => AppColors.fg2,
-      ShellTone.neutral => AppColors.fg3,
+      ShellTone.neutral => AppColors.fg2,
     };
 
-/// Compact metrics. The reference packs ~34px rows so a long list stays
-/// scannable — that density is the point, not an accident.
-const double kNavRowHeight = 34;
+/// Measured metrics.
+const double kNavRowHeight = 26;
 const double kNavHeaderHeight = 32;
-const double kNavIcon = 14;
-const double kNavIndent = 10;
+const double kNavIcon = 16;
 
-/// Horizontal inset for sidebar content. Kept small so rows start close to the
-/// column's left edge instead of floating in a wide gutter.
+/// Left padding inside a row. Top-level rows and section headers share it; a
+/// nested row adds [kNavNestStep] so the hierarchy reads without indentation
+/// guides.
+const double kNavIndent = 12;
+const double kNavNestStep = 24;
+const double kNavNestedIndent = kNavIndent + kNavNestStep;
+
+/// Outer padding on sidebar sections.
 const double kSidebarContentInset = 8;
 
 /// UPPERCASE section header with a leading chevron and a trailing action
-/// cluster (filter · sort · view · add).
+/// cluster.
 class ShellSectionHeader extends StatelessWidget {
   const ShellSectionHeader({
     super.key,
@@ -53,7 +60,7 @@ class ShellSectionHeader extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
 
-  /// Rendered right-aligned, smallest-first, matching the reference cluster.
+  /// Rendered right-aligned, smallest-first.
   final List<Widget> actions;
 
   @override
@@ -67,22 +74,23 @@ class ShellSectionHeader extends StatelessWidget {
             child: InkWell(
               onTap: onToggle,
               child: Padding(
-                padding: const EdgeInsets.only(left: kSidebarContentInset),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: kNavIndent, vertical: 8),
                 child: Row(children: [
                   AppIcon(expanded ? 'chevron-down' : 'chevron-right',
-                      size: 13, color: AppColors.fg4),
-                  const SizedBox(width: 7),
+                      size: 16, color: AppColors.fg4),
+                  const SizedBox(width: 8),
                   Text(
                     label.toUpperCase(),
-                    style: sans(10.5,
-                        weight: W.title, color: AppColors.fg4, spacing: 0.7),
+                    style: sans(11,
+                        weight: W.label, color: AppColors.fg4, spacing: 0.7),
                   ),
                 ]),
               ),
             ),
           ),
           ...actions,
-          const SizedBox(width: 6),
+          const SizedBox(width: kNavIndent),
         ],
       ),
     );
@@ -108,13 +116,14 @@ class ShellSectionAction extends StatelessWidget {
         waitDuration: const Duration(milliseconds: 400),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(R.md),
           child: SizedBox(
+            // 24px target around a 16px glyph.
             width: 24,
             height: 24,
             child: Center(
               child: AppIcon(icon,
-                  size: 13,
+                  size: 16,
                   color: onTap == null ? AppColors.fg4 : AppColors.fg3),
             ),
           ),
@@ -122,7 +131,7 @@ class ShellSectionAction extends StatelessWidget {
       );
 }
 
-/// Title-case collapsible group inside a section (e.g. "Tickets", a folder).
+/// Title-case collapsible group inside a section (e.g. a folder).
 class ShellGroupHeader extends StatelessWidget {
   const ShellGroupHeader({
     super.key,
@@ -147,25 +156,25 @@ class ShellGroupHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return SizedBox(
-      height: kNavHeaderHeight,
+      height: kNavRowHeight,
       child: InkWell(
         onTap: onToggle,
+        borderRadius: BorderRadius.circular(R.md),
         child: Padding(
-          padding: EdgeInsets.only(left: indent),
+          padding: EdgeInsets.only(left: indent, right: kNavIndent),
           child: Row(children: [
             AppIcon(expanded ? 'chevron-down' : 'chevron-right',
-                size: 12, color: AppColors.fg4),
-            const SizedBox(width: 6),
-            AppIcon(icon, size: 14, color: toneColor(tone)),
+                size: 16, color: AppColors.fg4),
+            const SizedBox(width: 8),
+            AppIcon(icon, size: kNavIcon, color: toneColor(tone)),
             const SizedBox(width: 8),
             Expanded(
               child: Text(label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(12.5, weight: W.label, color: AppColors.fg2)),
+                  style: sans(13, weight: W.label, color: AppColors.fg2)),
             ),
             if (trailing != null) trailing!,
-            const SizedBox(width: 8),
           ]),
         ),
       ),
@@ -173,11 +182,11 @@ class ShellGroupHeader extends StatelessWidget {
   }
 }
 
-/// The leaf: one nav row. Selection is an active card:
-/// - Background `AppColors.surface2` (#1B1B22)
-/// - Subtle hairline border `AppColors.border2` (#2E2E38)
-/// - Radius 6px
-/// - Crisp white text with `W.label`
+/// The leaf: one nav row.
+///
+/// Selection is expressed by surface alone — `surface1` (#222222) behind the
+/// row with 8px radius and no border — exactly as the reference does it. Text
+/// lifts from the default `#C1C1C1` to white only on the active row.
 class ShellNavRow extends StatelessWidget {
   const ShellNavRow({
     super.key,
@@ -205,29 +214,23 @@ class ShellNavRow extends StatelessWidget {
     Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
-          horizontal: kSidebarContentInset, vertical: 2),
+          horizontal: kSidebarContentInset, vertical: 1),
       child: Material(
-        color: selected ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
+        color: selected ? AppColors.surface1 : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.md),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(R.md),
           child: Container(
             height: kNavRowHeight,
-            padding: EdgeInsets.only(left: indent, right: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(R.sm),
-              border: Border.all(
-                color: selected ? AppColors.border2 : Colors.transparent,
-              ),
-            ),
+            padding: EdgeInsets.only(left: indent, right: kNavIndent),
             child: Row(children: [
               AppIcon(
                 icon,
                 size: kNavIcon,
-                color: selected ? AppColors.accent : toneColor(tone),
+                color: selected ? AppColors.fg1 : toneColor(tone),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   label,
