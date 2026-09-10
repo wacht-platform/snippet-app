@@ -286,10 +286,19 @@ class _DesktopShellState extends State<DesktopShell>
   /// dismisses the readout.
   _RightPanel _rightPanel = _RightPanel.none;
 
-  /// The user collapsed the right pane. Hiding the pane is always a view
-  /// action and never destroys anything — a terminal tab lives on in the
-  /// sidebar, and its pty stays alive.
+  /// The user collapsed a pane. Hiding a pane is always a view action and never
+  /// destroys anything — a terminal tab lives on in the sidebar, and its pty
+  /// stays alive, so re-opening is instant.
   bool _rightCollapsed = false;
+  bool _leftCollapsed = false;
+
+  /// The pane a pending terminal should dock in.
+  ///
+  /// Set when a strip's split control asks for a new shell. The pty arrives
+  /// asynchronously via the session's publish, so the pane is recorded now and
+  /// consumed by `_reconcileTermTabs` — reading the focused pane at publish time
+  /// would use whatever happened to be focused by then.
+  _Pane? _pendingTermPane;
 
   /// Which tab each pane is showing, keyed by pane. Separate from `_activeIndex`
   /// so the two containers keep independent selections.
@@ -772,8 +781,7 @@ class _DesktopShellState extends State<DesktopShell>
       changed = true;
     }
 
-    // New: give each live pty a tab, on the RIGHT so a terminal never displaces
-    // the conversation you are reading.
+    // New: give each live pty a tab, docked where it was requested.
     _ShellTab? owner;
     for (final t in _tabs) {
       if (t.key == sessionKey) {
@@ -788,13 +796,20 @@ class _DesktopShellState extends State<DesktopShell>
           t.termSessionKey == sessionKey &&
           t.termId == info.id);
       if (exists) continue;
+      // The pane the split control asked for, else the RIGHT — a terminal
+      // never displaces the conversation you are reading by default. Consumed
+      // once so a later publish does not re-dock a different terminal there.
+      final target = _pendingTermPane ?? _Pane.right;
       _tabs.add(_ShellTab.terminal(
         client: owner.client,
         instanceUrl: owner.instanceUrl,
         termSessionKey: sessionKey,
         termId: info.id,
         title: info.title,
+        pane: target,
       ));
+      _activeKey[target] = _tabs.last.key;
+      _pendingTermPane = null;
       changed = true;
     }
 
@@ -2727,24 +2742,32 @@ class _DesktopShellState extends State<DesktopShell>
   /// takes to move one across.
   Widget _bodyRow({required bool topInset}) {
     final rightTabs = _auxIn(_Pane.right);
+    final leftTabs = _auxIn(_Pane.left);
     // An explicit collapse wins over content, or the collapse control would
     // appear to do nothing while a terminal is docked.
     final showRight = !_rightCollapsed &&
         (rightTabs.isNotEmpty ||
             _rightPanel != _RightPanel.none ||
             _rightAgent != null);
+    // Collapsing the LEFT pane is only meaningful while it holds aux content —
+    // it is also the conversation surface, which there must always be a way
+    // back to.
+    final showLeft = !(_leftCollapsed && leftTabs.isNotEmpty);
     return Expanded(
       child: Row(children: [
         SizedBox(
           width: kSidebarWidth,
           child: _sidebar(topInset: topInset),
         ),
-        Expanded(
-          child: _dropOn(
-            _Pane.left,
-            _paneView(_Pane.left, roundRight: !showRight),
-          ),
-        ),
+        if (showLeft)
+          Expanded(
+            child: _dropOn(
+              _Pane.left,
+              _paneView(_Pane.left, roundRight: !showRight),
+            ),
+          )
+        else
+          Expanded(child: _collapsedPaneStub(_Pane.left)),
         if (showRight) ...[
           _paneResizeHandle(),
           SizedBox(
@@ -2756,6 +2779,22 @@ class _DesktopShellState extends State<DesktopShell>
       ]),
     );
   }
+
+  /// A collapsed pane leaves a thin re-open affordance rather than vanishing —
+  /// otherwise there is no way back to the terminals docked inside it.
+  Widget _collapsedPaneStub(_Pane p) => Center(
+        child: IconBtn('chevron-right',
+            size: 28,
+            iconSize: 14,
+            tooltip: 'Show pane',
+            onTap: () => setState(() {
+                  if (p == _Pane.left) {
+                    _leftCollapsed = false;
+                  } else {
+                    _rightCollapsed = false;
+                  }
+                })),
+      );
 
   /// A pane is a drop target for a tab dragged out of any strip.
   Widget _dropOn(_Pane p, Widget child) => DragTarget<_ShellTab>(
@@ -2811,13 +2850,42 @@ class _DesktopShellState extends State<DesktopShell>
 
   /// The active main workspace tab's body — what the left pane shows when no
   /// auxiliary tab is covering it.
+  /// The left pane's main content: **every** main workspace tab mounted, only
+  /// the active one laid out.
+  ///
+  /// Mounting all of them is not an optimisation — it is a correctness
+  /// requirement. A `SessionScreen` OWNS its ptys (it holds the socket and the
+  /// `TerminalHost`), so if switching sessions disposed the previous one, its
+  /// terminals would die and their tabs would be stranded pointing at a host
+  /// that no longer exists. That is exactly the "two terminals, switch session,
+  /// everything breaks" bug.
+  ///
+  /// `primary` is true only for the ACTIVE tab in the focused pane: it gates
+  /// file drops and inbound shares, and with several sessions mounted at once
+  /// more than one would otherwise ingest the same drop.
   Widget _mainWorkspaceBody() {
-    final t = _activeTab;
-    if (t == null) return _client == null ? _welcome() : _recentPlaceholder();
-    return _tabBody(t, primary: _focusedPane == _Pane.left);
+    final mains = _mainTabs;
+    if (mains.isEmpty) {
+      return _client == null ? _welcome() : _recentPlaceholder();
+    }
+    final active = _activeTab;
+    return Stack(children: [
+      for (final t in mains)
+        Offstage(
+          offstage: t != active,
+          child: _tabBody(
+            t,
+            primary: t == active && _focusedPane == _Pane.left,
+          ),
+        ),
+    ]);
   }
 
-  /// A pane's tab strip: one chip per tab, plus the pane's actions.
+  /// A pane's tab strip: its tabs, then the pane's own controls.
+  ///
+  /// Matches the reference: `tab … [|] ×`. Split opens a NEW terminal docked in
+  /// THIS pane; close collapses the pane. Neither destroys a shell — a pty is
+  /// created and destroyed only from the sidebar's terminal panel.
   Widget _paneStrip(_Pane p, List<_ShellTab> list) {
     final active = _activeAux(p);
     return Container(
@@ -2832,17 +2900,45 @@ class _DesktopShellState extends State<DesktopShell>
             itemBuilder: (_, i) => _paneTabChip(p, list[i], list[i] == active),
           ),
         ),
-        if (p == _Pane.right)
-          // Collapse, never destroy: a terminal tab lives on in the sidebar, so
-          // collapsing the pane cannot take a running pty with it.
-          IconBtn('minimize',
-              size: 24,
-              iconSize: 12,
-              tooltip: 'Collapse pane',
-              onTap: () => setState(() => _rightCollapsed = true)),
+        IconBtn('split',
+            size: 24,
+            iconSize: 12,
+            tooltip: 'New terminal in this pane',
+            onTap: () => _splitPane(p)),
+        // `×` collapses the pane. It does NOT destroy a shell: a pty is created
+        // and destroyed only from the sidebar's terminal panel, so closing a
+        // view can never take a running shell with it.
+        IconBtn('x',
+            size: 24,
+            iconSize: 12,
+            tooltip: 'Close pane',
+            onTap: () => _collapsePane(p)),
         const SizedBox(width: 4),
       ]),
     );
+  }
+
+  /// Open a new terminal, docked in [p].
+  ///
+  /// The pty is created by the SESSION (it owns the socket); where the resulting
+  /// tab lands is the shell's call. The pane is recorded now and consumed when
+  /// the session publishes the new terminal, because the two are asynchronous —
+  /// reading the pane at publish time would use whatever was focused by then.
+  void _splitPane(_Pane p) {
+    _pendingTermPane = p;
+    _dispatchSessionAction('shell_create');
+  }
+
+  /// Hide a pane. Never destroys: a terminal tab lives on in the sidebar and its
+  /// pty stays alive, so re-opening is instant.
+  void _collapsePane(_Pane p) {
+    setState(() {
+      if (p == _Pane.right) {
+        _rightCollapsed = true;
+      } else {
+        _leftCollapsed = true;
+      }
+    });
   }
 
   Widget _paneTabChip(_Pane p, _ShellTab t, bool active) {
