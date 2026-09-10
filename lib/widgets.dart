@@ -140,9 +140,19 @@ class _ToastCard extends StatefulWidget {
 
 class _ToastCardState extends State<_ToastCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 220))
-    ..forward();
+  /// Eager, in initState — a lazy `late final` makes `dispose` the first access
+  /// when `build` never runs, constructing a controller on a dead element. Same
+  /// defect class as `_StatusDotState`; fixed together so it cannot recur.
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 220))
+      ..forward();
+  }
+
   @override
   void dispose() {
     _c.dispose();
@@ -564,9 +574,23 @@ class StatusDot extends StatefulWidget {
 
 class _StatusDotState extends State<StatusDot>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1200))
-    ..repeat(reverse: true);
+  /// Assigned in initState, NOT as a lazy `late final` initialiser.
+  ///
+  /// A lazy initialiser is evaluated on FIRST ACCESS, and for a static status
+  /// ('online'/'offline') `build` never reads it — so `dispose` became the first
+  /// access and constructed an AnimationController on an element that was
+  /// already unmounting, throwing "the widget's element tree is no longer
+  /// stable". Creating it eagerly removes the ordering dependency entirely.
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
   @override
   void dispose() {
     _c.dispose();

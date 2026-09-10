@@ -416,9 +416,19 @@ class _Reticle extends StatefulWidget {
 
 class _ReticleState extends State<_Reticle>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 2600))
-    ..repeat(reverse: true);
+  /// Eager, in initState — see `_StatusDotState`: a lazy `late final` makes
+  /// `dispose` the first access if `build` never ran, which throws on a dead
+  /// element.
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2600))
+      ..repeat(reverse: true);
+  }
+
   @override
   void dispose() {
     _c.dispose();
