@@ -427,6 +427,21 @@ class _DesktopShellState extends State<DesktopShell>
         ifEmpty: _active?.label ?? 'Workspace');
   }
 
+  /// The active tab's workspace folder, or null when it cannot be resolved
+  /// (no session open, file tab, or the folder is not in the list yet). The
+  /// files panel falls back to the daemon home when this is null.
+  String? _activeWorkspaceFolder() {
+    final id = _activeTab?.sessionId;
+    if (id == null) return null;
+    for (final candidate in _sessions ?? const <SessionInfo>[]) {
+      if (candidate.id == id) {
+        final folder = candidate.folder.trim();
+        return folder.isEmpty ? null : folder;
+      }
+    }
+    return null;
+  }
+
   String? _macBranchLabel() {
     final branch = _macGit?.branch.trim();
     return branch == null || branch.isEmpty ? null : branch;
@@ -1240,6 +1255,29 @@ class _DesktopShellState extends State<DesktopShell>
         child: CoordinationActivityScreen(client: client, embedded: true),
       );
     }
+    if (_section == ShellSection.files) {
+      final client = _client;
+      if (client == null) {
+        return Container(
+          color: AppColors.bg,
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Text('Add a machine to browse its files.',
+              style: sans(12.5, color: AppColors.fg4, height: 1.5)),
+        );
+      }
+      return Container(
+        color: AppColors.bg,
+        child: FileExplorer(
+          client: client,
+          // Browsing the active session's workspace by default; fall back to the
+          // daemon home when nothing is open.
+          start: _activeWorkspaceFolder(),
+          onClose: null,
+          onOpenFile: (path, name) =>
+              _openFileTab(client, _active?.url ?? '', path, name),
+        ),
+      );
+    }
     if (_sidebarGit && tab != null && !tab.isFile) {
       final path = tab.filePath;
       final slash = path?.lastIndexOf('/') ?? -1;
@@ -1871,13 +1909,19 @@ class _DesktopShellState extends State<DesktopShell>
               _macWindowBar(),
               Expanded(
                 child: Row(children: [
-                  ShellRail(
-                    section: _section,
-                    onSelect: (s) => setState(() => _section = s),
+                  // Sidebar column owns the left edge: the icon row sits above
+                  // the panel, so switching sections never narrows the work area.
+                  SizedBox(
+                    width: 300,
+                    child: Column(children: [
+                      ShellRail(
+                        section: _section,
+                        onSelect: (s) => setState(() => _section = s),
+                        onTerminal: _openActiveShell,
+                      ),
+                      Expanded(child: _sidebar(topInset: false)),
+                    ]),
                   ),
-                  VerticalDivider(
-                      width: 1, thickness: 1, color: AppColors.border),
-                  SizedBox(width: 300, child: _sidebar(topInset: false)),
                   VerticalDivider(
                       width: 1, thickness: 1, color: AppColors.border),
                   Expanded(
@@ -1905,13 +1949,17 @@ class _DesktopShellState extends State<DesktopShell>
           child: Column(children: [
             Expanded(
               child: Row(children: [
-                ShellRail(
-                  section: _section,
-                  onSelect: (s) => setState(() => _section = s),
+                SizedBox(
+                  width: 300,
+                  child: Column(children: [
+                    ShellRail(
+                      section: _section,
+                      onSelect: (s) => setState(() => _section = s),
+                      onTerminal: _openActiveShell,
+                    ),
+                    Expanded(child: _sidebar(topInset: true)),
+                  ]),
                 ),
-                VerticalDivider(
-                    width: 1, thickness: 1, color: AppColors.border),
-                SizedBox(width: 300, child: _sidebar(topInset: true)),
                 VerticalDivider(
                     width: 1, thickness: 1, color: AppColors.border),
                 Expanded(child: _mainPane()),
@@ -1938,6 +1986,15 @@ class _DesktopShellState extends State<DesktopShell>
           onClose: () => setState(() => _rightAgent = null),
         ),
       );
+
+  /// Open the session shell for the active tab. The rail exposes it as a
+  /// destination, but a terminal is not a sidebar panel — it belongs to the
+  /// session, so this forwards to that session's own handler.
+  void _openActiveShell() {
+    final key = _activeTab?.key;
+    if (key == null) return;
+    _macSessionControls[key]?.performAction('shell');
+  }
 
   Widget _mainPane({VoidCallback? onMenu}) {
     final client = _client;
