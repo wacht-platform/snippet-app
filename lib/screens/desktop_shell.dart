@@ -206,10 +206,19 @@ class _DesktopShellState extends State<DesktopShell>
   final PageController _pageController = PageController();
   final ScrollController _stripController = ScrollController();
   final Map<String, GlobalKey> _chipKeys = {};
-  _ShellTab? get _activeTab =>
-      (_activeIndex >= 0 && _activeIndex < _tabs.length)
-          ? _tabs[_activeIndex]
-          : null;
+
+  /// The selected MAIN workspace tab — what the window bar highlights and what
+  /// the left pane shows when no auxiliary tab is covering it.
+  ///
+  /// Deliberately main-only: an auxiliary tab (terminal, preview, diff) is a
+  /// per-pane choice and must not move the window bar's selection.
+  _ShellTab? get _activeTab {
+    final i = _activeIndex;
+    if (i >= 0 && i < _tabs.length && !_isAuxiliary(_tabs[i])) return _tabs[i];
+    final mains = _mainTabs;
+    return mains.isEmpty ? null : mains.first;
+  }
+
   String? get _sessionId => _activeTab?.sessionId;
   bool _loading = true;
   // Session list lives here (not in the sidebar) so it survives drawer open/close
@@ -724,7 +733,9 @@ class _DesktopShellState extends State<DesktopShell>
     if (id == null) return;
     for (final t in _tabs) {
       if (t.isTerminal && t.termSessionKey == sessionKey && t.termId == id) {
-        _activeIndex = _tabs.indexOf(t);
+        // A terminal is AUXILIARY: selecting it docks it in its pane without
+        // moving the window bar's selection.
+        _dockAux(t.pane, t.key);
         return;
       }
     }
@@ -1070,9 +1081,13 @@ class _DesktopShellState extends State<DesktopShell>
         _tabs
           ..clear()
           ..addAll(restored);
+        // `saved.activeIndex` indexes the whole list, which can now point at an
+        // AUXILIARY tab (a terminal or preview). Normalize so the window bar
+        // lands on a main workspace tab, not on a pane's docked content.
         _activeIndex = saved.activeIndex.clamp(0, restored.length - 1);
-        final active = _tabs[_activeIndex];
-        _active = byUrl[active.instanceUrl];
+        _normalizeActiveIndex();
+        final active = _activeIndex >= 0 ? _tabs[_activeIndex] : null;
+        _active = active == null ? null : byUrl[active.instanceUrl];
         _client =
             _active == null ? null : DaemonClient(_active!.url, _active!.token);
       }
@@ -1299,19 +1314,32 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() {
       _clearTabState(key);
       // A pane selection pointing at a tab that no longer exists would leave
-      // that pane blank instead of falling back to its first tab.
+      // that pane blank instead of falling back to its default content.
       _activeKey.removeWhere((_, k) => k == key);
       _tabs.removeAt(i);
-      if (_tabs.isEmpty) {
-        _activeIndex = -1;
-      } else if (_activeIndex >= _tabs.length) {
-        _activeIndex = _tabs.length - 1;
-      } else if (i < _activeIndex) {
-        _activeIndex--;
-      }
+      _normalizeActiveIndex(i);
     });
     _persistTabs();
     _syncPage();
+  }
+
+  /// Keep `_activeIndex` pointing at a MAIN workspace tab after a mutation.
+  ///
+  /// [removedAt] is the index a tab was just removed from, or -1. Recomputing
+  /// beats hand-rolling the off-by-one at each call site, and it is the only way
+  /// to stay correct when the removed tab was AUXILIARY — closing a terminal or
+  /// a preview must not move the window bar's selection.
+  void _normalizeActiveIndex([int removedAt = -1]) {
+    if (_tabs.isEmpty) {
+      _activeIndex = -1;
+      return;
+    }
+    if (removedAt >= 0 && removedAt < _activeIndex) _activeIndex--;
+    final i = _activeIndex;
+    if (i >= 0 && i < _tabs.length && !_isAuxiliary(_tabs[i])) return;
+    // No valid main selection — fall to the first main tab, or -1 if the shell
+    // somehow holds auxiliary tabs only.
+    _activeIndex = _tabs.indexWhere((t) => !_isAuxiliary(t));
   }
 
   void _activateTab(int i) {
@@ -1320,7 +1348,13 @@ class _DesktopShellState extends State<DesktopShell>
     // before changing pages so the platform text-input client cannot remain
     // attached to the previous session after a swipe or tab tap.
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _activeIndex = i);
+    setState(() {
+      _activeIndex = i;
+      // Picking a conversation in the window bar brings it to the left pane, so
+      // clear any auxiliary tab sitting over it there. Without this, clicking a
+      // tab up top looks like it did nothing whenever a preview is docked left.
+      if (!_isAuxiliary(_tabs[i])) _activeKey.remove(_Pane.left);
+    });
     _persistTabs();
     _syncPage();
   }
@@ -1691,7 +1725,11 @@ class _DesktopShellState extends State<DesktopShell>
         (t) => t.isFile && t.instanceUrl == url && t.filePath == path);
     setState(() {
       if (existing >= 0) {
-        _activeIndex = existing;
+        // An already-open file is an AUXILIARY tab, so selecting it must not
+        // move the window bar's selection — only the pane it is docked in.
+        final t = _tabs[existing];
+        t.pane = _focusedPane;
+        _dockAux(_focusedPane, t.key);
       } else {
         _tabs.add(_ShellTab.file(
             client: client,
@@ -1700,8 +1738,7 @@ class _DesktopShellState extends State<DesktopShell>
             title: name,
             // Opens where you are working, not always in the left container.
             pane: _focusedPane));
-        _activeIndex = _tabs.length - 1;
-        _activeKey[_tabs.last.pane] = _tabs.last.key;
+        _dockAux(_tabs.last.pane, _tabs.last.key);
       }
     });
     _persistTabs();
@@ -1727,7 +1764,11 @@ class _DesktopShellState extends State<DesktopShell>
         t.diffStaged == staged);
     setState(() {
       if (existing >= 0) {
-        _activeIndex = existing;
+        // A diff is AUXILIARY: selecting it docks it in a pane without moving
+        // the window bar's selection.
+        final t = _tabs[existing];
+        t.pane = _focusedPane;
+        _dockAux(_focusedPane, t.key);
       } else {
         _tabs.add(_ShellTab.diff(
           client: client,
@@ -1739,7 +1780,7 @@ class _DesktopShellState extends State<DesktopShell>
           diffUntracked: f.untracked,
           pane: _focusedPane,
         ));
-        _activeIndex = _tabs.length - 1;
+        _dockAux(_tabs.last.pane, _tabs.last.key);
       }
     });
     _persistTabs();
@@ -2035,22 +2076,14 @@ class _DesktopShellState extends State<DesktopShell>
                 ),
               ),
               const SizedBox(width: 8),
-              // NO tab list here.
+              // Main workspace tabs: the conversations and Mission Control.
               //
-              // Both panes render their own tab strip (`_paneStrip`), so listing
-              // every tab in the title bar as well showed each one twice. The
-              // window bar is chrome: nav arrows, empty drag region, utilities.
-              // Tabs belong to the container that holds them — which is also
-              // what makes dragging a tab between panes work.
-              const Spacer(),
-              Center(
-                child: IconBtn(
-                  'plus',
-                  size: 24,
-                  iconSize: 16,
-                  tooltip: 'New session',
-                  onTap: _newSessionFlow,
-                ),
+              // Auxiliary content — terminals, previewed files, diffs — is docked
+              // in a PANE and listed by that pane's own strip, so the two strips
+              // never show the same tab. Naming what you are working on is the
+              // window bar's job.
+              Expanded(
+                child: Center(child: _mainTabsRow()),
               ),
               const SizedBox(width: 8),
               Center(
@@ -2272,6 +2305,99 @@ class _DesktopShellState extends State<DesktopShell>
                 style: sans(12.5, color: AppColors.fg1)),
           ]),
         ),
+      );
+
+  /// Activate a MAIN workspace tab by identity.
+  ///
+  /// Identity, not index: the window bar lists `_mainTabs`, so the chip's
+  /// position there is not its position in `_tabs`.
+  void _activateTabAt(_ShellTab t) {
+    final i = _tabs.indexOf(t);
+    if (i >= 0) _activateTab(i);
+  }
+
+  /// A MAIN workspace tab chip in the window bar.
+  ///
+  /// Separate from `_paneTabChip` on purpose: this strip lists the
+  /// conversations and Mission Control — what the window bar names — while a
+  /// pane strip lists the auxiliary content docked beside it. One chip is never
+  /// rendered by both.
+  Widget _topWorkspaceTab(_ShellTab t) {
+    final isActive = t == _activeTab;
+    final title = t.title.isEmpty ? '(untitled)' : t.title;
+    // Same key map the narrow strip uses; the two strips are mutually
+    // exclusive (the window bar is wide-macOS only), so they cannot collide.
+    final key = _chipKeys.putIfAbsent(t.key, () => GlobalKey());
+
+    return GestureDetector(
+      onTap: () => _activateTabAt(t),
+      child: Container(
+        key: key,
+        // Bottom-aligned in the taller bar: the active tab is filled with the
+        // band colour below and shows only rounded top corners, so it merges
+        // into the navigation band the way a browser tab merges into a page.
+        height: kTitleTabHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.bg : Colors.transparent,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon(_tabIconKind(t),
+                size: 18, color: isActive ? AppColors.fg2 : AppColors.fg4),
+            const SizedBox(width: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(14,
+                    weight: isActive ? W.label : W.body,
+                    color: isActive ? AppColors.fg1 : AppColors.fg3),
+              ),
+            ),
+            if (_canCloseTab(t)) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => _closePaneTab(t),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: AppIcon('x', size: 13, color: AppColors.fg4),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The main workspace tab strip: the chips plus the new-session button.
+  ///
+  /// Hosted by the window bar on macOS, and by a row above the panes on a plain
+  /// desktop that has no window bar of its own — so both show the same strip
+  /// instead of one silently lacking tabs.
+  Widget _mainTabsRow() => ListView(
+        controller: _stripController,
+        scrollDirection: Axis.horizontal,
+        // Horizontal padding only; the host bar owns the vertical alignment.
+        padding: const EdgeInsets.only(right: 4),
+        children: [
+          for (final t in _mainTabs) ...[
+            _topWorkspaceTab(t),
+            const SizedBox(width: 4),
+          ],
+          Center(
+            child: IconBtn('plus',
+                size: 24,
+                iconSize: 16,
+                tooltip: 'New session',
+                onTap: _newSessionFlow),
+          ),
+        ],
       );
 
   Future<void> _downloadActiveFile() async {
@@ -2502,25 +2628,34 @@ class _DesktopShellState extends State<DesktopShell>
   /// moves it into the secondary pane. Shared by the macOS and plain layouts so
   /// the two cannot diverge.
   /// Tabs assigned to a pane, in strip order.
-  List<_ShellTab> _tabsIn(_Pane p) => [
+  /// Auxiliary tabs are PANE content: a terminal, a previewed file, a diff.
+  ///
+  /// Everything else — a conversation, Mission Control — is a main workspace tab
+  /// and belongs in the window bar. Two strips, two jobs: the window bar names
+  /// WHAT you are working on; a pane strip names what is docked BESIDE it.
+  bool _isAuxiliary(_ShellTab t) => t.isTerminal || t.isFile || t.isDiff;
+
+  /// Main workspace tabs, in strip order. Rendered in the window bar.
+  List<_ShellTab> get _mainTabs => [
         for (final t in _tabs)
-          if (t.pane == p) t,
+          if (!_isAuxiliary(t)) t,
       ];
 
-  /// The tab a pane is showing.
-  ///
-  /// Per-pane, NOT `_activeIndex`: a single global index meant choosing a tab in
-  /// one pane reset the other pane back to its first tab — with two containers
-  /// on screen, each needs its own selection.
-  _ShellTab? _activeIn(_Pane p) {
+  /// Auxiliary tabs docked in one pane. Rendered in that pane's own strip.
+  List<_ShellTab> _auxIn(_Pane p) => [
+        for (final t in _tabs)
+          if (_isAuxiliary(t) && t.pane == p) t,
+      ];
+
+  /// The auxiliary tab selected in a pane, or null when the pane is showing its
+  /// default content (the conversation, or a readout) instead.
+  _ShellTab? _activeAux(_Pane p) {
     final key = _activeKey[p];
-    if (key != null) {
-      for (final t in _tabs) {
-        if (t.key == key && t.pane == p) return t;
-      }
+    if (key == null) return null;
+    for (final t in _tabs) {
+      if (t.key == key && t.pane == p && _isAuxiliary(t)) return t;
     }
-    final list = _tabsIn(p);
-    return list.isEmpty ? null : list.first;
+    return null;
   }
 
   /// The pane holding the focused tab. Drives drops and inbound shares, so a
@@ -2538,7 +2673,10 @@ class _DesktopShellState extends State<DesktopShell>
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _activeKey[p] = tab.key;
-      _activeIndex = i;
+      // `_activeIndex` tracks the MAIN workspace tab — the window bar's
+      // selection. Choosing an auxiliary tab in a pane is per-pane and must not
+      // move the window bar's highlight.
+      if (!_isAuxiliary(tab)) _activeIndex = i;
     });
     _persistTabs();
     _syncPage();
@@ -2554,15 +2692,28 @@ class _DesktopShellState extends State<DesktopShell>
     if (tab.pane == p) return;
     setState(() {
       tab.pane = p;
-      _activeKey[p] = tab.key;
-      _activeIndex = i;
-      // A tab now occupies the pane, so the readout yields to it.
-      if (p == _Pane.right) {
-        _rightPanel = _RightPanel.none;
-        _rightAgent = null;
-      }
+      // Moving an AUXILIARY tab is a pane concern; it must not drag the window
+      // bar's selection with it.
+      if (!_isAuxiliary(tab)) _activeIndex = i;
+      // Docking reveals the pane: a drop into a collapsed pane would otherwise
+      // land somewhere invisible.
+      _dockAux(p, tab.key);
     });
     _persistTabs();
+  }
+
+  /// Select an auxiliary tab in a pane, revealing that pane.
+  ///
+  /// Opening a terminal, preview or diff into a COLLAPSED pane would otherwise
+  /// place it somewhere invisible: the content exists, but nothing shows it and
+  /// the new tab looks like it did nothing. Docking always reveals.
+  void _dockAux(_Pane p, String key) {
+    _activeKey[p] = key;
+    if (p == _Pane.right) {
+      _rightCollapsed = false;
+      _rightPanel = _RightPanel.none;
+      _rightAgent = null;
+    }
   }
 
   /// Close a tab by identity, from either pane's strip.
@@ -2575,10 +2726,13 @@ class _DesktopShellState extends State<DesktopShell>
   /// hold is a property of each tab (`_ShellTab.pane`), so a drop is all it
   /// takes to move one across.
   Widget _bodyRow({required bool topInset}) {
-    final rightTabs = _tabsIn(_Pane.right);
-    final showRight = rightTabs.isNotEmpty ||
-        _rightPanel != _RightPanel.none ||
-        _rightAgent != null;
+    final rightTabs = _auxIn(_Pane.right);
+    // An explicit collapse wins over content, or the collapse control would
+    // appear to do nothing while a terminal is docked.
+    final showRight = !_rightCollapsed &&
+        (rightTabs.isNotEmpty ||
+            _rightPanel != _RightPanel.none ||
+            _rightAgent != null);
     return Expanded(
       child: Row(children: [
         SizedBox(
@@ -2610,44 +2764,62 @@ class _DesktopShellState extends State<DesktopShell>
         builder: (_, __, ___) => child,
       );
 
-  /// One pane: its own tab strip, then the active tab's body.
+  /// One pane.
+  ///
+  /// Its strip lists ONLY auxiliary tabs (terminals, previewed files, diffs) —
+  /// the main workspace tabs live in the window bar. When no aux tab is selected
+  /// the pane falls back to [fallback]: the conversation in the left pane, the
+  /// readout in the right.
   Widget _paneView(_Pane p, {required bool roundRight}) {
-    final list = _tabsIn(p);
+    final aux = _auxIn(p);
+    final activeAux = _activeAux(p);
 
-    Widget body;
-    if (list.isEmpty) {
-      if (p == _Pane.right && _rightPanel != _RightPanel.none) {
-        body = _rightPanelView();
-      } else if (p == _Pane.right && _rightAgent != null) {
-        body = CoordinationAgentDetail(
+    Widget fallback;
+    if (p == _Pane.right) {
+      if (_rightPanel != _RightPanel.none) {
+        fallback = _rightPanelView();
+      } else if (_rightAgent != null) {
+        fallback = CoordinationAgentDetail(
           agent: _rightAgent!,
           embedded: true,
           onClose: _closeSplitPane,
         );
-      } else if (p == _Pane.left) {
-        body = _client == null ? _welcome() : _recentPlaceholder();
       } else {
-        body = _emptyPaneHint();
+        fallback = _emptyPaneHint();
       }
     } else {
-      body = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _paneStrip(p, list),
-          Expanded(child: _paneBody(p, list)),
-        ],
-      );
+      fallback = _client == null ? _welcome() : _mainWorkspaceBody();
     }
 
+    final content = activeAux != null
+        ? _tabBody(activeAux, primary: _focusedPane == p)
+        : fallback;
+
     return _paneSurface(
-      child: body,
       roundRight: roundRight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // The strip renders whenever this pane hosts aux tabs, so there is
+          // always a way back to the fallback and to the other docked tab.
+          if (aux.isNotEmpty) _paneStrip(p, aux),
+          Expanded(child: content),
+        ],
+      ),
     );
+  }
+
+  /// The active main workspace tab's body — what the left pane shows when no
+  /// auxiliary tab is covering it.
+  Widget _mainWorkspaceBody() {
+    final t = _activeTab;
+    if (t == null) return _client == null ? _welcome() : _recentPlaceholder();
+    return _tabBody(t, primary: _focusedPane == _Pane.left);
   }
 
   /// A pane's tab strip: one chip per tab, plus the pane's actions.
   Widget _paneStrip(_Pane p, List<_ShellTab> list) {
-    final active = _activeIn(p);
+    final active = _activeAux(p);
     return Container(
       height: kPaneHeaderHeight,
       padding: const EdgeInsets.only(left: 4),
@@ -2667,13 +2839,7 @@ class _DesktopShellState extends State<DesktopShell>
               size: 24,
               iconSize: 12,
               tooltip: 'Collapse pane',
-              onTap: () => setState(() => _rightCollapsed = true))
-        else if (false)
-          IconBtn('x',
-              size: 24,
-              iconSize: 12,
-              tooltip: 'Close pane',
-              onTap: _closeSplitPane),
+              onTap: () => setState(() => _rightCollapsed = true)),
         const SizedBox(width: 4),
       ]),
     );
@@ -2730,20 +2896,6 @@ class _DesktopShellState extends State<DesktopShell>
       childWhenDragging: Opacity(opacity: 0.4, child: chip),
       child: chip,
     );
-  }
-
-  /// Every tab in a pane, mounted, with only the active one laid out — so
-  /// switching tabs keeps a session's socket and scroll position.
-  Widget _paneBody(_Pane p, List<_ShellTab> list) {
-    final active = _activeIn(p);
-    if (active == null) return _emptyPaneHint();
-    return Stack(children: [
-      for (final t in list)
-        Offstage(
-          offstage: t != active,
-          child: _tabBody(t, primary: _focusedPane == p),
-        ),
-    ]);
   }
 
   Widget _emptyPaneHint() => Padding(
