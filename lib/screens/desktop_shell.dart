@@ -1694,8 +1694,14 @@ class _DesktopShellState extends State<DesktopShell>
         _activeIndex = existing;
       } else {
         _tabs.add(_ShellTab.file(
-            client: client, instanceUrl: url, filePath: path, title: name));
+            client: client,
+            instanceUrl: url,
+            filePath: path,
+            title: name,
+            // Opens where you are working, not always in the left container.
+            pane: _focusedPane));
         _activeIndex = _tabs.length - 1;
+        _activeKey[_tabs.last.pane] = _tabs.last.key;
       }
     });
     _persistTabs();
@@ -1731,6 +1737,7 @@ class _DesktopShellState extends State<DesktopShell>
           title: name,
           diffStaged: staged,
           diffUntracked: f.untracked,
+          pane: _focusedPane,
         ));
         _activeIndex = _tabs.length - 1;
       }
