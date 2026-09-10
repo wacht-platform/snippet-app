@@ -123,6 +123,11 @@ class _DesktopShellState extends State<DesktopShell>
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
   final Map<String, _MacSessionControls> _macSessionControls = {};
+
+  /// Terminals per open tab key, published by the mounted `SessionScreen`.
+  /// Updated only when the set or focus changes, never on output.
+  final Map<String, List<TerminalInfo>> _macTerminals = {};
+  final Map<String, int> _macTerminalFocus = {};
   GitStatus? _macGit;
   String _macGitKey = '';
 
@@ -290,6 +295,17 @@ class _DesktopShellState extends State<DesktopShell>
     return false;
   }
 
+  /// Drop every per-tab bookkeeping entry for a tab that is going away.
+  ///
+  /// Kept in one place so a newly added map cannot be forgotten at the six
+  /// teardown sites.
+  void _clearTabState(String key) {
+    _macSessionStatuses.remove(key);
+    _macSessionControls.remove(key);
+    _macTerminals.remove(key);
+    _macTerminalFocus.remove(key);
+  }
+
   void _setMacSessionStatus(String key, HarnessState? state, bool running) {
     _macSessionStatuses[key] = _MacSessionStatus(state, running);
     final status = state?.status ?? (running ? 'running' : 'idle');
@@ -302,6 +318,28 @@ class _DesktopShellState extends State<DesktopShell>
     }
     if (sessionId != null) _patchSessionStatus(sessionId, status);
     if (mounted) setState(() {});
+  }
+
+  /// Record a tab's terminals so the shell's terminal panel can list them.
+  ///
+  /// Skips `setState` when nothing actually changed: `SessionScreen` publishes
+  /// this on every `alive`/`live` transition, and rebuilding the whole shell to
+  /// discover an identical list would be wasted frames.
+  void _setMacTerminals(String key, List<TerminalInfo> terms, int focus) {
+    final prev = _macTerminals[key];
+    final changed = prev == null ||
+        prev.length != terms.length ||
+        focus != _macTerminalFocus[key] ||
+        [
+          for (var i = 0; i < terms.length; i++)
+            prev[i].id != terms[i].id ||
+                prev[i].title != terms[i].title ||
+                prev[i].alive != terms[i].alive ||
+                prev[i].live != terms[i].live,
+        ].any((x) => x);
+    _macTerminals[key] = terms;
+    _macTerminalFocus[key] = focus;
+    if (changed && mounted) setState(() {});
   }
 
   void _patchSessionStatus(String sessionId, String status) {
@@ -618,16 +656,14 @@ class _DesktopShellState extends State<DesktopShell>
           continue;
         }
         if (t.instanceUrl != inst.url) {
-          _macSessionStatuses.remove(t.key);
-          _macSessionControls.remove(t.key);
+          _clearTabState(t.key);
           continue;
         }
         if (kept == null) {
           kept = t;
           share = t.inboundShare;
         } else {
-          _macSessionStatuses.remove(t.key);
-          _macSessionControls.remove(t.key);
+          _clearTabState(t.key);
         }
       }
       if (kept == null ||
@@ -679,8 +715,7 @@ class _DesktopShellState extends State<DesktopShell>
       _activeIndex = _tabs.indexWhere((tab) => identical(tab, kept));
       if (_activeIndex < 0) _activeIndex = 0;
       for (final key in removedKeys) {
-        _macSessionStatuses.remove(key);
-        _macSessionControls.remove(key);
+        _clearTabState(key);
       }
     });
     _ensurePinnedMissionControl();
@@ -693,8 +728,7 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() {
       for (final tab in _tabs.where((t) =>
           !t.isMissionControl || (url != null && t.instanceUrl != url))) {
-        _macSessionStatuses.remove(tab.key);
-        _macSessionControls.remove(tab.key);
+        _clearTabState(tab.key);
       }
       _tabs.removeWhere(
           (t) => !t.isMissionControl || (url != null && t.instanceUrl != url));
@@ -769,8 +803,7 @@ class _DesktopShellState extends State<DesktopShell>
     if (_tabs[i].isMissionControl) return;
     final key = _tabs[i].key;
     setState(() {
-      _macSessionStatuses.remove(key);
-      _macSessionControls.remove(key);
+      _clearTabState(key);
       _tabs.removeAt(i);
       if (_tabs.isEmpty) {
         _activeIndex = -1;
@@ -1221,8 +1254,7 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() {
       _instances = items;
       for (final tab in _tabs.where((t) => t.instanceUrl == inst.url)) {
-        _macSessionStatuses.remove(tab.key);
-        _macSessionControls.remove(tab.key);
+        _clearTabState(tab.key);
       }
       _tabs.removeWhere((t) => t.instanceUrl == inst.url);
       if (_activeIndex >= _tabs.length) _activeIndex = _tabs.length - 1;
@@ -1244,10 +1276,15 @@ class _DesktopShellState extends State<DesktopShell>
     // The rail switches which panel occupies the sidebar. Git stays a mode of
     // the sessions panel — you inspect a session's diff, not the agent list.
     if (_section == ShellSection.terminal) {
+      final key = _activeTab?.key;
       panel = TerminalsSidebarPanel(
         workspacePath: _activeWorkspaceFolder() ?? '',
-        onNewTerminal: _openActiveShell,
-        onOpenTerminal: (idx) => _openActiveShell(),
+        terminals: key == null
+            ? const <TerminalInfo>[]
+            : (_macTerminals[key] ?? const <TerminalInfo>[]),
+        focus: key == null ? -1 : (_macTerminalFocus[key] ?? -1),
+        onNewTerminal: () => _dispatchSessionAction('shell_new'),
+        onOpenTerminal: (idx) => _dispatchSessionAction('shell_focus', '$idx'),
       );
     } else if (_section == ShellSection.agents) {
       final client = _client;
@@ -1342,10 +1379,10 @@ class _DesktopShellState extends State<DesktopShell>
     _loadSessions();
   }
 
-  void _dispatchSessionAction(String action) {
+  void _dispatchSessionAction(String action, [String? extra]) {
     final key = _activeTab?.key;
     if (key == null) return;
-    _macSessionControls[key]?.performAction(action);
+    _macSessionControls[key]?.performAction(action, extra);
     if (_drawerOpen) _scaffoldKey.currentState?.closeDrawer();
   }
 
@@ -2147,6 +2184,10 @@ class _DesktopShellState extends State<DesktopShell>
                                 ? (stop, performAction) =>
                                     _setMacSessionControls(
                                         t.key, stop, performAction)
+                                : null,
+                            onMacTerminals: !kMobile
+                                ? (terms, focus) =>
+                                    _setMacTerminals(t.key, terms, focus)
                                 : null,
                           ),
                   );

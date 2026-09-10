@@ -6,11 +6,13 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 
-/// Git Diff sidebar panel:
-/// - Header: `⌄ 🗐 GIT DIFF` with branch and refresh icons
-/// - Project card: `Workspace • 0 changed ⌄`
-/// - When clean: `No changes`, `Last updated just now`, `Refresh` button
-/// - When dirty: list of modified/added files
+/// Git Diff sidebar panel.
+///
+/// Layout follows the measured reference: a 32px branch row directly under the
+/// section header, then 26px file rows. The previous version put a bordered
+/// card at the top followed by a hard 20px gap and then over-padded rows, which
+/// is what made the spacing read as broken — every vertical rhythm in the panel
+/// was a different number.
 class GitDiffSidebarPanel extends StatefulWidget {
   const GitDiffSidebarPanel({
     super.key,
@@ -66,14 +68,14 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     final repoName = widget.workspacePath.isEmpty
         ? 'Workspace'
         : lastPathSegment(widget.workspacePath, ifEmpty: 'Workspace');
-    final files = _status?.files ?? const [];
-    final changeCount = files.length;
+    final files = _status?.files ?? const <GitFile>[];
+    final branch = _status?.branch ?? '';
     final isClean = files.isEmpty;
 
     return Container(
       color: AppColors.bg,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 18),
+        padding: const EdgeInsets.only(top: 8, bottom: 16),
         children: [
           ShellSectionHeader(
             label: 'Git Diff',
@@ -81,105 +83,111 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             onToggle: () {},
             actions: [
               ShellSectionAction(
-                icon: 'git-branch',
-                tooltip: _status?.branch ?? 'Branch',
-                onTap: () {},
-              ),
-              ShellSectionAction(
                 icon: 'refresh',
                 tooltip: 'Refresh diff',
                 onTap: refresh,
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          // Project card with change count
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.sm),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                AppIcon('folder', size: 14, color: AppColors.fg3),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '$repoName • $changeCount changed',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12.5, weight: W.label, color: AppColors.fg1),
-                  ),
-                ),
-                AppIcon('chevron-down', size: 12, color: AppColors.fg4),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
+          _branchRow(repoName, branch, files.length),
           if (_loading && _status == null)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
                 child: SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
             )
           else if (_error != null)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(_error!,
-                      style: sans(12, color: AppColors.danger),
-                      textAlign: TextAlign.center),
-                  const SizedBox(height: 10),
-                  Btn('Retry', small: true, onTap: refresh),
-                ],
-              ),
-            )
+            _errorState()
           else if (isClean)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon('git-branch', size: 36, color: AppColors.fg4),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No changes',
-                    style: sans(14, weight: W.label, color: AppColors.fg2),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Last updated ${_timeAgo(_lastUpdated)}',
-                    style: sans(11.5, color: AppColors.fg4),
-                  ),
-                  const SizedBox(height: 16),
-                  Btn('Refresh', small: true, icon: 'refresh', onTap: refresh),
-                ],
-              ),
-            )
-          else
-            for (final f in files)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: ShellNavRow(
-                  id: f.path,
-                  label: f.path,
-                  icon: f.staged ? 'check' : 'edit',
-                  tone: f.staged ? ShellTone.review : ShellTone.chat,
-                  onTap: () {},
-                ),
-              ),
+            _cleanState()
+          else ...[
+            const SizedBox(height: 6),
+            for (final f in files) _fileRow(f),
+          ],
         ],
       ),
     );
   }
+
+  /// Branch + change count on one flat row, matching the file tree's workspace
+  /// selector. No card, no border: the surface step alone separates it.
+  Widget _branchRow(String repoName, String branch, int changes) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+          child: Row(children: [
+            AppIcon('git-branch', size: 14, color: AppColors.fg3),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                branch.isEmpty ? repoName : branch,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(13, weight: W.label, color: AppColors.fg1),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              changes == 0 ? 'clean' : '$changes changed',
+              style: sans(12, color: AppColors.fg4),
+            ),
+          ]),
+        ),
+      );
+
+  Widget _fileRow(GitFile f) => ShellNavRow(
+        id: f.path,
+        // Just the file name: the row is 26px and a full path ellipsizes to
+        // nothing useful. The directory is in the tooltip instead.
+        label: lastPathSegment(f.path, ifEmpty: f.path),
+        icon: 'file',
+        // Monochrome icon; the single-letter status carries the state colour,
+        // so colour stays rationed to information.
+        tone: ShellTone.neutral,
+        onTap: () {},
+        trailing: _statusLetter(f),
+      );
+
+  /// The git status character, matching how the full Git screen derives it:
+  /// the index char for a staged file, `?` for untracked, else the worktree
+  /// char. Colour is the only state signal in the panel.
+  Widget _statusLetter(GitFile f) {
+    final raw = f.staged ? f.x : (f.untracked ? '?' : f.y);
+    final letter = raw.trim().isEmpty ? 'M' : raw.trim();
+    final color =
+        f.staged ? AppColors.ok : (f.untracked ? AppColors.fg3 : AppColors.run);
+    return Tooltip(
+      message: f.staged ? 'staged' : (f.untracked ? 'untracked' : 'unstaged'),
+      child: Text(letter, style: mono(11, weight: W.label, color: color)),
+    );
+  }
+
+  Widget _cleanState() => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('No changes',
+              style: sans(13, weight: W.label, color: AppColors.fg2)),
+          const SizedBox(height: 3),
+          Text('Last updated ${_timeAgo(_lastUpdated)}',
+              style: sans(12, color: AppColors.fg4)),
+        ]),
+      );
+
+  Widget _errorState() => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_error!,
+              style: sans(12.5, color: AppColors.danger, height: 1.4)),
+          const SizedBox(height: 10),
+          Btn('Retry', small: true, onTap: refresh),
+        ]),
+      );
 
   String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);

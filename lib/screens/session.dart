@@ -115,6 +115,10 @@ class SessionScreen extends StatefulWidget {
           void Function(String action, [String? extra]) performAction)?
       onMacControls;
 
+  /// Publishes this session's terminals to the macOS shell sidebar. Called only
+  /// when the terminal set or focus changes, not on output.
+  final void Function(List<TerminalInfo> terminals, int focus)? onMacTerminals;
+
   /// Desktop PageView keeps every tab mounted. Only the visible session should
   /// accept file drops — otherwise every keep-alive DropTarget ingests the same
   /// file and the composer chips leak across tabs.
@@ -144,6 +148,7 @@ class SessionScreen extends StatefulWidget {
       this.onOpenSession,
       this.onMacStatus,
       this.onMacControls,
+      this.onMacTerminals,
       this.acceptDrops = true,
       this.inboundShare,
       this.onShareConsumed,
@@ -1171,6 +1176,10 @@ class _SessionScreenState extends State<SessionScreen>
       if (rows != null) pane.rows = rows;
       if (op == 'out') pane.live = true;
     });
+    // Only an `alive`/`live` transition or a new terminal changes what the
+    // sidebar shows. Output frames must not republish: that would rebuild the
+    // shell on every byte the pty writes.
+    _publishTerminals();
     if (op == 'out' && j['alive'] == false) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _closeTerm(id);
@@ -1213,6 +1222,7 @@ class _SessionScreenState extends State<SessionScreen>
         'cols': t.cols,
         'rows': t.rows,
       });
+      _publishTerminals();
       return;
     }
     final used = _terms.map((t) => int.tryParse(t.id) ?? 0).fold(0, math.max);
@@ -1229,6 +1239,7 @@ class _SessionScreenState extends State<SessionScreen>
       'cols': 80,
       'rows': 24,
     });
+    _publishTerminals();
   }
 
   void _closeTerm(String id) {
@@ -1242,6 +1253,48 @@ class _SessionScreenState extends State<SessionScreen>
         _termFocus = _termFocus.clamp(0, _terms.length - 1);
       }
     });
+    _publishTerminals();
+  }
+
+  /// Focus an existing terminal by index, opening the drawer if it is closed.
+  ///
+  /// Selecting a row in the shell's terminal panel must land on *that*
+  /// terminal, so this takes an index rather than toggling whatever was last
+  /// focused.
+  void _focusTerm(int i) {
+    if (_isMissionControl || i < 0 || i >= _terms.length) return;
+    setState(() {
+      _termOpen = true;
+      _termFocus = i;
+    });
+    final t = _terms[i];
+    _send({
+      'wire': 'term',
+      'op': 'open',
+      'id': t.id,
+      'cols': t.cols,
+      'rows': t.rows,
+    });
+    _publishTerminals();
+  }
+
+  /// Hand the current terminal set to the shell sidebar.
+  ///
+  /// Cheap and idempotent; called from the paths that can change the set or the
+  /// focused index, not from the output stream.
+  void _publishTerminals() {
+    widget.onMacTerminals?.call(
+      [
+        for (final t in _terms)
+          TerminalInfo(
+            id: t.id,
+            title: t.title,
+            alive: t.alive,
+            live: t.live,
+          ),
+      ],
+      _termFocus,
+    );
   }
 
   void _termIn(Uint8List bytes) {
@@ -2408,7 +2461,10 @@ class _SessionScreenState extends State<SessionScreen>
                 color: on ? AppColors.surface2 : Colors.transparent,
                 borderRadius: BorderRadius.circular(R.xs),
                 child: InkWell(
-                  onTap: () => setState(() => _termFocus = n),
+                  onTap: () {
+                    setState(() => _termFocus = n);
+                    _publishTerminals();
+                  },
                   borderRadius: BorderRadius.circular(R.xs),
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 6, 4, 6),
@@ -2629,6 +2685,14 @@ class _SessionScreenState extends State<SessionScreen>
         return;
       case 'shell':
         if (!_isMissionControl) _openTerm();
+        return;
+      case 'shell_new':
+        if (!_isMissionControl) _openTerm(fresh: true);
+        return;
+      case 'shell_focus':
+        // `extra` is the terminal index, from the shell's terminal panel.
+        final i = extra == null ? null : int.tryParse(extra);
+        if (i != null) _focusTerm(i);
         return;
       case 'processes':
         presentScreen(context,
@@ -4352,6 +4416,30 @@ class _LiveTerm {
   int rows = 24;
   bool alive = false;
   bool live = false;
+}
+
+/// A terminal as the shell's sidebar needs to see it: enough to render a row
+/// and focus it, without exposing the `Terminal` itself.
+///
+/// Published upward only when the terminal *set* changes (open/close/focus or
+/// an alive transition) — never per output frame, which would rebuild the whole
+/// shell on every byte the pty writes.
+class TerminalInfo {
+  const TerminalInfo({
+    required this.id,
+    required this.title,
+    required this.alive,
+    required this.live,
+  });
+
+  final String id;
+  final String title;
+
+  /// The pty is still running.
+  final bool alive;
+
+  /// At least one output frame has arrived, so the terminal has a prompt.
+  final bool live;
 }
 
 class _QueuedBubble extends StatelessWidget {

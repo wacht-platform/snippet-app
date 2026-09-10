@@ -6,8 +6,20 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 
+/// Nesting step for a tree level. The reference indents child rows by exactly
+/// this much, which is what makes the tree read as a tree without guide lines.
+const double kTreeIndentStep = 20;
+
 /// A recursively browsable workspace tree. Each directory is fetched only when
 /// first opened, then retained while the panel stays mounted.
+///
+/// Structure follows the measured reference panel: 26px rows with 12px inner
+/// padding, nesting in 20px steps, and a muted filter field inset one surface
+/// step into the panel.
+///
+/// Icons are deliberately monochrome. The previous per-extension palette (six
+/// hues across .ts/.tsx/.json/.md/.rs/.dart) made a long listing read as noise;
+/// in this shell colour is reserved for state, not file type.
 class FileTreeSidebarPanel extends StatefulWidget {
   const FileTreeSidebarPanel({
     super.key,
@@ -123,7 +135,9 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     return Container(
       color: AppColors.bg,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 18),
+        // Horizontal insets belong to each child (the section header carries
+        // its own), so the list itself only manages the top and tail.
+        padding: const EdgeInsets.only(top: 8, bottom: 16),
         children: [
           ShellSectionHeader(
             label: 'File Tree',
@@ -137,18 +151,16 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
           _workspaceRow(wsName),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           _filterField(),
-          const SizedBox(height: 12),
           if (_loading && _listing == null)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
                 child: SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
@@ -157,15 +169,16 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
             _rootError()
           else if (entries.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
               child: Text(
                 query.isEmpty ? 'Empty directory' : 'No matching files',
-                style: sans(12, color: AppColors.fg4),
-                textAlign: TextAlign.center,
+                style: sans(12.5, color: AppColors.fg4),
               ),
             )
-          else
+          else ...[
+            const SizedBox(height: 4),
             ..._buildRows(entries, depth: 0, query: query),
+          ],
         ],
       ),
     );
@@ -212,7 +225,13 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
       }
       if (expanded && _folderErrors.containsKey(entry.path)) {
         rows.add(Padding(
-          padding: EdgeInsets.fromLTRB(30 + depth * 16, 2, 8, 6),
+          padding: EdgeInsets.only(
+              left: kSidebarContentInset +
+                  kNavPadH +
+                  (depth + 1) * kTreeIndentStep,
+              right: kSidebarContentInset,
+              top: 2,
+              bottom: 6),
           child: Text('Could not load folder',
               style: sans(11, color: AppColors.danger)),
         ));
@@ -221,65 +240,69 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     return rows;
   }
 
-  Widget _workspaceRow(String wsName) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(color: AppColors.border),
+  /// Workspace selector: a flat 32px row, not a bordered card. The reference
+  /// keeps this level quiet — the tree below it is the content.
+  Widget _workspaceRow(String wsName) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+          child: Row(children: [
+            AppIcon('folder-open', size: 14, color: AppColors.fg3),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(wsName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, weight: W.label, color: AppColors.fg1)),
+            ),
+            AppIcon('chevron-down', size: 12, color: AppColors.fg4),
+          ]),
         ),
-        child: Row(children: [
-          AppIcon('folder', size: 14, color: AppColors.accent),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(wsName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(12.5, weight: W.label, color: AppColors.fg1)),
-          ),
-          AppIcon('chevron-down', size: 12, color: AppColors.fg4),
-        ]),
       );
 
-  Widget _filterField() => Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(children: [
-          AppIcon('search', size: 13, color: AppColors.fg4),
-          const SizedBox(width: 6),
-          Expanded(
-            child: TextField(
-              controller: _filterCtl,
-              onChanged: (_) => setState(() {}),
-              style: sans(12, color: AppColors.fg1),
-              decoration: InputDecoration(
-                hintText: 'Filter by name...',
-                hintStyle: sans(12, color: AppColors.fg4),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
+  /// Filter field, inset one surface step into the panel: a plain fill with no
+  /// border, which is how the reference draws every input.
+  Widget _filterField() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+          ),
+          child: Row(children: [
+            AppIcon('search', size: 14, color: AppColors.fg4),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _filterCtl,
+                onChanged: (_) => setState(() {}),
+                cursorColor: AppColors.fg1,
+                style: sans(13, color: AppColors.fg1),
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: 'Filter by name...',
+                  hintStyle: sans(13, color: AppColors.fg4),
+                ),
               ),
             ),
-          ),
-          if (_filterCtl.text.isNotEmpty)
-            GestureDetector(
-              onTap: () => setState(() => _filterCtl.clear()),
-              child: AppIcon('x', size: 11, color: AppColors.fg4),
-            ),
-        ]),
+            if (_filterCtl.text.isNotEmpty)
+              GestureDetector(
+                onTap: () => setState(() => _filterCtl.clear()),
+                child: AppIcon('x', size: 12, color: AppColors.fg4),
+              ),
+          ]),
+        ),
       );
 
   Widget _rootError() => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: [
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_error!,
-              style: sans(12, color: AppColors.danger),
-              textAlign: TextAlign.center),
+              style: sans(12.5, color: AppColors.danger, height: 1.4)),
           const SizedBox(height: 10),
           Btn('Retry', small: true, onTap: refresh),
         ]),
@@ -305,62 +328,59 @@ class _FileTreeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, color) = _fileIconAndColor(entry);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(6 + depth * 16, 5, 6, 5),
-          child: Row(children: [
-            if (entry.isDir) ...[
-              loading
-                  ? const SizedBox(
-                      width: 11,
-                      height: 11,
-                      child: CircularProgressIndicator(strokeWidth: 1.5),
-                    )
-                  : AppIcon(
-                      expanded ? 'chevron-down' : 'chevron-right',
-                      size: 11,
-                      color: hasError ? AppColors.danger : AppColors.fg4,
-                    ),
+    // Directories and files share one tone. Selection is the only thing that
+    // lifts, so a deep tree stays legible at a glance.
+    final color = entry.isDir ? AppColors.fg2 : AppColors.fg3;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: kSidebarContentInset + depth * kTreeIndentStep,
+        right: kSidebarContentInset,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(R.md),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.md),
+          child: Container(
+            height: kNavRowHeight,
+            padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+            child: Row(children: [
+              // Fixed chevron column so names align whether or not a row can be
+              // expanded — a file must not shift left against its siblings.
+              SizedBox(
+                width: 16,
+                child: entry.isDir
+                    ? (loading
+                        ? const SizedBox(
+                            width: 11,
+                            height: 11,
+                            child: CircularProgressIndicator(strokeWidth: 1.5),
+                          )
+                        : AppIcon(
+                            expanded ? 'chevron-down' : 'chevron-right',
+                            size: 12,
+                            color: hasError ? AppColors.danger : AppColors.fg4,
+                          ))
+                    : null,
+              ),
               const SizedBox(width: 4),
-            ] else
-              const SizedBox(width: 15),
-            AppIcon(icon, size: 14, color: color),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(entry.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(12,
-                      weight: entry.isDir ? W.label : W.body,
-                      color: entry.isDir ? AppColors.fg2 : AppColors.fg1)),
-            ),
-          ]),
+              AppIcon(
+                entry.isDir ? (expanded ? 'folder-open' : 'folder') : 'file',
+                size: 14,
+                color: hasError ? AppColors.danger : color,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(entry.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, color: AppColors.fg2)),
+              ),
+            ]),
+          ),
         ),
       ),
     );
-  }
-
-  static (String, Color) _fileIconAndColor(FsEntry entry) {
-    if (entry.isDir) return ('folder', const Color(0xFF60A5FA));
-    final name = entry.name.toLowerCase();
-    if (name.endsWith('.tsx') || name.endsWith('.jsx')) {
-      return ('code', const Color(0xFF38BDF8));
-    }
-    if (name.endsWith('.ts') || name.endsWith('.js')) {
-      return ('code', const Color(0xFF60A5FA));
-    }
-    if (name.endsWith('.html') || name.endsWith('.rs')) {
-      return ('code', const Color(0xFFF97316));
-    }
-    if (name.endsWith('.json')) return ('code', const Color(0xFFFBBF24));
-    if (name.endsWith('.md')) return ('file', const Color(0xFFA78BFA));
-    if (name.startsWith('.git')) return ('git-branch', const Color(0xFFF97316));
-    if (name.endsWith('.dart')) return ('code', const Color(0xFF38BDF8));
-    return ('file', AppColors.fg3);
   }
 }
