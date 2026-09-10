@@ -352,14 +352,24 @@ class _FileTreeRow extends StatelessWidget {
             child: Row(children: [
               // Fixed chevron column so names align whether or not a row can be
               // expanded — a file must not shift left against its siblings.
+              //
+              // SQUARE, and the spinner is CENTERED inside it. A width-only
+              // `SizedBox(width: 16)` hands its child a TIGHT width of 16, so an
+              // inner `SizedBox(width: 11)` is enforced against minWidth=16 and
+              // the spinner renders 16 wide x 11 tall — a flattened oval.
+              // Center gives the child loose constraints instead, so it stays
+              // circular.
               SizedBox(
                 width: 16,
+                height: 16,
                 child: entry.isDir
                     ? (loading
-                        ? const SizedBox(
-                            width: 11,
-                            height: 11,
-                            child: CircularProgressIndicator(strokeWidth: 1.5),
+                        ? const Center(
+                            child: SizedBox.square(
+                              dimension: 11,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 1.5),
+                            ),
                           )
                         : AppIcon(
                             expanded ? 'chevron-down' : 'chevron-right',
