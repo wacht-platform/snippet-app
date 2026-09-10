@@ -328,9 +328,10 @@ class _FileTreeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Directories and files share one tone. Selection is the only thing that
-    // lifts, so a deep tree stays legible at a glance.
-    final color = entry.isDir ? AppColors.fg2 : AppColors.fg3;
+    // Folders and files share ONE tone: measured labels are #C1C1C1 for both
+    // (`Src` is white only because it is the selected row). Tinting directories
+    // brighter invented a hierarchy the reference does not have.
+    final color = AppColors.fg2;
     return Padding(
       padding: EdgeInsets.only(
         left: kSidebarContentInset + depth * kTreeIndentStep,

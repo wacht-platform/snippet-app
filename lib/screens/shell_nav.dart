@@ -42,17 +42,17 @@ const double kNavIcon = 16;
 /// Outer padding on sidebar sections.
 const double kSidebarContentInset = 8;
 
-/// A row's box is inset one step further than a section header. That offset is
-/// what gives the list its hierarchy without drawing indentation guides, and it
-/// keeps the selected pill from colliding with the sidebar edge. Deeper nesting
-/// adds this same step again via a row's `indent`.
-///
-/// Kept modest: an over-wide gutter pushed row text far from the panel's left
-/// edge and wasted the width the sidebar needs for titles.
-const double kNavRowInset = kSidebarContentInset + 10;
+/// A row's box sits at the SAME inset as a section header — measured x8 for
+/// both. An earlier version inset rows one step further, which pushed every
+/// list 10px right of its own header and off the sidebar's left edge.
+/// Deeper nesting still adds `kTreeIndentStep` per level via a row's `indent`.
+const double kNavRowInset = kSidebarContentInset;
 
 /// Padding inside a row, between its box edge and its content.
-const double kNavPadH = 8;
+///
+/// With the box at 8 this puts the icon at 20 — the same column as the section
+/// header's chevron, so header and rows align on one axis.
+const double kNavPadH = 12;
 
 /// UPPERCASE section header with a leading chevron and a trailing action
 /// cluster.
@@ -95,8 +95,11 @@ class ShellSectionHeader extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       label.toUpperCase(),
-                      style: sans(11,
-                          weight: W.label, color: AppColors.fg4, spacing: 0.7),
+                      // Measured: 12px/500 in the default body ink (#C1C1C1), not
+                      // the faintest tone. At fg4 the header was nearly invisible
+                      // and read as disabled chrome rather than a section label.
+                      style: sans(12,
+                          weight: W.label, color: AppColors.fg2, spacing: 0.4),
                     ),
                   ]),
                 ),
@@ -238,11 +241,13 @@ class ShellNavRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Padding(
-      // The row box is inset one step past the section header, so the list
-      // reads as nested under it and the selected pill never touches the
-      // sidebar edge.
-      padding: EdgeInsets.only(
-          left: indent, right: kSidebarContentInset, top: 1, bottom: 1),
+      // The row box sits at the same inset as the section header, so header and
+      // rows share one left edge and one icon column.
+      //
+      // No vertical padding: measured rows are exactly 26px with zero gap, so
+      // any margin here would space the list out at 28 and drift from the
+      // reference's rhythm.
+      padding: EdgeInsets.only(left: indent, right: kSidebarContentInset),
       child: Material(
         color: selected ? AppColors.surface1 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.md),
