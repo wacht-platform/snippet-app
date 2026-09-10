@@ -161,7 +161,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   children: [
                     Text('Schedule a goal or message',
                         style: sans(14,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+                            weight: FontWeight.w500, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     Text(
                       'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',

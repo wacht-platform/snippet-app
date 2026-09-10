@@ -1100,7 +1100,7 @@ class _DesktopShellState extends State<DesktopShell>
                   overflow: TextOverflow.ellipsis,
                   style: sans(15,
                       weight: t.isMissionControl
-                          ? FontWeight.w600
+                          ? FontWeight.w500
                           : FontWeight.w400,
                       color: AppColors.fg1)),
               subtitle: Text(
@@ -1119,7 +1119,7 @@ class _DesktopShellState extends State<DesktopShell>
               leading: AppIcon('layers', size: 18, color: AppColors.accent),
               title: Text('Mission Control',
                   style:
-                      sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+                      sans(15, weight: FontWeight.w500, color: AppColors.fg1)),
               subtitle: Text(_active?.label ?? 'this machine',
                   style: sans(12, color: AppColors.fg4)),
               onTap: () => Navigator.pop(context, 'mission-control'),
@@ -1481,7 +1481,7 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _macWindowBarContent({required bool hasWindowControls}) {
     return SizedBox(
-      height: kMacTitlebar + 12,
+      height: kMacTitlebar,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.bg,
@@ -1489,8 +1489,8 @@ class _DesktopShellState extends State<DesktopShell>
         ),
         child: Padding(
           padding: EdgeInsets.only(
-            left: hasWindowControls ? 96 : 16,
-            right: 16,
+            left: hasWindowControls ? 88 : 14,
+            right: 14,
           ),
           child: Row(
             children: [
@@ -1498,7 +1498,7 @@ class _DesktopShellState extends State<DesktopShell>
               IconBtn(
                 'chevron-left',
                 size: 26,
-                iconSize: 13,
+                iconSize: 15,
                 tooltip: 'Back',
                 onTap: _canNavigateBack ? _navigateBack : null,
               ),
@@ -1506,7 +1506,7 @@ class _DesktopShellState extends State<DesktopShell>
               IconBtn(
                 'chevron-right',
                 size: 26,
-                iconSize: 13,
+                iconSize: 15,
                 tooltip: 'Forward',
                 onTap: _canNavigateForward ? _navigateForward : null,
               ),
@@ -1519,13 +1519,11 @@ class _DesktopShellState extends State<DesktopShell>
                       _topWorkspaceTab(i),
                       const SizedBox(width: 6),
                     ],
-                    // Start Page tab when tabs are few
-                    if (_tabs.isEmpty || _tabs.length < 3) _topStartPageTab(),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 2),
                     IconBtn(
                       'plus',
-                      size: 26,
-                      iconSize: 12,
+                      size: 28,
+                      iconSize: 15,
                       tooltip: 'New session',
                       onTap: _newSessionFlow,
                     ),
@@ -1537,7 +1535,7 @@ class _DesktopShellState extends State<DesktopShell>
               IconBtn(
                 'history',
                 size: 28,
-                iconSize: 15,
+                iconSize: 16,
                 tooltip: 'History & Checkpoints',
                 onTap: _showCheckpointsDrawer,
               ),
@@ -1545,7 +1543,7 @@ class _DesktopShellState extends State<DesktopShell>
               IconBtn(
                 'settings',
                 size: 28,
-                iconSize: 15,
+                iconSize: 16,
                 tooltip: 'Settings',
                 onTap: _openShellSettings,
               ),
@@ -1737,8 +1735,8 @@ class _DesktopShellState extends State<DesktopShell>
     return GestureDetector(
       onTap: () => _activateTab(i),
       child: Container(
-        height: 30,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: isActive ? AppColors.surface2 : Colors.transparent,
           borderRadius: BorderRadius.circular(R.sm),
@@ -1780,18 +1778,6 @@ class _DesktopShellState extends State<DesktopShell>
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _topStartPageTab() {
-    return Container(
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      alignment: Alignment.center,
-      child: Text(
-        'Start Page',
-        style: sans(12, color: AppColors.fg4),
       ),
     );
   }
@@ -2596,7 +2582,7 @@ class _GoalPopoverState extends State<_GoalPopover> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('Set goal',
-            style: sans(12.5, weight: FontWeight.w600, color: AppColors.fg1)),
+            style: sans(12.5, weight: FontWeight.w500, color: AppColors.fg1)),
         const SizedBox(height: 8),
         AppField(
           controller: _ctl,
@@ -2843,7 +2829,7 @@ class _SidebarState extends State<_Sidebar> {
                           ? Row(children: [
                               Text('${_selected.length} selected',
                                   style: sans(16,
-                                      weight: FontWeight.w600,
+                                      weight: FontWeight.w500,
                                       color: AppColors.fg1)),
                               const Spacer(),
                               IconBtn('x',
@@ -2862,7 +2848,7 @@ class _SidebarState extends State<_Sidebar> {
                           : Row(children: [
                               Text('Conversations',
                                   style: sans(20,
-                                      weight: FontWeight.w600,
+                                      weight: FontWeight.w500,
                                       color: AppColors.fg1)),
                               const Spacer(),
                               GestureDetector(
@@ -2954,7 +2940,7 @@ class _SidebarState extends State<_Sidebar> {
                   children: [
                     Text('Browse',
                         style: sans(14,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+                            weight: FontWeight.w500, color: AppColors.fg1)),
                     const SizedBox(height: 1),
                     Text('files · new chat',
                         style: sans(11.5, color: AppColors.fg4)),
@@ -3050,7 +3036,7 @@ class _SidebarState extends State<_Sidebar> {
                 : Text(
                     (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
                     style:
-                        sans(13, weight: FontWeight.w600, color: AppColors.fg1),
+                        sans(13, weight: FontWeight.w500, color: AppColors.fg1),
                   ),
           ),
         ),
@@ -3491,7 +3477,7 @@ class _SidebarState extends State<_Sidebar> {
             Expanded(
               child: Text('Mission Control',
                   style: sans(15.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
+                      weight: FontWeight.w500, color: AppColors.fg1)),
             ),
             if (status != null) status,
           ]),
@@ -3515,7 +3501,7 @@ class _SidebarState extends State<_Sidebar> {
               Expanded(
                 child: Text('Mission Control',
                     style: sans(12.5,
-                        weight: FontWeight.w600,
+                        weight: FontWeight.w500,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
               if (status != null) status,
@@ -3926,7 +3912,7 @@ class _SidebarState extends State<_Sidebar> {
                     : Text(
                         (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
                         style: sans(17,
-                            weight: FontWeight.w600, color: AppColors.fg1),
+                            weight: FontWeight.w500, color: AppColors.fg1),
                       ),
               ),
               const SizedBox(width: 12),
@@ -3940,7 +3926,7 @@ class _SidebarState extends State<_Sidebar> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: sans(15,
-                                  weight: FontWeight.w600,
+                                  weight: FontWeight.w500,
                                   color: AppColors.fg1)),
                           const SizedBox(height: 2),
                           Row(children: [
@@ -4334,7 +4320,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                   children: [
                     Text('Settings',
                         style: sans(14.5,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+                            weight: FontWeight.w500, color: AppColors.fg1)),
                     const SizedBox(height: 2),
                     Text('Configure this workspace and its models.',
                         style: sans(11.5, color: AppColors.fg3)),
@@ -4387,7 +4373,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                     Text(label,
                         style: sans(11.5,
                             weight: _page == page
-                                ? FontWeight.w600
+                                ? FontWeight.w500
                                 : FontWeight.w400,
                             color: _page == page
                                 ? AppColors.accent
@@ -4418,14 +4404,14 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
       children: [
         Text('General',
-            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+            style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)),
         const SizedBox(height: 3),
         Text('Manage the machine this app connects to and its alerts.',
             style: sans(11.5, color: AppColors.fg3)),
         const SizedBox(height: 14),
         Text('MACHINES',
             style: sans(10,
-                weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
+                weight: FontWeight.w500, color: AppColors.fg4, spacing: 0.5)),
         const SizedBox(height: 6),
         if (_instances.isEmpty)
           Padding(
@@ -4447,7 +4433,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           const SizedBox(height: 16),
           Text('NOTIFICATIONS',
               style: sans(10,
-                  weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
+                  weight: FontWeight.w500, color: AppColors.fg4, spacing: 0.5)),
           const SizedBox(height: 6),
           _notifTile(),
         ],

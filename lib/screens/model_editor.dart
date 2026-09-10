@@ -444,7 +444,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
             Expanded(
               child: Text(title,
                   style: sans(14.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
+                      weight: FontWeight.w500, color: AppColors.fg1)),
             ),
           ]),
         )
@@ -690,7 +690,7 @@ class _SubSignInState extends State<_SubSignIn> {
         const SizedBox(height: 8),
         Row(children: [
           Text(_code!,
-              style: mono(18, weight: FontWeight.w600, color: AppColors.fg1)),
+              style: mono(18, weight: FontWeight.w500, color: AppColors.fg1)),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () => Clipboard.setData(ClipboardData(text: _code!)),

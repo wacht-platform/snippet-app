@@ -432,7 +432,7 @@ class _SessionInspector extends StatelessWidget {
             (session.title as String).isEmpty
                 ? session.folder as String
                 : session.title as String,
-            style: sans(15, weight: FontWeight.w600, color: AppColors.fg1),
+            style: sans(15, weight: FontWeight.w500, color: AppColors.fg1),
           ),
           const SizedBox(height: 4),
           Text(session.folder as String, style: mono(11, color: AppColors.fg3)),

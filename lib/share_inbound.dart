@@ -22,9 +22,8 @@ class SharedInbound {
         .map((e) => '$e')
         .where((e) => e.isNotEmpty)
         .toList();
-    final names = ((raw['names'] as List?) ?? const [])
-        .map((e) => '$e')
-        .toList();
+    final names =
+        ((raw['names'] as List?) ?? const []).map((e) => '$e').toList();
     return SharedInbound(
       type: raw['type'] as String? ?? 'text',
       text: (raw['text'] as String?) ?? '',

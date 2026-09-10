@@ -920,8 +920,8 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('list session agents', r);
     final list = jsonDecode(r.body) as List;
     return list
-        .map((e) =>
-            CoordinationSessionAgent.fromJson(e as Map<String, dynamic>))
+        .map(
+            (e) => CoordinationSessionAgent.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 

@@ -829,12 +829,15 @@ class CoordinationSessionAgent {
   final String handle;
   final String role;
   final String status;
+
   /// True while this lease is the session's current, unexpired holder.
   final bool active;
   final String assignmentId;
   final String acquiredAt;
+
   /// Null while the agent still holds the turn.
   final String? releasedAt;
+
   /// Why it ended (released/expired/handoff); null while active.
   final String? releaseReason;
 
@@ -1092,9 +1095,8 @@ class CoordinationHandoff {
         scope = j['scope'] as String? ?? '',
         completedSummary = j['completed_summary'] as String? ?? '',
         nextAction = j['next_action'] as String? ?? '',
-        blockers = ((j['blockers'] as List?) ?? const [])
-            .whereType<String>()
-            .toList(),
+        blockers =
+            ((j['blockers'] as List?) ?? const []).whereType<String>().toList(),
         risks =
             ((j['risks'] as List?) ?? const []).whereType<String>().toList(),
         contentHash = j['content_hash'] as String? ?? '',

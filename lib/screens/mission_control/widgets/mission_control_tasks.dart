@@ -104,14 +104,15 @@ class _MissionControlTasksScreenState extends State<MissionControlTasksScreen> {
           else if (_error != null)
             Expanded(
                 child: EmptyState(
-                    icon: 'layers', title: "Couldn't load tasks", body: _error!))
+                    icon: 'layers',
+                    title: "Couldn't load tasks",
+                    body: _error!))
           else if (tasks.isEmpty)
             const Expanded(
                 child: EmptyState(
                     icon: 'layers',
                     title: 'No tasks yet',
-                    body:
-                        'Work Mission Control dispatches will show up here.'))
+                    body: 'Work Mission Control dispatches will show up here.'))
           else
             Expanded(
               child: RefreshIndicator(
@@ -282,7 +283,7 @@ class _TaskDetail extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             task.title.isEmpty ? '(untitled)' : task.title,
-            style: sans(17, weight: FontWeight.w600, color: AppColors.fg1),
+            style: sans(17, weight: FontWeight.w500, color: AppColors.fg1),
           ),
           const SizedBox(height: 8),
           Wrap(spacing: 6, runSpacing: 6, children: [

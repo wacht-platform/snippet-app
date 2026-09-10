@@ -41,10 +41,12 @@ class ShellRail extends StatelessWidget {
     Theme.of(context);
     return Container(
       width: double.infinity,
-      height: 44,
+      height: 38,
       decoration: BoxDecoration(
         color: AppColors.bg,
-        border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+        // A full-width hairline separates the nested navigation from the panel
+        // below it; `border2` keeps it visible against the shared grey chrome.
+        border: Border(bottom: BorderSide(color: AppColors.border2, width: 1)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -55,10 +57,10 @@ class ShellRail extends StatelessWidget {
               selected: item == section,
               onTap: () => onSelect(item),
             ),
-            if (item != ShellSection.values.last) const SizedBox(width: 10),
+            if (item != ShellSection.values.last) const SizedBox(width: 8),
           ],
           if (trailing != null) ...[
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             trailing!,
           ],
         ],
@@ -89,8 +91,8 @@ class _RailButton extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(R.sm),
             child: Container(
-              width: 38,
-              height: 36,
+              width: 32,
+              height: 30,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: selected ? AppColors.surface2 : Colors.transparent,
@@ -99,7 +101,7 @@ class _RailButton extends StatelessWidget {
               ),
               child: AppIcon(
                 section.icon,
-                size: 20,
+                size: 17,
                 visualScale: 1,
                 color: selected ? AppColors.fg1 : AppColors.fg4,
               ),

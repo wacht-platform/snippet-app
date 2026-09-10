@@ -133,7 +133,7 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             child: agents.isEmpty
                 ? _EmptyTeam()
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 18),
                     children: [
                       if (active.isNotEmpty) ...[
                         _GroupLabel('Active now', active.length, accent: true),
@@ -188,7 +188,7 @@ class _GroupLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
         child: Row(children: [
           Text(label.toUpperCase(),
               style: sans(10.5,
@@ -226,7 +226,7 @@ class _AgentSidebarRow extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(R.md),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             CircleAvatar(
               radius: 13,

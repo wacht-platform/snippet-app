@@ -33,9 +33,12 @@ bool get kMacOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 bool get kWindows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
 /// Height reserved for the macOS traffic lights and their surrounding title-bar
-/// breathing room. The controls stay native; the shell reserves their full
-/// visual footprint rather than crowding them with app chrome.
-const double kMacTitlebar = 34.0;
+/// breathing room.
+///
+/// This must stay close to AppKit's own titlebar height (~28pt): the lights are
+/// positioned natively and are NOT moved by the app, so a painted bar any taller
+/// than the native band leaves them stranded near the top instead of centred.
+const double kMacTitlebar = 28.0;
 const _windowStateChannel = MethodChannel('snippet/window_state');
 
 /// Whether macOS is in native full-screen mode. Other platforms never need a

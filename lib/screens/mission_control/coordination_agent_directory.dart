@@ -164,7 +164,7 @@ class _AgentRow extends StatelessWidget {
         child: Text(initial),
       ),
       title: Text(agent.displayName,
-          style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+          style: sans(15, weight: FontWeight.w500, color: AppColors.fg1)),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Text('@${agent.handle} · $detail',
@@ -197,7 +197,7 @@ class _MessageState extends StatelessWidget {
           const SizedBox(height: 18),
           Text(title,
               textAlign: TextAlign.center,
-              style: sans(19, weight: FontWeight.w600, color: AppColors.fg1)),
+              style: sans(19, weight: FontWeight.w500, color: AppColors.fg1)),
           const SizedBox(height: 8),
           Text(message,
               textAlign: TextAlign.center,

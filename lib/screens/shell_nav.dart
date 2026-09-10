@@ -32,8 +32,11 @@ Color toneColor(ShellTone tone) => switch (tone) {
 const double kNavRowHeight = 34;
 const double kNavHeaderHeight = 32;
 const double kNavIcon = 14;
-const double kNavIndent = 18;
-const double kSidebarContentInset = 14;
+const double kNavIndent = 10;
+
+/// Horizontal inset for sidebar content. Kept small so rows start close to the
+/// column's left edge instead of floating in a wide gutter.
+const double kSidebarContentInset = 8;
 
 /// UPPERCASE section header with a leading chevron and a trailing action
 /// cluster (filter · sort · view · add).

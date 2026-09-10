@@ -50,7 +50,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
               const SizedBox(width: 8),
               Text(toolTitle(widget.tool),
                   style:
-                      sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+                      sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
               if (summary.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Flexible(
@@ -275,7 +275,7 @@ class LaneNotice extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: sans(12.5,
-                          weight: FontWeight.w600, color: AppColors.fg2),
+                          weight: FontWeight.w500, color: AppColors.fg2),
                     ),
                   ),
                   const SizedBox(width: 9),

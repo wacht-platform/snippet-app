@@ -23,7 +23,7 @@ Widget _buildErrorWidget(FlutterErrorDetails details) {
             const SizedBox(height: 12),
             Text('This panel could not be displayed',
                 textAlign: TextAlign.center,
-                style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+                style: sans(15, weight: FontWeight.w500, color: AppColors.fg1)),
             const SizedBox(height: 6),
             Text('Close it and try again.',
                 textAlign: TextAlign.center,

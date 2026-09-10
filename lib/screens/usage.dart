@@ -103,7 +103,7 @@ class _ProviderCard extends StatelessWidget {
         Row(children: [
           Expanded(
             child: Text(provider.provider,
-                style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+                style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)),
           ),
           Text(
               '${provider.sessions} session${provider.sessions == 1 ? '' : 's'}',

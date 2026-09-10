@@ -98,7 +98,7 @@ class _CoordinationHandoffsScreenState
                     Text('Could not load handoffs',
                         textAlign: TextAlign.center,
                         style: sans(17,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+                            weight: FontWeight.w500, color: AppColors.fg1)),
                     const SizedBox(height: 8),
                     Text(error!,
                         textAlign: TextAlign.center,
@@ -116,7 +116,7 @@ class _CoordinationHandoffsScreenState
                         Text('Nothing awaiting acknowledgement',
                             textAlign: TextAlign.center,
                             style: sans(17,
-                                weight: FontWeight.w600, color: AppColors.fg1)),
+                                weight: FontWeight.w500, color: AppColors.fg1)),
                         const SizedBox(height: 8),
                         Text(
                             'Handoffs appear here when one agent transfers work to a successor.',
@@ -177,7 +177,7 @@ class _HandoffCard extends StatelessWidget {
                 Expanded(
                   child: Text(handoff.objective,
                       style: sans(15,
-                          weight: FontWeight.w600, color: AppColors.fg1)),
+                          weight: FontWeight.w500, color: AppColors.fg1)),
                 ),
                 Text(handoff.contextMode.replaceAll('_', ' '),
                     style: sans(11, color: AppColors.fg4)),

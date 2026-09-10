@@ -171,7 +171,7 @@ class _SessionActionPanel extends StatelessWidget {
               Expanded(
                   child: Text(title,
                       style: sans(16,
-                          weight: FontWeight.w600, color: AppColors.fg1))),
+                          weight: FontWeight.w500, color: AppColors.fg1))),
               IconBtn('x',
                   size: 34, iconSize: 18, tooltip: 'Close', onTap: onClose),
             ]),
@@ -2287,7 +2287,7 @@ class _SessionScreenState extends State<SessionScreen>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: sans(17,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+                            weight: FontWeight.w500, color: AppColors.fg1)),
                     const SizedBox(height: 3),
                     Text(facts.join(' · '),
                         maxLines: 1,
@@ -2416,7 +2416,7 @@ class _SessionScreenState extends State<SessionScreen>
                       Text(
                         pane.title,
                         style: sans(compact ? 12 : 13,
-                            weight: on ? FontWeight.w600 : FontWeight.w400,
+                            weight: on ? FontWeight.w500 : FontWeight.w400,
                             color: on ? AppColors.fg1 : AppColors.fg3),
                       ),
                       const SizedBox(width: 2),
@@ -2830,7 +2830,7 @@ class _SessionScreenState extends State<SessionScreen>
                 ? 'Compacting'
                 : (running ? 'Running' : 'Idle'),
             style: sans(12.5,
-                weight: FontWeight.w600,
+                weight: FontWeight.w500,
                 color: s?.compacting == true
                     ? AppColors.accent
                     : (running ? AppColors.run : AppColors.fg2))),
@@ -2915,7 +2915,7 @@ class _SessionScreenState extends State<SessionScreen>
             const SizedBox(width: 5),
             Text('Retry now',
                 style:
-                    sans(12, weight: FontWeight.w600, color: AppColors.danger)),
+                    sans(12, weight: FontWeight.w500, color: AppColors.danger)),
           ]),
         ),
       ]),
@@ -3548,7 +3548,7 @@ class _SessionScreenState extends State<SessionScreen>
             ),
             child: Text('Download',
                 style: sans(12,
-                    weight: FontWeight.w600, color: AppColors.accentFg)),
+                    weight: FontWeight.w500, color: AppColors.accentFg)),
           ),
         ]),
       ),
@@ -4105,7 +4105,7 @@ class _CompactingStatusState extends State<_CompactingStatus> {
                 TextSpan(
                     text: 'Compacting',
                     style: sans(13,
-                        weight: FontWeight.w600, color: AppColors.accent)),
+                        weight: FontWeight.w500, color: AppColors.accent)),
                 TextSpan(
                     text: ' $_elapsed',
                     style: sans(13,
@@ -4221,7 +4221,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: sans(13,
-                          weight: FontWeight.w600, color: AppColors.accent)),
+                          weight: FontWeight.w500, color: AppColors.accent)),
                 ),
                 const SizedBox(width: 8),
                 Text(_elapsed,
@@ -4418,7 +4418,7 @@ class _QueuedBubble extends StatelessWidget {
                               horizontal: 6, vertical: 3),
                           child: Text('Send now',
                               style: sans(kMobile ? 12 : 10.5,
-                                  weight: FontWeight.w600,
+                                  weight: FontWeight.w500,
                                   color: AppColors.accent)),
                         ),
                       ),
@@ -4473,7 +4473,7 @@ class _QueuedSection extends StatelessWidget {
             child: Row(children: [
               Text('QUEUED ($count)',
                   style: sans(10.5,
-                      weight: FontWeight.w600,
+                      weight: FontWeight.w500,
                       spacing: 0.6,
                       color: AppColors.fg4)),
               const Spacer(),
@@ -4489,7 +4489,7 @@ class _QueuedSection extends StatelessWidget {
                           horizontal: 8, vertical: 3),
                       child: Text('Send all',
                           style: sans(10.5,
-                              weight: FontWeight.w600,
+                              weight: FontWeight.w500,
                               color: AppColors.accent)),
                     ),
                   ),
@@ -4548,7 +4548,7 @@ class _GoalCard extends StatelessWidget {
             Row(children: [
               Text(paused ? 'Goal paused' : 'Working toward goal',
                   style: sans(12.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
+                      weight: FontWeight.w500, color: AppColors.fg1)),
             ]),
             if (goal.text.trim().isNotEmpty) ...[
               const SizedBox(height: 3),
@@ -4645,9 +4645,8 @@ class _BoardMessageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     final from = message.fromId.trim().isEmpty ? 'someone' : message.fromId;
-    final label = message.threadId.isEmpty
-        ? 'board'
-        : 'board · ${message.threadId}';
+    final label =
+        message.threadId.isEmpty ? 'board' : 'board · ${message.threadId}';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -4770,7 +4769,7 @@ class _QuestionRecord extends StatelessWidget {
               Expanded(
                 child: Text('Question',
                     style: sans(15.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                        weight: FontWeight.w500, color: AppColors.fg1)),
               ),
               Text(answers.isEmpty ? 'Asked' : 'Answered',
                   style: sans(12, color: AppColors.accent)),
@@ -4867,7 +4866,7 @@ class _ApprovalBarState extends State<_ApprovalBar> {
               Expanded(
                 child: Text(_sent ? 'Sending…' : title,
                     style: sans(15.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                        weight: FontWeight.w500, color: AppColors.fg1)),
               ),
               Text(total > 1 ? '$index of $total' : 'Input required',
                   style: sans(12, color: AppColors.accent)),
@@ -5103,7 +5102,7 @@ class _QuestionBarState extends State<_QuestionBar> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(label,
                 style: sans(13,
-                    weight: FontWeight.w600,
+                    weight: FontWeight.w500,
                     color: sel ? AppColors.accent : AppColors.fg2)),
           ),
         ),
@@ -5129,7 +5128,7 @@ class _QuestionBarState extends State<_QuestionBar> {
                   child: Text(label,
                       style: sans(14,
                           height: 1.4,
-                          weight: sel ? FontWeight.w600 : FontWeight.w500,
+                          weight: sel ? FontWeight.w500 : FontWeight.w500,
                           color: sel ? AppColors.fg1 : AppColors.fg2))),
               if (sel) ...[
                 const SizedBox(width: 10),
@@ -5207,7 +5206,7 @@ class _QuestionBarState extends State<_QuestionBar> {
             Expanded(
               child: Text(_sent ? 'Sending…' : 'Question',
                   style: sans(15.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
+                      weight: FontWeight.w500, color: AppColors.fg1)),
             ),
             Text(
               total > 1 ? '${_step + 1} of $total' : 'Input required',
@@ -5348,6 +5347,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onResumeGoal;
   final VoidCallback onLanes;
   final VoidCallback? onTasks;
+
   /// Which agents are (and were) active in THIS session. Present for every
   /// session, not just Mission Control.
   final VoidCallback? onSessionAgents;

@@ -236,7 +236,7 @@ class _SessionTermViewState extends State<SessionTermView> {
           padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
           child: Row(children: [
             Text(widget.alive ? 'Shell' : 'Shell · starting',
-                style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+                style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
             const Spacer(),
             if (widget.onNew != null)
               IconBtn('plus',

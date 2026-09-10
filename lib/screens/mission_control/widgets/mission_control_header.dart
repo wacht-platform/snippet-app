@@ -58,7 +58,7 @@ class MissionControlHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(_compact ? 17 : 16.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                        weight: FontWeight.w500, color: AppColors.fg1)),
                 const SizedBox(height: 3),
                 Row(children: [
                   if (state.loading)

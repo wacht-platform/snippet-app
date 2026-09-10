@@ -125,7 +125,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
                     children: [
                       Text('Models',
                           style: sans(widget.embedded ? 14 : 18,
-                              weight: FontWeight.w600, color: AppColors.fg1)),
+                              weight: FontWeight.w500, color: AppColors.fg1)),
                       const SizedBox(height: 3),
                       Text(
                           'Choose the model used for new sessions and delegated work.',

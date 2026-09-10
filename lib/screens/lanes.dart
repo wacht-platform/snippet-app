@@ -169,7 +169,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      sans(14, weight: FontWeight.w600, color: AppColors.fg1),
+                      sans(14, weight: FontWeight.w500, color: AppColors.fg1),
                 ),
               ),
               const SizedBox(width: 10),
@@ -216,7 +216,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label,
               style: mono(10,
-                  weight: FontWeight.w600,
+                  weight: FontWeight.w500,
                   color: danger ? AppColors.danger : AppColors.fg4)),
           const SizedBox(height: 6),
           MarkdownBody(
@@ -281,7 +281,7 @@ class _ActivityHistory extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('ACTIVITY HISTORY',
-              style: mono(10, weight: FontWeight.w600, color: AppColors.fg4)),
+              style: mono(10, weight: FontWeight.w500, color: AppColors.fg4)),
           const SizedBox(height: 7),
           for (final entry in entries.reversed.take(24))
             Padding(

@@ -289,7 +289,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
               const SizedBox(height: 12),
               Text('Camera access needed',
                   style:
-                      sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+                      sans(15, weight: FontWeight.w500, color: AppColors.fg1)),
               const SizedBox(height: 8),
               ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: 250),

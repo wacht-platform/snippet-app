@@ -179,7 +179,7 @@ class _GitScreenState extends State<GitScreen> {
                     : 'Source Control',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(12, weight: FontWeight.w600, color: AppColors.fg1),
+                style: sans(12, weight: FontWeight.w500, color: AppColors.fg1),
               ),
             ),
             IconBtn('refresh',
@@ -296,7 +296,7 @@ class _GitScreenState extends State<GitScreen> {
                 children: [
                   Text(st.branch.isEmpty ? '(no branch)' : st.branch,
                       style: sans(15.5,
-                          weight: FontWeight.w600, color: AppColors.fg1)),
+                          weight: FontWeight.w500, color: AppColors.fg1)),
                   if (hasUp)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
@@ -348,7 +348,7 @@ class _GitScreenState extends State<GitScreen> {
           Expanded(
               child: Text(title,
                   style: sans(11.5,
-                      weight: FontWeight.w600,
+                      weight: FontWeight.w500,
                       color: AppColors.fg3,
                       spacing: 0.3))),
           if (trailing != null)
@@ -373,7 +373,7 @@ class _GitScreenState extends State<GitScreen> {
           SizedBox(
               width: 16,
               child: Text(code,
-                  style: mono(13, weight: FontWeight.w700, color: c))),
+                  style: mono(13, weight: FontWeight.w500, color: c))),
           const SizedBox(width: 8),
           Expanded(
               child: Text(f.path,
@@ -466,7 +466,7 @@ class _BranchPickerState extends State<_BranchPicker> {
         const SizedBox(height: 10),
         if (local.isNotEmpty) ...[
           Text('Local',
-              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+              style: sans(11.5, weight: FontWeight.w500, color: AppColors.fg3)),
           const SizedBox(height: 6),
           ...local.map((b) => _row(
                 name: b,
@@ -479,7 +479,7 @@ class _BranchPickerState extends State<_BranchPicker> {
         ],
         if (remotes.isNotEmpty) ...[
           Text('Remote',
-              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+              style: sans(11.5, weight: FontWeight.w500, color: AppColors.fg3)),
           const SizedBox(height: 6),
           ...remotes.map((b) => _row(
                 name: b,

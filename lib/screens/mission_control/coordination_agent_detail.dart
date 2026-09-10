@@ -38,15 +38,11 @@ class CoordinationAgentDetail extends StatelessWidget {
                   child: Text(agent.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          sans(14, weight: W.title, color: AppColors.fg1)),
+                      style: sans(14, weight: W.title, color: AppColors.fg1)),
                 ),
                 if (onClose != null)
                   IconBtn('x',
-                      size: 28,
-                      iconSize: 15,
-                      tooltip: 'Close',
-                      onTap: onClose),
+                      size: 28, iconSize: 15, tooltip: 'Close', onTap: onClose),
               ]),
             ),
             Divider(height: 1, color: AppColors.border),
@@ -87,8 +83,7 @@ class CoordinationAgentDetail extends StatelessWidget {
                   Text(agent.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          sans(18, weight: W.title, color: AppColors.fg1)),
+                      style: sans(18, weight: W.title, color: AppColors.fg1)),
                   const SizedBox(height: 4),
                   Text('@${agent.handle}',
                       style: sans(13, color: AppColors.fg3)),
@@ -111,8 +106,8 @@ class CoordinationAgentDetail extends StatelessWidget {
         _Section(
           title: 'Capacity',
           children: [
-            _Field('Concurrent assignments',
-                '${agent.maxConcurrentAssignments}'),
+            _Field(
+                'Concurrent assignments', '${agent.maxConcurrentAssignments}'),
           ],
         ),
         if (agent.capabilities.isNotEmpty) ...[
@@ -148,9 +143,7 @@ class _Section extends StatelessWidget {
         children: [
           Text(title.toUpperCase(),
               style: sans(11,
-                  weight: FontWeight.w600,
-                  color: AppColors.fg4,
-                  spacing: 0.6)),
+                  weight: FontWeight.w500, color: AppColors.fg4, spacing: 0.6)),
           const SizedBox(height: 10),
           ...children,
         ],
@@ -175,8 +168,8 @@ class _Field extends StatelessWidget {
             ),
             Expanded(
               child: Text(value,
-                  style: sans(13,
-                      weight: FontWeight.w500, color: AppColors.fg1)),
+                  style:
+                      sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
             ),
           ],
         ),

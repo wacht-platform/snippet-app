@@ -3,8 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'platform.dart';
-
 // ---------------------------------------------------------------------------
 // Theme presets — each one defines every color the app uses. Ported from the
 // TUI's 13 presets (src/tui/theme.rs) plus mobile-specific surface/diff slots.
@@ -103,13 +101,16 @@ ThemePreset _dark({
   required Color danger,
   required Color warn,
 }) {
-  // Surface ladder:
-  // #0C0C0F background, #121216 sidebar, #1B1B22 cards/active, #24242E hover
-  final bg = const Color(0xFF0C0C0F); // page floor — shell canvas
-  final canvas = const Color(0xFF101014); // reading surface
-  final surface1 = const Color(0xFF14141A); // cards, panels
-  final surface2 = const Color(0xFF1B1B22); // active tab / active row card
-  final surface3 = const Color(0xFF24242E); // dropdowns, popovers, hover
+  // Surfaces are split by ROLE, not by brightness alone:
+  //   canvas  — the chat/content area, deliberately the darkest thing on screen
+  //   bg      — the chrome around it (top bar, sidebar, status line), a grey
+  //             that lifts away from the content so the reading pane recedes
+  //   surface1-3 — cards → active rows → hover, each one step brighter than bg
+  final canvas = const Color(0xFF0B0B0E); // chat / reader — darkest
+  final bg = const Color(0xFF17171C); // chrome: top bar, sidebar, status line
+  final surface1 = const Color(0xFF1E1E24); // cards, panels
+  final surface2 = const Color(0xFF26262D); // active tab / active row card
+  final surface3 = const Color(0xFF2E2E36); // dropdowns, popovers, hover
 
   return ThemePreset(
     name: name,
@@ -124,8 +125,8 @@ ThemePreset _dark({
     fg3: inkSubtle,
     fg4: inkFaint,
     // Hairlines:
-    border: const Color(0xFF22222A),
-    border2: const Color(0xFF2E2E38),
+    border: const Color(0xFF2A2A33),
+    border2: const Color(0xFF3A3A45),
     accent: accent,
     accentHover: _lighten(accent, 0.10),
     accentFg: const Color(0xFFFFFFFF),
@@ -261,10 +262,10 @@ class AppColors {
   static Color get diffGutter => currentTheme.diffGutter;
 }
 
-/// Reading/content surfaces (chat, editor, file viewer, diff). Phones use ONE
-/// background everywhere (the darker `bg` — no sidebar/canvas split on a small
-/// screen); desktop keeps the lighter canvas against the darker sidebar.
-Color get readingBg => kMobile ? AppColors.bg : AppColors.canvas;
+/// Reading/content surfaces (chat, editor, file viewer, diff). Always the dark
+/// `canvas`, so the content the user is actually reading recedes and the grey
+/// chrome around it carries the structure.
+Color get readingBg => AppColors.canvas;
 
 // ---------------------------------------------------------------------------
 // Radius — small and precise. Large radii read consumer/toy; a developer tool
@@ -290,11 +291,16 @@ class R {
 
 /// Role weights — prefer these over raw `FontWeight.wNNN` so the ramp stays
 /// consistent across the app.
+///
+/// Deliberately narrow: almost everything is `body` (400). `label` (500) is the
+/// ceiling for ordinary UI text — section headers, row titles, buttons — so
+/// weight reads as *meaning* rather than decoration. `strong` is reserved for
+/// the rare element that must outrank its surroundings.
 class W {
   static const body = FontWeight.w400;
   static const label = FontWeight.w500;
-  static const title = FontWeight.w600;
-  static const strong = FontWeight.w700;
+  static const title = FontWeight.w500;
+  static const strong = FontWeight.w600;
 }
 
 /// Optical tracking: tighter as type grows. Large text needs negative tracking
@@ -393,20 +399,20 @@ ThemeData buildAppTheme() {
   );
 }
 
-/// Give the Material text theme a real weight ramp instead of flattening
-/// everything to 400: display/headline/title carry weight, body stays regular,
-/// labels sit at 500. Material widgets inherit this, so they stop reading flat.
+/// Material widgets inherit their weights from here, so this is the single
+/// place that decides what reads as "heavy". Body copy stays at 400 and only
+/// titles/labels step up to 500 — no 600+ anywhere in the inherited theme.
 TextTheme _weightedTextTheme(TextTheme t) {
   TextStyle? w(TextStyle? s, FontWeight weight) =>
       s?.copyWith(fontWeight: weight);
   return t.copyWith(
-    displayLarge: w(t.displayLarge, W.title),
-    displayMedium: w(t.displayMedium, W.title),
-    displaySmall: w(t.displaySmall, W.title),
-    headlineLarge: w(t.headlineLarge, W.title),
-    headlineMedium: w(t.headlineMedium, W.title),
-    headlineSmall: w(t.headlineSmall, W.title),
-    titleLarge: w(t.titleLarge, W.title),
+    displayLarge: w(t.displayLarge, W.label),
+    displayMedium: w(t.displayMedium, W.label),
+    displaySmall: w(t.displaySmall, W.label),
+    headlineLarge: w(t.headlineLarge, W.label),
+    headlineMedium: w(t.headlineMedium, W.label),
+    headlineSmall: w(t.headlineSmall, W.label),
+    titleLarge: w(t.titleLarge, W.label),
     titleMedium: w(t.titleMedium, W.label),
     titleSmall: w(t.titleSmall, W.label),
     bodyLarge: w(t.bodyLarge, W.body),
