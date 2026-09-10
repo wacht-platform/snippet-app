@@ -9,9 +9,9 @@ import '../widgets.dart';
 /// conversation you're reading never gets pushed aside.
 enum ShellSection {
   sessions('Chat', 'message-text'),
-  terminal('Shell', 'terminal'),
-  files('Files', 'folder'),
-  activity('Activity', 'activity'),
+  terminal('Terminal', 'terminal'),
+  git('Git Diff', 'git-branch'),
+  files('File Tree', 'file'),
   agents('Agents', 'users');
 
   const ShellSection(this.label, this.icon);
@@ -19,11 +19,9 @@ enum ShellSection {
   final String icon;
 }
 
-/// Horizontal icon row pinned to the top of the sidebar column.
-///
-/// Sits *above* the sidebar rather than beside it, so the sidebar — not the rail
-/// — owns the left edge and the working area keeps its width. Wide layouts only;
-/// on a phone these destinations are reached from the session menu instead.
+/// Horizontal icon row pinned to the top of the sidebar column:
+/// - Clean icons with spacing
+/// - Active icon has a white horizontal underline bar right underneath it
 class ShellRail extends StatelessWidget {
   const ShellRail({
     super.key,
@@ -34,19 +32,21 @@ class ShellRail extends StatelessWidget {
 
   final ShellSection section;
   final ValueChanged<ShellSection> onSelect;
-
-  /// The shell opens a real terminal, which is not a sidebar panel — the host
-  /// handles it rather than the rail switching a section.
   final VoidCallback onTerminal;
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return SizedBox(
-      height: 40,
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+      ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const SizedBox(width: 8),
           for (final s in ShellSection.values)
             _RailButton(
               section: s,
@@ -75,26 +75,33 @@ class _RailButton extends StatelessWidget {
   Widget build(BuildContext context) => Tooltip(
         message: section.label,
         waitDuration: const Duration(milliseconds: 400),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(R.md),
-            child: Container(
-              width: 34,
-              height: 30,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.xs),
+          child: SizedBox(
+            width: 36,
+            height: 44,
+            child: Stack(
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                // Selection is a surface lift, not a filled block — the row
-                // should stay quiet at rest.
-                color: selected ? AppColors.surface2 : Colors.transparent,
-                borderRadius: BorderRadius.circular(R.md),
-              ),
-              child: AppIcon(
-                section.icon,
-                size: 16,
-                color: selected ? AppColors.fg1 : AppColors.fg4,
-              ),
+              children: [
+                AppIcon(
+                  section.icon,
+                  size: 17,
+                  color: selected ? AppColors.fg1 : AppColors.fg4,
+                ),
+                if (selected)
+                  Positioned(
+                    bottom: 0,
+                    child: Container(
+                      width: 24,
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(1),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

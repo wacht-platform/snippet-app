@@ -171,8 +171,11 @@ class ShellGroupHeader extends StatelessWidget {
   }
 }
 
-/// The leaf: one nav row. Selection is a subtle surface lift with a rounded
-/// fill — no left accent bar, no bold weight.
+/// The leaf: one nav row. Selection is an active card:
+/// - Background `AppColors.surface2` (#1B1B22)
+/// - Subtle hairline border `AppColors.border2` (#2E2E38)
+/// - Radius 6px
+/// - Crisp white text with `W.label`
 class ShellNavRow extends StatelessWidget {
   const ShellNavRow({
     super.key,
@@ -199,31 +202,43 @@ class ShellNavRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
         color: selected ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.md),
+        borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(R.md),
-          child: SizedBox(
+          borderRadius: BorderRadius.circular(R.sm),
+          child: Container(
             height: kNavRowHeight,
-            child: Padding(
-              padding: EdgeInsets.only(left: indent),
-              child: Row(children: [
-                AppIcon(icon, size: kNavIcon, color: toneColor(tone)),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(13,
-                          color: selected ? AppColors.fg1 : AppColors.fg2)),
-                ),
-                if (trailing != null) trailing!,
-                const SizedBox(width: 8),
-              ]),
+            padding: EdgeInsets.only(left: indent, right: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(R.sm),
+              border: Border.all(
+                color: selected ? AppColors.border2 : Colors.transparent,
+              ),
             ),
+            child: Row(children: [
+              AppIcon(
+                icon,
+                size: kNavIcon,
+                color: selected ? AppColors.accent : toneColor(tone),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(
+                    13,
+                    weight: selected ? W.label : W.body,
+                    color: selected ? AppColors.fg1 : AppColors.fg2,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ]),
           ),
         ),
       ),

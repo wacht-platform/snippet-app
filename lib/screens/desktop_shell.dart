@@ -30,6 +30,8 @@ import 'agents_sidebar_panel.dart';
 import 'terminals_sidebar_panel.dart';
 import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_agent_detail.dart';
+import 'git_diff_sidebar_panel.dart';
+import 'file_tree_sidebar_panel.dart';
 import 'session.dart';
 import 'shell_nav.dart';
 import 'shell_rail.dart';
@@ -1263,19 +1265,20 @@ class _DesktopShellState extends State<DesktopShell>
         onOpenAgent: (a) => setState(() => _rightAgent = a),
       );
     }
-    if (_section == ShellSection.activity) {
+    if (_section == ShellSection.git) {
       final client = _client;
       if (client == null) {
         return Container(
           color: AppColors.bg,
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-          child: Text('Add a machine to see activity.',
+          child: Text('Add a machine to see Git diff.',
               style: sans(12.5, color: AppColors.fg4, height: 1.5)),
         );
       }
-      return Container(
-        color: AppColors.bg,
-        child: CoordinationActivityScreen(client: client, embedded: true),
+      return GitDiffSidebarPanel(
+        client: client,
+        workspacePath: _activeWorkspaceFolder() ?? '',
+        sessionId: _activeTab?.sessionId,
       );
     }
     if (_section == ShellSection.files) {
@@ -1288,17 +1291,11 @@ class _DesktopShellState extends State<DesktopShell>
               style: sans(12.5, color: AppColors.fg4, height: 1.5)),
         );
       }
-      return Container(
-        color: AppColors.bg,
-        child: FileExplorer(
-          client: client,
-          // Browsing the active session's workspace by default; fall back to the
-          // daemon home when nothing is open.
-          start: _activeWorkspaceFolder(),
-          onClose: null,
-          onOpenFile: (path, name) =>
-              _openFileTab(client, _active?.url ?? '', path, name),
-        ),
+      return FileTreeSidebarPanel(
+        client: client,
+        workspacePath: _activeWorkspaceFolder() ?? '',
+        onOpenFile: (path, name) =>
+            _openFileTab(client, _active?.url ?? '', path, name),
       );
     }
     if (_sidebarGit && tab != null && !tab.isFile) {
@@ -1479,17 +1476,9 @@ class _DesktopShellState extends State<DesktopShell>
           Text('Running', style: sans(11, color: AppColors.run)),
           const SizedBox(width: 12),
         ],
-        if (contextLeft != null) ...[
+        if (contextLeft != null)
           Text('$contextLeft% context left',
               style: sans(11, color: AppColors.fg4)),
-          const SizedBox(width: 10),
-        ],
-        // Secondary destinations stay reachable without crowding the row.
-        IconBtn('settings',
-            size: 22,
-            iconSize: 13,
-            tooltip: 'Settings',
-            onTap: _openShellSettings),
       ]),
     );
   }
@@ -1818,12 +1807,7 @@ class _DesktopShellState extends State<DesktopShell>
                   ),
                   VerticalDivider(
                       width: 1, thickness: 1, color: AppColors.border),
-                  Expanded(
-                    child: Column(children: [
-                      _macNavigationBar(),
-                      Expanded(child: _mainPane()),
-                    ]),
-                  ),
+                  Expanded(child: _mainPane()),
                   if (_isSplit || _rightAgent != null) ...[
                     VerticalDivider(
                         width: 1, thickness: 1, color: AppColors.border),
@@ -2103,7 +2087,7 @@ class _DesktopShellState extends State<DesktopShell>
     ]);
   }
 
-  /// The tab strip, exactly matching the Traycer references:
+  /// The tab strip:
   /// - Individual rounded tab cards (220px wide) that scroll horizontally
   /// - Plus button immediately after the tabs
   /// - On the far right: Split pane toggle [|] and Close pane [✕]
@@ -2182,7 +2166,7 @@ class _DesktopShellState extends State<DesktopShell>
     return _macRepositoryLabel();
   }
 
-  /// One tab. Sized as an individual rounded card matching the Traycer references:
+  /// One tab. Sized as an individual rounded card:
   /// - Bounded width (180–240px, never stretched across the whole screen)
   /// - Dark card background `#1C1C22` when active, with subtle `#2E2E36` border
   /// - Two lines of text: bold title on top, muted subtitle/category below
@@ -3209,71 +3193,8 @@ class _SidebarState extends State<_Sidebar> {
           if (list.isEmpty && mc.isEmpty)
             const _SidebarEmpty('No chats yet.')
           else
-            for (final folder in order) ...[
-              ShellGroupHeader(
-                label: folder.isEmpty
-                    ? 'No folder'
-                    : lastPathSegment(folder, ifEmpty: folder),
-                icon: 'folder',
-                tone: ShellTone.artifact,
-                expanded: !_collapsed.contains(folder),
-                onToggle: () => setState(() => _toggleCollapsed(folder)),
-                // A folded group still shows how much is inside it.
-                trailing: _collapsed.contains(folder)
-                    ? Text('${groups[folder]!.length}',
-                        style: sans(10.5, color: AppColors.fg4))
-                    : null,
-              ),
-              if (!_collapsed.contains(folder))
-                for (final s in groups[folder]!) _sidebarSessionRow(s),
-            ],
-        ],
-        const SizedBox(height: 12),
-        // ---- ARTIFACTS --------------------------------------------------
-        ShellSectionHeader(
-          label: 'Artifacts',
-          expanded: !_collapsed.contains('__artifacts__'),
-          onToggle: () => setState(() => _toggleCollapsed('__artifacts__')),
-          actions: [
-            ShellSectionAction(
-              icon: 'sliders',
-              tooltip: 'Filter',
-              onTap: () {},
-            ),
-            ShellSectionAction(
-              icon: 'refresh',
-              tooltip: 'Refresh',
-              onTap: widget.onRefreshSessions,
-            ),
-            ShellSectionAction(
-              icon: 'plus',
-              tooltip: 'New artifact',
-              onTap: () {},
-            ),
-          ],
-        ),
-        if (!_collapsed.contains('__artifacts__')) ...[
-          ShellNavRow(
-            id: 'tickets',
-            label: 'Tickets',
-            icon: 'book',
-            tone: ShellTone.ticket,
-            onTap: () => widget.onSessionAction?.call('tasks'),
-          ),
-          ShellNavRow(
-            id: 'specs',
-            label: 'Specifications',
-            icon: 'file',
-            tone: ShellTone.artifact,
-            onTap: () => widget.onSessionAction?.call('files'),
-          ),
-          ShellNavRow(
-            id: 'reviews',
-            label: 'Reviews',
-            icon: 'check',
-            tone: ShellTone.review,
-            onTap: () => widget.onSessionAction?.call('coordination'),
-          ),
+            // Flat list of conversations directly under CHATS (no folder nesting)
+            for (final s in list) _sidebarSessionRow(s),
         ],
       ],
     );

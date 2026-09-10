@@ -103,14 +103,13 @@ ThemePreset _dark({
   required Color danger,
   required Color warn,
 }) {
-  // Surface ladder — each step a deliberate lift, not a lightness nudge. The
-  // shell sits on the floor; reading content lifts one step, so sidebar and
-  // canvas read as distinct planes.
-  final bg = const Color(0xFF010102); // page floor — shell / sidebar
-  final canvas = const Color(0xFF0F1011); // reading surface
-  final surface1 = const Color(0xFF141516); // cards, panels
-  final surface2 = const Color(0xFF18191A); // hovered / selected rows
-  final surface3 = const Color(0xFF191A1B); // dropdowns, popovers
+  // Surface ladder:
+  // #0C0C0F background, #121216 sidebar, #1B1B22 cards/active, #24242E hover
+  final bg = const Color(0xFF0C0C0F); // page floor — shell canvas
+  final canvas = const Color(0xFF101014); // reading surface
+  final surface1 = const Color(0xFF14141A); // cards, panels
+  final surface2 = const Color(0xFF1B1B22); // active tab / active row card
+  final surface3 = const Color(0xFF24242E); // dropdowns, popovers, hover
 
   return ThemePreset(
     name: name,
@@ -124,10 +123,9 @@ ThemePreset _dark({
     fg2: inkMuted,
     fg3: inkSubtle,
     fg4: inkFaint,
-    // Hairlines: explicit values, not white-alpha, so they stay crisp and
-    // consistent against every rung of the ladder.
-    border: const Color(0xFF23252A),
-    border2: const Color(0xFF34343A),
+    // Hairlines:
+    border: const Color(0xFF22222A),
+    border2: const Color(0xFF2E2E38),
     accent: accent,
     accentHover: _lighten(accent, 0.10),
     accentFg: const Color(0xFFFFFFFF),
@@ -144,24 +142,22 @@ ThemePreset _dark({
     diffDelBg: _withAlpha(danger, 0.10),
     diffAddFg: _lighten(success, 0.14),
     diffDelFg: _lighten(danger, 0.14),
-    diffGutter: const Color(0xFF3E3E44),
+    diffGutter: const Color(0xFF383846),
   );
 }
 
-// The only client theme. Other palettes were removed on request.
+// The only client theme.
 final _amoled = _dark(
   name: 'amoled',
   label: 'Dark',
-  // Lavender-blue, reserved for the brand mark, focus ring, and one primary
-  // action per view. Deliberately scarce: colour here carries meaning.
-  accent: const Color(0xFF5E6AD2),
-  ink: const Color(0xFFF7F8F8),
-  inkMuted: const Color(0xFFD0D6E0),
-  inkSubtle: const Color(0xFF8A8F98),
-  inkFaint: const Color(0xFF6E7380),
-  success: const Color(0xFF3FB950),
-  danger: const Color(0xFFF85149),
-  warn: const Color(0xFFD29922),
+  accent: const Color(0xFF4E88FF), // vibrant blue
+  ink: const Color(0xFFF2F2F6), // near-white
+  inkMuted: const Color(0xFF9EA0B0), // secondary
+  inkSubtle: const Color(0xFF686A78), // tertiary
+  inkFaint: const Color(0xFF4A4C58), // disabled
+  success: const Color(0xFF22C55E), // green status
+  danger: const Color(0xFFEF4444), // red danger
+  warn: const Color(0xFFF59E0B), // amber
 );
 
 List<ThemePreset> get allPresets => [_amoled];

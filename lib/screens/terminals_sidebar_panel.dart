@@ -4,7 +4,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 
-/// Sidebar panel for terminals, matching the Traycer layout:
+/// Sidebar panel for terminals:
 /// - Section header: `⌄ >_ TERMINALS` with a `+` action button.
 /// - Cards showing terminal name (e.g. `git terminal`, `dev commands`)
 ///   and workspace path subtitle.
