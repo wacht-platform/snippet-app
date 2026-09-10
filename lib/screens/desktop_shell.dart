@@ -254,6 +254,11 @@ class _DesktopShellState extends State<DesktopShell>
   // state so an unreachable daemon doesn't masquerade as "No chats yet".
   String? _sessionsError;
   bool _drawerOpen = false;
+
+  /// Phone navigation is intentionally not a collapsed desktop drawer. Chats is
+  /// a full-screen home, and one active session is its own full-screen reading
+  /// surface with a clear return affordance.
+  bool _mobileChatsOpen = true;
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
@@ -1242,7 +1247,10 @@ class _DesktopShellState extends State<DesktopShell>
     _ensurePinnedMissionControl();
     final i = _tabs
         .indexWhere((t) => t.isMissionControl && t.instanceUrl == inst.url);
-    if (i >= 0) _activateTab(i);
+    if (i >= 0) {
+      _activateTab(i);
+      if (kMobile) setState(() => _mobileChatsOpen = false);
+    }
   }
 
   void _closeOthers(int keep) {
@@ -1637,6 +1645,7 @@ class _DesktopShellState extends State<DesktopShell>
       final root = _tabs[_activeIndex];
       _groupRootKey[root.pane] = root.key;
       _activeKey[root.pane] = root.key;
+      if (kMobile) _mobileChatsOpen = false;
     });
     _persistTabs();
     _syncPage();
@@ -2514,6 +2523,43 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() => _sidebarGit = !_sidebarGit);
   }
 
+  void _showMobileChats() {
+    if (!kMobile) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _mobileChatsOpen = true);
+  }
+
+  Widget _mobileShell() {
+    final tab = _activeTab;
+    // A phone has two explicit destinations: the full Chats home and one
+    // focused reading surface. It never inherits the desktop drawer, tab strip,
+    // or split-pane mechanics just because the screen happens to be narrow.
+    if (_mobileChatsOpen || tab == null) {
+      return Scaffold(
+        backgroundColor: AppColors.bg,
+        body: SafeArea(
+          child: _sidebar(
+            topInset: false,
+            onAfterPick: () => setState(() => _mobileChatsOpen = false),
+          ),
+        ),
+      );
+    }
+    return Scaffold(
+      backgroundColor: readingBg,
+      body: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _showMobileChats();
+        },
+        child: SafeArea(
+          bottom: false,
+          child: _tabBody(tab, primary: true),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -2528,6 +2574,7 @@ class _DesktopShellState extends State<DesktopShell>
                     strokeWidth: 2, color: AppColors.fg3))),
       );
     }
+    if (kMobile) return _mobileShell();
     return _desktopShortcuts(LayoutBuilder(builder: (context, c) {
       // Narrow window → keep the native shell but collapse the sidebar to a drawer.
       if (c.maxWidth < kShellCompact) {
@@ -2699,7 +2746,7 @@ class _DesktopShellState extends State<DesktopShell>
           : () => setState(() => t.inboundShare = null),
       acceptDrops: primary,
       onTitle: (title) => _onSessionTitle(t.sessionId!, title),
-      onMenu: null,
+      onMenu: kMobile ? _showMobileChats : null,
       onOpenFileTab: (path, name) =>
           _openFileTab(t.client, t.instanceUrl, path, name),
       onOpenSession: _openSession,
@@ -4115,47 +4162,48 @@ class _SidebarState extends State<_Sidebar> {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Conversations section header with filter icon.
-                  if (hasClient && (_sessions?.isNotEmpty ?? false))
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-                      child: _selecting
-                          ? Row(children: [
-                              Text('${_selected.length} selected',
-                                  style: sans(16,
-                                      weight: W.label, color: AppColors.fg1)),
-                              const Spacer(),
-                              IconBtn('x',
-                                  size: 32,
-                                  iconSize: 18,
-                                  tooltip: 'Cancel',
-                                  onTap: _exitSelect),
-                              IconBtn('trash',
-                                  size: 32,
-                                  iconSize: 16,
-                                  tooltip: 'Delete selected',
-                                  onTap: _selected.isEmpty
-                                      ? null
-                                      : _confirmDeleteSelected),
-                            ])
-                          : Row(children: [
-                              Text('Conversations',
-                                  style: sans(20,
-                                      weight: W.label, color: AppColors.fg1)),
-                              const Spacer(),
-                              GestureDetector(
-                                onTap: _showFilterSheet,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(4),
-                                  child: AppIcon('sliders',
-                                      size: 20,
-                                      color: _filter != 'all'
-                                          ? AppColors.accent
-                                          : AppColors.fg3),
-                                ),
-                              ),
-                            ]),
-                    ),
+                  // Chats home: a labelled machine identity, then one simple
+                  // chronological list. The phone has no hidden desktop drawer
+                  // state or folder hierarchy to decode.
+                  _mobileMachineRow(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 16, 8),
+                    child: _selecting
+                        ? Row(children: [
+                            Text('${_selected.length} selected',
+                                style: sans(17,
+                                    weight: W.label, color: AppColors.fg1)),
+                            const Spacer(),
+                            IconBtn('x',
+                                size: M.minTarget,
+                                iconSize: 18,
+                                tooltip: 'Cancel',
+                                onTap: _exitSelect),
+                            IconBtn('trash',
+                                size: M.minTarget,
+                                iconSize: 17,
+                                tooltip: 'Delete selected',
+                                onTap: _selected.isEmpty
+                                    ? null
+                                    : _confirmDeleteSelected),
+                          ])
+                        : Row(children: [
+                            Text('Chats',
+                                style: sans(20,
+                                    weight: W.label, color: AppColors.fg1)),
+                            const Spacer(),
+                            IconBtn('sliders',
+                                size: M.minTarget,
+                                iconSize: 20,
+                                tooltip: 'Filter chats',
+                                onTap: _showFilterSheet),
+                            IconBtn('plus',
+                                size: M.minTarget,
+                                iconSize: 21,
+                                tooltip: 'New chat',
+                                onTap: hasClient ? widget.onNewSession : null),
+                          ]),
+                  ),
                   if (hasClient && !_selecting) _stickyMissionControl(),
                   Expanded(
                     child: !hasClient
@@ -4255,10 +4303,80 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  /// Bottom bar on mobile: full-width search pill + settings + new-chat.
+  /// Phone home owns machine identity. Keeping it as a labelled full-width row
+  /// makes connection state discoverable instead of hiding it behind an avatar.
+  Widget _mobileMachineRow() {
+    final a = widget.active;
+    final online = a == null ? null : widget.health[a.url];
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
+        child: Container(
+          height: 56,
+          margin: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.floor,
+            borderRadius: BorderRadius.circular(R.md),
+          ),
+          child: Row(children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(R.sm),
+              ),
+              child: a == null
+                  ? AppIcon('plus', size: 17, color: AppColors.fg2)
+                  : Text(
+                      (a.label.isEmpty ? '?' : a.label[0]).toUpperCase(),
+                      style: sans(13, weight: W.label, color: AppColors.fg1),
+                    ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: a == null
+                  ? Text('Add machine', style: sans(14, color: AppColors.fg1))
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(a.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(14,
+                                weight: W.label, color: AppColors.fg1)),
+                        const SizedBox(height: 2),
+                        Text(hostOf(a.url),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: mono(10.5, color: AppColors.fg4)),
+                      ],
+                    ),
+            ),
+            if (online != null)
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: online ? AppColors.ok : AppColors.fg4,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            const SizedBox(width: 10),
+            AppIcon('chevron-right', size: 17, color: AppColors.fg4),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// Bottom bar on mobile: search plus the app-level settings route.
   Widget _mobileBottomBar() {
     final hasClient = widget.client != null;
-    final a = widget.active;
     return Container(
       padding: EdgeInsets.fromLTRB(
           20,
@@ -4279,9 +4397,8 @@ class _SidebarState extends State<_Sidebar> {
               height: 40,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: AppColors.surface2,
+                color: AppColors.surface3,
                 borderRadius: BorderRadius.circular(R.sm),
-                border: Border.all(color: AppColors.border),
               ),
               child: Row(children: [
                 AppIcon('search', size: 16, color: AppColors.fg4),
@@ -4292,42 +4409,11 @@ class _SidebarState extends State<_Sidebar> {
           ),
         ),
         const SizedBox(width: 8),
-        IconBtn('folder',
-            size: 38,
-            iconSize: 19,
-            tooltip: 'Browse',
-            onTap: hasClient ? widget.onNewSession : null),
-        const SizedBox(width: 2),
         IconBtn('settings',
-            size: 38,
-            iconSize: 19,
+            size: M.minTarget,
+            iconSize: 20,
             tooltip: 'Settings',
             onTap: hasClient ? _openSettings : null),
-        const SizedBox(width: 2),
-        // Small machine avatar — tap to switch machines.
-        GestureDetector(
-          onTap: hasClient
-              ? (widget.instances.isEmpty
-                  ? widget.onAddInstance
-                  : _openMachines)
-              : null,
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border, width: 1),
-            ),
-            alignment: Alignment.center,
-            child: a == null
-                ? AppIcon('plus', size: 14, color: AppColors.fg2)
-                : Text(
-                    (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
-                    style: sans(13, weight: W.label, color: AppColors.fg1),
-                  ),
-          ),
-        ),
       ]),
     );
   }
@@ -4462,8 +4548,24 @@ class _SidebarState extends State<_Sidebar> {
             _statusMatch(_filter, s) &&
             _matchesQuery(s))
         .toList();
+    // Phone chats are one flat, chronological surface. Folder nesting is a
+    // desktop density aid; on a touch screen it obscures the one thing people
+    // came here to do: open the recent conversation.
+    if (kMobile) {
+      list.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      return RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: AppColors.surface3,
+        onRefresh: () async => widget.onRefreshSessions(),
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
+          itemCount: list.length,
+          itemBuilder: (_, i) => _sessionCard(list[i]),
+        ),
+      );
+    }
     final children = <Widget>[];
-    if (!kMobile && mc.isNotEmpty) {
+    if (mc.isNotEmpty) {
       children.add(_missionControlPin(mc.first));
     }
     final newest = <String, int>{};
@@ -4778,24 +4880,28 @@ class _SidebarState extends State<_Sidebar> {
           )
         : null;
     if (kMobile) {
-      return GestureDetector(
-        onTap: open,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.accentBg : AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(
-              color: selected ? AppColors.accentLine : AppColors.border,
-            ),
+      return Material(
+        color: selected ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.sm),
+          onTap: open,
+          child: Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(children: [
+              AppIcon('layers',
+                  size: 17, color: selected ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Text('Mission Control',
+                    style: sans(15,
+                        weight: W.label,
+                        color: selected ? AppColors.fg1 : AppColors.fg2)),
+              ),
+              if (status != null) status,
+            ]),
           ),
-          child: Row(children: [
-            Expanded(
-              child: Text('Mission Control',
-                  style: sans(15.5, weight: W.label, color: AppColors.fg1)),
-            ),
-            if (status != null) status,
-          ]),
         ),
       );
     }
@@ -4943,73 +5049,77 @@ class _SidebarState extends State<_Sidebar> {
     final waiting = s.status == 'waiting_for_input';
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
-    return GestureDetector(
-      onTap: renaming
-          ? null
-          : () {
-              if (_selecting) {
-                _toggleSelected(s.id);
-              } else {
-                widget.onOpenSession(s.id, s.title, s.profile);
-              }
-            },
-      onLongPress: renaming
-          ? null
-          : () {
-              if (_selecting) {
-                _toggleSelected(s.id);
-              } else {
-                _enterSelect(seed: s.id);
-              }
-            },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-        decoration: BoxDecoration(
-          color: checked ? AppColors.accentBg : AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          if (_selecting) ...[
-            AppIcon(checked ? 'check' : 'plus',
-                size: 16, color: checked ? AppColors.accent : AppColors.fg4),
-            const SizedBox(width: 10),
-          ],
-          Expanded(
-            child: renaming
-                ? _inlineRenameField(s, compact: false)
-                : Text(
-                    s.title.isEmpty ? '(untitled)' : s.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(15.5, color: AppColors.fg1),
+    final selected = s.id == widget.selectedSessionId;
+    return Material(
+      color: selected || checked ? AppColors.surface2 : Colors.transparent,
+      borderRadius: BorderRadius.circular(R.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.sm),
+        onTap: renaming
+            ? null
+            : () {
+                if (_selecting) {
+                  _toggleSelected(s.id);
+                } else {
+                  widget.onOpenSession(s.id, s.title, s.profile);
+                }
+              },
+        onLongPress: renaming
+            ? null
+            : () {
+                if (_selecting) {
+                  _toggleSelected(s.id);
+                } else {
+                  _enterSelect(seed: s.id);
+                }
+              },
+        child: SizedBox(
+          height: 56,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 14, right: 6),
+            child: Row(children: [
+              if (_selecting) ...[
+                AppIcon(checked ? 'check' : 'plus',
+                    size: 16,
+                    color: checked ? AppColors.accent : AppColors.fg4),
+                const SizedBox(width: 10),
+              ] else if (running || waiting) ...[
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: running ? AppColors.run : AppColors.accent,
+                    shape: BoxShape.circle,
                   ),
-          ),
-          if (!renaming) ...[
-            const SizedBox(width: 10),
-            Text(relativeTime(s.lastActive),
-                style: sans(12, color: AppColors.fg4)),
-          ],
-          if (!_selecting && (running || waiting)) ...[
-            const SizedBox(width: 8),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: running ? AppColors.run : AppColors.accent,
-                shape: BoxShape.circle,
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: renaming
+                    ? _inlineRenameField(s, compact: false)
+                    : Text(
+                        s.title.isEmpty ? '(untitled)' : s.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(15,
+                            color: selected ? AppColors.fg1 : AppColors.fg2),
+                      ),
               ),
-            ),
-          ],
-          if (!_selecting && !renaming) ...[
-            const SizedBox(width: 2),
-            IconBtn('more-vertical',
-                size: 32,
-                iconSize: 16,
-                tooltip: 'Options',
-                onTap: () => _sessionActions(s)),
-          ],
-        ]),
+              if (!renaming) ...[
+                Text(relativeTime(s.lastActive),
+                    style: sans(11.5, color: AppColors.fg4)),
+                if (!_selecting) ...[
+                  const SizedBox(width: 2),
+                  IconBtn('more-vertical',
+                      size: M.minTarget,
+                      iconSize: 17,
+                      tooltip: 'Options',
+                      onTap: () => _sessionActions(s)),
+                ],
+              ],
+            ]),
+          ),
+        ),
       ),
     );
   }

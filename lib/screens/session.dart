@@ -2384,9 +2384,15 @@ class _SessionScreenState extends State<SessionScreen>
     // Keep the model selector in the composer, where it is always visible.
     final facts = <String>[statusWord];
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
       decoration: BoxDecoration(color: readingBg),
       child: Row(children: [
+        if (widget.onMenu != null)
+          IconBtn('chevron-left',
+              size: M.minTarget,
+              iconSize: 20,
+              tooltip: 'Chats',
+              onTap: widget.onMenu),
         Expanded(
           child: InkWell(
             onTap: () => _openActions(s),

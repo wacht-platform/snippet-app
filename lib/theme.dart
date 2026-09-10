@@ -103,19 +103,15 @@ ThemePreset _dark({
   required Color danger,
   required Color warn,
 }) {
-  // Measured surface ladder. Depth is expressed by darkening, and the reading
-  // surface is the darkest thing on screen — not a raised card.
-  //   canvas  — chat / editor / viewer; content recedes into near-black
-  //   bg      — ALL chrome: window, top bar, strip, sidebar, status line
-  //   surface1-3 — cards → active row → popover, each one step lighter
-  // Separation comes from these steps, not from drawn lines: the reference uses
-  // zero borders anywhere in its tree.
-  final canvas = const Color(0xFF010101); // chat / reader — darkest
-  final bg = const Color(0xFF171717); // chrome: rail, sidebar, body
-  final floor = const Color(0xFF0D0D0D); // window + secondary pane
-  final surface1 = const Color(0xFF222222); // cards, selected row
-  final surface2 = const Color(0xFF2A2A2A); // hover, secondary active
-  final surface3 = const Color(0xFF2D2D2D); // chips, popovers, inputs
+  // One dark surface ladder for desktop and phone. Reading content is the
+  // darkest plane; shell chrome, active rows, and inputs step upward without
+  // borders or card shadows inventing a separate visual language.
+  final canvas = const Color(0xFF0C0C0F); // chat / reader — darkest
+  final bg = const Color(0xFF101014); // shell chrome and navigation
+  final floor = const Color(0xFF14141A); // secondary panes and sheets
+  final surface1 = const Color(0xFF16161D); // quiet raised content
+  final surface2 = const Color(0xFF1B1B22); // active row / selection
+  final surface3 = const Color(0xFF22222A); // inputs, menus, hover
 
   return ThemePreset(
     name: name,
