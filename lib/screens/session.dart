@@ -78,9 +78,12 @@ class SessionScreen extends StatefulWidget {
           void Function(String action, [String? extra]) performAction)?
       onMacControls;
 
-  /// Publishes this session's terminals to the macOS shell sidebar. Called only
-  /// when the terminal set or focus changes, not on output.
-  final void Function(List<TerminalInfo> terminals, int focus)? onMacTerminals;
+  /// Publishes this session's terminals to the shell as a render host. Called
+  /// only when the terminal set or focus changes, never on output.
+  ///
+  /// The shell owns WHERE a terminal renders; the session owns its lifecycle
+  /// (it is the only side holding the pty). See [TerminalHost].
+  final void Function(TerminalHost host, bool open)? onTerminalHost;
 
   /// Desktop PageView keeps every tab mounted. Only the visible session should
   /// accept file drops — otherwise every keep-alive DropTarget ingests the same
@@ -111,7 +114,7 @@ class SessionScreen extends StatefulWidget {
       this.onOpenSession,
       this.onMacStatus,
       this.onMacControls,
-      this.onMacTerminals,
+      this.onTerminalHost,
       this.acceptDrops = true,
       this.inboundShare,
       this.onShareConsumed,
@@ -1243,23 +1246,84 @@ class _SessionScreenState extends State<SessionScreen>
     _publishTerminals();
   }
 
-  /// Hand the current terminal set to the shell sidebar.
+  /// Hand the shell a host for this session's terminals, plus whether the pane
+  /// should currently be showing.
   ///
-  /// Cheap and idempotent; called from the paths that can change the set or the
-  /// focused index, not from the output stream.
+  /// Cheap and idempotent; called from the paths that can change the set, the
+  /// focus, or the open flag — never from the output stream.
   void _publishTerminals() {
-    widget.onMacTerminals?.call(
-      [
-        for (final t in _terms)
-          TerminalInfo(
-            id: t.id,
-            title: t.title,
-            alive: t.alive,
-            live: t.live,
-          ),
-      ],
-      _termFocus,
+    final publish = widget.onTerminalHost;
+    if (publish == null) return;
+    publish(
+      TerminalHost(
+        terms: [
+          for (final t in _terms)
+            TerminalInfo(
+              id: t.id,
+              title: t.title,
+              alive: t.alive,
+              live: t.live,
+            ),
+        ],
+        focus: _termFocus,
+        buildView: _buildTermView,
+        onFocus: _focusTermById,
+        onRequestNew: () => _openTerm(fresh: true),
+        onRequestClose: _closeTerm,
+      ),
+      // `_termOpen` is the "not minimized" flag. Minimizing hides the pane but
+      // deliberately keeps the pty alive — only the sidebar destroys a shell.
+      _termOpen,
     );
+  }
+
+  /// Render one terminal by id, for whichever pane is currently hosting it.
+  ///
+  /// The shell owns the pane; the session owns the socket and the view's input
+  /// wiring, so it must supply the widget rather than expose the `Terminal`.
+  Widget _buildTermView(String id, {required bool mobileKeys}) {
+    final t = _terms.firstWhere((e) => e.id == id, orElse: () => _terms.first);
+    return SessionTermView(
+      alive: t.alive,
+      terminal: t.terminal,
+      onInput: (bytes) => _termInFor(t.id, bytes),
+      onResize: (cols, rows) => _termResizeFor(t.id, cols, rows),
+      onClose: () => _closeTerm(t.id),
+      mobileKeys: mobileKeys,
+      showChrome: false,
+    );
+  }
+
+  /// Focus a terminal by id. The shell knows ids; the session knows order.
+  void _focusTermById(String id) {
+    final i = _terms.indexWhere((t) => t.id == id);
+    if (i >= 0) _focusTerm(i);
+  }
+
+  void _termInFor(String id, Uint8List bytes) {
+    _send({
+      'wire': 'term',
+      'op': 'in',
+      'id': id,
+      'data': base64Encode(bytes),
+    });
+  }
+
+  void _termResizeFor(String id, int cols, int rows) {
+    for (final t in _terms) {
+      if (t.id == id) {
+        t.cols = cols;
+        t.rows = rows;
+        break;
+      }
+    }
+    _send({
+      'wire': 'term',
+      'op': 'resize',
+      'id': id,
+      'cols': cols,
+      'rows': rows,
+    });
   }
 
   void _termIn(Uint8List bytes) {
@@ -2245,12 +2309,15 @@ class _SessionScreenState extends State<SessionScreen>
                           _centerWide(_inputBar(running)),
                       ]),
                 ),
-                // Desktop: the terminal is a second pane BESIDE the chat
-                // rather than a drawer stacked under it. The drawer fought the
-                // transcript for vertical space and hid the composer; side by
-                // side both stay usable, and it doubles as the chat/terminal
-                // split.
-                if (_termOpen && _terms.isNotEmpty && !kMobile)
+                // Desktop, standalone: the terminal is a second pane BESIDE the
+                // chat. When embedded, the SHELL owns this pane instead — a
+                // terminal must survive switching sessions, which a session-local
+                // pane cannot do, so the session only renders it when it is the
+                // outermost desktop surface.
+                if (_termOpen &&
+                    _terms.isNotEmpty &&
+                    !kMobile &&
+                    !widget.embedded)
                   _desktopTermPane(),
               ],
             ),
@@ -2712,6 +2779,18 @@ class _SessionScreenState extends State<SessionScreen>
         return;
       case 'shell_new':
         if (!_isMissionControl) _openTerm(fresh: true);
+        return;
+      // Called from the SIDEBAR's terminal panel. Creating a shell is the
+      // sidebar's job; showing the resulting pane is the shell's. Kept separate
+      // from `shell_new` so the sidebar's + does not depend on the pane's own
+      // toggle logic.
+      case 'shell_create':
+        if (!_isMissionControl) _openTerm(fresh: true);
+        return;
+      // Destroy a shell. Only the sidebar can do this — the pane may only
+      // minimize, so a pty is never lost by collapsing a view.
+      case 'shell_close':
+        if (extra != null && extra.isNotEmpty) _closeTerm(extra);
         return;
       case 'shell_focus':
         // `extra` is the terminal index, from the shell's terminal panel.
@@ -4517,6 +4596,76 @@ class TerminalInfo {
 
   /// At least one output frame has arrived, so the terminal has a prompt.
   final bool live;
+}
+
+/// The bridge that lets the SHELL render a terminal the session owns.
+///
+/// Why a host object and not just the `Terminal`: a `Terminal` is a live view
+/// model with a view attached — it can only be mounted in one place at a time.
+/// The session owns these (it holds the pty socket), but the pane they render
+/// in belongs to the shell. Handing the shell the object directly would mean two
+/// widgets racing for one terminal.
+///
+/// So the shell holds this host and asks it to render by id. Creation and
+/// destruction stay with the session, which is the only thing that can talk to
+/// the socket — matching the rule that a shell is created and destroyed from the
+/// sidebar's terminal panel, never from the pane itself.
+///
+/// The view builder is a closure rather than a public `Terminal` so the terminal
+/// cannot be captured twice: the session decides how its terminals are rendered,
+/// and the shell decides where.
+class TerminalHost {
+  TerminalHost({
+    required this.terms,
+    required this.focus,
+    required this.buildView,
+    required void Function(String id) onFocus,
+    required void Function() onRequestNew,
+    required void Function(String id) onRequestClose,
+  })  : _focus = onFocus,
+        _new = onRequestNew,
+        _close = onRequestClose;
+
+  /// Snapshot of the terminals the session currently holds.
+  final List<TerminalInfo> terms;
+
+  /// Index of the focused terminal, or -1 when none is selected.
+  final int focus;
+
+  /// Renders one terminal by id. Supplied by the session, which owns the view's
+  /// input and resize wiring.
+  final Widget Function(String id, {required bool mobileKeys}) buildView;
+
+  final void Function(String id) _focus;
+  final void Function() _new;
+  final void Function(String id) _close;
+
+  /// Focus a terminal by id — the shell knows ids, the session knows order.
+  void focusTerm(String id) => _focus(id);
+
+  /// Ask the session to create a terminal. The session mints the id, because it
+  /// is the only side that can open a pty.
+  void newTerminal() => _new();
+
+  /// Destroy a terminal. Only the session can close the pty.
+  void closeTerm(String id) => _close(id);
+
+  /// The id to render: the focused one, else the first, else none.
+  String? get activeId {
+    if (terms.isEmpty) return null;
+    final i = focus >= 0 && focus < terms.length ? focus : 0;
+    return terms[i].id;
+  }
+
+  /// The focused terminal's descriptor, or null when there are none.
+  TerminalInfo? get active {
+    final id = activeId;
+    if (id == null) return null;
+    for (final t in terms) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
 }
 
 class _QueuedBubble extends StatelessWidget {

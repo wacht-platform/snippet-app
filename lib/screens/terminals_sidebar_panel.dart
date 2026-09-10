@@ -19,6 +19,7 @@ class TerminalsSidebarPanel extends StatelessWidget {
     required this.focus,
     required this.onNewTerminal,
     required this.onOpenTerminal,
+    required this.onCloseTerminal,
   });
 
   final String workspacePath;
@@ -32,6 +33,10 @@ class TerminalsSidebarPanel extends StatelessWidget {
 
   final VoidCallback onNewTerminal;
   final ValueChanged<int> onOpenTerminal;
+
+  /// Destroy a terminal. This — or the + above — is the ONLY way a shell is
+  /// created or destroyed; the pane can only minimize it.
+  final ValueChanged<String> onCloseTerminal;
 
   @override
   Widget build(BuildContext context) {
@@ -97,10 +102,23 @@ class TerminalsSidebarPanel extends StatelessWidget {
       tone: ShellTone.neutral,
       selected: selected,
       onTap: () => onOpenTerminal(i),
-      // A running pty gets a live dot in the trailing slot; an exited one stays
-      // quiet rather than showing a "dead" state, since the row is still
-      // openable (the shell reattaches).
-      trailing: t.alive ? const StatusDot(status: 'online', size: 7) : null,
+      // Alive dot on the left of the close affordance, so a running pty reads
+      // at a glance while the row stays a single 26px line.
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (t.alive) ...[
+          const StatusDot(status: 'online', size: 7),
+          const SizedBox(width: 6),
+        ],
+        // Destroying lives here, not in the pane: the pane can only minimize.
+        GestureDetector(
+          onTap: () => onCloseTerminal(t.id),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: AppIcon('x', size: 12, color: AppColors.fg4),
+          ),
+        ),
+      ]),
     );
   }
 }

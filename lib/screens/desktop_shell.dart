@@ -141,6 +141,7 @@ class _MacSessionControls {
 /// belong beside it, and tapping the same band button again closes the pane.
 enum _RightPanel {
   none('', ''),
+  terminal('Terminal', 'terminal'),
   lanes('Lanes', 'layers'),
   checkpoints('Checkpoints', 'history'),
   usage('Usage', 'activity');
@@ -181,10 +182,23 @@ class _DesktopShellState extends State<DesktopShell>
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
   final Map<String, _MacSessionControls> _macSessionControls = {};
 
-  /// Terminals per open tab key, published by the mounted `SessionScreen`.
-  /// Updated only when the set or focus changes, never on output.
-  final Map<String, List<TerminalInfo>> _macTerminals = {};
-  final Map<String, int> _macTerminalFocus = {};
+  /// Terminals, bridged from each mounted `SessionScreen`.
+  ///
+  /// The session owns the pty and the ids; the SHELL owns the pane. A terminal
+  /// therefore outlives switching sessions — which it must, because you start a
+  /// shell and then keep reading the chat.
+  final Map<String, TerminalHost> _termHosts = {};
+
+  /// Whether each tab's session currently wants its terminal pane open.
+  /// `_termOpen` in the session; the shell honours it but can also minimize
+  /// independently without killing the pty.
+  final Map<String, bool> _termPaneOpen = {};
+
+  /// The user collapsed the terminal pane. Kept separate from the session's
+  /// `_termOpen` so minimizing never destroys a shell — only the sidebar's
+  /// terminal panel closes one.
+  bool _termMinimized = false;
+
   GitStatus? _macGit;
   String _macGitKey = '';
 
@@ -198,6 +212,14 @@ class _DesktopShellState extends State<DesktopShell>
   // /sessions refetch so the list doesn't flicker back to stale.
   final Map<String, String> _liveStatus = {};
   bool _sidebarGit = false;
+
+  /// Secondary-pane width, dragged by its handle. Width-driven rather than a
+  /// flex ratio because a flex ratio cannot be dragged and has no natural size.
+  double _paneWidth = kPaneDefaultWidth;
+
+  /// Whether the pointer is over the 6px resize zone, so the rule only shows on
+  /// hover (the reference draws no divider at rest).
+  bool _paneHandleHover = false;
 
   /// Which contextual sidebar the rail is showing. Purely a shell concern: the
   /// conversation you're reading stays put while this changes.
@@ -224,10 +246,20 @@ class _DesktopShellState extends State<DesktopShell>
   _RightPanel _rightPanel = _RightPanel.none;
 
   /// Is the secondary pane showing anything at all?
-  bool get _rightPaneOpen =>
-      _rightAgent != null ||
-      _splitTab != null ||
-      _rightPanel != _RightPanel.none;
+  bool get _rightPaneOpen {
+    // The terminal pane can be MINIMIZED, which hides it without touching the
+    // pty — the shell survives so reopening is instant and focus is preserved.
+    // Only the sidebar's terminal panel destroys a shell.
+    if (_rightPanel == _RightPanel.terminal) {
+      final key = _activeTab?.key;
+      final host = key == null ? null : _termHosts[key];
+      if (host == null || host.terms.isEmpty) return false;
+      if (_termMinimized) return false;
+    }
+    return _rightAgent != null ||
+        _splitTab != null ||
+        _rightPanel != _RightPanel.none;
+  }
 
   /// Show a session panel in the pane, or close it if it is already showing.
   void _toggleRightPanel(_RightPanel p) {
@@ -600,8 +632,8 @@ class _DesktopShellState extends State<DesktopShell>
   void _clearTabState(String key) {
     _macSessionStatuses.remove(key);
     _macSessionControls.remove(key);
-    _macTerminals.remove(key);
-    _macTerminalFocus.remove(key);
+    _termHosts.remove(key);
+    _termPaneOpen.remove(key);
   }
 
   void _setMacSessionStatus(String key, HarnessState? state, bool running) {
@@ -618,25 +650,53 @@ class _DesktopShellState extends State<DesktopShell>
     if (mounted) setState(() {});
   }
 
-  /// Record a tab's terminals so the shell's terminal panel can list them.
+  /// Record a tab's terminal host so the shell's pane can render it.
   ///
   /// Skips `setState` when nothing actually changed: `SessionScreen` publishes
   /// this on every `alive`/`live` transition, and rebuilding the whole shell to
   /// discover an identical list would be wasted frames.
-  void _setMacTerminals(String key, List<TerminalInfo> terms, int focus) {
-    final prev = _macTerminals[key];
+  void _setTerminalHost(String key, TerminalHost host, bool open) {
+    final prev = _termHosts[key];
+    final prevTerms = prev?.terms ?? const <TerminalInfo>[];
+    final hostTerms = host.terms;
     final changed = prev == null ||
-        prev.length != terms.length ||
-        focus != _macTerminalFocus[key] ||
+        prevTerms.length != hostTerms.length ||
+        host.focus != prev.focus ||
+        [_termPaneOpen[key] != open].any((x) => x) ||
         [
-          for (var i = 0; i < terms.length; i++)
-            prev[i].id != terms[i].id ||
-                prev[i].title != terms[i].title ||
-                prev[i].alive != terms[i].alive ||
-                prev[i].live != terms[i].live,
+          for (var i = 0; i < hostTerms.length; i++)
+            prevTerms[i].id != hostTerms[i].id ||
+                prevTerms[i].title != hostTerms[i].title ||
+                prevTerms[i].alive != hostTerms[i].alive ||
+                prevTerms[i].live != hostTerms[i].live,
         ].any((x) => x);
-    _macTerminals[key] = terms;
-    _macTerminalFocus[key] = focus;
+
+    _termHosts[key] = host;
+    // Capture BEFORE assigning: the un-minimize check below compares against
+    // the previous value, and assigning first made it permanently false.
+    final wasOpen = _termPaneOpen[key] ?? false;
+    _termPaneOpen[key] = open;
+
+    // A terminal created from the SIDEBAR must reveal the pane: creating is the
+    // sidebar's job, showing the result is the shell's. Only auto-open on the
+    // 0 -> n transition so a deliberate minimize is not undone by the next
+    // publish (publishes also fire on alive/live transitions).
+    if (prevTerms.isEmpty && hostTerms.isNotEmpty) {
+      _termMinimized = false;
+      _rightPanel = _RightPanel.terminal;
+    }
+    // An explicit open from the sidebar (false -> true) un-minimizes. Without
+    // this, tapping a terminal in the sidebar would flip the session's open flag
+    // but the shell would keep showing a minimized pane.
+    if (open && !wasOpen && hostTerms.isNotEmpty) {
+      _termMinimized = false;
+      _rightPanel = _RightPanel.terminal;
+    }
+    // Every shell gone: the pane has nothing left to show.
+    if (hostTerms.isEmpty && _rightPanel == _RightPanel.terminal) {
+      _rightPanel = _RightPanel.none;
+      _termMinimized = false;
+    }
     if (changed && mounted) setState(() {});
   }
 
@@ -1627,14 +1687,17 @@ class _DesktopShellState extends State<DesktopShell>
     // the sessions panel — you inspect a session's diff, not the agent list.
     if (_section == ShellSection.terminal) {
       final key = _activeTab?.key;
+      final host = key == null ? null : _termHosts[key];
       panel = TerminalsSidebarPanel(
         workspacePath: _activeWorkspaceFolder() ?? '',
-        terminals: key == null
-            ? const <TerminalInfo>[]
-            : (_macTerminals[key] ?? const <TerminalInfo>[]),
-        focus: key == null ? -1 : (_macTerminalFocus[key] ?? -1),
-        onNewTerminal: () => _dispatchSessionAction('shell_new'),
+        terminals: host?.terms ?? const <TerminalInfo>[],
+        focus: host?.focus ?? -1,
+        // Create and destroy happen HERE, in the sidebar: the pane can only
+        // minimize. `shell_create` mints the id in the session; the shell then
+        // reveals the pane so a new terminal is never invisible.
+        onNewTerminal: () => _dispatchSessionAction('shell_create'),
         onOpenTerminal: (idx) => _dispatchSessionAction('shell_focus', '$idx'),
+        onCloseTerminal: (id) => _dispatchSessionAction('shell_close', id),
       );
     } else if (_section == ShellSection.agents) {
       final client = _client;
@@ -2394,9 +2457,8 @@ class _DesktopShellState extends State<DesktopShell>
           ? (stop, performAction) =>
               _setMacSessionControls(t.key, stop, performAction)
           : null,
-      onMacTerminals: !kMobile
-          ? (terms, focus) => _setMacTerminals(t.key, terms, focus)
-          : null,
+      onTerminalHost:
+          !kMobile ? (host, open) => _setTerminalHost(t.key, host, open) : null,
     );
   }
 
@@ -2408,6 +2470,9 @@ class _DesktopShellState extends State<DesktopShell>
   /// the two cannot diverge.
   Widget _bodyRow({required bool topInset}) {
     final multi = _rightPaneOpen;
+    // Width-driven, not flex-driven: a fixed flex ratio cannot be dragged, and
+    // the pane has a natural width (a terminal needs columns; a readout does
+    // not stretch to 45% of a 4K window).
     final row = Row(children: [
       SizedBox(
         width: kSidebarWidth,
@@ -2416,15 +2481,18 @@ class _DesktopShellState extends State<DesktopShell>
       // No divider: the sidebar (bg) and the chat canvas are different
       // surfaces, which is the separation.
       Expanded(
-        // The reference splits the post-sidebar width 55:45, not 50:50 — the
-        // transcript is the primary surface and the detail pane is secondary.
-        flex: multi ? 55 : 1,
         child: _paneSurface(
           roundRight: !multi,
           child: _mainPane(),
         ),
       ),
-      if (multi) Expanded(flex: 45, child: _rightPane()),
+      if (multi) ...[
+        _paneResizeHandle(),
+        SizedBox(
+          width: _paneWidth.clamp(kPaneMinWidth, double.infinity),
+          child: _rightPane(),
+        ),
+      ],
     ]);
     return Expanded(
       child: DragTarget<_ShellTab>(
@@ -2437,6 +2505,34 @@ class _DesktopShellState extends State<DesktopShell>
       ),
     );
   }
+
+  /// 6px grab zone between the panes. The reference has no drawn divider — the
+  /// surface step separates them — so the rule only appears on hover.
+  Widget _paneResizeHandle() => MouseRegion(
+        cursor: SystemMouseCursors.resizeColumn,
+        onEnter: (_) => setState(() => _paneHandleHover = true),
+        onExit: (_) => setState(() => _paneHandleHover = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragUpdate: (d) {
+            setState(() {
+              // Dragging left GROWS the right pane, hence the negation.
+              final max = MediaQuery.sizeOf(context).width * 0.72;
+              _paneWidth = (_paneWidth - d.delta.dx).clamp(kPaneMinWidth, max);
+            });
+          },
+          child: SizedBox(
+            width: 6,
+            child: Center(
+              child: Container(
+                width: 1,
+                color:
+                    _paneHandleHover ? AppColors.border2 : Colors.transparent,
+              ),
+            ),
+          ),
+        ),
+      );
 
   /// Contents of the secondary pane. The caller supplies the flex, so this
   /// returns content only.
@@ -2499,6 +2595,16 @@ class _DesktopShellState extends State<DesktopShell>
         body =
             s == null ? const SizedBox.shrink() : SessionUsagePanel(state: s);
         break;
+      case _RightPanel.terminal:
+        final host = tab == null ? null : _termHosts[tab.key];
+        body = host == null || host.terms.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('No terminals. Create one from the sidebar.',
+                    style: sans(12.5, color: AppColors.fg3)),
+              )
+            : host.buildView(host.activeId!, mobileKeys: false);
+        break;
       case _RightPanel.none:
         body = const SizedBox.shrink();
     }
@@ -2515,11 +2621,21 @@ class _DesktopShellState extends State<DesktopShell>
           tabs: [PaneTab(label: _rightPanel.label, icon: _rightPanel.icon)],
           activeIndex: 0,
           actions: [
-            IconBtn('x',
-                size: 24,
-                iconSize: 12,
-                tooltip: 'Close pane',
-                onTap: _closeSplitPane),
+            // A terminal MINIMIZES; it is never destroyed here. Destroying is
+            // the sidebar panel's job, so a collapsed view can never take a
+            // running pty with it.
+            if (_rightPanel == _RightPanel.terminal)
+              IconBtn('minimize',
+                  size: 24,
+                  iconSize: 12,
+                  tooltip: 'Minimize pane',
+                  onTap: () => setState(() => _termMinimized = true))
+            else
+              IconBtn('x',
+                  size: 24,
+                  iconSize: 12,
+                  tooltip: 'Close pane',
+                  onTap: _closeSplitPane),
           ],
         ),
         Expanded(child: body),
@@ -2646,9 +2762,9 @@ class _DesktopShellState extends State<DesktopShell>
                                         _setMacSessionControls(
                                             t.key, stop, performAction)
                                     : null,
-                                onMacTerminals: !kMobile
-                                    ? (terms, focus) =>
-                                        _setMacTerminals(t.key, terms, focus)
+                                onTerminalHost: !kMobile
+                                    ? (host, open) =>
+                                        _setTerminalHost(t.key, host, open)
                                     : null,
                               ),
                   );

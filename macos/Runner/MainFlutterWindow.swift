@@ -9,7 +9,14 @@ class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     self.contentViewController = flutterViewController
-    self.minSize = NSSize(width: 720, height: 500)
+    // Floor for resizing. Below this the three-pane desktop layout
+    // (sidebar 300 + chat + secondary pane 280) has no room and the chrome
+    // starts clipping, so the window refuses to go smaller.
+    //
+    // Deliberately BELOW the Flutter desktop breakpoint (900) so the
+    // narrow-desktop drawer layout stays reachable between 800 and 900 —
+    // pinning the floor at 900 would make that path dead code on macOS.
+    self.minSize = NSSize(width: 800, height: 600)
     // Use the native traffic lights, but let Flutter paint a cohesive title
     // surface beneath them instead of leaving a separate blank title strip.
     self.title = "snippet"
