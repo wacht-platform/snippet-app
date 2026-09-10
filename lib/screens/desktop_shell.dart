@@ -2263,6 +2263,7 @@ class _DesktopShellState extends State<DesktopShell>
   /// moves it into the secondary pane. Shared by the macOS and plain layouts so
   /// the two cannot diverge.
   Widget _bodyRow({required bool topInset}) {
+    final multi = _rightPaneOpen;
     final row = Row(children: [
       SizedBox(
         width: kSidebarWidth,
@@ -2271,12 +2272,15 @@ class _DesktopShellState extends State<DesktopShell>
       // No divider: the sidebar (bg) and the chat canvas are different
       // surfaces, which is the separation.
       Expanded(
+        // The reference splits the post-sidebar width 55:45, not 50:50 — the
+        // transcript is the primary surface and the detail pane is secondary.
+        flex: multi ? 55 : 1,
         child: _paneSurface(
-          roundRight: !_rightPaneOpen,
+          roundRight: !multi,
           child: _mainPane(),
         ),
       ),
-      if (_rightPaneOpen) _rightPane(),
+      if (multi) Expanded(flex: 45, child: _rightPane()),
     ]);
     return Expanded(
       child: DragTarget<_ShellTab>(
@@ -2290,41 +2294,36 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  /// The secondary pane.
+  /// Contents of the secondary pane. The caller supplies the flex, so this
+  /// returns content only.
   ///
   /// Default state is a SINGLE pane: nothing here unless something was
   /// deliberately moved across. There is no split toggle — dragging a tab out
-  /// of the strip is what creates this pane (`_splitWith`), which is why the
-  /// old second-tab-and-a-button behaviour is gone: it made a split appear just
-  /// because two tabs were open.
+  /// of the strip is what creates this pane (`_splitWith`).
   Widget _rightPane() {
     if (_rightAgent != null) {
-      return SizedBox(
-        width: 360,
-        child: CoordinationAgentDetail(
-          agent: _rightAgent!,
-          embedded: true,
-          onClose: _closeSplitPane,
-        ),
+      return CoordinationAgentDetail(
+        agent: _rightAgent!,
+        embedded: true,
+        onClose: _closeSplitPane,
       );
     }
     final t = _splitTab;
     if (t == null) return const SizedBox.shrink();
-    return Expanded(
-      child: Container(
-        // Floor surface with a rounded outer corner, mirroring the chat pane.
-        decoration: BoxDecoration(
-          color: AppColors.floor,
-          borderRadius: BorderRadius.only(
-            topRight: Radius.circular(R.sheetTop),
-            bottomRight: Radius.circular(R.sheetTop),
-          ),
+    return Container(
+      // Floor surface, rounded on the TOP-RIGHT only. The reference leaves the
+      // bottom-right square: the pane is flush to the window's bottom edge, so
+      // a bottom curve would cut a notch out of the window frame.
+      decoration: BoxDecoration(
+        color: AppColors.floor,
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(R.sheetTop),
         ),
-        child: Column(children: [
-          _splitHeader(t),
-          Expanded(child: _tabBody(t, primary: false)),
-        ]),
       ),
+      child: Column(children: [
+        _splitHeader(t),
+        Expanded(child: _tabBody(t, primary: false)),
+      ]),
     );
   }
 
