@@ -1390,82 +1390,6 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  /// Bottom status line, matching the reference: connection + workspace on the
-  /// left, context remaining on the right.
-  ///
-  /// Deliberately NOT an action toolbar. The reference keeps this row to state;
-  /// the nine shortcuts that used to live here are all reachable from the
-  /// command palette (⌘K) and the session menu, and a 30px strip cannot hold
-  /// nine labelled buttons without reading as clutter.
-  Widget _macStatusBar() {
-    final tab = _activeTab;
-    final status = tab == null ? null : _macSessionStatuses[tab.key];
-    final state = status?.state;
-    final connected = _client != null;
-    final workspace = _macRepositoryLabel();
-    // Context remaining, computed from what the harness actually reports: the
-    // last prompt's token count against the model's window. Shown only when the
-    // window is known, so we never invent a percentage.
-    int? contextLeft;
-    if (state != null && state.contextWindow > 0) {
-      final used = state.lastPromptTokens > 0
-          ? state.lastPromptTokens
-          : state.promptTokens;
-      if (used > 0) {
-        final left =
-            ((1 - (used / state.contextWindow)) * 100).clamp(0, 100).round();
-        contextLeft = left;
-      }
-    }
-
-    return Container(
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      // The status line sits on the floor surface. No top border: the step
-      // between this and the body above is the separation.
-      color: AppColors.floor,
-      child: Row(children: [
-        StatusDot(status: connected ? 'online' : 'offline', size: 6),
-        const SizedBox(width: 7),
-        Text(connected ? 'Local Daemon' : 'Offline',
-            style:
-                sans(11, color: connected ? AppColors.fg3 : AppColors.danger)),
-        const SizedBox(width: 9),
-        Text('•', style: sans(11, color: AppColors.fg4)),
-        const SizedBox(width: 9),
-        // Workspace, with the picker affordance the reference shows.
-        Flexible(
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon('folder', size: 11, color: AppColors.fg4),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(workspace,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(11, color: AppColors.fg3)),
-            ),
-            const SizedBox(width: 2),
-            AppIcon('chevron-down', size: 11, color: AppColors.fg4),
-          ]),
-        ),
-        const Spacer(),
-        if (state?.compacting == true) ...[
-          Text('Compacting', style: sans(11, color: AppColors.accent)),
-          const SizedBox(width: 12),
-        ] else if (state?.status == 'waiting_for_input') ...[
-          Text('Needs input', style: sans(11, color: AppColors.accent)),
-          const SizedBox(width: 12),
-        ] else if (status?.running == true) ...[
-          Text('Running', style: sans(11, color: AppColors.run)),
-          const SizedBox(width: 12),
-        ],
-        if (contextLeft != null)
-          Text('$contextLeft% context left',
-              style: sans(11, color: AppColors.fg4)),
-      ]),
-    );
-  }
-
   Widget _macWindowBar() {
     // `fullSizeContentView` does not expose the native titlebar inset through
     // MediaQuery, so that value is false even while traffic lights are visible.
@@ -1494,61 +1418,93 @@ class _DesktopShellState extends State<DesktopShell>
             right: 12,
           ),
           child: Row(
+            // Children fill the bar's full height: the tab strip then sits on
+            // the bottom edge and merges into the band below it (the browser
+            // silhouette), while the utility controls centre in the same band.
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Back/Forward navigation arrows
-              IconBtn(
-                'chevron-left',
-                size: 24,
-                iconSize: 16,
-                tooltip: 'Back',
-                onTap: _canNavigateBack ? _navigateBack : null,
-              ),
-              IconBtn(
-                'chevron-right',
-                size: 24,
-                iconSize: 16,
-                tooltip: 'Forward',
-                onTap: _canNavigateForward ? _navigateForward : null,
-              ),
-              const SizedBox(width: 8),
-              // Top Workspace / Session Tabs
-              Expanded(
+              Center(
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (var i = 0; i < _tabs.length; i++) ...[
-                      _topWorkspaceTab(i),
-                      const SizedBox(width: 6),
-                    ],
-                    const SizedBox(width: 2),
+                    // Back/Forward navigation arrows
                     IconBtn(
-                      'plus',
+                      'chevron-left',
                       size: 24,
                       iconSize: 16,
-                      tooltip: 'New session',
-                      onTap: _newSessionFlow,
+                      tooltip: 'Back',
+                      onTap: _canNavigateBack ? _navigateBack : null,
+                    ),
+                    IconBtn(
+                      'chevron-right',
+                      size: 24,
+                      iconSize: 16,
+                      tooltip: 'Forward',
+                      onTap: _canNavigateForward ? _navigateForward : null,
                     ),
                   ],
                 ),
               ),
-              // Right-side utilities: history, settings, and the active
-              // machine avatar. The avatar is also the machine switcher.
-              IconBtn(
-                'history',
-                size: 24,
-                iconSize: 16,
-                tooltip: 'History & Checkpoints',
-                onTap: _showCheckpointsDrawer,
-              ),
-              const SizedBox(width: 2),
-              IconBtn(
-                'settings',
-                size: 24,
-                iconSize: 16,
-                tooltip: 'Settings',
-                onTap: _openShellSettings,
-              ),
               const SizedBox(width: 8),
-              _topMachineSwitcher(),
+              // Top Workspace / Session Tabs.
+              //
+              // Scrolls horizontally rather than overflowing: a long session
+              // list slides, and the active chip is scrolled into view by
+              // `_scrollStripToActive`. The strip is mutually exclusive with
+              // the narrow-layout `_tabStrip`, so both may share this
+              // controller.
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _stripController,
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (var i = 0; i < _tabs.length; i++) ...[
+                        _topWorkspaceTab(i),
+                        const SizedBox(width: 4),
+                      ],
+                      const SizedBox(width: 4),
+                      Center(
+                        child: IconBtn(
+                          'plus',
+                          size: 24,
+                          iconSize: 16,
+                          tooltip: 'New session',
+                          onTap: _newSessionFlow,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ),
+              ),
+              Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Right-side utilities: history, settings, and the active
+                    // machine avatar. The avatar is also the machine switcher.
+                    IconBtn(
+                      'history',
+                      size: 24,
+                      iconSize: 16,
+                      tooltip: 'History & Checkpoints',
+                      onTap: _showCheckpointsDrawer,
+                    ),
+                    const SizedBox(width: 2),
+                    IconBtn(
+                      'settings',
+                      size: 24,
+                      iconSize: 16,
+                      tooltip: 'Settings',
+                      onTap: _openShellSettings,
+                    ),
+                    const SizedBox(width: 6),
+                    _topMachineSwitcher(),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -1574,15 +1530,16 @@ class _DesktopShellState extends State<DesktopShell>
           onTap: _instances.isEmpty ? _addInstanceFlow : _openTopMachines,
           customBorder: const CircleBorder(),
           child: SizedBox(
-            width: 30,
-            height: 30,
+            // Fits inside the 28px title bar with margin to spare.
+            width: 26,
+            height: 26,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 Center(
                   child: Container(
-                    width: 26,
-                    height: 26,
+                    width: 22,
+                    height: 22,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: AppColors.surface2,
@@ -1599,8 +1556,8 @@ class _DesktopShellState extends State<DesktopShell>
                   right: 0,
                   bottom: 0,
                   child: Container(
-                    width: 8,
-                    height: 8,
+                    width: 7,
+                    height: 7,
                     decoration: BoxDecoration(
                       color: ok == true ? AppColors.ok : AppColors.fg4,
                       shape: BoxShape.circle,
@@ -1735,12 +1692,12 @@ class _DesktopShellState extends State<DesktopShell>
     return GestureDetector(
       onTap: () => _activateTab(i),
       child: Container(
-        height: 28,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        // Shorter than the bar and flushed to its bottom edge: the active tab
+        // reads as a tab because it is filled with the band colour below and
+        // shows only rounded top corners.
+        height: 22,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          // A browser-style tab: rounded at the top only, filled with the same
-          // chrome colour as the strip beneath it, so the active tab visually
-          // merges into the body. No border — the fill does the work.
           color: isActive ? AppColors.bg : Colors.transparent,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
         ),
@@ -1749,7 +1706,7 @@ class _DesktopShellState extends State<DesktopShell>
           children: [
             AppIcon(
               icon,
-              size: 16,
+              size: 18,
               color: isActive ? AppColors.fg2 : AppColors.fg4,
             ),
             const SizedBox(width: 8),
@@ -1760,7 +1717,7 @@ class _DesktopShellState extends State<DesktopShell>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: sans(
-                  12,
+                  14,
                   weight: isActive ? W.label : W.body,
                   color: isActive ? AppColors.fg1 : AppColors.fg3,
                 ),
@@ -1772,7 +1729,7 @@ class _DesktopShellState extends State<DesktopShell>
                 onTap: () => _closeTab(i),
                 child: Padding(
                   padding: const EdgeInsets.all(2),
-                  child: AppIcon('x', size: 12, color: AppColors.fg4),
+                  child: AppIcon('x', size: 13, color: AppColors.fg4),
                 ),
               ),
             ],
@@ -1882,7 +1839,9 @@ class _DesktopShellState extends State<DesktopShell>
       // the full height below the native title bar without an empty header gap.
       if (kMacOS) {
         return Scaffold(
-          backgroundColor: readingBg,
+          // The window paints the chrome surface; the reading pane inside it is
+          // the darker canvas.
+          backgroundColor: AppColors.bg,
           body: SafeArea(
             child: Column(children: [
               _macWindowBar(),
@@ -1909,14 +1868,13 @@ class _DesktopShellState extends State<DesktopShell>
                   if (_isSplit || _rightAgent != null) _rightPane(),
                 ]),
               ),
-              _macStatusBar(),
             ]),
           ),
         );
       }
 
       return Scaffold(
-        backgroundColor: readingBg,
+        backgroundColor: AppColors.bg,
         body: SafeArea(
           child: Column(children: [
             // The navigation band is a shell-level row: full window width,
@@ -3275,7 +3233,9 @@ class _SidebarState extends State<_Sidebar> {
 
     final chatsOpen = !_collapsed.contains(_chatsKey);
     return ListView(
-      padding: const EdgeInsets.only(bottom: 16),
+      // Top inset keeps the first section header clear of the navigation band,
+      // matching the reference's 8px section padding.
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
       children: [
         ShellSectionHeader(
           label: 'Chats',
