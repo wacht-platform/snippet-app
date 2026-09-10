@@ -2035,39 +2035,24 @@ class _DesktopShellState extends State<DesktopShell>
                 ),
               ),
               const SizedBox(width: 8),
-              // Top Workspace / Session Tabs.
+              // NO tab list here.
               //
-              // Scrolls horizontally rather than overflowing: a long session
-              // list slides, and the active chip is scrolled into view by
-              // `_scrollStripToActive`. The strip is mutually exclusive with
-              // the narrow-layout `_tabStrip`, so both may share this
-              // controller.
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _stripController,
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      for (var i = 0; i < _tabs.length; i++) ...[
-                        _topWorkspaceTab(i),
-                        const SizedBox(width: 4),
-                      ],
-                      const SizedBox(width: 4),
-                      Center(
-                        child: IconBtn(
-                          'plus',
-                          size: 24,
-                          iconSize: 16,
-                          tooltip: 'New session',
-                          onTap: _newSessionFlow,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                  ),
+              // Both panes render their own tab strip (`_paneStrip`), so listing
+              // every tab in the title bar as well showed each one twice. The
+              // window bar is chrome: nav arrows, empty drag region, utilities.
+              // Tabs belong to the container that holds them — which is also
+              // what makes dragging a tab between panes work.
+              const Spacer(),
+              Center(
+                child: IconBtn(
+                  'plus',
+                  size: 24,
+                  iconSize: 16,
+                  tooltip: 'New session',
+                  onTap: _newSessionFlow,
                 ),
               ),
+              const SizedBox(width: 8),
               Center(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -2268,73 +2253,6 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   /// Top-level workspace tab chip in the window bar.
-  Widget _topWorkspaceTab(int i) {
-    final t = _tabs[i];
-    final isActive = i == _activeIndex;
-    final title = t.title.isEmpty ? '(untitled)' : t.title;
-    final icon = _tabIconKind(t);
-
-    final chip = GestureDetector(
-      onTap: () => _activateTab(i),
-      child: Container(
-        // Bottom-aligned in the taller bar: the active tab is filled with the
-        // band colour below and shows only rounded top corners, so it merges
-        // into the navigation band the way a browser tab merges into a page.
-        height: kTitleTabHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.bg : Colors.transparent,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppIcon(
-              icon,
-              size: 18,
-              color: isActive ? AppColors.fg2 : AppColors.fg4,
-            ),
-            const SizedBox(width: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 160),
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(
-                  14,
-                  weight: isActive ? W.label : W.body,
-                  color: isActive ? AppColors.fg1 : AppColors.fg3,
-                ),
-              ),
-            ),
-            if (_canCloseTab(t)) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => _closeTab(i),
-                child: Padding(
-                  padding: const EdgeInsets.all(2),
-                  child: AppIcon('x', size: 13, color: AppColors.fg4),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-
-    // Dragging a tab out of the strip and dropping it on the body puts it in
-    // the secondary pane. Long-press rather than an immediate drag: the strip
-    // scrolls horizontally, and a plain Draggable would fight that gesture.
-    return LongPressDraggable<_ShellTab>(
-      data: t,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      feedback: _tabDragFeedback(t),
-      childWhenDragging: Opacity(opacity: 0.4, child: chip),
-      child: chip,
-    );
-  }
-
   /// The chip that follows the pointer while a tab is being dragged into the
   /// secondary pane.
   Widget _tabDragFeedback(_ShellTab t) => Material(
