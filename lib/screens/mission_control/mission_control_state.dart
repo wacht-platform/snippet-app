@@ -215,12 +215,13 @@ BoardMessage? parseBoardMessage(String text) {
     return match?.group(1)?.trim() ?? '';
   }
 
-  // The body is the final field before the closing tag, so take everything
-  // between `body: ` and the tag — preserving its internal newlines.
-  final start = t.indexOf('body: ');
+  // The body is the final field before the closing tag. Anchor to the last
+  // line-starting `body: ` so a prior message that happens to contain the text
+  // "body: " in its history digest can't be mistaken for the field.
   final end = t.lastIndexOf('[/coordination_board_message]');
-  var body = (start >= 0 && end > start)
-      ? t.substring(start + 'body: '.length, end).trim()
+  final bodyMarker = t.lastIndexOf('\nbody: ');
+  var body = (bodyMarker >= 0 && end > bodyMarker)
+      ? t.substring(bodyMarker + '\nbody: '.length, end).trim()
       : '';
 
   return BoardMessage(

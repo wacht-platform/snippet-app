@@ -627,4 +627,23 @@ void main() {
     expect(parseBoardMessage('just a normal message'), isNull);
   });
 
+
+  test('parseBoardMessage ignores a "body:" inside the history digest', () {
+    // A prior room message that literally contains "body: " must not be mistaken
+    // for the new message: the real field is the final line before the tag.
+    const envelope = '[coordination_board_message]\n'
+        'thread_id: system\n'
+        'from_id: human\n'
+        'from_kind: human\n'
+        'rules: board message, not an ordinary chat turn.\n'
+        'history: last 1 message(s), oldest first\n'
+        '  4 [agent] mission-control: earlier note about body: parsing\n'
+        'body: the real current message\n'
+        '[/coordination_board_message]';
+
+    final parsed = parseBoardMessage(envelope);
+    expect(parsed, isNotNull);
+    expect(parsed!.body, 'the real current message');
+  });
+
 }
