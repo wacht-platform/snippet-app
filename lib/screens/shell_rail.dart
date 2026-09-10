@@ -31,12 +31,18 @@ class ShellRail extends StatelessWidget {
     super.key,
     required this.section,
     required this.onSelect,
-    this.trailing,
+    this.tools = const [],
   });
 
   final ShellSection section;
   final ValueChanged<ShellSection> onSelect;
-  final Widget? trailing;
+
+  /// Tool buttons pinned to the extreme right of the band.
+  ///
+  /// These are the session-scoped tools that used to live as a row of buttons
+  /// in the removed bottom status strip. The band was the only full-width
+  /// chrome row left, so they live here rather than being dropped.
+  final List<Widget> tools;
 
   @override
   Widget build(BuildContext context) {
@@ -64,14 +70,15 @@ class ShellRail extends StatelessWidget {
                   if (item != ShellSection.values.last)
                     const SizedBox(width: 8),
                 ],
-                if (trailing != null) ...[
-                  const SizedBox(width: 8),
-                  trailing!,
-                ],
               ],
             ),
           ),
           const Spacer(),
+          // Tools sit at the far right, against the band's edge.
+          for (final tool in tools) ...[
+            tool,
+            const SizedBox(width: 2),
+          ],
         ],
       ),
     );

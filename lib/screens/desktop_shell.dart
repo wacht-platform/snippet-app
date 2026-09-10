@@ -23,6 +23,7 @@ import 'editor.dart';
 import 'files.dart';
 import 'git.dart';
 import 'models.dart';
+import 'processes.dart';
 import 'usage.dart';
 import 'vault.dart';
 import 'recurring.dart';
@@ -93,6 +94,22 @@ class _MacSessionControls {
   const _MacSessionControls(this.stop, this.performAction);
 }
 
+/// Session-scoped tools that open BESIDE the chat in the right pane.
+///
+/// Previously these were buttons in the bottom status strip. They are
+/// represented here rather than as modals so the transcript stays readable
+/// while you inspect git, files, or processes.
+enum _RightTool {
+  none('', ''),
+  git('Git', 'git-branch'),
+  files('Files', 'folder'),
+  processes('Processes', 'list');
+
+  const _RightTool(this.label, this.icon);
+  final String label;
+  final String icon;
+}
+
 class _DesktopShellState extends State<DesktopShell>
     with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -151,18 +168,85 @@ class _DesktopShellState extends State<DesktopShell>
   /// present would cost space even when nothing needs inspecting.
   CoordinationAgent? _rightAgent;
 
+  /// Which secondary tool occupies the right pane. `none` hides it; the chat
+  /// then owns the full width.
+  ///
+  /// These are the session-scoped tools that used to live as buttons in the
+  /// removed bottom strip. They open beside the chat instead of as modals, so
+  /// the transcript stays visible while you inspect git, files, or processes.
+  _RightTool _rightTool = _RightTool.none;
+
   /// Whether the split pane is toggled open via the [|] header button.
   bool _isSplit = false;
+
+  /// Is the right pane showing anything at all?
+  bool get _rightPaneOpen => _rightAgent != null || _rightTool != _RightTool.none;
+
+  /// Open a tool in the right pane, or close it if it is already showing.
+  void _toggleRightTool(_RightTool tool) {
+    final wasOpen = _rightTool == tool && _rightAgent == null;
+    setState(() {
+      _rightAgent = null;
+      _isSplit = false;
+      _rightTool = wasOpen ? _RightTool.none : tool;
+    });
+  }
 
   void _toggleSplitPane() {
     setState(() {
       if (_rightAgent != null) {
         _rightAgent = null;
         _isSplit = false;
+      } else if (_rightTool != _RightTool.none) {
+        // A tool owns the pane, so the split button replaces it rather than
+        // toggling something invisible underneath.
+        _rightTool = _RightTool.none;
+        _isSplit = true;
       } else {
         _isSplit = !_isSplit;
       }
     });
+  }
+
+  /// Tool buttons for the far right of the navigation band.
+  ///
+  /// These are the session-scoped actions that used to occupy the bottom status
+  /// strip. Each opens its target in the right pane — or toggles the terminal
+  /// split — so the transcript stays visible beside it, which the old strip
+  /// could not do. Everything else from that strip remains reachable from the
+  /// command palette and the session menu (⌘K).
+  List<Widget> _railTools() {
+    final client = _client;
+    final hasSession = _activeTab != null;
+    Widget tool(_RightTool t) => IconBtn(
+          t.icon,
+          size: 28,
+          iconSize: 15,
+          active: _rightTool == t && _rightAgent == null,
+          tooltip: t.label,
+          onTap: hasSession ? () => _toggleRightTool(t) : null,
+        );
+    return [
+      IconBtn(
+        'terminal',
+        size: 28,
+        iconSize: 15,
+        tooltip: 'Terminal split',
+        onTap: hasSession ? _openActiveShell : null,
+      ),
+      tool(_RightTool.git),
+      tool(_RightTool.files),
+      tool(_RightTool.processes),
+      if (!kMobile)
+        IconBtn(
+          'split',
+          size: 28,
+          iconSize: 15,
+          active: _isSplit,
+          tooltip: _isSplit ? 'Close split pane' : 'Split pane',
+          onTap: client == null ? null : _toggleSplitPane,
+        ),
+    ];
   }
 
   @override
@@ -1888,6 +1972,7 @@ class _DesktopShellState extends State<DesktopShell>
               ShellRail(
                 section: _section,
                 onSelect: (s) => setState(() => _section = s),
+                tools: _railTools(),
               ),
               Expanded(
                 child: Row(children: [
@@ -1899,11 +1984,11 @@ class _DesktopShellState extends State<DesktopShell>
                   // different surfaces, which is the separation.
                   Expanded(
                     child: _paneSurface(
-                      roundRight: !(_isSplit || _rightAgent != null),
+                      roundRight: !_rightPaneOpen,
                       child: _mainPane(),
                     ),
                   ),
-                  if (_isSplit || _rightAgent != null) _rightPane(),
+                  if (_rightPaneOpen) _rightPane(),
                 ]),
               ),
             ]),
@@ -1920,6 +2005,7 @@ class _DesktopShellState extends State<DesktopShell>
             ShellRail(
               section: _section,
               onSelect: (s) => setState(() => _section = s),
+              tools: _railTools(),
             ),
             Expanded(
               child: Row(children: [
@@ -1931,11 +2017,11 @@ class _DesktopShellState extends State<DesktopShell>
                 // different surfaces, which is the separation.
                 Expanded(
                   child: _paneSurface(
-                    roundRight: !(_isSplit || _rightAgent != null),
+                    roundRight: !_rightPaneOpen,
                     child: _mainPane(),
                   ),
                 ),
-                if (_isSplit || _rightAgent != null) _rightPane(),
+                if (_rightPaneOpen) _rightPane(),
               ]),
             ),
           ]),
@@ -1965,6 +2051,61 @@ class _DesktopShellState extends State<DesktopShell>
   /// Detail / split pane on the right. When `_rightAgent` is set, displays the
   /// agent detail. When split view is toggled via [|], displays the split
   /// secondary view.
+  /// Header for a right-pane tool: icon + label on the surface, with a close
+  /// affordance. Matches the split pane's header so the two panes read alike.
+  Widget _toolHeader() => Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(children: [
+          AppIcon(_rightTool.icon, size: 14, color: AppColors.fg3),
+          const SizedBox(width: 8),
+          Text(_rightTool.label,
+              style: sans(13, weight: W.label, color: AppColors.fg1)),
+          const Spacer(),
+          IconBtn(
+            'x',
+            size: 24,
+            iconSize: 12,
+            tooltip: 'Close',
+            onTap: () => setState(() => _rightTool = _RightTool.none),
+          ),
+        ]),
+      );
+
+  /// Body for the active right-pane tool. Each hosts its existing screen in
+  /// embedded mode, so the pane does not reimplement any of them.
+  Widget _toolBody(DaemonClient client) {
+    final sessionId = _activeTab?.sessionId ?? '';
+    final ws = _activeWorkspaceFolder() ?? '';
+    switch (_rightTool) {
+      case _RightTool.git:
+        return GitScreen(
+          key: ValueKey('rt-git-$sessionId'),
+          client: client,
+          sessionId: sessionId,
+          folder: ws.isEmpty ? null : ws,
+          embedded: true,
+        );
+      case _RightTool.files:
+        return FileExplorer(
+          key: ValueKey('rt-files-$ws'),
+          client: client,
+          title: lastPathSegment(ws, ifEmpty: 'Files'),
+          start: ws.isEmpty ? null : ws,
+          onOpenFile: (path, name) =>
+              _openFileTab(client, _active?.url ?? '', path, name),
+        );
+      case _RightTool.processes:
+        return ProcessesScreen(
+          key: ValueKey('rt-proc-$sessionId'),
+          client: client,
+          sessionId: sessionId,
+        );
+      case _RightTool.none:
+        return const SizedBox.shrink();
+    }
+  }
+
   Widget _rightPane() {
     if (_rightAgent != null) {
       return SizedBox(
@@ -1976,6 +2117,28 @@ class _DesktopShellState extends State<DesktopShell>
             _rightAgent = null;
             _isSplit = false;
           }),
+        ),
+      );
+    }
+    // Session-scoped tools (git / files / processes) open here rather than as
+    // modals, so the transcript stays readable beside them.
+    if (_rightTool != _RightTool.none) {
+      final client = _client;
+      if (client == null) return const SizedBox.shrink();
+      return SizedBox(
+        width: 420,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.floor,
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(R.sheetTop),
+              bottomRight: Radius.circular(R.sheetTop),
+            ),
+          ),
+          child: Column(children: [
+            _toolHeader(),
+            Expanded(child: _toolBody(client)),
+          ]),
         ),
       );
     }

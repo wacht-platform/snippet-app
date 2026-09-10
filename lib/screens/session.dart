@@ -219,7 +219,9 @@ class _SessionScreenState extends State<SessionScreen>
   final List<_LiveTerm> _terms = [];
   int _termFocus = 0;
   int _termSeq = 0;
-  double _termHeight = 280;
+  /// Width of the desktop terminal split pane. Height is not tracked: the pane
+  /// is full-height beside the chat.
+  double _termWidth = 420;
   int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _currentProfile;
@@ -2097,9 +2099,13 @@ class _SessionScreenState extends State<SessionScreen>
         bottom: false,
         child: Stack(children: [
           Positioned.fill(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                   if (kMobile)
                     _mobileHeader(s, running, waiting)
                   else if (!kMacOS)
@@ -2257,9 +2263,17 @@ class _SessionScreenState extends State<SessionScreen>
                     )),
                   if (!(waiting && s?.pendingQuestion != null))
                     _centerWide(_inputBar(running)),
+                    ]),
+                  ),
+                  // Desktop: the terminal is a second pane BESIDE the chat
+                  // rather than a drawer stacked under it. The drawer fought the
+                  // transcript for vertical space and hid the composer; side by
+                  // side both stay usable, and it doubles as the chat/terminal
+                  // split.
                   if (_termOpen && _terms.isNotEmpty && !kMobile)
-                    _desktopTermDrawer(),
-                ]),
+                    _desktopTermPane(),
+              ],
+            ),
           ),
           if (kMobile && _termOpen && _terms.isNotEmpty)
             Positioned.fill(child: _mobileTermTab()),
@@ -2361,54 +2375,62 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
-  Widget _desktopTermDrawer() {
+  /// Desktop terminal pane: a resizable split BESIDE the chat.
+  ///
+  /// Replaces the bottom drawer. The drawer stacked under the transcript and
+  /// competed with it for height, hiding the composer; a side pane keeps both
+  /// usable and is the same shape as the reference's chat/split arrangement.
+  Widget _desktopTermPane() {
     final i = _termFocus.clamp(0, _terms.length - 1);
     final t = _terms[i];
-    return ColoredBox(
-      color: const Color(0xff0a0a0a),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          GestureDetector(
+    final maxW = MediaQuery.sizeOf(context).width * 0.72;
+    return Row(
+      // Sized to content: this is a non-flex child of the chat Row, so it must
+      // not try to expand.
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 6px grab zone carrying a 1px rule. A chunky grab bar would eat
+        // transcript width for no benefit.
+        MouseRegion(
+          cursor: SystemMouseCursors.resizeColumn,
+          child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onVerticalDragUpdate: (d) {
-              final maxH = MediaQuery.sizeOf(context).height * 0.72;
+            onHorizontalDragUpdate: (d) {
               setState(() {
-                _termHeight = (_termHeight - d.delta.dy).clamp(140.0, maxH);
+                _termWidth = (_termWidth - d.delta.dx).clamp(280.0, maxW);
               });
             },
-            child: MouseRegion(
-              cursor: SystemMouseCursors.resizeRow,
-              child: SizedBox(
-                height: 18,
-                child: Center(
-                  child: Container(
-                    width: 36,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: AppColors.border2,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
+            child: Container(
+              width: 6,
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: AppColors.border2)),
               ),
             ),
           ),
-          _termTabStrip(i, compact: true),
-          SizedBox(
-            height: _termHeight,
-            child: SessionTermView(
-              alive: t.alive,
-              terminal: t.terminal,
-              onInput: _termIn,
-              onResize: _termResize,
-              onClose: () => _closeTerm(t.id),
-              mobileKeys: false,
-              showChrome: false,
-            ),
+        ),
+        Container(
+          width: _termWidth,
+          color: const Color(0xff0a0a0a),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _termTabStrip(i, compact: true),
+              Expanded(
+                child: SessionTermView(
+                  alive: t.alive,
+                  terminal: t.terminal,
+                  onInput: _termIn,
+                  onResize: _termResize,
+                  onClose: () => _closeTerm(t.id),
+                  mobileKeys: false,
+                  showChrome: false,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -2444,6 +2466,20 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
+  /// Rename a terminal from its tab. Titles are local to this client (the pty
+  /// has no notion of a name), so this only has to republish to the sidebar.
+  Future<void> _renameTerm(String id) async {
+    final t = _terms.firstWhere((e) => e.id == id, orElse: () => _terms.first);
+    final name = await promptText(context,
+        title: 'Rename terminal',
+        initial: t.title,
+        hint: 'Terminal name',
+        saveLabel: 'Rename');
+    if (name == null || name.trim().isEmpty) return;
+    setState(() => t.title = name.trim());
+    _publishTerminals();
+  }
+
   Widget _termTabStrip(int focus, {required bool compact}) {
     return SizedBox(
       height: compact ? 30 : 36,
@@ -2465,27 +2501,36 @@ class _SessionScreenState extends State<SessionScreen>
                     setState(() => _termFocus = n);
                     _publishTerminals();
                   },
+                  // Right-click / long-press renames. A dedicated pencil button
+                  // per tab would crowd a strip that already carries a close,
+                  // and the gesture is discoverable in the tooltip below.
+                  onSecondaryTap: () => _renameTerm(pane.id),
+                  onLongPress: () => _renameTerm(pane.id),
                   borderRadius: BorderRadius.circular(R.xs),
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 6, 4, 6),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(
-                        pane.title,
-                        style: sans(compact ? 12 : 13,
-                            weight: on ? FontWeight.w500 : FontWeight.w400,
-                            color: on ? AppColors.fg1 : AppColors.fg3),
-                      ),
-                      const SizedBox(width: 2),
-                      GestureDetector(
-                        onTap: () => _closeTerm(pane.id),
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.all(3),
-                          child: AppIcon('x',
-                              size: compact ? 10 : 12, color: AppColors.fg4),
+                  child: Tooltip(
+                    message: '${pane.title} — right-click to rename',
+                    waitDuration: const Duration(milliseconds: 500),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 6, 4, 6),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(
+                          pane.title,
+                          style: sans(compact ? 12 : 13,
+                              weight: on ? FontWeight.w500 : FontWeight.w400,
+                              color: on ? AppColors.fg1 : AppColors.fg3),
                         ),
-                      ),
-                    ]),
+                        const SizedBox(width: 2),
+                        GestureDetector(
+                          onTap: () => _closeTerm(pane.id),
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.all(3),
+                            child: AppIcon('x',
+                                size: compact ? 10 : 12, color: AppColors.fg4),
+                          ),
+                        ),
+                      ]),
+                    ),
                   ),
                 ),
               );
@@ -4410,7 +4455,9 @@ class _LiveFrame {
 class _LiveTerm {
   _LiveTerm(this.id, {required this.title}) : terminal = _ClearScrollTerminal();
   final String id;
-  final String title;
+
+  /// Mutable: the user can rename a terminal from its tab.
+  String title;
   final Terminal terminal;
   int cols = 80;
   int rows = 24;
