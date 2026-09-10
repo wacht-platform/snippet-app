@@ -1325,11 +1325,7 @@ class _DesktopShellState extends State<DesktopShell>
       );
     }
 
-    if (kMobile) return panel;
-    return Column(children: [
-      Expanded(child: panel),
-      _sidebarSettingsRow(),
-    ]);
+    return panel;
   }
 
   Widget _sidebarUnavailable(String message) => Container(
@@ -1337,27 +1333,6 @@ class _DesktopShellState extends State<DesktopShell>
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
         child:
             Text(message, style: sans(12.5, color: AppColors.fg4, height: 1.5)),
-      );
-
-  Widget _sidebarSettingsRow() => Material(
-        color: AppColors.bg,
-        child: InkWell(
-          onTap: _client == null ? null : _openShellSettings,
-          child: Container(
-            height: 42,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: AppColors.border)),
-            ),
-            child: Row(children: [
-              AppIcon('settings', size: 16, color: AppColors.fg3),
-              const SizedBox(width: 10),
-              Text('Settings', style: sans(12.5, color: AppColors.fg2)),
-              const Spacer(),
-              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
-            ]),
-          ),
-        ),
       );
 
   void _onSessionDeleted(String id) {
@@ -1557,22 +1532,22 @@ class _DesktopShellState extends State<DesktopShell>
                   ],
                 ),
               ),
-              // Right-side utilities: history, sessions, and the active
+              // Right-side utilities: history, settings, and the active
               // machine avatar. The avatar is also the machine switcher.
               IconBtn(
                 'history',
-                size: 26,
-                iconSize: 12,
+                size: 28,
+                iconSize: 15,
                 tooltip: 'History & Checkpoints',
                 onTap: _showCheckpointsDrawer,
               ),
               const SizedBox(width: 4),
               IconBtn(
-                'message-text',
-                size: 26,
-                iconSize: 12,
-                tooltip: 'Sessions',
-                onTap: () => setState(() => _section = ShellSection.sessions),
+                'settings',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Settings',
+                onTap: _openShellSettings,
               ),
               const SizedBox(width: 8),
               _topMachineSwitcher(),
@@ -1925,19 +1900,17 @@ class _DesktopShellState extends State<DesktopShell>
           body: SafeArea(
             child: Column(children: [
               _macWindowBar(),
+              ShellRail(
+                section: _section,
+                onSelect: (s) => setState(() => _section = s),
+              ),
               Expanded(
                 child: Row(children: [
-                  // Sidebar nested navigation owns a compact horizontal row;
-                  // every active panel gets the full sidebar width underneath.
+                  // The second-level strip lives at the shell level. The
+                  // sidebar below is only the selected panel's full-width body.
                   SizedBox(
                     width: 320,
-                    child: Column(children: [
-                      ShellRail(
-                        section: _section,
-                        onSelect: (s) => setState(() => _section = s),
-                      ),
-                      Expanded(child: _sidebar(topInset: false)),
-                    ]),
+                    child: _sidebar(topInset: false),
                   ),
                   VerticalDivider(
                       width: 1, thickness: 1, color: AppColors.border),
@@ -1959,17 +1932,15 @@ class _DesktopShellState extends State<DesktopShell>
         backgroundColor: readingBg,
         body: SafeArea(
           child: Column(children: [
+            ShellRail(
+              section: _section,
+              onSelect: (s) => setState(() => _section = s),
+            ),
             Expanded(
               child: Row(children: [
                 SizedBox(
-                  width: 300,
-                  child: Column(children: [
-                    ShellRail(
-                      section: _section,
-                      onSelect: (s) => setState(() => _section = s),
-                    ),
-                    Expanded(child: _sidebar(topInset: true)),
-                  ]),
+                  width: 320,
+                  child: _sidebar(topInset: true),
                 ),
                 VerticalDivider(
                     width: 1, thickness: 1, color: AppColors.border),
