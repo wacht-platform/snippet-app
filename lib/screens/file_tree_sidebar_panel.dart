@@ -123,7 +123,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     return Container(
       color: AppColors.bg,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 16),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 18),
         children: [
           ShellSectionHeader(
             label: 'File Tree',

@@ -32,8 +32,10 @@ bool get kMacOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 /// sites guard on this to fall back instead of throwing MissingPluginException.
 bool get kWindows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
-/// Height to reserve at the top for the macOS window controls.
-const double kMacTitlebar = 28.0;
+/// Height reserved for the macOS traffic lights and their surrounding title-bar
+/// breathing room. The controls stay native; the shell reserves their full
+/// visual footprint rather than crowding them with app chrome.
+const double kMacTitlebar = 34.0;
 const _windowStateChannel = MethodChannel('snippet/window_state');
 
 /// Whether macOS is in native full-screen mode. Other platforms never need a

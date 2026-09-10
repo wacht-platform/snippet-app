@@ -1506,7 +1506,7 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _macWindowBarContent({required bool hasWindowControls}) {
     return SizedBox(
-      height: kMacTitlebar + 10,
+      height: kMacTitlebar + 12,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.bg,
@@ -1514,28 +1514,28 @@ class _DesktopShellState extends State<DesktopShell>
         ),
         child: Padding(
           padding: EdgeInsets.only(
-            left: hasWindowControls ? 80 : 12,
-            right: 14,
+            left: hasWindowControls ? 96 : 16,
+            right: 16,
           ),
           child: Row(
             children: [
               // Back/Forward navigation arrows
               IconBtn(
                 'chevron-left',
-                size: 24,
-                iconSize: 14,
+                size: 26,
+                iconSize: 13,
                 tooltip: 'Back',
                 onTap: _canNavigateBack ? _navigateBack : null,
               ),
-              const SizedBox(width: 2),
+              const SizedBox(width: 4),
               IconBtn(
                 'chevron-right',
-                size: 24,
-                iconSize: 14,
+                size: 26,
+                iconSize: 13,
                 tooltip: 'Forward',
                 onTap: _canNavigateForward ? _navigateForward : null,
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               // Top Workspace / Session Tabs
               Expanded(
                 child: Row(
@@ -1546,11 +1546,11 @@ class _DesktopShellState extends State<DesktopShell>
                     ],
                     // Start Page tab when tabs are few
                     if (_tabs.isEmpty || _tabs.length < 3) _topStartPageTab(),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     IconBtn(
                       'plus',
-                      size: 24,
-                      iconSize: 13,
+                      size: 26,
+                      iconSize: 12,
                       tooltip: 'New session',
                       onTap: _newSessionFlow,
                     ),
@@ -1561,16 +1561,16 @@ class _DesktopShellState extends State<DesktopShell>
               // machine avatar. The avatar is also the machine switcher.
               IconBtn(
                 'history',
-                size: 28,
-                iconSize: 15,
+                size: 26,
+                iconSize: 12,
                 tooltip: 'History & Checkpoints',
                 onTap: _showCheckpointsDrawer,
               ),
               const SizedBox(width: 4),
               IconBtn(
                 'message-text',
-                size: 28,
-                iconSize: 15,
+                size: 26,
+                iconSize: 12,
                 tooltip: 'Sessions',
                 onTap: () => setState(() => _section = ShellSection.sessions),
               ),
@@ -1618,7 +1618,7 @@ class _DesktopShellState extends State<DesktopShell>
                     ),
                     child: Text(
                       initial,
-                      style: sans(11.5, weight: W.title, color: AppColors.fg1),
+                      style: sans(10.5, weight: W.title, color: AppColors.fg1),
                     ),
                   ),
                 ),
@@ -1762,8 +1762,8 @@ class _DesktopShellState extends State<DesktopShell>
     return GestureDetector(
       onTap: () => _activateTab(i),
       child: Container(
-        height: 28,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        height: 30,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: isActive ? AppColors.surface2 : Colors.transparent,
           borderRadius: BorderRadius.circular(R.sm),
@@ -1811,8 +1811,8 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _topStartPageTab() {
     return Container(
-      height: 28,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       alignment: Alignment.center,
       child: Text(
         'Start Page',
@@ -1930,7 +1930,7 @@ class _DesktopShellState extends State<DesktopShell>
                   // Sidebar nested navigation owns a compact horizontal row;
                   // every active panel gets the full sidebar width underneath.
                   SizedBox(
-                    width: 300,
+                    width: 320,
                     child: Column(children: [
                       ShellRail(
                         section: _section,
@@ -3241,7 +3241,8 @@ class _SidebarState extends State<_Sidebar> {
               style: sans(12.5, color: AppColors.fg4))));
     }
     final listView = ListView(
-        padding: EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
+        padding:
+            EdgeInsets.fromLTRB(kMobile ? 20 : 14, 2, kMobile ? 20 : 14, 32),
         children: children);
     // Phones: the natural refresh gesture. Desktop keeps the header button.
     if (!kMobile) return listView;

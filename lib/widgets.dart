@@ -530,19 +530,27 @@ class _MdCodeBlock extends StatelessWidget {
   }
 }
 
-/// Icons use the project-wide rounded HugeIcons set. The string seam lets
-/// feature panels declare semantic names without coupling to glyph details.
+/// HugeIcons sit inside an explicit square and are optically scaled below its
+/// layout bound. This prevents round/full-canvas SVGs from reading larger than
+/// adjacent text or controls.
 class AppIcon extends StatelessWidget {
   final String name;
   final double size;
   final Color? color;
-  const AppIcon(this.name, {super.key, this.size = 18, this.color});
+  final double visualScale;
+  const AppIcon(this.name,
+      {super.key, this.size = 18, this.color, this.visualScale = 0.78});
 
   @override
-  Widget build(BuildContext context) => HugeIcon(
-        icon: hugeIconFor(name),
-        size: size,
-        color: color ?? AppColors.fg2,
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: size,
+        child: Center(
+          child: HugeIcon(
+            icon: hugeIconFor(name),
+            size: size * visualScale,
+            color: color ?? AppColors.fg2,
+          ),
+        ),
       );
 }
 

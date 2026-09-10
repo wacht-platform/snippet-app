@@ -30,9 +30,10 @@ Color toneColor(ShellTone tone) => switch (tone) {
 /// Compact metrics. The reference packs ~34px rows so a long list stays
 /// scannable — that density is the point, not an accident.
 const double kNavRowHeight = 34;
-const double kNavHeaderHeight = 30;
-const double kNavIcon = 15;
-const double kNavIndent = 16;
+const double kNavHeaderHeight = 32;
+const double kNavIcon = 14;
+const double kNavIndent = 18;
+const double kSidebarContentInset = 14;
 
 /// UPPERCASE section header with a leading chevron and a trailing action
 /// cluster (filter · sort · view · add).
@@ -63,7 +64,7 @@ class ShellSectionHeader extends StatelessWidget {
             child: InkWell(
               onTap: onToggle,
               child: Padding(
-                padding: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.only(left: kSidebarContentInset),
                 child: Row(children: [
                   AppIcon(expanded ? 'chevron-down' : 'chevron-right',
                       size: 13, color: AppColors.fg4),
@@ -71,9 +72,7 @@ class ShellSectionHeader extends StatelessWidget {
                   Text(
                     label.toUpperCase(),
                     style: sans(10.5,
-                        weight: W.title,
-                        color: AppColors.fg4,
-                        spacing: 0.7),
+                        weight: W.title, color: AppColors.fg4, spacing: 0.7),
                   ),
                 ]),
               ),
@@ -202,7 +201,8 @@ class ShellNavRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+          horizontal: kSidebarContentInset, vertical: 2),
       child: Material(
         color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),

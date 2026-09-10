@@ -30,6 +30,7 @@ class AgentsSidebarPanel extends StatefulWidget {
 
 class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   List<CoordinationAgent> agents = const [];
+
   /// session id → agent id, for the sessions that currently have a holder.
   Map<String, String> activeBySession = const {};
   String? error;
@@ -117,13 +118,12 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 10, 10),
+            padding: const EdgeInsets.fromLTRB(16, 16, 14, 10),
             child: Row(children: [
               Text('Agents',
                   style: sans(15, weight: W.title, color: AppColors.fg1)),
               const SizedBox(width: 8),
-              Text('${agents.length}',
-                  style: sans(12, color: AppColors.fg4)),
+              Text('${agents.length}', style: sans(12, color: AppColors.fg4)),
               const Spacer(),
               IconBtn('refresh',
                   size: 28, iconSize: 15, tooltip: 'Refresh', onTap: refresh),
@@ -133,7 +133,7 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             child: agents.isEmpty
                 ? _EmptyTeam()
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
                     children: [
                       if (active.isNotEmpty) ...[
                         _GroupLabel('Active now', active.length, accent: true),
@@ -188,7 +188,7 @@ class _GroupLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
         child: Row(children: [
           Text(label.toUpperCase(),
               style: sans(10.5,
@@ -215,9 +215,8 @@ class _AgentSidebarRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = agent.displayName.trim().isEmpty
-        ? agent.id
-        : agent.displayName;
+    final name =
+        agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     final isActive = sessions.isNotEmpty;
 
@@ -227,7 +226,7 @@ class _AgentSidebarRow extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(R.md),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             CircleAvatar(
               radius: 13,
@@ -247,13 +246,10 @@ class _AgentSidebarRow extends StatelessWidget {
                   Text(name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          sans(13, weight: W.label, color: AppColors.fg1)),
+                      style: sans(13, weight: W.label, color: AppColors.fg1)),
                   const SizedBox(height: 2),
                   Text(
-                    isActive
-                        ? _sessionSummary(sessions)
-                        : agent.role,
+                    isActive ? _sessionSummary(sessions) : agent.role,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: sans(11.5,
