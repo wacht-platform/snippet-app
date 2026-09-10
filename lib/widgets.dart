@@ -539,7 +539,7 @@ class AppIcon extends StatelessWidget {
   final Color? color;
   final double visualScale;
   const AppIcon(this.name,
-      {super.key, this.size = 18, this.color, this.visualScale = 0.9});
+      {super.key, this.size = 18, this.color, this.visualScale = 1.0});
 
   @override
   Widget build(BuildContext context) => SizedBox.square(

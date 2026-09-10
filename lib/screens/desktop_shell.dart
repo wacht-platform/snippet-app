@@ -1900,16 +1900,24 @@ class _DesktopShellState extends State<DesktopShell>
           body: SafeArea(
             child: Column(children: [
               _macWindowBar(),
-              ShellRail(
-                section: _section,
-                onSelect: (s) => setState(() => _section = s),
-              ),
+              // The nested strip sits directly over the sidebar at exactly the
+              // sidebar's width, so the two read as one column.
+              Row(children: [
+                SizedBox(
+                  width: kSidebarWidth,
+                  child: ShellRail(
+                    section: _section,
+                    onSelect: (s) => setState(() => _section = s),
+                  ),
+                ),
+                const Expanded(child: SizedBox()),
+              ]),
               Expanded(
                 child: Row(children: [
-                  // The second-level strip lives at the shell level. The
-                  // sidebar below is only the selected panel's full-width body.
+                  // The sidebar is only the selected panel's full-width body;
+                  // the strip above already owns the navigation row.
                   SizedBox(
-                    width: 320,
+                    width: kSidebarWidth,
                     child: _sidebar(topInset: false),
                   ),
                   VerticalDivider(
@@ -1932,14 +1940,22 @@ class _DesktopShellState extends State<DesktopShell>
         backgroundColor: readingBg,
         body: SafeArea(
           child: Column(children: [
-            ShellRail(
-              section: _section,
-              onSelect: (s) => setState(() => _section = s),
-            ),
+            // The nested strip sits directly over the sidebar at exactly the
+            // sidebar's width, so the two read as one column.
+            Row(children: [
+              SizedBox(
+                width: kSidebarWidth,
+                child: ShellRail(
+                  section: _section,
+                  onSelect: (s) => setState(() => _section = s),
+                ),
+              ),
+              const Expanded(child: SizedBox()),
+            ]),
             Expanded(
               child: Row(children: [
                 SizedBox(
-                  width: 320,
+                  width: kSidebarWidth,
                   child: _sidebar(topInset: true),
                 ),
                 VerticalDivider(
