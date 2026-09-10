@@ -604,4 +604,27 @@ void main() {
       expect(tester.takeException(), isNull, reason: entry.key);
     }
   });
+
+  test('parseBoardMessage extracts sender and preserves a multi-line body', () {
+    const envelope = '[coordination_board_message]\n'
+        'thread_id: system\n'
+        'from_id: human\n'
+        'from_kind: human\n'
+        'rules: board message, not an ordinary chat turn. Reply on this same thread.\n'
+        'body: first line\n'
+        'second line\n'
+        '[/coordination_board_message]';
+
+    final parsed = parseBoardMessage(envelope);
+    expect(parsed, isNotNull);
+    expect(parsed!.threadId, 'system');
+    expect(parsed.fromId, 'human');
+    expect(parsed.fromKind, 'human');
+    // The body keeps its newlines and never swallows the closing tag.
+    expect(parsed.body, 'first line\nsecond line');
+
+    // Ordinary chat text is not a board message.
+    expect(parseBoardMessage('just a normal message'), isNull);
+  });
+
 }

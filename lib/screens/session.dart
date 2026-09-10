@@ -36,7 +36,12 @@ import 'git.dart';
 import 'lanes.dart';
 import 'recurring.dart';
 import 'mission_control/mission_control_state.dart'
-    show isDedicatedMcSession, parseMissionEnvelope, MissionEnvelope;
+    show
+        isDedicatedMcSession,
+        parseMissionEnvelope,
+        parseBoardMessage,
+        BoardMessage,
+        MissionEnvelope;
 import 'mission_control/coordination_agent_directory.dart';
 import 'mission_control/coordination_board_screen.dart';
 import 'mission_control/widgets/mission_control_tasks.dart';
@@ -3359,6 +3364,13 @@ class _SessionScreenState extends State<SessionScreen>
             addEvent(key, _MissionEnvelopeCard(envelope: envelope));
             break;
           }
+          // A board message routed into this session renders as a compact
+          // card — never the raw envelope text.
+          final board = parseBoardMessage(text);
+          if (board != null) {
+            addEvent(key, _BoardMessageCard(message: board));
+            break;
+          }
           addEvent(
               key,
               KeyedSubtree(
@@ -4610,6 +4622,61 @@ class _MissionEnvelopeCard extends StatelessWidget {
                   Text(summary,
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
+                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Transcript card for a message routed from the coordination board. Shows the
+/// sender and the message itself — the internal envelope never surfaces.
+class _BoardMessageCard extends StatelessWidget {
+  const _BoardMessageCard({required this.message});
+  final BoardMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final from = message.fromId.trim().isEmpty ? 'someone' : message.fromId;
+    final label = message.threadId.isEmpty
+        ? 'board'
+        : 'board · ${message.threadId}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                  color: AppColors.accent, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(from,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13.5, color: AppColors.fg1)),
+                  ),
+                  Text(label, style: sans(12, color: AppColors.fg4)),
+                ]),
+                if (message.body.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(message.body.trim(),
                       style: sans(12.5, height: 1.35, color: AppColors.fg3)),
                 ],
               ],
