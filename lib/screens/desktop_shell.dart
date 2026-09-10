@@ -27,6 +27,7 @@ import 'usage.dart';
 import 'vault.dart';
 import 'recurring.dart';
 import 'agents_sidebar_panel.dart';
+import 'terminals_sidebar_panel.dart';
 import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'session.dart';
@@ -142,6 +143,20 @@ class _DesktopShellState extends State<DesktopShell>
   /// the full width until something asks for detail — a pane that is always
   /// present would cost space even when nothing needs inspecting.
   CoordinationAgent? _rightAgent;
+
+  /// Whether the split pane is toggled open via the [|] header button.
+  bool _isSplit = false;
+
+  void _toggleSplitPane() {
+    setState(() {
+      if (_rightAgent != null) {
+        _rightAgent = null;
+        _isSplit = false;
+      } else {
+        _isSplit = !_isSplit;
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -1225,6 +1240,13 @@ class _DesktopShellState extends State<DesktopShell>
     final tab = _activeTab;
     // The rail switches which panel occupies the sidebar. Git stays a mode of
     // the sessions panel — you inspect a session's diff, not the agent list.
+    if (_section == ShellSection.terminal) {
+      return TerminalsSidebarPanel(
+        workspacePath: _activeWorkspaceFolder() ?? '',
+        onNewTerminal: _openActiveShell,
+        onOpenTerminal: (idx) => _openActiveShell(),
+      );
+    }
     if (_section == ShellSection.agents) {
       final client = _client;
       if (client == null) {
@@ -1305,6 +1327,7 @@ class _DesktopShellState extends State<DesktopShell>
       sessionsLoading: _sessionsLoading,
       sessionsError: _sessionsError,
       onRefreshSessions: _loadSessions,
+      onSessionAction: _dispatchSessionAction,
       onNewSession: () {
         _newSessionFlow();
         onAfterPick?.call();
@@ -1334,6 +1357,13 @@ class _DesktopShellState extends State<DesktopShell>
     _loadSessions();
   }
 
+  void _dispatchSessionAction(String action) {
+    final key = _activeTab?.key;
+    if (key == null) return;
+    _macSessionControls[key]?.performAction(action);
+    if (_drawerOpen) _scaffoldKey.currentState?.closeDrawer();
+  }
+
   Widget _macNavigationBar() {
     final tab = _activeTab;
     final controls = tab == null ? null : _macSessionControls[tab.key];
@@ -1345,19 +1375,18 @@ class _DesktopShellState extends State<DesktopShell>
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [
-        Expanded(
-          child: ListView.builder(
-            controller: _stripController,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            itemCount: _tabs.length,
-            itemBuilder: (_, i) => _tabChip(i),
-          ),
-        ),
+        Expanded(child: _tabList()),
         if (tab != null && tab.isFile) ...[
-          _macTopIconAction(
-              'download', 'Download', () => _downloadActiveFile()),
-          _macTopIconAction('edit', 'Edit', () => _editActiveFile()),
+          IconBtn('download',
+              size: 26,
+              iconSize: 12,
+              tooltip: 'Download',
+              onTap: _downloadActiveFile),
+          IconBtn('edit',
+              size: 26,
+              iconSize: 12,
+              tooltip: 'Edit',
+              onTap: _editActiveFile),
         ] else if (controls != null) ...[
           if (running)
             Padding(
@@ -1379,217 +1408,7 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  Widget _macApprovalChip({
-    required bool manual,
-    required void Function(bool manual) onPick,
-  }) {
-    return Builder(builder: (chipCtx) {
-      return Tooltip(
-        message: manual ? 'Ask before tool actions' : 'Auto-approve tools',
-        child: InkWell(
-          onTap: () => _pickApprovalMode(chipCtx, manual, onPick),
-          borderRadius: BorderRadius.circular(R.xs),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon('shield', size: 12, color: AppColors.fg3),
-              const SizedBox(width: 5),
-              Text(manual ? 'Ask' : 'Auto',
-                  style: sans(10.5, color: AppColors.fg2)),
-              const SizedBox(width: 2),
-              AppIcon('chevron-down', size: 9, color: AppColors.fg4),
-            ]),
-          ),
-        ),
-      );
-    });
-  }
-
-  Future<void> _pickApprovalMode(
-    BuildContext chipCtx,
-    bool manual,
-    void Function(bool manual) onPick,
-  ) async {
-    final box = chipCtx.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(chipCtx).context.findRenderObject() as RenderBox?;
-    RelativeRect position;
-    if (box != null && overlay != null) {
-      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      final openUp = origin.dy > overlay.size.height / 2;
-      position = RelativeRect.fromLTRB(
-        origin.dx
-            .clamp(12.0, math.max(12.0, overlay.size.width - 280).toDouble()),
-        openUp ? (origin.dy - 110) : (origin.dy + box.size.height + 4),
-        overlay.size.width - origin.dx - box.size.width,
-        openUp ? (overlay.size.height - origin.dy + 4) : 0,
-      );
-    } else {
-      position = const RelativeRect.fromLTRB(16, 48, 16, 16);
-    }
-    final picked = await showMenu<bool>(
-      context: chipCtx,
-      position: position,
-      color: AppColors.surface1,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      shape: appMenuShape,
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
-      items: [
-        appMenuItem(
-          value: false,
-          icon: 'zap',
-          label: 'Auto',
-          detail: 'Run tools without asking',
-          selected: !manual,
-        ),
-        appMenuItem(
-          value: true,
-          icon: 'shield',
-          label: 'Ask',
-          detail: 'Confirm each tool',
-          selected: manual,
-        ),
-      ],
-    );
-    if (picked == null || picked == manual) return;
-    onPick(picked);
-  }
-
-  Widget _macGoalChip({
-    required bool active,
-    required bool paused,
-    required void Function(String text) onSet,
-    required VoidCallback onCancel,
-    required VoidCallback onResume,
-  }) {
-    return Builder(builder: (chipCtx) {
-      return Tooltip(
-        message: active
-            ? (paused
-                ? 'Goal paused — tap to resume'
-                : 'Goal running — tap to cancel')
-            : 'Set an autonomous goal',
-        child: InkWell(
-          onTap: () {
-            if (active) {
-              if (paused) {
-                onResume();
-              } else {
-                onCancel();
-              }
-              return;
-            }
-            _pickGoal(chipCtx, onSet);
-          },
-          borderRadius: BorderRadius.circular(R.xs),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon('zap',
-                  size: 12, color: active ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 5),
-              Text(active ? (paused ? 'Paused' : 'Goal') : 'Goal',
-                  style: sans(10.5,
-                      color: active ? AppColors.accent : AppColors.fg2)),
-              if (!active) ...[
-                const SizedBox(width: 2),
-                AppIcon('chevron-down', size: 9, color: AppColors.fg4),
-              ],
-            ]),
-          ),
-        ),
-      );
-    });
-  }
-
-  Future<void> _pickGoal(
-    BuildContext chipCtx,
-    void Function(String text) onSet,
-  ) async {
-    final box = chipCtx.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(chipCtx).context.findRenderObject() as RenderBox?;
-    Offset origin = Offset.zero;
-    Size size = Size.zero;
-    if (box != null && overlay != null) {
-      origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      size = box.size;
-    }
-    final openUp = origin.dy > (overlay?.size.height ?? 600) / 2;
-    final text = await showDialog<String>(
-      context: chipCtx,
-      barrierColor: Colors.black.withValues(alpha: 0.35),
-      builder: (ctx) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: Stack(children: [
-            Positioned(
-              left: origin.dx.clamp(
-                  12.0,
-                  overlay == null
-                      ? origin.dx
-                      : math.max(12.0, overlay.size.width - 292).toDouble()),
-              top: openUp ? null : origin.dy + size.height + 4,
-              bottom: openUp
-                  ? (overlay == null
-                      ? 40.0
-                      : overlay.size.height - origin.dy + 4)
-                  : null,
-              child: Material(
-                color: AppColors.surface1,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(R.sm),
-                ),
-                child: ConstrainedBox(
-                  constraints:
-                      const BoxConstraints(minWidth: 240, maxWidth: 280),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                    child: _GoalPopover(onSet: (t) => Navigator.pop(ctx, t)),
-                  ),
-                ),
-              ),
-            ),
-          ]),
-        );
-      },
-    );
-    final t = text?.trim();
-    if (t == null || t.isEmpty) return;
-    onSet(t);
-  }
-
-  Widget _macTopAction(
-      String icon, String label, String tooltip, VoidCallback onTap) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.xs),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(icon, size: 12, color: AppColors.fg3),
-            const SizedBox(width: 5),
-            Text(label, style: sans(10.5, color: AppColors.fg2)),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _macTopIconAction(String icon, String tooltip, VoidCallback onTap) {
-    return Tooltip(
-      message: tooltip,
-      child:
-          IconBtn(icon, size: 26, iconSize: 12, tooltip: tooltip, onTap: onTap),
-    );
-  }
-
-  /// Bottom status line, matching the reference: connection + workspace on the
+/// Bottom status line, matching the reference: connection + workspace on the
   /// left, context remaining on the right.
   ///
   /// Deliberately NOT an action toolbar. The reference keeps this row to state;
@@ -1675,24 +1494,6 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  Widget _macStatusAction(String icon, String label, VoidCallback onTap) {
-    return Tooltip(
-      message: label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.xs),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(icon, size: 11, color: AppColors.fg4),
-            const SizedBox(width: 5),
-            Text(label, style: mono(10, color: AppColors.fg3)),
-          ]),
-        ),
-      ),
-    );
-  }
-
   Widget _macWindowBar() {
     // `fullSizeContentView` does not expose the native titlebar inset through
     // MediaQuery, so that value is false even while traffic lights are visible.
@@ -1706,72 +1507,192 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   Widget _macWindowBarContent({required bool hasWindowControls}) {
-    final branch = _macBranchLabel();
-    final changes = _macChangeLabel();
     return SizedBox(
-      height: kMacTitlebar + 8,
+      height: kMacTitlebar + 10,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.bg,
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
         child: Padding(
-          // Reserve room for traffic lights only while macOS actually draws
-          // them; full-screen removes those controls, so use the space.
-          padding:
-              EdgeInsets.only(left: hasWindowControls ? 88 : 16, right: 16),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Semantics(
-              button: true,
-              label: 'Open Git',
-              child: InkWell(
-                borderRadius: BorderRadius.circular(R.sm),
-                onTap: _openMacGit,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color:
-                        _sidebarGit ? AppColors.accentBg : Colors.transparent,
-                    borderRadius: BorderRadius.circular(R.sm),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    AppIcon('folder-open', size: 13, color: AppColors.fg3),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      flex: 2,
-                      child: Text(_macRepositoryLabel(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12.5,
-                              weight: FontWeight.w500, color: AppColors.fg1)),
-                    ),
-                    if (branch != null) ...[
-                      const SizedBox(width: 12),
-                      Container(width: 1, height: 14, color: AppColors.border2),
-                      const SizedBox(width: 12),
-                      AppIcon('git-branch', size: 13, color: AppColors.fg3),
+          padding: EdgeInsets.only(
+            left: hasWindowControls ? 80 : 12,
+            right: 14,
+          ),
+          child: Row(
+            children: [
+              // Back/Forward navigation arrows
+              IconBtn(
+                'chevron-left',
+                size: 24,
+                iconSize: 14,
+                tooltip: 'Back',
+                onTap: _canNavigateBack ? _navigateBack : null,
+              ),
+              const SizedBox(width: 2),
+              IconBtn(
+                'chevron-right',
+                size: 24,
+                iconSize: 14,
+                tooltip: 'Forward',
+                onTap: _canNavigateForward ? _navigateForward : null,
+              ),
+              const SizedBox(width: 10),
+              // Top Workspace / Session Tabs
+              Expanded(
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _tabs.length; i++) ...[
+                      _topWorkspaceTab(i),
                       const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(branch,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: mono(11.5, color: AppColors.fg2)),
-                      ),
                     ],
-                    if (changes.isNotEmpty) ...[
-                      const SizedBox(width: 12),
-                      Container(width: 1, height: 14, color: AppColors.border2),
-                      const SizedBox(width: 12),
-                      Text(changes, style: sans(11, color: AppColors.fg4)),
-                    ],
-                  ]),
+                    // Start Page tab when tabs are few
+                    if (_tabs.isEmpty || _tabs.length < 3)
+                      _topStartPageTab(),
+                    const SizedBox(width: 6),
+                    IconBtn(
+                      'plus',
+                      size: 24,
+                      iconSize: 13,
+                      tooltip: 'New session',
+                      onTap: _newSessionFlow,
+                    ),
+                  ],
+                ),
+              ),
+              // Far right: History, Notifications, Profile Avatar
+              IconBtn(
+                'history',
+                size: 26,
+                iconSize: 14,
+                tooltip: 'History & Checkpoints',
+                onTap: _showCheckpointsDrawer,
+              ),
+              const SizedBox(width: 4),
+              IconBtn(
+                'bell',
+                size: 26,
+                iconSize: 14,
+                tooltip: 'Notifications',
+                onTap: _showNotificationsDrawer,
+              ),
+              const SizedBox(width: 8),
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.surface2,
+                child: Text(
+                  'S',
+                  style: sans(11, weight: W.title, color: AppColors.fg2),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool get _canNavigateBack => _activeIndex > 0;
+  bool get _canNavigateForward =>
+      _activeIndex >= 0 && _activeIndex < _tabs.length - 1;
+
+  void _navigateBack() {
+    if (_canNavigateBack) _activateTab(_activeIndex - 1);
+  }
+
+  void _navigateForward() {
+    if (_canNavigateForward) _activateTab(_activeIndex + 1);
+  }
+
+  void _showCheckpointsDrawer() {
+    final key = _activeTab?.key;
+    if (key == null) return;
+    _macSessionControls[key]?.performAction('checkpoints');
+  }
+
+  void _showNotificationsDrawer() {
+    final c = _client;
+    if (c == null) return;
+    presentScreen(
+      context,
+      maxWidth: 520,
+      maxHeight: 600,
+      builder: (_, close) => Scaffold(
+        appBar: AppBar(title: const Text('Notifications')),
+        body: Center(
+          child: Text('No new notifications', style: sans(13, color: AppColors.fg4)),
+        ),
+      ),
+    );
+  }
+
+  /// Top-level workspace tab pill in the window bar.
+  Widget _topWorkspaceTab(int i) {
+    final t = _tabs[i];
+    final isActive = i == _activeIndex;
+    final title = t.title.isEmpty ? '(untitled)' : t.title;
+    final icon = t.isMissionControl
+        ? 'layers'
+        : t.isFile
+            ? 'file'
+            : 'cube';
+
+    return GestureDetector(
+      onTap: () => _activateTab(i),
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.surface2 : Colors.transparent,
+          borderRadius: BorderRadius.circular(R.sm),
+          border: Border.all(
+            color: isActive ? AppColors.border2 : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppIcon(
+              icon,
+              size: 13,
+              color: isActive ? AppColors.accent : AppColors.fg4,
+            ),
+            const SizedBox(width: 7),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(
+                  12,
+                  weight: isActive ? W.label : W.body,
+                  color: isActive ? AppColors.fg1 : AppColors.fg3,
                 ),
               ),
             ),
-          ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => _closeTab(i),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: AppIcon('x', size: 10, color: AppColors.fg4),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _topStartPageTab() {
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.center,
+      child: Text(
+        'Start Page',
+        style: sans(12, color: AppColors.fg4),
       ),
     );
   }
@@ -1903,7 +1824,7 @@ class _DesktopShellState extends State<DesktopShell>
                       Expanded(child: _mainPane()),
                     ]),
                   ),
-                  if (_rightAgent != null) ...[
+                  if (_isSplit || _rightAgent != null) ...[
                     VerticalDivider(
                         width: 1, thickness: 1, color: AppColors.border),
                     _rightPane(),
@@ -1936,7 +1857,7 @@ class _DesktopShellState extends State<DesktopShell>
                 VerticalDivider(
                     width: 1, thickness: 1, color: AppColors.border),
                 Expanded(child: _mainPane()),
-                if (_rightAgent != null) ...[
+                if (_isSplit || _rightAgent != null) ...[
                   VerticalDivider(
                       width: 1, thickness: 1, color: AppColors.border),
                   _rightPane(),
@@ -1949,16 +1870,117 @@ class _DesktopShellState extends State<DesktopShell>
     }));
   }
 
-  /// Detail pane on the right, when something has asked for it. Kept last in
-  /// the row so the reading column never shifts position.
-  Widget _rightPane() => SizedBox(
-        width: 340,
+  /// Detail / split pane on the right. When `_rightAgent` is set, displays the
+  /// agent detail. When split view is toggled via [|], displays the split
+  /// secondary view.
+  Widget _rightPane() {
+    if (_rightAgent != null) {
+      return SizedBox(
+        width: 360,
         child: CoordinationAgentDetail(
           agent: _rightAgent!,
           embedded: true,
-          onClose: () => setState(() => _rightAgent = null),
+          onClose: () => setState(() {
+            _rightAgent = null;
+            _isSplit = false;
+          }),
         ),
       );
+    }
+    // If we have multiple tabs, split pane displays the second tab!
+    if (_tabs.length > 1) {
+      final secondIdx = _activeIndex == 0 ? 1 : 0;
+      final t = _tabs[secondIdx];
+      return Expanded(
+        child: Container(
+          color: AppColors.canvas,
+          child: Column(
+            children: [
+              Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.bg,
+                  border: Border(bottom: BorderSide(color: AppColors.border)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface2,
+                        borderRadius: BorderRadius.circular(R.sm),
+                        border: Border.all(color: AppColors.border2),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AppIcon(
+                            t.isFile
+                                ? 'file'
+                                : t.isMissionControl
+                                    ? 'layers'
+                                    : 'message-text',
+                            size: 12,
+                            color: AppColors.accent,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            t.title.isEmpty ? '(session)' : t.title,
+                            style: sans(12,
+                                weight: W.label, color: AppColors.fg1),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    IconBtn(
+                      'x',
+                      size: 24,
+                      iconSize: 12,
+                      tooltip: 'Close split',
+                      onTap: () => setState(() => _isSplit = false),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: t.isFile
+                    ? FileViewer(
+                        key: ValueKey('split-${t.key}'),
+                        client: t.client,
+                        path: t.filePath!,
+                        name: t.title,
+                        embedded: true,
+                      )
+                    : SessionScreen(
+                        key: ValueKey('split-${t.key}'),
+                        client: t.client,
+                        sessionId: t.sessionId!,
+                        title: t.title,
+                        profile: t.profile,
+                        embedded: true,
+                        acceptDrops: false,
+                        onTitle: (title) =>
+                            _onSessionTitle(t.sessionId!, title),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    // Fallback split view: coordination activity
+    final c = _client;
+    if (c != null) {
+      return SizedBox(
+        width: 360,
+        child: CoordinationActivityScreen(client: c, embedded: true),
+      );
+    }
+    return const SizedBox.shrink();
+  }
 
   /// Open the session shell for the active tab. The rail exposes it as a
   /// destination, but a terminal is not a sidebar panel — it belongs to the
@@ -2081,8 +2103,34 @@ class _DesktopShellState extends State<DesktopShell>
     ]);
   }
 
+  /// The tab strip, exactly matching the Traycer references:
+  /// - Individual rounded tab cards (220px wide) that scroll horizontally
+  /// - Plus button immediately after the tabs
+  /// - On the far right: Split pane toggle [|] and Close pane [✕]
+  Widget _tabList() {
+    return SingleChildScrollView(
+      controller: _stripController,
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < _tabs.length; i++) _tabChip(i),
+          const SizedBox(width: 4),
+          IconBtn(
+            'plus',
+            size: 28,
+            iconSize: 14,
+            tooltip: 'New tab',
+            onTap: _newSessionFlow,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _tabStrip(VoidCallback? onMenu) {
-    final compact = kMobile ? 56.0 : (kMacOS ? 38.0 : 40.0);
+    final compact = kMobile ? 56.0 : 42.0;
     return Container(
       height: compact,
       decoration: BoxDecoration(
@@ -2092,131 +2140,184 @@ class _DesktopShellState extends State<DesktopShell>
       child: Row(children: [
         if (onMenu != null)
           IconBtn('sidebar',
-              size: kMobile ? 52 : 38,
-              iconSize: kMobile ? 28 : 18,
+              size: kMobile ? 52 : 36,
+              iconSize: kMobile ? 28 : 16,
               tooltip: 'Sidebar',
               onTap: onMenu),
-        // Tabs share the strip equally rather than sizing to their titles, so
-        // the row reads as a segmented control. Below the minimum width they
-        // stop shrinking and the strip scrolls instead of crushing labels.
-        Expanded(
-          child: LayoutBuilder(builder: (ctx, c) {
-            const minTab = 150.0;
-            final needsScroll = _tabs.length * minTab > c.maxWidth;
-            if (needsScroll) {
-              return ListView.builder(
-                controller: _stripController,
-                scrollDirection: Axis.horizontal,
-                itemCount: _tabs.length,
-                itemBuilder: (_, i) =>
-                    SizedBox(width: minTab, child: _tabChip(i)),
-              );
-            }
-            return Row(
-              children: [
-                for (var i = 0; i < _tabs.length; i++)
-                  Expanded(child: _tabChip(i)),
-              ],
-            );
-          }),
-        ),
+        Expanded(child: _tabList()),
         if (!kMobile && _activeTab?.isFile == true) ...[
           IconBtn('download',
-              size: 38,
-              iconSize: 16,
+              size: 32,
+              iconSize: 14,
               tooltip: 'Download',
               onTap: _downloadActiveFile),
           IconBtn('edit',
-              size: 38, iconSize: 16, tooltip: 'Edit', onTap: _editActiveFile),
+              size: 32, iconSize: 14, tooltip: 'Edit', onTap: _editActiveFile),
         ],
-        IconBtn('plus',
-            size: kMobile ? 52 : 38,
-            iconSize: kMobile ? 25 : 17,
-            tooltip: 'New session',
-            onTap: _newSessionFlow),
+        if (!kMobile) ...[
+          // Split pane toggle button [|]
+          IconBtn(
+            'scan',
+            size: 32,
+            iconSize: 14,
+            tooltip: _isSplit ? 'Close split pane' : 'Split pane',
+            onTap: _toggleSplitPane,
+          ),
+          const SizedBox(width: 6),
+        ],
       ]),
     );
   }
 
-  /// One tab. Active state is a filled surface plus a **top** accent bar —
-  /// matching the reference, where the indicator sits above the label.
+  /// The second line of a desktop tab. File tabs show their folder; the
+  /// Mission Control pin reads as orchestration; sessions show the workspace.
+  String _tabSubtitle(_ShellTab t) {
+    if (t.isFile) {
+      final path = t.filePath ?? '';
+      final slash = path.lastIndexOf('/');
+      final parent = slash > 0 ? path.substring(0, slash) : '';
+      return lastPathSegment(parent, ifEmpty: 'file');
+    }
+    if (t.isMissionControl) return 'orchestration';
+    return _macRepositoryLabel();
+  }
+
+  /// One tab. Sized as an individual rounded card matching the Traycer references:
+  /// - Bounded width (180–240px, never stretched across the whole screen)
+  /// - Dark card background `#1C1C22` when active, with subtle `#2E2E36` border
+  /// - Two lines of text: bold title on top, muted subtitle/category below
+  /// - Close ✕ button on right
   Widget _tabChip(int i) {
     final t = _tabs[i];
     final active = i == _activeIndex;
     final desktop = !kMobile;
-    final mac = kMacOS && desktop;
     final title = t.title.isEmpty ? '(untitled)' : t.title;
     final key = _chipKeys.putIfAbsent(t.key, () => GlobalKey());
+
+    if (!desktop) {
+      return GestureDetector(
+        onTap: () => _activateTab(i),
+        onLongPress: () => _tabMenu(i),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          key: key,
+          margin: const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
+          padding: const EdgeInsets.only(left: 12, right: 6),
+          decoration: BoxDecoration(
+            color: active ? AppColors.surface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(R.sm),
+            border: Border.all(
+              color: active ? AppColors.border : Colors.transparent,
+            ),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(
+              t.isMissionControl
+                  ? 'layers'
+                  : t.isFile
+                      ? 'file'
+                      : 'message-text',
+              size: 12,
+              color: active ? AppColors.accent : AppColors.fg4,
+            ),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(12.5, color: active ? AppColors.fg1 : AppColors.fg3),
+              ),
+            ),
+            if (!t.isMissionControl) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _closeTab(i),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: AppIcon('x', size: 10, color: AppColors.fg4),
+                ),
+              ),
+            ],
+          ]),
+        ),
+      );
+    }
+
+    // Desktop card tab: bounded width, distinct card surface, 2-line label
     return GestureDetector(
       onTap: () => _activateTab(i),
       onLongPress: () => _tabMenu(i),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
+        duration: const Duration(milliseconds: 120),
         curve: Curves.easeOutCubic,
         key: key,
-        margin: desktop ? EdgeInsets.zero : const EdgeInsets.symmetric(
-            vertical: 7, horizontal: 3),
-        padding: EdgeInsets.only(
-            left: desktop ? 12 : 13, right: desktop ? 6 : 5),
+        width: 220,
+        margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: desktop
-              ? (active ? AppColors.surface1 : Colors.transparent)
-              : (active ? AppColors.surface2 : Colors.transparent),
-          borderRadius: BorderRadius.zero,
-          // Hairline between tabs so equal widths still read as separate.
-          border: desktop
-              ? Border(
-                  top: BorderSide(
-                      color: active ? AppColors.accent : Colors.transparent,
-                      width: 2),
-                  right: BorderSide(
-                      color: active
-                          ? AppColors.border
-                          : (i == _tabs.length - 1
-                              ? Colors.transparent
-                              : AppColors.border)),
-                )
-              : null,
-        ),
-        // Fills the tab's width (the parent Expanded sizes it), so the title
-        // can ellipsize rather than the row collapsing to fit.
-        child: Row(mainAxisSize: MainAxisSize.max, children: [
-          if (t.isMissionControl)
-            AppIcon('layers',
-                size: mac ? 13 : 12,
-                color: active ? AppColors.accent : AppColors.fg4)
-          else if (t.isFile)
-            AppIcon('file',
-                size: mac ? 13 : 12,
-                color: active ? AppColors.accent : AppColors.fg4)
-          else
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: active ? AppColors.accent : AppColors.fg4),
-            ),
-          SizedBox(width: mac ? 7 : 8),
-          Expanded(
-            child: Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(mac ? 12 : 12.5,
-                    color: active ? AppColors.fg1 : AppColors.fg3)),
+          color: active ? AppColors.surface2 : Colors.transparent,
+          borderRadius: BorderRadius.circular(R.sm),
+          border: Border.all(
+            color: active ? AppColors.border2 : Colors.transparent,
           ),
-          if (!t.isMissionControl) ...[
-            SizedBox(width: mac ? 3 : 4),
-            GestureDetector(
-              onTap: () => _closeTab(i),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: EdgeInsets.all(mac ? 4 : 5),
-                child: AppIcon('x', size: mac ? 11 : 11, color: AppColors.fg4),
+        ),
+        child: Row(
+          children: [
+            AppIcon(
+              t.isMissionControl
+                  ? 'layers'
+                  : t.isFile
+                      ? 'file'
+                      : 'message-text',
+              size: 14,
+              color: active ? AppColors.accent : AppColors.fg4,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(
+                      11.5,
+                      weight: active ? W.label : W.body,
+                      color: active ? AppColors.fg1 : AppColors.fg3,
+                    ),
+                  ),
+                  Text(
+                    _tabSubtitle(t),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(10, color: AppColors.fg4),
+                  ),
+                ],
               ),
             ),
+            if (!t.isMissionControl) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _closeTab(i),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(R.xs),
+                  ),
+                  child: AppIcon('x', size: 10, color: active ? AppColors.fg3 : AppColors.fg4),
+                ),
+              ),
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }
@@ -2478,6 +2579,7 @@ class _Sidebar extends StatefulWidget {
   final Map<String, bool> health;
   final VoidCallback onRefreshHealth;
   final bool topInset;
+  final void Function(String action)? onSessionAction;
   const _Sidebar({
     required this.instances,
     required this.active,
@@ -2498,6 +2600,7 @@ class _Sidebar extends StatefulWidget {
     required this.health,
     required this.onRefreshHealth,
     required this.topInset,
+    this.onSessionAction,
   });
   @override
   State<_Sidebar> createState() => _SidebarState();
@@ -3124,6 +3227,53 @@ class _SidebarState extends State<_Sidebar> {
               if (!_collapsed.contains(folder))
                 for (final s in groups[folder]!) _sidebarSessionRow(s),
             ],
+        ],
+        const SizedBox(height: 12),
+        // ---- ARTIFACTS --------------------------------------------------
+        ShellSectionHeader(
+          label: 'Artifacts',
+          expanded: !_collapsed.contains('__artifacts__'),
+          onToggle: () => setState(() => _toggleCollapsed('__artifacts__')),
+          actions: [
+            ShellSectionAction(
+              icon: 'sliders',
+              tooltip: 'Filter',
+              onTap: () {},
+            ),
+            ShellSectionAction(
+              icon: 'refresh',
+              tooltip: 'Refresh',
+              onTap: widget.onRefreshSessions,
+            ),
+            ShellSectionAction(
+              icon: 'plus',
+              tooltip: 'New artifact',
+              onTap: () {},
+            ),
+          ],
+        ),
+        if (!_collapsed.contains('__artifacts__')) ...[
+          ShellNavRow(
+            id: 'tickets',
+            label: 'Tickets',
+            icon: 'book',
+            tone: ShellTone.ticket,
+            onTap: () => widget.onSessionAction?.call('tasks'),
+          ),
+          ShellNavRow(
+            id: 'specs',
+            label: 'Specifications',
+            icon: 'file',
+            tone: ShellTone.artifact,
+            onTap: () => widget.onSessionAction?.call('files'),
+          ),
+          ShellNavRow(
+            id: 'reviews',
+            label: 'Reviews',
+            icon: 'check',
+            tone: ShellTone.review,
+            onTap: () => widget.onSessionAction?.call('coordination'),
+          ),
         ],
       ],
     );
