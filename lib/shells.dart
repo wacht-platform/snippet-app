@@ -44,6 +44,12 @@ class ShellsController extends ChangeNotifier {
   Timer? _reconnect;
   bool _closed = false;
 
+  /// A socket object exists before the WebSocket handshake is ready. Do not
+  /// throw away `new` during that gap: it is exactly what left a freshly-created
+  /// shell as an empty tab after a daemon restart.
+  bool _ready = false;
+  final List<Map<String, dynamic>> _pendingFrames = [];
+
   /// The focused shell id, so a pane strip can show the selection.
   String? _focusId;
   String? get focusId => _focusId;
@@ -78,6 +84,7 @@ class ShellsController extends ChangeNotifier {
   }
 
   void _teardown() {
+    _ready = false;
     _reconnect?.cancel();
     _reconnect = null;
     _sub?.cancel();
@@ -123,10 +130,21 @@ class ShellsController extends ChangeNotifier {
 
     switch (op) {
       case 'list':
+        // A list is the server's handshake. Retain optimistic `new` ids while
+        // applying it: clearing one between the hello and its acknowledgement
+        // was the cause of a blank, stuck terminal after daemon restart.
+        _ready = true;
+        final queued = List<Map<String, dynamic>>.from(_pendingFrames);
+        final pendingNewIds = <String>{
+          for (final frame in queued)
+            if (frame['op'] == 'new' && frame['id'] is String)
+              frame['id'] as String,
+        };
+        _pendingFrames.clear();
         // Reconnect: adopt what the daemon already has, so a dropped socket does
         // not make live shells vanish from the strip.
         final listed = (j['shells'] as List?) ?? const [];
-        final live = <String>{};
+        final live = <String>{...pendingNewIds};
         var changed = false;
         for (final raw in listed) {
           if (raw is! Map) continue;
@@ -144,7 +162,10 @@ class ShellsController extends ChangeNotifier {
         if (_shells.length != before) changed = true;
         _sort();
         if (focusId != null && byId(focusId!) == null) _focusId = null;
-        if (changed) notifyListeners();
+        for (final frame in queued) {
+          _send(frame);
+        }
+        if (changed || queued.isNotEmpty) notifyListeners();
         return;
 
       case 'out':
@@ -188,11 +209,20 @@ class ShellsController extends ChangeNotifier {
 
   void _send(Map<String, dynamic> m) {
     final ch = _channel;
-    if (ch == null) return;
+    // WebSocketChannel.connect returns before the protocol handshake completes.
+    // Queue lifecycle/input frames until the daemon's `list` hello confirms this
+    // particular socket is ready; otherwise pressing + immediately after a
+    // restart creates an optimistic tab but never a pty.
+    if (ch == null || !_ready) {
+      _pendingFrames.add(m);
+      return;
+    }
     try {
       ch.sink.add(jsonEncode(m));
     } catch (_) {
-      // Socket already gone; the reconnect path will re-list.
+      // Socket already gone; retain the request for the reconnect rather than
+      // leaving an optimistic terminal tab forever blank.
+      _pendingFrames.add(m);
     }
   }
 
@@ -210,15 +240,15 @@ class ShellsController extends ChangeNotifier {
     return '${max + 1}';
   }
 
-  /// Create a shell and return it. The pty is opened by the daemon; the row
-  /// appears immediately so the pane is not empty while it spawns.
+  /// Create a shell locally, then let its owning UI insert the optimistic tab.
+  /// The daemon acknowledgement will refresh it through the normal listener;
+  /// notifying synchronously here would race that insertion and duplicate it.
   GlobalShell create({String? title}) {
     final id = _nextId();
     final s = GlobalShell(id, title: title ?? 'shell $id');
     _shells.add(s);
     _sort();
-    focusId = id;
-    notifyListeners();
+    _focusId = id;
     _send({'wire': 'term', 'op': 'new', 'id': id, 'cols': 80, 'rows': 24});
     return s;
   }

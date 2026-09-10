@@ -16,11 +16,13 @@ class OpenTabDescriptor {
   final bool diffStaged;
   final bool diffUntracked;
 
-  /// Which pane the tab was in, and — for a terminal tab — which pty it showed.
+  /// Which pane the tab was in, which inner session tab group owns it, and —
+  /// for a terminal tab — which pty it showed.
   ///
   /// A pane is a property of the tab, so it has to survive a restart; otherwise
   /// reopening the app would collapse every split back into the left pane.
   final String? pane;
+  final String? groupSessionKey;
   final String? termSessionKey;
   final String? termId;
 
@@ -34,6 +36,7 @@ class OpenTabDescriptor {
     this.diffStaged = false,
     this.diffUntracked = false,
     this.pane,
+    this.groupSessionKey,
     this.termSessionKey,
     this.termId,
   });
@@ -49,6 +52,7 @@ class OpenTabDescriptor {
         diffStaged: j['diff_staged'] as bool? ?? false,
         diffUntracked: j['diff_untracked'] as bool? ?? false,
         pane: j['pane'] as String?,
+        groupSessionKey: j['group_session_key'] as String?,
         termSessionKey: j['term_session_key'] as String?,
         termId: j['term_id'] as String?,
       );
@@ -63,6 +67,7 @@ class OpenTabDescriptor {
         if (diffStaged) 'diff_staged': true,
         if (diffUntracked) 'diff_untracked': true,
         if (pane != null) 'pane': pane,
+        if (groupSessionKey != null) 'group_session_key': groupSessionKey,
         if (termSessionKey != null) 'term_session_key': termSessionKey,
         if (termId != null) 'term_id': termId,
       };

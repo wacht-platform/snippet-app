@@ -73,6 +73,12 @@ class _ShellTab {
   /// Which pane this tab is shown in. Mutable: this is what a drag changes.
   _Pane pane;
 
+  /// The locked conversation root of the inner tab group this item belongs to.
+  /// A group shows exactly one session root; its files, diffs and terminals sit
+  /// alongside it in the full-width strip. Null is only valid for a session
+  /// root itself, or for a legacy item that will be adopted by the active root.
+  String? groupSessionKey;
+
   /// Set only for a diff tab: the changed file plus the view it should show.
   /// A staged-only file reads the index diff; an untracked one shows as an add.
   final String? diffPath;
@@ -96,6 +102,7 @@ class _ShellTab {
     this.profile,
     this.inboundShare,
     this.pane = _Pane.left,
+    this.groupSessionKey,
   })  : filePath = null,
         diffPath = null,
         diffStaged = false,
@@ -108,6 +115,7 @@ class _ShellTab {
     required this.filePath,
     required this.title,
     this.pane = _Pane.left,
+    this.groupSessionKey,
   })  : sessionId = null,
         profile = null,
         diffPath = null,
@@ -124,6 +132,7 @@ class _ShellTab {
     required this.diffStaged,
     required this.diffUntracked,
     this.pane = _Pane.left,
+    this.groupSessionKey,
   })  : filePath = null,
         profile = null,
         termId = null,
@@ -134,7 +143,8 @@ class _ShellTab {
     required this.termId,
     required this.title,
     this.termSessionKey,
-    this.pane = _Pane.right,
+    this.pane = _Pane.left,
+    this.groupSessionKey,
   })  : sessionId = null,
         filePath = null,
         profile = null,
@@ -165,11 +175,13 @@ class _ShellTab {
 /// tab (top bar, desktop strip, split header, tab menu) cannot drift.
 String _tabIconKind(_ShellTab t) => t.isMissionControl
     ? 'layers'
-    : t.isDiff
-        ? 'git-branch'
-        : t.isFile
-            ? 'file'
-            : 'chat-thread';
+    : t.isTerminal
+        ? 'terminal'
+        : t.isDiff
+            ? 'git-branch'
+            : t.isFile
+                ? 'file'
+                : 'chat-thread';
 
 class _MacSessionStatus {
   final HarnessState? state;
@@ -308,6 +320,11 @@ class _DesktopShellState extends State<DesktopShell>
   /// Which tab each pane is showing, keyed by pane. Separate from `_activeIndex`
   /// so the two containers keep independent selections.
   final Map<_Pane, String> _activeKey = {};
+
+  /// Root session selected for each inner tab group. A root is always present as
+  /// that group's first, locked tab; its files, diffs and terminals reference it
+  /// through `_ShellTab.groupSessionKey`.
+  final Map<_Pane, String> _groupRootKey = {};
 
   /// Show a session panel in the pane, or close it if it is already showing.
   void _toggleRightPanel(_RightPanel p) {
@@ -809,11 +826,10 @@ class _DesktopShellState extends State<DesktopShell>
           t.termSessionKey == sessionKey &&
           t.termId == info.id);
       if (exists) continue;
-      // SESSION shells dock on the RIGHT — they never displace the conversation
-      // you are reading. GLOBAL shells (the ones the sidebar creates) can be
-      // docked wherever their creator asked, which is why they are added
-      // directly rather than through here.
-      const target = _Pane.right;
+      // A session terminal is a sibling of its one locked conversation root.
+      // Selecting another session hides it but leaves the session-owned pty
+      // untouched; returning to the session restores the tab and scrollback.
+      final target = owner.pane;
       _tabs.add(_ShellTab.terminal(
         client: owner.client,
         instanceUrl: owner.instanceUrl,
@@ -821,8 +837,11 @@ class _DesktopShellState extends State<DesktopShell>
         termId: info.id,
         title: info.title,
         pane: target,
+        groupSessionKey: owner.key,
       ));
-      _activeKey[target] = _tabs.last.key;
+      if (_groupRootFor(target) == owner.key) {
+        _activeKey[target] = _tabs.last.key;
+      }
       changed = true;
     }
 
@@ -1040,6 +1059,7 @@ class _DesktopShellState extends State<DesktopShell>
                   // Which pane a tab sits in is a property OF the tab, so a
                   // restart must not collapse every split back to the left.
                   pane: t.pane.name,
+                  groupSessionKey: t.groupSessionKey,
                   termSessionKey: t.termSessionKey,
                   termId: t.termId,
                 ))
@@ -1076,6 +1096,7 @@ class _DesktopShellState extends State<DesktopShell>
           diffStaged: descriptor.diffStaged,
           diffUntracked: descriptor.diffUntracked,
           pane: pane,
+          groupSessionKey: descriptor.groupSessionKey,
         ));
       } else if (descriptor.isFile) {
         restored.add(_ShellTab.file(
@@ -1084,6 +1105,7 @@ class _DesktopShellState extends State<DesktopShell>
           filePath: descriptor.filePath!,
           title: descriptor.title,
           pane: pane,
+          groupSessionKey: descriptor.groupSessionKey,
         ));
       } else if (descriptor.sessionId != null) {
         final mc = isMissionControlTab(
@@ -1100,6 +1122,7 @@ class _DesktopShellState extends State<DesktopShell>
           title: mc ? 'Mission Control' : descriptor.title,
           profile: descriptor.profile,
           pane: pane,
+          groupSessionKey: descriptor.groupSessionKey,
         ));
       }
     }
@@ -1328,12 +1351,9 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  /// Whether a tab may be destroyed from a strip.
-  ///
-  /// Mission Control is pinned. A TERMINAL may not: a shell is created and
-  /// destroyed only from the sidebar's terminal panel, so collapsing a view can
-  /// never take a running pty with it. The pane offers minimize instead.
-  bool _canCloseTab(_ShellTab t) => !t.isMissionControl && !t.isTerminal;
+  /// An inner tab group is session-rooted: only user-opened supporting content
+  /// can be closed. The session root is permanent for the lifetime of its group.
+  bool _canCloseTab(_ShellTab t) => _isAuxiliary(t) && !t.isTerminal;
 
   void _closeTab(int i) {
     if (i < 0 || i >= _tabs.length) return;
@@ -1378,10 +1398,12 @@ class _DesktopShellState extends State<DesktopShell>
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _activeIndex = i;
-      // A window-bar click must bring the session forward in ITS pane. The pane
-      // renders from `_activeKey`, so without this the click would move the
-      // highlight while the pane kept showing whatever was docked over it.
-      _activeKey[_tabs[i].pane] = _tabs[i].key;
+      final tab = _tabs[i];
+      // The window bar switches the selected nested group, not merely the
+      // highlight: the conversation becomes the locked first item in its own
+      // full-width inner strip.
+      _groupRootKey[tab.pane] = tab.key;
+      _activeKey[tab.pane] = tab.key;
     });
     _persistTabs();
     _syncPage();
@@ -1612,6 +1634,9 @@ class _DesktopShellState extends State<DesktopShell>
             inboundShare: share));
         _activeIndex = _tabs.length - 1;
       }
+      final root = _tabs[_activeIndex];
+      _groupRootKey[root.pane] = root.key;
+      _activeKey[root.pane] = root.key;
     });
     _persistTabs();
     _syncPage();
@@ -1755,24 +1780,28 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _openFileTab(DaemonClient client, String url, String path, String name) {
+    final pane = _focusedPane;
+    final group = _activeGroupKeyFor(pane);
+    if (group == null) return;
     final existing = _tabs.indexWhere(
         (t) => t.isFile && t.instanceUrl == url && t.filePath == path);
     setState(() {
       if (existing >= 0) {
-        // An already-open file is an AUXILIARY tab, so selecting it must not
-        // move the window bar's selection — only the pane it is docked in.
         final t = _tabs[existing];
-        t.pane = _focusedPane;
-        _dockAux(_focusedPane, t.key);
+        t
+          ..pane = pane
+          ..groupSessionKey = group;
+        _dockAux(pane, t.key);
       } else {
         _tabs.add(_ShellTab.file(
-            client: client,
-            instanceUrl: url,
-            filePath: path,
-            title: name,
-            // Opens where you are working, not always in the left container.
-            pane: _focusedPane));
-        _dockAux(_tabs.last.pane, _tabs.last.key);
+          client: client,
+          instanceUrl: url,
+          filePath: path,
+          title: name,
+          pane: pane,
+          groupSessionKey: group,
+        ));
+        _dockAux(pane, _tabs.last.key);
       }
     });
     _persistTabs();
@@ -1787,6 +1816,9 @@ class _DesktopShellState extends State<DesktopShell>
     String sessionId,
     GitFile f,
   ) {
+    final pane = _focusedPane;
+    final group = _activeGroupKeyFor(pane);
+    if (group == null) return;
     // Staged-only files show the index diff; anything else shows the worktree
     // diff — the same rule the full Git screen uses.
     final staged = f.staged && !f.unstaged;
@@ -1798,11 +1830,11 @@ class _DesktopShellState extends State<DesktopShell>
         t.diffStaged == staged);
     setState(() {
       if (existing >= 0) {
-        // A diff is AUXILIARY: selecting it docks it in a pane without moving
-        // the window bar's selection.
         final t = _tabs[existing];
-        t.pane = _focusedPane;
-        _dockAux(_focusedPane, t.key);
+        t
+          ..pane = pane
+          ..groupSessionKey = group;
+        _dockAux(pane, t.key);
       } else {
         _tabs.add(_ShellTab.diff(
           client: client,
@@ -1812,9 +1844,10 @@ class _DesktopShellState extends State<DesktopShell>
           title: name,
           diffStaged: staged,
           diffUntracked: f.untracked,
-          pane: _focusedPane,
+          pane: pane,
+          groupSessionKey: group,
         ));
-        _dockAux(_tabs.last.pane, _tabs.last.key);
+        _dockAux(pane, _tabs.last.key);
       }
     });
     _persistTabs();
@@ -2699,28 +2732,43 @@ class _DesktopShellState extends State<DesktopShell>
           if (!_isAuxiliary(t)) t,
       ];
 
-  /// Every tab docked in a pane, whatever its kind, in strip order.
-  ///
-  /// The LEFT pane's first tab is the SESSION — a conversation is a tab like
-  /// anything else, so it can be closed or dragged to the other pane exactly
-  /// like a terminal. The window bar lists the workspaces (an outer view); a
-  /// pane strip lists what is docked in that pane (an inner view).
-  List<_ShellTab> _tabsIn(_Pane p) => [
-        for (final t in _tabs)
-          if (t.pane == p) t,
-      ];
+  /// Root-session identity for the inner tab group displayed by [p].
+  /// Every group is anchored by one always-open conversation; files, diffs and
+  /// terminals are merely sibling content tabs in that group.
+  String? _groupRootFor(_Pane p) {
+    final root = _groupRootKey[p];
+    if (root != null && _tabs.any((t) => t.key == root && t.pane == p)) {
+      return root;
+    }
+    final active = _activeTab;
+    return active?.pane == p ? active?.key : null;
+  }
 
-  /// The tab a pane is showing, or null when nothing is docked there.
+  /// Items in one nested tab group. The root is deliberately first and locked;
+  /// the rest are user-opened files, diffs and terminals for that conversation.
+  List<_ShellTab> _tabsIn(_Pane p) {
+    final root = _groupRootFor(p);
+    if (root == null) return const <_ShellTab>[];
+    return [
+      for (final t in _tabs)
+        if (t.pane == p && (t.key == root || t.groupSessionKey == root)) t,
+    ];
+  }
+
+  /// The tab a pane is showing, or null when its selected group has no content.
   _ShellTab? _activeIn(_Pane p) {
+    final list = _tabsIn(p);
     final key = _activeKey[p];
     if (key != null) {
-      for (final t in _tabs) {
-        if (t.key == key && t.pane == p) return t;
+      for (final t in list) {
+        if (t.key == key) return t;
       }
     }
-    final list = _tabsIn(p);
     return list.isEmpty ? null : list.first;
   }
+
+  String? _activeGroupKeyFor(_Pane p) =>
+      _groupRootFor(p) ?? (_activeTab?.pane == p ? _activeTab?.key : null);
 
   /// The pane holding the focused tab. Drives drops and inbound shares, so a
   /// dropped file lands in one composer rather than both.
@@ -2737,6 +2785,11 @@ class _DesktopShellState extends State<DesktopShell>
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _activeKey[p] = tab.key;
+      // Selecting a nested item also selects its one locked session root. The
+      // inner strip therefore never turns into a rootless bag of files.
+      final root =
+          _isAuxiliary(tab) ? tab.groupSessionKey ?? _groupRootFor(p) : tab.key;
+      if (root != null) _groupRootKey[p] = root;
       // `_activeIndex` tracks the MAIN workspace tab — the window bar's
       // selection. Choosing an auxiliary tab in a pane is per-pane and must not
       // move the window bar's highlight.
@@ -2919,13 +2972,9 @@ class _DesktopShellState extends State<DesktopShell>
     return _client == null ? _welcome() : _recentPlaceholder();
   }
 
-  /// The active main workspace tab's body — what the left pane shows when no
-  /// auxiliary tab is covering it.
-  /// A pane's tab strip: its tabs, then the pane's own controls.
-  ///
-  /// Matches the reference: `tab … [|] ×`. Split opens a NEW terminal docked in
-  /// THIS pane; close collapses the pane. Neither destroys a shell — a pty is
-  /// created and destroyed only from the sidebar's terminal panel.
+  /// A pane's nested tab strip: locked session root, then its user-opened
+  /// files, diffs, and terminals. The only trailing action collapses the view;
+  /// terminal creation and destruction live exclusively in the sidebar.
   Widget _paneStrip(_Pane p, List<_ShellTab> list) {
     final active = _activeIn(p);
     return Container(
@@ -2940,11 +2989,6 @@ class _DesktopShellState extends State<DesktopShell>
             itemBuilder: (_, i) => _paneTabChip(p, list[i], list[i] == active),
           ),
         ),
-        IconBtn('split',
-            size: 24,
-            iconSize: 12,
-            tooltip: 'New terminal in this pane',
-            onTap: () => _splitPane(p)),
         // `×` collapses the pane. It does NOT destroy a shell: a pty is created
         // and destroyed only from the sidebar's terminal panel, so closing a
         // view can never take a running shell with it.
@@ -2958,40 +3002,45 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  /// Open a new terminal, docked in [p].
-  ///
-  /// The pty is created by the SESSION (it owns the socket); where the resulting
-  /// tab lands is the shell's call. The pane is recorded now and consumed when
-  /// the session publishes the new terminal, because the two are asynchronous —
-  /// reading the pane at publish time would use whatever was focused by then.
-  /// Create a daemon-wide shell (the sidebar's `+`) and dock it on the RIGHT so
-  /// a new shell never displaces the conversation you are reading.
+  /// The sidebar is the only shell creator. Its controller listener adds the
+  /// acknowledged shell to the active inner group exactly once.
   void _newGlobalShell() {
+    final root = _activeTab;
+    if (root == null) return;
     final s = _shells.create();
     setState(() {
       _tabs.add(_ShellTab.terminal(
-        client: _client!,
-        instanceUrl: _active?.url ?? '',
+        client: root.client,
+        instanceUrl: root.instanceUrl,
         termId: s.id,
         termSessionKey: null,
         title: s.title,
-        pane: _Pane.right,
+        pane: root.pane,
+        groupSessionKey: root.key,
       ));
-      _activeKey[_Pane.right] = _tabs.last.key;
-      _rightCollapsed = false;
+      _groupRootKey[root.pane] = root.key;
+      _activeKey[root.pane] = _tabs.last.key;
     });
     _persistTabs();
   }
 
-  /// Bring a global shell forward: focus it and reveal the pane holding its tab.
+  /// Bring a global shell forward. Its owning session becomes the selected
+  /// inner group, but its daemon pty is never recreated or killed.
   void _focusGlobalShell(String id) {
     _shells.focus(id);
     for (final t in _tabs) {
       if (t.isTerminal && t.termSessionKey == null && t.termId == id) {
+        final root = _tabs.firstWhere(
+          (candidate) => candidate.key == t.groupSessionKey,
+          orElse: () => t,
+        );
+        final i = _tabs.indexOf(root);
         setState(() {
+          if (!_isAuxiliary(root) && i >= 0) _activeIndex = i;
+          _groupRootKey[t.pane] = root.key;
           _activeKey[t.pane] = t.key;
-          if (t.pane == _Pane.right) _rightCollapsed = false;
         });
+        _syncPage();
         return;
       }
     }
@@ -3004,69 +3053,43 @@ class _DesktopShellState extends State<DesktopShell>
     _syncGlobalShellTabs();
   }
 
-  /// Open a NEW daemon-wide shell, docked in [p].
-  ///
-  /// A global shell: it belongs to the machine, so switching or closing a session
-  /// leaves it running. The controller mints the id and owns the socket.
-  void _splitPane(_Pane p) {
-    final s = _shells.create();
-    setState(() {
-      _tabs.add(_ShellTab.terminal(
-        client: _client!,
-        instanceUrl: _active?.url ?? '',
-        termId: s.id,
-        // Null is what makes this the daemon-wide kind.
-        termSessionKey: null,
-        title: s.title,
-        pane: p,
-      ));
-      _activeKey[p] = _tabs.last.key;
-      if (p == _Pane.right) _rightCollapsed = false;
-    });
-    _persistTabs();
-  }
-
-  /// Mirror the daemon-wide shell list into tabs.
-  ///
-  /// Called when the controller reports a change (a shell was adopted after a
-  /// reconnect, or exited). New shells get a tab; a shell the daemon no longer
-  /// reports loses its tab. Only GLOBAL shells are touched (`termSessionKey ==
-  /// null`) — session shells are reconciled by their own session.
+  /// Mirror daemon shells into their existing session-owned tab. Shells adopted
+  /// after a reconnect are attached to the active session once; a duplicate
+  /// legacy tab for the same pty is discarded, never rendered twice.
   void _syncGlobalShellTabs() {
     if (!mounted) return;
     final live = {for (final s in _shells.shells) s.id: s};
     var changed = false;
     setState(() {
-      final stale = [
-        for (final t in _tabs)
-          if (t.isTerminal &&
-              t.termSessionKey == null &&
-              !live.containsKey(t.termId))
-            t,
-      ];
-      for (final t in stale) {
-        final i = _tabs.indexOf(t);
-        if (i < 0) continue;
-        _activeKey.removeWhere((_, k) => k == t.key);
-        _tabs.removeAt(i);
-        _normalizeActiveIndex(i);
+      final seen = <String>{};
+      _tabs.removeWhere((t) {
+        if (!t.isTerminal || t.termSessionKey != null) return false;
+        final id = t.termId!;
+        final duplicate = !seen.add(id);
+        final stale = !live.containsKey(id);
+        if (!duplicate && !stale) return false;
+        _activeKey.removeWhere((_, key) => key == t.key);
         changed = true;
+        return true;
+      });
+
+      final owner = _activeTab;
+      if (owner != null) {
+        for (final s in live.values) {
+          if (seen.contains(s.id)) continue;
+          _tabs.add(_ShellTab.terminal(
+            client: owner.client,
+            instanceUrl: owner.instanceUrl,
+            termId: s.id,
+            termSessionKey: null,
+            title: s.title,
+            pane: owner.pane,
+            groupSessionKey: owner.key,
+          ));
+          seen.add(s.id);
+          changed = true;
+        }
       }
-      for (final s in live.values) {
-        final exists = _tabs.any((t) =>
-            t.isTerminal && t.termSessionKey == null && t.termId == s.id);
-        if (exists) continue;
-        _tabs.add(_ShellTab.terminal(
-          client: _client!,
-          instanceUrl: _active?.url ?? '',
-          termId: s.id,
-          termSessionKey: null,
-          title: s.title,
-          pane: _Pane.right,
-        ));
-        changed = true;
-      }
-      // Titles follow a rename from wherever it happened.
       for (final t in _tabs) {
         if (t.isTerminal && t.termSessionKey == null) {
           final s = live[t.termId];
@@ -3076,6 +3099,7 @@ class _DesktopShellState extends State<DesktopShell>
           }
         }
       }
+      _normalizeActiveIndex();
     });
     if (changed) _persistTabs();
   }
