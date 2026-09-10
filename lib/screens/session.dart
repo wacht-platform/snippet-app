@@ -45,6 +45,7 @@ import 'mission_control/mission_control_state.dart'
 import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_agent_directory.dart';
 import 'mission_control/coordination_board_screen.dart';
+import 'mission_control/coordination_session_agents.dart';
 import 'mission_control/widgets/mission_control_tasks.dart';
 
 String formatCheckpointDate(String raw) {
@@ -2767,6 +2768,13 @@ class _SessionScreenState extends State<SessionScreen>
           onCancelGoal: _cancelGoal,
           onResumeGoal: _resumeGoal,
           onLanes: () => run(_showLanes),
+          // Session agents are available in EVERY session, not just Mission
+          // Control: which agent is working here is a property of the session,
+          // and gating it behind MC hid it from ordinary chats.
+          onSessionAgents: () => run(() => presentScreen(context,
+              style: PanelStyle.drawer,
+              builder: (_, close) => SessionAgentsPanel(
+                  client: widget.client, sessionId: widget.sessionId))),
           onTasks: _isMissionControl ? () => run(_showTasks) : null,
           onAgents: _isMissionControl
               ? () => run(() => presentScreen(context,
@@ -5353,6 +5361,9 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onResumeGoal;
   final VoidCallback onLanes;
   final VoidCallback? onTasks;
+  /// Which agents are (and were) active in THIS session. Present for every
+  /// session, not just Mission Control.
+  final VoidCallback? onSessionAgents;
   final VoidCallback? onAgents;
   final VoidCallback? onCoordination;
   final VoidCallback? onActivity;
@@ -5379,6 +5390,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onResumeGoal,
     required this.onLanes,
     this.onTasks,
+    this.onSessionAgents,
     this.onAgents,
     this.onCoordination,
     this.onActivity,
@@ -5564,6 +5576,13 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           _row(icon: 'layers', label: 'Lanes', onTap: widget.onLanes),
         if (widget.onTasks != null)
           _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
+        // Which agents are active here — available in every session, so it sits
+        // above the Mission-Control-only directory row.
+        if (widget.onSessionAgents != null)
+          _row(
+              icon: 'cpu',
+              label: 'Agents in session',
+              onTap: widget.onSessionAgents),
         if (widget.onAgents != null)
           _row(icon: 'users', label: 'Agents', onTap: widget.onAgents),
         if (widget.onCoordination != null)

@@ -820,6 +820,44 @@ class CoordinationAgent {
   bool get available => status == 'active';
 }
 
+/// One agent's participation in one session — a lease period joined to the
+/// agent's identity. Answers "when is an agent active in this session": an
+/// agent that held the turn twice appears twice, which is the activity history.
+class CoordinationSessionAgent {
+  final String agentId;
+  final String displayName;
+  final String handle;
+  final String role;
+  final String status;
+  /// True while this lease is the session's current, unexpired holder.
+  final bool active;
+  final String assignmentId;
+  final String acquiredAt;
+  /// Null while the agent still holds the turn.
+  final String? releasedAt;
+  /// Why it ended (released/expired/handoff); null while active.
+  final String? releaseReason;
+
+  CoordinationSessionAgent.fromJson(Map<String, dynamic> j)
+      : agentId = j['agent_id'] as String? ?? '',
+        displayName = j['display_name'] as String? ?? '',
+        handle = j['handle'] as String? ?? '',
+        role = j['role'] as String? ?? '',
+        status = j['status'] as String? ?? '',
+        active = j['active'] as bool? ?? false,
+        assignmentId = j['assignment_id'] as String? ?? '',
+        acquiredAt = j['acquired_at'] as String? ?? '',
+        releasedAt = j['released_at'] as String?,
+        releaseReason = j['release_reason'] as String?;
+
+  /// How the hold ended, in words. Empty while the agent is still active.
+  String get outcome {
+    if (active) return 'active';
+    final reason = releaseReason?.trim() ?? '';
+    return reason.isEmpty ? 'finished' : reason;
+  }
+}
+
 class CoordinationAssignment {
   final String id;
   final String goalId;

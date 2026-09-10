@@ -911,6 +911,20 @@ class DaemonClient {
         .toList();
   }
 
+  /// GET /coordination/sessions/{id}/agents — which agents are (and were) in a
+  /// session, active holder first, then history.
+  Future<List<CoordinationSessionAgent>> coordinationSessionAgents(
+      String sessionId) async {
+    final r = await http.get(_uri(
+        '/coordination/sessions/${Uri.encodeComponent(sessionId)}/agents'));
+    if (r.statusCode != 200) throw _err('list session agents', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) =>
+            CoordinationSessionAgent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// GET /coordination/threads/{threadId}/events — cursor-paged board events.
   Future<List<CoordinationEvent>> coordinationEvents(
     String threadId, {
