@@ -26,7 +26,10 @@ import 'models.dart';
 import 'usage.dart';
 import 'vault.dart';
 import 'recurring.dart';
+import 'agents_sidebar_panel.dart';
+import 'mission_control/coordination_activity_screen.dart';
 import 'session.dart';
+import 'shell_rail.dart';
 import 'mission_control.dart';
 
 /// Desktop two-pane shell: a persistent left sidebar (instances + sessions) and
@@ -128,6 +131,10 @@ class _DesktopShellState extends State<DesktopShell>
   // /sessions refetch so the list doesn't flicker back to stale.
   final Map<String, String> _liveStatus = {};
   bool _sidebarGit = false;
+
+  /// Which contextual sidebar the rail is showing. Purely a shell concern: the
+  /// conversation you're reading stays put while this changes.
+  ShellSection _section = ShellSection.sessions;
 
   @override
   void initState() {
@@ -1194,6 +1201,35 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) {
     final tab = _activeTab;
+    // The rail switches which panel occupies the sidebar. Git stays a mode of
+    // the sessions panel — you inspect a session's diff, not the agent list.
+    if (_section == ShellSection.agents) {
+      final client = _client;
+      if (client == null) {
+        return Container(
+          color: AppColors.bg,
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Text('Add a machine to see its agents.',
+              style: sans(12.5, color: AppColors.fg4, height: 1.5)),
+        );
+      }
+      return AgentsSidebarPanel(client: client);
+    }
+    if (_section == ShellSection.activity) {
+      final client = _client;
+      if (client == null) {
+        return Container(
+          color: AppColors.bg,
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Text('Add a machine to see activity.',
+              style: sans(12.5, color: AppColors.fg4, height: 1.5)),
+        );
+      }
+      return Container(
+        color: AppColors.bg,
+        child: CoordinationActivityScreen(client: client, embedded: true),
+      );
+    }
     if (_sidebarGit && tab != null && !tab.isFile) {
       final path = tab.filePath;
       final slash = path?.lastIndexOf('/') ?? -1;
@@ -1825,6 +1861,12 @@ class _DesktopShellState extends State<DesktopShell>
               _macWindowBar(),
               Expanded(
                 child: Row(children: [
+                  ShellRail(
+                    section: _section,
+                    onSelect: (s) => setState(() => _section = s),
+                  ),
+                  VerticalDivider(
+                      width: 1, thickness: 1, color: AppColors.border),
                   SizedBox(width: 300, child: _sidebar(topInset: false)),
                   VerticalDivider(
                       width: 1, thickness: 1, color: AppColors.border),
@@ -1848,6 +1890,12 @@ class _DesktopShellState extends State<DesktopShell>
           child: Column(children: [
             Expanded(
               child: Row(children: [
+                ShellRail(
+                  section: _section,
+                  onSelect: (s) => setState(() => _section = s),
+                ),
+                VerticalDivider(
+                    width: 1, thickness: 1, color: AppColors.border),
                 SizedBox(width: 300, child: _sidebar(topInset: true)),
                 VerticalDivider(
                     width: 1, thickness: 1, color: AppColors.border),
