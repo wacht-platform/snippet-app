@@ -11,6 +11,7 @@ import 'package:snippet/notifications.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/mission_control/mission_control_state.dart';
 import 'package:snippet/tool_views.dart';
+import 'package:snippet/theme.dart';
 import 'package:snippet/transcript.dart';
 import 'package:snippet/widgets.dart';
 
@@ -646,4 +647,62 @@ void main() {
     expect(parsed!.body, 'the real current message');
   });
 
+
+  // --- Design token guards -------------------------------------------------
+  // These lock two defects that were silent and app-wide:
+  //   1. every weight was capped at 400, so 119 call sites asking for emphasis
+  //      rendered regular and hierarchy came from size alone;
+  //   2. palette values drifting below accessible contrast on the dark canvas.
+
+  test('sans() honours the requested weight (no silent 400 cap)', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    expect(sans(15, weight: FontWeight.w500).fontWeight, FontWeight.w500);
+    expect(sans(15, weight: FontWeight.w600).fontWeight, FontWeight.w600);
+    expect(sans(15, weight: FontWeight.w700).fontWeight, FontWeight.w700);
+    // Default body stays regular.
+    expect(sans(15).fontWeight, FontWeight.w400);
+    // The ramp is reachable through mono() as well.
+    expect(mono(13, weight: FontWeight.w600).fontWeight, FontWeight.w600);
+  });
+
+  test('display() keeps its weight instead of flattening', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    expect(display(22).fontWeight, W.title);
+  });
+
+  test('dark palette clears accessible contrast on every surface', () {
+    // Color.computeLuminance() is Flutter's WCAG relative luminance.
+    double ratio(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      final hi = la > lb ? la : lb;
+      final lo = la > lb ? lb : la;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    final surfaces = [
+      AppColors.canvas,
+      AppColors.surface1,
+      AppColors.surface2,
+      AppColors.surface3,
+    ];
+
+    // Body text must clear AA (4.5:1) wherever it can land.
+    for (final s in surfaces) {
+      expect(ratio(AppColors.fg1, s), greaterThanOrEqualTo(4.5),
+          reason: 'fg1 must meet AA on its surface');
+      expect(ratio(AppColors.fg2, s), greaterThanOrEqualTo(4.5),
+          reason: 'fg2 carries secondary body text');
+    }
+    // Meta/tertiary text only needs the large-text threshold.
+    expect(ratio(AppColors.fg3, AppColors.canvas), greaterThanOrEqualTo(3.0));
+    // The text ladder must stay ordered, or "fainter" stops meaning anything.
+    final l1 = AppColors.fg1.computeLuminance();
+    final l2 = AppColors.fg2.computeLuminance();
+    final l3 = AppColors.fg3.computeLuminance();
+    final l4 = AppColors.fg4.computeLuminance();
+    expect(l1, greaterThan(l2));
+    expect(l2, greaterThan(l3));
+    expect(l3, greaterThan(l4));
+  });
 }

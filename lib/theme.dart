@@ -88,26 +88,29 @@ class ThemePreset {
   });
 }
 
-// Helper: derive dark surfaces + status from a TUI accent/text palette.
+// Helper: build the palette. Surfaces follow a "surface ladder" — hierarchy
+// comes from surface lift + hairlines, not drop shadows. Text follows a strict
+// brightness ladder so fg1 > fg2 > fg3 > fg4 always holds.
 ThemePreset _dark({
   required String name,
   required String label,
   required Color accent,
-  required Color text,
-  required Color muted,
-  required Color faint,
+  required Color ink,
+  required Color inkMuted,
+  required Color inkSubtle,
+  required Color inkFaint,
   required Color success,
   required Color danger,
   required Color warn,
-  bool isAmoled = false,
 }) {
-  // Surfaces: neutral grays (no color tint) — Grok-style.
-  // AMOLED mode: pure #000000 for deepest blacks on OLED screens.
-  final bg = isAmoled ? const Color(0xFF000000) : const Color(0xFF121212);
-  final canvas = isAmoled ? const Color(0xFF000000) : const Color(0xFF181818);
-  final surface1 = isAmoled ? const Color(0xFF0A0A0A) : const Color(0xFF1E1E1E);
-  final surface2 = isAmoled ? const Color(0xFF141414) : const Color(0xFF2A2A2A);
-  final surface3 = isAmoled ? const Color(0xFF1E1E1E) : const Color(0xFF363636);
+  // Surface ladder — each step a deliberate lift, not a lightness nudge. The
+  // shell sits on the floor; reading content lifts one step, so sidebar and
+  // canvas read as distinct planes.
+  final bg = const Color(0xFF010102); // page floor — shell / sidebar
+  final canvas = const Color(0xFF0F1011); // reading surface
+  final surface1 = const Color(0xFF141516); // cards, panels
+  final surface2 = const Color(0xFF18191A); // hovered / selected rows
+  final surface3 = const Color(0xFF191A1B); // dropdowns, popovers
 
   return ThemePreset(
     name: name,
@@ -117,44 +120,48 @@ ThemePreset _dark({
     surface1: surface1,
     surface2: surface2,
     surface3: surface3,
-    fg1: text,
-    fg2: muted,
-    fg3: _lighten(muted, 0.15),
-    fg4: _lighten(faint, 0.20),
-    border: _alphaWhite(0.09),
-    border2: _alphaWhite(0.14),
+    fg1: ink,
+    fg2: inkMuted,
+    fg3: inkSubtle,
+    fg4: inkFaint,
+    // Hairlines: explicit values, not white-alpha, so they stay crisp and
+    // consistent against every rung of the ladder.
+    border: const Color(0xFF23252A),
+    border2: const Color(0xFF34343A),
     accent: accent,
-    accentHover: _lighten(accent, 0.12),
-    accentFg: _nearBlack(),
-    accentBg: _withAlpha(accent, 0.15),
-    accentLine: _withAlpha(accent, 0.40),
-    accentRing: _withAlpha(accent, 0.30),
+    accentHover: _lighten(accent, 0.10),
+    accentFg: const Color(0xFFFFFFFF),
+    accentBg: _withAlpha(accent, 0.14),
+    accentLine: _withAlpha(accent, 0.38),
+    accentRing: _withAlpha(accent, 0.45),
     ok: success,
-    okBg: _withAlpha(success, 0.15),
+    okBg: _withAlpha(success, 0.13),
     run: warn,
-    runBg: _withAlpha(warn, 0.15),
+    runBg: _withAlpha(warn, 0.13),
     danger: danger,
-    dangerBg: _withAlpha(danger, 0.15),
-    diffAddBg: _withAlpha(success, 0.12),
-    diffDelBg: _withAlpha(danger, 0.12),
-    diffAddFg: _lighten(success, 0.20),
-    diffDelFg: _lighten(danger, 0.20),
-    diffGutter: _lighten(faint, 0.15),
+    dangerBg: _withAlpha(danger, 0.13),
+    diffAddBg: _withAlpha(success, 0.10),
+    diffDelBg: _withAlpha(danger, 0.10),
+    diffAddFg: _lighten(success, 0.14),
+    diffDelFg: _lighten(danger, 0.14),
+    diffGutter: const Color(0xFF3E3E44),
   );
 }
 
 // The only client theme. Other palettes were removed on request.
 final _amoled = _dark(
   name: 'amoled',
-  label: 'AMOLED Black',
-  accent: const Color(0xFF60A5FA),
-  text: const Color(0xFFE5E7EB),
-  muted: const Color(0xFF9CA3AF),
-  faint: const Color(0xFF6B7280),
-  success: const Color(0xFF34D399),
-  danger: const Color(0xFFF87171),
-  warn: const Color(0xFFFBBF24),
-  isAmoled: true,
+  label: 'Dark',
+  // Lavender-blue, reserved for the brand mark, focus ring, and one primary
+  // action per view. Deliberately scarce: colour here carries meaning.
+  accent: const Color(0xFF5E6AD2),
+  ink: const Color(0xFFF7F8F8),
+  inkMuted: const Color(0xFFD0D6E0),
+  inkSubtle: const Color(0xFF8A8F98),
+  inkFaint: const Color(0xFF6E7380),
+  success: const Color(0xFF3FB950),
+  danger: const Color(0xFFF85149),
+  warn: const Color(0xFFD29922),
 );
 
 List<ThemePreset> get allPresets => [_amoled];
@@ -164,8 +171,6 @@ List<ThemePreset> get allPresets => [_amoled];
 // ---------------------------------------------------------------------------
 
 Color _withAlpha(Color c, double a) => c.withValues(alpha: a);
-Color _alphaWhite(double a) => Color.fromRGBO(255, 255, 255, a);
-Color _nearBlack() => const Color(0xFF160E02);
 
 Color _lighten(Color c, double amount) {
   final hsl = HSLColor.fromColor(c);
@@ -266,50 +271,75 @@ class AppColors {
 Color get readingBg => kMobile ? AppColors.bg : AppColors.canvas;
 
 // ---------------------------------------------------------------------------
-// Radius — crisp but friendly corners.
+// Radius — small and precise. Large radii read consumer/toy; a developer tool
+// wants edges that feel engineered.
 // ---------------------------------------------------------------------------
 
 class R {
-  static const card = 14.0;
-  static const md = 12.0;
-  static const sm = 8.0;
-  static const xs = 6.0;
-  static const sheetTop = 16.0;
+  static const card = 8.0;
+  static const md = 6.0;
+  static const sm = 4.0;
+  static const xs = 4.0;
+  static const sheetTop = 12.0;
 }
 
 // ---------------------------------------------------------------------------
-// Typography — Inter for UI (clean, readable at all sizes), Geist Mono for code.
+// Typography — Inter for UI, JetBrains Mono for code.
+//
+// Weights are a real ramp, NOT capped. Capping every call at 400 removed all
+// weight-based hierarchy: 119 call sites asked for emphasis and every one
+// rendered regular, leaving size as the only differentiator, which reads flat.
+// 400 body · 500 labels/emphasis · 600 titles/active.
 // ---------------------------------------------------------------------------
 
-FontWeight _cap(FontWeight w) => w.value > 400 ? FontWeight.w400 : w;
+/// Role weights — prefer these over raw `FontWeight.wNNN` so the ramp stays
+/// consistent across the app.
+class W {
+  static const body = FontWeight.w400;
+  static const label = FontWeight.w500;
+  static const title = FontWeight.w600;
+  static const strong = FontWeight.w700;
+}
+
+/// Optical tracking: tighter as type grows. Large text needs negative tracking
+/// to avoid looking loose; small text must stay open to remain legible.
+double _tracking(double size) {
+  if (size >= 32) return -0.8;
+  if (size >= 24) return -0.5;
+  if (size >= 17) return -0.2;
+  if (size >= 14) return -0.05;
+  if (size >= 13) return 0;
+  return 0.1;
+}
 
 TextStyle sans(double size,
-        {FontWeight weight = FontWeight.w400,
+        {FontWeight weight = W.body,
         double? height,
         double? spacing,
         Color? color}) =>
     GoogleFonts.inter(
       fontSize: size,
-      fontWeight: _cap(weight),
+      fontWeight: weight,
       height: height ?? 1.45,
-      letterSpacing: spacing ?? (size >= 16 ? -0.2 : -0.1),
+      letterSpacing: spacing ?? _tracking(size),
       color: color ?? AppColors.fg1,
     );
 
-TextStyle display(double size, {Color? color, double? height}) =>
+TextStyle display(double size,
+        {FontWeight weight = W.title, Color? color, double? height}) =>
     GoogleFonts.inter(
       fontSize: size,
-      fontWeight: FontWeight.w400,
-      height: height,
-      letterSpacing: -0.3,
+      fontWeight: weight,
+      height: height ?? 1.2,
+      letterSpacing: _tracking(size),
       color: color ?? AppColors.fg1,
     );
 
 TextStyle mono(double size,
-        {FontWeight weight = FontWeight.w400, double? height, Color? color}) =>
+        {FontWeight weight = W.body, double? height, Color? color}) =>
     GoogleFonts.jetBrainsMono(
       fontSize: size,
-      fontWeight: _cap(weight),
+      fontWeight: weight,
       height: height ?? 1.45,
       color: color ?? AppColors.fg1,
     );
@@ -361,30 +391,35 @@ ThemeData buildAppTheme() {
           borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(color: c.border)),
     ),
-    textTheme: _allRegular(GoogleFonts.interTextTheme(base.textTheme)
-        .apply(bodyColor: c.fg1, displayColor: c.fg1)),
+    textTheme: _weightedTextTheme(
+        GoogleFonts.interTextTheme(base.textTheme)
+            .apply(bodyColor: c.fg1, displayColor: c.fg1)),
     dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 12),
   );
 }
 
-TextTheme _allRegular(TextTheme t) {
-  TextStyle? r(TextStyle? s) => s?.copyWith(fontWeight: FontWeight.w400);
+/// Give the Material text theme a real weight ramp instead of flattening
+/// everything to 400: display/headline/title carry weight, body stays regular,
+/// labels sit at 500. Material widgets inherit this, so they stop reading flat.
+TextTheme _weightedTextTheme(TextTheme t) {
+  TextStyle? w(TextStyle? s, FontWeight weight) =>
+      s?.copyWith(fontWeight: weight);
   return t.copyWith(
-    displayLarge: r(t.displayLarge),
-    displayMedium: r(t.displayMedium),
-    displaySmall: r(t.displaySmall),
-    headlineLarge: r(t.headlineLarge),
-    headlineMedium: r(t.headlineMedium),
-    headlineSmall: r(t.headlineSmall),
-    titleLarge: r(t.titleLarge),
-    titleMedium: r(t.titleMedium),
-    titleSmall: r(t.titleSmall),
-    bodyLarge: r(t.bodyLarge),
-    bodyMedium: r(t.bodyMedium),
-    bodySmall: r(t.bodySmall),
-    labelLarge: r(t.labelLarge),
-    labelMedium: r(t.labelMedium),
-    labelSmall: r(t.labelSmall),
+    displayLarge: w(t.displayLarge, W.title),
+    displayMedium: w(t.displayMedium, W.title),
+    displaySmall: w(t.displaySmall, W.title),
+    headlineLarge: w(t.headlineLarge, W.title),
+    headlineMedium: w(t.headlineMedium, W.title),
+    headlineSmall: w(t.headlineSmall, W.title),
+    titleLarge: w(t.titleLarge, W.title),
+    titleMedium: w(t.titleMedium, W.label),
+    titleSmall: w(t.titleSmall, W.label),
+    bodyLarge: w(t.bodyLarge, W.body),
+    bodyMedium: w(t.bodyMedium, W.body),
+    bodySmall: w(t.bodySmall, W.body),
+    labelLarge: w(t.labelLarge, W.label),
+    labelMedium: w(t.labelMedium, W.label),
+    labelSmall: w(t.labelSmall, W.label),
   );
 }
 
