@@ -28,6 +28,7 @@ import 'vault.dart';
 import 'recurring.dart';
 import 'agents_sidebar_panel.dart';
 import 'mission_control/coordination_activity_screen.dart';
+import 'mission_control/coordination_agent_detail.dart';
 import 'session.dart';
 import 'shell_rail.dart';
 import 'mission_control.dart';
@@ -135,6 +136,11 @@ class _DesktopShellState extends State<DesktopShell>
   /// Which contextual sidebar the rail is showing. Purely a shell concern: the
   /// conversation you're reading stays put while this changes.
   ShellSection _section = ShellSection.sessions;
+
+  /// Detail shown in the right pane. Null = pane hidden, so the transcript gets
+  /// the full width until something asks for detail — a pane that is always
+  /// present would cost space even when nothing needs inspecting.
+  CoordinationAgent? _rightAgent;
 
   @override
   void initState() {
@@ -1213,7 +1219,11 @@ class _DesktopShellState extends State<DesktopShell>
               style: sans(12.5, color: AppColors.fg4, height: 1.5)),
         );
       }
-      return AgentsSidebarPanel(client: client);
+      return AgentsSidebarPanel(
+        client: client,
+        // Detail opens in the right pane instead of a nested modal.
+        onOpenAgent: (a) => setState(() => _rightAgent = a),
+      );
     }
     if (_section == ShellSection.activity) {
       final client = _client;
@@ -1876,6 +1886,11 @@ class _DesktopShellState extends State<DesktopShell>
                       Expanded(child: _mainPane()),
                     ]),
                   ),
+                  if (_rightAgent != null) ...[
+                    VerticalDivider(
+                        width: 1, thickness: 1, color: AppColors.border),
+                    _rightPane(),
+                  ],
                 ]),
               ),
               _macStatusBar(),
@@ -1900,6 +1915,11 @@ class _DesktopShellState extends State<DesktopShell>
                 VerticalDivider(
                     width: 1, thickness: 1, color: AppColors.border),
                 Expanded(child: _mainPane()),
+                if (_rightAgent != null) ...[
+                  VerticalDivider(
+                      width: 1, thickness: 1, color: AppColors.border),
+                  _rightPane(),
+                ],
               ]),
             ),
           ]),
@@ -1907,6 +1927,17 @@ class _DesktopShellState extends State<DesktopShell>
       );
     }));
   }
+
+  /// Detail pane on the right, when something has asked for it. Kept last in
+  /// the row so the reading column never shifts position.
+  Widget _rightPane() => SizedBox(
+        width: 340,
+        child: CoordinationAgentDetail(
+          agent: _rightAgent!,
+          embedded: true,
+          onClose: () => setState(() => _rightAgent = null),
+        ),
+      );
 
   Widget _mainPane({VoidCallback? onMenu}) {
     final client = _client;

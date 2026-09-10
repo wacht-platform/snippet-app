@@ -2,89 +2,136 @@ import 'package:flutter/material.dart';
 
 import '../../models.dart';
 import '../../theme.dart';
+import '../../widgets.dart';
 
-/// Read-only detail view for one coordination agent. Opened by tapping a row in
-/// [CoordinationAgentDirectory]. Shows the directory identity plus its configured
-/// capacity; no actions yet.
+/// Read-only detail view for one coordination agent.
+///
+/// Renders two ways: as a full screen with its own app bar, or `embedded` as
+/// the shell's right pane — the same data, no nested modal to dismiss.
 class CoordinationAgentDetail extends StatelessWidget {
-  const CoordinationAgentDetail({super.key, required this.agent});
+  const CoordinationAgentDetail({
+    super.key,
+    required this.agent,
+    this.embedded = false,
+    this.onClose,
+  });
 
   final CoordinationAgent agent;
 
+  /// When embedded, the host owns the chrome and supplies [onClose].
+  final bool embedded;
+  final VoidCallback? onClose;
+
   @override
   Widget build(BuildContext context) {
+    final body = _body(context);
+    if (embedded) {
+      return Container(
+        color: AppColors.bg,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(children: [
+                Expanded(
+                  child: Text(agent.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          sans(14, weight: W.title, color: AppColors.fg1)),
+                ),
+                if (onClose != null)
+                  IconBtn('x',
+                      size: 28,
+                      iconSize: 15,
+                      tooltip: 'Close',
+                      onTap: onClose),
+              ]),
+            ),
+            Divider(height: 1, color: AppColors.border),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(title: Text(agent.displayName)),
+      body: body,
+    );
+  }
+
+  Widget _body(BuildContext context) {
     final initial = agent.displayName.trim().isEmpty
         ? '?'
         : agent.displayName.trim()[0].toUpperCase();
-    return Scaffold(
-      appBar: AppBar(title: Text(agent.displayName)),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: AppColors.accentBg,
-                foregroundColor: AppColors.accent,
-                child: Text(initial,
-                    style:
-                        sans(20, weight: FontWeight.w600, color: AppColors.accent)),
+    return ListView(
+      padding: EdgeInsets.fromLTRB(20, embedded ? 16 : 20, 20, 40),
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: embedded ? 20 : 26,
+              backgroundColor: AppColors.accentBg,
+              foregroundColor: AppColors.accent,
+              child: Text(initial,
+                  style: sans(embedded ? 16 : 20,
+                      weight: W.title, color: AppColors.accent)),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(agent.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          sans(18, weight: W.title, color: AppColors.fg1)),
+                  const SizedBox(height: 4),
+                  Text('@${agent.handle}',
+                      style: sans(13, color: AppColors.fg3)),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(agent.displayName,
-                        style: sans(18,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(height: 4),
-                    Text('@${agent.handle}',
-                        style: sans(13, color: AppColors.fg3)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _Section(
-            title: 'Role',
-            children: [
-              _Field('Kind', agent.kind),
-              _Field('Role', agent.role),
-              _Field('Status', agent.status),
-              _Field('Version', 'v${agent.version}'),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _Section(
-            title: 'Capacity',
-            children: [
-              _Field(
-                  'Concurrent assignments',
-                  '${agent.maxConcurrentAssignments}'),
-            ],
-          ),
-          if (agent.capabilities.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            _Section(
-              title: 'Capabilities',
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final capability in agent.capabilities)
-                      _CapabilityChip(capability),
-                  ],
-                ),
-              ],
             ),
           ],
+        ),
+        const SizedBox(height: 24),
+        _Section(
+          title: 'Role',
+          children: [
+            _Field('Kind', agent.kind),
+            _Field('Role', agent.role),
+            _Field('Status', agent.status),
+            _Field('Version', 'v${agent.version}'),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _Section(
+          title: 'Capacity',
+          children: [
+            _Field('Concurrent assignments',
+                '${agent.maxConcurrentAssignments}'),
+          ],
+        ),
+        if (agent.capabilities.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _Section(
+            title: 'Capabilities',
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final capability in agent.capabilities)
+                    _CapabilityChip(capability),
+                ],
+              ),
+            ],
+          ),
         ],
-      ),
+      ],
     );
   }
 }
