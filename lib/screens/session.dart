@@ -35,6 +35,7 @@ import 'processes.dart';
 import 'git.dart';
 import 'lanes.dart';
 import 'recurring.dart';
+import 'session_panels.dart';
 import 'mission_control/mission_control_state.dart'
     show
         isDedicatedMcSession,
@@ -46,45 +47,6 @@ import 'mission_control/coordination_hub.dart';
 import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_session_agents.dart';
 import 'mission_control/widgets/mission_control_tasks.dart';
-
-String formatCheckpointDate(String raw) {
-  final parsed = DateTime.tryParse(raw)?.toLocal();
-  if (parsed == null) return raw;
-
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(parsed.year, parsed.month, parsed.day);
-  final daysAgo = today.difference(day).inDays;
-  final hour = parsed.hour == 0
-      ? 12
-      : (parsed.hour > 12 ? parsed.hour - 12 : parsed.hour);
-  final minute = parsed.minute.toString().padLeft(2, '0');
-  final meridiem = parsed.hour >= 12 ? 'PM' : 'AM';
-  final time = '$hour:$minute $meridiem';
-
-  if (daysAgo == 0) return 'Today · $time';
-  if (daysAgo == 1) return 'Yesterday · $time';
-  if (daysAgo >= 0 && daysAgo < 7) {
-    const weekdays = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return '${weekdays[parsed.weekday - 1]} · $time';
-  }
-  const months = <String>[
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  final date = '${months[parsed.month - 1]} ${parsed.day}, ${parsed.year}';
-  return '$date · $time';
-}
 
 class SessionScreen extends StatefulWidget {
   final DaemonClient client;
@@ -2776,6 +2738,16 @@ class _SessionScreenState extends State<SessionScreen>
       case 'usage':
         _showUsage();
         return;
+      // Rewind / fork from a checkpoint shown in the shell's right pane. The
+      // pane sends the id, so the session resolves it against live state rather
+      // than the pane holding a stale Checkpoint copy.
+      case 'rewind':
+        final cp = _checkpointById(extra);
+        if (cp != null) _confirmRewind(cp);
+        return;
+      case 'fork':
+        _confirmFork(_checkpointById(extra));
+        return;
       // ---- Mission Control only: the actions the LHS panels do not cover ----
       case 'tasks':
         _showTasks();
@@ -4008,6 +3980,16 @@ class _SessionScreenState extends State<SessionScreen>
           builder: (_, close) => _SessionActionPanel(
               title: 'Checkpoints', onClose: close, child: content));
     }
+  }
+
+  /// Resolve a checkpoint id sent from the shell's right pane against live
+  /// state, so the pane never holds a stale copy.
+  Checkpoint? _checkpointById(String? id) {
+    if (id == null || id.isEmpty) return null;
+    for (final c in _state?.checkpoints ?? const <Checkpoint>[]) {
+      if (c.id == id) return c;
+    }
+    return null;
   }
 
   Future<void> _confirmRewind(Checkpoint c) async {

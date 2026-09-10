@@ -284,3 +284,111 @@ class ShellNavRow extends StatelessWidget {
     );
   }
 }
+
+/// Header height for a pane. Measured 36px in the reference.
+const double kPaneHeaderHeight = 36;
+
+/// Label-row height inside a pane header (36 minus the 2px indicator).
+const double kPaneTabHeight = 34;
+
+/// Pane tab label size.
+const double kPaneTabText = 12;
+
+/// One tab in a pane header.
+class PaneTab {
+  const PaneTab({required this.label, required this.icon});
+  final String label;
+  final String icon;
+}
+
+/// A pane's own header: its tabs on the left, its actions on the right.
+///
+/// Measured from the reference: a 36px row where the ACTIVE tab is marked by a
+/// 2px pill along its top edge, with its label row beneath. No fill and no
+/// border — a pane header never draws a line, which is how two adjacent panes
+/// read as one surface.
+///
+/// Each pane carries its own header so that once a tab can be moved between
+/// panes, the header is what says which tab lives where.
+class PaneTabStrip extends StatelessWidget {
+  const PaneTabStrip({
+    super.key,
+    required this.tabs,
+    required this.activeIndex,
+    this.onSelect,
+    this.actions = const [],
+  });
+
+  final List<PaneTab> tabs;
+  final int activeIndex;
+  final ValueChanged<int>? onSelect;
+
+  /// Right-aligned 24px icon buttons.
+  final List<Widget> actions;
+
+  /// Indicator height. Reserved on inactive tabs too, so selecting cannot shift
+  /// the label down by two pixels.
+  static const double _indicator = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return SizedBox(
+      height: kPaneHeaderHeight,
+      child: Row(
+        children: [
+          for (var i = 0; i < tabs.length; i++) _tab(i),
+          const Spacer(),
+          if (actions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(mainAxisSize: MainAxisSize.min, children: actions),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(int i) {
+    final t = tabs[i];
+    final active = i == activeIndex;
+    return MouseRegion(
+      cursor: onSelect == null ? MouseCursor.defer : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onSelect == null ? null : () => onSelect!(i),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: _indicator,
+              decoration: BoxDecoration(
+                color: active ? AppColors.fg1 : Colors.transparent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            Container(
+              height: kPaneTabHeight,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(children: [
+                AppIcon(t.icon,
+                    size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    t.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(kPaneTabText,
+                        weight: active ? W.label : W.body,
+                        color: active ? AppColors.fg1 : AppColors.fg3),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

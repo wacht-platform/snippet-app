@@ -34,6 +34,7 @@ import 'mission_control/coordination_agent_detail.dart';
 import 'git_diff_sidebar_panel.dart';
 import 'file_tree_sidebar_panel.dart';
 import 'session.dart';
+import 'session_panels.dart';
 import 'shell_nav.dart';
 import 'shell_rail.dart';
 import 'mission_control.dart';
@@ -133,6 +134,22 @@ class _MacSessionControls {
   const _MacSessionControls(this.stop, this.performAction);
 }
 
+/// Session readouts that render in the secondary pane.
+///
+/// These were drawers. A drawer covers the transcript, but Lanes / Checkpoints /
+/// Usage are exactly the things you check WHILE reading a session — so they
+/// belong beside it, and tapping the same band button again closes the pane.
+enum _RightPanel {
+  none('', ''),
+  lanes('Lanes', 'layers'),
+  checkpoints('Checkpoints', 'history'),
+  usage('Usage', 'activity');
+
+  const _RightPanel(this.label, this.icon);
+  final String label;
+  final String icon;
+}
+
 class _DesktopShellState extends State<DesktopShell>
     with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -199,8 +216,27 @@ class _DesktopShellState extends State<DesktopShell>
   /// creates the second pane; closing the pane returns to one.
   _ShellTab? _splitTab;
 
+  /// Session readouts that render in the secondary pane instead of a drawer.
+  ///
+  /// Lanes, Checkpoints and Usage are things you glance at WHILE reading the
+  /// transcript, so a modal was the wrong shape for them — it covered the very
+  /// context you were checking against.
+  _RightPanel _rightPanel = _RightPanel.none;
+
   /// Is the secondary pane showing anything at all?
-  bool get _rightPaneOpen => _rightAgent != null || _splitTab != null;
+  bool get _rightPaneOpen =>
+      _rightAgent != null ||
+      _splitTab != null ||
+      _rightPanel != _RightPanel.none;
+
+  /// Show a session panel in the pane, or close it if it is already showing.
+  void _toggleRightPanel(_RightPanel p) {
+    setState(() {
+      _rightAgent = null;
+      _splitTab = null;
+      _rightPanel = _rightPanel == p ? _RightPanel.none : p;
+    });
+  }
 
   /// Move a tab into the secondary pane (called when it is dropped there).
   void _splitWith(_ShellTab tab) {
@@ -218,25 +254,134 @@ class _DesktopShellState extends State<DesktopShell>
     });
   }
 
-  /// The overflow menu for the far right of the navigation band.
+  /// The button list at the far right of the navigation band.
   ///
-  /// This is the replacement for the removed bottom status strip. It carries
-  /// only what the LHS panels do NOT already provide: Git, Files and Terminals
-  /// live in those panels, so repeating them here would be two doors to one
-  /// room. Grouped by section, matching the session menu.
+  /// Same shape as the icon strip over the sidebar, per the steer. Carries the
+  /// session-scoped actions the removed bottom strip held — but ONLY what the
+  /// LHS panels do NOT provide: Git, Files and Terminals have panels of their
+  /// own, so repeating them here would be two doors to one room.
+  ///
+  /// Approval is a TOGGLE: the button shows its state and flips it inline, since
+  /// a popover to flip a boolean is pure friction. Goal opens an anchored
+  /// popover for its text. Lanes, Checkpoints and Usage render in the pane.
   List<Widget> _railTools() {
-    final hasSession = _activeTab != null;
+    final tab = _activeTab;
+    final mc = tab?.isMissionControl ?? false;
+    final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
+    final manual = (s?.approvalMode ?? 'auto') == 'manual';
+    final goalRunning = s?.goal?.ongoing ?? false;
+    final lanes = s?.lanes.where((l) => l.running).length ?? 0;
+
     return [
+      _railTool('shield',
+          tooltip: manual ? 'Approval: ask' : 'Approval: auto',
+          active: manual,
+          onTap: tab == null
+              ? null
+              : () => _dispatchSessionAction(
+                  manual ? 'approval_auto' : 'approval_ask')),
       Builder(
-        builder: (btnCtx) => IconBtn(
-          'more-horizontal',
-          size: 28,
-          iconSize: 15,
-          tooltip: 'Session actions',
-          onTap: hasSession ? () => _openShellMenu(btnCtx) : null,
+        builder: (ctx) => _railTool('goal',
+            tooltip: goalRunning ? 'Cancel goal' : 'Set goal',
+            active: goalRunning,
+            onTap: tab == null
+                ? null
+                : (goalRunning
+                    ? () => _dispatchSessionAction('goal')
+                    : () => _openGoalPopover(ctx))),
+      ),
+      _railTool('layers',
+          tooltip: 'Lanes',
+          active: _rightPanel == _RightPanel.lanes,
+          badge: lanes > 0 ? '$lanes' : null,
+          onTap:
+              tab == null ? null : () => _toggleRightPanel(_RightPanel.lanes)),
+      _railTool('history',
+          tooltip: 'Checkpoints',
+          active: _rightPanel == _RightPanel.checkpoints,
+          onTap: tab == null
+              ? null
+              : () => _toggleRightPanel(_RightPanel.checkpoints)),
+      _railTool('activity',
+          tooltip: 'Usage',
+          active: _rightPanel == _RightPanel.usage,
+          onTap:
+              tab == null ? null : () => _toggleRightPanel(_RightPanel.usage)),
+      if (mc)
+        Builder(
+          builder: (ctx) => _railTool('more-horizontal',
+              tooltip: 'Mission Control actions',
+              onTap: () => _openShellMenu(ctx)),
+        ),
+    ];
+  }
+
+  /// One 24px button in the band, with an optional count badge.
+  Widget _railTool(
+    String icon, {
+    required String tooltip,
+    required VoidCallback? onTap,
+    bool active = false,
+    String? badge,
+  }) {
+    final button = IconBtn(icon,
+        size: 28, iconSize: 15, active: active, tooltip: tooltip, onTap: onTap);
+    if (badge == null) return button;
+    return Stack(clipBehavior: Clip.none, children: [
+      button,
+      Positioned(
+        right: 1,
+        top: 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: AppColors.surface3,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(badge, style: mono(9, color: AppColors.fg2)),
         ),
       ),
-    ];
+    ]);
+  }
+
+  /// Anchored goal field, under its button in the band.
+  Future<void> _openGoalPopover(BuildContext btnCtx) async {
+    final box = btnCtx.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final origin = box.localToGlobal(Offset.zero);
+    const width = 320.0;
+    final screen = MediaQuery.sizeOf(context).width;
+    final left =
+        (origin.dx + box.size.width - width).clamp(8.0, screen - width - 8);
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'goal',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 120),
+      pageBuilder: (_, __, ___) => Stack(children: [
+        Positioned(
+          left: left,
+          top: origin.dy + box.size.height + 6,
+          width: width,
+          child: Material(
+            color: AppColors.surface3,
+            borderRadius: BorderRadius.circular(R.md),
+            elevation: 12,
+            shadowColor: Colors.black87,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: _GoalPopover(
+                onSet: (text) {
+                  Navigator.pop(context);
+                  _dispatchSessionAction('goal', text);
+                },
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
   }
 
   Future<void> _openShellMenu(BuildContext btnCtx) async {
@@ -2307,6 +2452,7 @@ class _DesktopShellState extends State<DesktopShell>
         onClose: _closeSplitPane,
       );
     }
+    if (_rightPanel != _RightPanel.none) return _rightPanelView();
     final t = _splitTab;
     if (t == null) return const SizedBox.shrink();
     return Container(
@@ -2322,6 +2468,61 @@ class _DesktopShellState extends State<DesktopShell>
       child: Column(children: [
         _splitHeader(t),
         Expanded(child: _tabBody(t, primary: false)),
+      ]),
+    );
+  }
+
+  /// A session readout in the pane: Lanes, Checkpoints or Usage.
+  ///
+  /// Content comes from the shared panel widgets so the pane and the session's
+  /// drawer can never show a different view of the same thing.
+  Widget _rightPanelView() {
+    final tab = _activeTab;
+    final controls = tab == null ? null : _macSessionControls[tab.key];
+    final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
+
+    Widget body;
+    switch (_rightPanel) {
+      case _RightPanel.lanes:
+        body = SessionLanesPanel(lanes: s?.lanes ?? const []);
+        break;
+      case _RightPanel.checkpoints:
+        body = SessionCheckpointsPanel(
+          checkpoints: s?.checkpoints.reversed.toList() ?? const [],
+          // Route the action back through the session, so rewinding from the
+          // pane behaves exactly as rewinding from the session's own drawer.
+          onRewind: (c) => controls?.performAction('rewind', c.id),
+          onFork: (c) => controls?.performAction('fork', c.id),
+        );
+        break;
+      case _RightPanel.usage:
+        body =
+            s == null ? const SizedBox.shrink() : SessionUsagePanel(state: s);
+        break;
+      case _RightPanel.none:
+        body = const SizedBox.shrink();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.floor,
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(R.sheetTop),
+        ),
+      ),
+      child: Column(children: [
+        PaneTabStrip(
+          tabs: [PaneTab(label: _rightPanel.label, icon: _rightPanel.icon)],
+          activeIndex: 0,
+          actions: [
+            IconBtn('x',
+                size: 24,
+                iconSize: 12,
+                tooltip: 'Close pane',
+                onTap: _closeSplitPane),
+          ],
+        ),
+        Expanded(child: body),
       ]),
     );
   }
