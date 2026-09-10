@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api.dart';
 import '../../theme.dart';
+import '../../widgets.dart';
 
 import 'coordination_activity_screen.dart';
 import 'coordination_agent_directory.dart';
@@ -60,7 +61,7 @@ class _CoordinationHubState extends State<CoordinationHub> {
             IconButton(
               tooltip: 'Refresh',
               onPressed: () => _refreshSignal.value++,
-              icon: const Icon(Icons.refresh),
+              icon: AppIcon('refresh', size: 19, color: AppColors.fg2),
             ),
           ],
           bottom: PreferredSize(
@@ -150,8 +151,7 @@ class _Segment extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(R.md),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: selected ? AppColors.surface2 : Colors.transparent,
                 borderRadius: BorderRadius.circular(R.md),

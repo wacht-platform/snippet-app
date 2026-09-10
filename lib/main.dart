@@ -6,6 +6,7 @@ import 'android_reconciliation.dart';
 import 'platform.dart';
 import 'screens/adaptive_home.dart';
 import 'theme.dart';
+import 'widgets.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -18,8 +19,7 @@ Widget _buildErrorWidget(FlutterErrorDetails details) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.warning_amber_rounded,
-                size: 28, color: AppColors.danger),
+            AppIcon('alert-triangle', size: 28, color: AppColors.danger),
             const SizedBox(height: 12),
             Text('This panel could not be displayed',
                 textAlign: TextAlign.center,

@@ -88,57 +88,55 @@ class _CoordinationHandoffsScreenState
   @override
   Widget build(BuildContext context) {
     final body = RefreshIndicator(
-          onRefresh: refresh,
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : error != null
+      onRefresh: refresh,
+      child: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+              ? ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+                  children: [
+                    Text('Could not load handoffs',
+                        textAlign: TextAlign.center,
+                        style: sans(17,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const SizedBox(height: 8),
+                    Text(error!,
+                        textAlign: TextAlign.center,
+                        style: sans(13, color: AppColors.fg3)),
+                    const SizedBox(height: 18),
+                    Center(child: Btn('Retry', onTap: refresh)),
+                  ],
+                )
+              : handoffs.isEmpty
                   ? ListView(
                       padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
                       children: [
-                        Text('Could not load handoffs',
+                        AppIcon('inbox', size: 48, color: AppColors.fg3),
+                        const SizedBox(height: 18),
+                        Text('Nothing awaiting acknowledgement',
                             textAlign: TextAlign.center,
                             style: sans(17,
                                 weight: FontWeight.w600, color: AppColors.fg1)),
                         const SizedBox(height: 8),
-                        Text(error!,
+                        Text(
+                            'Handoffs appear here when one agent transfers work to a successor.',
                             textAlign: TextAlign.center,
-                            style: sans(13, color: AppColors.fg3)),
-                        const SizedBox(height: 18),
-                        Center(child: Btn('Retry', onTap: refresh)),
+                            style:
+                                sans(13, color: AppColors.fg3, height: 1.45)),
                       ],
                     )
-                  : handoffs.isEmpty
-                      ? ListView(
-                          padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
-                          children: [
-                            Icon(Icons.inbox_outlined,
-                                size: 48, color: AppColors.fg3),
-                            const SizedBox(height: 18),
-                            Text('Nothing awaiting acknowledgement',
-                                textAlign: TextAlign.center,
-                                style: sans(17,
-                                    weight: FontWeight.w600,
-                                    color: AppColors.fg1)),
-                            const SizedBox(height: 8),
-                            Text(
-                                'Handoffs appear here when one agent transfers work to a successor.',
-                                textAlign: TextAlign.center,
-                                style: sans(13,
-                                    color: AppColors.fg3, height: 1.45)),
-                          ],
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                          itemCount: handoffs.length,
-                          separatorBuilder: (_, __) => Divider(
-                              color: AppColors.border, height: 1),
-                          itemBuilder: (_, index) => _HandoffCard(
-                            handoff: handoffs[index],
-                            busy: acknowledging.contains(handoffs[index].id),
-                            onAcknowledge: () => _acknowledge(handoffs[index]),
-                          ),
-                        ),
-        );
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      itemCount: handoffs.length,
+                      separatorBuilder: (_, __) =>
+                          Divider(color: AppColors.border, height: 1),
+                      itemBuilder: (_, index) => _HandoffCard(
+                        handoff: handoffs[index],
+                        busy: acknowledging.contains(handoffs[index].id),
+                        onAcknowledge: () => _acknowledge(handoffs[index]),
+                      ),
+                    ),
+    );
 
     // Embedded in the hub: the host owns the chrome.
     if (widget.embedded) return body;
@@ -146,7 +144,10 @@ class _CoordinationHandoffsScreenState
       appBar: AppBar(
         title: const Text('Handoffs'),
         actions: [
-          IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: refresh,
+            icon: AppIcon('refresh', size: 19, color: AppColors.fg2),
+          ),
         ],
       ),
       body: body,

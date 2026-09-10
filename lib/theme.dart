@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'platform.dart';
@@ -313,20 +313,20 @@ TextStyle sans(double size,
         double? height,
         double? spacing,
         Color? color}) =>
-    GoogleFonts.inter(
+    GoogleFonts.dmSans(
       fontSize: size,
       fontWeight: weight,
-      height: height ?? 1.45,
+      height: height ?? 1.4,
       letterSpacing: spacing ?? _tracking(size),
       color: color ?? AppColors.fg1,
     );
 
 TextStyle display(double size,
         {FontWeight weight = W.title, Color? color, double? height}) =>
-    GoogleFonts.inter(
+    GoogleFonts.dmSans(
       fontSize: size,
       fontWeight: weight,
-      height: height ?? 1.2,
+      height: height ?? 1.16,
       letterSpacing: _tracking(size),
       color: color ?? AppColors.fg1,
     );
@@ -387,9 +387,8 @@ ThemeData buildAppTheme() {
           borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(color: c.border)),
     ),
-    textTheme: _weightedTextTheme(
-        GoogleFonts.interTextTheme(base.textTheme)
-            .apply(bodyColor: c.fg1, displayColor: c.fg1)),
+    textTheme: _weightedTextTheme(GoogleFonts.interTextTheme(base.textTheme)
+        .apply(bodyColor: c.fg1, displayColor: c.fg1)),
     dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 12),
   );
 }
@@ -419,151 +418,153 @@ TextTheme _weightedTextTheme(TextTheme t) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Icon map
-// ---------------------------------------------------------------------------
-
-IconData iconFor(String name) {
+/// HugeIcons semantic map. Every application icon resolves to a deliberate
+/// rounded glyph instead of a generic fallback.
+List<List<dynamic>> hugeIconFor(String name) {
   switch (name) {
     case 'chevron-left':
-      return Icons.chevron_left_rounded;
     case 'arrow-left':
-      return IconsaxPlusLinear.arrow_left_2;
+      return HugeIcons.strokeRoundedArrowLeft01;
     case 'chevron-right':
-      return Icons.chevron_right_rounded;
+    case 'arrow-right':
+      return HugeIcons.strokeRoundedArrowRight01;
+    case 'chevron-down':
+      return HugeIcons.strokeRoundedArrowDown01;
+    case 'chevron-up':
+    case 'arrow-up':
+    case 'send':
+      return HugeIcons.strokeRoundedArrowUp01;
     case 'bell':
-      return IconsaxPlusLinear.notification;
+      return HugeIcons.strokeRoundedNotification01;
     case 'alert-circle':
-      return IconsaxPlusLinear.info_circle;
+      return HugeIcons.strokeRoundedInformationCircle;
     case 'message':
     case 'message-text':
-      return IconsaxPlusLinear.message_text_1;
+      return HugeIcons.strokeRoundedBubbleChat;
     case 'users':
-      return IconsaxPlusLinear.profile_2user;
+      return HugeIcons.strokeRoundedUserGroup;
     case 'archive':
-      return IconsaxPlusLinear.archive;
-    case 'chevron-down':
-      return Icons.expand_more_rounded;
-    case 'chevron-up':
-      return Icons.expand_less_rounded;
-    case 'arrow-right':
-      return Icons.arrow_forward_rounded;
+      return HugeIcons.strokeRoundedArchive01;
     case 'plus':
-      return IconsaxPlusLinear.add;
+    case 'add':
+      return HugeIcons.strokeRoundedAdd01;
     case 'x':
-      return Icons.close_rounded;
+      return HugeIcons.strokeRoundedCancel01;
+    case 'more-horizontal':
+      return HugeIcons.strokeRoundedMoreHorizontal;
     case 'more-vertical':
-      return Icons.more_vert;
+      return HugeIcons.strokeRoundedMoreVertical;
     case 'search':
-      return IconsaxPlusLinear.search_normal_1;
+      return HugeIcons.strokeRoundedSearch01;
     case 'settings':
-      return IconsaxPlusLinear.setting_2;
+      return HugeIcons.strokeRoundedSettings01;
     case 'sliders':
-      return IconsaxPlusLinear.setting_4;
+      return HugeIcons.strokeRoundedSlidersHorizontal;
     case 'wifi-off':
-      return IconsaxPlusLinear.wifi;
+      return HugeIcons.strokeRoundedWifiOff01;
     case 'refresh':
-      return IconsaxPlusLinear.refresh_2;
+      return HugeIcons.strokeRoundedRefresh;
     case 'alert-triangle':
-      return IconsaxPlusLinear.warning_2;
+      return HugeIcons.strokeRoundedAlert02;
     case 'check':
-      return Icons.check_rounded;
+      return HugeIcons.strokeRoundedTick01;
     case 'check-check':
-      return Icons.done_all_rounded;
+      return HugeIcons.strokeRoundedTickDouble01;
     case 'stop':
-      return IconsaxPlusLinear.stop;
+      return HugeIcons.strokeRoundedStop;
     case 'play':
-      return Icons.play_arrow_rounded;
+      return HugeIcons.strokeRoundedPlay;
     case 'pause':
-      return Icons.pause_rounded;
-    case 'send':
-    case 'arrow-up':
-      return IconsaxPlusLinear.arrow_up_3;
+      return HugeIcons.strokeRoundedPause;
     case 'sparkles':
-      return IconsaxPlusLinear.flash_1;
-    case 'mic':
-      return IconsaxPlusLinear.microphone_2;
-    case 'mic-off':
-      return IconsaxPlusLinear.microphone_slash;
-    case 'shield':
-      return IconsaxPlusLinear.shield_tick;
-    case 'goal':
-      return Icons.gps_fixed_rounded;
-    case 'folder':
-      return IconsaxPlusLinear.folder_2;
-    case 'folder-open':
-      return IconsaxPlusLinear.folder_open;
-    case 'folder-plus':
-      return IconsaxPlusLinear.folder_add;
-    case 'upload':
-      return IconsaxPlusLinear.document_upload;
-    case 'download':
-      return IconsaxPlusLinear.document_download;
-    case 'file':
-      return IconsaxPlusLinear.document_text;
-    case 'git-branch':
-      return IconsaxPlusLinear.hierarchy;
-    case 'terminal':
-      return IconsaxPlusLinear.code;
-    case 'grip':
-      return IconsaxPlusLinear.menu;
-    case 'edit':
-      return IconsaxPlusLinear.edit_2;
-    case 'eye':
-      return IconsaxPlusLinear.eye;
-    case 'code':
-      return IconsaxPlusLinear.document_code_2;
-    case 'book':
-      return IconsaxPlusLinear.book_1;
-    case 'trash':
-      return IconsaxPlusLinear.trash;
-    case 'key':
-      return IconsaxPlusLinear.key;
-    case 'cpu':
-      return IconsaxPlusLinear.cpu;
-    case 'layers':
-      return IconsaxPlusLinear.layer;
-    case 'activity':
-      return IconsaxPlusLinear.activity;
-    case 'image':
-      return IconsaxPlusLinear.gallery;
-    case 'scan':
-      return IconsaxPlusLinear.scan;
-    case 'camera':
-      return IconsaxPlusLinear.camera;
-    case 'camera-off':
-      return IconsaxPlusLinear.camera_slash;
-    case 'clipboard':
-      return IconsaxPlusLinear.clipboard_text;
-    case 'history':
-      return IconsaxPlusLinear.timer_1;
     case 'zap':
-      return IconsaxPlusLinear.flash_1;
-    case 'minimize':
-      return IconsaxPlusLinear.minus;
-    case 'rotate':
-      return IconsaxPlusLinear.rotate_left;
-    case 'globe':
-      return IconsaxPlusLinear.global;
-    case 'map':
-      return IconsaxPlusLinear.map;
-    case 'list':
-      return IconsaxPlusLinear.menu;
-    case 'file-plus':
-      return IconsaxPlusLinear.document_upload;
-    case 'corner-down-right':
-      return IconsaxPlusLinear.direct_right;
-    case 'home':
-      return IconsaxPlusLinear.home_2;
-    case 'clock':
-      return IconsaxPlusLinear.clock;
-    case 'scheduled':
-      return IconsaxPlusLinear.calendar_tick;
+      return HugeIcons.strokeRoundedFlash;
+    case 'mic':
+      return HugeIcons.strokeRoundedMic01;
+    case 'mic-off':
+      return HugeIcons.strokeRoundedMicOff01;
+    case 'shield':
+      return HugeIcons.strokeRoundedShield01;
+    case 'goal':
+      return HugeIcons.strokeRoundedTarget01;
+    case 'folder':
+      return HugeIcons.strokeRoundedFolder01;
+    case 'folder-open':
+      return HugeIcons.strokeRoundedFolderOpen;
+    case 'folder-plus':
+      return HugeIcons.strokeRoundedFolderAdd;
+    case 'upload':
+      return HugeIcons.strokeRoundedUpload01;
+    case 'download':
+      return HugeIcons.strokeRoundedDownload01;
+    case 'file':
+      return HugeIcons.strokeRoundedFile01;
+    case 'git-branch':
+      return HugeIcons.strokeRoundedGitBranch;
+    case 'terminal':
+      return HugeIcons.strokeRoundedComputerTerminal01;
+    case 'grip':
     case 'sidebar':
-      return IconsaxPlusLinear.menu;
     case 'menu':
-      return IconsaxPlusLinear.menu;
+      return HugeIcons.strokeRoundedMenu01;
+    case 'edit':
+      return HugeIcons.strokeRoundedPencilEdit01;
+    case 'eye':
+      return HugeIcons.strokeRoundedView;
+    case 'code':
+      return HugeIcons.strokeRoundedCode;
+    case 'book':
+      return HugeIcons.strokeRoundedBook01;
+    case 'trash':
+      return HugeIcons.strokeRoundedDelete01;
+    case 'copy':
+      return HugeIcons.strokeRoundedCopy01;
+    case 'cube':
+      return HugeIcons.strokeRoundedBubbleChat;
+    case 'inbox':
+      return HugeIcons.strokeRoundedInbox;
+    case 'transfer':
+      return HugeIcons.strokeRoundedArrowLeftRight;
+    case 'key':
+      return HugeIcons.strokeRoundedKey01;
+    case 'cpu':
+      return HugeIcons.strokeRoundedCpu;
+    case 'layers':
+      return HugeIcons.strokeRoundedLayers01;
+    case 'activity':
+      return HugeIcons.strokeRoundedActivity01;
+    case 'image':
+      return HugeIcons.strokeRoundedImage01;
+    case 'scan':
+      return HugeIcons.strokeRoundedScan;
+    case 'camera':
+      return HugeIcons.strokeRoundedCamera01;
+    case 'camera-off':
+      return HugeIcons.strokeRoundedCameraOff01;
+    case 'clipboard':
+      return HugeIcons.strokeRoundedClipboard;
+    case 'history':
+    case 'clock':
+      return HugeIcons.strokeRoundedClock01;
+    case 'minimize':
+      return HugeIcons.strokeRoundedMinusSign;
+    case 'rotate':
+      return HugeIcons.strokeRoundedRotate01;
+    case 'globe':
+      return HugeIcons.strokeRoundedGlobal;
+    case 'map':
+      return HugeIcons.strokeRoundedMaps;
+    case 'list':
+      return HugeIcons.strokeRoundedMenuSquare;
+    case 'file-plus':
+      return HugeIcons.strokeRoundedFileAdd;
+    case 'corner-down-right':
+      return HugeIcons.strokeRoundedArrowDownRight01;
+    case 'home':
+      return HugeIcons.strokeRoundedHome01;
+    case 'scheduled':
+      return HugeIcons.strokeRoundedCalendar01;
     default:
-      return IconsaxPlusLinear.element_3;
+      return HugeIcons.strokeRoundedCircle;
   }
 }

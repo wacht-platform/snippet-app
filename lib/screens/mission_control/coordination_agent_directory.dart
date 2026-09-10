@@ -78,32 +78,32 @@ class _CoordinationAgentDirectoryState
   @override
   Widget build(BuildContext context) {
     final body = RefreshIndicator(
-          onRefresh: refresh,
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : error != null
+      onRefresh: refresh,
+      child: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+              ? _MessageState(
+                  title: 'Could not load agents',
+                  message: error!,
+                  action: Btn('Retry', onTap: refresh),
+                )
+              : agents.isEmpty
                   ? _MessageState(
-                      title: 'Could not load agents',
-                      message: error!,
-                      action: Btn('Retry', onTap: refresh),
+                      icon: 'users',
+                      title: 'Build your agent team',
+                      message:
+                          'Create a specialized agent with its own identity and workspace-independent sessions.',
+                      action: Btn('Create your first agent',
+                          icon: 'add', onTap: _create),
                     )
-                  : agents.isEmpty
-                      ? _MessageState(
-                          icon: Icons.groups_outlined,
-                          title: 'Build your agent team',
-                          message:
-                              'Create a specialized agent with its own identity and workspace-independent sessions.',
-                          action: Btn('Create your first agent',
-                              icon: 'add', onTap: _create),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                          itemCount: agents.length,
-                          separatorBuilder: (_, __) =>
-                              Divider(color: AppColors.border, height: 1),
-                          itemBuilder: (_, index) => _AgentRow(agents[index]),
-                        ),
-        );
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                      itemCount: agents.length,
+                      separatorBuilder: (_, __) =>
+                          Divider(color: AppColors.border, height: 1),
+                      itemBuilder: (_, index) => _AgentRow(agents[index]),
+                    ),
+    );
 
     // Embedded in the hub: no app bar (the host owns chrome), but keep the
     // create affordance where users expect it via a transparent nested Scaffold
@@ -113,7 +113,7 @@ class _CoordinationAgentDirectoryState
         backgroundColor: Colors.transparent,
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _create,
-          icon: const Icon(Icons.add),
+          icon: AppIcon('plus', size: 18, color: AppColors.accentFg),
           label: const Text('Build agent'),
         ),
         body: body,
@@ -123,12 +123,15 @@ class _CoordinationAgentDirectoryState
       appBar: AppBar(
         title: const Text('Agents'),
         actions: [
-          IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: refresh,
+            icon: AppIcon('refresh', size: 19, color: AppColors.fg2),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
-        icon: const Icon(Icons.add),
+        icon: AppIcon('plus', size: 18, color: AppColors.accentFg),
         label: const Text('Create agent'),
       ),
       body: body,
@@ -177,11 +180,11 @@ class _AgentRow extends StatelessWidget {
 
 class _MessageState extends StatelessWidget {
   const _MessageState(
-      {this.icon = Icons.error_outline,
+      {this.icon = 'alert-circle',
       required this.title,
       required this.message,
       required this.action});
-  final IconData icon;
+  final String icon;
   final String title;
   final String message;
   final Widget action;
@@ -190,7 +193,7 @@ class _MessageState extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
         padding: const EdgeInsets.fromLTRB(28, 72, 28, 120),
         children: [
-          Icon(icon, size: 48, color: AppColors.fg3),
+          AppIcon(icon, size: 48, color: AppColors.fg3),
           const SizedBox(height: 18),
           Text(title,
               textAlign: TextAlign.center,

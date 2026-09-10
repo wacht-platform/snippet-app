@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// What the shell's contextual sidebar is showing. The compact icon rail picks
-/// one panel without taking focus away from the tab already open in the pane.
+/// The sidebar's five work areas. The rail is deliberately a narrow vertical
+/// strip, leaving the panel beside it free for dense, full-width content.
 enum ShellSection {
   sessions('Chat', 'message-text'),
   terminal('Terminal', 'terminal'),
@@ -17,7 +17,8 @@ enum ShellSection {
   final String icon;
 }
 
-/// Compact, centered section picker pinned above the sidebar panel.
+/// Vertical rail matching the desktop shell: a slim, centered stack of small
+/// glyphs with a quiet active capsule rather than an oversized tab bar.
 class ShellRail extends StatelessWidget {
   const ShellRail({
     super.key,
@@ -32,25 +33,22 @@ class ShellRail extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Container(
-      height: 42,
+      width: 44,
       decoration: BoxDecoration(
         color: AppColors.bg,
-        border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+        border: Border(right: BorderSide(color: AppColors.border, width: 0.5)),
       ),
-      alignment: Alignment.center,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final s in ShellSection.values) ...[
-            _RailButton(
-              section: s,
-              selected: s == section,
-              onTap: () => onSelect(s),
-            ),
-            if (s != ShellSection.values.last) const SizedBox(width: 6),
-          ],
+      child: Column(children: [
+        const SizedBox(height: 10),
+        for (final item in ShellSection.values) ...[
+          _RailButton(
+            section: item,
+            selected: item == section,
+            onTap: () => onSelect(item),
+          ),
+          const SizedBox(height: 5),
         ],
-      ),
+      ]),
     );
   }
 }
@@ -70,33 +68,27 @@ class _RailButton extends StatelessWidget {
   Widget build(BuildContext context) => Tooltip(
         message: section.label,
         waitDuration: const Duration(milliseconds: 400),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(R.xs),
-          child: SizedBox(
-            width: 34,
-            height: 42,
-            child: Stack(
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(R.sm),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(R.sm),
+            child: Container(
+              width: 32,
+              height: 32,
+              margin: const EdgeInsets.symmetric(horizontal: 6),
               alignment: Alignment.center,
-              children: [
-                AppIcon(
-                  section.icon,
-                  size: 16,
-                  color: selected ? AppColors.fg1 : AppColors.fg4,
-                ),
-                if (selected)
-                  Positioned(
-                    bottom: 0,
-                    child: Container(
-                      width: 22,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: AppColors.fg1,
-                        borderRadius: BorderRadius.circular(1),
-                      ),
-                    ),
-                  ),
-              ],
+              decoration: BoxDecoration(
+                color: selected ? AppColors.surface2 : Colors.transparent,
+                borderRadius: BorderRadius.circular(R.sm),
+                border: selected ? Border.all(color: AppColors.border) : null,
+              ),
+              child: AppIcon(
+                section.icon,
+                size: 16,
+                color: selected ? AppColors.fg1 : AppColors.fg4,
+              ),
             ),
           ),
         ),

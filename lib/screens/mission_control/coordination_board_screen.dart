@@ -4,6 +4,8 @@ import '../../api.dart';
 import '../../models.dart';
 import '../../coordination/coordination_thread_state.dart';
 import '../../panel.dart';
+import '../../theme.dart';
+import '../../widgets.dart';
 
 import 'coordination_handoffs_screen.dart';
 
@@ -83,40 +85,40 @@ class _CoordinationBoardScreenState extends State<CoordinationBoardScreen> {
   @override
   Widget build(BuildContext context) {
     final body = Column(children: [
-          Expanded(
-              child: RefreshIndicator(
-            onRefresh: () async {
-              await state.refresh();
-              if (mounted) setState(() {});
-            },
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: state.events.length,
-              itemBuilder: (_, index) =>
-                  _EventBubble(event: state.events[index]),
-            ),
-          )),
-          if (state.error != null)
-            Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(state.error!,
-                    style: const TextStyle(color: Colors.red))),
-          SafeArea(
-              child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                  child: Row(children: [
-                    Expanded(
-                        child: TextField(
-                            controller: composer,
-                            minLines: 1,
-                            maxLines: 4,
-                            decoration: const InputDecoration(
-                                hintText: 'Message an agent…'))),
-                    IconButton(
-                        onPressed: state.sending ? null : send,
-                        icon: const Icon(Icons.send)),
-                  ]))),
-        ]);
+      Expanded(
+          child: RefreshIndicator(
+        onRefresh: () async {
+          await state.refresh();
+          if (mounted) setState(() {});
+        },
+        child: ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: state.events.length,
+          itemBuilder: (_, index) => _EventBubble(event: state.events[index]),
+        ),
+      )),
+      if (state.error != null)
+        Padding(
+            padding: const EdgeInsets.all(8),
+            child:
+                Text(state.error!, style: const TextStyle(color: Colors.red))),
+      SafeArea(
+          child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              child: Row(children: [
+                Expanded(
+                    child: TextField(
+                        controller: composer,
+                        minLines: 1,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                            hintText: 'Message an agent…'))),
+                IconButton(
+                  onPressed: state.sending ? null : send,
+                  icon: AppIcon('send', size: 20, color: AppColors.fg2),
+                ),
+              ]))),
+    ]);
 
     // Embedded in the hub: the host owns the chrome, so the board contributes
     // only its transcript and composer.
@@ -127,7 +129,7 @@ class _CoordinationBoardScreenState extends State<CoordinationBoardScreen> {
         actions: [
           IconButton(
             tooltip: 'Handoffs',
-            icon: const Icon(Icons.swap_horiz),
+            icon: AppIcon('transfer', size: 19, color: AppColors.fg2),
             onPressed: () => presentScreen(
               context,
               style: PanelStyle.drawer,

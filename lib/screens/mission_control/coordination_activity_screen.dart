@@ -34,6 +34,7 @@ class _CoordinationActivityScreenState
     extends State<CoordinationActivityScreen> {
   List<CoordinationLease> leases = const [];
   List<CoordinationAssignment> assignments = const [];
+
   /// agent id → display name, so the view names people rather than ids.
   Map<String, String> agentNames = const {};
   String? error;
@@ -73,7 +74,8 @@ class _CoordinationActivityScreenState
       leases = results[0] as List<CoordinationLease>;
       assignments = results[1] as List<CoordinationAssignment>;
       agentNames = {
-        for (final a in results[2] as List<CoordinationAgent>) a.id: a.displayName,
+        for (final a in results[2] as List<CoordinationAgent>)
+          a.id: a.displayName,
       };
     } catch (e) {
       error = '$e';
@@ -89,55 +91,52 @@ class _CoordinationActivityScreenState
   @override
   Widget build(BuildContext context) {
     final body = RefreshIndicator(
-          onRefresh: refresh,
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : error != null
-                  ? ListView(
-                      padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
-                      children: [
-                        Text('Could not load activity',
-                            textAlign: TextAlign.center,
-                            style: sans(17,
-                                weight: FontWeight.w600, color: AppColors.fg1)),
-                        const SizedBox(height: 8),
-                        Text(error!,
-                            textAlign: TextAlign.center,
-                            style: sans(13, color: AppColors.fg3)),
-                        const SizedBox(height: 18),
-                        Center(child: Btn('Retry', onTap: refresh)),
-                      ],
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                      children: [
-                        _SectionHeader(
-                            title: 'Active now',
-                            count: leases.length),
-                        if (leases.isEmpty)
-                          _Empty(
-                              'No session has a turn holder. Agents appear here '
-                              'while they hold a lease.')
-                        else
-                          for (final lease in leases)
-                            _LeaseRow(
-                              lease: lease,
-                              agentName: _name(lease.agentId),
-                            ),
-                        const SizedBox(height: 24),
-                        _SectionHeader(
-                            title: 'Assignments', count: assignments.length),
-                        if (assignments.isEmpty)
-                          _Empty('No work has been handed out yet.')
-                        else
-                          for (final assignment in assignments)
-                            _AssignmentRow(
-                              assignment: assignment,
-                              agentName: _name(assignment.agentId),
-                            ),
-                      ],
-                    ),
-        );
+      onRefresh: refresh,
+      child: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+              ? ListView(
+                  padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+                  children: [
+                    Text('Could not load activity',
+                        textAlign: TextAlign.center,
+                        style: sans(17,
+                            weight: FontWeight.w600, color: AppColors.fg1)),
+                    const SizedBox(height: 8),
+                    Text(error!,
+                        textAlign: TextAlign.center,
+                        style: sans(13, color: AppColors.fg3)),
+                    const SizedBox(height: 18),
+                    Center(child: Btn('Retry', onTap: refresh)),
+                  ],
+                )
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  children: [
+                    _SectionHeader(title: 'Active now', count: leases.length),
+                    if (leases.isEmpty)
+                      _Empty('No session has a turn holder. Agents appear here '
+                          'while they hold a lease.')
+                    else
+                      for (final lease in leases)
+                        _LeaseRow(
+                          lease: lease,
+                          agentName: _name(lease.agentId),
+                        ),
+                    const SizedBox(height: 24),
+                    _SectionHeader(
+                        title: 'Assignments', count: assignments.length),
+                    if (assignments.isEmpty)
+                      _Empty('No work has been handed out yet.')
+                    else
+                      for (final assignment in assignments)
+                        _AssignmentRow(
+                          assignment: assignment,
+                          agentName: _name(assignment.agentId),
+                        ),
+                  ],
+                ),
+    );
 
     // Embedded in the hub: the host owns the chrome.
     if (widget.embedded) return body;
@@ -145,7 +144,10 @@ class _CoordinationActivityScreenState
       appBar: AppBar(
         title: const Text('Active'),
         actions: [
-          IconButton(onPressed: refresh, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: refresh,
+            icon: AppIcon('refresh', size: 19, color: AppColors.fg2),
+          ),
         ],
       ),
       body: body,
@@ -183,8 +185,8 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Text(message,
-            style: sans(12.5, color: AppColors.fg4, height: 1.4)),
+        child:
+            Text(message, style: sans(12.5, color: AppColors.fg4, height: 1.4)),
       );
 }
 
@@ -206,8 +208,8 @@ class _LeaseRow extends StatelessWidget {
               child: Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(
-                    color: AppColors.run, shape: BoxShape.circle),
+                decoration:
+                    BoxDecoration(color: AppColors.run, shape: BoxShape.circle),
               ),
             ),
             const SizedBox(width: 10),
@@ -272,7 +274,8 @@ class _AssignmentRow extends StatelessWidget {
               children: [
                 Row(children: [
                   Expanded(
-                    child: Text(assignment.scope.isEmpty
+                    child: Text(
+                        assignment.scope.isEmpty
                             ? assignment.id
                             : assignment.scope,
                         maxLines: 1,

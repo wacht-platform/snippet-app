@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -529,15 +530,20 @@ class _MdCodeBlock extends StatelessWidget {
   }
 }
 
-/// Line icon (Material outlined, mapped from the handoff's Lucide names).
+/// Icons use the project-wide rounded HugeIcons set. The string seam lets
+/// feature panels declare semantic names without coupling to glyph details.
 class AppIcon extends StatelessWidget {
   final String name;
   final double size;
   final Color? color;
   const AppIcon(this.name, {super.key, this.size = 18, this.color});
+
   @override
-  Widget build(BuildContext context) =>
-      Icon(iconFor(name), size: size, color: color ?? AppColors.fg2);
+  Widget build(BuildContext context) => HugeIcon(
+        icon: hugeIconFor(name),
+        size: size,
+        color: color ?? AppColors.fg2,
+      );
 }
 
 /// Glowing status dot.
@@ -807,7 +813,7 @@ class IconBtn extends StatelessWidget {
         child: SizedBox(
           width: size,
           height: size,
-          child: Icon(iconFor(name),
+          child: AppIcon(name,
               size: iconSize, color: active ? AppColors.accent : AppColors.fg2),
         ),
       ),

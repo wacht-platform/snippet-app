@@ -662,9 +662,8 @@ class _Row extends StatelessWidget {
           border: Border.all(
               color: on ? AppColors.accent : AppColors.border2, width: 1.5),
         ),
-        child: on
-            ? Icon(Icons.check_rounded, size: 12, color: AppColors.accentFg)
-            : null,
+        child:
+            on ? AppIcon('check', size: 12, color: AppColors.accentFg) : null,
       );
 }
 

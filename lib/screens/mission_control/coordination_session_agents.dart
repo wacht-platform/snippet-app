@@ -84,7 +84,7 @@ class _SessionAgentsPanelState extends State<SessionAgentsPanel> {
             IconButton(
               tooltip: 'Refresh',
               onPressed: refresh,
-              icon: const Icon(Icons.refresh),
+              icon: AppIcon('refresh', size: 19, color: AppColors.fg2),
             ),
           ],
         ),
@@ -132,7 +132,7 @@ class SessionAgentsList extends StatelessWidget {
       return ListView(
         padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
         children: [
-          Icon(Icons.groups_outlined, size: 44, color: AppColors.fg4),
+          AppIcon('users', size: 44, color: AppColors.fg4),
           const SizedBox(height: 16),
           Text('No agents have worked here',
               textAlign: TextAlign.center,
@@ -209,8 +209,8 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(message,
-            style: sans(12.5, color: AppColors.fg4, height: 1.4)),
+        child:
+            Text(message, style: sans(12.5, color: AppColors.fg4, height: 1.4)),
       );
 }
 
@@ -222,9 +222,8 @@ class CoordinationAgentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = agent.displayName.trim().isEmpty
-        ? agent.agentId
-        : agent.displayName;
+    final name =
+        agent.displayName.trim().isEmpty ? agent.agentId : agent.displayName;
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -235,14 +234,11 @@ class CoordinationAgentRow extends StatelessWidget {
             radius: 14,
             backgroundColor:
                 agent.active ? AppColors.accentBg : AppColors.surface2,
-            foregroundColor:
-                agent.active ? AppColors.accent : AppColors.fg3,
+            foregroundColor: agent.active ? AppColors.accent : AppColors.fg3,
             child: Text(initial,
                 style: sans(12,
                     weight: W.title,
-                    color: agent.active
-                        ? AppColors.accent
-                        : AppColors.fg3)),
+                    color: agent.active ? AppColors.accent : AppColors.fg3)),
           ),
           const SizedBox(width: 11),
           Expanded(
@@ -303,8 +299,7 @@ class _StateChip extends StatelessWidget {
         child: Text(
           active ? 'active' : label,
           style: sans(11,
-              weight: W.label,
-              color: active ? AppColors.ok : AppColors.fg4),
+              weight: W.label, color: active ? AppColors.ok : AppColors.fg4),
         ),
       );
 }

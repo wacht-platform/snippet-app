@@ -1557,33 +1557,25 @@ class _DesktopShellState extends State<DesktopShell>
                   ],
                 ),
               ),
-              // Far right: Machine switcher, History, Notifications, Profile Avatar
-              _topMachineSwitcher(),
-              const SizedBox(width: 8),
+              // Right-side utilities: history, sessions, and the active
+              // machine avatar. The avatar is also the machine switcher.
               IconBtn(
                 'history',
-                size: 26,
-                iconSize: 14,
+                size: 28,
+                iconSize: 15,
                 tooltip: 'History & Checkpoints',
                 onTap: _showCheckpointsDrawer,
               ),
               const SizedBox(width: 4),
               IconBtn(
-                'bell',
-                size: 26,
-                iconSize: 14,
-                tooltip: 'Notifications',
-                onTap: _showNotificationsDrawer,
+                'message-text',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Sessions',
+                onTap: () => setState(() => _section = ShellSection.sessions),
               ),
               const SizedBox(width: 8),
-              CircleAvatar(
-                radius: 12,
-                backgroundColor: AppColors.surface2,
-                child: Text(
-                  'S',
-                  style: sans(11, weight: W.title, color: AppColors.fg2),
-                ),
-              ),
+              _topMachineSwitcher(),
             ],
           ),
         ),
@@ -1596,38 +1588,55 @@ class _DesktopShellState extends State<DesktopShell>
   Widget _topMachineSwitcher() {
     final a = _active;
     final ok = a == null ? null : _health[a.url];
-    return Material(
-      key: _topMachineKey,
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _instances.isEmpty ? _addInstanceFlow : _openTopMachines,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(R.sm),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                a?.label ?? 'No machine',
-                style: sans(12, weight: W.label, color: AppColors.fg1),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: ok == true ? AppColors.ok : AppColors.fg4,
-                  shape: BoxShape.circle,
+    final initial = a == null || a.label.trim().isEmpty
+        ? '+'
+        : a.label.trim().characters.first.toUpperCase();
+    return Tooltip(
+      message: a == null ? 'Add machine' : 'Switch machine',
+      child: Material(
+        key: _topMachineKey,
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: _instances.isEmpty ? _addInstanceFlow : _openTopMachines,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: 30,
+            height: 30,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Center(
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.border2),
+                    ),
+                    child: Text(
+                      initial,
+                      style: sans(11.5, weight: W.title, color: AppColors.fg1),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              AppIcon('chevron-down', size: 12, color: AppColors.fg3),
-            ],
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: ok == true ? AppColors.ok : AppColors.fg4,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.bg, width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1737,23 +1746,6 @@ class _DesktopShellState extends State<DesktopShell>
     final key = _activeTab?.key;
     if (key == null) return;
     _macSessionControls[key]?.performAction('checkpoints');
-  }
-
-  void _showNotificationsDrawer() {
-    final c = _client;
-    if (c == null) return;
-    presentScreen(
-      context,
-      maxWidth: 520,
-      maxHeight: 600,
-      builder: (_, close) => Scaffold(
-        appBar: AppBar(title: const Text('Notifications')),
-        body: Center(
-          child: Text('No new notifications',
-              style: sans(13, color: AppColors.fg4)),
-        ),
-      ),
-    );
   }
 
   /// Top-level workspace tab pill in the window bar.
@@ -1935,11 +1927,11 @@ class _DesktopShellState extends State<DesktopShell>
               _macWindowBar(),
               Expanded(
                 child: Row(children: [
-                  // Sidebar column owns the left edge: the icon row sits above
-                  // the panel, so switching sections never narrows the work area.
+                  // Sidebar is a vertical icon rail beside its full-width
+                  // contextual panel, matching the dense desktop reference.
                   SizedBox(
                     width: 300,
-                    child: Column(children: [
+                    child: Row(children: [
                       ShellRail(
                         section: _section,
                         onSelect: (s) => setState(() => _section = s),
@@ -1971,7 +1963,7 @@ class _DesktopShellState extends State<DesktopShell>
               child: Row(children: [
                 SizedBox(
                   width: 300,
-                  child: Column(children: [
+                  child: Row(children: [
                     ShellRail(
                       section: _section,
                       onSelect: (s) => setState(() => _section = s),
@@ -2890,8 +2882,8 @@ class _SidebarState extends State<_Sidebar> {
                                 onTap: _showFilterSheet,
                                 child: Padding(
                                   padding: const EdgeInsets.all(4),
-                                  child: Icon(Icons.filter_list_rounded,
-                                      size: 24,
+                                  child: AppIcon('sliders',
+                                      size: 20,
                                       color: _filter != 'all'
                                           ? AppColors.accent
                                           : AppColors.fg3),
