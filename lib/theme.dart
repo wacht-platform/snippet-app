@@ -290,6 +290,46 @@ class R {
 }
 
 // ---------------------------------------------------------------------------
+// Mobile metrics.
+//
+// The design language is one system at two densities, not two designs. Phones
+// scale UP for touch (a 44pt minimum target) and down in density; they do NOT
+// change the palette, the weight ramp, or the zero-border rule.
+//
+// These lived as inline `kMobile ? a : b` ternaries scattered across a 5k-line
+// screen, which is how the two densities drifted apart. One table instead.
+// ---------------------------------------------------------------------------
+
+class M {
+  /// Content inset for a phone's list/gutter. Wider than the desktop's 8: a
+  /// phone has no sidebar chrome to frame the content, so the page gutter does
+  /// that job.
+  static const gutter = 20.0;
+
+  /// Navigation row height. Desktop is 26 (mouse); a phone row is a tap target.
+  static const navRow = 44.0;
+  static const navText = 16.5;
+  static const navIcon = 22.0;
+
+  /// Rows in the session list.
+  static const rowTitle = 14.5;
+  static const rowTime = 11.5;
+
+  /// Horizontal padding inside a phone row.
+  static const rowPadH = 14.0;
+
+  /// Chrome heights. A phone's bar carries a title and an action or two and is
+  /// tapped, so it is taller than the 40px desktop band.
+  static const tabStripHeight = 56.0;
+  static const tabIconSize = 28.0;
+  static const tabActionSize = 52.0;
+
+  /// Minimum touch target. Anything tappable must reach this in at least one
+  /// axis; smaller controls visually can still pad out to it.
+  static const minTarget = 44.0;
+}
+
+// ---------------------------------------------------------------------------
 // Typography — Geist for UI, JetBrains Mono for code.
 //
 // The ceiling is 500. `600` exists as `strong` only for the single large page

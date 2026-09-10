@@ -190,10 +190,9 @@ class _ToastCardState extends State<_ToastCard>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(a.label,
-                        style: sans(12,
-                                weight: FontWeight.w500,
-                                color: AppColors.accent)
-                            .copyWith(decoration: TextDecoration.none)),
+                        style:
+                            sans(12, weight: W.label, color: AppColors.accent)
+                                .copyWith(decoration: TextDecoration.none)),
                   ),
                 ),
               ],
@@ -260,7 +259,7 @@ class Pills<T> extends StatelessWidget {
               ),
               child: Text(label,
                   style: sans(12.5,
-                      weight: FontWeight.w500,
+                      weight: W.label,
                       color:
                           selected == val ? AppColors.accent : AppColors.fg2)),
             ),
@@ -293,11 +292,11 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     p: sans(16, height: 1.5, color: AppColors.fg1),
     pPadding: EdgeInsets.zero,
     a: sans(16, height: 1.5, color: AppColors.accent),
-    h1: sans(21, weight: FontWeight.w500, height: 1.25, color: AppColors.fg1),
+    h1: sans(21, weight: W.label, height: 1.25, color: AppColors.fg1),
     h1Padding: const EdgeInsets.only(top: 8, bottom: 4),
-    h2: sans(18, weight: FontWeight.w500, height: 1.28, color: AppColors.fg1),
+    h2: sans(18, weight: W.label, height: 1.28, color: AppColors.fg1),
     h2Padding: const EdgeInsets.only(top: 8, bottom: 3),
-    h3: sans(16.5, weight: FontWeight.w500, height: 1.3, color: AppColors.fg1),
+    h3: sans(16.5, weight: W.label, height: 1.3, color: AppColors.fg1),
     h3Padding: const EdgeInsets.only(top: 6, bottom: 2),
     listIndent: 18,
     listBulletPadding: const EdgeInsets.only(right: 6),
@@ -344,13 +343,13 @@ MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
     pPadding: EdgeInsets.zero,
     em: sans(13.5, height: 1.45, color: dim)
         .copyWith(fontStyle: FontStyle.italic),
-    strong: sans(13.5, height: 1.45, color: dim, weight: FontWeight.w500),
+    strong: sans(13.5, height: 1.45, color: dim, weight: W.label),
     a: sans(13.5, height: 1.45, color: AppColors.accent),
-    h1: sans(15, weight: FontWeight.w500, height: 1.3, color: dim),
+    h1: sans(15, weight: W.label, height: 1.3, color: dim),
     h1Padding: const EdgeInsets.only(top: 4, bottom: 2),
-    h2: sans(14.5, weight: FontWeight.w500, height: 1.3, color: dim),
+    h2: sans(14.5, weight: W.label, height: 1.3, color: dim),
     h2Padding: const EdgeInsets.only(top: 4, bottom: 2),
-    h3: sans(14, weight: FontWeight.w500, height: 1.3, color: dim),
+    h3: sans(14, weight: W.label, height: 1.3, color: dim),
     h3Padding: const EdgeInsets.only(top: 2, bottom: 1),
     code: mono(12.5, color: dim2),
     codeblockPadding: EdgeInsets.zero,
@@ -634,7 +633,7 @@ class StatusPill extends StatelessWidget {
             height: 6,
             decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
         const SizedBox(width: 6),
-        Text(label, style: sans(11, weight: FontWeight.w500, color: c)),
+        Text(label, style: sans(11, weight: W.label, color: c)),
       ]),
     );
   }
@@ -726,8 +725,7 @@ class Btn extends StatelessWidget {
           const SizedBox(width: 8)
         ],
         Text(label,
-            style:
-                sans(small ? 12.5 : 13.5, weight: FontWeight.w500, color: fg)),
+            style: sans(small ? 12.5 : 13.5, weight: W.label, color: fg)),
         if (iconRight != null) ...[
           const SizedBox(width: 8),
           AppIcon(iconRight!, size: small ? 15 : 17, color: fg)
@@ -786,7 +784,7 @@ class PillBtn extends StatelessWidget {
               ],
               Text(label,
                   style: sans(kMobile ? 14.5 : 13,
-                      weight: FontWeight.w500, color: AppColors.accentFg)),
+                      weight: W.label, color: AppColors.accentFg)),
             ]),
           ),
         ),
@@ -852,8 +850,7 @@ class AddCard extends StatelessWidget {
             const AppIcon('plus', size: 15),
             const SizedBox(width: 8),
             Text(label,
-                style:
-                    sans(12.5, weight: FontWeight.w500, color: AppColors.fg2)),
+                style: sans(12.5, weight: W.label, color: AppColors.fg2)),
           ]),
         ),
       ),
@@ -1360,7 +1357,7 @@ class StatTile extends StatelessWidget {
             const SizedBox(height: 5),
             Text(value,
                 style: mono(16,
-                    weight: FontWeight.w500,
+                    weight: W.label,
                     color: accent ? AppColors.accent : AppColors.fg1)),
             if (sub != null) ...[
               const SizedBox(height: 4),
@@ -1404,8 +1401,7 @@ class WarnChip extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         AppIcon('alert-triangle', size: 11, color: AppColors.run),
         const SizedBox(width: 5),
-        Text(label,
-            style: sans(10.5, weight: FontWeight.w500, color: AppColors.run)),
+        Text(label, style: sans(10.5, weight: W.label, color: AppColors.run)),
       ]),
     );
   }
@@ -1449,8 +1445,7 @@ class EmptyState extends StatelessWidget {
           child: AppIcon(icon, size: 24, color: AppColors.fg3),
         ),
         const SizedBox(height: 12),
-        Text(title,
-            style: sans(15, weight: FontWeight.w500, color: AppColors.fg1)),
+        Text(title, style: sans(15, weight: W.label, color: AppColors.fg1)),
         if (body != null) ...[
           const SizedBox(height: 8),
           ConstrainedBox(
@@ -1586,7 +1581,7 @@ class _AppFieldState extends State<AppField> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (widget.label != null) ...[
         Text(widget.label!,
-            style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+            style: sans(12, weight: W.label, color: AppColors.fg2)),
         const SizedBox(height: 7),
       ],
       AnimatedContainer(
@@ -1679,8 +1674,7 @@ Future<bool> confirmAction(
                 children: [
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(title,
-                        style: sans(15,
-                            weight: FontWeight.w500, color: AppColors.fg1)),
+                        style: sans(15, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Text(body,
@@ -1744,8 +1738,8 @@ Future<String?> promptText(BuildContext context,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(title,
-                        style: sans(13.5,
-                            weight: FontWeight.w500, color: AppColors.fg1)),
+                        style:
+                            sans(13.5, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     _TextPromptSheet(
                         initial: initial,
@@ -1863,8 +1857,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                       Expanded(
                           child: Text(title,
                               style: sans(13.5,
-                                  weight: FontWeight.w500,
-                                  color: AppColors.fg1))),
+                                  weight: W.label, color: AppColors.fg1))),
                       IconBtn('x',
                           size: 28,
                           iconSize: 14,
@@ -1919,8 +1912,8 @@ Future<T?> showAppSheet<T>(BuildContext context,
               child: Row(children: [
                 Expanded(
                     child: Text(title,
-                        style: sans(14.5,
-                            weight: FontWeight.w500, color: AppColors.fg1))),
+                        style:
+                            sans(14.5, weight: W.label, color: AppColors.fg1))),
                 IconBtn('x',
                     size: 32,
                     iconSize: 16,
@@ -1970,8 +1963,7 @@ class AppToggle extends StatelessWidget {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(label,
-                  style:
-                      sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
+                  style: sans(13, weight: W.label, color: AppColors.fg1)),
               if (sub != null) ...[
                 const SizedBox(height: 3),
                 Text(sub!, style: sans(11, color: AppColors.fg3))

@@ -1320,8 +1320,7 @@ class _DesktopShellState extends State<DesktopShell>
               contentPadding: EdgeInsets.zero,
               leading: AppIcon('layers', size: 18, color: AppColors.accent),
               title: Text('Mission Control',
-                  style:
-                      sans(15, weight: FontWeight.w500, color: AppColors.fg1)),
+                  style: sans(15, weight: W.label, color: AppColors.fg1)),
               subtitle: Text(_active?.label ?? 'this machine',
                   style: sans(12, color: AppColors.fg4)),
               onTap: () => Navigator.pop(context, 'mission-control'),
@@ -2488,18 +2487,17 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   Widget _tabStrip(VoidCallback? onMenu) {
-    final compact = kMobile ? 56.0 : 42.0;
+    final compact = kMobile ? M.tabStripHeight : 42.0;
     return Container(
+      // No bottom border: the band's surface (#171717) against the darker panes
+      // below is the separation, as everywhere else in this design language.
       height: compact,
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
+      color: AppColors.bg,
       child: Row(children: [
         if (onMenu != null)
           IconBtn('sidebar',
-              size: kMobile ? 52 : 36,
-              iconSize: kMobile ? 28 : 16,
+              size: kMobile ? M.tabActionSize : 36,
+              iconSize: kMobile ? M.tabIconSize : 16,
               tooltip: 'Sidebar',
               onTap: onMenu),
         Expanded(child: _tabList()),
@@ -2835,7 +2833,7 @@ class _GoalPopoverState extends State<_GoalPopover> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('Set goal',
-            style: sans(12.5, weight: FontWeight.w500, color: AppColors.fg1)),
+            style: sans(12.5, weight: W.label, color: AppColors.fg1)),
         const SizedBox(height: 8),
         AppField(
           controller: _ctl,
@@ -3238,8 +3236,7 @@ class _SidebarState extends State<_Sidebar> {
                           ? Row(children: [
                               Text('${_selected.length} selected',
                                   style: sans(16,
-                                      weight: FontWeight.w500,
-                                      color: AppColors.fg1)),
+                                      weight: W.label, color: AppColors.fg1)),
                               const Spacer(),
                               IconBtn('x',
                                   size: 32,
@@ -3257,8 +3254,7 @@ class _SidebarState extends State<_Sidebar> {
                           : Row(children: [
                               Text('Conversations',
                                   style: sans(20,
-                                      weight: FontWeight.w500,
-                                      color: AppColors.fg1)),
+                                      weight: W.label, color: AppColors.fg1)),
                               const Spacer(),
                               GestureDetector(
                                 onTap: _showFilterSheet,
@@ -3348,8 +3344,7 @@ class _SidebarState extends State<_Sidebar> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Browse',
-                        style: sans(14,
-                            weight: FontWeight.w500, color: AppColors.fg1)),
+                        style: sans(14, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 1),
                     Text('files · new chat',
                         style: sans(11.5, color: AppColors.fg4)),
@@ -3386,10 +3381,8 @@ class _SidebarState extends State<_Sidebar> {
               MediaQuery.of(context)
                   .padding
                   .bottom), // safe-area-ish bottom padding
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
-      ),
+      // No hairline: the bar sits on its own surface step.
+      decoration: BoxDecoration(color: AppColors.bg),
       child: Row(children: [
         // Search pill.
         Expanded(
@@ -3444,8 +3437,7 @@ class _SidebarState extends State<_Sidebar> {
                 ? AppIcon('plus', size: 14, color: AppColors.fg2)
                 : Text(
                     (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
-                    style:
-                        sans(13, weight: FontWeight.w500, color: AppColors.fg1),
+                    style: sans(13, weight: W.label, color: AppColors.fg1),
                   ),
           ),
         ),
@@ -3453,12 +3445,13 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  // The sidebar/drawer reads bigger on phones than on desktop.
-  double get _navText => kMobile ? 16.5 : 13;
-  double get _navIcon => kMobile ? 22 : 16;
+  // Phone metrics come from the shared M table so the two densities cannot
+  // drift; desktop values stay local because they are already tokenised.
+  double get _navText => kMobile ? M.navText : 13;
+  double get _navIcon => kMobile ? M.navIcon : 16;
   double get _navPadV => kMobile ? 13 : 8;
-  double get _rowTitle => kMobile ? 14.5 : 12.5;
-  double get _rowTime => kMobile ? 11.5 : 10;
+  double get _rowTitle => kMobile ? M.rowTitle : 12.5;
+  double get _rowTime => kMobile ? M.rowTime : 10;
 
   Widget _navRow(String icon, String label,
       {String? sub, VoidCallback? onTap, bool active = false}) {
@@ -3545,8 +3538,8 @@ class _SidebarState extends State<_Sidebar> {
       // Offline ≠ empty: a failed fetch gets an explicit error + retry.
       if (widget.sessionsError != null) {
         return ListView(
-            padding:
-                EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
+            padding: EdgeInsets.fromLTRB(
+                kMobile ? M.gutter : 8, 2, kMobile ? M.gutter : 8, 32),
             children: [
               Padding(
                   padding: const EdgeInsets.all(20),
@@ -3565,8 +3558,8 @@ class _SidebarState extends State<_Sidebar> {
             ]);
       }
       return ListView(
-          padding:
-              EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
+          padding: EdgeInsets.fromLTRB(
+              kMobile ? M.gutter : 8, 2, kMobile ? M.gutter : 8, 32),
           children: [
             Padding(
                 padding: const EdgeInsets.all(20),
@@ -3635,8 +3628,8 @@ class _SidebarState extends State<_Sidebar> {
               style: sans(12.5, color: AppColors.fg4))));
     }
     final listView = ListView(
-        padding:
-            EdgeInsets.fromLTRB(kMobile ? 20 : 14, 2, kMobile ? 20 : 14, 32),
+        padding: EdgeInsets.fromLTRB(
+            kMobile ? M.gutter : 14, 2, kMobile ? M.gutter : 14, 32),
         children: children);
     // Phones: the natural refresh gesture. Desktop keeps the header button.
     if (!kMobile) return listView;
@@ -3805,8 +3798,7 @@ class _SidebarState extends State<_Sidebar> {
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
           child: Text('$label $n',
               style: sans(12.5,
-                  weight: FontWeight.w500,
-                  color: sel ? AppColors.bg : AppColors.fg3)),
+                  weight: W.label, color: sel ? AppColors.bg : AppColors.fg3)),
         ),
       ),
     );
@@ -3913,8 +3905,7 @@ class _SidebarState extends State<_Sidebar> {
           child: Row(children: [
             Expanded(
               child: Text('Mission Control',
-                  style: sans(15.5,
-                      weight: FontWeight.w500, color: AppColors.fg1)),
+                  style: sans(15.5, weight: W.label, color: AppColors.fg1)),
             ),
             if (status != null) status,
           ]),
@@ -3938,7 +3929,7 @@ class _SidebarState extends State<_Sidebar> {
               Expanded(
                 child: Text('Mission Control',
                     style: sans(12.5,
-                        weight: FontWeight.w500,
+                        weight: W.label,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
               if (status != null) status,
@@ -4348,8 +4339,7 @@ class _SidebarState extends State<_Sidebar> {
                     ? AppIcon('plus', size: 18, color: AppColors.fg2)
                     : Text(
                         (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
-                        style: sans(17,
-                            weight: FontWeight.w500, color: AppColors.fg1),
+                        style: sans(17, weight: W.label, color: AppColors.fg1),
                       ),
               ),
               const SizedBox(width: 12),
@@ -4363,8 +4353,7 @@ class _SidebarState extends State<_Sidebar> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: sans(15,
-                                  weight: FontWeight.w500,
-                                  color: AppColors.fg1)),
+                                  weight: W.label, color: AppColors.fg1)),
                           const SizedBox(height: 2),
                           Row(children: [
                             Container(
@@ -4666,7 +4655,7 @@ class _MachineListState extends State<_MachineList> {
           const SizedBox(width: 10),
           Text('Add machine',
               style: sans(kMobile ? 14 : 12.5,
-                  weight: FontWeight.w500, color: AppColors.accent)),
+                  weight: W.label, color: AppColors.accent)),
         ]),
       ),
     );
@@ -4756,8 +4745,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Settings',
-                        style: sans(14.5,
-                            weight: FontWeight.w500, color: AppColors.fg1)),
+                        style:
+                            sans(14.5, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 2),
                     Text('Configure this workspace and its models.',
                         style: sans(11.5, color: AppColors.fg3)),
@@ -4840,15 +4829,14 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
       children: [
-        Text('General',
-            style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)),
+        Text('General', style: sans(14, weight: W.label, color: AppColors.fg1)),
         const SizedBox(height: 3),
         Text('Manage the machine this app connects to and its alerts.',
             style: sans(11.5, color: AppColors.fg3)),
         const SizedBox(height: 14),
         Text('MACHINES',
-            style: sans(10,
-                weight: FontWeight.w500, color: AppColors.fg4, spacing: 0.5)),
+            style:
+                sans(10, weight: W.label, color: AppColors.fg4, spacing: 0.5)),
         const SizedBox(height: 6),
         if (_instances.isEmpty)
           Padding(
@@ -4870,7 +4858,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           const SizedBox(height: 16),
           Text('NOTIFICATIONS',
               style: sans(10,
-                  weight: FontWeight.w500, color: AppColors.fg4, spacing: 0.5)),
+                  weight: W.label, color: AppColors.fg4, spacing: 0.5)),
           const SizedBox(height: 6),
           _notifTile(),
         ],
@@ -4895,8 +4883,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 Text(i.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(12.5,
-                        weight: FontWeight.w500, color: AppColors.fg1)),
+                    style: sans(12.5, weight: W.label, color: AppColors.fg1)),
                 const SizedBox(height: 1),
                 Text(hostOf(i.url),
                     maxLines: 1,
@@ -4930,8 +4917,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Alerts',
-                style:
-                    sans(12.5, weight: FontWeight.w500, color: AppColors.fg1)),
+                style: sans(12.5, weight: W.label, color: AppColors.fg1)),
             const SizedBox(height: 1),
             Text('Notify when a session needs input',
                 style: sans(11, color: AppColors.fg4)),

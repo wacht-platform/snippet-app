@@ -176,8 +176,7 @@ class _SessionActionPanel extends StatelessWidget {
             child: Row(children: [
               Expanded(
                   child: Text(title,
-                      style: sans(16,
-                          weight: FontWeight.w500, color: AppColors.fg1))),
+                      style: sans(16, weight: W.label, color: AppColors.fg1))),
               IconBtn('x',
                   size: 34, iconSize: 18, tooltip: 'Close', onTap: onClose),
             ]),
@@ -2372,8 +2371,7 @@ class _SessionScreenState extends State<SessionScreen>
                     Text(_title.isEmpty ? 'session' : _title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(17,
-                            weight: FontWeight.w500, color: AppColors.fg1)),
+                        style: sans(17, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 3),
                     Text(facts.join(' · '),
                         maxLines: 1,
@@ -2589,7 +2587,7 @@ class _SessionScreenState extends State<SessionScreen>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: sans(mac ? 13.5 : 16.5,
-                  weight: FontWeight.w500, color: AppColors.fg1)),
+                  weight: W.label, color: AppColors.fg1)),
         ),
         if (mac && running)
           IconBtn('stop',
@@ -2979,7 +2977,7 @@ class _SessionScreenState extends State<SessionScreen>
                 ? 'Compacting'
                 : (running ? 'Running' : 'Idle'),
             style: sans(12.5,
-                weight: FontWeight.w500,
+                weight: W.label,
                 color: s?.compacting == true
                     ? AppColors.accent
                     : (running ? AppColors.run : AppColors.fg2))),
@@ -3063,8 +3061,7 @@ class _SessionScreenState extends State<SessionScreen>
             AppIcon('refresh', size: 13, color: AppColors.danger),
             const SizedBox(width: 5),
             Text('Retry now',
-                style:
-                    sans(12, weight: FontWeight.w500, color: AppColors.danger)),
+                style: sans(12, weight: W.label, color: AppColors.danger)),
           ]),
         ),
       ]),
@@ -3238,7 +3235,7 @@ class _SessionScreenState extends State<SessionScreen>
                                           const SizedBox(width: 5),
                                           Text(_modelLabel ?? 'Auto',
                                               style: sans(11.5,
-                                                  weight: FontWeight.w500,
+                                                  weight: W.label,
                                                   color: AppColors.fg2)),
                                           const SizedBox(width: 3),
                                           AppIcon('chevron-down',
@@ -3699,8 +3696,7 @@ class _SessionScreenState extends State<SessionScreen>
                   borderRadius: BorderRadius.circular(4)),
             ),
             child: Text('Download',
-                style: sans(12,
-                    weight: FontWeight.w500, color: AppColors.accentFg)),
+                style: sans(12, weight: W.label, color: AppColors.accentFg)),
           ),
         ]),
       ),
@@ -3805,7 +3801,7 @@ class _SessionScreenState extends State<SessionScreen>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: sans(13,
-                            weight: FontWeight.w500,
+                            weight: W.label,
                             color: p.name == current
                                 ? AppColors.accent
                                 : AppColors.fg1)),
@@ -3870,7 +3866,7 @@ class _SessionScreenState extends State<SessionScreen>
       if (s.contextWindow > 0) ...[
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('Context window',
-              style: sans(12.5, weight: FontWeight.w500, color: AppColors.fg2)),
+              style: sans(12.5, weight: W.label, color: AppColors.fg2)),
           Text('${fmtSi(s.lastPromptTokens)} / ${fmtSi(s.contextWindow)}',
               style: mono(11.5, color: AppColors.fg3)),
         ]),
@@ -3987,7 +3983,7 @@ class _SessionScreenState extends State<SessionScreen>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: sans(13,
-                                weight: FontWeight.w500,
+                                weight: W.label,
                                 height: 1.2,
                                 color: AppColors.fg1)),
                         const SizedBox(height: 3),
@@ -4089,7 +4085,7 @@ class _SessionScreenState extends State<SessionScreen>
                       children: [
                         Text('Full history',
                             style: sans(13,
-                                weight: FontWeight.w500, color: AppColors.fg1)),
+                                weight: W.label, color: AppColors.fg1)),
                         const SizedBox(height: 3),
                         Text('Branch everything so far',
                             style: mono(11, color: AppColors.fg3)),
@@ -4125,7 +4121,7 @@ class _SessionScreenState extends State<SessionScreen>
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: sans(13,
-                                    weight: FontWeight.w500,
+                                    weight: W.label,
                                     height: 1.2,
                                     color: AppColors.fg1)),
                             const SizedBox(height: 3),
@@ -4256,8 +4252,7 @@ class _CompactingStatusState extends State<_CompactingStatus> {
               child: Text.rich(TextSpan(children: [
                 TextSpan(
                     text: 'Compacting',
-                    style: sans(13,
-                        weight: FontWeight.w500, color: AppColors.accent)),
+                    style: sans(13, weight: W.label, color: AppColors.accent)),
                 TextSpan(
                     text: ' $_elapsed',
                     style: sans(13,
@@ -4372,8 +4367,8 @@ class _ChurningStatusState extends State<_ChurningStatus> {
                   child: Text(_verb,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13,
-                          weight: FontWeight.w500, color: AppColors.accent)),
+                      style:
+                          sans(13, weight: W.label, color: AppColors.accent)),
                 ),
                 const SizedBox(width: 8),
                 Text(_elapsed,
@@ -4596,8 +4591,7 @@ class _QueuedBubble extends StatelessWidget {
                               horizontal: 6, vertical: 3),
                           child: Text('Send now',
                               style: sans(kMobile ? 12 : 10.5,
-                                  weight: FontWeight.w500,
-                                  color: AppColors.accent)),
+                                  weight: W.label, color: AppColors.accent)),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -4651,9 +4645,7 @@ class _QueuedSection extends StatelessWidget {
             child: Row(children: [
               Text('QUEUED ($count)',
                   style: sans(10.5,
-                      weight: FontWeight.w500,
-                      spacing: 0.6,
-                      color: AppColors.fg4)),
+                      weight: W.label, spacing: 0.6, color: AppColors.fg4)),
               const Spacer(),
               if (showBulk) ...[
                 Material(
@@ -4667,8 +4659,7 @@ class _QueuedSection extends StatelessWidget {
                           horizontal: 8, vertical: 3),
                       child: Text('Send all',
                           style: sans(10.5,
-                              weight: FontWeight.w500,
-                              color: AppColors.accent)),
+                              weight: W.label, color: AppColors.accent)),
                     ),
                   ),
                 ),
@@ -4725,8 +4716,7 @@ class _GoalCard extends StatelessWidget {
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Text(paused ? 'Goal paused' : 'Working toward goal',
-                  style: sans(12.5,
-                      weight: FontWeight.w500, color: AppColors.fg1)),
+                  style: sans(12.5, weight: W.label, color: AppColors.fg1)),
             ]),
             if (goal.text.trim().isNotEmpty) ...[
               const SizedBox(height: 3),
@@ -4946,8 +4936,7 @@ class _QuestionRecord extends StatelessWidget {
             Row(children: [
               Expanded(
                 child: Text('Question',
-                    style: sans(15.5,
-                        weight: FontWeight.w500, color: AppColors.fg1)),
+                    style: sans(15.5, weight: W.label, color: AppColors.fg1)),
               ),
               Text(answers.isEmpty ? 'Asked' : 'Answered',
                   style: sans(12, color: AppColors.accent)),
@@ -5043,8 +5032,7 @@ class _ApprovalBarState extends State<_ApprovalBar> {
             Row(children: [
               Expanded(
                 child: Text(_sent ? 'Sending…' : title,
-                    style: sans(15.5,
-                        weight: FontWeight.w500, color: AppColors.fg1)),
+                    style: sans(15.5, weight: W.label, color: AppColors.fg1)),
               ),
               Text(total > 1 ? '$index of $total' : 'Input required',
                   style: sans(12, color: AppColors.accent)),
@@ -5280,7 +5268,7 @@ class _QuestionBarState extends State<_QuestionBar> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(label,
                 style: sans(13,
-                    weight: FontWeight.w500,
+                    weight: W.label,
                     color: sel ? AppColors.accent : AppColors.fg2)),
           ),
         ),
@@ -5383,8 +5371,7 @@ class _QuestionBarState extends State<_QuestionBar> {
           Row(children: [
             Expanded(
               child: Text(_sent ? 'Sending…' : 'Question',
-                  style: sans(15.5,
-                      weight: FontWeight.w500, color: AppColors.fg1)),
+                  style: sans(15.5, weight: W.label, color: AppColors.fg1)),
             ),
             Text(
               total > 1 ? '${_step + 1} of $total' : 'Input required',
