@@ -11,12 +11,20 @@ class OpenTabDescriptor {
   final String title;
   final String? profile;
 
+  /// Set for a diff tab: the changed file and which diff to show.
+  final String? diffPath;
+  final bool diffStaged;
+  final bool diffUntracked;
+
   const OpenTabDescriptor({
     required this.instanceUrl,
     this.sessionId,
     this.filePath,
     required this.title,
     this.profile,
+    this.diffPath,
+    this.diffStaged = false,
+    this.diffUntracked = false,
   });
 
   factory OpenTabDescriptor.fromJson(Map<String, dynamic> j) =>
@@ -26,6 +34,9 @@ class OpenTabDescriptor {
         filePath: j['file_path'] as String?,
         title: j['title'] as String? ?? '',
         profile: j['profile'] as String?,
+        diffPath: j['diff_path'] as String?,
+        diffStaged: j['diff_staged'] as bool? ?? false,
+        diffUntracked: j['diff_untracked'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -34,9 +45,13 @@ class OpenTabDescriptor {
         if (filePath != null) 'file_path': filePath,
         'title': title,
         if (profile != null) 'profile': profile,
+        if (diffPath != null) 'diff_path': diffPath,
+        if (diffStaged) 'diff_staged': true,
+        if (diffUntracked) 'diff_untracked': true,
       };
 
   bool get isFile => filePath != null;
+  bool get isDiff => diffPath != null;
 }
 
 class OpenTabsState {

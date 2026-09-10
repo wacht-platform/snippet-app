@@ -46,10 +46,13 @@ const double kSidebarContentInset = 8;
 /// what gives the list its hierarchy without drawing indentation guides, and it
 /// keeps the selected pill from colliding with the sidebar edge. Deeper nesting
 /// adds this same step again via a row's `indent`.
-const double kNavRowInset = kSidebarContentInset + 24;
+///
+/// Kept modest: an over-wide gutter pushed row text far from the panel's left
+/// edge and wasted the width the sidebar needs for titles.
+const double kNavRowInset = kSidebarContentInset + 10;
 
 /// Padding inside a row, between its box edge and its content.
-const double kNavPadH = 12;
+const double kNavPadH = 8;
 
 /// UPPERCASE section header with a leading chevron and a trailing action
 /// cluster.

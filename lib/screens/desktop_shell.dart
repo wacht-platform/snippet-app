@@ -47,8 +47,8 @@ class DesktopShell extends StatefulWidget {
   State<DesktopShell> createState() => _DesktopShellState();
 }
 
-/// One open tab in the shell — a live chat session or an opened file, on a
-/// given instance.
+/// One open tab in the shell — a live chat session, an opened file, or a single
+/// git change, on a given instance.
 class _ShellTab {
   final DaemonClient client;
   final String instanceUrl;
@@ -57,6 +57,13 @@ class _ShellTab {
   String title;
   String? profile;
   SharedInbound? inboundShare;
+
+  /// Set only for a diff tab: the changed file plus the view it should show.
+  /// A staged-only file reads the index diff; an untracked one shows as an add.
+  final String? diffPath;
+  final bool diffStaged;
+  final bool diffUntracked;
+
   _ShellTab.session({
     required this.client,
     required this.instanceUrl,
@@ -64,23 +71,55 @@ class _ShellTab {
     required this.title,
     this.profile,
     this.inboundShare,
-  }) : filePath = null;
+  })  : filePath = null,
+        diffPath = null,
+        diffStaged = false,
+        diffUntracked = false;
   _ShellTab.file({
     required this.client,
     required this.instanceUrl,
     required this.filePath,
     required this.title,
   })  : sessionId = null,
+        profile = null,
+        diffPath = null,
+        diffStaged = false,
+        diffUntracked = false;
+  _ShellTab.diff({
+    required this.client,
+    required this.instanceUrl,
+    required this.sessionId,
+    required this.diffPath,
+    required this.title,
+    required this.diffStaged,
+    required this.diffUntracked,
+  })  : filePath = null,
         profile = null;
+
   bool get isFile => filePath != null;
+  bool get isDiff => diffPath != null;
   bool get isMissionControl =>
-      !isFile && isMissionControlTab(sessionId: sessionId, title: title);
-  String get key => isFile
-      ? '$instanceUrl|file|$filePath'
-      : isMissionControl
-          ? '$instanceUrl|mission-control'
-          : '$instanceUrl|$sessionId';
+      !isFile &&
+      !isDiff &&
+      isMissionControlTab(sessionId: sessionId, title: title);
+  String get key => isDiff
+      ? '$instanceUrl|diff|$diffPath|$diffStaged'
+      : isFile
+          ? '$instanceUrl|file|$filePath'
+          : isMissionControl
+              ? '$instanceUrl|mission-control'
+              : '$instanceUrl|$sessionId';
 }
+
+/// Icon for a tab, by kind. One helper so the four call sites that render a
+/// tab (top bar, desktop strip, split header, tab menu) cannot drift.
+String _tabIconKind(_ShellTab t) => t.isMissionControl
+    ? 'layers'
+    : t.isDiff
+        ? 'git-branch'
+        : t.isFile
+            ? 'file'
+            : 'chat-thread';
 
 class _MacSessionStatus {
   final HarnessState? state;
@@ -180,7 +219,8 @@ class _DesktopShellState extends State<DesktopShell>
   bool _isSplit = false;
 
   /// Is the right pane showing anything at all?
-  bool get _rightPaneOpen => _rightAgent != null || _rightTool != _RightTool.none;
+  bool get _rightPaneOpen =>
+      _rightAgent != null || _rightTool != _RightTool.none;
 
   /// Open a tool in the right pane, or close it if it is already showing.
   void _toggleRightTool(_RightTool tool) {
@@ -621,6 +661,9 @@ class _DesktopShellState extends State<DesktopShell>
                   filePath: t.filePath,
                   title: t.title,
                   profile: t.profile,
+                  diffPath: t.diffPath,
+                  diffStaged: t.diffStaged,
+                  diffUntracked: t.diffUntracked,
                 ))
             .toList(),
         _activeIndex,
@@ -637,7 +680,17 @@ class _DesktopShellState extends State<DesktopShell>
       final inst = byUrl[descriptor.instanceUrl];
       if (inst == null) continue;
       final client = DaemonClient(inst.url, inst.token);
-      if (descriptor.isFile) {
+      if (descriptor.isDiff) {
+        restored.add(_ShellTab.diff(
+          client: client,
+          instanceUrl: inst.url,
+          sessionId: descriptor.sessionId,
+          diffPath: descriptor.diffPath!,
+          title: descriptor.title,
+          diffStaged: descriptor.diffStaged,
+          diffUntracked: descriptor.diffUntracked,
+        ));
+      } else if (descriptor.isFile) {
         restored.add(_ShellTab.file(
           client: client,
           instanceUrl: inst.url,
@@ -1206,7 +1259,7 @@ class _DesktopShellState extends State<DesktopShell>
           for (final t in open)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: AppIcon(t.isMissionControl ? 'layers' : 'terminal',
+              leading: AppIcon(_tabIconKind(t),
                   size: 18,
                   color: t.isMissionControl ? AppColors.accent : AppColors.fg3),
               title: Text(
@@ -1283,6 +1336,43 @@ class _DesktopShellState extends State<DesktopShell>
       } else {
         _tabs.add(_ShellTab.file(
             client: client, instanceUrl: url, filePath: path, title: name));
+        _activeIndex = _tabs.length - 1;
+      }
+    });
+    _persistTabs();
+    _syncPage();
+  }
+
+  /// Open one changed file as a tab, so a git diff reads in the same main-pane
+  /// tab system as a chat or a file. Previously the sidebar rows did nothing.
+  void _openDiffTab(
+    DaemonClient client,
+    String url,
+    String sessionId,
+    GitFile f,
+  ) {
+    // Staged-only files show the index diff; anything else shows the worktree
+    // diff — the same rule the full Git screen uses.
+    final staged = f.staged && !f.unstaged;
+    final name = lastPathSegment(f.path, ifEmpty: f.path);
+    final existing = _tabs.indexWhere((t) =>
+        t.isDiff &&
+        t.instanceUrl == url &&
+        t.diffPath == f.path &&
+        t.diffStaged == staged);
+    setState(() {
+      if (existing >= 0) {
+        _activeIndex = existing;
+      } else {
+        _tabs.add(_ShellTab.diff(
+          client: client,
+          instanceUrl: url,
+          sessionId: sessionId,
+          diffPath: f.path,
+          title: name,
+          diffStaged: staged,
+          diffUntracked: f.untracked,
+        ));
         _activeIndex = _tabs.length - 1;
       }
     });
@@ -1386,6 +1476,14 @@ class _DesktopShellState extends State<DesktopShell>
               client: client,
               workspacePath: _activeWorkspaceFolder() ?? '',
               sessionId: _activeTab?.sessionId,
+              // Open the change as a tab in the main pane, so a diff reads in
+              // the same tab system as a chat or a file.
+              onOpenDiff: (f) => _openDiffTab(
+                client,
+                _active?.url ?? '',
+                _activeTab?.sessionId ?? '',
+                f,
+              ),
             );
     } else if (_section == ShellSection.files) {
       final client = _client;
@@ -1805,11 +1903,7 @@ class _DesktopShellState extends State<DesktopShell>
     final t = _tabs[i];
     final isActive = i == _activeIndex;
     final title = t.title.isEmpty ? '(untitled)' : t.title;
-    final icon = t.isMissionControl
-        ? 'layers'
-        : t.isFile
-            ? 'file'
-            : 'chat-thread';
+    final icon = _tabIconKind(t);
 
     return GestureDetector(
       onTap: () => _activateTab(i),
@@ -2175,11 +2269,7 @@ class _DesktopShellState extends State<DesktopShell>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           AppIcon(
-                            t.isFile
-                                ? 'file'
-                                : t.isMissionControl
-                                    ? 'layers'
-                                    : 'message-text',
+                            _tabIconKind(t),
                             size: 12,
                             color: AppColors.accent,
                           ),
@@ -2204,25 +2294,35 @@ class _DesktopShellState extends State<DesktopShell>
                 ),
               ),
               Expanded(
-                child: t.isFile
-                    ? FileViewer(
+                child: t.isDiff
+                    ? GitFileDiffView(
                         key: ValueKey('split-${t.key}'),
                         client: t.client,
-                        path: t.filePath!,
-                        name: t.title,
+                        sessionId: t.sessionId ?? '',
+                        file: t.diffPath!,
+                        staged: t.diffStaged,
+                        untracked: t.diffUntracked,
                         embedded: true,
                       )
-                    : SessionScreen(
-                        key: ValueKey('split-${t.key}'),
-                        client: t.client,
-                        sessionId: t.sessionId!,
-                        title: t.title,
-                        profile: t.profile,
-                        embedded: true,
-                        acceptDrops: false,
-                        onTitle: (title) =>
-                            _onSessionTitle(t.sessionId!, title),
-                      ),
+                    : t.isFile
+                        ? FileViewer(
+                            key: ValueKey('split-${t.key}'),
+                            client: t.client,
+                            path: t.filePath!,
+                            name: t.title,
+                            embedded: true,
+                          )
+                        : SessionScreen(
+                            key: ValueKey('split-${t.key}'),
+                            client: t.client,
+                            sessionId: t.sessionId!,
+                            title: t.title,
+                            profile: t.profile,
+                            embedded: true,
+                            acceptDrops: false,
+                            onTitle: (title) =>
+                                _onSessionTitle(t.sessionId!, title),
+                          ),
               ),
             ],
           ),
@@ -2314,45 +2414,56 @@ class _DesktopShellState extends State<DesktopShell>
                   return _KeepAlive(
                     key: ValueKey(t.key),
                     keep: t.isMissionControl || i == _activeIndex,
-                    child: t.isFile
-                        ? FileViewer(
+                    child: t.isDiff
+                        ? GitFileDiffView(
                             key: ValueKey(t.key),
                             client: t.client,
-                            path: t.filePath!,
-                            name: t.title,
+                            sessionId: t.sessionId ?? '',
+                            file: t.diffPath!,
+                            staged: t.diffStaged,
+                            untracked: t.diffUntracked,
                             embedded: true,
-                            onClose: () => _closeTabByKey(t.key),
                           )
-                        : SessionScreen(
-                            key: ValueKey(t.key),
-                            client: t.client,
-                            sessionId: t.sessionId!,
-                            title: t.title,
-                            profile: t.profile,
-                            embedded: true,
-                            inboundShare: t.inboundShare,
-                            onShareConsumed: t.inboundShare == null
-                                ? null
-                                : () => setState(() => t.inboundShare = null),
-                            acceptDrops: i == _activeIndex,
-                            onTitle: (title) =>
-                                _onSessionTitle(t.sessionId!, title),
-                            onMenu: null,
-                            onOpenFileTab: (path, name) => _openFileTab(
-                                t.client, t.instanceUrl, path, name),
-                            onOpenSession: _openSession,
-                            onMacStatus: (state, running) =>
-                                _setMacSessionStatus(t.key, state, running),
-                            onMacControls: !kMobile
-                                ? (stop, performAction) =>
-                                    _setMacSessionControls(
-                                        t.key, stop, performAction)
-                                : null,
-                            onMacTerminals: !kMobile
-                                ? (terms, focus) =>
-                                    _setMacTerminals(t.key, terms, focus)
-                                : null,
-                          ),
+                        : t.isFile
+                            ? FileViewer(
+                                key: ValueKey(t.key),
+                                client: t.client,
+                                path: t.filePath!,
+                                name: t.title,
+                                embedded: true,
+                                onClose: () => _closeTabByKey(t.key),
+                              )
+                            : SessionScreen(
+                                key: ValueKey(t.key),
+                                client: t.client,
+                                sessionId: t.sessionId!,
+                                title: t.title,
+                                profile: t.profile,
+                                embedded: true,
+                                inboundShare: t.inboundShare,
+                                onShareConsumed: t.inboundShare == null
+                                    ? null
+                                    : () =>
+                                        setState(() => t.inboundShare = null),
+                                acceptDrops: i == _activeIndex,
+                                onTitle: (title) =>
+                                    _onSessionTitle(t.sessionId!, title),
+                                onMenu: null,
+                                onOpenFileTab: (path, name) => _openFileTab(
+                                    t.client, t.instanceUrl, path, name),
+                                onOpenSession: _openSession,
+                                onMacStatus: (state, running) =>
+                                    _setMacSessionStatus(t.key, state, running),
+                                onMacControls: !kMobile
+                                    ? (stop, performAction) =>
+                                        _setMacSessionControls(
+                                            t.key, stop, performAction)
+                                    : null,
+                                onMacTerminals: !kMobile
+                                    ? (terms, focus) =>
+                                        _setMacTerminals(t.key, terms, focus)
+                                    : null,
+                              ),
                   );
                 },
               ),
@@ -2473,11 +2584,7 @@ class _DesktopShellState extends State<DesktopShell>
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             AppIcon(
-              t.isMissionControl
-                  ? 'layers'
-                  : t.isFile
-                      ? 'file'
-                      : 'message-text',
+              _tabIconKind(t),
               size: 12,
               color: active ? AppColors.accent : AppColors.fg4,
             ),
@@ -2528,11 +2635,7 @@ class _DesktopShellState extends State<DesktopShell>
         child: Row(
           children: [
             AppIcon(
-              t.isMissionControl
-                  ? 'layers'
-                  : t.isFile
-                      ? 'file'
-                      : 'message-text',
+              _tabIconKind(t),
               size: 14,
               color: active ? AppColors.accent : AppColors.fg4,
             ),

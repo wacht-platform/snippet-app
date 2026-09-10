@@ -19,11 +19,16 @@ class GitDiffSidebarPanel extends StatefulWidget {
     required this.client,
     required this.workspacePath,
     this.sessionId,
+    this.onOpenDiff,
   });
 
   final DaemonClient client;
   final String workspacePath;
   final String? sessionId;
+
+  /// Called when a changed file is tapped. The host opens it as a tab in the
+  /// main pane, so a diff reads in the same tab system as everything else.
+  final void Function(GitFile file)? onOpenDiff;
 
   @override
   State<GitDiffSidebarPanel> createState() => _GitDiffSidebarPanelState();
@@ -150,7 +155,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
         // Monochrome icon; the single-letter status carries the state colour,
         // so colour stays rationed to information.
         tone: ShellTone.neutral,
-        onTap: () {},
+        onTap: widget.onOpenDiff == null ? null : () => widget.onOpenDiff!(f),
         trailing: _statusLetter(f),
       );
 

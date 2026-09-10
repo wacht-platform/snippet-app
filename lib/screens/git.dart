@@ -114,7 +114,7 @@ class _GitScreenState extends State<GitScreen> {
     Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => _DiffView(
+          builder: (_) => GitFileDiffView(
             client: widget.client,
             sessionId: _repo,
             file: f.path,
@@ -543,25 +543,33 @@ class _BranchPickerState extends State<_BranchPicker> {
   }
 }
 
-/// Read-only unified-diff viewer with +/- line tints. Reused later by the editor.
-class _DiffView extends StatefulWidget {
+/// Read-only unified-diff viewer with +/- line tints.
+///
+/// Public so a single change can open as a shell tab: the git sidebar panel
+/// inspects a diff beside the chat, and that is the same widget the full Git
+/// screen pushes. [embedded] drops the app bar when a shell tab already
+/// provides chrome.
+class GitFileDiffView extends StatefulWidget {
   final DaemonClient client;
   final String sessionId;
   final String file;
   final bool staged;
   final bool untracked;
-  const _DiffView({
+  final bool embedded;
+  const GitFileDiffView({
+    super.key,
     required this.client,
     required this.sessionId,
     required this.file,
     required this.staged,
     required this.untracked,
+    this.embedded = false,
   });
   @override
-  State<_DiffView> createState() => _DiffViewState();
+  State<GitFileDiffView> createState() => _GitFileDiffViewState();
 }
 
-class _DiffViewState extends State<_DiffView> {
+class _GitFileDiffViewState extends State<GitFileDiffView> {
   String? _patch;
   String? _error;
   bool _loading = true;
@@ -598,49 +606,51 @@ class _DiffViewState extends State<_DiffView> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final name = widget.file.split('/').last;
+    final bar = SnAppBar(
+      title: name,
+      subtitle: widget.file,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        if (_patch != null && _patch!.isNotEmpty)
+          IconBtn('clipboard', tooltip: 'Copy', onTap: () {
+            Clipboard.setData(ClipboardData(text: _patch!));
+            toast(context, 'Diff copied');
+          }),
+      ],
+    );
+    final body = Column(children: [
+      // A shell tab already supplies chrome, so only the pushed route draws
+      // the app bar. Without this the diff would show two title bars.
+      if (!widget.embedded) bar,
+      if (_loading)
+        Expanded(
+            child: Center(
+                child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.fg3))))
+      else if (_error != null)
+        Expanded(
+            child: EmptyState(
+                icon: 'alert-triangle', title: 'Diff failed', body: _error!))
+      else if ((_patch ?? '').trim().isEmpty)
+        Expanded(
+            child: EmptyState(
+                icon: 'file',
+                title: widget.untracked ? 'Untracked file' : 'No diff',
+                body: widget.untracked
+                    ? 'New file — stage it to include it in the next commit.'
+                    : 'No changes to show for this view.'))
+      else
+        Expanded(child: _diffBody(_patch!)),
+    ]);
+    if (widget.embedded) {
+      return ColoredBox(color: readingBg, child: body);
+    }
     return Scaffold(
       backgroundColor: readingBg,
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          SnAppBar(
-            title: name,
-            subtitle: widget.file,
-            onBack: () => Navigator.pop(context),
-            actions: [
-              if (_patch != null && _patch!.isNotEmpty)
-                IconBtn('clipboard', tooltip: 'Copy', onTap: () {
-                  Clipboard.setData(ClipboardData(text: _patch!));
-                  toast(context, 'Diff copied');
-                }),
-            ],
-          ),
-          if (_loading)
-            Expanded(
-                child: Center(
-                    child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3))))
-          else if (_error != null)
-            Expanded(
-                child: EmptyState(
-                    icon: 'alert-triangle',
-                    title: 'Diff failed',
-                    body: _error!))
-          else if ((_patch ?? '').trim().isEmpty)
-            Expanded(
-                child: EmptyState(
-                    icon: 'file',
-                    title: widget.untracked ? 'Untracked file' : 'No diff',
-                    body: widget.untracked
-                        ? 'New file — stage it to include it in the next commit.'
-                        : 'No changes to show for this view.'))
-          else
-            Expanded(child: _diffBody(_patch!)),
-        ]),
-      ),
+      body: SafeArea(bottom: false, child: body),
     );
   }
 

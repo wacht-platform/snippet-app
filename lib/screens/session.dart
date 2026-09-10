@@ -219,6 +219,7 @@ class _SessionScreenState extends State<SessionScreen>
   final List<_LiveTerm> _terms = [];
   int _termFocus = 0;
   int _termSeq = 0;
+
   /// Width of the desktop terminal split pane. Height is not tracked: the pane
   /// is full-height beside the chat.
   double _termWidth = 420;
@@ -2104,174 +2105,191 @@ class _SessionScreenState extends State<SessionScreen>
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                  if (kMobile)
-                    _mobileHeader(s, running, waiting)
-                  else if (!kMacOS)
-                    _desktopBar(s, running),
-                  // Desktop keeps the detailed chip strip.
-                  if (!kMobile && !kMacOS) _statusStrip(s, running),
-                  if (_connError != null) _disconnectedBanner(),
-                  Expanded(
-                    child: Stack(children: [
-                      s == null
-                          ? Center(
-                              child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.fg3)))
-                          : NotificationListener<ScrollNotification>(
-                              onNotification: _onScroll,
-                              child: Builder(builder: (context) {
-                                final timeline = <Widget>[
-                                  if (items.isEmpty && !running)
-                                    const EmptyState(
-                                        icon: 'terminal',
-                                        title: 'Session ready',
-                                        body: 'Send a task to get started.'),
-                                  ...items,
-                                  // Optimistic bubbles for messages sent but not yet echoed.
-                                  for (var pi = 0; pi < _pending.length; pi++)
-                                    Opacity(
-                                        key: ValueKey(
-                                            'pending-$pi-${_pending[pi].hashCode}'),
-                                        opacity: 0.5,
-                                        child: Padding(
-                                            padding: const EdgeInsets.only(
-                                                bottom: 12),
-                                            child: Bubble(
-                                                mine: true,
-                                                text: _pending[pi],
-                                                selectable: false))),
-                                  if (_heldQueue.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    _QueuedSection(
-                                      count: _heldQueue.length,
-                                      showBulkActions:
-                                          !kMobile || _heldQueue.length > 1,
-                                      onSendAll: _steerAllQueued,
-                                      onCancelAll: _cancelAllQueued,
-                                      children: [
-                                        for (var qi = 0;
-                                            qi < _heldQueue.length;
-                                            qi++)
-                                          KeyedSubtree(
-                                            key: ValueKey(
-                                                'queued-$qi-${_heldQueue[qi].id}'),
-                                            child: _QueuedBubble(
-                                              text: _queuedText(
-                                                  _heldQueue[qi].text),
-                                              audio: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$1,
-                                              images: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$2,
-                                              files: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$3,
-                                              onCancel: () =>
-                                                  _cancelQueuedAt(qi),
-                                              onSteer: () => _steerQueuedAt(qi),
-                                            ),
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (kMobile)
+                          _mobileHeader(s, running, waiting)
+                        else if (!kMacOS)
+                          _desktopBar(s, running),
+                        // Desktop keeps the detailed chip strip.
+                        if (!kMobile && !kMacOS) _statusStrip(s, running),
+                        if (_connError != null) _disconnectedBanner(),
+                        Expanded(
+                          child: Stack(children: [
+                            s == null
+                                ? Center(
+                                    child: SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.fg3)))
+                                : NotificationListener<ScrollNotification>(
+                                    onNotification: _onScroll,
+                                    child: Builder(builder: (context) {
+                                      final timeline = <Widget>[
+                                        if (items.isEmpty && !running)
+                                          const EmptyState(
+                                              icon: 'terminal',
+                                              title: 'Session ready',
+                                              body:
+                                                  'Send a task to get started.'),
+                                        ...items,
+                                        // Optimistic bubbles for messages sent but not yet echoed.
+                                        for (var pi = 0;
+                                            pi < _pending.length;
+                                            pi++)
+                                          Opacity(
+                                              key: ValueKey(
+                                                  'pending-$pi-${_pending[pi].hashCode}'),
+                                              opacity: 0.5,
+                                              child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          bottom: 12),
+                                                  child: Bubble(
+                                                      mine: true,
+                                                      text: _pending[pi],
+                                                      selectable: false))),
+                                        if (_heldQueue.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          _QueuedSection(
+                                            count: _heldQueue.length,
+                                            showBulkActions: !kMobile ||
+                                                _heldQueue.length > 1,
+                                            onSendAll: _steerAllQueued,
+                                            onCancelAll: _cancelAllQueued,
+                                            children: [
+                                              for (var qi = 0;
+                                                  qi < _heldQueue.length;
+                                                  qi++)
+                                                KeyedSubtree(
+                                                  key: ValueKey(
+                                                      'queued-$qi-${_heldQueue[qi].id}'),
+                                                  child: _QueuedBubble(
+                                                    text: _queuedText(
+                                                        _heldQueue[qi].text),
+                                                    audio: _queuedAttachCounts(
+                                                            _heldQueue[qi].text)
+                                                        .$1,
+                                                    images: _queuedAttachCounts(
+                                                            _heldQueue[qi].text)
+                                                        .$2,
+                                                    files: _queuedAttachCounts(
+                                                            _heldQueue[qi].text)
+                                                        .$3,
+                                                    onCancel: () =>
+                                                        _cancelQueuedAt(qi),
+                                                    onSteer: () =>
+                                                        _steerQueuedAt(qi),
+                                                  ),
+                                                ),
+                                            ],
                                           ),
-                                      ],
-                                    ),
-                                  ],
-                                  _LiveStreamRow(
-                                    key: const ValueKey('live-stream-row'),
-                                    frame: _liveFrame,
-                                    running: running,
-                                    compacting: s.compacting,
-                                    startedAt: s.turnStartedAt,
-                                    hasVisibleAction:
-                                        _turnHasVisibleAction(events),
-                                    compactionDetail:
-                                        _latestCompactionDetail(events),
-                                  ),
-                                ];
-                                return ScrollConfiguration(
-                                  behavior: ScrollConfiguration.of(context)
-                                      .copyWith(scrollbars: false),
-                                  child: ListView.builder(
-                                    controller: _scroll,
-                                    reverse: true,
-                                    scrollCacheExtent:
-                                        ScrollCacheExtent.pixels(400),
-                                    padding: const EdgeInsets.fromLTRB(
-                                        20, 16, 20, 24),
-                                    itemCount: timeline.length,
-                                    itemBuilder: (context, index) {
-                                      final child =
-                                          timeline[timeline.length - 1 - index];
-                                      return KeyedSubtree(
-                                        key: child.key ??
-                                            ValueKey('timeline-$index'),
-                                        child: _centerWide(
-                                          RepaintBoundary(child: child),
+                                        ],
+                                        _LiveStreamRow(
+                                          key:
+                                              const ValueKey('live-stream-row'),
+                                          frame: _liveFrame,
+                                          running: running,
+                                          compacting: s.compacting,
+                                          startedAt: s.turnStartedAt,
+                                          hasVisibleAction:
+                                              _turnHasVisibleAction(events),
+                                          compactionDetail:
+                                              _latestCompactionDetail(events),
+                                        ),
+                                      ];
+                                      return ScrollConfiguration(
+                                        behavior:
+                                            ScrollConfiguration.of(context)
+                                                .copyWith(scrollbars: false),
+                                        child: ListView.builder(
+                                          controller: _scroll,
+                                          reverse: true,
+                                          scrollCacheExtent:
+                                              ScrollCacheExtent.pixels(400),
+                                          padding: const EdgeInsets.fromLTRB(
+                                              20, 16, 20, 24),
+                                          itemCount: timeline.length,
+                                          itemBuilder: (context, index) {
+                                            final child = timeline[
+                                                timeline.length - 1 - index];
+                                            return KeyedSubtree(
+                                              key: child.key ??
+                                                  ValueKey('timeline-$index'),
+                                              child: _centerWide(
+                                                RepaintBoundary(child: child),
+                                              ),
+                                            );
+                                          },
                                         ),
                                       );
+                                    })),
+                            if (!_stickToBottom && s != null)
+                              Positioned(
+                                right: 16,
+                                bottom: 12,
+                                child: Material(
+                                  color: AppColors.surface1,
+                                  shape: const CircleBorder(),
+                                  elevation: 0,
+                                  child: InkWell(
+                                    customBorder: const CircleBorder(),
+                                    onTap: () {
+                                      _stickToBottom = true;
+                                      setState(() {});
+                                      _scheduleBottom(
+                                          settle: true, smooth: true);
                                     },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: AppIcon('chevron-down',
+                                          size: 16, color: AppColors.fg3),
+                                    ),
                                   ),
-                                );
-                              })),
-                      if (!_stickToBottom && s != null)
-                        Positioned(
-                          right: 16,
-                          bottom: 12,
-                          child: Material(
-                            color: AppColors.surface1,
-                            shape: const CircleBorder(),
-                            elevation: 0,
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: () {
-                                _stickToBottom = true;
-                                setState(() {});
-                                _scheduleBottom(settle: true, smooth: true);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: AppIcon('chevron-down',
-                                    size: 16, color: AppColors.fg3),
+                                ),
                               ),
-                            ),
-                          ),
+                          ]),
                         ),
-                    ]),
-                  ),
-                  // The question/approval bars are PINNED here (not inside the scroll
-                  // list) so a "needs input" request is always visible — buried at the
-                  // bottom of a scrolled-up transcript it read as "the agent is stuck".
-                  if (waiting && _pendingApproval(events))
-                    _centerWide(Padding(
-                      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 6,
-                          widget.embedded ? 0 : 20, 0),
-                      child: _ApprovalBar(
-                          events: events,
-                          onSend: _sendDecision,
-                          showApproveAll: _pendingApprovalTotal(events) > 1),
-                    )),
-                  if (waiting && s?.pendingQuestion != null)
-                    _centerWide(Padding(
-                      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 6,
-                          widget.embedded ? 0 : 20, 0),
-                      child: _QuestionBar(
-                          question: s!.pendingQuestion!, onSend: _sendDecision),
-                    )),
-                  if (!(waiting && s?.pendingQuestion != null))
-                    _centerWide(_inputBar(running)),
-                    ]),
-                  ),
-                  // Desktop: the terminal is a second pane BESIDE the chat
-                  // rather than a drawer stacked under it. The drawer fought the
-                  // transcript for vertical space and hid the composer; side by
-                  // side both stay usable, and it doubles as the chat/terminal
-                  // split.
-                  if (_termOpen && _terms.isNotEmpty && !kMobile)
-                    _desktopTermPane(),
+                        // The question/approval bars are PINNED here (not inside the scroll
+                        // list) so a "needs input" request is always visible — buried at the
+                        // bottom of a scrolled-up transcript it read as "the agent is stuck".
+                        if (waiting && _pendingApproval(events))
+                          _centerWide(Padding(
+                            padding: EdgeInsets.fromLTRB(
+                                widget.embedded ? 0 : 20,
+                                6,
+                                widget.embedded ? 0 : 20,
+                                0),
+                            child: _ApprovalBar(
+                                events: events,
+                                onSend: _sendDecision,
+                                showApproveAll:
+                                    _pendingApprovalTotal(events) > 1),
+                          )),
+                        if (waiting && s?.pendingQuestion != null)
+                          _centerWide(Padding(
+                            padding: EdgeInsets.fromLTRB(
+                                widget.embedded ? 0 : 20,
+                                6,
+                                widget.embedded ? 0 : 20,
+                                0),
+                            child: _QuestionBar(
+                                question: s!.pendingQuestion!,
+                                onSend: _sendDecision),
+                          )),
+                        if (!(waiting && s?.pendingQuestion != null))
+                          _centerWide(_inputBar(running)),
+                      ]),
+                ),
+                // Desktop: the terminal is a second pane BESIDE the chat
+                // rather than a drawer stacked under it. The drawer fought the
+                // transcript for vertical space and hid the composer; side by
+                // side both stay usable, and it doubles as the chat/terminal
+                // split.
+                if (_termOpen && _terms.isNotEmpty && !kMobile)
+                  _desktopTermPane(),
               ],
             ),
           ),
