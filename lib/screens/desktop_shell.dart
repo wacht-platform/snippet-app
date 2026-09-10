@@ -282,6 +282,10 @@ class _DesktopShellState extends State<DesktopShell>
   /// sidebar, and its pty stays alive.
   bool _rightCollapsed = false;
 
+  /// Which tab each pane is showing, keyed by pane. Separate from `_activeIndex`
+  /// so the two containers keep independent selections.
+  final Map<_Pane, String> _activeKey = {};
+
   /// Show a session panel in the pane, or close it if it is already showing.
   void _toggleRightPanel(_RightPanel p) {
     setState(() {
@@ -1294,6 +1298,9 @@ class _DesktopShellState extends State<DesktopShell>
     final key = _tabs[i].key;
     setState(() {
       _clearTabState(key);
+      // A pane selection pointing at a tab that no longer exists would leave
+      // that pane blank instead of falling back to its first tab.
+      _activeKey.removeWhere((_, k) => k == key);
       _tabs.removeAt(i);
       if (_tabs.isEmpty) {
         _activeIndex = -1;
@@ -2575,13 +2582,28 @@ class _DesktopShellState extends State<DesktopShell>
           if (t.pane == p) t,
       ];
 
-  /// The tab a pane is showing: the focused one if it lives here, else the
-  /// pane's first tab.
+  /// The tab a pane is showing.
+  ///
+  /// Per-pane, NOT `_activeIndex`: a single global index meant choosing a tab in
+  /// one pane reset the other pane back to its first tab — with two containers
+  /// on screen, each needs its own selection.
   _ShellTab? _activeIn(_Pane p) {
-    final i = _activeIndex;
-    if (i >= 0 && i < _tabs.length && _tabs[i].pane == p) return _tabs[i];
+    final key = _activeKey[p];
+    if (key != null) {
+      for (final t in _tabs) {
+        if (t.key == key && t.pane == p) return t;
+      }
+    }
     final list = _tabsIn(p);
     return list.isEmpty ? null : list.first;
+  }
+
+  /// The pane holding the focused tab. Drives drops and inbound shares, so a
+  /// dropped file lands in one composer rather than both.
+  _Pane get _focusedPane {
+    final i = _activeIndex;
+    if (i >= 0 && i < _tabs.length) return _tabs[i].pane;
+    return _Pane.left;
   }
 
   /// Make a tab its pane's active tab, and the shell's focused tab.
@@ -2589,7 +2611,10 @@ class _DesktopShellState extends State<DesktopShell>
     final i = _tabs.indexOf(tab);
     if (i < 0) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _activeIndex = i);
+    setState(() {
+      _activeKey[p] = tab.key;
+      _activeIndex = i;
+    });
     _persistTabs();
     _syncPage();
   }
@@ -2604,6 +2629,7 @@ class _DesktopShellState extends State<DesktopShell>
     if (tab.pane == p) return;
     setState(() {
       tab.pane = p;
+      _activeKey[p] = tab.key;
       _activeIndex = i;
       // A tab now occupies the pane, so the readout yields to it.
       if (p == _Pane.right) {
@@ -2790,7 +2816,7 @@ class _DesktopShellState extends State<DesktopShell>
       for (final t in list)
         Offstage(
           offstage: t != active,
-          child: _tabBody(t, primary: p == _Pane.left),
+          child: _tabBody(t, primary: _focusedPane == p),
         ),
     ]);
   }
