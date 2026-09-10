@@ -1588,116 +1588,88 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
+  /// Bottom status line, matching the reference: connection + workspace on the
+  /// left, context remaining on the right.
+  ///
+  /// Deliberately NOT an action toolbar. The reference keeps this row to state;
+  /// the nine shortcuts that used to live here are all reachable from the
+  /// command palette (⌘K) and the session menu, and a 30px strip cannot hold
+  /// nine labelled buttons without reading as clutter.
   Widget _macStatusBar() {
     final tab = _activeTab;
-    final controls = tab == null ? null : _macSessionControls[tab.key];
     final status = tab == null ? null : _macSessionStatuses[tab.key];
     final state = status?.state;
-    final statusLabel = state?.compacting == true
-        ? 'Compacting'
-        : state?.status == 'waiting_for_input'
-            ? 'Needs input'
-            : status?.running == true
-                ? 'Running'
-                : null;
-    final statusColor = state?.compacting == true
-        ? AppColors.accent
-        : state?.status == 'waiting_for_input'
-            ? AppColors.accent
-            : AppColors.run;
     final connected = _client != null;
-    final rightActions = <Widget>[];
-    if (controls != null) {
-      rightActions.addAll([
-        _macApprovalChip(
-          manual: state?.approvalMode == 'manual',
-          onPick: (manual) =>
-              controls.performAction(manual ? 'approval_ask' : 'approval_auto'),
-        ),
-        _macGoalChip(
-          active: state?.goal?.ongoing == true,
-          paused: state?.goal?.paused == true,
-          onSet: (text) => controls.performAction('goal', text),
-          onCancel: () => controls.performAction('goal'),
-          onResume: () => controls.performAction('resume_goal'),
-        ),
-        if (state?.lanes.isNotEmpty ?? false)
-          _macStatusAction(
-              'layers', 'Lanes', () => controls.performAction('lanes')),
-        _macStatusAction('scheduled', 'Scheduled',
-            () => controls.performAction('recurring')),
-        _macStatusAction(
-            'folder', 'Files', () => controls.performAction('files')),
-        if (tab?.isMissionControl != true)
-          _macStatusAction(
-              'terminal', 'Shell', () => controls.performAction('shell')),
-        _macStatusAction(
-            'list', 'Processes', () => controls.performAction('processes')),
-        _macStatusAction(
-            'activity', 'Usage', () => controls.performAction('usage')),
-        _macStatusAction('history', 'Checkpoints',
-            () => controls.performAction('checkpoints')),
-      ]);
+    final workspace = _macRepositoryLabel();
+    // Context remaining, computed from what the harness actually reports: the
+    // last prompt's token count against the model's window. Shown only when the
+    // window is known, so we never invent a percentage.
+    int? contextLeft;
+    if (state != null && state.contextWindow > 0) {
+      final used = state.lastPromptTokens > 0
+          ? state.lastPromptTokens
+          : state.promptTokens;
+      if (used > 0) {
+        final left =
+            ((1 - (used / state.contextWindow)) * 100).clamp(0, 100).round();
+        contextLeft = left;
+      }
     }
+
     return Container(
       height: 30,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
+        color: AppColors.bg,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Stack(children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Row(children: [
-              StatusDot(status: connected ? 'online' : 'offline', size: 6),
-              const SizedBox(width: 7),
-              Text(connected ? 'Connected' : 'Offline',
-                  style: sans(10.5,
-                      color: connected ? AppColors.fg2 : AppColors.danger)),
-              if (statusLabel != null) ...[
-                const SizedBox(width: 14),
-                Container(width: 1, height: 12, color: AppColors.border2),
-                const SizedBox(width: 10),
-                Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                        color: statusColor, shape: BoxShape.circle)),
-                const SizedBox(width: 6),
-                Text(statusLabel, style: sans(10.5, color: statusColor)),
-              ],
-              if (tab != null) ...[
-                const SizedBox(width: 14),
-                Container(width: 1, height: 12, color: AppColors.border2),
-                const SizedBox(width: 14),
-                AppIcon(tab.isFile ? 'file' : 'terminal',
-                    size: 11, color: AppColors.fg4),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(tab.title.isEmpty ? 'session' : tab.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(10, color: AppColors.fg4)),
-                ),
-              ],
-            ]),
-          ),
+      child: Row(children: [
+        StatusDot(status: connected ? 'online' : 'offline', size: 6),
+        const SizedBox(width: 7),
+        Text(connected ? 'Local Daemon' : 'Offline',
+            style: sans(11,
+                color: connected ? AppColors.fg3 : AppColors.danger)),
+        const SizedBox(width: 9),
+        Text('•', style: sans(11, color: AppColors.fg4)),
+        const SizedBox(width: 9),
+        // Workspace, with the picker affordance the reference shows.
+        Flexible(
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon('folder', size: 11, color: AppColors.fg4),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(workspace,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(11, color: AppColors.fg3)),
+            ),
+            const SizedBox(width: 2),
+            AppIcon('chevron-down', size: 11, color: AppColors.fg4),
+          ]),
         ),
-        if (rightActions.isNotEmpty)
-          Align(
-            alignment: Alignment.centerRight,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 1, height: 12, color: AppColors.border2),
-              const SizedBox(width: 8),
-              for (var i = 0; i < rightActions.length; i++) ...[
-                if (i > 0) const SizedBox(width: 10),
-                rightActions[i],
-              ],
-            ]),
-          ),
+        const Spacer(),
+        if (state?.compacting == true) ...[
+          Text('Compacting',
+              style: sans(11, color: AppColors.accent)),
+          const SizedBox(width: 12),
+        ] else if (state?.status == 'waiting_for_input') ...[
+          Text('Needs input', style: sans(11, color: AppColors.accent)),
+          const SizedBox(width: 12),
+        ] else if (status?.running == true) ...[
+          Text('Running', style: sans(11, color: AppColors.run)),
+          const SizedBox(width: 12),
+        ],
+        if (contextLeft != null) ...[
+          Text('$contextLeft% context left',
+              style: sans(11, color: AppColors.fg4)),
+          const SizedBox(width: 10),
+        ],
+        // Secondary destinations stay reachable without crowding the row.
+        IconBtn('settings',
+            size: 22,
+            iconSize: 13,
+            tooltip: 'Settings',
+            onTap: _openShellSettings),
       ]),
     );
   }
@@ -1996,6 +1968,25 @@ class _DesktopShellState extends State<DesktopShell>
     _macSessionControls[key]?.performAction('shell');
   }
 
+  /// Settings, opened from the shell's status line. The sidebar has its own
+  /// opener for the machine popover; this one exists so the status bar does not
+  /// have to reach into a child's state.
+  void _openShellSettings() {
+    final c = _client;
+    if (c == null) return;
+    final inst = _active;
+    presentScreen(context,
+        maxWidth: 640,
+        maxHeight: 620,
+        builder: (_, close) => _SettingsPanel(
+              client: c,
+              instances: _instances,
+              active: inst,
+              onRemove: _removeInstance,
+              onClose: close,
+            ));
+  }
+
   Widget _mainPane({VoidCallback? onMenu}) {
     final client = _client;
     if (client == null) {
@@ -2104,14 +2095,29 @@ class _DesktopShellState extends State<DesktopShell>
               iconSize: kMobile ? 28 : 18,
               tooltip: 'Sidebar',
               onTap: onMenu),
+        // Tabs share the strip equally rather than sizing to their titles, so
+        // the row reads as a segmented control. Below the minimum width they
+        // stop shrinking and the strip scrolls instead of crushing labels.
         Expanded(
-          child: ListView.builder(
-            controller: _stripController,
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: kMobile ? 4 : 8),
-            itemCount: _tabs.length,
-            itemBuilder: (_, i) => _tabChip(i),
-          ),
+          child: LayoutBuilder(builder: (ctx, c) {
+            const minTab = 150.0;
+            final needsScroll = _tabs.length * minTab > c.maxWidth;
+            if (needsScroll) {
+              return ListView.builder(
+                controller: _stripController,
+                scrollDirection: Axis.horizontal,
+                itemCount: _tabs.length,
+                itemBuilder: (_, i) =>
+                    SizedBox(width: minTab, child: _tabChip(i)),
+              );
+            }
+            return Row(
+              children: [
+                for (var i = 0; i < _tabs.length; i++)
+                  Expanded(child: _tabChip(i)),
+              ],
+            );
+          }),
         ),
         if (!kMobile && _activeTab?.isFile == true) ...[
           IconBtn('download',
@@ -2131,6 +2137,8 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
+  /// One tab. Active state is a filled surface plus a **top** accent bar —
+  /// matching the reference, where the indicator sits above the label.
   Widget _tabChip(int i) {
     final t = _tabs[i];
     final active = i == _activeIndex;
@@ -2142,29 +2150,36 @@ class _DesktopShellState extends State<DesktopShell>
       onTap: () => _activateTab(i),
       onLongPress: () => _tabMenu(i),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 140),
         curve: Curves.easeOutCubic,
         key: key,
-        margin: desktop
-            ? EdgeInsets.zero
-            : const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
-        padding:
-            EdgeInsets.only(left: desktop ? 12 : 13, right: desktop ? 8 : 5),
-        constraints: BoxConstraints(maxWidth: active ? 240 : 180),
+        margin: desktop ? EdgeInsets.zero : const EdgeInsets.symmetric(
+            vertical: 7, horizontal: 3),
+        padding: EdgeInsets.only(
+            left: desktop ? 12 : 13, right: desktop ? 6 : 5),
         decoration: BoxDecoration(
           color: desktop
               ? (active ? AppColors.surface1 : Colors.transparent)
               : (active ? AppColors.surface2 : Colors.transparent),
           borderRadius: BorderRadius.zero,
+          // Hairline between tabs so equal widths still read as separate.
           border: desktop
               ? Border(
-                  bottom: BorderSide(
+                  top: BorderSide(
                       color: active ? AppColors.accent : Colors.transparent,
                       width: 2),
+                  right: BorderSide(
+                      color: active
+                          ? AppColors.border
+                          : (i == _tabs.length - 1
+                              ? Colors.transparent
+                              : AppColors.border)),
                 )
               : null,
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
+        // Fills the tab's width (the parent Expanded sizes it), so the title
+        // can ellipsize rather than the row collapsing to fit.
+        child: Row(mainAxisSize: MainAxisSize.max, children: [
           if (t.isMissionControl)
             AppIcon('layers',
                 size: mac ? 13 : 12,
@@ -2182,7 +2197,7 @@ class _DesktopShellState extends State<DesktopShell>
                   color: active ? AppColors.accent : AppColors.fg4),
             ),
           SizedBox(width: mac ? 7 : 8),
-          Flexible(
+          Expanded(
             child: Text(title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
