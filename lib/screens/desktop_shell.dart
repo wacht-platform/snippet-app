@@ -15,7 +15,9 @@ import '../notifications.dart';
 import '../panel.dart';
 import '../platform.dart';
 import '../share_inbound.dart';
+import '../shells.dart';
 import '../store.dart';
+import '../term.dart' show SessionTermView;
 import '../theme.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
@@ -77,9 +79,12 @@ class _ShellTab {
   final bool diffStaged;
   final bool diffUntracked;
 
-  /// Set only for a terminal tab. [termSessionKey] is the shell key of the
-  /// session that owns the pty, whose `TerminalHost` renders it. The pty itself
-  /// belongs to the session — the tab is only a placement.
+  /// Set only for a terminal tab.
+  ///
+  /// [termSessionKey] is the shell key of the session that owns the pty when the
+  /// shell is SESSION-scoped. It is NULL for a daemon-wide shell, which belongs
+  /// to the machine rather than a conversation — those render from
+  /// `ShellsController` over `/shells`.
   final String? termId;
   final String? termSessionKey;
 
@@ -126,9 +131,9 @@ class _ShellTab {
   _ShellTab.terminal({
     required this.client,
     required this.instanceUrl,
-    required this.termSessionKey,
     required this.termId,
     required this.title,
+    this.termSessionKey,
     this.pane = _Pane.right,
   })  : sessionId = null,
         filePath = null,
@@ -146,7 +151,7 @@ class _ShellTab {
       !isTerminal &&
       isMissionControlTab(sessionId: sessionId, title: title);
   String get key => isTerminal
-      ? '$instanceUrl|term|$termSessionKey|$termId'
+      ? '$instanceUrl|term|${termSessionKey ?? 'global'}|$termId'
       : isDiff
           ? '$instanceUrl|diff|$diffPath|$diffStaged'
           : isFile
@@ -206,6 +211,14 @@ class _DesktopShellState extends State<DesktopShell>
   final PageController _pageController = PageController();
   final ScrollController _stripController = ScrollController();
   final Map<String, GlobalKey> _chipKeys = {};
+
+  /// Daemon-wide interactive shells.
+  ///
+  /// Owns its own socket (`/shells`), so a shell survives switching or closing a
+  /// session — which is the whole point of it being global. Its tab list is
+  /// mirrored into `_tabs` by `_syncGlobalShellTabs` so shells are ordinary pane
+  /// tabs, draggable and closeable like anything else.
+  final ShellsController _shells = ShellsController();
 
   /// The selected MAIN workspace tab — what the window bar highlights and what
   /// the left pane shows when no auxiliary tab is covering it.
@@ -291,14 +304,6 @@ class _DesktopShellState extends State<DesktopShell>
   /// stays alive, so re-opening is instant.
   bool _rightCollapsed = false;
   bool _leftCollapsed = false;
-
-  /// The pane a pending terminal should dock in.
-  ///
-  /// Set when a strip's split control asks for a new shell. The pty arrives
-  /// asynchronously via the session's publish, so the pane is recorded now and
-  /// consumed by `_reconcileTermTabs` — reading the focused pane at publish time
-  /// would use whatever happened to be focused by then.
-  _Pane? _pendingTermPane;
 
   /// Which tab each pane is showing, keyed by pane. Separate from `_activeIndex`
   /// so the two containers keep independent selections.
@@ -545,6 +550,10 @@ class _DesktopShellState extends State<DesktopShell>
     _startSessionsTicker();
     if (!kMobile) HardwareKeyboard.instance.addHandler(_handleGlobalShortcuts);
     if (kMobile) ShareInbound.listen(_onInboundShare);
+    // Global shells mirror into tabs whenever the daemon reports a change: a
+    // reconnect adopts whatever ptys already exist, so live shells never vanish
+    // from the strip just because the socket dropped.
+    _shells.addListener(_syncGlobalShellTabs);
   }
 
   @override
@@ -557,6 +566,10 @@ class _DesktopShellState extends State<DesktopShell>
     _persistTabsDebounce?.cancel();
     _pageController.dispose();
     _stripController.dispose();
+    _shells.removeListener(_syncGlobalShellTabs);
+    // Closes the socket only. Never the ptys: a shell outlives this window, which
+    // is the entire point of it being daemon-wide.
+    _shells.dispose();
     if (onNotifTap == _onNotif) onNotifTap = null;
     if (kMobile) ShareInbound.dispose();
     super.dispose();
@@ -796,10 +809,11 @@ class _DesktopShellState extends State<DesktopShell>
           t.termSessionKey == sessionKey &&
           t.termId == info.id);
       if (exists) continue;
-      // The pane the split control asked for, else the RIGHT — a terminal
-      // never displaces the conversation you are reading by default. Consumed
-      // once so a later publish does not re-dock a different terminal there.
-      final target = _pendingTermPane ?? _Pane.right;
+      // SESSION shells dock on the RIGHT — they never displace the conversation
+      // you are reading. GLOBAL shells (the ones the sidebar creates) can be
+      // docked wherever their creator asked, which is why they are added
+      // directly rather than through here.
+      const target = _Pane.right;
       _tabs.add(_ShellTab.terminal(
         client: owner.client,
         instanceUrl: owner.instanceUrl,
@@ -809,7 +823,6 @@ class _DesktopShellState extends State<DesktopShell>
         pane: target,
       ));
       _activeKey[target] = _tabs.last.key;
-      _pendingTermPane = null;
       changed = true;
     }
 
@@ -1447,6 +1460,10 @@ class _DesktopShellState extends State<DesktopShell>
       _sessions = null;
       _liveStatus.clear();
     });
+    // AFTER setState: setClient notifies, which re-enters via
+    // `_syncGlobalShellTabs` -> setState, and calling setState during setState
+    // throws. Global shells are per-machine, so they reconnect here.
+    _shells.setClient(_client);
     _connectEventsWatch();
     _openSession(sid, '${m['title'] ?? 'session'}', null);
     _loadSessions();
@@ -1560,6 +1577,8 @@ class _DesktopShellState extends State<DesktopShell>
       _sessions = null;
       _liveStatus.clear();
     });
+    // See `_onInboundShare`: must follow the setState block.
+    _shells.setClient(_client);
     _ensurePinnedMissionControl();
     _connectEventsWatch();
     _loadSessions();
@@ -1872,18 +1891,28 @@ class _DesktopShellState extends State<DesktopShell>
     // The rail switches which panel occupies the sidebar. Git stays a mode of
     // the sessions panel — you inspect a session's diff, not the agent list.
     if (_section == ShellSection.terminal) {
-      final key = _activeTab?.key;
-      final host = key == null ? null : _termHosts[key];
+      // DAEMON-WIDE shells, not the session's. A shell belongs to the machine, so
+      // this panel is the same list whichever session is open — and it is the
+      // only place a shell is created or destroyed.
+      final shells = _shells.shells;
       panel = TerminalsSidebarPanel(
         workspacePath: _activeWorkspaceFolder() ?? '',
-        terminals: host?.terms ?? const <TerminalInfo>[],
-        focus: host?.focus ?? -1,
-        // Create and destroy happen HERE, in the sidebar: the pane can only
-        // minimize. `shell_create` mints the id in the session; the shell then
-        // reveals the pane so a new terminal is never invisible.
-        onNewTerminal: () => _dispatchSessionAction('shell_create'),
-        onOpenTerminal: (idx) => _dispatchSessionAction('shell_focus', '$idx'),
-        onCloseTerminal: (id) => _dispatchSessionAction('shell_close', id),
+        terminals: [
+          for (final s in shells)
+            TerminalInfo(
+              id: s.id,
+              title: s.title,
+              alive: s.alive,
+              live: s.live,
+            ),
+        ],
+        focus: shells.indexWhere((s) => s.id == _shells.focusId),
+        onNewTerminal: _newGlobalShell,
+        onOpenTerminal: (idx) {
+          if (idx < 0 || idx >= shells.length) return;
+          _focusGlobalShell(shells[idx].id);
+        },
+        onCloseTerminal: _closeGlobalShell,
       );
     } else if (_section == ShellSection.agents) {
       final client = _client;
@@ -2578,9 +2607,25 @@ class _DesktopShellState extends State<DesktopShell>
   /// mounted copies would both ingest the same drop.
   Widget _tabBody(_ShellTab t, {required bool primary}) {
     if (t.isTerminal) {
-      // The session owns the pty and the view wiring; this tab is only a
-      // placement. Rendering goes through its host so the terminal cannot be
-      // captured twice.
+      // A GLOBAL shell (no session key) renders from the controller, which owns
+      // its own socket — that is what makes it survive switching sessions.
+      if (t.termSessionKey == null) {
+        final s = _shells.byId(t.termId!);
+        if (s == null) return _emptyPaneHint();
+        return SessionTermView(
+          key: ValueKey('shell-${t.termId}'),
+          alive: s.alive,
+          terminal: s.terminal,
+          onInput: (bytes) => _shells.write(s.id, bytes),
+          onResize: (cols, rows) => _shells.resize(s.id, cols, rows),
+          onClose: () => _closePaneTab(t),
+          mobileKeys: kMobile,
+          showChrome: false,
+        );
+      }
+      // A SESSION shell: the session owns the pty and the view wiring; this tab
+      // is only a placement. Rendering goes through its host so the terminal
+      // cannot be captured twice.
       final host = _termHosts[t.termSessionKey];
       if (host == null || !host.terms.any((x) => x.id == t.termId)) {
         return _emptyPaneHint();
@@ -2919,9 +2964,120 @@ class _DesktopShellState extends State<DesktopShell>
   /// tab lands is the shell's call. The pane is recorded now and consumed when
   /// the session publishes the new terminal, because the two are asynchronous —
   /// reading the pane at publish time would use whatever was focused by then.
+  /// Create a daemon-wide shell (the sidebar's `+`) and dock it on the RIGHT so
+  /// a new shell never displaces the conversation you are reading.
+  void _newGlobalShell() {
+    final s = _shells.create();
+    setState(() {
+      _tabs.add(_ShellTab.terminal(
+        client: _client!,
+        instanceUrl: _active?.url ?? '',
+        termId: s.id,
+        termSessionKey: null,
+        title: s.title,
+        pane: _Pane.right,
+      ));
+      _activeKey[_Pane.right] = _tabs.last.key;
+      _rightCollapsed = false;
+    });
+    _persistTabs();
+  }
+
+  /// Bring a global shell forward: focus it and reveal the pane holding its tab.
+  void _focusGlobalShell(String id) {
+    _shells.focus(id);
+    for (final t in _tabs) {
+      if (t.isTerminal && t.termSessionKey == null && t.termId == id) {
+        setState(() {
+          _activeKey[t.pane] = t.key;
+          if (t.pane == _Pane.right) _rightCollapsed = false;
+        });
+        return;
+      }
+    }
+  }
+
+  /// Destroy a global shell. Sidebar-only, matching the rule that a shell is
+  /// created and destroyed here and never from a pane.
+  void _closeGlobalShell(String id) {
+    _shells.close(id);
+    _syncGlobalShellTabs();
+  }
+
+  /// Open a NEW daemon-wide shell, docked in [p].
+  ///
+  /// A global shell: it belongs to the machine, so switching or closing a session
+  /// leaves it running. The controller mints the id and owns the socket.
   void _splitPane(_Pane p) {
-    _pendingTermPane = p;
-    _dispatchSessionAction('shell_create');
+    final s = _shells.create();
+    setState(() {
+      _tabs.add(_ShellTab.terminal(
+        client: _client!,
+        instanceUrl: _active?.url ?? '',
+        termId: s.id,
+        // Null is what makes this the daemon-wide kind.
+        termSessionKey: null,
+        title: s.title,
+        pane: p,
+      ));
+      _activeKey[p] = _tabs.last.key;
+      if (p == _Pane.right) _rightCollapsed = false;
+    });
+    _persistTabs();
+  }
+
+  /// Mirror the daemon-wide shell list into tabs.
+  ///
+  /// Called when the controller reports a change (a shell was adopted after a
+  /// reconnect, or exited). New shells get a tab; a shell the daemon no longer
+  /// reports loses its tab. Only GLOBAL shells are touched (`termSessionKey ==
+  /// null`) — session shells are reconciled by their own session.
+  void _syncGlobalShellTabs() {
+    if (!mounted) return;
+    final live = {for (final s in _shells.shells) s.id: s};
+    var changed = false;
+    setState(() {
+      final stale = [
+        for (final t in _tabs)
+          if (t.isTerminal &&
+              t.termSessionKey == null &&
+              !live.containsKey(t.termId))
+            t,
+      ];
+      for (final t in stale) {
+        final i = _tabs.indexOf(t);
+        if (i < 0) continue;
+        _activeKey.removeWhere((_, k) => k == t.key);
+        _tabs.removeAt(i);
+        _normalizeActiveIndex(i);
+        changed = true;
+      }
+      for (final s in live.values) {
+        final exists = _tabs.any((t) =>
+            t.isTerminal && t.termSessionKey == null && t.termId == s.id);
+        if (exists) continue;
+        _tabs.add(_ShellTab.terminal(
+          client: _client!,
+          instanceUrl: _active?.url ?? '',
+          termId: s.id,
+          termSessionKey: null,
+          title: s.title,
+          pane: _Pane.right,
+        ));
+        changed = true;
+      }
+      // Titles follow a rename from wherever it happened.
+      for (final t in _tabs) {
+        if (t.isTerminal && t.termSessionKey == null) {
+          final s = live[t.termId];
+          if (s != null && s.title != t.title) {
+            t.title = s.title;
+            changed = true;
+          }
+        }
+      }
+    });
+    if (changed) _persistTabs();
   }
 
   /// Hide a pane. Never destroys: a terminal tab lives on in the sidebar and its

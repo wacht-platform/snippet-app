@@ -123,6 +123,26 @@ class DaemonClient {
     );
   }
 
+  /// Daemon-wide interactive shells: NOT tied to any session.
+  ///
+  /// A shell belongs to the machine, so switching or closing a session must not
+  /// kill it. `/attach` cannot serve this — it requires a live session — so the
+  /// daemon exposes the same `wire: term` frames over `/shells`.
+  WebSocketChannel attachShells() {
+    final base = Uri.parse(baseUrl);
+    final wsScheme = base.scheme == 'https' ? 'wss' : 'ws';
+    final uri = base.replace(
+      scheme: wsScheme,
+      path: '/shells',
+      queryParameters: {'token': token},
+    );
+    return ws_io.IOWebSocketChannel.connect(
+      uri,
+      connectTimeout: const Duration(seconds: 10),
+      pingInterval: const Duration(seconds: 20),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> notificationReplay({int since = 0}) async {
     final r =
         await http.get(_uri('/notifications/replay', {'since': '$since'}));
