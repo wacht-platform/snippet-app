@@ -52,9 +52,15 @@ const double kTitleBarHeight = 40.0;
 /// merges into the navigation band beneath it.
 const double kTitleTabHeight = 32.0;
 
-/// Horizontal space reserved at the left of the title bar for the native
-/// traffic lights: the trio itself plus breathing room before the nav arrows.
-const double kTrafficLightReserve = 84.0;
+/// Horizontal space reserved at the left of the title bar, before the tab
+/// strip.
+///
+/// Measured: the reference's tab strip begins at x128, with a 128px block to
+/// its left. For us that block holds the native traffic lights (which AppKit
+/// places at the window's left) plus the same breathing room — so the tabs land
+/// on the same axis as the reference rather than 44px to its left, which is what
+/// read as the bar being "compressed".
+const double kTrafficLightReserve = 128.0;
 
 const _windowStateChannel = MethodChannel('snippet/window_state');
 
