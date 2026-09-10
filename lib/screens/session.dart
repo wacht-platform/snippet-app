@@ -2981,11 +2981,14 @@ class _SessionScreenState extends State<SessionScreen>
               if (_isRecording || _recordingPath != null) _recordingPanel(),
               Container(
                 decoration: BoxDecoration(
+                  // The composer sits on the near-black canvas (#010101), so a
+                  // plain `bg` (#171717) fill is already a visible plane. The
+                  // reference draws no border here and uses an 8px radius —
+                  // the surface step is the whole separation.
                   color: AppColors.bg,
                   borderRadius: BorderRadius.circular(R.md),
-                  border: Border.all(color: AppColors.border),
                 ),
-                padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
+                padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,

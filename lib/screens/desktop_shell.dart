@@ -3281,7 +3281,7 @@ class _SidebarState extends State<_Sidebar> {
     return ShellNavRow(
       id: s.id,
       label: s.title.trim().isEmpty ? '(untitled)' : s.title,
-      icon: 'message-text',
+      icon: 'chat-thread',
       tone: ShellTone.chat,
       selected: selected,
       onTap: () => widget.onOpenSession(s.id, s.title, s.profile),

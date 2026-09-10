@@ -449,6 +449,11 @@ List<List<dynamic>> hugeIconFor(String name) {
     case 'message':
     case 'message-text':
       return HugeIcons.strokeRoundedBubbleChat;
+    case 'chat-thread':
+      // Sidebar chat rows. Deliberately not the bubble glyph the rest of the
+      // app uses, so a conversation row reads as a thread rather than a
+      // generic message.
+      return HugeIcons.strokeRoundedMessageMultiple02;
     case 'users':
       return HugeIcons.strokeRoundedUserGroup;
     case 'archive':

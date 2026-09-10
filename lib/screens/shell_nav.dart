@@ -19,10 +19,14 @@ import '../widgets.dart';
 /// Rows are colour-coded by kind. Colour here is *information* — which list a
 /// row belongs to — which is why the reference can afford several hues: they
 /// are rationed to iconography, never used as surfaces.
+///
+/// Chat rows in particular stay neutral: every conversation sharing one
+/// saturated accent turned the list into a wall of blue and buried the
+/// selection state.
 enum ShellTone { chat, ticket, artifact, review, agent, neutral }
 
 Color toneColor(ShellTone tone) => switch (tone) {
-      ShellTone.chat => AppColors.accent,
+      ShellTone.chat => AppColors.fg3,
       ShellTone.ticket => AppColors.run,
       ShellTone.review => AppColors.ok,
       ShellTone.artifact => AppColors.fg3,
@@ -35,15 +39,17 @@ const double kNavRowHeight = 26;
 const double kNavHeaderHeight = 32;
 const double kNavIcon = 16;
 
-/// Left padding inside a row. Top-level rows and section headers share it; a
-/// nested row adds [kNavNestStep] so the hierarchy reads without indentation
-/// guides.
-const double kNavIndent = 12;
-const double kNavNestStep = 24;
-const double kNavNestedIndent = kNavIndent + kNavNestStep;
-
 /// Outer padding on sidebar sections.
 const double kSidebarContentInset = 8;
+
+/// A row's box is inset one step further than a section header. That offset is
+/// what gives the list its hierarchy without drawing indentation guides, and it
+/// keeps the selected pill from colliding with the sidebar edge. Deeper nesting
+/// adds this same step again via a row's `indent`.
+const double kNavRowInset = kSidebarContentInset + 24;
+
+/// Padding inside a row, between its box edge and its content.
+const double kNavPadH = 12;
 
 /// UPPERCASE section header with a leading chevron and a trailing action
 /// cluster.
@@ -68,30 +74,35 @@ class ShellSectionHeader extends StatelessWidget {
     Theme.of(context); // Rebuild on theme change
     return SizedBox(
       height: kNavHeaderHeight,
-      child: Row(
-        children: [
-          Expanded(
-            child: InkWell(
-              onTap: onToggle,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: kNavIndent, vertical: 8),
-                child: Row(children: [
-                  AppIcon(expanded ? 'chevron-down' : 'chevron-right',
-                      size: 16, color: AppColors.fg4),
-                  const SizedBox(width: 8),
-                  Text(
-                    label.toUpperCase(),
-                    style: sans(11,
-                        weight: W.label, color: AppColors.fg4, spacing: 0.7),
-                  ),
-                ]),
+      child: Padding(
+        // Headers sit at the outer section inset; the rows beneath them are
+        // inset one step further, which is what creates the hierarchy.
+        padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: onToggle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: kNavPadH, vertical: 8),
+                  child: Row(children: [
+                    AppIcon(expanded ? 'chevron-down' : 'chevron-right',
+                        size: 16, color: AppColors.fg4),
+                    const SizedBox(width: 8),
+                    Text(
+                      label.toUpperCase(),
+                      style: sans(11,
+                          weight: W.label, color: AppColors.fg4, spacing: 0.7),
+                    ),
+                  ]),
+                ),
               ),
             ),
-          ),
-          ...actions,
-          const SizedBox(width: kNavIndent),
-        ],
+            ...actions,
+            const SizedBox(width: kNavPadH),
+          ],
+        ),
       ),
     );
   }
@@ -140,7 +151,7 @@ class ShellGroupHeader extends StatelessWidget {
     required this.tone,
     required this.expanded,
     required this.onToggle,
-    this.indent = kNavIndent,
+    this.indent = kNavRowInset,
     this.trailing,
   });
 
@@ -157,25 +168,28 @@ class ShellGroupHeader extends StatelessWidget {
     Theme.of(context);
     return SizedBox(
       height: kNavRowHeight,
-      child: InkWell(
-        onTap: onToggle,
-        borderRadius: BorderRadius.circular(R.md),
-        child: Padding(
-          padding: EdgeInsets.only(left: indent, right: kNavIndent),
-          child: Row(children: [
-            AppIcon(expanded ? 'chevron-down' : 'chevron-right',
-                size: 16, color: AppColors.fg4),
-            const SizedBox(width: 8),
-            AppIcon(icon, size: kNavIcon, color: toneColor(tone)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, weight: W.label, color: AppColors.fg2)),
-            ),
-            if (trailing != null) trailing!,
-          ]),
+      child: Padding(
+        padding: EdgeInsets.only(left: indent, right: kSidebarContentInset),
+        child: InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(R.md),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+            child: Row(children: [
+              AppIcon(expanded ? 'chevron-down' : 'chevron-right',
+                  size: 16, color: AppColors.fg4),
+              const SizedBox(width: 8),
+              AppIcon(icon, size: kNavIcon, color: toneColor(tone)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, weight: W.label, color: AppColors.fg2)),
+              ),
+              if (trailing != null) trailing!,
+            ]),
+          ),
         ),
       ),
     );
@@ -195,7 +209,7 @@ class ShellNavRow extends StatelessWidget {
     required this.icon,
     required this.tone,
     this.selected = false,
-    this.indent = kNavIndent,
+    this.indent = kNavRowInset,
     this.onTap,
     this.trailing,
   });
@@ -213,8 +227,11 @@ class ShellNavRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: kSidebarContentInset, vertical: 1),
+      // The row box is inset one step past the section header, so the list
+      // reads as nested under it and the selected pill never touches the
+      // sidebar edge.
+      padding: EdgeInsets.only(
+          left: indent, right: kSidebarContentInset, top: 1, bottom: 1),
       child: Material(
         color: selected ? AppColors.surface1 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.md),
@@ -223,7 +240,7 @@ class ShellNavRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(R.md),
           child: Container(
             height: kNavRowHeight,
-            padding: EdgeInsets.only(left: indent, right: kNavIndent),
+            padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
             child: Row(children: [
               AppIcon(
                 icon,
