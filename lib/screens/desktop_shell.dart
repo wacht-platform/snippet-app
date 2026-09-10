@@ -1240,70 +1240,48 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) {
     final tab = _activeTab;
+    Widget panel;
     // The rail switches which panel occupies the sidebar. Git stays a mode of
     // the sessions panel — you inspect a session's diff, not the agent list.
     if (_section == ShellSection.terminal) {
-      return TerminalsSidebarPanel(
+      panel = TerminalsSidebarPanel(
         workspacePath: _activeWorkspaceFolder() ?? '',
         onNewTerminal: _openActiveShell,
         onOpenTerminal: (idx) => _openActiveShell(),
       );
-    }
-    if (_section == ShellSection.agents) {
+    } else if (_section == ShellSection.agents) {
       final client = _client;
-      if (client == null) {
-        return Container(
-          color: AppColors.bg,
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-          child: Text('Add a machine to see its agents.',
-              style: sans(12.5, color: AppColors.fg4, height: 1.5)),
-        );
-      }
-      return AgentsSidebarPanel(
-        client: client,
-        // Detail opens in the right pane instead of a nested modal.
-        onOpenAgent: (a) => setState(() => _rightAgent = a),
-      );
-    }
-    if (_section == ShellSection.git) {
+      panel = client == null
+          ? _sidebarUnavailable('Add a machine to see its agents.')
+          : AgentsSidebarPanel(
+              client: client,
+              onOpenAgent: (a) => setState(() => _rightAgent = a),
+            );
+    } else if (_section == ShellSection.git) {
       final client = _client;
-      if (client == null) {
-        return Container(
-          color: AppColors.bg,
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-          child: Text('Add a machine to see Git diff.',
-              style: sans(12.5, color: AppColors.fg4, height: 1.5)),
-        );
-      }
-      return GitDiffSidebarPanel(
-        client: client,
-        workspacePath: _activeWorkspaceFolder() ?? '',
-        sessionId: _activeTab?.sessionId,
-      );
-    }
-    if (_section == ShellSection.files) {
+      panel = client == null
+          ? _sidebarUnavailable('Add a machine to see Git diff.')
+          : GitDiffSidebarPanel(
+              client: client,
+              workspacePath: _activeWorkspaceFolder() ?? '',
+              sessionId: _activeTab?.sessionId,
+            );
+    } else if (_section == ShellSection.files) {
       final client = _client;
-      if (client == null) {
-        return Container(
-          color: AppColors.bg,
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-          child: Text('Add a machine to browse its files.',
-              style: sans(12.5, color: AppColors.fg4, height: 1.5)),
-        );
-      }
-      return FileTreeSidebarPanel(
-        client: client,
-        workspacePath: _activeWorkspaceFolder() ?? '',
-        onOpenFile: (path, name) =>
-            _openFileTab(client, _active?.url ?? '', path, name),
-      );
-    }
-    if (_sidebarGit && tab != null && !tab.isFile) {
+      panel = client == null
+          ? _sidebarUnavailable('Add a machine to browse its files.')
+          : FileTreeSidebarPanel(
+              client: client,
+              workspacePath: _activeWorkspaceFolder() ?? '',
+              onOpenFile: (path, name) =>
+                  _openFileTab(client, _active?.url ?? '', path, name),
+            );
+    } else if (_sidebarGit && tab != null && !tab.isFile) {
       final path = tab.filePath;
       final slash = path?.lastIndexOf('/') ?? -1;
       final folder =
           path != null && slash > 0 ? path.substring(0, slash) : null;
-      return Container(
+      panel = Container(
         color: AppColors.surface1,
         child: GitScreen(
           client: tab.client,
@@ -1313,39 +1291,74 @@ class _DesktopShellState extends State<DesktopShell>
           onClose: () => setState(() => _sidebarGit = false),
         ),
       );
+    } else {
+      panel = _Sidebar(
+        topInset: topInset,
+        instances: _instances,
+        active: _active,
+        client: _client,
+        selectedSessionId: _sessionId,
+        sessions: _sessions,
+        sessionsLoading: _sessionsLoading,
+        sessionsError: _sessionsError,
+        onRefreshSessions: _loadSessions,
+        onSessionAction: _dispatchSessionAction,
+        onNewSession: () {
+          _newSessionFlow();
+          onAfterPick?.call();
+        },
+        onSelectInstance: _selectInstance,
+        onOpenMissionControl: () {
+          _openMissionControlTab();
+          onAfterPick?.call();
+        },
+        onOpenSession: (id, title, profile) {
+          _openSession(id, title, profile);
+          onAfterPick?.call();
+        },
+        onAddInstance: _addInstanceFlow,
+        onRenameInstance: _renameInstance,
+        onRemoveInstance: _removeInstance,
+        onSessionDeleted: _onSessionDeleted,
+        health: _health,
+        onRefreshHealth: _refreshHealth,
+      );
     }
-    return _Sidebar(
-      topInset: topInset,
-      instances: _instances,
-      active: _active,
-      client: _client,
-      selectedSessionId: _sessionId,
-      sessions: _sessions,
-      sessionsLoading: _sessionsLoading,
-      sessionsError: _sessionsError,
-      onRefreshSessions: _loadSessions,
-      onSessionAction: _dispatchSessionAction,
-      onNewSession: () {
-        _newSessionFlow();
-        onAfterPick?.call();
-      },
-      onSelectInstance: _selectInstance,
-      onOpenMissionControl: () {
-        _openMissionControlTab();
-        onAfterPick?.call();
-      },
-      onOpenSession: (id, title, profile) {
-        _openSession(id, title, profile);
-        onAfterPick?.call();
-      },
-      onAddInstance: _addInstanceFlow,
-      onRenameInstance: _renameInstance,
-      onRemoveInstance: _removeInstance,
-      onSessionDeleted: _onSessionDeleted,
-      health: _health,
-      onRefreshHealth: _refreshHealth,
-    );
+
+    if (kMobile) return panel;
+    return Column(children: [
+      Expanded(child: panel),
+      _sidebarSettingsRow(),
+    ]);
   }
+
+  Widget _sidebarUnavailable(String message) => Container(
+        color: AppColors.bg,
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+        child:
+            Text(message, style: sans(12.5, color: AppColors.fg4, height: 1.5)),
+      );
+
+  Widget _sidebarSettingsRow() => Material(
+        color: AppColors.bg,
+        child: InkWell(
+          onTap: _client == null ? null : _openShellSettings,
+          child: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(children: [
+              AppIcon('settings', size: 16, color: AppColors.fg3),
+              const SizedBox(width: 10),
+              Text('Settings', style: sans(12.5, color: AppColors.fg2)),
+              const Spacer(),
+              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+      );
 
   void _onSessionDeleted(String id) {
     if (isDedicatedMcSession(id)) return;
@@ -1380,10 +1393,7 @@ class _DesktopShellState extends State<DesktopShell>
               tooltip: 'Download',
               onTap: _downloadActiveFile),
           IconBtn('edit',
-              size: 26,
-              iconSize: 12,
-              tooltip: 'Edit',
-              onTap: _editActiveFile),
+              size: 26, iconSize: 12, tooltip: 'Edit', onTap: _editActiveFile),
         ] else if (controls != null) ...[
           if (running)
             Padding(
@@ -1405,7 +1415,7 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-/// Bottom status line, matching the reference: connection + workspace on the
+  /// Bottom status line, matching the reference: connection + workspace on the
   /// left, context remaining on the right.
   ///
   /// Deliberately NOT an action toolbar. The reference keeps this row to state;
@@ -1444,8 +1454,8 @@ class _DesktopShellState extends State<DesktopShell>
         StatusDot(status: connected ? 'online' : 'offline', size: 6),
         const SizedBox(width: 7),
         Text(connected ? 'Local Daemon' : 'Offline',
-            style: sans(11,
-                color: connected ? AppColors.fg3 : AppColors.danger)),
+            style:
+                sans(11, color: connected ? AppColors.fg3 : AppColors.danger)),
         const SizedBox(width: 9),
         Text('•', style: sans(11, color: AppColors.fg4)),
         const SizedBox(width: 9),
@@ -1466,8 +1476,7 @@ class _DesktopShellState extends State<DesktopShell>
         ),
         const Spacer(),
         if (state?.compacting == true) ...[
-          Text('Compacting',
-              style: sans(11, color: AppColors.accent)),
+          Text('Compacting', style: sans(11, color: AppColors.accent)),
           const SizedBox(width: 12),
         ] else if (state?.status == 'waiting_for_input') ...[
           Text('Needs input', style: sans(11, color: AppColors.accent)),
@@ -1536,8 +1545,7 @@ class _DesktopShellState extends State<DesktopShell>
                       const SizedBox(width: 6),
                     ],
                     // Start Page tab when tabs are few
-                    if (_tabs.isEmpty || _tabs.length < 3)
-                      _topStartPageTab(),
+                    if (_tabs.isEmpty || _tabs.length < 3) _topStartPageTab(),
                     const SizedBox(width: 6),
                     IconBtn(
                       'plus',
@@ -1549,7 +1557,9 @@ class _DesktopShellState extends State<DesktopShell>
                   ],
                 ),
               ),
-              // Far right: History, Notifications, Profile Avatar
+              // Far right: Machine switcher, History, Notifications, Profile Avatar
+              _topMachineSwitcher(),
+              const SizedBox(width: 8),
               IconBtn(
                 'history',
                 size: 26,
@@ -1577,6 +1587,136 @@ class _DesktopShellState extends State<DesktopShell>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  final _topMachineKey = GlobalKey();
+
+  Widget _topMachineSwitcher() {
+    final a = _active;
+    final ok = a == null ? null : _health[a.url];
+    return Material(
+      key: _topMachineKey,
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _instances.isEmpty ? _addInstanceFlow : _openTopMachines,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(R.sm),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                a?.label ?? 'No machine',
+                style: sans(12, weight: W.label, color: AppColors.fg1),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: ok == true ? AppColors.ok : AppColors.fg4,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 4),
+              AppIcon('chevron-down', size: 12, color: AppColors.fg3),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openTopMachines() async {
+    _refreshHealth();
+    final content = _MachineList(
+      instances: _instances,
+      active: _active,
+      health: _health,
+      onSelect: _selectInstance,
+      onAdd: _addInstanceFlow,
+      onManage: _manageMachine,
+    );
+    final box = _topMachineKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final origin = box.localToGlobal(Offset.zero);
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'machines',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 120),
+      pageBuilder: (_, __, ___) => Stack(children: [
+        Positioned(
+          right:
+              (MediaQuery.of(context).size.width - origin.dx - box.size.width)
+                  .clamp(10.0, 500.0),
+          top: origin.dy + box.size.height + 4,
+          width: 260,
+          child: Material(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+            elevation: 12,
+            shadowColor: Colors.black87,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(R.md),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: content,
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  void _manageMachine(Instance i) {
+    showAppSheet(
+      context,
+      title: i.label,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            leading: AppIcon('edit', size: 16, color: AppColors.fg2),
+            title: Text('Rename', style: sans(14, color: AppColors.fg1)),
+            onTap: () async {
+              Navigator.pop(context);
+              final name = await promptText(context,
+                  title: 'Rename machine',
+                  initial: i.label,
+                  hint: 'Machine name',
+                  saveLabel: 'Rename');
+              if (name != null && name.isNotEmpty) {
+                _renameInstance(i, name);
+              }
+            },
+          ),
+          ListTile(
+            leading: AppIcon('trash', size: 16, color: AppColors.danger),
+            title: Text('Remove', style: sans(14, color: AppColors.danger)),
+            onTap: () async {
+              Navigator.pop(context);
+              final ok = await confirmAction(
+                context,
+                title: 'Remove machine?',
+                body:
+                    '${i.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
+                confirmLabel: 'Remove',
+              );
+              if (ok) _removeInstance(i);
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1609,7 +1749,8 @@ class _DesktopShellState extends State<DesktopShell>
       builder: (_, close) => Scaffold(
         appBar: AppBar(title: const Text('Notifications')),
         body: Center(
-          child: Text('No new notifications', style: sans(13, color: AppColors.fg4)),
+          child: Text('No new notifications',
+              style: sans(13, color: AppColors.fg4)),
         ),
       ),
     );
@@ -1660,14 +1801,16 @@ class _DesktopShellState extends State<DesktopShell>
                 ),
               ),
             ),
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: () => _closeTab(i),
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: AppIcon('x', size: 10, color: AppColors.fg4),
+            if (!t.isMissionControl) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => _closeTab(i),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: AppIcon('x', size: 10, color: AppColors.fg4),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -1800,7 +1943,6 @@ class _DesktopShellState extends State<DesktopShell>
                       ShellRail(
                         section: _section,
                         onSelect: (s) => setState(() => _section = s),
-                        onTerminal: _openActiveShell,
                       ),
                       Expanded(child: _sidebar(topInset: false)),
                     ]),
@@ -1833,7 +1975,6 @@ class _DesktopShellState extends State<DesktopShell>
                     ShellRail(
                       section: _section,
                       onSelect: (s) => setState(() => _section = s),
-                      onTerminal: _openActiveShell,
                     ),
                     Expanded(child: _sidebar(topInset: true)),
                   ]),
@@ -1912,8 +2053,8 @@ class _DesktopShellState extends State<DesktopShell>
                           const SizedBox(width: 6),
                           Text(
                             t.title.isEmpty ? '(session)' : t.title,
-                            style: sans(12,
-                                weight: W.label, color: AppColors.fg1),
+                            style:
+                                sans(12, weight: W.label, color: AppColors.fg1),
                           ),
                         ],
                       ),
@@ -1966,9 +2107,7 @@ class _DesktopShellState extends State<DesktopShell>
     return const SizedBox.shrink();
   }
 
-  /// Open the session shell for the active tab. The rail exposes it as a
-  /// destination, but a terminal is not a sidebar panel — it belongs to the
-  /// session, so this forwards to that session's own handler.
+  /// Open the active session's terminal from the terminal sidebar panel.
   void _openActiveShell() {
     final key = _activeTab?.key;
     if (key == null) return;
@@ -2211,7 +2350,8 @@ class _DesktopShellState extends State<DesktopShell>
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(12.5, color: active ? AppColors.fg1 : AppColors.fg3),
+                style:
+                    sans(12.5, color: active ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
             if (!t.isMissionControl) ...[
@@ -2296,7 +2436,8 @@ class _DesktopShellState extends State<DesktopShell>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(R.xs),
                   ),
-                  child: AppIcon('x', size: 10, color: active ? AppColors.fg3 : AppColors.fg4),
+                  child: AppIcon('x',
+                      size: 10, color: active ? AppColors.fg3 : AppColors.fg4),
                 ),
               ),
             ],
@@ -2597,6 +2738,7 @@ class _SidebarState extends State<_Sidebar> {
   final _machineKey = GlobalKey(); // anchors the desktop machine popover
   bool _selecting = false;
   final Set<String> _selected = {};
+
   /// Folder groups the user has collapsed. Keyed by folder path; a group is
   /// expanded by default, so a fresh session list is fully visible.
   final Set<String> _collapsed = {};
@@ -2774,7 +2916,6 @@ class _SidebarState extends State<_Sidebar> {
           _mobileBottomBar(),
         ],
         if (!kMobile) ...[
-          _machineHeader(),
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
@@ -3129,7 +3270,6 @@ class _SidebarState extends State<_Sidebar> {
   Widget _sectionedSidebar() {
     final hasClient = widget.client != null;
     final all = _sessions ?? const <SessionInfo>[];
-    final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
     final list = all
         .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
         .toList();
@@ -3168,16 +3308,6 @@ class _SidebarState extends State<_Sidebar> {
           onToggle: () => setState(() => _toggleCollapsed(_chatsKey)),
           actions: [
             ShellSectionAction(
-              icon: 'sliders',
-              tooltip: 'Filter',
-              onTap: _showFilterSheet,
-            ),
-            ShellSectionAction(
-              icon: 'refresh',
-              tooltip: 'Refresh',
-              onTap: widget.onRefreshSessions,
-            ),
-            ShellSectionAction(
               icon: 'plus',
               tooltip: 'New chat',
               onTap: hasClient ? widget.onNewSession : null,
@@ -3189,8 +3319,7 @@ class _SidebarState extends State<_Sidebar> {
         else if (!hasClient)
           const _SidebarEmpty('Add a machine to begin.')
         else ...[
-          if (mc.isNotEmpty) _missionControlPin(mc.first),
-          if (list.isEmpty && mc.isEmpty)
+          if (list.isEmpty)
             const _SidebarEmpty('No chats yet.')
           else
             // Flat list of conversations directly under CHATS (no folder nesting)
@@ -3310,8 +3439,7 @@ class _SidebarState extends State<_Sidebar> {
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        sans(12, weight: W.label, color: AppColors.fg3)),
+                    style: sans(12, weight: W.label, color: AppColors.fg3)),
               ),
               // A collapsed group still tells you how much is inside it.
               if (collapsed && count > 0)
@@ -3338,8 +3466,7 @@ class _SidebarState extends State<_Sidebar> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.left,
-                  style:
-                      sans(11.5, weight: W.title, color: AppColors.fg3)),
+                  style: sans(11.5, weight: W.title, color: AppColors.fg3)),
             ),
             if (collapsed && count > 0)
               Text('$count', style: sans(10.5, color: AppColors.fg4)),

@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// What the shell's contextual sidebar is showing. The icon row picks one; the
-/// sidebar renders it. Modelled on the reference app, where the icon row
-/// switches the sidebar's *content* rather than the main pane — so the
-/// conversation you're reading never gets pushed aside.
+/// What the shell's contextual sidebar is showing. The compact icon rail picks
+/// one panel without taking focus away from the tab already open in the pane.
 enum ShellSection {
   sessions('Chat', 'message-text'),
   terminal('Terminal', 'terminal'),
@@ -19,41 +17,38 @@ enum ShellSection {
   final String icon;
 }
 
-/// Horizontal icon row pinned to the top of the sidebar column:
-/// - Clean icons with spacing
-/// - Active icon has a white horizontal underline bar right underneath it
+/// Compact, centered section picker pinned above the sidebar panel.
 class ShellRail extends StatelessWidget {
   const ShellRail({
     super.key,
     required this.section,
     required this.onSelect,
-    required this.onTerminal,
   });
 
   final ShellSection section;
   final ValueChanged<ShellSection> onSelect;
-  final VoidCallback onTerminal;
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
+    Theme.of(context);
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: 42,
       decoration: BoxDecoration(
         color: AppColors.bg,
         border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
       ),
+      alignment: Alignment.center,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          for (final s in ShellSection.values)
+          for (final s in ShellSection.values) ...[
             _RailButton(
               section: s,
               selected: s == section,
-              onTap: () =>
-                  s == ShellSection.terminal ? onTerminal() : onSelect(s),
+              onTap: () => onSelect(s),
             ),
+            if (s != ShellSection.values.last) const SizedBox(width: 6),
+          ],
         ],
       ),
     );
@@ -79,24 +74,24 @@ class _RailButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(R.xs),
           child: SizedBox(
-            width: 36,
-            height: 44,
+            width: 34,
+            height: 42,
             child: Stack(
               alignment: Alignment.center,
               children: [
                 AppIcon(
                   section.icon,
-                  size: 17,
+                  size: 16,
                   color: selected ? AppColors.fg1 : AppColors.fg4,
                 ),
                 if (selected)
                   Positioned(
                     bottom: 0,
                     child: Container(
-                      width: 24,
+                      width: 22,
                       height: 2,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.fg1,
                         borderRadius: BorderRadius.circular(1),
                       ),
                     ),
