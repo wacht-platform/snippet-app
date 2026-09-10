@@ -1365,10 +1365,10 @@ class _DesktopShellState extends State<DesktopShell>
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _activeIndex = i;
-      // Picking a conversation in the window bar brings it to the left pane, so
-      // clear any auxiliary tab sitting over it there. Without this, clicking a
-      // tab up top looks like it did nothing whenever a preview is docked left.
-      if (!_isAuxiliary(_tabs[i])) _activeKey.remove(_Pane.left);
+      // A window-bar click must bring the session forward in ITS pane. The pane
+      // renders from `_activeKey`, so without this the click would move the
+      // highlight while the pane kept showing whatever was docked over it.
+      _activeKey[_tabs[i].pane] = _tabs[i].key;
     });
     _persistTabs();
     _syncPage();
@@ -2642,12 +2642,10 @@ class _DesktopShellState extends State<DesktopShell>
   /// dragged onto the right-hand side, which is where the second pane appears)
   /// moves it into the secondary pane. Shared by the macOS and plain layouts so
   /// the two cannot diverge.
-  /// Tabs assigned to a pane, in strip order.
-  /// Auxiliary tabs are PANE content: a terminal, a previewed file, a diff.
+  /// Whether a tab is auxiliary (pane-docked content) rather than a workspace.
   ///
-  /// Everything else — a conversation, Mission Control — is a main workspace tab
-  /// and belongs in the window bar. Two strips, two jobs: the window bar names
-  /// WHAT you are working on; a pane strip names what is docked BESIDE it.
+  /// Used ONLY to decide what the window bar lists. A pane's own strip shows
+  /// every tab docked in it, of any kind — including the session itself.
   bool _isAuxiliary(_ShellTab t) => t.isTerminal || t.isFile || t.isDiff;
 
   /// Main workspace tabs, in strip order. Rendered in the window bar.
@@ -2656,21 +2654,27 @@ class _DesktopShellState extends State<DesktopShell>
           if (!_isAuxiliary(t)) t,
       ];
 
-  /// Auxiliary tabs docked in one pane. Rendered in that pane's own strip.
-  List<_ShellTab> _auxIn(_Pane p) => [
+  /// Every tab docked in a pane, whatever its kind, in strip order.
+  ///
+  /// The LEFT pane's first tab is the SESSION — a conversation is a tab like
+  /// anything else, so it can be closed or dragged to the other pane exactly
+  /// like a terminal. The window bar lists the workspaces (an outer view); a
+  /// pane strip lists what is docked in that pane (an inner view).
+  List<_ShellTab> _tabsIn(_Pane p) => [
         for (final t in _tabs)
-          if (_isAuxiliary(t) && t.pane == p) t,
+          if (t.pane == p) t,
       ];
 
-  /// The auxiliary tab selected in a pane, or null when the pane is showing its
-  /// default content (the conversation, or a readout) instead.
-  _ShellTab? _activeAux(_Pane p) {
+  /// The tab a pane is showing, or null when nothing is docked there.
+  _ShellTab? _activeIn(_Pane p) {
     final key = _activeKey[p];
-    if (key == null) return null;
-    for (final t in _tabs) {
-      if (t.key == key && t.pane == p && _isAuxiliary(t)) return t;
+    if (key != null) {
+      for (final t in _tabs) {
+        if (t.key == key && t.pane == p) return t;
+      }
     }
-    return null;
+    final list = _tabsIn(p);
+    return list.isEmpty ? null : list.first;
   }
 
   /// The pane holding the focused tab. Drives drops and inbound shares, so a
@@ -2741,8 +2745,8 @@ class _DesktopShellState extends State<DesktopShell>
   /// hold is a property of each tab (`_ShellTab.pane`), so a drop is all it
   /// takes to move one across.
   Widget _bodyRow({required bool topInset}) {
-    final rightTabs = _auxIn(_Pane.right);
-    final leftTabs = _auxIn(_Pane.left);
+    final rightTabs = _tabsIn(_Pane.right);
+    final leftTabs = _tabsIn(_Pane.left);
     // An explicit collapse wins over content, or the collapse control would
     // appear to do nothing while a terminal is docked.
     final showRight = !_rightCollapsed &&
@@ -2809,85 +2813,76 @@ class _DesktopShellState extends State<DesktopShell>
   /// the main workspace tabs live in the window bar. When no aux tab is selected
   /// the pane falls back to [fallback]: the conversation in the left pane, the
   /// readout in the right.
+  /// One pane: its own tab strip, then its content.
+  ///
+  /// Content STACKS every tab docked here with only the active one laid out.
+  /// That is a correctness requirement, not an optimisation: a `SessionScreen`
+  /// owns its ptys, so unmounting one on a tab switch would kill its terminals.
+  /// The same applies to a terminal tab, whose `TerminalHost` lives in the
+  /// session that owns it.
   Widget _paneView(_Pane p, {required bool roundRight}) {
-    final aux = _auxIn(p);
-    final activeAux = _activeAux(p);
+    final list = _tabsIn(p);
+    final active = _activeIn(p);
 
-    Widget fallback;
-    if (p == _Pane.right) {
-      if (_rightPanel != _RightPanel.none) {
-        fallback = _rightPanelView();
-      } else if (_rightAgent != null) {
-        fallback = CoordinationAgentDetail(
-          agent: _rightAgent!,
-          embedded: true,
-          onClose: _closeSplitPane,
-        );
-      } else {
-        fallback = _emptyPaneHint();
-      }
+    Widget content;
+    if (list.isEmpty) {
+      // Nothing docked: the pane's own default surface.
+      content = _paneFallback(p);
     } else {
-      fallback = _client == null ? _welcome() : _mainWorkspaceBody();
+      content = Stack(children: [
+        for (final t in list)
+          Offstage(
+            offstage: t != active,
+            child: _tabBody(
+              t,
+              // `primary` gates file drops and inbound shares. Several sessions
+              // can be mounted at once, so exactly one may claim them: the
+              // active tab, in the focused pane.
+              primary: t == active && _focusedPane == p,
+            ),
+          ),
+      ]);
     }
-
-    final content = activeAux != null
-        ? _tabBody(activeAux, primary: _focusedPane == p)
-        : fallback;
 
     return _paneSurface(
       roundRight: roundRight,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // The strip renders whenever this pane hosts aux tabs, so there is
-          // always a way back to the fallback and to the other docked tab.
-          if (aux.isNotEmpty) _paneStrip(p, aux),
+          // The strip renders whenever this pane hosts tabs, so there is always
+          // a way to switch between them and to re-open a collapsed one.
+          if (list.isNotEmpty) _paneStrip(p, list),
           Expanded(child: content),
         ],
       ),
     );
   }
 
-  /// The active main workspace tab's body — what the left pane shows when no
-  /// auxiliary tab is covering it.
-  /// The left pane's main content: **every** main workspace tab mounted, only
-  /// the active one laid out.
-  ///
-  /// Mounting all of them is not an optimisation — it is a correctness
-  /// requirement. A `SessionScreen` OWNS its ptys (it holds the socket and the
-  /// `TerminalHost`), so if switching sessions disposed the previous one, its
-  /// terminals would die and their tabs would be stranded pointing at a host
-  /// that no longer exists. That is exactly the "two terminals, switch session,
-  /// everything breaks" bug.
-  ///
-  /// `primary` is true only for the ACTIVE tab in the focused pane: it gates
-  /// file drops and inbound shares, and with several sessions mounted at once
-  /// more than one would otherwise ingest the same drop.
-  Widget _mainWorkspaceBody() {
-    final mains = _mainTabs;
-    if (mains.isEmpty) {
-      return _client == null ? _welcome() : _recentPlaceholder();
+  /// What a pane shows when nothing is docked in it.
+  Widget _paneFallback(_Pane p) {
+    if (p == _Pane.right) {
+      if (_rightPanel != _RightPanel.none) return _rightPanelView();
+      if (_rightAgent != null) {
+        return CoordinationAgentDetail(
+          agent: _rightAgent!,
+          embedded: true,
+          onClose: _closeSplitPane,
+        );
+      }
+      return _emptyPaneHint();
     }
-    final active = _activeTab;
-    return Stack(children: [
-      for (final t in mains)
-        Offstage(
-          offstage: t != active,
-          child: _tabBody(
-            t,
-            primary: t == active && _focusedPane == _Pane.left,
-          ),
-        ),
-    ]);
+    return _client == null ? _welcome() : _recentPlaceholder();
   }
 
+  /// The active main workspace tab's body — what the left pane shows when no
+  /// auxiliary tab is covering it.
   /// A pane's tab strip: its tabs, then the pane's own controls.
   ///
   /// Matches the reference: `tab … [|] ×`. Split opens a NEW terminal docked in
   /// THIS pane; close collapses the pane. Neither destroys a shell — a pty is
   /// created and destroyed only from the sidebar's terminal panel.
   Widget _paneStrip(_Pane p, List<_ShellTab> list) {
-    final active = _activeAux(p);
+    final active = _activeIn(p);
     return Container(
       height: kPaneHeaderHeight,
       padding: const EdgeInsets.only(left: 4),
