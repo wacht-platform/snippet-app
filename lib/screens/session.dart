@@ -3199,28 +3199,32 @@ class _SessionScreenState extends State<SessionScreen>
                             Builder(builder: (chipCtx) {
                               return Material(
                                 color: AppColors.surface2,
-                                // Measured: the reference's chips are 4px radius
-                                // with a much tighter inset than ours had.
+                                // Measured chip: 22px tall, 4px radius, 4px
+                                // horizontal inset, gaps 8/8. The DOM exposes
+                                // icon BOXES (14/16), not glyph sizes, so the
+                                // icon sizes below are approximations of that
+                                // box rather than an equality.
                                 borderRadius: BorderRadius.circular(R.xs),
                                 child: InkWell(
                                   onTap: () => _switchModel(chipCtx),
                                   borderRadius: BorderRadius.circular(R.xs),
-                                  child: Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(6, 3, 5, 3),
+                                  child: Container(
+                                    height: 22,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4),
                                     child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           AppIcon('sparkles',
-                                              size: 11, color: AppColors.fg2),
-                                          const SizedBox(width: 5),
+                                              size: 13, color: AppColors.fg2),
+                                          const SizedBox(width: 8),
                                           Text(_modelLabel ?? 'Auto',
                                               style: sans(11.5,
                                                   weight: W.label,
                                                   color: AppColors.fg2)),
-                                          const SizedBox(width: 3),
+                                          const SizedBox(width: 8),
                                           AppIcon('chevron-down',
-                                              size: 10, color: AppColors.fg4),
+                                              size: 12, color: AppColors.fg4),
                                         ]),
                                   ),
                                 ),
