@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../api.dart';
 import '../../models.dart';
+import '../../panel.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
+
+import 'coordination_agent_detail.dart';
 
 class CoordinationAgentDirectory extends StatefulWidget {
   const CoordinationAgentDirectory({super.key, required this.client});
@@ -107,6 +110,11 @@ class _AgentRow extends StatelessWidget {
         : '${agent.role} · ${agent.capabilities.take(3).join(' · ')}';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 8),
+      onTap: () => presentScreen(
+        context,
+        style: PanelStyle.drawer,
+        builder: (_, __) => CoordinationAgentDetail(agent: agent),
+      ),
       leading: CircleAvatar(
         backgroundColor: AppColors.accentBg,
         foregroundColor: AppColors.accent,
