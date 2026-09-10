@@ -32,13 +32,30 @@ bool get kMacOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 /// sites guard on this to fall back instead of throwing MissingPluginException.
 bool get kWindows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
-/// Height reserved for the macOS traffic lights and their surrounding title-bar
-/// breathing room.
+/// Height reserved for the macOS traffic lights when the sidebar has to clear
+/// the native window chrome (narrow layout, drawer).
 ///
-/// This must stay close to AppKit's own titlebar height (~28pt): the lights are
-/// positioned natively and are NOT moved by the app, so a painted bar any taller
-/// than the native band leaves them stranded near the top instead of centred.
+/// This is AppKit's own titlebar height: the lights are positioned natively and
+/// are NOT moved by the app.
 const double kMacTitlebar = 28.0;
+
+/// Height of the app's painted title bar.
+///
+/// Deliberately taller than [kMacTitlebar]. At 28px the bar crushed the tabs
+/// against the window edge; the reference measures its title bar at 40px with
+/// 32px tabs sitting on the bar's bottom edge. The extra height is painted by
+/// Flutter, and `MainFlutterWindow` nudges the traffic lights down so they stay
+/// centred in the taller band.
+const double kTitleBarHeight = 40.0;
+
+/// Tab height inside [kTitleBarHeight]. Bottom-aligned, so the active tab
+/// merges into the navigation band beneath it.
+const double kTitleTabHeight = 32.0;
+
+/// Horizontal space reserved at the left of the title bar for the native
+/// traffic lights: the trio itself plus breathing room before the nav arrows.
+const double kTrafficLightReserve = 84.0;
+
 const _windowStateChannel = MethodChannel('snippet/window_state');
 
 /// Whether macOS is in native full-screen mode. Other platforms never need a

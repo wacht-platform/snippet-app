@@ -1404,9 +1404,10 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _macWindowBarContent({required bool hasWindowControls}) {
     return SizedBox(
-      // Matches AppKit's own titlebar band so the native traffic lights sit
-      // vertically centred rather than stranded near the top.
-      height: kMacTitlebar,
+      // Taller than AppKit's own band. At 28px this crushed the tabs; the
+      // reference runs a 40px bar with 32px tabs on its bottom edge, and the
+      // native traffic lights are nudged down to stay centred.
+      height: kTitleBarHeight,
       child: ColoredBox(
         // The window/title bar sits on the floor surface (#0D0D0D) while the
         // body below is the lighter chrome (#171717) — that step is what makes
@@ -1414,8 +1415,8 @@ class _DesktopShellState extends State<DesktopShell>
         color: AppColors.floor,
         child: Padding(
           padding: EdgeInsets.only(
-            left: hasWindowControls ? 84 : 12,
-            right: 12,
+            left: hasWindowControls ? kTrafficLightReserve : 16,
+            right: 20,
           ),
           child: Row(
             // Children fill the bar's full height: the tab strip then sits on
@@ -1678,7 +1679,7 @@ class _DesktopShellState extends State<DesktopShell>
     _macSessionControls[key]?.performAction('checkpoints');
   }
 
-  /// Top-level workspace tab pill in the window bar.
+  /// Top-level workspace tab chip in the window bar.
   Widget _topWorkspaceTab(int i) {
     final t = _tabs[i];
     final isActive = i == _activeIndex;
@@ -1687,16 +1688,16 @@ class _DesktopShellState extends State<DesktopShell>
         ? 'layers'
         : t.isFile
             ? 'file'
-            : 'cube';
+            : 'chat-thread';
 
     return GestureDetector(
       onTap: () => _activateTab(i),
       child: Container(
-        // Shorter than the bar and flushed to its bottom edge: the active tab
-        // reads as a tab because it is filled with the band colour below and
-        // shows only rounded top corners.
-        height: 22,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        // Bottom-aligned in the taller bar: the active tab is filled with the
+        // band colour below and shows only rounded top corners, so it merges
+        // into the navigation band the way a browser tab merges into a page.
+        height: kTitleTabHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: isActive ? AppColors.bg : Colors.transparent,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
@@ -2574,6 +2575,136 @@ class _GoalPopoverState extends State<_GoalPopover> {
   }
 }
 
+/// Filter control for the CHATS list: a free-text query over titles and folders,
+/// plus the status shortcuts with live counts.
+///
+/// Shared by the desktop popover and the mobile sheet so the two can never
+/// drift apart. Follows the shell's language: 8px radii, a 28px row, one
+/// surface step between the panel and its inset field, and weight (not colour)
+/// marking the active row except for a single accent tick.
+class _ChatFilterPanel extends StatefulWidget {
+  const _ChatFilterPanel({
+    required this.query,
+    required this.status,
+    required this.counts,
+    required this.onQuery,
+    required this.onStatus,
+  });
+
+  final String query;
+  final String status;
+  final Map<String, int> counts;
+  final ValueChanged<String> onQuery;
+  final ValueChanged<String> onStatus;
+
+  @override
+  State<_ChatFilterPanel> createState() => _ChatFilterPanelState();
+}
+
+class _ChatFilterPanelState extends State<_ChatFilterPanel> {
+  late final TextEditingController _ctl =
+      TextEditingController(text: widget.query);
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Inset field: one step darker than the panel it sits on, so the
+          // input reads as carved into the popover rather than drawn on it.
+          Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: AppColors.bg,
+              borderRadius: BorderRadius.circular(R.md),
+            ),
+            child: Row(children: [
+              AppIcon('search', size: 14, color: AppColors.fg4),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _ctl,
+                  autofocus: true,
+                  onChanged: (v) {
+                    widget.onQuery(v);
+                    setState(() {}); // reveal/hide the clear affordance
+                  },
+                  cursorColor: AppColors.fg1,
+                  style: sans(13, color: AppColors.fg1),
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    border: InputBorder.none,
+                    hintText: 'Filter chats',
+                    hintStyle: sans(13, color: AppColors.fg4),
+                  ),
+                ),
+              ),
+              if (_ctl.text.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    _ctl.clear();
+                    widget.onQuery('');
+                    setState(() {});
+                  },
+                  child: AppIcon('x', size: 12, color: AppColors.fg4),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          for (final (val, label) in const [
+            ('all', 'All'),
+            ('input', 'Needs input'),
+            ('running', 'Running'),
+            ('done', 'Done'),
+          ])
+            _statusRow(val, label),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusRow(String val, String label) {
+    final selected = widget.status == val;
+    return Material(
+      color: selected ? AppColors.surface1 : Colors.transparent,
+      borderRadius: BorderRadius.circular(R.md),
+      child: InkWell(
+        onTap: () => widget.onStatus(val),
+        borderRadius: BorderRadius.circular(R.md),
+        child: Container(
+          height: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(children: [
+            Expanded(
+              child: Text(label,
+                  style: sans(13,
+                      weight: selected ? W.label : W.body,
+                      color: selected ? AppColors.fg1 : AppColors.fg2)),
+            ),
+            Text('${widget.counts[val] ?? 0}',
+                style: sans(12, color: AppColors.fg4)),
+            if (selected) ...[
+              const SizedBox(width: 6),
+              AppIcon('check', size: 14, color: AppColors.accent),
+            ],
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
 /// Keeps a swiped-away tab mounted so its WebSocket attach and scroll position
 /// survive switching between tabs.
 class _KeepAlive extends StatefulWidget {
@@ -2667,6 +2798,10 @@ class _SidebarState extends State<_Sidebar> {
   // The session list now lives in the shell (passed via widget.sessions); the
   // sidebar is presentational, so opening the drawer doesn't refetch.
   String _filter = 'all'; // all | input | running | done
+  /// Free-text filter over a session's title and folder, set from the CHATS
+  /// header popover. Empty means "no text filter".
+  String _filterQuery = '';
+  final _filterKey = GlobalKey(); // anchors the desktop filter popover
   final _machineKey = GlobalKey(); // anchors the desktop machine popover
   bool _selecting = false;
   final Set<String> _selected = {};
@@ -2697,50 +2832,72 @@ class _SidebarState extends State<_Sidebar> {
   List<SessionInfo>? get _sessions => widget.sessions;
   bool get _loading => widget.sessionsLoading;
 
-  void _showFilterSheet() {
-    final counts = <String, int>{
-      'all': widget.sessions?.length ?? 0,
-      'input': widget.sessions
-              ?.where((s) => s.status == 'waiting_for_input')
-              .length ??
-          0,
-      'running':
-          widget.sessions?.where((s) => s.status == 'running').length ?? 0,
-      'done': widget.sessions
-              ?.where((s) =>
-                  s.status != 'waiting_for_input' && s.status != 'running')
-              .length ??
-          0,
+  /// Status counts for the filter panel, computed from the *unfiltered* list so
+  /// the numbers stay meaningful while a query narrows the visible rows.
+  Map<String, int> _filterCounts() {
+    final all = widget.sessions ?? const <SessionInfo>[];
+    int n(bool Function(SessionInfo) f) => all.where(f).length;
+    return {
+      'all': all.length,
+      'input': n((s) => s.status == 'waiting_for_input'),
+      'running': n((s) => s.status == 'running'),
+      'done':
+          n((s) => s.status != 'waiting_for_input' && s.status != 'running'),
     };
+  }
+
+  /// Desktop filter control: an anchored popover beneath the CHATS filter icon,
+  /// so the list stays visible while the query is typed.
+  Future<void> _openFilterPopover() async {
+    final box = _filterKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final origin = box.localToGlobal(Offset.zero);
+    final screen = MediaQuery.of(context).size;
+    const width = 264.0;
+    // Right-align to the icon, then keep the panel fully on screen.
+    final maxLeft = (screen.width - width - 8).clamp(8.0, screen.width);
+    final left = (origin.dx + box.size.width - width).clamp(8.0, maxLeft);
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: true, // click-away and Esc dismiss
+      barrierLabel: 'filter',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 120),
+      pageBuilder: (_, __, ___) => Stack(children: [
+        Positioned(
+          left: left,
+          top: origin.dy + box.size.height + 6,
+          width: width,
+          child: Material(
+            // Popover surface; separation comes from the surface step and the
+            // shadow, not a drawn border.
+            color: AppColors.surface3,
+            borderRadius: BorderRadius.circular(R.md),
+            elevation: 12,
+            shadowColor: Colors.black87,
+            child: _ChatFilterPanel(
+              query: _filterQuery,
+              status: _filter,
+              counts: _filterCounts(),
+              onQuery: (q) => setState(() => _filterQuery = q),
+              onStatus: (s) => setState(() => _filter = s),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  void _showFilterSheet() {
     showAppSheet(
       context,
       title: 'Filter conversations',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final (val, label) in [
-            ('all', 'All'),
-            ('input', 'Needs input'),
-            ('running', 'Running'),
-            ('done', 'Done')
-          ]) ...[
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              title: Text(label,
-                  style: sans(16,
-                      color:
-                          _filter == val ? AppColors.accent : AppColors.fg1)),
-              trailing: Text('${counts[val] ?? 0}',
-                  style: sans(14, color: AppColors.fg3)),
-              onTap: () {
-                setState(() => _filter = val);
-                Navigator.pop(context);
-              },
-            ),
-            if (val != 'done') Divider(height: 1, color: AppColors.border),
-          ],
-        ],
+      child: _ChatFilterPanel(
+        query: _filterQuery,
+        status: _filter,
+        counts: _filterCounts(),
+        onQuery: (q) => setState(() => _filterQuery = q),
+        onStatus: (s) => setState(() => _filter = s),
       ),
     );
   }
@@ -3080,6 +3237,15 @@ class _SidebarState extends State<_Sidebar> {
         _ => true,
       };
 
+  /// Free-text match against a session's title and folder. An empty query
+  /// matches everything, so the text filter is inert until the user types.
+  bool _matchesQuery(SessionInfo s) {
+    final q = _filterQuery.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return s.title.toLowerCase().contains(q) ||
+        s.folder.toLowerCase().contains(q);
+  }
+
   Widget _sessionList() {
     if (_loading && _sessions == null) {
       return Center(
@@ -3126,7 +3292,10 @@ class _SidebarState extends State<_Sidebar> {
     }
     final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
     final list = all
-        .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
+        .where((s) =>
+            !isDedicatedMcSession(s.id) &&
+            _statusMatch(_filter, s) &&
+            _matchesQuery(s))
         .toList();
     final children = <Widget>[];
     if (!kMobile && mc.isNotEmpty) {
@@ -3204,7 +3373,10 @@ class _SidebarState extends State<_Sidebar> {
     final hasClient = widget.client != null;
     final all = _sessions ?? const <SessionInfo>[];
     final list = all
-        .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
+        .where((s) =>
+            !isDedicatedMcSession(s.id) &&
+            _statusMatch(_filter, s) &&
+            _matchesQuery(s))
         .toList();
 
     // Newest folder first, then newest session within it.
@@ -3243,6 +3415,15 @@ class _SidebarState extends State<_Sidebar> {
           onToggle: () => setState(() => _toggleCollapsed(_chatsKey)),
           actions: [
             ShellSectionAction(
+              key: _filterKey,
+              icon: 'sliders',
+              tooltip: 'Filter chats',
+              // Accented while a text filter is active, so a filtered list is
+              // never mistaken for an empty one.
+              active: _filterQuery.trim().isNotEmpty,
+              onTap: hasClient ? _openFilterPopover : null,
+            ),
+            ShellSectionAction(
               icon: 'plus',
               tooltip: 'New chat',
               onTap: hasClient ? widget.onNewSession : null,
@@ -3253,13 +3434,15 @@ class _SidebarState extends State<_Sidebar> {
           const SizedBox.shrink()
         else if (!hasClient)
           const _SidebarEmpty('Add a machine to begin.')
-        else ...[
-          if (list.isEmpty)
-            const _SidebarEmpty('No chats yet.')
-          else
-            // Flat list of conversations directly under CHATS (no folder nesting)
-            for (final s in list) _sidebarSessionRow(s),
-        ],
+        else if (list.isEmpty)
+          // Distinguish "no conversations" from "none match the filter": saying
+          // "No chats yet" over a filtered list reads as data loss.
+          _SidebarEmpty(_filterQuery.trim().isNotEmpty || _filter != 'all'
+              ? 'No chats match the filter.'
+              : 'No chats yet.')
+        else
+          // Flat list of conversations directly under CHATS (no folder nesting)
+          for (final s in list) _sidebarSessionRow(s),
       ],
     );
   }

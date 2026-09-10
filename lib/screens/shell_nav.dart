@@ -115,11 +115,17 @@ class ShellSectionAction extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     this.onTap,
+    this.active = false,
   });
 
   final String icon;
   final String tooltip;
   final VoidCallback? onTap;
+
+  /// Tints the glyph with the accent. Used to show that a toggle in the cluster
+  /// is currently on — e.g. a text filter is active — so the state is visible
+  /// without opening the control.
+  final bool active;
 
   @override
   Widget build(BuildContext context) => Tooltip(
@@ -135,7 +141,9 @@ class ShellSectionAction extends StatelessWidget {
             child: Center(
               child: AppIcon(icon,
                   size: 16,
-                  color: onTap == null ? AppColors.fg4 : AppColors.fg3),
+                  color: active
+                      ? AppColors.accent
+                      : (onTap == null ? AppColors.fg4 : AppColors.fg3)),
             ),
           ),
         ),
