@@ -356,37 +356,45 @@ class PaneTabStrip extends StatelessWidget {
       cursor: onSelect == null ? MouseCursor.defer : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onSelect == null ? null : () => onSelect!(i),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              height: _indicator,
-              decoration: BoxDecoration(
-                color: active ? AppColors.fg1 : Colors.transparent,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            Container(
-              height: kPaneTabHeight,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(children: [
-                AppIcon(t.icon,
-                    size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    t.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(kPaneTabText,
-                        weight: active ? W.label : W.body,
-                        color: active ? AppColors.fg1 : AppColors.fg3),
-                  ),
+        // IntrinsicWidth bounds the column to its widest child (the label row),
+        // so `stretch` can mark the indicator across exactly that width.
+        //
+        // Without it the Column sits in a Row — unbounded on the cross axis —
+        // and `stretch` resolves to w=Infinity, which throws during layout.
+        // `flutter analyze` cannot see this: it is a runtime constraint error.
+        child: IntrinsicWidth(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                height: _indicator,
+                decoration: BoxDecoration(
+                  color: active ? AppColors.fg1 : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
                 ),
-              ]),
-            ),
-          ],
+              ),
+              Container(
+                height: kPaneTabHeight,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(children: [
+                  AppIcon(t.icon,
+                      size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      t.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(kPaneTabText,
+                          weight: active ? W.label : W.body,
+                          color: active ? AppColors.fg1 : AppColors.fg3),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+          ),
         ),
       ),
     );
