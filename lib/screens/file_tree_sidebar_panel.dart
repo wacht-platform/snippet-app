@@ -6,9 +6,12 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 
-/// Nesting step for a tree level. The reference indents child rows by exactly
-/// this much, which is what makes the tree read as a tree without guide lines.
-const double kTreeIndentStep = 20;
+/// Nesting step for a tree level.
+///
+/// Measured: a top-level row box sits at x8 and its child at x29 — 21px, not the
+/// 20px a round number suggests. That 1px compounds on deep trees, so it is kept
+/// exact.
+const double kTreeIndentStep = 21;
 
 /// A recursively browsable workspace tree. Each directory is fetched only when
 /// first opened, then retained while the panel stays mounted.
