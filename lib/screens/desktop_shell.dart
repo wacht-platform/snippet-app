@@ -2480,6 +2480,9 @@ class _SidebarState extends State<_Sidebar> {
   final _machineKey = GlobalKey(); // anchors the desktop machine popover
   bool _selecting = false;
   final Set<String> _selected = {};
+  /// Folder groups the user has collapsed. Keyed by folder path; a group is
+  /// expanded by default, so a fresh session list is fully visible.
+  final Set<String> _collapsed = {};
   String? _renamingId;
   String? _hoveredId;
   final TextEditingController _renameCtl = TextEditingController();
@@ -2974,8 +2977,11 @@ class _SidebarState extends State<_Sidebar> {
     var firstFolder = true;
     for (final key in order) {
       final sessions = groups[key]!;
-      children.add(_folderHeader(key, first: firstFolder && mc.isEmpty));
+      children.add(_folderHeader(key,
+          first: firstFolder && mc.isEmpty, count: sessions.length));
       firstFolder = false;
+      // A collapsed group keeps its header (with its count) but hides its rows.
+      if (_collapsed.contains(key)) continue;
       for (var i = 0; i < sessions.length; i++) {
         if (kMobile) {
           children.add(Padding(
@@ -3051,37 +3057,72 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  Widget _folderHeader(String folder, {required bool first}) {
+  Widget _folderHeader(String folder, {required bool first, int count = 0}) {
     final name =
         folder.isEmpty ? 'No folder' : lastPathSegment(folder, ifEmpty: folder);
+    final collapsed = _collapsed.contains(folder);
+    // Collapsing is a local view preference, not state worth persisting — a
+    // fresh session list should show everything.
+    void toggle() => setState(() {
+          if (collapsed) {
+            _collapsed.remove(folder);
+          } else {
+            _collapsed.add(folder);
+          }
+        });
+    final chevron = collapsed ? 'chevron-right' : 'chevron-down';
     if (kMobile) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 8),
-        child: Row(children: [
-          AppIcon('folder', size: 13, color: AppColors.fg4),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(12, weight: FontWeight.w500, color: AppColors.fg3)),
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: toggle,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 8),
+            child: Row(children: [
+              AppIcon(chevron, size: 14, color: AppColors.fg4),
+              const SizedBox(width: 4),
+              AppIcon('folder', size: 13, color: AppColors.fg4),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style:
+                        sans(12, weight: W.label, color: AppColors.fg3)),
+              ),
+              // A collapsed group still tells you how much is inside it.
+              if (collapsed && count > 0)
+                Text('$count', style: sans(11, color: AppColors.fg4)),
+            ]),
           ),
-        ]),
+        ),
       );
     }
-    return Padding(
-      padding: EdgeInsets.fromLTRB(6, first ? 10 : 16, 6, 4),
-      child: Row(children: [
-        AppIcon('folder', size: 13, color: AppColors.fg4),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.left,
-              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: toggle,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(4, first ? 10 : 16, 6, 4),
+          child: Row(children: [
+            AppIcon(chevron, size: 13, color: AppColors.fg4),
+            const SizedBox(width: 3),
+            AppIcon('folder', size: 13, color: AppColors.fg4),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.left,
+                  style:
+                      sans(11.5, weight: W.title, color: AppColors.fg3)),
+            ),
+            if (collapsed && count > 0)
+              Text('$count', style: sans(10.5, color: AppColors.fg4)),
+          ]),
         ),
-      ]),
+      ),
     );
   }
 
