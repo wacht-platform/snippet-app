@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../api.dart';
 import '../../models.dart';
 import '../../coordination/coordination_thread_state.dart';
+import '../../panel.dart';
+
+import 'coordination_handoffs_screen.dart';
 
 class CoordinationBoardScreen extends StatefulWidget {
   const CoordinationBoardScreen(
@@ -61,7 +64,21 @@ class _CoordinationBoardScreenState extends State<CoordinationBoardScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Coordination board')),
+        appBar: AppBar(
+          title: const Text('Coordination board'),
+          actions: [
+            IconButton(
+              tooltip: 'Handoffs',
+              icon: const Icon(Icons.swap_horiz),
+              onPressed: () => presentScreen(
+                context,
+                style: PanelStyle.drawer,
+                builder: (_, __) =>
+                    CoordinationHandoffsScreen(client: widget.client),
+              ),
+            ),
+          ],
+        ),
         body: Column(children: [
           Expanded(
               child: RefreshIndicator(

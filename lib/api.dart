@@ -861,6 +861,16 @@ class DaemonClient {
         jsonDecode(r.body) as Map<String, dynamic>);
   }
 
+  /// GET /coordination/handoffs — unacknowledged handoffs awaiting a successor.
+  Future<List<CoordinationHandoff>> coordinationHandoffs() async {
+    final r = await http.get(_uri('/coordination/handoffs'));
+    if (r.statusCode != 200) throw _err('list coordination handoffs', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => CoordinationHandoff.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// POST /coordination/handoffs/{handoffId}/acknowledge.
   Future<void> acknowledgeCoordinationHandoff(String handoffId) async {
     final r = await http.post(

@@ -1023,6 +1023,46 @@ class RecurringJob {
   }
 }
 
+/// A handoff transferring work from one assignment to a successor. A successor
+/// cannot take the turn until it acknowledges the exact record.
+class CoordinationHandoff {
+  final String id;
+  final String goalId;
+  final String sessionId;
+  final String sourceAssignmentId;
+  final String targetAssignmentId;
+  final String contextMode;
+  final String objective;
+  final String definitionOfDone;
+  final String scope;
+  final String completedSummary;
+  final String nextAction;
+  final List<String> blockers;
+  final List<String> risks;
+  final String contentHash;
+  final String createdAt;
+
+  CoordinationHandoff.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        goalId = j['goal_id'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '',
+        sourceAssignmentId = j['source_assignment_id'] as String? ?? '',
+        targetAssignmentId = j['target_assignment_id'] as String? ?? '',
+        contextMode = j['context_mode'] as String? ?? '',
+        objective = j['objective'] as String? ?? '',
+        definitionOfDone = j['definition_of_done'] as String? ?? '',
+        scope = j['scope'] as String? ?? '',
+        completedSummary = j['completed_summary'] as String? ?? '',
+        nextAction = j['next_action'] as String? ?? '',
+        blockers = ((j['blockers'] as List?) ?? const [])
+            .whereType<String>()
+            .toList(),
+        risks =
+            ((j['risks'] as List?) ?? const []).whereType<String>().toList(),
+        contentHash = j['content_hash'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '';
+}
+
 /// Global notifier bumped whenever model profiles are added, updated, or deleted
 /// so open session views, composers, and settings can refresh their pickers live.
 final ValueNotifier<int> modelsRevision = ValueNotifier<int>(0);
