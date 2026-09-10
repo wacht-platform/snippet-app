@@ -1927,11 +1927,11 @@ class _DesktopShellState extends State<DesktopShell>
               _macWindowBar(),
               Expanded(
                 child: Row(children: [
-                  // Sidebar is a vertical icon rail beside its full-width
-                  // contextual panel, matching the dense desktop reference.
+                  // Sidebar nested navigation owns a compact horizontal row;
+                  // every active panel gets the full sidebar width underneath.
                   SizedBox(
                     width: 300,
-                    child: Row(children: [
+                    child: Column(children: [
                       ShellRail(
                         section: _section,
                         onSelect: (s) => setState(() => _section = s),
@@ -1963,7 +1963,7 @@ class _DesktopShellState extends State<DesktopShell>
               child: Row(children: [
                 SizedBox(
                   width: 300,
-                  child: Row(children: [
+                  child: Column(children: [
                     ShellRail(
                       section: _section,
                       onSelect: (s) => setState(() => _section = s),

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// The sidebar's five work areas. The rail is deliberately a narrow vertical
-/// strip, leaving the panel beside it free for dense, full-width content.
+/// The five sidebar work areas. This is a compact horizontal strip that owns
+/// its own row; the active panel fills the complete sidebar underneath it.
 enum ShellSection {
   sessions('Chat', 'message-text'),
   terminal('Terminal', 'terminal'),
@@ -17,8 +17,8 @@ enum ShellSection {
   final String icon;
 }
 
-/// Vertical rail matching the desktop shell: a slim, centered stack of small
-/// glyphs with a quiet active capsule rather than an oversized tab bar.
+/// Narrow horizontal section strip at the top of the sidebar. Glyphs are kept
+/// deliberately small so this reads as nested navigation, not a second toolbar.
 class ShellRail extends StatelessWidget {
   const ShellRail({
     super.key,
@@ -33,22 +33,24 @@ class ShellRail extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Container(
-      width: 44,
+      height: 34,
       decoration: BoxDecoration(
         color: AppColors.bg,
-        border: Border(right: BorderSide(color: AppColors.border, width: 0.5)),
+        border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
       ),
-      child: Column(children: [
-        const SizedBox(height: 10),
-        for (final item in ShellSection.values) ...[
-          _RailButton(
-            section: item,
-            selected: item == section,
-            onTap: () => onSelect(item),
-          ),
-          const SizedBox(height: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (final item in ShellSection.values) ...[
+            _RailButton(
+              section: item,
+              selected: item == section,
+              onTap: () => onSelect(item),
+            ),
+            if (item != ShellSection.values.last) const SizedBox(width: 8),
+          ],
         ],
-      ]),
+      ),
     );
   }
 }
@@ -70,23 +72,21 @@ class _RailButton extends StatelessWidget {
         waitDuration: const Duration(milliseconds: 400),
         child: Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(R.xs),
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(R.xs),
             child: Container(
-              width: 32,
-              height: 32,
-              margin: const EdgeInsets.symmetric(horizontal: 6),
+              width: 24,
+              height: 26,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: selected ? AppColors.surface2 : Colors.transparent,
-                borderRadius: BorderRadius.circular(R.sm),
-                border: selected ? Border.all(color: AppColors.border) : null,
+                borderRadius: BorderRadius.circular(R.xs),
               ),
               child: AppIcon(
                 section.icon,
-                size: 16,
+                size: 13,
                 color: selected ? AppColors.fg1 : AppColors.fg4,
               ),
             ),
