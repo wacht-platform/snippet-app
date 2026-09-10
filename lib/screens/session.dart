@@ -43,6 +43,7 @@ import 'mission_control/mission_control_state.dart'
         BoardMessage,
         MissionEnvelope;
 import 'mission_control/coordination_hub.dart';
+import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_session_agents.dart';
 import 'mission_control/widgets/mission_control_tasks.dart';
 
@@ -2776,6 +2777,27 @@ class _SessionScreenState extends State<SessionScreen>
         return;
       case 'usage':
         _showUsage();
+        return;
+      // ---- Mission Control only: the actions the LHS panels do not cover ----
+      case 'tasks':
+        _showTasks();
+        return;
+      case 'agents':
+        presentScreen(context,
+            style: PanelStyle.drawer,
+            builder: (_, close) => SessionAgentsPanel(
+                client: widget.client, sessionId: widget.sessionId));
+        return;
+      case 'coordination':
+        presentScreen(context,
+            style: PanelStyle.drawer,
+            builder: (_, close) => CoordinationHub(client: widget.client));
+        return;
+      case 'coordination_activity':
+        presentScreen(context,
+            style: PanelStyle.drawer,
+            builder: (_, close) =>
+                CoordinationActivityScreen(client: widget.client));
         return;
     }
   }

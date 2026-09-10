@@ -133,22 +133,6 @@ class _MacSessionControls {
   const _MacSessionControls(this.stop, this.performAction);
 }
 
-/// Session-scoped tools that open BESIDE the chat in the right pane.
-///
-/// Previously these were buttons in the bottom status strip. They are
-/// represented here rather than as modals so the transcript stays readable
-/// while you inspect git, files, or processes.
-enum _RightTool {
-  none('', ''),
-  git('Git', 'git-branch'),
-  files('Files', 'folder'),
-  processes('Processes', 'list');
-
-  const _RightTool(this.label, this.icon);
-  final String label;
-  final String icon;
-}
-
 class _DesktopShellState extends State<DesktopShell>
     with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -207,86 +191,131 @@ class _DesktopShellState extends State<DesktopShell>
   /// present would cost space even when nothing needs inspecting.
   CoordinationAgent? _rightAgent;
 
-  /// Which secondary tool occupies the right pane. `none` hides it; the chat
-  /// then owns the full width.
+  /// A tab dragged out of the strip into the secondary pane. Null = a single
+  /// pane, which is the default.
   ///
-  /// These are the session-scoped tools that used to live as buttons in the
-  /// removed bottom strip. They open beside the chat instead of as modals, so
-  /// the transcript stays visible while you inspect git, files, or processes.
-  _RightTool _rightTool = _RightTool.none;
+  /// There is deliberately no split *toggle*: splitting is a consequence of
+  /// moving something there, not a mode you switch into. Dragging a tab out
+  /// creates the second pane; closing the pane returns to one.
+  _ShellTab? _splitTab;
 
-  /// Whether the split pane is toggled open via the [|] header button.
-  bool _isSplit = false;
+  /// Is the secondary pane showing anything at all?
+  bool get _rightPaneOpen => _rightAgent != null || _splitTab != null;
 
-  /// Is the right pane showing anything at all?
-  bool get _rightPaneOpen =>
-      _rightAgent != null || _rightTool != _RightTool.none;
-
-  /// Open a tool in the right pane, or close it if it is already showing.
-  void _toggleRightTool(_RightTool tool) {
-    final wasOpen = _rightTool == tool && _rightAgent == null;
+  /// Move a tab into the secondary pane (called when it is dropped there).
+  void _splitWith(_ShellTab tab) {
+    if (tab.key == _activeTab?.key && _tabs.length == 1) return;
     setState(() {
       _rightAgent = null;
-      _isSplit = false;
-      _rightTool = wasOpen ? _RightTool.none : tool;
+      _splitTab = tab;
     });
   }
 
-  void _toggleSplitPane() {
+  void _closeSplitPane() {
     setState(() {
-      if (_rightAgent != null) {
-        _rightAgent = null;
-        _isSplit = false;
-      } else if (_rightTool != _RightTool.none) {
-        // A tool owns the pane, so the split button replaces it rather than
-        // toggling something invisible underneath.
-        _rightTool = _RightTool.none;
-        _isSplit = true;
-      } else {
-        _isSplit = !_isSplit;
-      }
+      _splitTab = null;
+      _rightAgent = null;
     });
   }
 
-  /// Tool buttons for the far right of the navigation band.
+  /// The overflow menu for the far right of the navigation band.
   ///
-  /// These are the session-scoped actions that used to occupy the bottom status
-  /// strip. Each opens its target in the right pane — or toggles the terminal
-  /// split — so the transcript stays visible beside it, which the old strip
-  /// could not do. Everything else from that strip remains reachable from the
-  /// command palette and the session menu (⌘K).
+  /// This is the replacement for the removed bottom status strip. It carries
+  /// only what the LHS panels do NOT already provide: Git, Files and Terminals
+  /// live in those panels, so repeating them here would be two doors to one
+  /// room. Grouped by section, matching the session menu.
   List<Widget> _railTools() {
-    final client = _client;
     final hasSession = _activeTab != null;
-    Widget tool(_RightTool t) => IconBtn(
-          t.icon,
-          size: 28,
-          iconSize: 15,
-          active: _rightTool == t && _rightAgent == null,
-          tooltip: t.label,
-          onTap: hasSession ? () => _toggleRightTool(t) : null,
-        );
     return [
-      IconBtn(
-        'terminal',
-        size: 28,
-        iconSize: 15,
-        tooltip: 'Terminal split',
-        onTap: hasSession ? _openActiveShell : null,
-      ),
-      tool(_RightTool.git),
-      tool(_RightTool.files),
-      tool(_RightTool.processes),
-      if (!kMobile)
-        IconBtn(
-          'split',
+      Builder(
+        builder: (btnCtx) => IconBtn(
+          'more-horizontal',
           size: 28,
           iconSize: 15,
-          active: _isSplit,
-          tooltip: _isSplit ? 'Close split pane' : 'Split pane',
-          onTap: client == null ? null : _toggleSplitPane,
+          tooltip: 'Session actions',
+          onTap: hasSession ? () => _openShellMenu(btnCtx) : null,
         ),
+      ),
     ];
+  }
+
+  Future<void> _openShellMenu(BuildContext btnCtx) async {
+    final box = btnCtx.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final origin = box.localToGlobal(Offset.zero);
+    final sel = await showMenu<VoidCallback>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        origin.dx,
+        origin.dy + box.size.height + 4,
+        // Right-align the menu under the button, with an 8px screen margin.
+        (MediaQuery.sizeOf(context).width - origin.dx - box.size.width)
+            .clamp(8.0, double.infinity),
+        0,
+      ),
+      color: AppColors.surface3,
+      items: _shellMenuItems(),
+    );
+    sel?.call();
+  }
+
+  /// Menu rows for everything the LHS panels do not cover.
+  List<PopupMenuEntry<VoidCallback>> _shellMenuItems() {
+    final tab = _activeTab;
+    final mc = tab?.isMissionControl ?? false;
+    final controls = tab == null ? null : _macSessionControls[tab.key];
+    final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
+    final manual = (s?.approvalMode ?? 'auto') == 'manual';
+
+    PopupMenuItem<VoidCallback> item(String icon, String label, String action,
+            {String? extra, String? value}) =>
+        appMenuItem(
+          value: () => controls?.performAction(action, extra),
+          icon: icon,
+          label: label,
+          detail: value,
+        );
+    PopupMenuItem<VoidCallback> run(
+            String icon, String label, VoidCallback fn) =>
+        appMenuItem(value: fn, icon: icon, label: label);
+
+    final items = <PopupMenuEntry<VoidCallback>>[];
+
+    // ---- Session ----
+    if (mc) {
+      items.add(item('layers', 'Tasks', 'tasks'));
+      items.add(item('users', 'Agents', 'agents'));
+      items.add(item('coordination', 'Coordination board', 'coordination'));
+      items.add(
+          item('activity', 'Coordination activity', 'coordination_activity'));
+    } else {
+      items.add(item('edit', 'Rename session', 'rename'));
+      items.add(item('shield', 'Approval: Auto', 'approval_auto',
+          value: manual ? null : 'on'));
+      items.add(item('shield', 'Approval: Ask', 'approval_ask',
+          value: manual ? 'on' : null));
+      final goal = s?.goal;
+      if (goal?.ongoing ?? false) {
+        items.add(goal!.paused
+            ? item('play', 'Resume goal', 'resume_goal', value: 'paused')
+            : item('zap', 'Cancel goal', 'goal', value: 'running'));
+      } else {
+        items.add(item('zap', 'Set goal', 'goal'));
+      }
+      if (s?.lanes.isNotEmpty ?? false) {
+        items.add(item('layers', 'Lanes', 'lanes',
+            value: '${s!.lanes.where((l) => l.running).length} running'));
+      }
+      items.add(item('scheduled', 'Scheduled', 'recurring'));
+    }
+
+    // ---- History ----
+    items.add(const PopupMenuDivider());
+    items.add(item('minimize', 'Compact history', 'compact'));
+    if (!mc) items.add(item('history', 'Checkpoints', 'checkpoints'));
+    items.add(item('activity', 'Usage', 'usage'));
+
+    return items;
   }
 
   @override
@@ -941,6 +970,9 @@ class _DesktopShellState extends State<DesktopShell>
     final key = _tabs[i].key;
     setState(() {
       _clearTabState(key);
+      // The pane holds a tab by reference; without this it would keep rendering
+      // a tab that no longer exists in the strip.
+      if (_splitTab?.key == key) _splitTab = null;
       _tabs.removeAt(i);
       if (_tabs.isEmpty) {
         _activeIndex = -1;
@@ -1905,7 +1937,7 @@ class _DesktopShellState extends State<DesktopShell>
     final title = t.title.isEmpty ? '(untitled)' : t.title;
     final icon = _tabIconKind(t);
 
-    return GestureDetector(
+    final chip = GestureDetector(
       onTap: () => _activateTab(i),
       child: Container(
         // Bottom-aligned in the taller bar: the active tab is filled with the
@@ -1953,7 +1985,39 @@ class _DesktopShellState extends State<DesktopShell>
         ),
       ),
     );
+
+    // Dragging a tab out of the strip and dropping it on the body puts it in
+    // the secondary pane. Long-press rather than an immediate drag: the strip
+    // scrolls horizontally, and a plain Draggable would fight that gesture.
+    return LongPressDraggable<_ShellTab>(
+      data: t,
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedback: _tabDragFeedback(t),
+      childWhenDragging: Opacity(opacity: 0.4, child: chip),
+      child: chip,
+    );
   }
+
+  /// The chip that follows the pointer while a tab is being dragged into the
+  /// secondary pane.
+  Widget _tabDragFeedback(_ShellTab t) => Material(
+        color: Colors.transparent,
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface3,
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: AppColors.border2),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(_tabIconKind(t), size: 13, color: AppColors.accent),
+            const SizedBox(width: 7),
+            Text(t.title.isEmpty ? '(untitled)' : t.title,
+                style: sans(12.5, color: AppColors.fg1)),
+          ]),
+        ),
+      );
 
   Future<void> _downloadActiveFile() async {
     final tab = _activeTab;
@@ -2068,23 +2132,7 @@ class _DesktopShellState extends State<DesktopShell>
                 onSelect: (s) => setState(() => _section = s),
                 tools: _railTools(),
               ),
-              Expanded(
-                child: Row(children: [
-                  SizedBox(
-                    width: kSidebarWidth,
-                    child: _sidebar(topInset: false),
-                  ),
-                  // No divider: the sidebar (bg) and the chat canvas are
-                  // different surfaces, which is the separation.
-                  Expanded(
-                    child: _paneSurface(
-                      roundRight: !_rightPaneOpen,
-                      child: _mainPane(),
-                    ),
-                  ),
-                  if (_rightPaneOpen) _rightPane(),
-                ]),
-              ),
+              _bodyRow(topInset: false),
             ]),
           ),
         );
@@ -2101,23 +2149,7 @@ class _DesktopShellState extends State<DesktopShell>
               onSelect: (s) => setState(() => _section = s),
               tools: _railTools(),
             ),
-            Expanded(
-              child: Row(children: [
-                SizedBox(
-                  width: kSidebarWidth,
-                  child: _sidebar(topInset: true),
-                ),
-                // No divider: the sidebar (bg) and the chat canvas are
-                // different surfaces, which is the separation.
-                Expanded(
-                  child: _paneSurface(
-                    roundRight: !_rightPaneOpen,
-                    child: _mainPane(),
-                  ),
-                ),
-                if (_rightPaneOpen) _rightPane(),
-              ]),
-            ),
+            _bodyRow(topInset: true),
           ]),
         ),
       );
@@ -2142,64 +2174,129 @@ class _DesktopShellState extends State<DesktopShell>
         child: child,
       );
 
-  /// Detail / split pane on the right. When `_rightAgent` is set, displays the
-  /// agent detail. When split view is toggled via [|], displays the split
-  /// secondary view.
-  /// Header for a right-pane tool: icon + label on the surface, with a close
-  /// affordance. Matches the split pane's header so the two panes read alike.
-  Widget _toolHeader() => Container(
+  /// Header for the secondary pane: the tab's icon + title, and a close.
+  Widget _splitHeader(_ShellTab t) => Container(
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(children: [
-          AppIcon(_rightTool.icon, size: 14, color: AppColors.fg3),
-          const SizedBox(width: 8),
-          Text(_rightTool.label,
-              style: sans(13, weight: W.label, color: AppColors.fg1)),
-          const Spacer(),
+          AppIcon(_tabIconKind(t), size: 13, color: AppColors.accent),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              t.title.isEmpty ? '(untitled)' : t.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(12.5, weight: W.label, color: AppColors.fg1),
+            ),
+          ),
           IconBtn(
             'x',
             size: 24,
             iconSize: 12,
-            tooltip: 'Close',
-            onTap: () => setState(() => _rightTool = _RightTool.none),
+            tooltip: 'Close pane',
+            onTap: _closeSplitPane,
           ),
         ]),
       );
 
-  /// Body for the active right-pane tool. Each hosts its existing screen in
-  /// embedded mode, so the pane does not reimplement any of them.
-  Widget _toolBody(DaemonClient client) {
-    final sessionId = _activeTab?.sessionId ?? '';
-    final ws = _activeWorkspaceFolder() ?? '';
-    switch (_rightTool) {
-      case _RightTool.git:
-        return GitScreen(
-          key: ValueKey('rt-git-$sessionId'),
-          client: client,
-          sessionId: sessionId,
-          folder: ws.isEmpty ? null : ws,
-          embedded: true,
-        );
-      case _RightTool.files:
-        return FileExplorer(
-          key: ValueKey('rt-files-$ws'),
-          client: client,
-          title: lastPathSegment(ws, ifEmpty: 'Files'),
-          start: ws.isEmpty ? null : ws,
-          onOpenFile: (path, name) =>
-              _openFileTab(client, _active?.url ?? '', path, name),
-        );
-      case _RightTool.processes:
-        return ProcessesScreen(
-          key: ValueKey('rt-proc-$sessionId'),
-          client: client,
-          sessionId: sessionId,
-        );
-      case _RightTool.none:
-        return const SizedBox.shrink();
+  /// Body for one tab.
+  ///
+  /// Shared by the main pane and the secondary pane so a tab kind cannot render
+  /// in one and silently not the other. [primary] gates the extras that only
+  /// the focused pane should own — file drops and inbound shares — since two
+  /// mounted copies would both ingest the same drop.
+  Widget _tabBody(_ShellTab t, {required bool primary}) {
+    if (t.isDiff) {
+      return GitFileDiffView(
+        key: ValueKey('body-${t.key}'),
+        client: t.client,
+        sessionId: t.sessionId ?? '',
+        file: t.diffPath!,
+        staged: t.diffStaged,
+        untracked: t.diffUntracked,
+        embedded: true,
+      );
     }
+    if (t.isFile) {
+      return FileViewer(
+        key: ValueKey('body-${t.key}'),
+        client: t.client,
+        path: t.filePath!,
+        name: t.title,
+        embedded: true,
+        onClose: primary ? () => _closeTabByKey(t.key) : null,
+      );
+    }
+    return SessionScreen(
+      key: ValueKey('body-${t.key}'),
+      client: t.client,
+      sessionId: t.sessionId!,
+      title: t.title,
+      profile: t.profile,
+      embedded: true,
+      inboundShare: primary ? t.inboundShare : null,
+      onShareConsumed: !primary || t.inboundShare == null
+          ? null
+          : () => setState(() => t.inboundShare = null),
+      acceptDrops: primary,
+      onTitle: (title) => _onSessionTitle(t.sessionId!, title),
+      onMenu: null,
+      onOpenFileTab: (path, name) =>
+          _openFileTab(t.client, t.instanceUrl, path, name),
+      onOpenSession: _openSession,
+      onMacStatus: (state, running) =>
+          _setMacSessionStatus(t.key, state, running),
+      onMacControls: !kMobile
+          ? (stop, performAction) =>
+              _setMacSessionControls(t.key, stop, performAction)
+          : null,
+      onMacTerminals: !kMobile
+          ? (terms, focus) => _setMacTerminals(t.key, terms, focus)
+          : null,
+    );
   }
 
+  /// Sidebar + main pane + optional secondary pane.
+  ///
+  /// A single drop target wraps the row: dropping a dragged tab (including one
+  /// dragged onto the right-hand side, which is where the second pane appears)
+  /// moves it into the secondary pane. Shared by the macOS and plain layouts so
+  /// the two cannot diverge.
+  Widget _bodyRow({required bool topInset}) {
+    final row = Row(children: [
+      SizedBox(
+        width: kSidebarWidth,
+        child: _sidebar(topInset: topInset),
+      ),
+      // No divider: the sidebar (bg) and the chat canvas are different
+      // surfaces, which is the separation.
+      Expanded(
+        child: _paneSurface(
+          roundRight: !_rightPaneOpen,
+          child: _mainPane(),
+        ),
+      ),
+      if (_rightPaneOpen) _rightPane(),
+    ]);
+    return Expanded(
+      child: DragTarget<_ShellTab>(
+        onWillAcceptWithDetails: (d) =>
+            // A lone tab cannot be split from itself: there would be nothing
+            // left in the primary pane.
+            !(d.data.key == _activeTab?.key && _tabs.length == 1),
+        onAcceptWithDetails: (d) => _splitWith(d.data),
+        builder: (_, __, ___) => row,
+      ),
+    );
+  }
+
+  /// The secondary pane.
+  ///
+  /// Default state is a SINGLE pane: nothing here unless something was
+  /// deliberately moved across. There is no split toggle — dragging a tab out
+  /// of the strip is what creates this pane (`_splitWith`), which is why the
+  /// old second-tab-and-a-button behaviour is gone: it made a split appear just
+  /// because two tabs were open.
   Widget _rightPane() {
     if (_rightAgent != null) {
       return SizedBox(
@@ -2207,137 +2304,28 @@ class _DesktopShellState extends State<DesktopShell>
         child: CoordinationAgentDetail(
           agent: _rightAgent!,
           embedded: true,
-          onClose: () => setState(() {
-            _rightAgent = null;
-            _isSplit = false;
-          }),
+          onClose: _closeSplitPane,
         ),
       );
     }
-    // Session-scoped tools (git / files / processes) open here rather than as
-    // modals, so the transcript stays readable beside them.
-    if (_rightTool != _RightTool.none) {
-      final client = _client;
-      if (client == null) return const SizedBox.shrink();
-      return SizedBox(
-        width: 420,
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.floor,
-            borderRadius: BorderRadius.only(
-              topRight: Radius.circular(R.sheetTop),
-              bottomRight: Radius.circular(R.sheetTop),
-            ),
-          ),
-          child: Column(children: [
-            _toolHeader(),
-            Expanded(child: _toolBody(client)),
-          ]),
-        ),
-      );
-    }
-    // If we have multiple tabs, split pane displays the second tab!
-    if (_tabs.length > 1) {
-      final secondIdx = _activeIndex == 0 ? 1 : 0;
-      final t = _tabs[secondIdx];
-      return Expanded(
-        child: Container(
-          // Secondary pane sits on the floor surface with a rounded outer
-          // corner, mirroring the chat pane opposite it.
-          decoration: BoxDecoration(
-            color: AppColors.floor,
-            borderRadius: BorderRadius.only(
-              topRight: Radius.circular(R.sheetTop),
-              bottomRight: Radius.circular(R.sheetTop),
-            ),
-          ),
-          child: Column(
-            children: [
-              Container(
-                height: 36,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface3,
-                        borderRadius: BorderRadius.circular(R.chip),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppIcon(
-                            _tabIconKind(t),
-                            size: 12,
-                            color: AppColors.accent,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            t.title.isEmpty ? '(session)' : t.title,
-                            style:
-                                sans(12, weight: W.label, color: AppColors.fg1),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    IconBtn(
-                      'x',
-                      size: 24,
-                      iconSize: 12,
-                      tooltip: 'Close split',
-                      onTap: () => setState(() => _isSplit = false),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: t.isDiff
-                    ? GitFileDiffView(
-                        key: ValueKey('split-${t.key}'),
-                        client: t.client,
-                        sessionId: t.sessionId ?? '',
-                        file: t.diffPath!,
-                        staged: t.diffStaged,
-                        untracked: t.diffUntracked,
-                        embedded: true,
-                      )
-                    : t.isFile
-                        ? FileViewer(
-                            key: ValueKey('split-${t.key}'),
-                            client: t.client,
-                            path: t.filePath!,
-                            name: t.title,
-                            embedded: true,
-                          )
-                        : SessionScreen(
-                            key: ValueKey('split-${t.key}'),
-                            client: t.client,
-                            sessionId: t.sessionId!,
-                            title: t.title,
-                            profile: t.profile,
-                            embedded: true,
-                            acceptDrops: false,
-                            onTitle: (title) =>
-                                _onSessionTitle(t.sessionId!, title),
-                          ),
-              ),
-            ],
+    final t = _splitTab;
+    if (t == null) return const SizedBox.shrink();
+    return Expanded(
+      child: Container(
+        // Floor surface with a rounded outer corner, mirroring the chat pane.
+        decoration: BoxDecoration(
+          color: AppColors.floor,
+          borderRadius: BorderRadius.only(
+            topRight: Radius.circular(R.sheetTop),
+            bottomRight: Radius.circular(R.sheetTop),
           ),
         ),
-      );
-    }
-    // Fallback split view: coordination activity
-    final c = _client;
-    if (c != null) {
-      return SizedBox(
-        width: 360,
-        child: CoordinationActivityScreen(client: c, embedded: true),
-      );
-    }
-    return const SizedBox.shrink();
+        child: Column(children: [
+          _splitHeader(t),
+          Expanded(child: _tabBody(t, primary: false)),
+        ]),
+      ),
+    );
   }
 
   /// Open the active session's terminal from the terminal sidebar panel.
@@ -2525,17 +2513,8 @@ class _DesktopShellState extends State<DesktopShell>
           IconBtn('edit',
               size: 32, iconSize: 14, tooltip: 'Edit', onTap: _editActiveFile),
         ],
-        if (!kMobile) ...[
-          // Split pane toggle button [|]
-          IconBtn(
-            'scan',
-            size: 32,
-            iconSize: 14,
-            tooltip: _isSplit ? 'Close split pane' : 'Split pane',
-            onTap: _toggleSplitPane,
-          ),
-          const SizedBox(width: 6),
-        ],
+        // No split toggle: the secondary pane appears when a tab is dragged
+        // out of the strip, not from a mode button.
       ]),
     );
   }

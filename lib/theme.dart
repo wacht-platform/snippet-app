@@ -577,9 +577,11 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedHome01;
     case 'scheduled':
       return HugeIcons.strokeRoundedCalendar01;
+    case 'more-horizontal':
+      return HugeIcons.strokeRoundedMoreHorizontal;
+    case 'coordination':
+      return HugeIcons.strokeRoundedRoute01;
     case 'split':
-      // The right-pane split toggle. `Layout2Column` is literally "two columns",
-      // which is what the pane does.
       return HugeIcons.strokeRoundedLayout2Column;
     case 'processes':
       return HugeIcons.strokeRoundedActivity01;
