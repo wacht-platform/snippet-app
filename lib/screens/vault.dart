@@ -4,19 +4,27 @@ import '../api.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'shell_nav.dart';
 
 /// Secret vault — names only ever reach this screen (and the agent); values go
 /// straight to the daemon on save and are injected/redacted server-side.
 class VaultScreen extends StatefulWidget {
   final DaemonClient client;
   final VoidCallback? onClose;
+
   /// When true, skip the app bar and fill the parent (settings dialog pane).
   final bool embedded;
+
+  /// Host-supplied back action for [embedded] use. This screen draws its OWN
+  /// `NavBackRow`, so exactly one header exists per level.
+  final VoidCallback? onBack;
+
   const VaultScreen({
     super.key,
     required this.client,
     this.onClose,
     this.embedded = false,
+    this.onBack,
   });
   @override
   State<VaultScreen> createState() => _VaultScreenState();
@@ -184,7 +192,17 @@ class _VaultScreenState extends State<VaultScreen> {
                   constraints: const BoxConstraints(maxWidth: 680),
                   child: list));
     }
-    if (widget.embedded) return body;
+    if (widget.embedded) {
+      // See usage.dart: a null back action means the host owns navigation.
+      if (widget.onBack == null) return body;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          NavBackRow(title: 'Vault', onBack: widget.onBack!),
+          Expanded(child: body),
+        ],
+      );
+    }
     return Scaffold(
       body: SafeArea(
         bottom: false,

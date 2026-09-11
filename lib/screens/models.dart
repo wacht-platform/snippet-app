@@ -6,6 +6,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'model_editor.dart';
+import 'shell_nav.dart';
 
 class ModelsScreen extends StatefulWidget {
   final DaemonClient client;
@@ -13,11 +14,18 @@ class ModelsScreen extends StatefulWidget {
 
   /// When true, skip the app bar and fill the parent (settings dialog pane).
   final bool embedded;
+
+  /// Host-supplied back action for [embedded] use. The screen draws its OWN
+  /// `NavBackRow`, so exactly one header exists per level — the host drawing it
+  /// instead is what produced two stacked back rows in the model editor.
+  final VoidCallback? onBack;
+
   const ModelsScreen({
     super.key,
     required this.client,
     this.onClose,
     this.embedded = false,
+    this.onBack,
   });
   @override
   State<ModelsScreen> createState() => _ModelsScreenState();
@@ -91,13 +99,31 @@ class _ModelsScreenState extends State<ModelsScreen> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     if (_inEditor) {
-      return ModelEditorScreen(
+      final editor = ModelEditorScreen(
         client: widget.client,
         existing: _editProfile,
         delegateName: _delegate,
         embedded: widget.embedded,
         onClose: () => _closeEditor(),
         onSaved: () => _closeEditor(saved: true),
+      );
+      if (!widget.embedded) return editor;
+      // The editor brings NO header of its own when embedded — THIS level owns
+      // it, on both platforms:
+      //   phone   → the host draws no header, so this is the only row;
+      //   desktop → the chip strip names the SECTION but offers no way back to
+      //             the models list, so this row is what returns there.
+      // Drawing a second row is what produced the stacked-header bug: the host
+      // drew one for "Models" AND the editor drew its own for "Edit model".
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          NavBackRow(
+            title: _editProfile == null ? 'Add model' : 'Edit model',
+            onBack: _closeEditor,
+          ),
+          Expanded(child: editor),
+        ],
       );
     }
     final body = FutureBuilder<ServerConfig>(
@@ -113,8 +139,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
         }
         final profiles = snap.data?.profiles ?? const [];
         final list = ListView(
-          padding: EdgeInsets.fromLTRB(
-              widget.embedded ? 16 : 16, widget.embedded ? 14 : 14, 16, 20),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,13 +148,18 @@ class _ModelsScreenState extends State<ModelsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Models',
-                          style: sans(widget.embedded ? 14 : 18,
-                              weight: FontWeight.w500, color: AppColors.fg1)),
-                      const SizedBox(height: 3),
+                      // Title only when NOT embedded: embedded draws it in the
+                      // shared NavBackRow above, so repeating it here is the
+                      // duplication this screen already had.
+                      if (!widget.embedded) ...[
+                        Text('Models',
+                            style: sans(18,
+                                weight: FontWeight.w500, color: AppColors.fg1)),
+                        const SizedBox(height: 3),
+                      ],
                       Text(
                           'Choose the model used for new sessions and delegated work.',
-                          style: sans(widget.embedded ? 11.5 : 12.5,
+                          style: sans(widget.embedded ? 12 : 12.5,
                               color: AppColors.fg3)),
                     ],
                   ),
@@ -166,7 +196,18 @@ class _ModelsScreenState extends State<ModelsScreen> {
                 constraints: const BoxConstraints(maxWidth: 680), child: list));
       },
     );
-    if (widget.embedded) return body;
+    if (widget.embedded) {
+      // Desktop dialog pane: host owns navigation (chip strip), so no back row.
+      if (widget.onBack == null) return body;
+      // Phone drill-down: this level owns the header (see the editor branch).
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          NavBackRow(title: 'Models', onBack: widget.onBack!),
+          Expanded(child: body),
+        ],
+      );
+    }
     return Scaffold(
       body: SafeArea(
         bottom: false,

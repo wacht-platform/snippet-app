@@ -6186,37 +6186,47 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         _SettingsPage.scheduled => 'Recurring jobs',
       };
 
-  /// One phone settings section, with a back row and no chip strip.
+  /// One phone settings section.
+  ///
+  /// The HOST does not draw a header here — each section screen owns its own
+  /// `NavBackRow`. That is deliberate: models nests a second level (the model
+  /// editor), and if the host drew the outer header the editor level would stack
+  /// a second one under it. One header per level, always.
   Widget _mobileSectionPage() {
     final section = _mobileSection!;
-    final label = _nav.firstWhere((n) => n.$1 == section).$3;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _mobileSectionHeader(label),
-        Expanded(
-          child: switch (section) {
-            _SettingsPage.general => _generalPage(),
-            _SettingsPage.models =>
-              ModelsScreen(client: widget.client, embedded: true),
-            _SettingsPage.usage =>
-              UsageScreen(client: widget.client, embedded: true),
-            _SettingsPage.vault =>
-              VaultScreen(client: widget.client, embedded: true),
-            _SettingsPage.scheduled => RecurringScreen(
-                client: widget.client, listOnly: true, embedded: true),
-          },
+    void back() => widget.onSection?.call(null);
+    return switch (section) {
+      _SettingsPage.general => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            NavBackRow(title: 'General', onBack: back),
+            // showTitle: false — the NavBackRow above already names it.
+            Expanded(child: _generalPage(showTitle: false)),
+          ],
         ),
-      ],
-    );
+      _SettingsPage.models => ModelsScreen(
+          client: widget.client,
+          embedded: true,
+          onBack: back,
+        ),
+      _SettingsPage.usage => UsageScreen(
+          client: widget.client,
+          embedded: true,
+          onBack: back,
+        ),
+      _SettingsPage.vault => VaultScreen(
+          client: widget.client,
+          embedded: true,
+          onBack: back,
+        ),
+      _SettingsPage.scheduled => RecurringScreen(
+          client: widget.client,
+          listOnly: true,
+          embedded: true,
+          onBack: back,
+        ),
+    };
   }
-
-  /// One phone settings section header — the SHARED back row, so settings and
-  /// agent detail present the same exit in the same place.
-  Widget _mobileSectionHeader(String label) => NavBackRow(
-        title: label,
-        onBack: () => widget.onSection?.call(null),
-      );
 
   Widget _navChips() {
     return ListView(
@@ -6270,12 +6280,21 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     };
   }
 
-  Widget _generalPage() {
+  /// The General section's content.
+  ///
+  /// [showTitle] is false on the phone drill-down, where the host already draws
+  /// a `NavBackRow("General")` above this — the same duplication the model
+  /// editor had with its stacked back rows. Desktop still needs the title,
+  /// because there the section chip strip does not name the current pane.
+  Widget _generalPage({bool showTitle = true}) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
       children: [
-        Text('General', style: sans(14, weight: W.label, color: AppColors.fg1)),
-        const SizedBox(height: 3),
+        if (showTitle) ...[
+          Text('General',
+              style: sans(14, weight: W.label, color: AppColors.fg1)),
+          const SizedBox(height: 3),
+        ],
         Text('Manage the machine this app connects to and its alerts.',
             style: sans(11.5, color: AppColors.fg3)),
         const SizedBox(height: 14),

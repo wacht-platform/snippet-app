@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'files.dart';
 import 'mission_control.dart';
+import 'shell_nav.dart';
 
 /// Recurring goals — list, create, pause, and delete jobs that SetGoal a
 /// session. The daemon detects `~/.snippet/recurring/<id>.json`. If that
@@ -31,6 +32,11 @@ class RecurringScreen extends StatefulWidget {
 
   /// When true, skip the app bar and fill the parent (settings dialog pane).
   final bool embedded;
+
+  /// Host-supplied back action for [embedded] use. This screen draws its OWN
+  /// `NavBackRow`, so exactly one header exists per level.
+  final VoidCallback? onBack;
+
   const RecurringScreen({
     super.key,
     required this.client,
@@ -39,6 +45,7 @@ class RecurringScreen extends StatefulWidget {
     this.workspace,
     this.listOnly = false,
     this.embedded = false,
+    this.onBack,
   });
   @override
   State<RecurringScreen> createState() => _RecurringScreenState();
@@ -436,19 +443,37 @@ class _RecurringScreenState extends State<RecurringScreen> {
                 constraints: const BoxConstraints(maxWidth: 680), child: list));
       },
     );
-    if (widget.embedded) return body;
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          SnAppBar(
-              title: 'Scheduled',
-              titleSize: 14,
-              compact: true,
-              onBack: widget.onClose ?? () => Navigator.pop(context)),
-          Expanded(child: body),
-        ]),
-      ),
+    // Three cases, and the header differs for each:
+    //   not embedded        → owned Scaffold + SnAppBar
+    //   embedded + onBack   → OWNED NavBackRow (phone drill-down)
+    //   embedded, no onBack → NO header (desktop dialog pane; the host's section
+    //                         chip strip is the navigation)
+    // Drawing a row regardless is what stacked two back rows in the editor.
+    if (!widget.embedded) {
+      return Scaffold(
+        body: SafeArea(
+          bottom: false,
+          child: Column(children: [
+            SnAppBar(
+                title: 'Scheduled',
+                titleSize: 14,
+                compact: true,
+                onBack: widget.onClose ?? () => Navigator.pop(context)),
+            Expanded(child: body),
+          ]),
+        ),
+      );
+    }
+    // Embedded with a back action → phone drill-down, so THIS level owns the
+    // header. Embedded without one → the desktop dialog pane, where the host's
+    // section chip strip is the navigation and a back row would duplicate it.
+    if (widget.onBack == null) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        NavBackRow(title: 'Scheduled', onBack: widget.onBack!),
+        Expanded(child: body),
+      ],
     );
   }
 

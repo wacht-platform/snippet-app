@@ -431,25 +431,10 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
       ),
     );
     final body = Column(children: [
-      if (widget.embedded)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(6, 6, 16, 4),
-          child: Row(children: [
-            IconBtn('chevron-left',
-                size: 30,
-                iconSize: 18,
-                tooltip: 'Back to models',
-                onTap: _dismiss),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(title,
-                  style: sans(14.5,
-                      weight: FontWeight.w500, color: AppColors.fg1)),
-            ),
-          ]),
-        )
-      else
-        SnAppBar(title: title, onBack: _dismiss),
+      // No embedded header. When embedded, the HOST level owns the header
+      // (models.dart draws "Edit model" / "Add model"), so drawing one here
+      // stacked a second back row under it — two rows, two exits, same screen.
+      if (!widget.embedded) SnAppBar(title: title, onBack: _dismiss),
       form,
       footer,
     ]);

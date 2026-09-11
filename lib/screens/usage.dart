@@ -6,11 +6,22 @@ import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'shell_nav.dart';
 
 class UsageScreen extends StatefulWidget {
   final DaemonClient client;
   final bool embedded;
-  const UsageScreen({super.key, required this.client, this.embedded = false});
+
+  /// Host-supplied back action for [embedded] use. This screen draws its OWN
+  /// `NavBackRow`, so exactly one header exists per level.
+  final VoidCallback? onBack;
+
+  const UsageScreen({
+    super.key,
+    required this.client,
+    this.embedded = false,
+    this.onBack,
+  });
 
   @override
   State<UsageScreen> createState() => _UsageScreenState();
@@ -79,7 +90,18 @@ class _UsageScreenState extends State<UsageScreen> {
         );
       },
     );
-    if (widget.embedded) return body;
+    if (widget.embedded) {
+      // No back action → desktop dialog pane, where the host's section chip strip
+      // is the navigation. Drawing a row anyway duplicates it.
+      if (widget.onBack == null) return body;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          NavBackRow(title: 'Usage', onBack: widget.onBack!),
+          Expanded(child: body),
+        ],
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.surface1,
       body: Column(children: [
