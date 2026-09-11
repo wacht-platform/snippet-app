@@ -66,36 +66,60 @@ PopupMenuItem<T> appMenuRow<T>({
   return PopupMenuItem<T>(
     value: value,
     height: height,
-    padding: const EdgeInsets.symmetric(horizontal: 12),
-    child: Row(children: [
-      AppIcon(icon, size: 15, color: selected ? AppColors.fg1 : AppColors.fg3),
-      const SizedBox(width: 11),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(13, weight: W.label, color: AppColors.fg1)),
-            if (description != null)
-              Text(description,
+    // Deliberately small: the row draws its own rounded, filled hit area, so a
+    // large outer padding would double up and inset the fill too far.
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
+      ),
+      child: Row(children: [
+        // Icon in a tinted tile. A bare 15px glyph floating beside two lines of
+        // text had no visual anchor, which is most of why these menus read flat.
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.accentBg : AppColors.surface3,
+            borderRadius: BorderRadius.circular(R.xs),
+          ),
+          child: AppIcon(icon,
+              size: 14, color: selected ? AppColors.accent : AppColors.fg3),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(11.5, color: AppColors.fg4)),
-          ],
+                  style: sans(13, weight: W.label, color: AppColors.fg1)),
+              if (description != null)
+                Text(description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(11.5, color: AppColors.fg4)),
+            ],
+          ),
         ),
-      ),
-      if (trailing != null) ...[
-        const SizedBox(width: 8),
-        Text(trailing, style: sans(11.5, color: AppColors.fg4)),
-      ],
-      if (selected) ...[
-        const SizedBox(width: 8),
-        AppIcon('check', size: 15, color: AppColors.fg1),
-      ],
-    ]),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          Text(trailing, style: sans(11.5, color: AppColors.fg4)),
+        ],
+        // The check is the one saturated mark in the row, so "this is the
+        // current setting" is legible at a glance rather than one grey glyph
+        // among four.
+        if (selected) ...[
+          const SizedBox(width: 8),
+          AppIcon('check', size: 15, color: AppColors.accent),
+        ],
+      ]),
+    ),
   );
 }
 
@@ -251,7 +275,15 @@ Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
   return InkWell(
     onTap: () => Navigator.pop(sheet, entry.value),
     child: Padding(
-      padding: pad,
+      // The row now draws its own rounded, filled hit area for desktop, where a
+      // 4px outer inset is right — the popover supplies the surrounding gutter.
+      // A SHEET does not: it is full width, so inheriting 4px would run the fill
+      // nearly edge-to-edge. Impose the sheet's own gutter here and let the row's
+      // fill sit inside it.
+      padding: EdgeInsets.symmetric(
+        horizontal: pad.horizontal < M.gutter ? M.gutter : pad.horizontal,
+        vertical: 2,
+      ),
       child: SizedBox(
         // Never below the 44px touch minimum, whatever the desktop helper used.
         height: entry.height < 48 ? 52 : entry.height,
@@ -1885,39 +1917,65 @@ Future<bool> confirmAction(
   String confirmLabel = 'Delete',
   bool danger = true,
 }) async {
+  final accent = danger ? AppColors.danger : AppColors.accent;
   final result = await showDialog<bool>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.58),
     builder: (ctx) {
       return BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: Dialog(
           backgroundColor: AppColors.surface1,
           elevation: 0,
           insetPadding:
-              EdgeInsets.symmetric(horizontal: kMobile ? 28 : 40, vertical: 24),
+              EdgeInsets.symmetric(horizontal: kMobile ? 24 : 40, vertical: 24),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.md),
+            borderRadius: BorderRadius.circular(R.card),
             side: BorderSide(color: AppColors.border2),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: const BoxConstraints(maxWidth: 400),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(title,
-                        style: sans(15, weight: W.label, color: AppColors.fg1)),
-                    const SizedBox(width: 16),
+                    // Tinted badge: a destructive confirm should look
+                    // destructive before you read a word of it.
+                    Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: AppIcon(danger ? 'alert-triangle' : 'alert-circle',
+                          size: 16, color: accent),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(body,
-                          style: sans(13, height: 1.45, color: AppColors.fg3)),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Text(title,
+                            style: sans(14.5,
+                                weight: W.label, color: AppColors.fg1)),
+                      ),
                     ),
                   ]),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
+                  // The body gets its OWN line, aligned under the title rather
+                  // than beside it. Sharing one Row made the body wrap into a
+                  // narrow column next to a one-line title, so the dialog read
+                  // as two unrelated fragments.
+                  Padding(
+                    padding: const EdgeInsets.only(left: 44),
+                    child: Text(body,
+                        style: sans(12.5, height: 1.5, color: AppColors.fg3)),
+                  ),
+                  const SizedBox(height: 18),
                   Row(children: [
                     const Spacer(),
                     Btn('Cancel',

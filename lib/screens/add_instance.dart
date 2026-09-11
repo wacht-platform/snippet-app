@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_zxing/flutter_zxing.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -101,13 +102,13 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    final canConnect = _paste.text.trim().isNotEmpty && !_busy;
     return Material(
       color: AppColors.surface1,
       borderRadius: BorderRadius.circular(R.card),
       clipBehavior: Clip.antiAlias,
       child: Container(
-        width: 460,
-        padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+        width: 420,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(R.card),
           border: Border.all(color: AppColors.border2),
@@ -116,60 +117,167 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Connect a machine', style: display(17)),
-              const SizedBox(height: 8),
-              Text(
-                  'Run this on the machine you want to control, then paste the connection string it prints.',
-                  style: sans(12.5, height: 1.45, color: AppColors.fg3)),
-              const SizedBox(height: 12),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(R.sm)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon('terminal', size: 13, color: AppColors.fg3),
-                  const SizedBox(width: 8),
-                  Text('snippet serve', style: mono(12, color: AppColors.fg2)),
+              // Header: badge, title, dismiss. The close is here rather than
+              // relying on Esc alone, so the dialog has a visible exit.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 10, 0),
+                child: Row(children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(R.sm),
+                    ),
+                    child: AppIcon('plus', size: 15, color: AppColors.accent),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Connect a machine', style: display(16)),
+                          const SizedBox(height: 2),
+                          Text('Control another machine from here',
+                              style: sans(11.5, color: AppColors.fg4)),
+                        ]),
+                  ),
+                  IconBtn('x',
+                      size: 32,
+                      iconSize: 16,
+                      tooltip: 'Close',
+                      onTap: () => Navigator.pop(context)),
                 ]),
               ),
               const SizedBox(height: 16),
-              Row(children: [
-                Expanded(
-                    child: AppField(
-                        controller: _paste,
-                        mono: true,
-                        autofocus: true,
-                        hint: 'Paste connection string or URL',
-                        onSubmitted: _connect)),
-                const SizedBox(width: 10),
-                if (_busy)
-                  Container(
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                        color: AppColors.accent, shape: BoxShape.circle),
-                    child: SizedBox(
-                        width: 15,
-                        height: 15,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.accentFg)),
-                  )
-                else
-                  PillBtn('Connect',
-                      onTap: _paste.text.trim().isEmpty
-                          ? null
-                          : () => _connect(_paste.text)),
-              ]),
+              // Step one: the command, on its own line with a copy affordance.
+              // It is something to run elsewhere, not to read in passing.
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const _StepLabel('1', 'Run this on the other machine'),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(11, 9, 6, 9),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(R.sm),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(children: [
+                          AppIcon('terminal', size: 13, color: AppColors.fg3),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text('snippet serve',
+                                style: mono(12, color: AppColors.fg1)),
+                          ),
+                          IconBtn('copy',
+                              size: 28,
+                              iconSize: 13,
+                              tooltip: 'Copy command', onTap: () {
+                            Clipboard.setData(
+                                const ClipboardData(text: 'snippet serve'));
+                            toast(context, 'Command copied');
+                          }),
+                        ]),
+                      ),
+                    ]),
+              ),
+              const SizedBox(height: 16),
+              // Step two: paste what it prints.
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const _StepLabel('2', 'Paste the connection string'),
+                      const SizedBox(height: 8),
+                      AppField(
+                          controller: _paste,
+                          mono: true,
+                          autofocus: true,
+                          hint: 'https://…?token=…',
+                          onSubmitted: _connect),
+                    ]),
+              ),
               if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(_error!, style: sans(11.5, color: AppColors.danger)),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: Row(children: [
+                    AppIcon('alert-triangle',
+                        size: 13, color: AppColors.danger),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(_error!,
+                          style:
+                              sans(11.5, height: 1.4, color: AppColors.danger)),
+                    ),
+                  ]),
+                ),
               ],
+              const SizedBox(height: 18),
+              // Footer: status on the left, the action on the right.
+              Container(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                child: Row(children: [
+                  if (_busy) ...[
+                    SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 1.8, color: AppColors.fg3)),
+                    const SizedBox(width: 9),
+                    Text('Connecting…', style: sans(12, color: AppColors.fg3)),
+                  ] else
+                    Text('Connection stays on this device',
+                        style: sans(11, color: AppColors.fg4)),
+                  const Spacer(),
+                  Btn('Connect',
+                      small: true,
+                      onTap: canConnect ? () => _connect(_paste.text) : null),
+                ]),
+              ),
             ]),
       ),
     );
+  }
+}
+
+/// A numbered step label — gives the two-step flow an order instead of two
+/// unlabelled blocks stacked with equal weight.
+class _StepLabel extends StatelessWidget {
+  const _StepLabel(this.step, this.text);
+  final String step;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Row(children: [
+      Container(
+        width: 16,
+        height: 16,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surface3,
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child:
+            Text(step, style: sans(10, weight: W.label, color: AppColors.fg3)),
+      ),
+      const SizedBox(width: 8),
+      Text(text, style: sans(11.5, weight: W.label, color: AppColors.fg2)),
+    ]);
   }
 }
 
