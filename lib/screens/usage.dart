@@ -149,8 +149,33 @@ class _ProviderCard extends StatelessWidget {
         ],
         if (provider.rateLimits.isEmpty) ...[
           const SizedBox(height: 12),
-          Text('No reported rate-limit usage yet.',
-              style: sans(11.5, color: AppColors.fg4)),
+          // THREE states, worded distinctly — a single generic "no usage yet"
+          // said the wrong thing in two of them:
+          //   true  → provider publishes limits, we just haven't seen one yet
+          //   false → provider never publishes them; "yet" would promise a
+          //           number the API cannot produce
+          //   null  → daemon predates the flag; assert nothing either way
+          Row(children: [
+            AppIcon(
+                switch (provider.rateLimitsSupported) {
+                  true => 'clock',
+                  false => 'alert-circle',
+                  null => 'sparkles',
+                },
+                size: 12,
+                color: AppColors.fg4),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                  switch (provider.rateLimitsSupported) {
+                    true =>
+                      'No rate-limit report yet — this provider publishes them, none seen so far.',
+                    false => 'This provider doesn’t publish rate limits.',
+                    null => 'No reported rate-limit usage.',
+                  },
+                  style: sans(11.5, height: 1.35, color: AppColors.fg4)),
+            ),
+          ]),
         ] else ...[
           const SizedBox(height: 12),
           for (final rate in provider.rateLimits) ...[

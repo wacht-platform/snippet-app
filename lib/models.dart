@@ -242,6 +242,19 @@ class UsageProvider {
   final int cacheReadTokens;
   final List<RateWindow> rateLimits;
 
+  /// Whether this provider can report rate limits at all.
+  ///
+  /// Only the ChatGPT/Codex subscription exposes them; every other provider
+  /// hardcodes no snapshot, and opencode returns no such headers even in
+  /// principle. So an empty [rateLimits] means one of two very different things,
+  /// and the card must not blur them: a provider that CAN report just hasn't yet,
+  /// whereas one that cannot will never show a number.
+  ///
+  /// Null means UNKNOWN — a daemon predating this field. Kept distinct from
+  /// false so we never assert a provider *cannot* report when we simply haven't
+  /// been told; the UI falls back to neutral wording in that case.
+  final bool? rateLimitsSupported;
+
   UsageProvider.fromJson(Map<String, dynamic> j)
       : provider = j['provider'] as String? ?? '',
         profile = j['profile'] as String?,
@@ -251,6 +264,7 @@ class UsageProvider {
         promptTokens = (j['prompt_tokens'] as num?)?.toInt() ?? 0,
         completionTokens = (j['completion_tokens'] as num?)?.toInt() ?? 0,
         cacheReadTokens = (j['cache_read_tokens'] as num?)?.toInt() ?? 0,
+        rateLimitsSupported = j['rate_limits_supported'] as bool?,
         rateLimits = _reportedRateWindows(j['rate_limits']);
 
   static List<RateWindow> _reportedRateWindows(dynamic raw) {
