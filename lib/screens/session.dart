@@ -2136,6 +2136,11 @@ class _SessionScreenState extends State<SessionScreen>
     final scaffold = Scaffold(
       key: useDrawer ? _scaffoldKey : null,
       endDrawer: useDrawer ? _actionsDrawer(s) : null,
+      // Open the actions panel by TAPPING THE HEADER only. Flutter's endDrawer
+      // otherwise wires a right-edge drag, which competes with the transcript's
+      // horizontal gestures and can fire while reading. The drawer itself —
+      // its close button and the system back path — is unchanged.
+      endDrawerEnableOpenDragGesture: false,
       backgroundColor: readingBg,
       resizeToAvoidBottomInset: false,
       body: SafeArea(
