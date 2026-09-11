@@ -2509,8 +2509,13 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _mobileShell() {
     final tab = _activeTab;
+    // Chats is ALSO the visible surface whenever no session is active. Without
+    // the `tab == null` arm, closing the last tab (or deleting the open session
+    // from elsewhere) would leave the panel parked off-screen with no session
+    // behind it: a blank screen with nothing owning back.
+    final chatsVisible = _mobileChatsOpen || tab == null;
     final shell = Scaffold(
-      backgroundColor: _mobileChatsOpen ? AppColors.bg : readingBg,
+      backgroundColor: chatsVisible ? AppColors.bg : readingBg,
       body: Stack(children: [
         // The session sits UNDERNEATH and stays fully drawn. The Chats panel
         // slides over it and reveals it again on the way out, so there is no
@@ -2518,7 +2523,7 @@ class _DesktopShellState extends State<DesktopShell>
         if (tab != null)
           Positioned.fill(
             child: IgnorePointer(
-              ignoring: _mobileChatsOpen,
+              ignoring: chatsVisible,
               child: SafeArea(
                 bottom: false,
                 child: _tabBody(tab, primary: true),
@@ -2532,11 +2537,11 @@ class _DesktopShellState extends State<DesktopShell>
         // shrink-wrapping its content.
         Positioned.fill(
           child: IgnorePointer(
-            ignoring: !_mobileChatsOpen,
+            ignoring: !chatsVisible,
             child: AnimatedSlide(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
-              offset: _mobileChatsOpen ? Offset.zero : const Offset(-1, 0),
+              offset: chatsVisible ? Offset.zero : const Offset(-1, 0),
               child: Material(
                 color: AppColors.bg,
                 child: SafeArea(
@@ -2559,7 +2564,7 @@ class _DesktopShellState extends State<DesktopShell>
     // Session open → the SESSION owns back (see SessionScreen): its ladder
     // closes the actions drawer, then the terminal overlay, then returns here.
     // It passes `mobileActive` so its guard is absent whenever Chats is showing.
-    if (!_mobileChatsOpen) return shell;
+    if (!chatsVisible) return shell;
 
     // Chats on screen → the shell IS the app root. Background the app so a
     // running watcher service keeps working, rather than finishing the activity.
