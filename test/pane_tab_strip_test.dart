@@ -43,8 +43,7 @@ void main() {
     expect(find.text('Checkpoints'), findsOneWidget);
   });
 
-  testWidgets('PaneTabStrip lays out with multiple tabs and actions',
-      (tester) async {
+  testWidgets('PaneTabStrip lays out with multiple tabs', (tester) async {
     await pumpAsMounted(
       tester,
       PaneTabStrip(
@@ -54,7 +53,6 @@ void main() {
         ],
         activeIndex: 1,
         onSelect: (_) {},
-        actions: [IconButton(onPressed: () {}, icon: const Icon(Icons.close))],
       ),
     );
 

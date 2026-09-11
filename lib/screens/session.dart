@@ -200,6 +200,10 @@ class _SessionScreenState extends State<SessionScreen>
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
+
+  /// Owns the mobile end-drawer so the actions panel can close it directly.
+  /// `Navigator.pop` does NOT close a drawer, so the closer must be this key.
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   StreamSubscription<Amplitude>? _amplitudeSub;
@@ -2125,7 +2129,13 @@ class _SessionScreenState extends State<SessionScreen>
       _transcriptDirty = false;
     }
     final items = _transcriptCache!;
+    // The mobile end-drawer is the ONLY host for the action list on a phone, so
+    // the scaffold needs a key (Navigator.pop cannot close a drawer) and the
+    // drawer itself. Desktop keeps the pull-up sheet.
+    final useDrawer = kMobile && widget.onMenu != null;
     final scaffold = Scaffold(
+      key: useDrawer ? _scaffoldKey : null,
+      endDrawer: useDrawer ? _actionsDrawer(s) : null,
       backgroundColor: readingBg,
       resizeToAvoidBottomInset: false,
       body: SafeArea(
@@ -2364,7 +2374,13 @@ class _SessionScreenState extends State<SessionScreen>
                 canPop: false,
                 onPopInvokedWithResult: (didPop, _) {
                   if (didPop) return;
-                  if (_termOpen && _terms.isNotEmpty) {
+                  // One authority, innermost first: an open actions drawer
+                  // closes, then the terminal overlay, then the session yields
+                  // back to the Chats list. Only Chats may exit the app.
+                  final scaf = _scaffoldKey.currentState;
+                  if (scaf != null && scaf.isEndDrawerOpen) {
+                    scaf.closeEndDrawer();
+                  } else if (_termOpen && _terms.isNotEmpty) {
                     setState(() => _termOpen = false);
                   } else {
                     widget.onMenu?.call();
@@ -2470,23 +2486,12 @@ class _SessionScreenState extends State<SessionScreen>
             ),
           ),
         ),
-        if (running)
-          IconBtn('stop',
-              size: M.minTarget,
-              iconSize: 18,
-              tooltip: 'Stop',
-              onTap: () => _send({'kind': 'interrupt'})),
         if (!_isMissionControl)
           IconBtn('terminal',
               size: M.minTarget,
               iconSize: 19,
               tooltip: 'Shell',
               onTap: _openTerm),
-        IconBtn('more-vertical',
-            size: M.minTarget,
-            iconSize: 19,
-            tooltip: 'Session actions',
-            onTap: () => _openActions(s)),
       ]),
     );
   }
@@ -2998,89 +3003,77 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _openActions(HarnessState? s) {
-    final ws = s?.workspace ?? '';
     void run(VoidCallback f) {
       Navigator.pop(context);
       f();
     }
 
-    showAppSheet(context,
-        title: 'Actions',
-        child: _SessionActionsPanel(
-          session: s,
-          title: _title,
-          hideRename: _isMissionControl,
-          hideWorkspace: _isMissionControl,
-          hideGoal: _isMissionControl,
-          hideCheckpoints: _isMissionControl,
-          onRename: (name) async {
-            if (_isMissionControl) return;
-            try {
-              await widget.client.renameSession(widget.sessionId, name);
-              if (mounted) {
-                setState(() => _publishTitle(name));
-              } else {
-                _publishTitle(name);
-              }
-            } catch (e) {
-              if (mounted) _toast('$e');
-            }
-          },
-          onApproval: _setApproval,
-          onSetGoal: (text) {
-            _send({'kind': 'set_goal', 'value': text});
-            _toast('Goal set — the agent will drive toward it');
-          },
-          onCancelGoal: _cancelGoal,
-          onResumeGoal: _resumeGoal,
-          onLanes: () => run(_showLanes),
-          // Session agents are available in EVERY session, not just Mission
-          // Control: which agent is working here is a property of the session,
-          // and gating it behind MC hid it from ordinary chats.
-          onSessionAgents: () => run(() => presentScreen(context,
+    showAppSheet(context, title: 'Actions', child: _actionsPanel(s, run));
+  }
+
+  /// The action list, shared by the mobile end-drawer and the pull-up sheet so
+  /// the two hosts cannot offer different actions. [run] dismisses the host,
+  /// then performs the action.
+  Widget _actionsPanel(HarnessState? s, void Function(VoidCallback) run) {
+    final ws = s?.workspace ?? '';
+    return _SessionActionsPanel(
+      session: s,
+      hideWorkspace: _isMissionControl,
+      hideGoal: _isMissionControl,
+      hideCheckpoints: _isMissionControl,
+      onSetGoal: (text) {
+        _send({'kind': 'set_goal', 'value': text});
+        _toast('Goal set — the agent will drive toward it');
+      },
+      onCancelGoal: _cancelGoal,
+      onResumeGoal: _resumeGoal,
+      onLanes: () => run(_showLanes),
+      // Session agents are available in EVERY session, not just Mission
+      // Control: which agent is working here is a property of the session,
+      // and gating it behind MC hid it from ordinary chats.
+      onSessionAgents: () => run(() => presentScreen(context,
+          style: PanelStyle.drawer,
+          builder: (_, close) => SessionAgentsPanel(
+              client: widget.client, sessionId: widget.sessionId))),
+      onTasks: _isMissionControl ? () => run(_showTasks) : null,
+      // One coordination destination instead of three sibling drawers with
+      // handoffs nested inside the board. Device-wide, so Mission-Control
+      // gated.
+      onCoordination: _isMissionControl
+          ? () => run(() => presentScreen(context,
               style: PanelStyle.drawer,
-              builder: (_, close) => SessionAgentsPanel(
-                  client: widget.client, sessionId: widget.sessionId))),
-          onTasks: _isMissionControl ? () => run(_showTasks) : null,
-          // One coordination destination instead of three sibling drawers with
-          // handoffs nested inside the board. Device-wide, so Mission-Control
-          // gated.
-          onCoordination: _isMissionControl
-              ? () => run(() => presentScreen(context,
-                  style: PanelStyle.drawer,
-                  builder: (_, close) =>
-                      CoordinationHub(client: widget.client)))
-              : null,
-          onTerm: () => run(_openTerm),
-          hideShell: _isMissionControl,
-          onGit: () => run(() => presentScreen(context,
-              builder: (_, close) => GitScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-          onFiles: () => run(() {
-            final name = lastPathSegment(ws, ifEmpty: 'Files');
-            presentScreen(context,
-                maxWidth: 1060,
-                maxHeight: 760,
-                builder: (_, close) => FileExplorer(
-                    client: widget.client,
-                    title: name,
-                    start: ws.isEmpty ? null : ws,
-                    onClose: close,
-                    onOpenFile: widget.onOpenFileTab));
-          }),
-          onProcesses: () => run(() => presentScreen(context,
-              style: PanelStyle.drawer,
-              builder: (_, close) => ProcessesScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-          onRecurring: () => run(_openRecurring),
-          onCompact: () => run(_confirmCompact),
-          onCheckpoints: () => run(_showCheckpoints),
-          onUsage: () => run(_showUsage),
-        ));
+              builder: (_, close) => CoordinationHub(client: widget.client)))
+          : null,
+      onTerm: () => run(_openTerm),
+      hideShell: _isMissionControl,
+      onGit: () => run(() => presentScreen(context,
+          builder: (_, close) => GitScreen(
+              client: widget.client,
+              sessionId: widget.sessionId,
+              onClose: close))),
+      onFiles: () => run(() {
+        final name = lastPathSegment(ws, ifEmpty: 'Files');
+        presentScreen(context,
+            maxWidth: 1060,
+            maxHeight: 760,
+            builder: (_, close) => FileExplorer(
+                client: widget.client,
+                title: name,
+                start: ws.isEmpty ? null : ws,
+                onClose: close,
+                onOpenFile: widget.onOpenFileTab));
+      }),
+      onProcesses: () => run(() => presentScreen(context,
+          style: PanelStyle.drawer,
+          builder: (_, close) => ProcessesScreen(
+              client: widget.client,
+              sessionId: widget.sessionId,
+              onClose: close))),
+      onRecurring: () => run(_openRecurring),
+      onCompact: () => run(_confirmCompact),
+      onCheckpoints: () => run(_showCheckpoints),
+      onUsage: () => run(_showUsage),
+    );
   }
 
   List<Widget> _statusChips(HarnessState? s, bool running) {
@@ -3237,6 +3230,53 @@ class _SessionScreenState extends State<SessionScreen>
     return (100 - used * 100).clamp(0, 100).round();
   }
 
+  /// The phone's action list, as a right-hand drawer the user drags in from the
+  /// pane edge. It replaces the toolbar's overflow button: the same actions, but
+  /// a full surface with room for labels instead of a cramped popup.
+  Widget _actionsDrawer(HarnessState? s) {
+    // Closing the drawer dismisses the host, then runs the action — the drawer
+    // is not a route, so `Navigator.pop` (what the sheet uses) would not close
+    // it and the action would fire behind an open drawer.
+    void run(VoidCallback f) {
+      _scaffoldKey.currentState?.closeEndDrawer();
+      f();
+    }
+
+    return Drawer(
+      width: math.min(320.0, MediaQuery.sizeOf(context).width * 0.86),
+      backgroundColor: AppColors.surface1,
+      shape: const RoundedRectangleBorder(),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(M.gutter, 12, 8, 8),
+              child: Row(children: [
+                Expanded(
+                  child: Text('Actions',
+                      style: sans(M.sectionTitle,
+                          weight: W.label, color: AppColors.fg1)),
+                ),
+                IconBtn('x',
+                    size: M.minTarget,
+                    iconSize: 18,
+                    tooltip: 'Close',
+                    onTap: () => _scaffoldKey.currentState?.closeEndDrawer()),
+              ]),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 24),
+                child: _actionsPanel(s, run),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// One composer footer control: icon + label + disclosure chevron.
   Widget _composerChip({
     required String icon,
@@ -3272,19 +3312,28 @@ class _SessionScreenState extends State<SessionScreen>
     return Padding(
       padding: const EdgeInsets.only(top: 6, left: 2, right: 2),
       child: Row(children: [
-        if (name.isNotEmpty) ...[
-          AppIcon('folder', size: 11, color: AppColors.fg4),
-          const SizedBox(width: 5),
-          Flexible(
-            child: Text(name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(11, color: AppColors.fg4)),
-          ),
-        ],
-        const Spacer(),
-        if (left != null)
+        // ONE tight flex child absorbs the free space, pinning the trailing
+        // readout to the card's right edge. A loose `Flexible` beside a
+        // `Spacer` splits the free space and leaves the leftover AFTER the
+        // readout, so it stops short of the edge instead of reaching it.
+        Expanded(
+          child: name.isEmpty
+              ? const SizedBox.shrink()
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  AppIcon('folder', size: 11, color: AppColors.fg4),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(11, color: AppColors.fg4)),
+                  ),
+                ]),
+        ),
+        if (left != null) ...[
+          const SizedBox(width: 8),
           Text('$left% context left', style: sans(11, color: AppColors.fg4)),
+        ],
       ]),
     );
   }
@@ -5791,9 +5840,6 @@ class _SendBtn extends StatelessWidget {
 
 class _SessionActionsPanel extends StatefulWidget {
   final HarnessState? session;
-  final String title;
-  final Future<void> Function(String name) onRename;
-  final void Function(bool manual) onApproval;
   final void Function(String text) onSetGoal;
   final VoidCallback onCancelGoal;
   final VoidCallback onResumeGoal;
@@ -5813,15 +5859,11 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onCheckpoints;
   final VoidCallback onUsage;
   final bool hideShell;
-  final bool hideRename;
   final bool hideWorkspace;
   final bool hideGoal;
   final bool hideCheckpoints;
   const _SessionActionsPanel({
     required this.session,
-    required this.title,
-    required this.onRename,
-    required this.onApproval,
     required this.onSetGoal,
     required this.onCancelGoal,
     required this.onResumeGoal,
@@ -5838,7 +5880,6 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onCheckpoints,
     required this.onUsage,
     this.hideShell = false,
-    this.hideRename = false,
     this.hideWorkspace = false,
     this.hideGoal = false,
     this.hideCheckpoints = false,
@@ -5850,15 +5891,10 @@ class _SessionActionsPanel extends StatefulWidget {
 
 class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   String? _open;
-  bool? _manualOverride;
-  late final TextEditingController _titleCtl =
-      TextEditingController(text: widget.title);
   late final TextEditingController _goalCtl = TextEditingController();
-  bool _savingTitle = false;
 
   @override
   void dispose() {
-    _titleCtl.dispose();
     _goalCtl.dispose();
     super.dispose();
   }
@@ -5928,60 +5964,15 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
-    final manual = _manualOverride ?? ((s?.approvalMode ?? 'auto') == 'manual');
     final goalOn = s?.goal?.ongoing ?? false;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _section('Session'),
-        if (!widget.hideRename)
-          _row(
-            icon: 'edit',
-            label: 'Rename',
-            id: 'rename',
-            value: widget.title.isEmpty ? null : widget.title,
-            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Expanded(
-                child: AppField(
-                    controller: _titleCtl,
-                    hint: 'Session title',
-                    onSubmitted: (_) => _saveTitle()),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 1),
-                child: Btn(_savingTitle ? '…' : 'Save',
-                    small: true, disabled: _savingTitle, onTap: _saveTitle),
-              ),
-            ]),
-          ),
-        if (!kMacOS)
-          _row(
-            icon: 'shield',
-            label: 'Approval',
-            id: 'approval',
-            value: manual ? 'Ask' : 'Auto',
-            child: Row(children: [
-              Expanded(
-                child: Btn('Auto',
-                    variant: manual ? BtnVariant.secondary : BtnVariant.primary,
-                    onTap: () {
-                  setState(() => _manualOverride = false);
-                  widget.onApproval(false);
-                }),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Btn('Ask',
-                    variant: manual ? BtnVariant.primary : BtnVariant.secondary,
-                    onTap: () {
-                  setState(() => _manualOverride = true);
-                  widget.onApproval(true);
-                }),
-              ),
-            ]),
-          ),
+        // Rename and Approval are deliberately NOT here: both moved to the
+        // composer / a dedicated affordance, so the actions list stays a list
+        // of actions rather than a settings form.
         if (!widget.hideGoal)
           _row(
             icon: 'zap',
@@ -6052,16 +6043,5 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
         _row(icon: 'activity', label: 'Usage', onTap: widget.onUsage),
       ],
     );
-  }
-
-  Future<void> _saveTitle() async {
-    final name = _titleCtl.text.trim();
-    if (name.isEmpty || _savingTitle) return;
-    setState(() => _savingTitle = true);
-    try {
-      await widget.onRename(name);
-    } finally {
-      if (mounted) setState(() => _savingTitle = false);
-    }
   }
 }

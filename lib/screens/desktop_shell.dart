@@ -2509,50 +2509,61 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _mobileShell() {
     final tab = _activeTab;
-    return Scaffold(
-      backgroundColor: _mobileChatsOpen ? AppColors.bg : readingBg,
-      body: Stack(children: [
-        // Keep both surfaces mounted while switching. Apart from feeling more
-        // natural than a hard cut, this preserves a live transcript and any
-        // open terminal when the user checks Chats and returns.
-        IgnorePointer(
-          ignoring: !_mobileChatsOpen,
-          child: AnimatedSlide(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            offset: _mobileChatsOpen ? Offset.zero : const Offset(-0.025, 0),
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOut,
-              opacity: _mobileChatsOpen ? 1 : 0,
-              child: SafeArea(
-                child: _sidebar(
-                  topInset: false,
-                  onAfterPick: () => setState(() => _mobileChatsOpen = false),
-                ),
-              ),
-            ),
-          ),
-        ),
-        if (tab != null)
+    // The SHELL is the outermost back authority. The session may consume a back
+    // first (an open actions drawer or terminal overlay), but if it does not,
+    // this guarantees the gesture lands on the Chats list instead of closing the
+    // app. `canPop: _mobileChatsOpen` means back only exits once Chats itself is
+    // showing — the root route.
+    return PopScope(
+      canPop: _mobileChatsOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_mobileChatsOpen) _showMobileChats();
+      },
+      child: Scaffold(
+        backgroundColor: _mobileChatsOpen ? AppColors.bg : readingBg,
+        body: Stack(children: [
+          // Keep both surfaces mounted while switching. Apart from feeling more
+          // natural than a hard cut, this preserves a live transcript and any
+          // open terminal when the user checks Chats and returns.
           IgnorePointer(
-            ignoring: _mobileChatsOpen,
+            ignoring: !_mobileChatsOpen,
             child: AnimatedSlide(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 180),
               curve: Curves.easeOutCubic,
-              offset: _mobileChatsOpen ? const Offset(0.035, 0) : Offset.zero,
+              offset: _mobileChatsOpen ? Offset.zero : const Offset(-0.025, 0),
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 160),
                 curve: Curves.easeOut,
-                opacity: _mobileChatsOpen ? 0 : 1,
+                opacity: _mobileChatsOpen ? 1 : 0,
                 child: SafeArea(
-                  bottom: false,
-                  child: _tabBody(tab, primary: true),
+                  child: _sidebar(
+                    topInset: false,
+                    onAfterPick: () => setState(() => _mobileChatsOpen = false),
+                  ),
                 ),
               ),
             ),
           ),
-      ]),
+          if (tab != null)
+            IgnorePointer(
+              ignoring: _mobileChatsOpen,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                offset: _mobileChatsOpen ? const Offset(0.035, 0) : Offset.zero,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOut,
+                  opacity: _mobileChatsOpen ? 0 : 1,
+                  child: SafeArea(
+                    bottom: false,
+                    child: _tabBody(tab, primary: true),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      ),
     );
   }
 
@@ -3213,17 +3224,26 @@ class _DesktopShellState extends State<DesktopShell>
         child: Container(
           height: kPaneTabHeight,
           padding: const EdgeInsets.symmetric(horizontal: 12),
+          // Every tab carries the SAME hairline top border, so selection cannot
+          // move anything. The active tab's heavier stroke is a
+          // `foregroundDecoration`: it paints above the child and takes no part
+          // in layout. A thicker `Border` would inset only the active tab and
+          // jog its label by the width difference on every tab switch.
           decoration: BoxDecoration(
             color: AppColors.canvas,
             border: Border(
               right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-              // Every tab is bounded on top, so the pane has a real top edge;
-              // the active tab simply makes its own segment heavier.
-              top: active
-                  ? BorderSide(color: AppColors.fg1, width: kPaneActiveStroke)
-                  : BorderSide(color: kPaneSeamColor, width: kPaneHairline),
+              top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
             ),
           ),
+          foregroundDecoration: !active
+              ? null
+              : BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                        color: AppColors.fg1, width: kPaneActiveStroke),
+                  ),
+                ),
           child: Row(children: [
             AppIcon(_tabIconKind(t),
                 size: 14, color: active ? AppColors.fg2 : AppColors.fg4),
@@ -4271,6 +4291,7 @@ class _SidebarState extends State<_Sidebar> {
                 Text('${_selected.length} selected',
                     style: sans(11.5, color: AppColors.fg3)),
                 const Spacer(),
+                _selectAllToggle(),
                 IconBtn('x',
                     size: 28,
                     iconSize: 15,
@@ -4361,6 +4382,7 @@ class _SidebarState extends State<_Sidebar> {
                 style: sans(M.sectionTitle,
                     weight: W.label, color: AppColors.fg1)),
             const Spacer(),
+            _selectAllToggle(),
             IconBtn('x',
                 size: M.minTarget,
                 iconSize: 18,
@@ -5105,13 +5127,16 @@ class _SidebarState extends State<_Sidebar> {
                   widget.onOpenSession(s.id, s.title, s.profile);
                 }
               },
+        // Long-press opens this chat's actions rather than jumping straight into
+        // selection: the common intent is to rename or delete ONE chat, and bulk
+        // selection stays reachable from that same sheet.
         onLongPress: renaming
             ? null
             : () {
                 if (_selecting) {
                   _toggleSelected(s.id);
                 } else {
-                  _enterSelect(seed: s.id);
+                  _sessionActions(s);
                 }
               },
         child: SizedBox(
@@ -5146,18 +5171,12 @@ class _SidebarState extends State<_Sidebar> {
                             color: selected ? AppColors.fg1 : AppColors.fg2),
                       ),
               ),
-              if (!renaming) ...[
+              // No per-row overflow button. At this row height it crowded the
+              // title, and its glyph rendered as a dark blob rather than a
+              // control. The same actions live on long-press.
+              if (!renaming)
                 Text(relativeTime(s.lastActive),
                     style: sans(M.meta, color: AppColors.fg4)),
-                if (!_selecting) ...[
-                  const SizedBox(width: 2),
-                  IconBtn('more-vertical',
-                      size: M.minTarget,
-                      iconSize: 17,
-                      tooltip: 'Options',
-                      onTap: () => _sessionActions(s)),
-                ],
-              ],
             ]),
           ),
         ),
@@ -5202,6 +5221,10 @@ class _SidebarState extends State<_Sidebar> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _sessionActionTile('check-check', 'Select', onTap: () {
+              Navigator.pop(context);
+              _enterSelect(seed: s.id);
+            }),
             _sessionActionTile('edit', 'Rename', onTap: () {
               Navigator.pop(context);
               _beginRename(s);
@@ -5256,6 +5279,62 @@ class _SidebarState extends State<_Sidebar> {
     setState(() {
       if (!_selected.add(id)) _selected.remove(id);
     });
+  }
+
+  /// Rows the current filter is showing — the exact set "Select all" acts on.
+  ///
+  /// Mirrors [_sessionList]'s predicate deliberately: selecting rows the user
+  /// cannot see (a filtered-out chat) would let a bulk delete remove something
+  /// that was never on screen.
+  List<SessionInfo> get _visibleSessions => [
+        for (final s in _sessions ?? const <SessionInfo>[])
+          if (!isDedicatedMcSession(s.id) &&
+              _statusMatch(_filter, s) &&
+              _matchesQuery(s))
+            s,
+      ];
+
+  bool get _allVisibleSelected {
+    final ids = _visibleSessions.map((s) => s.id).toList();
+    return ids.isNotEmpty && ids.every(_selected.contains);
+  }
+
+  void _toggleSelectAllVisible() {
+    final ids = _visibleSessions.map((s) => s.id).toList();
+    if (ids.isEmpty) return;
+    setState(() {
+      if (ids.every(_selected.contains)) {
+        for (final id in ids) {
+          _selected.remove(id);
+        }
+      } else {
+        _selected.addAll(ids);
+      }
+      // An emptied selection must not leave the bar up reading "0 selected".
+      if (_selected.isEmpty) _selecting = false;
+    });
+  }
+
+  /// "Select all" / "Unselect all" as a text toggle, not an icon: nothing in the
+  /// icon set means "all" unambiguously, and the label also states which way the
+  /// next tap goes.
+  Widget _selectAllToggle() {
+    final all = _allVisibleSelected;
+    return InkWell(
+      borderRadius: BorderRadius.circular(R.sm),
+      onTap: _toggleSelectAllVisible,
+      child: SizedBox(
+        height: kMobile ? M.minTarget : 26,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(all ? 'Unselect all' : 'Select all',
+                style: sans(kMobile ? M.rowTitle : 11.5,
+                    weight: W.label, color: AppColors.fg3)),
+          ),
+        ),
+      ),
+    );
   }
 
   void _beginRename(SessionInfo s) {

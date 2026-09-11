@@ -395,19 +395,28 @@ class PaneTabStrip extends StatelessWidget {
         onTap: onSelect == null ? null : () => onSelect!(i),
         child: SizedBox(
           width: width,
+          // Every tab carries the SAME hairline top border, so selection cannot
+          // move anything. The active tab's heavier stroke is a
+          // `foregroundDecoration`: it paints above the child and takes no part
+          // in layout. A thicker `Border` insets the active tab's content, which
+          // jogs its label by the width difference every time you switch tabs.
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: AppColors.canvas,
               border: Border(
                 right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-                // Every tab is bounded on top, so the pane has a real top edge;
-                // the active tab simply makes its own segment heavier.
-                top: active
-                    ? BorderSide(color: AppColors.fg1, width: kPaneActiveStroke)
-                    : BorderSide(color: kPaneSeamColor, width: kPaneHairline),
+                top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
               ),
             ),
+            foregroundDecoration: !active
+                ? null
+                : BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                          color: AppColors.fg1, width: kPaneActiveStroke),
+                    ),
+                  ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               AppIcon(t.icon,
                   size: 14, color: active ? AppColors.fg2 : AppColors.fg4),
