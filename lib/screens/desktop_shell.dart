@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -8,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
-import '../command_palette.dart';
 import '../device_events.dart';
 import '../models.dart';
 import '../notifications.dart';
@@ -35,6 +33,7 @@ import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'git_diff_sidebar_panel.dart';
 import 'file_tree_sidebar_panel.dart';
+import 'new_session_picker.dart';
 import 'session.dart';
 import 'session_panels.dart';
 import 'shell_nav.dart';
@@ -70,8 +69,8 @@ enum _MobileHome {
 /// Floating action bar geometry. Kept local: it is the only floating surface in
 /// the app, so it has not earned a shared token — but the radius is deliberately
 /// larger than `R.card` so it reads as a float rather than another card.
-const double _kMobileBarHeight = 58;
-const double _kMobileBarRadius = 18;
+const double _kMobileBarHeight = 46;
+const double _kMobileBarRadius = 14;
 
 /// One open tab in the shell — a live chat session, an opened file, a single git
 /// change, or a terminal, on a given instance.
@@ -526,20 +525,15 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   Future<void> _openShellMenu(BuildContext btnCtx) async {
-    final box = btnCtx.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final origin = box.localToGlobal(Offset.zero);
-    final sel = await showMenu<VoidCallback>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        origin.dx,
-        origin.dy + box.size.height + 4,
-        // Right-align the menu under the button, with an 8px screen margin.
-        (MediaQuery.sizeOf(context).width - origin.dx - box.size.width)
-            .clamp(8.0, double.infinity),
-        0,
-      ),
+    final sel = await showAppMenu<VoidCallback>(
+      context,
+      anchor: btnCtx,
       color: AppColors.surface3,
+      minWidth: 240,
+      maxWidth: 300,
+      // The trigger is in the window bar at the very top, so the menu must open
+      // downward — an upward one would be clipped offscreen.
+      below: true,
       items: _shellMenuItems(),
     );
     sel?.call();
@@ -1613,34 +1607,32 @@ class _DesktopShellState extends State<DesktopShell>
     }
   }
 
-  // Start a chat by browsing to a folder in the file explorer and tapping
-  // "New chat here" — the explorer doubles as the new-chat picker.
+  // Start a chat by picking a folder. One screen for both platforms: it renders
+  // as a centered modal on desktop and full screen on a phone (see presentScreen).
   Future<void> _newSessionFlow() async {
     final c = _client;
     final active = _active;
     if (c == null) return;
     await presentScreen(
       context,
-      style: PanelStyle.drawer,
-      maxWidth: 1060,
-      maxHeight: 760,
-      builder: (_, close) => FileExplorer(
+      style: PanelStyle.dialog,
+      maxWidth: 620,
+      maxHeight: 720,
+      builder: (_, close) => NewSessionPicker(
         client: c,
-        title: active?.label ?? 'Files',
+        machineLabel: active?.label ?? '',
+        startPath: _activeWorkspaceFolder(),
         onClose: close,
-        onOpenFile: (path, name) {
-          close();
-          if (active != null) {
-            _openFileTab(c, active.url, path, name);
-          }
-        },
-        onNewChat: (folder) async {
+        onOpenFolder: (folder) async {
           try {
             final id = await c.openSession(folder, newConversation: true);
             _openSession(id, 'New session', null);
             _loadSessions();
           } catch (e) {
+            // Surfaced by the picker as a toast; keep the screen open so the
+            // folder choice is not lost on a transient failure.
             if (mounted) toast(context, '$e', danger: true);
+            rethrow;
           }
           close();
         },
@@ -4002,136 +3994,6 @@ class _GoalPopoverState extends State<_GoalPopover> {
   }
 }
 
-/// Filter control for the CHATS list: a free-text query over titles and folders,
-/// plus the status shortcuts with live counts.
-///
-/// Shared by the desktop popover and the mobile sheet so the two can never
-/// drift apart. Follows the shell's language: 8px radii, a 28px row, one
-/// surface step between the panel and its inset field, and weight (not colour)
-/// marking the active row except for a single accent tick.
-class _ChatFilterPanel extends StatefulWidget {
-  const _ChatFilterPanel({
-    required this.query,
-    required this.status,
-    required this.counts,
-    required this.onQuery,
-    required this.onStatus,
-  });
-
-  final String query;
-  final String status;
-  final Map<String, int> counts;
-  final ValueChanged<String> onQuery;
-  final ValueChanged<String> onStatus;
-
-  @override
-  State<_ChatFilterPanel> createState() => _ChatFilterPanelState();
-}
-
-class _ChatFilterPanelState extends State<_ChatFilterPanel> {
-  late final TextEditingController _ctl =
-      TextEditingController(text: widget.query);
-
-  @override
-  void dispose() {
-    _ctl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(10),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Inset field: one step darker than the panel it sits on, so the
-          // input reads as carved into the popover rather than drawn on it.
-          Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: AppColors.bg,
-              borderRadius: BorderRadius.circular(R.md),
-            ),
-            child: Row(children: [
-              AppIcon('search', size: 14, color: AppColors.fg4),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _ctl,
-                  autofocus: true,
-                  onChanged: (v) {
-                    widget.onQuery(v);
-                    setState(() {}); // reveal/hide the clear affordance
-                  },
-                  cursorColor: AppColors.fg1,
-                  style: sans(13, color: AppColors.fg1),
-                  decoration: InputDecoration(
-                    isCollapsed: true,
-                    border: InputBorder.none,
-                    hintText: 'Filter chats',
-                    hintStyle: sans(13, color: AppColors.fg4),
-                  ),
-                ),
-              ),
-              if (_ctl.text.isNotEmpty)
-                GestureDetector(
-                  onTap: () {
-                    _ctl.clear();
-                    widget.onQuery('');
-                    setState(() {});
-                  },
-                  child: AppIcon('x', size: 12, color: AppColors.fg4),
-                ),
-            ]),
-          ),
-          const SizedBox(height: 8),
-          for (final (val, label) in const [
-            ('all', 'All'),
-            ('input', 'Needs input'),
-            ('running', 'Running'),
-            ('done', 'Done'),
-          ])
-            _statusRow(val, label),
-        ],
-      ),
-    );
-  }
-
-  Widget _statusRow(String val, String label) {
-    final selected = widget.status == val;
-    return Material(
-      color: selected ? AppColors.surface1 : Colors.transparent,
-      borderRadius: BorderRadius.circular(R.md),
-      child: InkWell(
-        onTap: () => widget.onStatus(val),
-        borderRadius: BorderRadius.circular(R.md),
-        child: Container(
-          height: 28,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(children: [
-            Expanded(
-              child: Text(label,
-                  style: sans(13,
-                      weight: selected ? W.label : W.body,
-                      color: selected ? AppColors.fg1 : AppColors.fg2)),
-            ),
-            Text('${widget.counts[val] ?? 0}',
-                style: sans(12, color: AppColors.fg4)),
-            if (selected) ...[
-              const SizedBox(width: 6),
-              AppIcon('check', size: 14, color: AppColors.accent),
-            ],
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
 /// Keeps a swiped-away tab mounted so its WebSocket attach and scroll position
 /// survive switching between tabs.
 class _KeepAlive extends StatefulWidget {
@@ -4232,14 +4094,16 @@ class _Sidebar extends StatefulWidget {
 class _SidebarState extends State<_Sidebar> {
   // The session list now lives in the shell (passed via widget.sessions); the
   // sidebar is presentational, so opening the drawer doesn't refetch.
-  String _filter = 'all'; // all | input | running | done
-  /// Free-text filter over a session's title and folder, set from the CHATS
-  /// header popover. Empty means "no text filter".
   String _filterQuery = '';
-  final _filterKey = GlobalKey(); // anchors the desktop filter popover
   final _machineKey = GlobalKey(); // anchors the desktop machine popover
   bool _selecting = false;
   final Set<String> _selected = {};
+
+  /// Phone search. The bar's search action flips this and the pill expands into a
+  /// full-width field, so searching never costs permanent vertical space.
+  bool _mobileSearchOpen = false;
+  final TextEditingController _searchCtl = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
 
   /// Folder groups the user has collapsed. Keyed by folder path; a group is
   /// expanded by default, so a fresh session list is fully visible.
@@ -4256,6 +4120,8 @@ class _SidebarState extends State<_Sidebar> {
   void dispose() {
     _renameCtl.dispose();
     _renameFocus.dispose();
+    _searchCtl.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -4267,106 +4133,25 @@ class _SidebarState extends State<_Sidebar> {
   List<SessionInfo>? get _sessions => widget.sessions;
   bool get _loading => widget.sessionsLoading;
 
-  /// Status counts for the filter panel, computed from the *unfiltered* list so
-  /// the numbers stay meaningful while a query narrows the visible rows.
-  Map<String, int> _filterCounts() {
-    final all = widget.sessions ?? const <SessionInfo>[];
-    int n(bool Function(SessionInfo) f) => all.where(f).length;
-    return {
-      'all': all.length,
-      'input': n((s) => s.status == 'waiting_for_input'),
-      'running': n((s) => s.status == 'running'),
-      'done':
-          n((s) => s.status != 'waiting_for_input' && s.status != 'running'),
-    };
-  }
-
-  /// Desktop filter control: an anchored popover beneath the CHATS filter icon,
-  /// so the list stays visible while the query is typed.
-  Future<void> _openFilterPopover() async {
-    final box = _filterKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final origin = box.localToGlobal(Offset.zero);
-    final screen = MediaQuery.of(context).size;
-    const width = 264.0;
-    // Right-align to the icon, then keep the panel fully on screen.
-    final maxLeft = (screen.width - width - 8).clamp(8.0, screen.width);
-    final left = (origin.dx + box.size.width - width).clamp(8.0, maxLeft);
-    await showGeneralDialog(
-      context: context,
-      barrierDismissible: true, // click-away and Esc dismiss
-      barrierLabel: 'filter',
-      barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 120),
-      pageBuilder: (_, __, ___) => Stack(children: [
-        Positioned(
-          left: left,
-          top: origin.dy + box.size.height + 6,
-          width: width,
-          child: Material(
-            // Popover surface; separation comes from the surface step and the
-            // shadow, not a drawn border.
-            color: AppColors.surface3,
-            borderRadius: BorderRadius.circular(R.md),
-            elevation: 12,
-            shadowColor: Colors.black87,
-            child: _ChatFilterPanel(
-              query: _filterQuery,
-              status: _filter,
-              counts: _filterCounts(),
-              onQuery: (q) => setState(() => _filterQuery = q),
-              onStatus: (s) => setState(() => _filter = s),
-            ),
+  /// Empty state for a phone search that matched nothing.
+  ///
+  /// Needed now that the head and the pinned row step aside during search: an
+  /// empty list would otherwise read as a load failure rather than "no matches".
+  Widget _mobileSearchEmpty() => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon('search', size: 20, color: AppColors.fg4),
+              const SizedBox(height: 10),
+              Text('No chats match “${_filterQuery.trim()}”',
+                  textAlign: TextAlign.center,
+                  style: sans(12.5, color: AppColors.fg3)),
+            ],
           ),
         ),
-      ]),
-    );
-  }
-
-  void _showFilterSheet() {
-    showAppSheet(
-      context,
-      title: 'Filter conversations',
-      child: _ChatFilterPanel(
-        query: _filterQuery,
-        status: _filter,
-        counts: _filterCounts(),
-        onQuery: (q) => setState(() => _filterQuery = q),
-        onStatus: (s) => setState(() => _filter = s),
-      ),
-    );
-  }
-
-  /// Label for the machine sheet's filter row. Names the ACTIVE filter, so the
-  /// row reports state instead of being an anonymous "Filter" that gives no
-  /// sign the list is currently narrowed.
-  String _mobileFilterLabel() {
-    final active = _filter == 'all'
-        ? 'All chats'
-        : switch (_filter) {
-            'input' => 'Needs input',
-            'running' => 'Running',
-            'done' => 'Done',
-            _ => 'All chats',
-          };
-    return _filterQuery.trim().isEmpty
-        ? 'Filter · $active'
-        : 'Filter · $active · "${_filterQuery.trim()}"';
-  }
-
-  void _openSearch() {
-    showCommandPalette(
-      context,
-      sessions: _sessions ?? const [],
-      onOpenChat: (s) => widget.onOpenSession(s.id, s.title, s.profile),
-      commands: [
-        PaletteCommand('layers', 'Mission Control', '', _openMc),
-        PaletteCommand('edit', 'New chat', '', widget.onNewSession),
-        PaletteCommand('folder', 'Open folder', '', widget.onNewSession),
-        PaletteCommand('settings', 'Settings', '', _openSettings),
-      ],
-    );
-  }
+      );
 
   void _openSettings() {
     final c = widget.client;
@@ -4498,17 +4283,21 @@ class _SidebarState extends State<_Sidebar> {
 
   /// The phone home body for the destination the bar currently selects.
   ///
-  /// Each destination gets the whole surface below the bar. Chats keeps its own
-  /// head (machine context + the two quick actions); Agents and Settings own
-  /// their own headers, so they render directly.
+  /// Each destination gets the whole surface below the bar. Chats keeps a head
+  /// for machine identity; Agents and Settings own their own headers, so they
+  /// render directly.
   Widget _mobileHomeBody(bool hasClient) {
     switch (widget.mobileHome) {
       case _MobileHome.chats:
+        // While searching, the head and the pinned Mission Control row step
+        // aside: every line above the results is a line not showing matches, and
+        // the expanded field already states what the screen is doing.
+        final searching = _mobileSearchOpen && _filterQuery.trim().isNotEmpty;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _mobileHomeHead(hasClient),
-            if (hasClient && !_selecting) _stickyMissionControl(),
+            if (!searching) _mobileHomeHead(),
+            if (!searching && hasClient && !_selecting) _stickyMissionControl(),
             Expanded(
               child: !hasClient
                   ? Center(
@@ -4562,7 +4351,13 @@ class _SidebarState extends State<_Sidebar> {
   /// repeating "Chats" here spent a line on something the user just tapped. The
   /// state filter moved into the machine sheet, which is what let the old
   /// three-band stack collapse into one row.
-  Widget _mobileHomeHead(bool hasClient) {
+  /// The Chats head: machine identity, and nothing else.
+  ///
+  /// Search moved into the bottom bar (it expands there), and `plus` already
+  /// lives in the bar, so repeating either here would be two controls for one
+  /// action. What is left is the one thing the bar cannot carry: which machine
+  /// these chats belong to.
+  Widget _mobileHomeHead() {
     if (_selecting) {
       return Padding(
         padding: EdgeInsets.fromLTRB(M.gutter, 8, M.gutter - 4, 8),
@@ -4629,16 +4424,6 @@ class _SidebarState extends State<_Sidebar> {
             ),
           ),
         ),
-        IconBtn('search',
-            size: M.minTarget,
-            iconSize: 20,
-            tooltip: 'Search chats',
-            onTap: hasClient ? _openSearch : null),
-        IconBtn('plus',
-            size: M.minTarget,
-            iconSize: 21,
-            tooltip: 'New chat',
-            onTap: hasClient ? widget.onNewSession : null),
       ]),
     );
   }
@@ -4651,75 +4436,166 @@ class _SidebarState extends State<_Sidebar> {
   ///
   /// Rendered as a sibling of the body by the caller, never an overlay, so it
   /// cannot hide the last row of a list.
+  /// The floating action bar.
+  ///
+  /// Deliberately COMPACT: icon-only destinations in a pill that hugs its
+  /// content and centres, rather than a full-width strip. The bar is an
+  /// affordance you reach occasionally, so it should not reserve a third of the
+  /// screen's width for three glyphs.
+  ///
+  /// Tapping search expands the SAME pill into a full-width field — the control
+  /// grows in place instead of a second search surface appearing.
+  ///
+  /// Rendered as a sibling of the body by the caller, never an overlay, so it
+  /// cannot hide the last row of a list.
   Widget _mobileBar(bool hasClient) {
     final radius = BorderRadius.circular(_kMobileBarRadius);
+    final searching = _mobileSearchOpen && hasClient;
     return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter, 6),
-      child: Container(
-        height: _kMobileBarHeight,
-        // The shadow lives on the OUTER container; the fill, border and rounded
-        // clip live on the inner Material. An `InkWell` paints its ripple onto
-        // the nearest Material ancestor — with no local Material these would
-        // splash onto the Scaffold's and bleed outside the pill's corners.
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x59000000),
-              blurRadius: 16,
-              offset: Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Material(
-          color: AppColors.surface1,
-          shape: RoundedRectangleBorder(
-            borderRadius: radius,
-            side: BorderSide(color: AppColors.border2),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Row(children: [
-            const SizedBox(width: 4),
-            for (final h in _MobileHome.values)
-              Expanded(
-                child: _mobileBarDest(h, widget.mobileHome == h, hasClient),
+      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter, 8),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 170),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: searching
+            ? _mobileBarPill(radius, key: 'search', child: _mobileSearchRow())
+            // `Align` sizes itself to the parent but hands the child LOOSE
+            // constraints, which is what lets the pill hug its content and sit
+            // centred while the row still fills the width around it.
+            : Align(
+                alignment: Alignment.center,
+                child: _mobileBarPill(radius,
+                    key: 'bar', child: _mobileBarRow(hasClient)),
               ),
-            // Divider separates "where you are" from "what you can do".
-            Container(width: 1, height: 22, color: AppColors.border),
-            SizedBox(
-              width: 42,
-              child: _mobileBarAction('search', 'Search chats',
-                  onTap: hasClient ? _openSearch : null),
-            ),
-            SizedBox(
-              width: 42,
-              child: _mobileBarAction('plus', 'New chat',
-                  onTap: hasClient ? widget.onNewSession : null),
-            ),
-            const SizedBox(width: 4),
-          ]),
-        ),
       ),
     );
   }
 
-  Widget _mobileBarDest(_MobileHome h, bool active, bool enabled) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(_kMobileBarRadius - 6),
-      onTap: enabled ? () => widget.onMobileHome(h) : null,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AppIcon(h.icon,
-              size: 19, color: active ? AppColors.fg1 : AppColors.fg3),
-          const SizedBox(height: 3),
-          Text(h.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: sans(10.5,
-                  weight: active ? W.label : W.body,
-                  color: active ? AppColors.fg1 : AppColors.fg3)),
+  Widget _mobileBarPill(BorderRadius radius,
+      {required String key, required Widget child}) {
+    return Container(
+      key: ValueKey(key),
+      height: _kMobileBarHeight,
+      // Shadow on the OUTER container; fill, border and rounded clip on the
+      // inner Material. An InkWell paints its ripple onto the nearest Material
+      // ancestor — with none local it splashes onto the Scaffold and bleeds
+      // outside the pill's corners.
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x59000000),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
         ],
+      ),
+      child: Material(
+        color: AppColors.surface1,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: AppColors.border2),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+    );
+  }
+
+  Widget _mobileBarRow(bool hasClient) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(width: 4),
+        for (final h in _MobileHome.values)
+          _mobileBarDest(h, widget.mobileHome == h, hasClient),
+        const SizedBox(width: 4),
+        // Divider separates "where you are" from "what you can do".
+        Container(width: 1, height: 20, color: AppColors.border),
+        const SizedBox(width: 2),
+        _mobileBarAction('search', 'Search chats',
+            onTap: hasClient ? _toggleMobileSearch : null),
+        _mobileBarAction('plus', 'New chat',
+            onTap: hasClient ? widget.onNewSession : null),
+        const SizedBox(width: 4),
+      ],
+    );
+  }
+
+  /// The expanded search field. Occupies the whole pill, so the destinations and
+  /// the create action yield to it rather than competing with it.
+  Widget _mobileSearchRow() {
+    return Row(children: [
+      const SizedBox(width: 12),
+      AppIcon('search', size: 16, color: AppColors.fg3),
+      const SizedBox(width: 9),
+      Expanded(
+        child: TextField(
+          controller: _searchCtl,
+          focusNode: _searchFocus,
+          autofocus: true,
+          cursorColor: AppColors.accent,
+          textInputAction: TextInputAction.search,
+          onChanged: (v) => setState(() => _filterQuery = v),
+          style: sans(13.5, color: AppColors.fg1),
+          decoration: InputDecoration(
+            isCollapsed: true,
+            border: InputBorder.none,
+            hintText: 'Search chats',
+            hintStyle: sans(13.5, color: AppColors.fg4),
+          ),
+        ),
+      ),
+      if (_filterQuery.isNotEmpty)
+        IconBtn('x', size: 32, iconSize: 14, tooltip: 'Clear', onTap: () {
+          _searchCtl.clear();
+          setState(() => _filterQuery = '');
+        }),
+      IconBtn('arrow-down',
+          size: 36,
+          iconSize: 16,
+          tooltip: 'Close search',
+          onTap: _toggleMobileSearch),
+      const SizedBox(width: 4),
+    ]);
+  }
+
+  void _toggleMobileSearch() {
+    final open = !_mobileSearchOpen;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _mobileSearchOpen = open;
+      if (!open) {
+        // Leaving search CLEARS the query: a filter that stays applied while its
+        // field is hidden leaves the list silently missing rows.
+        _searchCtl.clear();
+        _filterQuery = '';
+      }
+    });
+    if (open) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchFocus.requestFocus();
+      });
+    }
+  }
+
+  Widget _mobileBarDest(_MobileHome h, bool active, bool enabled) {
+    return Tooltip(
+      message: h.label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
+          onTap: enabled ? () => widget.onMobileHome(h) : null,
+          child: SizedBox(
+            width: 44,
+            height: _kMobileBarHeight,
+            child: Center(
+              child: AppIcon(h.icon,
+                  size: 18, color: active ? AppColors.fg1 : AppColors.fg4),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -4727,12 +4603,20 @@ class _SidebarState extends State<_Sidebar> {
   Widget _mobileBarAction(String icon, String tooltip, {VoidCallback? onTap}) {
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(_kMobileBarRadius - 6),
-        onTap: onTap,
-        child: Center(
-          child: AppIcon(icon,
-              size: 20, color: onTap == null ? AppColors.fg4 : AppColors.fg2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
+          onTap: onTap,
+          child: SizedBox(
+            width: 44,
+            height: _kMobileBarHeight,
+            child: Center(
+              child: AppIcon(icon,
+                  size: 18,
+                  color: onTap == null ? AppColors.fg4 : AppColors.fg2),
+            ),
+          ),
         ),
       ),
     );
@@ -4801,13 +4685,6 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  static bool _statusMatch(String filter, SessionInfo s) => switch (filter) {
-        'input' => s.status == 'waiting_for_input',
-        'running' => s.status == 'running',
-        'done' => s.status != 'waiting_for_input' && s.status != 'running',
-        _ => true,
-      };
-
   /// Free-text match against a session's title and folder. An empty query
   /// matches everything, so the text filter is inert until the user types.
   bool _matchesQuery(SessionInfo s) {
@@ -4863,16 +4740,18 @@ class _SidebarState extends State<_Sidebar> {
     }
     final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
     final list = all
-        .where((s) =>
-            !isDedicatedMcSession(s.id) &&
-            _statusMatch(_filter, s) &&
-            _matchesQuery(s))
+        .where((s) => !isDedicatedMcSession(s.id) && _matchesQuery(s))
         .toList();
     // Phone chats are one flat, chronological surface. Folder nesting is a
     // desktop density aid; on a touch screen it obscures the one thing people
     // came here to do: open the recent conversation.
     if (kMobile) {
       list.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      // A query that matches nothing must say so — an empty list would read as a
+      // load failure once the head and Mission Control have stepped aside.
+      if (list.isEmpty && _filterQuery.trim().isNotEmpty) {
+        return _mobileSearchEmpty();
+      }
       return RefreshIndicator(
         color: AppColors.accent,
         backgroundColor: AppColors.surface3,
@@ -4929,7 +4808,7 @@ class _SidebarState extends State<_Sidebar> {
         }
       }
     }
-    if (list.isEmpty && (mc.isEmpty || _filter != 'all')) {
+    if (list.isEmpty && mc.isEmpty) {
       children.add(Padding(
           padding: const EdgeInsets.all(20),
           child: Text('Nothing here.',
@@ -4960,10 +4839,7 @@ class _SidebarState extends State<_Sidebar> {
     final hasClient = widget.client != null;
     final all = _sessions ?? const <SessionInfo>[];
     final list = all
-        .where((s) =>
-            !isDedicatedMcSession(s.id) &&
-            _statusMatch(_filter, s) &&
-            _matchesQuery(s))
+        .where((s) => !isDedicatedMcSession(s.id) && _matchesQuery(s))
         .toList();
 
     // Newest folder first, then newest session within it.
@@ -5001,15 +4877,6 @@ class _SidebarState extends State<_Sidebar> {
           onToggle: () => setState(() => _toggleCollapsed(_chatsKey)),
           actions: [
             ShellSectionAction(
-              key: _filterKey,
-              icon: 'sliders',
-              tooltip: 'Filter chats',
-              // Accented while a text filter is active, so a filtered list is
-              // never mistaken for an empty one.
-              active: _filterQuery.trim().isNotEmpty,
-              onTap: hasClient ? _openFilterPopover : null,
-            ),
-            ShellSectionAction(
               icon: 'plus',
               tooltip: 'New chat',
               onTap: hasClient ? widget.onNewSession : null,
@@ -5021,10 +4888,10 @@ class _SidebarState extends State<_Sidebar> {
         else if (!hasClient)
           const _SidebarEmpty('Add a machine to begin.')
         else if (list.isEmpty)
-          // Distinguish "no conversations" from "none match the filter": saying
-          // "No chats yet" over a filtered list reads as data loss.
-          _SidebarEmpty(_filterQuery.trim().isNotEmpty || _filter != 'all'
-              ? 'No chats match the filter.'
+          // Distinguish "no conversations" from "none match the search": saying
+          // "No chats yet" over a searched list reads as data loss.
+          _SidebarEmpty(_filterQuery.trim().isNotEmpty
+              ? 'No chats match the search.'
               : 'No chats yet.')
         else
           // Flat list of conversations directly under CHATS (no folder nesting)
@@ -5056,49 +4923,6 @@ class _SidebarState extends State<_Sidebar> {
       // indicator for one fact. Colour is the state channel — see
       // `sessionStateColor`: amber busy, accent needs-you, neutral idle.
       leading: SessionStateIcon(status: s.status, size: kNavIcon),
-    );
-  }
-
-  Widget _filterChips(List<SessionInfo> all) {
-    const items = [
-      ('all', 'All'),
-      ('input', 'Needs input'),
-      ('running', 'Running'),
-      ('done', 'Done')
-    ];
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
-        child: Row(children: [
-          for (final (val, label) in items) ...[
-            _chip(val, label, all.where((s) => _statusMatch(val, s)).length),
-            const SizedBox(width: 7),
-          ],
-        ]),
-      ),
-    );
-  }
-
-  Widget _chip(String val, String label, int n) {
-    final sel = _filter == val;
-    return Material(
-      color: sel ? AppColors.fg1 : AppColors.surface2,
-      borderRadius: BorderRadius.circular(99),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(99),
-        hoverColor: sel
-            ? Colors.transparent
-            : null, // no raise on the light selected chip
-        onTap: () => setState(() => _filter = val),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-          child: Text('$label $n',
-              style: sans(12.5,
-                  weight: W.label, color: sel ? AppColors.bg : AppColors.fg3)),
-        ),
-      ),
     );
   }
 
@@ -5424,17 +5248,9 @@ class _SidebarState extends State<_Sidebar> {
       final overlay =
           Overlay.of(context).context.findRenderObject() as RenderBox;
       final point = position ?? overlay.size.center(Offset.zero);
-      final selected = await showMenu<String>(
-        context: context,
-        position: RelativeRect.fromRect(
-          Rect.fromCircle(center: point, radius: 0),
-          Offset.zero & overlay.size,
-        ),
-        color: AppColors.surface1,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        shape: appMenuShape,
+      final selected = await showAppMenu<String>(
+        context,
+        point: point,
         items: [
           appMenuItem(value: 'rename', icon: 'edit', label: 'Rename'),
           appMenuItem(
@@ -5521,10 +5337,7 @@ class _SidebarState extends State<_Sidebar> {
   /// that was never on screen.
   List<SessionInfo> get _visibleSessions => [
         for (final s in _sessions ?? const <SessionInfo>[])
-          if (!isDedicatedMcSession(s.id) &&
-              _statusMatch(_filter, s) &&
-              _matchesQuery(s))
-            s,
+          if (!isDedicatedMcSession(s.id) && _matchesQuery(s)) s,
       ];
 
   bool get _allVisibleSelected {
@@ -5807,26 +5620,10 @@ class _SidebarState extends State<_Sidebar> {
       onManage: _machineActions,
     );
     if (kMobile) {
-      // The sheet carries two things: which machine, and the state filter. The
-      // filter used to live on the always-visible search field, but that field
-      // was removed from the head — and a filter with no way to reach it would
-      // silently strand the list. The machine row is the head's one overflow,
-      // so it owns both.
       await showAppSheet(
         context,
         title: 'Machines',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            content,
-            Divider(height: 13, thickness: 1, color: AppColors.border),
-            _sessionActionTile('sliders', _mobileFilterLabel(), onTap: () {
-              Navigator.pop(context);
-              _showFilterSheet();
-            }),
-          ],
-        ),
+        child: content,
       );
       return;
     }
@@ -6067,6 +5864,12 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   bool _notifBusy = false;
   _SettingsPage _page = _SettingsPage.general;
 
+  /// Phone drill-down. Null shows the section INDEX; a value shows that section
+  /// with a back row. A horizontal chip strip was the wrong shape on a phone:
+  /// it hides sections off-screen unless you swipe, and each chip is far below
+  /// the 44px touch minimum.
+  _SettingsPage? _mobileSection;
+
   static const _nav = [
     (_SettingsPage.general, 'settings', 'General'),
     (_SettingsPage.models, 'cpu', 'Models'),
@@ -6110,6 +5913,17 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    // Phone + embedded in the home: drill down instead of a chip strip.
+    final drill = kMobile && widget.embedded;
+    if (drill) {
+      return Scaffold(
+        backgroundColor: AppColors.surface1,
+        body: SafeArea(
+          bottom: false,
+          child: _mobileSection == null ? _mobileIndex() : _mobileSectionPage(),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.surface1,
       body: SafeArea(
@@ -6156,6 +5970,106 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       ),
     );
   }
+
+  /// Phone settings INDEX: one full-width row per section.
+  ///
+  /// A list of destinations rather than a strip of tabs — every row is a 52px
+  /// target, all five are visible at once, and each one says what it holds.
+  Widget _mobileIndex() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 24),
+      children: [
+        for (final (page, icon, label) in _nav) ...[
+          _mobileIndexRow(page, icon, label),
+          const SizedBox(height: 6),
+        ],
+      ],
+    );
+  }
+
+  Widget _mobileIndexRow(_SettingsPage page, String icon, String label) {
+    return Material(
+      color: AppColors.surface2,
+      borderRadius: BorderRadius.circular(R.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.md),
+        onTap: () => setState(() => _mobileSection = page),
+        child: Container(
+          height: M.rowHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(children: [
+            AppIcon(icon, size: 19, color: AppColors.fg2),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(label, style: sans(M.rowTitle, color: AppColors.fg1)),
+                  const SizedBox(height: 1),
+                  Text(_sectionSummary(page),
+                      style: sans(11, color: AppColors.fg4)),
+                ],
+              ),
+            ),
+            AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  String _sectionSummary(_SettingsPage p) => switch (p) {
+        _SettingsPage.general => 'Machines and alerts',
+        _SettingsPage.models => 'Providers and models',
+        _SettingsPage.usage => 'Tokens and spend',
+        _SettingsPage.vault => 'Stored secrets',
+        _SettingsPage.scheduled => 'Recurring jobs',
+      };
+
+  /// One phone settings section, with a back row and no chip strip.
+  Widget _mobileSectionPage() {
+    final section = _mobileSection!;
+    final label = _nav.firstWhere((n) => n.$1 == section).$3;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _mobileSectionHeader(label),
+        Expanded(
+          child: switch (section) {
+            _SettingsPage.general => _generalPage(),
+            _SettingsPage.models =>
+              ModelsScreen(client: widget.client, embedded: true),
+            _SettingsPage.usage =>
+              UsageScreen(client: widget.client, embedded: true),
+            _SettingsPage.vault =>
+              VaultScreen(client: widget.client, embedded: true),
+            _SettingsPage.scheduled => RecurringScreen(
+                client: widget.client, listOnly: true, embedded: true),
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _mobileSectionHeader(String label) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
+        child: Row(children: [
+          IconBtn('arrow-left',
+              size: M.minTarget,
+              iconSize: 19,
+              tooltip: 'Settings',
+              onTap: () => setState(() => _mobileSection = null)),
+          Expanded(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(M.sectionTitle,
+                    weight: W.label, color: AppColors.fg1)),
+          ),
+          const SizedBox(width: 4),
+        ]),
+      );
 
   Widget _navChips() {
     return ListView(

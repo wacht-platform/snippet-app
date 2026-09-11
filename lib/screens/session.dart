@@ -3357,31 +3357,11 @@ class _SessionScreenState extends State<SessionScreen>
   /// Approval picker, anchored under its composer chip.
   Future<void> _switchApproval([BuildContext? anchor]) async {
     final current = _state?.approvalMode ?? 'auto';
-    final box = (anchor ?? context).findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    RelativeRect position;
-    if (box != null && overlay != null) {
-      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      final menuW = math.min(300.0, overlay.size.width - 24);
-      final left = origin.dx.clamp(12.0, overlay.size.width - menuW - 12);
-      position = RelativeRect.fromLTRB(
-        left,
-        origin.dy - 8,
-        overlay.size.width - left - menuW,
-        overlay.size.height - origin.dy + 8,
-      );
-    } else {
-      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
-    }
-    final picked = await showMenu<String>(
-      context: context,
-      position: position,
-      color: AppColors.surface1,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      shape: appMenuShape,
-      constraints: const BoxConstraints(minWidth: 260, maxWidth: 320),
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor ?? context,
+      minWidth: 260,
+      maxWidth: 320,
       items: [
         appMenuRow(
           value: 'auto',
@@ -4052,34 +4032,12 @@ class _SessionScreenState extends State<SessionScreen>
       _toast('No model profiles');
       return;
     }
-    final box = (anchor ?? context).findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    RelativeRect position;
-    if (box != null && overlay != null) {
-      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      final menuW = math.min(280.0, overlay.size.width - 24);
-      final left = origin.dx.clamp(12.0, overlay.size.width - menuW - 12);
-      // Sit just above the chip. A tiny top inset (16) used to pin the menu
-      // to the status bar on phones.
-      position = RelativeRect.fromLTRB(
-        left,
-        origin.dy - 8,
-        overlay.size.width - left - menuW,
-        overlay.size.height - origin.dy + 8,
-      );
-    } else {
-      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
-    }
     final current = _modelLabel;
-    final picked = await showMenu<String>(
-      context: context,
-      position: position,
-      color: AppColors.surface1,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      shape: appMenuShape,
-      constraints: const BoxConstraints(minWidth: 260, maxWidth: 340),
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor ?? context,
+      minWidth: 260,
+      maxWidth: 340,
       items: [
         appMenuHeading<String>('Model'),
         for (final p in cfg.profiles)

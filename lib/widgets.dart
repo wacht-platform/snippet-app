@@ -109,6 +109,158 @@ PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
           style: sans(10, weight: W.label, color: AppColors.fg4)),
     );
 
+/// Present a menu in the shape the platform expects.
+///
+/// ONE entry point for every `appMenuItem`/`appMenuRow` menu in the app: a bottom
+/// sheet on a phone (full width, rows at real touch height, thumb reachable) and
+/// an anchored popover on desktop.
+///
+/// Callers previously each computed a `RelativeRect` and called `showMenu`
+/// directly, which is why the same menu opened as a cramped floating card on a
+/// phone — 40px rows, 12px padding, no grab handle, no sheet affordance.
+Future<T?> showAppMenu<T>(
+  BuildContext context, {
+  required List<PopupMenuEntry<T>> items,
+
+  /// The control this menu belongs to; the desktop popover anchors to it.
+  BuildContext? anchor,
+
+  /// Explicit screen point (long-press / right-click). Wins over [anchor].
+  Offset? point,
+  double minWidth = 260,
+  double maxWidth = 340,
+  Color? color,
+
+  /// Open BELOW the anchor instead of above it. Set for controls at the TOP of
+  /// the window (the shell menu), where an upward menu would be clipped offscreen.
+  bool below = false,
+}) {
+  final bg = color ?? AppColors.surface1;
+
+  if (kMobile) {
+    return showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: const Color(0x9E000000),
+      isScrollControlled: true,
+      builder: (sheet) {
+        final media = MediaQuery.of(sheet);
+        return Container(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 10),
+            Center(
+                child: Container(
+                    width: 32,
+                    height: 3,
+                    decoration: BoxDecoration(
+                        color: AppColors.border2,
+                        borderRadius: BorderRadius.circular(99)))),
+            const SizedBox(height: 6),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  for (final item in items) _appMenuSheetEntry(sheet, item),
+                ]),
+              ),
+            ),
+            SizedBox(height: media.padding.bottom + 8),
+          ]),
+        );
+      },
+    );
+  }
+
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+  RelativeRect position;
+  if (overlay == null) {
+    position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+  } else if (point != null) {
+    position = RelativeRect.fromRect(
+      Rect.fromCircle(center: point, radius: 0),
+      Offset.zero & overlay.size,
+    );
+  } else if (anchor != null) {
+    final box = anchor.findRenderObject() as RenderBox?;
+    if (box == null) {
+      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+    } else {
+      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+      final left = origin.dx.clamp(12.0, overlay.size.width - minWidth - 12);
+      if (below) {
+        // Anchored under a control at the TOP of the window (the shell menu),
+        // where an upward menu would be clipped offscreen.
+        position = RelativeRect.fromLTRB(
+          left,
+          origin.dy + box.size.height + 4,
+          overlay.size.width - left - minWidth,
+          0,
+        );
+      } else {
+        // Above the control: the composer chips sit at the bottom of the window,
+        // so a menu opening downward would be clipped.
+        position = RelativeRect.fromLTRB(
+          left,
+          origin.dy - 8,
+          overlay.size.width - left - minWidth,
+          overlay.size.height - origin.dy + 8,
+        );
+      }
+    }
+  } else {
+    position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+  }
+
+  return showMenu<T>(
+    context: context,
+    position: position,
+    color: bg,
+    elevation: 0,
+    shadowColor: Colors.transparent,
+    surfaceTintColor: Colors.transparent,
+    shape: appMenuShape,
+    constraints: BoxConstraints(minWidth: minWidth, maxWidth: maxWidth),
+    items: items,
+  );
+}
+
+/// One entry inside the phone menu sheet.
+///
+/// Mirrors what `PopupMenuItem` draws, so a helper-built row needs no
+/// mobile-specific variant — but sized to a real touch target, which the popup
+/// defaults are not.
+Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
+  if (entry is PopupMenuDivider) {
+    return Divider(height: 13, thickness: 1, color: AppColors.border);
+  }
+  if (entry is! PopupMenuItem<T>) {
+    return const SizedBox.shrink();
+  }
+  final pad = entry.padding ?? const EdgeInsets.symmetric(horizontal: M.gutter);
+  // A heading is a section label and is deliberately NOT tappable.
+  if (!entry.enabled) {
+    return Padding(
+      padding: pad,
+      child: SizedBox(height: entry.height, child: entry.child),
+    );
+  }
+  return InkWell(
+    onTap: () => Navigator.pop(sheet, entry.value),
+    child: Padding(
+      padding: pad,
+      child: SizedBox(
+        // Never below the 44px touch minimum, whatever the desktop helper used.
+        height: entry.height < 48 ? 52 : entry.height,
+        child: entry.child,
+      ),
+    ),
+  );
+}
+
 /// A slick, theme-styled toast rendered in the ROOT overlay — so it floats above
 /// panels/dialogs instead of a SnackBar buried behind a modal backdrop. A new one
 /// replaces the previous (no stacking). Use for transient feedback.
