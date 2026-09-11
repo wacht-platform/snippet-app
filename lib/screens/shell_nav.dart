@@ -288,11 +288,25 @@ class ShellNavRow extends StatelessWidget {
 /// Header height for a pane. Measured 36px in the reference.
 const double kPaneHeaderHeight = 36;
 
-/// A framed tab sits in the full strip band. The active state is a 1px top
-/// edge inside the frame; passive edges use a 0.2px neutral-grey hairline.
+/// A framed tab sits in the full strip band. The active state is a solid white
+/// top edge; passive seams are a near-background white hairline.
 const double kPaneTabHeight = kPaneHeaderHeight;
 const double kPaneHairline = 0.2;
 const double kPaneActiveStroke = 1.0;
+
+/// Passive pane/tab seam. Very low-alpha white over the canvas, so the boundary
+/// reads as a soft edge that is present but nearly part of the background.
+const double kPaneSeamAlpha = 0.10;
+
+/// The same seam while the divider is hovered — bright enough to signal that the
+/// line is the resize target, without becoming a drawn border.
+const double kPaneSeamHoverAlpha = 0.30;
+
+/// The one seam colour both panes share, so their boundary cannot render as two
+/// disjoint edges.
+Color get kPaneSeamColor => AppColors.fg1.withValues(alpha: kPaneSeamAlpha);
+Color get kPaneSeamHoverColor =>
+    AppColors.fg1.withValues(alpha: kPaneSeamHoverAlpha);
 
 /// Bounded desktop tab widths. A root/session tab never grows to fill an empty
 /// pane; its longer title may grow until the cap, while auxiliary tabs remain
@@ -314,8 +328,8 @@ class PaneTab {
   final VoidCallback? onClose;
 }
 
-/// Shared joined tab strip for a pane readout. The outside hairline is one
-/// continuous frame; tabs meet directly and share their internal vertical seam.
+/// Shared joined tab strip for a pane readout. Tabs meet directly and share one
+/// near-background baseline; the active tab carries a solid white top edge.
 class PaneTabStrip extends StatelessWidget {
   const PaneTabStrip({
     super.key,
@@ -342,13 +356,14 @@ class PaneTabStrip extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox.shrink(),
           itemBuilder: (_, i) => _tab(i),
         ),
-        Positioned.fill(
+        // Foreground baseline: the ListView paints over the container's own
+        // decoration, so the strip rule must be laid on top of the tabs.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
           child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.fg4, width: kPaneHairline),
-              ),
-            ),
+            child: Container(height: kPaneHairline, color: kPaneSeamColor),
           ),
         ),
       ]),
@@ -372,9 +387,9 @@ class PaneTabStrip extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.canvas,
               border: Border(
-                right: BorderSide(color: AppColors.fg4, width: kPaneHairline),
+                right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
                 top: active
-                    ? BorderSide(color: AppColors.fg3, width: kPaneActiveStroke)
+                    ? BorderSide(color: AppColors.fg1, width: kPaneActiveStroke)
                     : BorderSide.none,
               ),
             ),

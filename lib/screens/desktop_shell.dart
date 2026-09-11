@@ -2680,7 +2680,7 @@ class _DesktopShellState extends State<DesktopShell>
               child: IgnorePointer(
                 child: Container(
                   width: kPaneHairline,
-                  color: AppColors.fg4,
+                  color: kPaneSeamColor,
                 ),
               ),
             ),
@@ -3027,10 +3027,10 @@ class _DesktopShellState extends State<DesktopShell>
     return _client == null ? _welcome() : _recentPlaceholder();
   }
 
-  /// Joined pane-tab construction: a single outer hairline frames the strip,
-  /// and adjacent tabs share their vertical seam with no visual gap. A session
-  /// root stays a capped, locked first tab; supporting tabs are larger bounded
-  /// frames with their close action inside the tab itself.
+  /// Joined pane-tab construction: tabs meet directly on one shared
+  /// near-background baseline, with the active tab marked by a solid white top
+  /// edge. A session root stays a capped, locked first tab; supporting tabs are
+  /// larger bounded frames with their close action inside the tab itself.
   Widget _paneStrip(_Pane p, List<_ShellTab> list) {
     final active = _activeIn(p);
     return Container(
@@ -3044,13 +3044,14 @@ class _DesktopShellState extends State<DesktopShell>
           separatorBuilder: (_, __) => const SizedBox.shrink(),
           itemBuilder: (_, i) => _paneTabChip(p, list[i], list[i] == active),
         ),
-        Positioned.fill(
+        // Foreground baseline: the ListView paints over the container's own
+        // decoration, so the strip rule must be laid on top of the tabs.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
           child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.fg4, width: kPaneHairline),
-              ),
-            ),
+            child: Container(height: kPaneHairline, color: kPaneSeamColor),
           ),
         ),
       ]),
@@ -3196,9 +3197,9 @@ class _DesktopShellState extends State<DesktopShell>
           decoration: BoxDecoration(
             color: AppColors.canvas,
             border: Border(
-              right: BorderSide(color: AppColors.fg4, width: kPaneHairline),
+              right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
               top: active
-                  ? BorderSide(color: AppColors.fg3, width: kPaneActiveStroke)
+                  ? BorderSide(color: AppColors.fg1, width: kPaneActiveStroke)
                   : BorderSide.none,
             ),
           ),
@@ -3249,8 +3250,9 @@ class _DesktopShellState extends State<DesktopShell>
             style: sans(12.5, color: AppColors.fg4)),
       );
 
-  /// A stable 1px divider separates the two equal-canvas panes. The wider hit
-  /// zone remains draggable, but its visual edge no longer disappears at rest.
+  /// The single shared divider between the two panes. It is one line, not a
+  /// per-pane edge, which is what keeps the boundary continuous when both panes
+  /// are open — and the wider hit zone makes that same line the resize target.
   Widget _paneResizeHandle() => MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
         onEnter: (_) => setState(() => _paneHandleHover = true),
@@ -3267,9 +3269,13 @@ class _DesktopShellState extends State<DesktopShell>
           child: SizedBox(
             width: 6,
             child: Center(
-              child: Container(
+              child: SizedBox(
                 width: kPaneHairline,
-                color: _paneHandleHover ? AppColors.fg4 : AppColors.border2,
+                height: double.infinity,
+                child: ColoredBox(
+                  color:
+                      _paneHandleHover ? kPaneSeamHoverColor : kPaneSeamColor,
+                ),
               ),
             ),
           ),
