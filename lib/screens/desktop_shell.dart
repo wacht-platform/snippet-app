@@ -3099,14 +3099,21 @@ class _DesktopShellState extends State<DesktopShell>
 
   /// Items in one nested tab group. The root is deliberately first and locked;
   /// the rest are user-opened files, diffs and terminals for that conversation.
+  ///
+  /// A pane with NO root still lists whatever is docked in it. That case is what
+  /// made a moved tab vanish: a file or terminal dragged to the secondary pane
+  /// keeps the `groupSessionKey` of the conversation it belongs to, and that
+  /// conversation lives in the LEFT pane — so `_groupRootFor(right)` returned
+  /// null, this returned empty, and `showRight` then collapsed the very pane the
+  /// tab had just been dropped into. Requiring a root here only makes sense for
+  /// the pane that actually holds one.
   List<_ShellTab> _tabsIn(_Pane p) {
     final root = _groupRootFor(p);
-    if (root == null) return const <_ShellTab>[];
     return [
       for (final t in _tabs)
         if (t.pane == p &&
-            (t.key == root || t.groupSessionKey == root) &&
-            !_hiddenTabs.contains(t.key))
+            !_hiddenTabs.contains(t.key) &&
+            (root == null || t.key == root || t.groupSessionKey == root))
           t,
     ];
   }
