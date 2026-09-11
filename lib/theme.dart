@@ -641,6 +641,21 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedLayout2Column;
     case 'processes':
       return HugeIcons.strokeRoundedActivity01;
+    // Settings-section glyphs. Each names what the section actually holds, so
+    // the icons are readable without the label: a machine is a server stack,
+    // not a CPU (a CPU is a chip INSIDE the machine); inference profiles are the
+    // model layer; usage is spend; the vault is a locked key; scheduled work is
+    // a repeat cycle rather than a bare calendar date.
+    case 'server':
+      return HugeIcons.strokeRoundedServerStack01;
+    case 'ai-chip':
+      return HugeIcons.strokeRoundedAiChip;
+    case 'analytics':
+      return HugeIcons.strokeRoundedAnalytics01;
+    case 'lock-key':
+      return HugeIcons.strokeRoundedLockKey;
+    case 'repeat':
+      return HugeIcons.strokeRoundedRepeat;
     default:
       return HugeIcons.strokeRoundedCircle;
   }

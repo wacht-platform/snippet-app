@@ -4149,7 +4149,7 @@ class _DesktopShellState extends State<DesktopShell>
                         color: AppColors.surface2,
                         borderRadius: BorderRadius.circular(R.card),
                         border: Border.all(color: AppColors.border)),
-                    child: AppIcon('cpu', size: 24, color: AppColors.fg3),
+                    child: AppIcon('server', size: 24, color: AppColors.fg3),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -6184,11 +6184,11 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   _SettingsPage? get _mobileSection => widget.section;
 
   static const _nav = [
-    (_SettingsPage.general, 'settings', 'General'),
-    (_SettingsPage.models, 'cpu', 'Inference profiles'),
-    (_SettingsPage.usage, 'activity', 'Usage'),
-    (_SettingsPage.vault, 'key', 'Vault'),
-    (_SettingsPage.scheduled, 'scheduled', 'Scheduled'),
+    (_SettingsPage.general, 'server', 'General'),
+    (_SettingsPage.models, 'ai-chip', 'Inference profiles'),
+    (_SettingsPage.usage, 'analytics', 'Usage'),
+    (_SettingsPage.vault, 'lock-key', 'Vault'),
+    (_SettingsPage.scheduled, 'repeat', 'Scheduled'),
   ];
 
   @override
@@ -6350,7 +6350,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   Widget _inlineLabel(String t) => Padding(
         padding: const EdgeInsets.only(left: 2),
         child: Text(t.toUpperCase(),
-            style: sans(kMobile ? 12 : 10,
+            style: sans(kMobile ? 11 : 10,
                 weight: W.label, color: AppColors.fg4, spacing: 0.5)),
       );
 
@@ -6372,35 +6372,44 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return InkWell(
       onTap: () => widget.onSection?.call(page),
       child: Container(
-        height: 64,
+        height: 60,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(children: [
-          AppIcon(icon, size: 21, color: AppColors.fg2),
-          const SizedBox(width: 14),
+          AppIcon(icon, size: 20, color: AppColors.fg2),
+          const SizedBox(width: 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(label, style: sans(M.rowTitle, color: AppColors.fg1)),
+                // Deliberately BELOW `M.rowTitle` (14): these are navigation
+                // labels in a two-line stack, not the primary content of a list
+                // row. Sized locally so the session list — which the same tokens
+                // drive, and which was deliberately enlarged — keeps its size.
+                Text(label, style: sans(13.5, color: AppColors.fg1)),
                 const SizedBox(height: 2),
                 Text(_sectionSummary(page),
-                    style: sans(M.meta, color: AppColors.fg4)),
+                    style: sans(11.5, color: AppColors.fg4)),
               ],
             ),
           ),
-          AppIcon('chevron-right', size: 17, color: AppColors.fg4),
+          AppIcon('chevron-right', size: 16, color: AppColors.fg4),
         ]),
       ),
     );
   }
 
+  /// One-line description of what a settings section is FOR.
+  ///
+  /// Phrased as what you go there to do, not as a noun list — "Providers and
+  /// models" restated the label; "Pick the model each session runs on" tells you
+  /// why you'd tap it.
   String _sectionSummary(_SettingsPage p) => switch (p) {
-        _SettingsPage.general => 'Machines and alerts',
-        _SettingsPage.models => 'Providers, keys and models',
-        _SettingsPage.usage => 'Tokens and spend',
-        _SettingsPage.vault => 'Stored secrets',
-        _SettingsPage.scheduled => 'Recurring jobs',
+        _SettingsPage.general => 'Machines, alerts and this workspace',
+        _SettingsPage.models => 'Pick the model new sessions run on',
+        _SettingsPage.usage => 'Token spend and rate limits',
+        _SettingsPage.vault => 'Secrets the agent may use as \$NAME',
+        _SettingsPage.scheduled => 'Jobs that re-run on a schedule',
       };
 
   /// One phone settings section.
@@ -6554,8 +6563,10 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         padding: EdgeInsets.fromLTRB(
             kMobile ? 14 : 10, kMobile ? 12 : 8, 4, kMobile ? 12 : 8),
         child: Row(children: [
-          AppIcon('cpu',
-              size: kMobile ? 17 : 14,
+          // A machine is a SERVER, not a CPU. The old `cpu` glyph described a
+          // chip inside the machine, which read as the wrong object entirely.
+          AppIcon('server',
+              size: kMobile ? 18 : 14,
               color: isActive ? AppColors.accent : AppColors.fg3),
           const SizedBox(width: 10),
           Expanded(
@@ -6596,7 +6607,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       padding: EdgeInsets.symmetric(
           horizontal: kMobile ? 14 : 0, vertical: kMobile ? 12 : 2),
       child: Row(children: [
-        AppIcon('zap', size: kMobile ? 17 : 14, color: AppColors.fg3),
+        // A bell for a notification setting. `zap` (a lightning bolt) named
+        // nothing about alerts.
+        AppIcon('bell', size: kMobile ? 18 : 14, color: AppColors.fg3),
         const SizedBox(width: 10),
         Expanded(
           child:
