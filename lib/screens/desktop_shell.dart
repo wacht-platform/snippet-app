@@ -339,6 +339,14 @@ class _DesktopShellState extends State<DesktopShell>
   bool _rightCollapsed = false;
   bool _leftCollapsed = false;
 
+  /// Terminal tabs the user dismissed from a pane's strip.
+  ///
+  /// Dismissing a terminal closes only its VIEW. The pty keeps running in the
+  /// daemon and the shell stays listed in the Terminals panel, so re-opening is
+  /// instant. Without this the chip's close hid the whole PANE the terminal
+  /// lived in — conversation included — instead of just the terminal's view.
+  final Set<String> _hiddenTabs = {};
+
   /// Which tab each pane is showing, keyed by pane. Separate from `_activeIndex`
   /// so the two containers keep independent selections.
   final Map<_Pane, String> _activeKey = {};
@@ -1518,6 +1526,11 @@ class _DesktopShellState extends State<DesktopShell>
           _active != null ? DaemonClient(_active!.url, _active!.token) : null;
       _loading = false;
     });
+    // Wire the daemon-wide shell socket on COLD START too. `_selectInstance` and
+    // `_onNotif` already do this; skipping it here left the Terminal tab with no
+    // `/shells` connection, so a shell created from the sidebar was an optimistic
+    // local row with no pty behind it — a black pane with only a caret.
+    _shells.setClient(_client);
     await _restoreTabs(items);
     _ensurePinnedMissionControl();
     _connectEventsWatch();
@@ -2867,7 +2880,10 @@ class _DesktopShellState extends State<DesktopShell>
     if (root == null) return const <_ShellTab>[];
     return [
       for (final t in _tabs)
-        if (t.pane == p && (t.key == root || t.groupSessionKey == root)) t,
+        if (t.pane == p &&
+            (t.key == root || t.groupSessionKey == root) &&
+            !_hiddenTabs.contains(t.key))
+          t,
     ];
   }
 
@@ -3161,6 +3177,9 @@ class _DesktopShellState extends State<DesktopShell>
         final i = _tabs.indexOf(root);
         setState(() {
           if (!_isAuxiliary(root) && i >= 0) _activeIndex = i;
+          // Re-opening a shell the user had dismissed from a pane un-hides it,
+          // so picking it in the Terminals panel always brings it back.
+          _hiddenTabs.remove(t.key);
           _groupRootKey[t.pane] = root.key;
           _activeKey[t.pane] = t.key;
         });
@@ -3193,6 +3212,7 @@ class _DesktopShellState extends State<DesktopShell>
         final stale = !live.containsKey(id);
         if (!duplicate && !stale) return false;
         _activeKey.removeWhere((_, key) => key == t.key);
+        _hiddenTabs.remove(t.key);
         changed = true;
         return true;
       });
@@ -3228,16 +3248,21 @@ class _DesktopShellState extends State<DesktopShell>
     if (changed) _persistTabs();
   }
 
-  /// Hide a pane. Never destroys: a terminal tab lives on in the sidebar and its
-  /// pty stays alive, so re-opening is instant.
-  void _collapsePane(_Pane p) {
+  /// Hide ONE terminal view without touching the pane that holds it.
+  ///
+  /// The pty stays alive in the daemon and the shell stays listed in the
+  /// Terminals panel, so opening it again re-docks the same view instantly.
+  /// Re-opening from the sidebar clears the flag through [_focusGlobalShell].
+  void _hideTabView(_Pane p, _ShellTab t) {
     setState(() {
-      if (p == _Pane.right) {
-        _rightCollapsed = true;
-      } else {
-        _leftCollapsed = true;
+      _hiddenTabs.add(t.key);
+      // If the hidden view was the pane's selection, fall back to another tab
+      // in that pane (or the pane's default surface) rather than a blank slot.
+      if (_activeKey[p] == t.key) {
+        _activeKey.remove(p);
       }
     });
+    _persistTabs();
   }
 
   Widget _paneTabChip(_Pane p, _ShellTab t, bool active, double width) {
@@ -3246,7 +3271,7 @@ class _DesktopShellState extends State<DesktopShell>
       // Closing a terminal tab only hides this pane view. Its pty remains alive
       // and traceable from the Terminals panel; file/diff tabs close normally.
       if (t.isTerminal) {
-        _collapsePane(p);
+        _hideTabView(p, t);
       } else {
         _closePaneTab(t);
       }

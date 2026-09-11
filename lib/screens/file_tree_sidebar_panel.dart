@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
@@ -43,13 +46,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   FsListing? _listing;
   bool _loading = true;
   String? _error;
-  final TextEditingController _filterCtl = TextEditingController();
-  final FocusNode _filterFocus = FocusNode();
-
-  /// Whether the search field is revealed. Collapsed by default: at 26px rows
-  /// an always-visible field spent a slab of vertical space on something used
-  /// occasionally, and it competed with the tree for the eye.
-  bool _searchOpen = false;
   final Set<String> _expandedFolders = {};
   final Set<String> _loadingFolders = {};
   final Map<String, List<FsEntry>> _childrenByPath = {};
@@ -74,31 +70,17 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     }
   }
 
-  @override
-  void dispose() {
-    _filterCtl.dispose();
-    _filterFocus.dispose();
-    super.dispose();
-  }
-
-  /// Show/hide the search field.
+  /// Search is a POPOVER, not an inline field.
   ///
-  /// Closing CLEARS the query: a filter that stays applied while its field is
-  /// hidden leaves the tree silently missing files, with nothing on screen
-  /// explaining why.
-  void _toggleSearch() {
-    setState(() {
-      _searchOpen = !_searchOpen;
-      if (!_searchOpen) _filterCtl.clear();
-    });
-    if (_searchOpen) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _filterFocus.requestFocus();
-      });
-    } else {
-      FocusManager.instance.primaryFocus?.unfocus();
-    }
-  }
+  /// The same floating card the chat search uses, so "search" is one interaction
+  /// everywhere in the shell. An inline field spent a slab of the panel's height
+  /// on something used occasionally and pushed the tree itself down.
+  Future<void> _openFileSearch() => showFileSearchDialog(
+        context,
+        client: widget.client,
+        root: widget.workspacePath,
+        onOpen: widget.onOpenFile,
+      );
 
   Future<void> refresh() async {
     if (mounted) {
@@ -226,8 +208,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     final wsName = widget.workspacePath.isEmpty
         ? 'Workspace'
         : lastPathSegment(widget.workspacePath, ifEmpty: 'Workspace');
-    final query = _filterCtl.text.trim().toLowerCase();
-    final entries = _rootEntries(query);
+    final entries = _listing?.entries ?? const <FsEntry>[];
 
     return Container(
       color: AppColors.bg,
@@ -241,34 +222,17 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
             actions: [
               ShellSectionAction(
                 icon: 'search',
-                tooltip: _searchOpen ? 'Hide search' : 'Search files',
-                active: _searchOpen,
-                onTap: _toggleSearch,
+                tooltip: 'Search files',
+                onTap: _openFileSearch,
               ),
               ShellSectionAction(
                 icon: 'plus',
                 tooltip: 'New file or folder',
                 onTap: _listing == null ? null : _openAddMenu,
               ),
-              ShellSectionAction(
-                icon: 'refresh',
-                tooltip: 'Refresh files',
-                onTap: refresh,
-              ),
             ],
           ),
           _workspaceRow(wsName),
-          // Collapsible: the field is only present while searching, so the tree
-          // gets the full column the rest of the time. AnimatedSize keeps the
-          // reveal from snapping the whole list.
-          AnimatedSize(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: _searchOpen
-                ? _filterField()
-                : const SizedBox(width: double.infinity),
-          ),
           if (_loading && _listing == null)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
@@ -285,43 +249,26 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
           else if (entries.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-              child: Text(
-                query.isEmpty ? 'Empty directory' : 'No matching files',
-                style: sans(12.5, color: AppColors.fg4),
-              ),
+              child: Text('Empty directory',
+                  style: sans(12.5, color: AppColors.fg4)),
             )
           else ...[
             const SizedBox(height: 4),
-            ..._buildRows(entries, depth: 0, query: query),
+            ..._buildRows(entries, depth: 0),
           ],
         ],
       ),
     );
   }
 
-  List<FsEntry> _rootEntries(String query) {
-    final entries = _listing?.entries ?? const <FsEntry>[];
-    if (query.isEmpty) return entries;
-    return entries.where((entry) => _matchesFilter(entry, query)).toList();
-  }
-
-  bool _matchesFilter(FsEntry entry, String query) {
-    if (entry.name.toLowerCase().contains(query)) return true;
-    return entry.isDir &&
-        (_childrenByPath[entry.path] ?? const <FsEntry>[])
-            .any((child) => _matchesFilter(child, query));
-  }
-
   List<Widget> _buildRows(
     List<FsEntry> entries, {
     required int depth,
-    required String query,
   }) {
     final rows = <Widget>[];
     for (final entry in entries) {
       final expanded = _expandedFolders.contains(entry.path);
       final children = _childrenByPath[entry.path] ?? const <FsEntry>[];
-      final showChildren = entry.isDir && (expanded || query.isNotEmpty);
       rows.add(_FileTreeRow(
         entry: entry,
         depth: depth,
@@ -332,11 +279,8 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
             ? _toggleFolder(entry)
             : widget.onOpenFile(entry.path, entry.name),
       ));
-      if (showChildren && children.isNotEmpty) {
-        final visible = query.isEmpty
-            ? children
-            : children.where((child) => _matchesFilter(child, query)).toList();
-        rows.addAll(_buildRows(visible, depth: depth + 1, query: query));
+      if (expanded && children.isNotEmpty) {
+        rows.addAll(_buildRows(children, depth: depth + 1));
       }
       if (expanded && _folderErrors.containsKey(entry.path)) {
         rows.add(Padding(
@@ -372,50 +316,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                   style: sans(13, weight: W.label, color: AppColors.fg1)),
             ),
             AppIcon('chevron-down', size: 12, color: AppColors.fg4),
-          ]),
-        ),
-      );
-
-  /// Filter field: a full-height input, not a hairline strip.
-  ///
-  /// 44px with a 16px glyph, matching the phone's Chats search field. The old
-  /// 32px / 14px version read as a decorative rule rather than something you can
-  /// type into — which is exactly what "thin" described.
-  Widget _filterField() => Padding(
-        padding: const EdgeInsets.fromLTRB(
-            kSidebarContentInset, 6, kSidebarContentInset, 6),
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(children: [
-            AppIcon('search', size: 16, color: AppColors.fg4),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _filterCtl,
-                focusNode: _filterFocus,
-                onChanged: (_) => setState(() {}),
-                cursorColor: AppColors.fg1,
-                style: sans(13.5, color: AppColors.fg1),
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  border: InputBorder.none,
-                  hintText: 'Search this folder...',
-                  hintStyle: sans(13.5, color: AppColors.fg4),
-                ),
-              ),
-            ),
-            if (_filterCtl.text.isNotEmpty)
-              IconBtn('x',
-                  size: 24,
-                  iconSize: 13,
-                  tooltip: 'Clear',
-                  onTap: () => setState(() => _filterCtl.clear())),
           ]),
         ),
       );
@@ -516,4 +416,269 @@ class _FileTreeRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// File search popover.
+// ---------------------------------------------------------------------------
+
+/// One matched file.
+class _FileHit {
+  final String name;
+  final String path;
+  const _FileHit(this.name, this.path);
+}
+
+/// File search: a centered floating card on desktop, a bottom sheet on mobile.
+///
+/// Deliberately the SAME shape as the chat command palette, so searching files
+/// and searching chats are one interaction. Matches come from a bounded walk of
+/// the workspace, cached for the lifetime of the popover so typing filters
+/// locally instead of re-fetching the tree on every keystroke.
+Future<void> showFileSearchDialog(
+  BuildContext context, {
+  required DaemonClient client,
+  required String root,
+  required void Function(String path, String name) onOpen,
+}) {
+  final view = View.of(context);
+  final desktop =
+      view.physicalSize.width / view.devicePixelRatio >= kDesktopBreakpoint;
+  Widget body() => _FileSearch(client: client, root: root, onOpen: onOpen);
+  if (desktop) {
+    return showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'file search',
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      transitionDuration: const Duration(milliseconds: 140),
+      pageBuilder: (ctx, _, __) => Align(
+        alignment: const Alignment(0, -0.5),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640, maxHeight: 520),
+            child: _fileSearchFrame(body()),
+          ),
+        ),
+      ),
+      transitionBuilder: (ctx, anim, _, child) {
+        final c = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return FadeTransition(
+            opacity: c,
+            child: ScaleTransition(
+                scale: Tween(begin: 0.98, end: 1.0).animate(c), child: child));
+      },
+    );
+  }
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) {
+      final mq = MediaQuery.of(context);
+      final available = mq.size.height - mq.viewInsets.bottom;
+      return Padding(
+        padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: available * 0.85),
+          child: _fileSearchFrame(body()),
+        ),
+      );
+    },
+  );
+}
+
+Widget _fileSearchFrame(Widget child) => Material(
+      color: AppColors.surface1,
+      borderRadius: BorderRadius.circular(R.card),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(R.card),
+            border: Border.all(color: AppColors.border2)),
+        child: child,
+      ),
+    );
+
+class _FileSearch extends StatefulWidget {
+  const _FileSearch(
+      {required this.client, required this.root, required this.onOpen});
+  final DaemonClient client;
+  final String root;
+  final void Function(String path, String name) onOpen;
+  @override
+  State<_FileSearch> createState() => _FileSearchState();
+}
+
+class _FileSearchState extends State<_FileSearch> {
+  final _ctrl = TextEditingController();
+  Timer? _debounce;
+  int _run = 0;
+  bool _loading = false;
+  List<_FileHit> _hits = const [];
+
+  /// Every file discovered by the one bounded walk. Null until the first
+  /// non-empty query, so opening the popover does not crawl the whole tree.
+  List<_FileHit>? _all;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(_onQuery);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onQuery() {
+    // Rebuild immediately so the hint/results swap on the keystroke, then
+    // debounce the walk itself.
+    setState(() {});
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 220), () {
+      _walk(_ctrl.text.trim());
+    });
+  }
+
+  /// Bounded breadth-first walk of the workspace, cached after the first run.
+  /// Limits keep a huge repo (or a slow tunnel) from making the popover hang.
+  Future<void> _walk(String query) async {
+    final q = query.toLowerCase();
+    if (q.isEmpty) {
+      setState(() {
+        _hits = const [];
+        _loading = false;
+      });
+      return;
+    }
+    if (_all == null) {
+      setState(() => _loading = true);
+      final id = ++_run;
+      final all = <_FileHit>[];
+      final queue = <String>[widget.root];
+      var dirs = 0;
+      var visited = 0;
+      const maxDirs = 200;
+      const maxEntries = 6000;
+      while (queue.isNotEmpty && dirs < maxDirs && visited < maxEntries) {
+        final dir = queue.removeAt(0);
+        dirs++;
+        FsListing listing;
+        try {
+          listing = await widget.client.fs(dir.isEmpty ? null : dir);
+        } catch (_) {
+          continue;
+        }
+        if (!mounted || id != _run) return;
+        visited += listing.entries.length;
+        for (final e in listing.entries) {
+          if (e.isDir) {
+            queue.add(e.path);
+          } else {
+            all.add(_FileHit(e.name, e.path));
+          }
+        }
+      }
+      if (!mounted || id != _run) return;
+      _all = all;
+    }
+    final hits =
+        _all!.where((h) => h.name.toLowerCase().contains(q)).take(80).toList();
+    if (!mounted) return;
+    setState(() {
+      _hits = hits;
+      _loading = false;
+    });
+  }
+
+  String _dirLabel(String path) {
+    final i = path.lastIndexOf('/');
+    if (i <= 0) return '';
+    final dir = path.substring(0, i);
+    return lastPathSegment(dir, ifEmpty: dir);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    final typed = _ctrl.text.trim();
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+        child: Row(children: [
+          AppIcon('search', size: 16, color: AppColors.fg3),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _ctrl,
+              autofocus: true,
+              cursorColor: AppColors.accent,
+              style: sans(14, color: AppColors.fg1),
+              decoration: InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                hintText: 'Search files',
+                hintStyle: sans(14, color: AppColors.fg4),
+              ),
+            ),
+          ),
+          if (_loading)
+            const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 1.5)),
+        ]),
+      ),
+      Divider(height: 1, thickness: 1, color: AppColors.border),
+      Flexible(
+        child: typed.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(20),
+                child: Center(
+                    child: Text('Type to search the workspace',
+                        style: sans(12.5, color: AppColors.fg4))),
+              )
+            : (_hits.isEmpty && !_loading
+                ? Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Center(
+                        child: Text('No matching files',
+                            style: sans(12.5, color: AppColors.fg4))),
+                  )
+                : ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    children: [for (final h in _hits) _row(h)],
+                  )),
+      ),
+    ]);
+  }
+
+  Widget _row(_FileHit h) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.pop(context);
+            widget.onOpen(h.path, h.name);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            child: Row(children: [
+              AppIcon('file', size: 15, color: AppColors.fg2),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(h.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13, color: AppColors.fg1))),
+              Text(_dirLabel(h.path), style: mono(11, color: AppColors.fg4)),
+            ]),
+          ),
+        ),
+      );
 }
