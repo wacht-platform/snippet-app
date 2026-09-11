@@ -36,9 +36,9 @@ bool _usesOpenAiAdapter(String p) =>
     p == 'opencode-zen' ||
     p == 'opencode-go';
 
-class ModelEditorScreen extends StatefulWidget {
+class InferenceProfileEditor extends StatefulWidget {
   final DaemonClient client;
-  final ModelProfile? existing;
+  final InferenceProfile? existing;
   final String? delegateName;
 
   /// Skip Scaffold / app bar and fill the parent (settings Models pane).
@@ -49,7 +49,7 @@ class ModelEditorScreen extends StatefulWidget {
 
   /// Called after a successful save, before [onClose].
   final VoidCallback? onSaved;
-  const ModelEditorScreen(
+  const InferenceProfileEditor(
       {super.key,
       required this.client,
       this.existing,
@@ -58,10 +58,10 @@ class ModelEditorScreen extends StatefulWidget {
       this.onClose,
       this.onSaved});
   @override
-  State<ModelEditorScreen> createState() => _ModelEditorScreenState();
+  State<InferenceProfileEditor> createState() => _InferenceProfileEditorState();
 }
 
-class _ModelEditorScreenState extends State<ModelEditorScreen> {
+class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   late String _provider;
   late final TextEditingController _name;
   late final TextEditingController _baseUrl;
@@ -239,7 +239,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     final pills = [..._providers];
     if (!pills.any((p) => p.$1 == _provider))
       pills.insert(0, (_provider, _provider));
-    final title = _isEdit ? 'Edit model' : 'Add model';
+    final title = _isEdit ? 'Edit profile' : 'Add profile';
     final form = Expanded(
       child: ListView(
         padding: EdgeInsets.fromLTRB(
@@ -432,8 +432,9 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     );
     final body = Column(children: [
       // No embedded header. When embedded, the HOST level owns the header
-      // (models.dart draws "Edit model" / "Add model"), so drawing one here
-      // stacked a second back row under it — two rows, two exits, same screen.
+      // (inference_profiles.dart draws "Edit profile" / "Add profile"), so
+      // drawing one here stacked a second back row under it — two rows, two
+      // exits, same screen.
       if (!widget.embedded) SnAppBar(title: title, onBack: _dismiss),
       form,
       footer,
@@ -510,7 +511,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
               child: Row(children: [
                 AppIcon('cpu', size: 16, color: AppColors.fg2),
                 const SizedBox(width: 9),
-                Text('Models',
+                Text('Inference profiles',
                     style: sans(15, weight: W.label, color: AppColors.fg1)),
                 const SizedBox(width: 8),
                 Container(
@@ -536,7 +537,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
               child: AppField(
                 controller: _query,
                 mono: true,
-                hint: 'Search models…',
+                hint: 'Search profiles…',
               ),
             ),
             Flexible(
@@ -548,7 +549,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                       child: Column(children: [
                         AppIcon('search', size: 18, color: AppColors.fg4),
                         const SizedBox(height: 9),
-                        Text('No model matches “${_query.text.trim()}”',
+                        Text('No profile matches “${_query.text.trim()}”',
                             textAlign: TextAlign.center,
                             style: sans(12.5, color: AppColors.fg3)),
                       ]),
@@ -577,7 +578,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
       else if (m.reasoning != null)
         m.reasoning! ? 'reasoning' : 'no reasoning',
       if ((m.contextWindow ?? 0) > 0)
-        _ModelEditorScreenState._fmtCtx(m.contextWindow!),
+        _InferenceProfileEditorState._fmtCtx(m.contextWindow!),
     ];
     final subtitle = [
       if (m.displayName != null) m.displayName!,

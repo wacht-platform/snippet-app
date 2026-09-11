@@ -22,7 +22,7 @@ import 'add_instance.dart';
 import 'editor.dart';
 import 'files.dart';
 import 'git.dart';
-import 'models.dart';
+import 'inference_profiles.dart';
 import 'processes.dart';
 import 'usage.dart';
 import 'vault.dart';
@@ -6185,7 +6185,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   static const _nav = [
     (_SettingsPage.general, 'settings', 'General'),
-    (_SettingsPage.models, 'cpu', 'Models'),
+    (_SettingsPage.models, 'cpu', 'Inference profiles'),
     (_SettingsPage.usage, 'activity', 'Usage'),
     (_SettingsPage.vault, 'key', 'Vault'),
     (_SettingsPage.scheduled, 'scheduled', 'Scheduled'),
@@ -6263,7 +6263,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                           style: sans(14.5,
                               weight: W.label, color: AppColors.fg1)),
                       const SizedBox(height: 2),
-                      Text('Configure this workspace and its models.',
+                      Text(
+                          'Configure this workspace and its inference profiles.',
                           style: sans(11.5, color: AppColors.fg3)),
                     ],
                   ),
@@ -6396,7 +6397,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   String _sectionSummary(_SettingsPage p) => switch (p) {
         _SettingsPage.general => 'Machines and alerts',
-        _SettingsPage.models => 'Providers and models',
+        _SettingsPage.models => 'Providers, keys and models',
         _SettingsPage.usage => 'Tokens and spend',
         _SettingsPage.vault => 'Stored secrets',
         _SettingsPage.scheduled => 'Recurring jobs',
@@ -6420,7 +6421,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
             Expanded(child: _generalPage(showTitle: false)),
           ],
         ),
-      _SettingsPage.models => ModelsScreen(
+      _SettingsPage.models => InferenceProfilesScreen(
           client: widget.client,
           embedded: true,
           onBack: back,
@@ -6488,7 +6489,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return switch (_page) {
       _SettingsPage.general => _generalPage(),
       _SettingsPage.models =>
-        ModelsScreen(client: widget.client, embedded: true),
+        InferenceProfilesScreen(client: widget.client, embedded: true),
       _SettingsPage.usage => UsageScreen(client: widget.client, embedded: true),
       _SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
       _SettingsPage.scheduled =>

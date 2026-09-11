@@ -32,7 +32,7 @@ String hostOf(String url) {
 
 /// A configured model profile (from GET /config). Keys are never sent back — only
 /// [hasKey] tells whether one is set.
-class ModelProfile {
+class InferenceProfile {
   final String name;
   final String provider;
   final String baseUrl;
@@ -45,7 +45,7 @@ class ModelProfile {
   final bool? supportsImages; // null on daemons that don't report it yet
   final bool xSearch; // xAI server-side X search
 
-  ModelProfile.fromJson(Map<String, dynamic> j)
+  InferenceProfile.fromJson(Map<String, dynamic> j)
       : name = j['name'] as String? ?? '',
         provider = j['provider'] as String? ?? '',
         baseUrl = j['base_url'] as String? ?? '',
@@ -66,7 +66,7 @@ class ModelProfile {
 }
 
 class ServerConfig {
-  final List<ModelProfile> profiles;
+  final List<InferenceProfile> profiles;
   final String? active;
 
   /// Profile that delegated lanes run on; null → they use the active model.
@@ -76,7 +76,7 @@ class ServerConfig {
 
   ServerConfig.fromJson(Map<String, dynamic> j)
       : profiles = ((j['profiles'] as List?) ?? const [])
-            .map((e) => ModelProfile.fromJson(e as Map<String, dynamic>))
+            .map((e) => InferenceProfile.fromJson(e as Map<String, dynamic>))
             .toList(),
         active = j['active'] as String?,
         delegate = j['delegate'] as String?,

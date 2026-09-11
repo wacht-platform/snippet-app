@@ -657,7 +657,7 @@ class _SessionScreenState extends State<SessionScreen>
         }
       }
 
-      ModelProfile? p;
+      InferenceProfile? p;
       if (wanted != null) {
         for (final m in cfg.profiles) {
           if (m.name == wanted) {
@@ -4023,7 +4023,7 @@ class _SessionScreenState extends State<SessionScreen>
     }
     if (!mounted) return;
     if (cfg.profiles.isEmpty) {
-      _toast('No model profiles');
+      _toast('No inference profiles');
       return;
     }
     final current = _modelLabel;
@@ -4033,7 +4033,7 @@ class _SessionScreenState extends State<SessionScreen>
       minWidth: 260,
       maxWidth: 340,
       items: [
-        appMenuHeading<String>('Model'),
+        appMenuHeading<String>('Inference profile'),
         for (final p in cfg.profiles)
           appMenuRow<String>(
             value: p.name,

@@ -5,10 +5,10 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'model_editor.dart';
+import 'inference_profile_editor.dart';
 import 'shell_nav.dart';
 
-class ModelsScreen extends StatefulWidget {
+class InferenceProfilesScreen extends StatefulWidget {
   final DaemonClient client;
   final VoidCallback? onClose;
 
@@ -20,7 +20,7 @@ class ModelsScreen extends StatefulWidget {
   /// instead is what produced two stacked back rows in the model editor.
   final VoidCallback? onBack;
 
-  const ModelsScreen({
+  const InferenceProfilesScreen({
     super.key,
     required this.client,
     this.onClose,
@@ -28,13 +28,14 @@ class ModelsScreen extends StatefulWidget {
     this.onBack,
   });
   @override
-  State<ModelsScreen> createState() => _ModelsScreenState();
+  State<InferenceProfilesScreen> createState() =>
+      _InferenceProfilesScreenState();
 }
 
-class _ModelsScreenState extends State<ModelsScreen> {
+class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
   late Future<ServerConfig> _future;
   bool _inEditor = false;
-  ModelProfile? _editProfile;
+  InferenceProfile? _editProfile;
   String? _delegate;
 
   @override
@@ -73,7 +74,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     }
   }
 
-  Future<void> _edit(ModelProfile? p) async {
+  Future<void> _edit(InferenceProfile? p) async {
     String? delegate;
     try {
       delegate = (await widget.client.getConfig()).delegate;
@@ -99,7 +100,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     if (_inEditor) {
-      final editor = ModelEditorScreen(
+      final editor = InferenceProfileEditor(
         client: widget.client,
         existing: _editProfile,
         delegateName: _delegate,
@@ -112,14 +113,15 @@ class _ModelsScreenState extends State<ModelsScreen> {
       // it, on both platforms:
       //   phone   → the host draws no header, so this is the only row;
       //   desktop → the chip strip names the SECTION but offers no way back to
-      //             the models list, so this row is what returns there.
+      //             the profiles list, so this row is what returns there.
       // Drawing a second row is what produced the stacked-header bug: the host
-      // drew one for "Models" AND the editor drew its own for "Edit model".
+      // drew one for "Inference profiles" AND the editor drew its own for
+      // "Edit profile".
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           NavBackRow(
-            title: _editProfile == null ? 'Add model' : 'Edit model',
+            title: _editProfile == null ? 'Add profile' : 'Edit profile',
             onBack: _closeEditor,
           ),
           Expanded(child: editor),
@@ -152,20 +154,20 @@ class _ModelsScreenState extends State<ModelsScreen> {
                       // shared NavBackRow above, so repeating it here is the
                       // duplication this screen already had.
                       if (!widget.embedded) ...[
-                        Text('Models',
+                        Text('Inference profiles',
                             style: sans(18,
                                 weight: FontWeight.w500, color: AppColors.fg1)),
                         const SizedBox(height: 3),
                       ],
                       Text(
-                          'Choose the model used for new sessions and delegated work.',
+                          'Choose the profile used for new sessions and delegated work.',
                           style: sans(widget.embedded ? 12 : 12.5,
                               color: AppColors.fg3)),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                Btn('Add model',
+                Btn('Add profile',
                     icon: 'plus', small: true, onTap: () => _edit(null)),
               ],
             ),
@@ -174,7 +176,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
                 child: Text(
-                    'No model configured. Add a profile with an API key before starting a session.',
+                    'No inference profile configured. Add one with an API key before starting a session.',
                     style: sans(widget.embedded ? 12 : 13,
                         height: 1.4, color: AppColors.fg3)),
               )
@@ -203,7 +205,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NavBackRow(title: 'Models', onBack: widget.onBack!),
+          NavBackRow(title: 'Inference profiles', onBack: widget.onBack!),
           Expanded(child: body),
         ],
       );
@@ -213,7 +215,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
         bottom: false,
         child: Column(children: [
           SnAppBar(
-              title: 'Models',
+              title: 'Inference profiles',
               onBack: widget.onClose ?? () => Navigator.pop(context)),
           Expanded(child: body),
         ]),
@@ -221,7 +223,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     );
   }
 
-  Widget _profileCard(ModelProfile p, String? delegate) {
+  Widget _profileCard(InferenceProfile p, String? delegate) {
     final isDelegate =
         delegate != null && delegate.isNotEmpty && delegate == p.name;
     return Material(
@@ -281,7 +283,7 @@ class _ModelsScreenState extends State<ModelsScreen> {
     );
   }
 
-  Widget _overflowMenu(ModelProfile p) => PopupMenuButton<String>(
+  Widget _overflowMenu(InferenceProfile p) => PopupMenuButton<String>(
         tooltip: '',
         color: AppColors.surface1,
         elevation: 0,
