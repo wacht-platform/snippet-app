@@ -44,6 +44,12 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   bool _loading = true;
   String? _error;
   final TextEditingController _filterCtl = TextEditingController();
+  final FocusNode _filterFocus = FocusNode();
+
+  /// Whether the search field is revealed. Collapsed by default: at 26px rows
+  /// an always-visible field spent a slab of vertical space on something used
+  /// occasionally, and it competed with the tree for the eye.
+  bool _searchOpen = false;
   final Set<String> _expandedFolders = {};
   final Set<String> _loadingFolders = {};
   final Map<String, List<FsEntry>> _childrenByPath = {};
@@ -71,7 +77,27 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   @override
   void dispose() {
     _filterCtl.dispose();
+    _filterFocus.dispose();
     super.dispose();
+  }
+
+  /// Show/hide the search field.
+  ///
+  /// Closing CLEARS the query: a filter that stays applied while its field is
+  /// hidden leaves the tree silently missing files, with nothing on screen
+  /// explaining why.
+  void _toggleSearch() {
+    setState(() {
+      _searchOpen = !_searchOpen;
+      if (!_searchOpen) _filterCtl.clear();
+    });
+    if (_searchOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _filterFocus.requestFocus();
+      });
+    } else {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
   }
 
   Future<void> refresh() async {
@@ -148,6 +174,12 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
             onToggle: () {},
             actions: [
               ShellSectionAction(
+                icon: 'search',
+                tooltip: _searchOpen ? 'Hide search' : 'Search files',
+                active: _searchOpen,
+                onTap: _toggleSearch,
+              ),
+              ShellSectionAction(
                 icon: 'refresh',
                 tooltip: 'Refresh files',
                 onTap: refresh,
@@ -155,8 +187,17 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
             ],
           ),
           _workspaceRow(wsName),
-          const SizedBox(height: 4),
-          _filterField(),
+          // Collapsible: the field is only present while searching, so the tree
+          // gets the full column the rest of the time. AnimatedSize keeps the
+          // reveal from snapping the whole list.
+          AnimatedSize(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _searchOpen
+                ? _filterField()
+                : const SizedBox(width: double.infinity),
+          ),
           if (_loading && _listing == null)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
@@ -264,39 +305,46 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
         ),
       );
 
-  /// Filter field, inset one surface step into the panel: a plain fill with no
-  /// border, which is how the reference draws every input.
+  /// Filter field: a full-height input, not a hairline strip.
+  ///
+  /// 44px with a 16px glyph, matching the phone's Chats search field. The old
+  /// 32px / 14px version read as a decorative rule rather than something you can
+  /// type into — which is exactly what "thin" described.
   Widget _filterField() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
+        padding: const EdgeInsets.fromLTRB(
+            kSidebarContentInset, 6, kSidebarContentInset, 6),
         child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: AppColors.surface1,
             borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: AppColors.border),
           ),
           child: Row(children: [
-            AppIcon('search', size: 14, color: AppColors.fg4),
-            const SizedBox(width: 8),
+            AppIcon('search', size: 16, color: AppColors.fg4),
+            const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: _filterCtl,
+                focusNode: _filterFocus,
                 onChanged: (_) => setState(() {}),
                 cursorColor: AppColors.fg1,
-                style: sans(13, color: AppColors.fg1),
+                style: sans(13.5, color: AppColors.fg1),
                 decoration: InputDecoration(
                   isCollapsed: true,
                   border: InputBorder.none,
-                  hintText: 'Filter by name...',
-                  hintStyle: sans(13, color: AppColors.fg4),
+                  hintText: 'Search this folder...',
+                  hintStyle: sans(13.5, color: AppColors.fg4),
                 ),
               ),
             ),
             if (_filterCtl.text.isNotEmpty)
-              GestureDetector(
-                onTap: () => setState(() => _filterCtl.clear()),
-                child: AppIcon('x', size: 12, color: AppColors.fg4),
-              ),
+              IconBtn('x',
+                  size: 24,
+                  iconSize: 13,
+                  tooltip: 'Clear',
+                  onTap: () => setState(() => _filterCtl.clear())),
           ]),
         ),
       );
