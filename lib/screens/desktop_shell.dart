@@ -69,8 +69,8 @@ enum _MobileHome {
 /// Floating action bar geometry. Kept local: it is the only floating surface in
 /// the app, so it has not earned a shared token — but the radius is deliberately
 /// larger than `R.card` so it reads as a float rather than another card.
-const double _kMobileBarHeight = 46;
-const double _kMobileBarRadius = 14;
+const double _kMobileBarHeight = 52;
+const double _kMobileBarRadius = 16;
 
 /// One open tab in the shell — a live chat session, an opened file, a single git
 /// change, or a terminal, on a given instance.
@@ -4598,11 +4598,11 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
           onTap: enabled ? () => widget.onMobileHome(h) : null,
           child: SizedBox(
-            width: 44,
+            width: 48,
             height: _kMobileBarHeight,
             child: Center(
               child: AppIcon(h.icon,
-                  size: 18, color: active ? AppColors.fg1 : AppColors.fg4),
+                  size: 20, color: active ? AppColors.fg1 : AppColors.fg4),
             ),
           ),
         ),
@@ -4619,11 +4619,11 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
           onTap: onTap,
           child: SizedBox(
-            width: 44,
+            width: 48,
             height: _kMobileBarHeight,
             child: Center(
               child: AppIcon(icon,
-                  size: 18,
+                  size: 20,
                   color: onTap == null ? AppColors.fg4 : AppColors.fg2),
             ),
           ),
@@ -6019,7 +6019,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   /// Section label, shared so the inline and nested settings cannot diverge.
   Widget _inlineLabel(String t) => Text(t.toUpperCase(),
-      style: sans(10, weight: W.label, color: AppColors.fg4, spacing: 0.5));
+      style: sans(kMobile ? 12 : 10,
+          weight: W.label, color: AppColors.fg4, spacing: 0.5));
 
   List<Widget> _machineRows() => [
         if (_instances.isEmpty)
@@ -6044,10 +6045,10 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         borderRadius: BorderRadius.circular(R.md),
         onTap: () => setState(() => _mobileSection = page),
         child: Container(
-          height: M.rowHeight,
+          height: 60,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(children: [
-            AppIcon(icon, size: 19, color: AppColors.fg2),
+            AppIcon(icon, size: 21, color: AppColors.fg2),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -6055,13 +6056,13 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(label, style: sans(M.rowTitle, color: AppColors.fg1)),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Text(_sectionSummary(page),
-                      style: sans(11, color: AppColors.fg4)),
+                      style: sans(M.meta, color: AppColors.fg4)),
                 ],
               ),
             ),
-            AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+            AppIcon('chevron-right', size: 17, color: AppColors.fg4),
           ]),
         ),
       ),
@@ -6217,7 +6218,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
         child: Row(children: [
           AppIcon('cpu',
-              size: 14, color: isActive ? AppColors.accent : AppColors.fg3),
+              size: kMobile ? 17 : 14,
+              color: isActive ? AppColors.accent : AppColors.fg3),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -6226,23 +6228,25 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 Text(i.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(12.5, weight: W.label, color: AppColors.fg1)),
+                    style: sans(kMobile ? M.rowTitle : 12.5,
+                        weight: W.label, color: AppColors.fg1)),
                 const SizedBox(height: 1),
                 Text(hostOf(i.url),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: mono(10.5, color: AppColors.fg4)),
+                    style: mono(kMobile ? M.meta : 10.5, color: AppColors.fg4)),
               ],
             ),
           ),
           if (isActive)
             Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: Text('active', style: sans(10, color: AppColors.accent)),
+              child: Text('active',
+                  style: sans(kMobile ? 12 : 10, color: AppColors.accent)),
             ),
           IconBtn('trash',
-              size: 26,
-              iconSize: 13,
+              size: kMobile ? M.minTarget : 26,
+              iconSize: kMobile ? 17 : 13,
               tooltip: 'Remove',
               onTap: () => _confirmRemove(i)),
         ]),
@@ -6254,16 +6258,15 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(children: [
-        AppIcon('zap', size: 14, color: AppColors.fg3),
+        AppIcon('zap', size: kMobile ? 17 : 14, color: AppColors.fg3),
         const SizedBox(width: 10),
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Alerts',
-                style: sans(12.5, weight: W.label, color: AppColors.fg1)),
-            const SizedBox(height: 1),
+            // No "Alerts" title here: every call site already prints an ALERTS
+            // section label directly above, so the row was repeating it.
             Text('Notify when a session needs input',
-                style: sans(11, color: AppColors.fg4)),
+                style: sans(kMobile ? M.rowTitle : 12.5, color: AppColors.fg1)),
           ]),
         ),
         _notifBusy

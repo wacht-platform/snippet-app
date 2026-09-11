@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -191,12 +192,13 @@ class _GroupLabel extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
         child: Row(children: [
           Text(label.toUpperCase(),
-              style: sans(10.5,
+              style: sans(kMobile ? 12 : 10.5,
                   weight: W.title,
                   color: accent ? AppColors.accent : AppColors.fg4,
                   spacing: 0.6)),
           const SizedBox(width: 6),
-          Text('$count', style: sans(10.5, color: AppColors.fg4)),
+          Text('$count',
+              style: sans(kMobile ? 12 : 10.5, color: AppColors.fg4)),
         ]),
       );
 }
@@ -234,7 +236,7 @@ class _AgentSidebarRow extends StatelessWidget {
                   isActive ? AppColors.accentBg : AppColors.surface2,
               foregroundColor: isActive ? AppColors.accent : AppColors.fg3,
               child: Text(initial,
-                  style: sans(11.5,
+                  style: sans(kMobile ? 13 : 11.5,
                       weight: W.title,
                       color: isActive ? AppColors.accent : AppColors.fg3)),
             ),
@@ -246,13 +248,14 @@ class _AgentSidebarRow extends StatelessWidget {
                   Text(name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13, weight: W.label, color: AppColors.fg1)),
+                      style: sans(kMobile ? M.rowTitle : 13,
+                          weight: W.label, color: AppColors.fg1)),
                   const SizedBox(height: 2),
                   Text(
                     isActive ? _sessionSummary(sessions) : agent.role,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(11.5,
+                    style: sans(kMobile ? M.meta : 11.5,
                         color: isActive ? AppColors.ok : AppColors.fg4,
                         height: 1.35),
                   ),

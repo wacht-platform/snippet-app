@@ -63,10 +63,23 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   String? _busy;
   int _run = 0;
 
+  /// Keeps the CURRENT folder (the last crumb) in view on wide paths.
+  ///
+  /// Deliberately NOT `ListView(reverse: true)`: reverse flips the DRAWING order,
+  /// which rendered `intellinesia › code › ~` — the path backwards. Order stays
+  /// left-to-right; only the scroll position moves to the end.
+  final ScrollController _crumbScroll = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _go(widget.startPath);
+  }
+
+  @override
+  void dispose() {
+    _crumbScroll.dispose();
+    super.dispose();
   }
 
   Future<void> _go(String? path) async {
@@ -83,6 +96,12 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         // The first successful load of an unspecified path IS home.
         if (path == null || _homePath == null) _homePath = res.path;
         _loading = false;
+      });
+      // After the crumbs rebuild, park the view at the deep end.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _crumbScroll.hasClients) {
+          _crumbScroll.jumpTo(_crumbScroll.position.maxScrollExtent);
+        }
       });
     } catch (e) {
       if (!mounted || id != _run) return;
@@ -261,10 +280,12 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           child: SizedBox(
             height: kMobile ? M.minTarget : 40,
             child: ListView.separated(
+              controller: _crumbScroll,
               scrollDirection: Axis.horizontal,
-              // Reversed so the CURRENT folder is always visible; a deep path
-              // scrolls its head off the left rather than hiding where you are.
-              reverse: true,
+              // Order is deliberately LEFT-TO-RIGHT (root first). `reverse: true`
+              // would have kept the tail in view but draws the list backwards,
+              // which rendered the path as `intellinesia › code › ~`. The
+              // controller jumps to the deep end instead (see `_go`).
               padding: const EdgeInsets.symmetric(vertical: 4),
               itemCount: crumbs.length,
               separatorBuilder: (_, __) => Center(
