@@ -55,6 +55,24 @@ class DesktopShell extends StatefulWidget {
 /// what moves it.
 enum _Pane { left, right }
 
+/// Which top-level place the phone home is showing. The floating action bar
+/// switches this; desktop keeps its sidebar rail instead, so this is phone-only.
+enum _MobileHome {
+  chats('Chats', 'chat-thread'),
+  agents('Agents', 'users'),
+  settings('Settings', 'settings');
+
+  const _MobileHome(this.label, this.icon);
+  final String label;
+  final String icon;
+}
+
+/// Floating action bar geometry. Kept local: it is the only floating surface in
+/// the app, so it has not earned a shared token — but the radius is deliberately
+/// larger than `R.card` so it reads as a float rather than another card.
+const double _kMobileBarHeight = 58;
+const double _kMobileBarRadius = 18;
+
 /// One open tab in the shell — a live chat session, an opened file, a single git
 /// change, or a terminal, on a given instance.
 ///
@@ -276,6 +294,14 @@ class _DesktopShellState extends State<DesktopShell>
   /// a full-screen home, and one active session is its own full-screen reading
   /// surface with a clear return affordance.
   bool _mobileChatsOpen = true;
+
+  /// Which place the phone home is showing.
+  ///
+  /// Owned by the SHELL, not the sidebar: `_mobileShell`'s back handler must see
+  /// it, or pressing back from Settings would exit the app instead of returning
+  /// to Chats. Desktop navigates with the sidebar rail, so this is phone-only.
+  _MobileHome _mobileHome = _MobileHome.chats;
+
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
@@ -2059,6 +2085,8 @@ class _DesktopShellState extends State<DesktopShell>
         onSessionDeleted: _onSessionDeleted,
         health: _health,
         onRefreshHealth: _refreshHealth,
+        mobileHome: _mobileHome,
+        onMobileHome: (h) => setState(() => _mobileHome = h),
       );
     }
 
@@ -2539,7 +2567,13 @@ class _DesktopShellState extends State<DesktopShell>
   void _showMobileChats() {
     if (!kMobile) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _mobileChatsOpen = true);
+    // Reset the destination too. A session can be opened from Agents, so without
+    // this, backing out of it returned you to Agents — leaving the bar showing
+    // "Chats" while the body showed Agents, and stranding the list.
+    setState(() {
+      _mobileHome = _MobileHome.chats;
+      _mobileChatsOpen = true;
+    });
   }
 
   Widget _mobileShell() {
@@ -2598,6 +2632,20 @@ class _DesktopShellState extends State<DesktopShell>
     // closes the actions drawer, then the terminal overlay, then returns here.
     // It passes `mobileActive` so its guard is absent whenever Chats is showing.
     if (!chatsVisible) return shell;
+
+    // On a non-Chats destination, back returns to Chats rather than leaving the
+    // app — otherwise Settings/Agents would be a dead end whose only exit is the
+    // bar, and back would exit the app from a screen the user just navigated to.
+    if (_mobileHome != _MobileHome.chats) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          setState(() => _mobileHome = _MobileHome.chats);
+        },
+        child: shell,
+      );
+    }
 
     // Chats on screen → the shell IS the app root. Background the app so a
     // running watcher service keeps working, rather than finishing the activity.
@@ -4147,6 +4195,12 @@ class _Sidebar extends StatefulWidget {
   final VoidCallback onRefreshHealth;
   final bool topInset;
   final void Function(String action)? onSessionAction;
+
+  /// Phone home destination + its setter. Owned by the shell so that back can
+  /// return to Chats; passed down because the phone home IS this widget.
+  final _MobileHome mobileHome;
+  final ValueChanged<_MobileHome> onMobileHome;
+
   const _Sidebar({
     required this.instances,
     required this.active,
@@ -4168,6 +4222,8 @@ class _Sidebar extends StatefulWidget {
     required this.onRefreshHealth,
     required this.topInset,
     this.onSessionAction,
+    required this.mobileHome,
+    required this.onMobileHome,
   });
   @override
   State<_Sidebar> createState() => _SidebarState();
@@ -4281,6 +4337,23 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
+  /// Label for the machine sheet's filter row. Names the ACTIVE filter, so the
+  /// row reports state instead of being an anonymous "Filter" that gives no
+  /// sign the list is currently narrowed.
+  String _mobileFilterLabel() {
+    final active = _filter == 'all'
+        ? 'All chats'
+        : switch (_filter) {
+            'input' => 'Needs input',
+            'running' => 'Running',
+            'done' => 'Done',
+            _ => 'All chats',
+          };
+    return _filterQuery.trim().isEmpty
+        ? 'Filter · $active'
+        : 'Filter · $active · "${_filterQuery.trim()}"';
+  }
+
   void _openSearch() {
     showCommandPalette(
       context,
@@ -4319,32 +4392,12 @@ class _SidebarState extends State<_Sidebar> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (widget.topInset && kMacOS) SizedBox(height: kMacTitlebar + 6),
         if (kMobile) ...[
-          // Mobile: full-height conversations list with the machine row at the bottom.
-          Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // A phone home needs one reading order: destination, machine
-                  // context, search, then the chronological list. The earlier
-                  // machine card + header + bottom toolbar gave every control
-                  // equal priority and made the first action unclear.
-                  _mobileHomeHeader(hasClient),
-                  if (hasClient && !_selecting) _stickyMissionControl(),
-                  Expanded(
-                    child: !hasClient
-                        ? Center(
-                            child: Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Text('Add a machine to begin.',
-                                    textAlign: TextAlign.center,
-                                    style: sans(12.5, color: AppColors.fg4))))
-                        : _sessionList(),
-                  ),
-                ]),
-          ),
-          // The Chats header owns search, machine switching, creation, and
-          // settings; another bottom toolbar would split those decisions across
-          // both ends of the phone.
+          // The bar is a SIBLING of the content, not an overlay: the content
+          // gets the remaining height, so nothing hides behind the bar and no
+          // scroll-padding hack is needed. It still reads as floating (inset,
+          // rounded, raised).
+          Expanded(child: _mobileHomeBody(hasClient)),
+          _mobileBar(hasClient),
         ],
         if (!kMobile) ...[
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
@@ -4430,52 +4483,117 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  /// The one phone-home hierarchy: destination, connection context, discovery,
-  /// then the chat list. Keeping the actions together makes the next step
-  /// obvious instead of splitting navigation across a top card and bottom bar.
-  Widget _mobileHomeHeader(bool hasClient) {
+  /// Full-surface placeholder for a phone destination with no machine.
+  ///
+  /// Local to the sidebar rather than reusing the shell's `_sidebarUnavailable`:
+  /// that one is a `_DesktopShellState` method and is not in scope here.
+  Widget _mobileUnavailable(String message) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(message,
+              textAlign: TextAlign.center,
+              style: sans(12.5, color: AppColors.fg4, height: 1.5)),
+        ),
+      );
+
+  /// The phone home body for the destination the bar currently selects.
+  ///
+  /// Each destination gets the whole surface below the bar. Chats keeps its own
+  /// head (machine context + the two quick actions); Agents and Settings own
+  /// their own headers, so they render directly.
+  Widget _mobileHomeBody(bool hasClient) {
+    switch (widget.mobileHome) {
+      case _MobileHome.chats:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _mobileHomeHead(hasClient),
+            if (hasClient && !_selecting) _stickyMissionControl(),
+            Expanded(
+              child: !hasClient
+                  ? Center(
+                      child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Text('Add a machine to begin.',
+                              textAlign: TextAlign.center,
+                              style: sans(12.5, color: AppColors.fg4))))
+                  : _sessionList(),
+            ),
+          ],
+        );
+
+      case _MobileHome.agents:
+        final client = widget.client;
+        if (client == null) {
+          return _mobileUnavailable('Add a machine to see its agents.');
+        }
+        // The panel already carries its own title + refresh header, so it is
+        // used as-is rather than wrapped in a second one.
+        return AgentsSidebarPanel(
+          client: client,
+          onOpenAgent: (a) => presentScreen(
+            context,
+            builder: (_, close) =>
+                CoordinationAgentDetail(agent: a, onClose: close),
+          ),
+        );
+
+      case _MobileHome.settings:
+        final client = widget.client;
+        if (client == null) {
+          return _mobileUnavailable('Add a machine to configure it.');
+        }
+        return _SettingsPanel(
+          client: client,
+          instances: widget.instances,
+          active: widget.active,
+          onRemove: widget.onRemoveInstance,
+          // Returning to Chats is the destination switch, so the embedded header
+          // needs no separate "close" affordance.
+          onClose: () => widget.onMobileHome(_MobileHome.chats),
+          embedded: true,
+        );
+    }
+  }
+
+  /// The Chats head: machine context plus the two quick actions.
+  ///
+  /// Deliberately NOT a page title — the bar already names the destination, so
+  /// repeating "Chats" here spent a line on something the user just tapped. The
+  /// state filter moved into the machine sheet, which is what let the old
+  /// three-band stack collapse into one row.
+  Widget _mobileHomeHead(bool hasClient) {
+    if (_selecting) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(M.gutter, 8, M.gutter - 4, 8),
+        child: Row(children: [
+          Text('${_selected.length} selected',
+              style:
+                  sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
+          const Spacer(),
+          _selectAllToggle(),
+          IconBtn('x',
+              size: M.minTarget,
+              iconSize: 18,
+              tooltip: 'Cancel',
+              onTap: _exitSelect),
+          IconBtn('trash',
+              size: M.minTarget,
+              iconSize: 17,
+              tooltip: 'Delete selected',
+              onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
+        ]),
+      );
+    }
     final machine = widget.active;
     final online = machine == null ? null : widget.health[machine.url];
     return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 12, M.gutter, 10),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (_selecting)
-          Row(children: [
-            Text('${_selected.length} selected',
-                style: sans(M.sectionTitle,
-                    weight: W.label, color: AppColors.fg1)),
-            const Spacer(),
-            _selectAllToggle(),
-            IconBtn('x',
-                size: M.minTarget,
-                iconSize: 18,
-                tooltip: 'Cancel',
-                onTap: _exitSelect),
-            IconBtn('trash',
-                size: M.minTarget,
-                iconSize: 17,
-                tooltip: 'Delete selected',
-                onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
-          ])
-        else ...[
-          Row(children: [
-            Text('Chats',
-                style:
-                    sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
-            const Spacer(),
-            IconBtn('plus',
-                size: M.minTarget,
-                iconSize: 21,
-                tooltip: 'New chat',
-                onTap: hasClient ? widget.onNewSession : null),
-            IconBtn('settings',
-                size: M.minTarget,
-                iconSize: 19,
-                tooltip: 'Settings',
-                onTap: hasClient ? _openSettings : null),
-          ]),
-          const SizedBox(height: 6),
-          Material(
+      padding: EdgeInsets.fromLTRB(M.gutter, 4, M.gutter - 4, 4),
+      child: Row(children: [
+        // Machine identity is the left anchor now that the page title is gone:
+        // the switcher is what tells you WHERE these chats live.
+        Expanded(
+          child: Material(
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(R.sm),
             child: InkWell(
@@ -4483,8 +4601,8 @@ class _SidebarState extends State<_Sidebar> {
               onTap: widget.instances.isEmpty
                   ? widget.onAddInstance
                   : _openMachines,
-              child: SizedBox(
-                height: 36,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Row(children: [
                   Container(
                     width: 7,
@@ -4495,52 +4613,128 @@ class _SidebarState extends State<_Sidebar> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       machine == null ? 'Add machine' : machine.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(M.rowTitle, color: AppColors.fg3),
+                      style: sans(M.sectionTitle,
+                          weight: W.label, color: AppColors.fg1),
                     ),
                   ),
-                  Text(machine == null ? '' : hostOf(machine.url),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(M.monoMeta, color: AppColors.fg4)),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   AppIcon('chevron-down', size: 14, color: AppColors.fg4),
                 ]),
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          Material(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(R.md),
-              onTap: hasClient ? _openSearch : null,
-              child: Container(
-                height: M.minTarget,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(children: [
-                  AppIcon('search', size: 18, color: AppColors.fg4),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text('Search chats',
-                        style: sans(13.5, color: AppColors.fg4)),
-                  ),
-                  IconBtn('sliders',
-                      size: 36,
-                      iconSize: 17,
-                      tooltip: 'Filter chats',
-                      onTap: _showFilterSheet),
-                ]),
-              ),
-            ),
-          ),
-        ],
+        ),
+        IconBtn('search',
+            size: M.minTarget,
+            iconSize: 20,
+            tooltip: 'Search chats',
+            onTap: hasClient ? _openSearch : null),
+        IconBtn('plus',
+            size: M.minTarget,
+            iconSize: 21,
+            tooltip: 'New chat',
+            onTap: hasClient ? widget.onNewSession : null),
       ]),
+    );
+  }
+
+  /// The floating action bar: destinations left, quick actions right.
+  ///
+  /// Destinations are the phone's translation of the desktop sidebar rail — on
+  /// a phone those five panels had NO entry point at all, which is the real
+  /// reason this exists (the reclaimed vertical space is a side effect).
+  ///
+  /// Rendered as a sibling of the body by the caller, never an overlay, so it
+  /// cannot hide the last row of a list.
+  Widget _mobileBar(bool hasClient) {
+    final radius = BorderRadius.circular(_kMobileBarRadius);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter, 6),
+      child: Container(
+        height: _kMobileBarHeight,
+        // The shadow lives on the OUTER container; the fill, border and rounded
+        // clip live on the inner Material. An `InkWell` paints its ripple onto
+        // the nearest Material ancestor — with no local Material these would
+        // splash onto the Scaffold's and bleed outside the pill's corners.
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x59000000),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Material(
+          color: AppColors.surface1,
+          shape: RoundedRectangleBorder(
+            borderRadius: radius,
+            side: BorderSide(color: AppColors.border2),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Row(children: [
+            const SizedBox(width: 4),
+            for (final h in _MobileHome.values)
+              Expanded(
+                child: _mobileBarDest(h, widget.mobileHome == h, hasClient),
+              ),
+            // Divider separates "where you are" from "what you can do".
+            Container(width: 1, height: 22, color: AppColors.border),
+            SizedBox(
+              width: 42,
+              child: _mobileBarAction('search', 'Search chats',
+                  onTap: hasClient ? _openSearch : null),
+            ),
+            SizedBox(
+              width: 42,
+              child: _mobileBarAction('plus', 'New chat',
+                  onTap: hasClient ? widget.onNewSession : null),
+            ),
+            const SizedBox(width: 4),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _mobileBarDest(_MobileHome h, bool active, bool enabled) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(_kMobileBarRadius - 6),
+      onTap: enabled ? () => widget.onMobileHome(h) : null,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AppIcon(h.icon,
+              size: 19, color: active ? AppColors.fg1 : AppColors.fg3),
+          const SizedBox(height: 3),
+          Text(h.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(10.5,
+                  weight: active ? W.label : W.body,
+                  color: active ? AppColors.fg1 : AppColors.fg3)),
+        ],
+      ),
+    );
+  }
+
+  Widget _mobileBarAction(String icon, String tooltip, {VoidCallback? onTap}) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(_kMobileBarRadius - 6),
+        onTap: onTap,
+        child: Center(
+          child: AppIcon(icon,
+              size: 20, color: onTap == null ? AppColors.fg4 : AppColors.fg2),
+        ),
+      ),
     );
   }
 
@@ -5613,7 +5807,27 @@ class _SidebarState extends State<_Sidebar> {
       onManage: _machineActions,
     );
     if (kMobile) {
-      await showAppSheet(context, title: 'Machines', child: content);
+      // The sheet carries two things: which machine, and the state filter. The
+      // filter used to live on the always-visible search field, but that field
+      // was removed from the head — and a filter with no way to reach it would
+      // silently strand the list. The machine row is the head's one overflow,
+      // so it owns both.
+      await showAppSheet(
+        context,
+        title: 'Machines',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            content,
+            Divider(height: 13, thickness: 1, color: AppColors.border),
+            _sessionActionTile('sliders', _mobileFilterLabel(), onTap: () {
+              Navigator.pop(context);
+              _showFilterSheet();
+            }),
+          ],
+        ),
+      );
       return;
     }
     final box = _machineKey.currentContext!.findRenderObject() as RenderBox;
@@ -5826,12 +6040,20 @@ class _SettingsPanel extends StatefulWidget {
   final Instance? active;
   final void Function(Instance) onRemove;
   final VoidCallback onClose;
+
+  /// True when hosted INSIDE the phone home under the floating bar, rather than
+  /// presented as its own dialog/drawer. Drops the oversized "Settings" title
+  /// (nothing here is a screen title when the bar already names it) and keeps
+  /// the section picker as the top line.
+  final bool embedded;
+
   const _SettingsPanel({
     required this.client,
     required this.instances,
     required this.active,
     required this.onRemove,
     required this.onClose,
+    this.embedded = false,
   });
   @override
   State<_SettingsPanel> createState() => _SettingsPanelState();
@@ -5893,33 +6115,39 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
-            child: Row(children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Settings',
-                        style:
-                            sans(14.5, weight: W.label, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text('Configure this workspace and its models.',
-                        style: sans(11.5, color: AppColors.fg3)),
-                  ],
+          // Embedded in the phone home, the bar already names this destination,
+          // so the title block is pure repetition — the section picker becomes
+          // the first line. Presented as a panel, it keeps its own title and
+          // close affordance.
+          if (!widget.embedded) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
+              child: Row(children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Settings',
+                          style: sans(14.5,
+                              weight: W.label, color: AppColors.fg1)),
+                      const SizedBox(height: 2),
+                      Text('Configure this workspace and its models.',
+                          style: sans(11.5, color: AppColors.fg3)),
+                    ],
+                  ),
                 ),
-              ),
-              IconBtn('x',
-                  size: 26,
-                  iconSize: 13,
-                  tooltip: 'Close',
-                  onTap: widget.onClose),
-            ]),
-          ),
-          Divider(height: 1, color: AppColors.border),
+                IconBtn('x',
+                    size: 26,
+                    iconSize: 13,
+                    tooltip: 'Close',
+                    onTap: widget.onClose),
+              ]),
+            ),
+            Divider(height: 1, color: AppColors.border),
+          ],
           Expanded(
             child: Column(children: [
-              SizedBox(height: 38, child: _navChips()),
+              SizedBox(height: 44, child: _navChips()),
               Divider(height: 1, color: AppColors.border),
               Expanded(child: _pageBody()),
             ]),

@@ -2152,7 +2152,7 @@ class _SessionScreenState extends State<SessionScreen>
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         if (kMobile)
-                          _mobileHeader(s, running, waiting)
+                          _mobileHeader(s)
                         else if (!kMacOS)
                           _desktopBar(s, running),
                         // Desktop keeps the detailed chip strip.
@@ -2440,14 +2440,10 @@ class _SessionScreenState extends State<SessionScreen>
   // title with a live status dot, and a compact subtitle folding in the key
   // facts (status · model · context · approval) — so there's no separate,
   // cramped desktop toolbar + scrolling chip strip on a phone.
-  Widget _mobileHeader(HarnessState? s, bool running, bool waiting) {
-    final compacting = s?.compacting ?? false;
-    final statusWord = compacting
-        ? 'Compacting history'
-        : (waiting ? 'Needs input' : (running ? 'Working' : 'Ready'));
-    final statusColor = compacting || waiting
-        ? AppColors.accent
-        : (running ? AppColors.run : AppColors.fg4);
+  /// Phone session bar: back, title, and the shell action. Deliberately NO run
+  /// state — the chat canvas already carries working/idle, so a second readout
+  /// here was one more thing competing with the title for the same 56px.
+  Widget _mobileHeader(HarnessState? s) {
     return Container(
       height: M.appBarHeight,
       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -2469,29 +2465,15 @@ class _SessionScreenState extends State<SessionScreen>
             borderRadius: BorderRadius.circular(R.sm),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_title.isEmpty ? 'Session' : _title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(M.sectionTitle,
-                          weight: W.label, color: AppColors.fg1)),
-                  const SizedBox(height: 3),
-                  Row(children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(statusWord, style: sans(M.meta, color: AppColors.fg3)),
-                  ]),
-                ],
+              // CENTERED, not baseline-stacked: with the status line gone the
+              // title is the sole element, so it should sit on the bar's optical
+              // centre rather than hug the top of a now-empty column.
+              child: Text(
+                _title.isEmpty ? 'Session' : _title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    sans(M.sectionTitle, weight: W.label, color: AppColors.fg1),
               ),
             ),
           ),
