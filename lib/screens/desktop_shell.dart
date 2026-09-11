@@ -5539,9 +5539,15 @@ class _SidebarState extends State<_Sidebar> {
               // No per-row overflow button. At this row height it crowded the
               // title, and its glyph rendered as a dark blob rather than a
               // control. The same actions live on long-press.
-              if (!renaming)
+              //
+              // The gap is REQUIRED, not cosmetic: the title is `Expanded`, so a
+              // long one fills the full width and butts straight against the
+              // time — the two run together with no separation.
+              if (!renaming) ...[
+                const SizedBox(width: 10),
                 Text(relativeTime(s.lastActive),
                     style: sans(M.meta, color: AppColors.fg4)),
+              ],
             ]),
           ),
         ),
@@ -6570,21 +6576,27 @@ class _SettingsPanelState extends State<_SettingsPanel> {
               color: isActive ? AppColors.accent : AppColors.fg3),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(i.label,
+            // Name and hostname share ONE baseline. Stacked, the hostname was a
+            // second line that doubled the row height to say something short;
+            // side by side the pair reads as "this machine, at this address".
+            child: Row(children: [
+              Flexible(
+                child: Text(i.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? M.rowTitle : 12.5,
+                    style: sans(kMobile ? 13.5 : 12.5,
                         weight: W.label, color: AppColors.fg1)),
-                const SizedBox(height: 1),
-                Text(hostOf(i.url),
+              ),
+              const SizedBox(width: 8),
+              // Both are variable-length, so they share the space equally and
+              // ellipsize independently — neither is guaranteed to survive.
+              Flexible(
+                child: Text(hostOf(i.url),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: mono(kMobile ? M.meta : 10.5, color: AppColors.fg4)),
-              ],
-            ),
+                    style: mono(kMobile ? 11 : 10.5, color: AppColors.fg4)),
+              ),
+            ]),
           ),
           if (isActive)
             Padding(
