@@ -3828,8 +3828,8 @@ class _DesktopShellState extends State<DesktopShell>
     if (c == null) return;
     final inst = _active;
     presentScreen(context,
-        maxWidth: 640,
-        maxHeight: 620,
+        maxWidth: 780,
+        maxHeight: 640,
         builder: (_, close) => _SettingsPanel(
               client: c,
               instances: _instances,
@@ -4419,8 +4419,8 @@ class _SidebarState extends State<_Sidebar> {
     final c = widget.client;
     if (c == null) return;
     presentScreen(context,
-        maxWidth: 640,
-        maxHeight: 620,
+        maxWidth: 780,
+        maxHeight: 640,
         builder: (_, close) => _SettingsPanel(
               client: c,
               instances: widget.instances,
@@ -6435,12 +6435,16 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   /// Phrased as what you go there to do, not as a noun list — "Providers and
   /// models" restated the label; "Pick the model each session runs on" tells you
   /// why you'd tap it.
+  ///
+  /// Kept under ~25 chars so they fit the rail on ONE line. Longer strings
+  /// ellipsized, and a row of truncated descriptions reads as broken rather than
+  /// concise — which defeats the reason the rail carries them at all.
   String _sectionSummary(_SettingsPage p) => switch (p) {
-        _SettingsPage.general => 'Machines, alerts and this workspace',
-        _SettingsPage.models => 'Pick the model new sessions run on',
-        _SettingsPage.usage => 'Token spend and rate limits',
-        _SettingsPage.vault => 'Secrets the agent may use as \$NAME',
-        _SettingsPage.scheduled => 'Jobs that re-run on a schedule',
+        _SettingsPage.general => 'Machine and alerts',
+        _SettingsPage.models => 'Model for new chats',
+        _SettingsPage.usage => 'Token spend and limits',
+        _SettingsPage.vault => 'Secrets the agent can use',
+        _SettingsPage.scheduled => 'Jobs that re-run on time',
       };
 
   /// One phone settings section.
@@ -6576,7 +6580,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   Widget _pageBody() {
     return switch (_page) {
-      _SettingsPage.general => _generalPage(),
+      // Title and blurb suppressed: the desktop rail already shows both, so
+      // repeating them here duplicates two lines above the first card.
+      _SettingsPage.general => _generalPage(showTitle: false, showBlurb: false),
       _SettingsPage.models =>
         InferenceProfilesScreen(client: widget.client, embedded: true),
       _SettingsPage.usage => UsageScreen(client: widget.client, embedded: true),
@@ -6588,28 +6594,31 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   /// The General section's content.
   ///
-  /// [showTitle] is false on the phone drill-down, where the host already draws
-  /// a `NavBackRow("General")` above this — the same duplication the model
-  /// editor had with its stacked back rows.
+  /// [showTitle] and [showBlurb] are false wherever the host already names this
+  /// section — the phone drill-down draws a `NavBackRow("General")`, and the
+  /// desktop rail shows the section name AND its description. Repeating either
+  /// here is the same duplication the model editor had with its stacked rows.
   ///
-  /// Groups are CARDS on both platforms. Desktop previously drew bare rows with
-  /// dividers floating on the panel surface while the phone drew cards, so the
-  /// same screen had two different structures. One `_settingsCard` helper keeps
-  /// them identical.
-  Widget _generalPage({bool showTitle = true}) {
+  /// Groups are CARDS on both platforms, and the vertical rhythm is one scale:
+  /// 18 between groups, 8 between a section label and its card. The old values
+  /// (14 / 16 / 6) were three different numbers for the same two relationships,
+  /// which is what made the spacing read as uneven.
+  Widget _generalPage({bool showTitle = true, bool showBlurb = true}) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
         if (showTitle) ...[
           Text('General',
               style: sans(14, weight: W.label, color: AppColors.fg1)),
           const SizedBox(height: 3),
         ],
-        Text('Manage the machine this app connects to and its alerts.',
-            style: sans(11.5, color: AppColors.fg3)),
-        const SizedBox(height: 14),
+        if (showBlurb) ...[
+          Text('Manage the machine this app connects to and its alerts.',
+              style: sans(11.5, color: AppColors.fg3)),
+          const SizedBox(height: 18),
+        ],
         _inlineLabel('Machines'),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         _settingsCard(
           _instances.isEmpty
               ? [
@@ -6623,9 +6632,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
               : [for (final i in _instances) _instanceRow(i)],
         ),
         if (kCanNotify) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           _inlineLabel('Alerts'),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           _settingsCard([_notifTile()]),
         ],
       ],
@@ -6709,20 +6718,11 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         ),
         _notifBusy
             ? SizedBox(
-                width: 16,
-                height: 16,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: AppColors.fg3))
-            : Transform.scale(
-                scale: 0.72,
-                child: Switch(
-                  value: _notif,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  activeThumbColor: AppColors.accentFg,
-                  activeTrackColor: AppColors.accent,
-                  onChanged: _toggleNotif,
-                ),
-              ),
+            : AppSwitch(on: _notif, onChanged: _toggleNotif),
       ]),
     );
   }

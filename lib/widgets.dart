@@ -2238,6 +2238,78 @@ Future<T?> showAppSheet<T>(BuildContext context,
   );
 }
 
+/// A theme-styled switch track + thumb.
+///
+/// Extracted so a settings row can use the switch WITHOUT the card chrome that
+/// [AppToggle] wraps around it. Call sites previously reached for
+/// `Transform.scale(child: Switch(...))` to size a Material switch down, which
+/// scales the whole widget including its touch target and distorts Material's
+/// fixed internal proportions — that is why the result looked wrong.
+class AppSwitch extends StatelessWidget {
+  final bool on;
+  final ValueChanged<bool> onChanged;
+
+  /// Whole-track size. The thumb and its inset derive from this, so the
+  /// proportions hold at any size.
+  final double width;
+  final double height;
+  final double thumb;
+
+  const AppSwitch({
+    super.key,
+    required this.on,
+    required this.onChanged,
+    this.width = 44,
+    this.height = 26,
+    this.thumb = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    const inset = 3.0;
+    return Semantics(
+      toggled: on,
+      child: GestureDetector(
+        onTap: () => onChanged(!on),
+        // The visible track is small; this keeps the tappable area comfortable
+        // without scaling the drawing.
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: width,
+          height: height + 12,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              width: width,
+              height: height,
+              decoration: BoxDecoration(
+                color: on ? AppColors.accent : AppColors.surface3,
+                borderRadius: BorderRadius.circular(height / 2),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: inset),
+                  child: Container(
+                    width: thumb,
+                    height: thumb,
+                    decoration: const BoxDecoration(
+                        color: Colors.white, shape: BoxShape.circle),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class AppToggle extends StatelessWidget {
   final bool on;
   final ValueChanged<bool> onChanged;
@@ -2275,26 +2347,7 @@ class AppToggle extends StatelessWidget {
             ]),
           ),
           const SizedBox(width: 12),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 40,
-            height: 24,
-            decoration: BoxDecoration(
-                color: on ? AppColors.accent : AppColors.surface3,
-                borderRadius: BorderRadius.circular(99)),
-            child: AnimatedAlign(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.all(3),
-                width: 18,
-                height: 18,
-                decoration: const BoxDecoration(
-                    color: Colors.white, shape: BoxShape.circle),
-              ),
-            ),
-          ),
+          AppSwitch(on: on, onChanged: onChanged),
         ]),
       ),
     );
