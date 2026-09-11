@@ -4448,14 +4448,6 @@ class _SidebarState extends State<_Sidebar> {
           // scroll-padding hack is needed. It still reads as floating (inset,
           // rounded, raised).
           Expanded(child: _mobileHomeBody(hasClient)),
-          // Context goes BELOW the content and above the nav bar: the machine
-          // these chats live on, and the one pinned destination that is not a
-          // top-level place. Both were in the head, where they cost the top of
-          // every screen — and the head is the first thing to disappear while
-          // searching, so the machine you were looking at vanished exactly when
-          // you were narrowing its chats.
-          if (!_mobileDrilledDown && widget.mobileHome == _MobileHome.chats)
-            _mobileContextBar(hasClient),
           // The bar names the app's TOP LEVEL, so it hides inside a nested
           // screen. Leaving it up would give that screen a second exit that
           // skips the level you are in — and make the bar look like part of the
@@ -4551,20 +4543,18 @@ class _SidebarState extends State<_Sidebar> {
   /// The phone home body for the destination the bar currently selects.
   ///
   /// Each destination gets the whole surface below the bar. Chats keeps a head
-  /// for machine identity; Agents and Settings own their own headers, so they
-  /// render directly.
+  /// for its title and context controls; Agents and Settings own their own
+  /// headers, so they render directly.
   Widget _mobileHomeBody(bool hasClient) {
     switch (widget.mobileHome) {
       case _MobileHome.chats:
-        // While searching, the head steps aside: every line above the results is
-        // a line not showing matches, and the expanded field already states what
-        // the screen is doing. The head now carries ONLY the selection bar — the
-        // machine switcher and the Mission Control pin moved into the bar below.
-        final searching = _mobileSearchOpen && _filterQuery.trim().isNotEmpty;
+        // The header STAYS while searching. It names the machine whose chats are
+        // being filtered — hiding it exactly when you are narrowing a machine's
+        // chats took away the context you were filtering against.
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!searching && _selecting) _mobileHomeHead(),
+            _mobileChatsHeader(hasClient),
             Expanded(
               child: !hasClient
                   ? Center(
@@ -4633,138 +4623,117 @@ class _SidebarState extends State<_Sidebar> {
   /// The Chats head: machine identity, and nothing else.
   ///
   /// Search moved into the bottom bar (it expands there), and `plus` already
-  /// lives in the bar, so repeating either here would be two controls for one
-  /// action. What is left is the one thing the bar cannot carry: which machine
-  /// these chats belong to.
-  /// The selection bar, shown only while bulk-selecting.
+  /// The Chats header: the destination name on the left, small icon buttons on
+  /// the right for the two controls that are context rather than destinations.
   ///
-  /// Machine identity and the Mission Control pin used to live here too. They
-  /// moved to `_mobileContextBar` below the list: the head is the first thing
-  /// hidden while searching, so the machine you were looking at disappeared
-  /// precisely when you were narrowing its chats.
-  Widget _mobileHomeHead() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 8, M.gutter - 4, 8),
-      child: Row(children: [
-        Text('${_selected.length} selected',
-            style: sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
-        const Spacer(),
-        _selectAllToggle(),
-        IconBtn('x',
-            size: M.minTarget,
-            iconSize: 18,
-            tooltip: 'Cancel',
-            onTap: _exitSelect),
-        IconBtn('trash',
-            size: M.minTarget,
-            iconSize: 17,
-            tooltip: 'Delete selected',
-            onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
-      ]),
-    );
-  }
-
-  /// The context chips under the list: which machine, and Mission Control.
-  ///
-  /// Below rather than above for two reasons. It costs the top of every screen
-  /// otherwise, and the head is hidden while searching — so the machine you were
-  /// looking at vanished exactly when you were narrowing its chats. Being outside
-  /// the list also means it cannot be confused for a conversation row.
-  Widget _mobileContextBar(bool hasClient) {
-    final machine = widget.active;
-    final online = machine == null ? null : widget.health[machine.url];
+  /// ONE row, above the list. The machine switcher and Mission Control are not
+  /// nav-bar destinations (that bar is icon-only and names top-level places), so
+  /// they sit here beside the title rather than in a separate strip below the
+  /// list. The row stays visible while searching, so the machine you are
+  /// narrowing stays named.
+  Widget _mobileChatsHeader(bool hasClient) {
+    if (_selecting) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(M.gutter, 8, M.gutter - 4, 8),
+        child: Row(children: [
+          Text('${_selected.length} selected',
+              style:
+                  sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
+          const Spacer(),
+          _selectAllToggle(),
+          IconBtn('x',
+              size: M.minTarget,
+              iconSize: 18,
+              tooltip: 'Cancel',
+              onTap: _exitSelect),
+          IconBtn('trash',
+              size: M.minTarget,
+              iconSize: 17,
+              tooltip: 'Delete selected',
+              onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
+        ]),
+      );
+    }
     final mc = (_sessions ?? const <SessionInfo>[])
         .where((s) => isDedicatedMcSession(s.id))
         .toList();
-
+    final mcActive = mc.isNotEmpty && mc.first.id == widget.selectedSessionId;
     return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 8),
+      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter - 4, 2),
       child: Row(children: [
-        Expanded(
-          child: _mobileContextChip(
-            onTap:
-                widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
-            child: Row(children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: online == true ? AppColors.ok : AppColors.fg4,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  machine == null ? 'Add machine' : machine.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(M.meta, weight: W.label, color: AppColors.fg2),
-                ),
-              ),
-              const SizedBox(width: 4),
-              AppIcon('chevron-down', size: 13, color: AppColors.fg4),
-            ]),
-          ),
-        ),
-        if (hasClient && mc.isNotEmpty) ...[
-          const SizedBox(width: 8),
-          _mobileContextChip(
-            onTap: widget.onOpenMissionControl,
-            active: mc.first.id == widget.selectedSessionId,
-            child: Row(children: [
-              AppIcon('layers',
-                  size: 14,
-                  color: mc.first.id == widget.selectedSessionId
-                      ? AppColors.accent
-                      : AppColors.fg3),
-              const SizedBox(width: 7),
-              Text('Mission Control',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(M.meta, weight: W.label, color: AppColors.fg2)),
-              if (mc.first.status == 'waiting_for_input' ||
-                  mc.first.status == 'running') ...[
-                const SizedBox(width: 6),
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: mc.first.status == 'waiting_for_input'
-                        ? AppColors.accent
-                        : AppColors.run,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-            ]),
-          ),
-        ],
+        Text('Chats',
+            style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
+        const Spacer(),
+        if (hasClient && mc.isNotEmpty)
+          IconBtn('layers',
+              size: M.minTarget,
+              iconSize: 19,
+              active: mcActive,
+              tooltip: 'Mission Control',
+              onTap: widget.onOpenMissionControl),
+        _machineAvatarButton(),
       ]),
     );
   }
 
-  /// One context chip. Compact and quiet: this is metadata about the list, not a
-  /// destination, so it must not compete with the nav bar's icons.
-  Widget _mobileContextChip({
-    required VoidCallback onTap,
-    required Widget child,
-    bool active = false,
-  }) =>
-      Material(
-        color: active ? AppColors.surface2 : AppColors.surface1,
-        borderRadius: BorderRadius.circular(R.md),
+  /// Machine switcher, as a small round button: the machine's initial plus a
+  /// reachability dot, matching the desktop window bar's avatar so the two read
+  /// as the same control.
+  Widget _machineAvatarButton() {
+    final a = widget.active;
+    final ok = a == null ? null : widget.health[a.url];
+    final initial = a == null || a.label.trim().isEmpty
+        ? '+'
+        : a.label.trim().characters.first.toUpperCase();
+    return Tooltip(
+      message: a == null ? 'Add machine' : 'Switch machine',
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
         child: InkWell(
-          borderRadius: BorderRadius.circular(R.md),
-          onTap: onTap,
-          child: Container(
-            height: 34,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            alignment: Alignment.centerLeft,
-            child: child,
+          customBorder: const CircleBorder(),
+          onTap:
+              widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
+          child: SizedBox(
+            width: M.minTarget,
+            height: M.minTarget,
+            child: Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.border2),
+                    ),
+                    child: Text(initial,
+                        style: sans(13, weight: W.title, color: AppColors.fg1)),
+                  ),
+                  Positioned(
+                    right: -1,
+                    bottom: -1,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: ok == true ? AppColors.ok : AppColors.fg4,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.bg, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-      );
+      ),
+    );
+  }
 
   /// The floating action bar: destinations left, quick actions right.
   ///
