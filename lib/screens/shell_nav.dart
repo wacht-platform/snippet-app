@@ -221,6 +221,49 @@ class ShellSectionHeader extends StatelessWidget {
   }
 }
 
+/// The ONE navigation header for a drilled-down phone screen.
+///
+/// Every nested surface under the phone home — a settings section, an agent's
+/// detail — uses this, so the back affordance and title sit in the same place at
+/// the same size wherever you are. Per-screen headers are how the two drifted:
+/// settings had a 16px title behind an arrow-left, agent detail its own behind
+/// an x. Two screens inside one shell should not offer two different exits.
+class NavBackRow extends StatelessWidget {
+  const NavBackRow({
+    super.key,
+    required this.title,
+    required this.onBack,
+    this.trailing = const [],
+  });
+
+  final String title;
+  final VoidCallback onBack;
+
+  /// Rendered right-aligned, after the title.
+  final List<Widget> trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
+      child: Row(children: [
+        IconBtn('arrow-left',
+            size: M.minTarget, iconSize: 19, tooltip: 'Back', onTap: onBack),
+        const SizedBox(width: 2),
+        Expanded(
+          child: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
+        ),
+        ...trailing,
+      ]),
+    );
+  }
+}
+
 /// Small square icon action used inside a section header's cluster.
 class ShellSectionAction extends StatelessWidget {
   const ShellSectionAction({

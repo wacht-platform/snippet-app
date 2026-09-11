@@ -301,6 +301,22 @@ class _DesktopShellState extends State<DesktopShell>
   /// to Chats. Desktop navigates with the sidebar rail, so this is phone-only.
   _MobileHome _mobileHome = _MobileHome.chats;
 
+  /// Phone drill-down: which settings section is open, and which agent's detail.
+  ///
+  /// Both live HERE rather than inside their own screens because two things
+  /// outside them must read them: the back handler (to unwind one level at a
+  /// time) and the bar's visibility (to hide itself while drilled down).
+  _SettingsPage? _mobileSettingsSection;
+  CoordinationAgent? _mobileAgent;
+
+  /// True while a nested phone screen is open, in which case the bar hides.
+  ///
+  /// The bar names the app's TOP LEVEL. Leaving it up inside a nested screen
+  /// gives that screen a second exit that skips the level you are in, and makes
+  /// the bar read as part of the sub-screen.
+  bool get _mobileDrilledDown =>
+      _mobileSettingsSection != null || _mobileAgent != null;
+
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
@@ -2083,7 +2099,17 @@ class _DesktopShellState extends State<DesktopShell>
         health: _health,
         onRefreshHealth: _refreshHealth,
         mobileHome: _mobileHome,
-        onMobileHome: (h) => setState(() => _mobileHome = h),
+        onMobileHome: (h) => setState(() {
+          _mobileHome = h;
+          // Switching destinations abandons any drill-down, or the new
+          // destination would open showing the previous one's nested screen.
+          _mobileSettingsSection = null;
+          _mobileAgent = null;
+        }),
+        settingsSection: _mobileSettingsSection,
+        onSettingsSection: (s) => setState(() => _mobileSettingsSection = s),
+        agent: _mobileAgent,
+        onAgent: (a) => setState(() => _mobileAgent = a),
       );
     }
 
@@ -2629,6 +2655,23 @@ class _DesktopShellState extends State<DesktopShell>
     // closes the actions drawer, then the terminal overlay, then returns here.
     // It passes `mobileActive` so its guard is absent whenever Chats is showing.
     if (!chatsVisible) return shell;
+
+    // Drilled into a nested screen → back pops ONE level, not the whole
+    // destination. Without this, backing out of a settings section landed you on
+    // Chats and lost the destination you were in.
+    if (_mobileDrilledDown) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          setState(() {
+            _mobileSettingsSection = null;
+            _mobileAgent = null;
+          });
+        },
+        child: shell,
+      );
+    }
 
     // On a non-Chats destination, back returns to Chats rather than leaving the
     // app — otherwise Settings/Agents would be a dead end whose only exit is the
@@ -4068,6 +4111,13 @@ class _Sidebar extends StatefulWidget {
   final _MobileHome mobileHome;
   final ValueChanged<_MobileHome> onMobileHome;
 
+  /// Phone drill-down state + setters. Also shell-owned, for the same reason:
+  /// the back handler and the bar's visibility both live up there.
+  final _SettingsPage? settingsSection;
+  final ValueChanged<_SettingsPage?> onSettingsSection;
+  final CoordinationAgent? agent;
+  final ValueChanged<CoordinationAgent?> onAgent;
+
   const _Sidebar({
     required this.instances,
     required this.active,
@@ -4091,6 +4141,10 @@ class _Sidebar extends StatefulWidget {
     this.onSessionAction,
     required this.mobileHome,
     required this.onMobileHome,
+    required this.settingsSection,
+    required this.onSettingsSection,
+    required this.agent,
+    required this.onAgent,
   });
   @override
   State<_Sidebar> createState() => _SidebarState();
@@ -4109,6 +4163,14 @@ class _SidebarState extends State<_Sidebar> {
   bool _mobileSearchOpen = false;
   final TextEditingController _searchCtl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
+
+  /// True while a nested phone screen is open, in which case the bar hides.
+  ///
+  /// Read from the widget rather than re-deriving it here: the state is
+  /// shell-owned (the back handler needs it too), and the bar is rendered from
+  /// THIS state, so this is the only place both are in scope.
+  bool get _mobileDrilledDown =>
+      widget.settingsSection != null || widget.agent != null;
 
   /// Folder groups the user has collapsed. Keyed by folder path; a group is
   /// expanded by default, so a fresh session list is fully visible.
@@ -4187,7 +4249,11 @@ class _SidebarState extends State<_Sidebar> {
           // scroll-padding hack is needed. It still reads as floating (inset,
           // rounded, raised).
           Expanded(child: _mobileHomeBody(hasClient)),
-          _mobileBar(hasClient),
+          // The bar names the app's TOP LEVEL, so it hides inside a nested
+          // screen. Leaving it up would give that screen a second exit that
+          // skips the level you are in — and make the bar look like part of the
+          // sub-screen rather than the shell.
+          if (!_mobileDrilledDown) _mobileBar(hasClient),
         ],
         if (!kMobile) ...[
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
@@ -4321,15 +4387,24 @@ class _SidebarState extends State<_Sidebar> {
         if (client == null) {
           return _mobileUnavailable('Add a machine to see its agents.');
         }
-        // The panel already carries its own title + refresh header, so it is
-        // used as-is rather than wrapped in a second one.
+        // Drilled into one agent: same shared header as every other nested
+        // phone screen, so the back affordance cannot drift between them.
+        final agent = widget.agent;
+        if (agent != null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              NavBackRow(
+                  title: agent.displayName, onBack: () => widget.onAgent(null)),
+              Expanded(
+                child: CoordinationAgentDetail(agent: agent, embedded: true),
+              ),
+            ],
+          );
+        }
         return AgentsSidebarPanel(
           client: client,
-          onOpenAgent: (a) => presentScreen(
-            context,
-            builder: (_, close) =>
-                CoordinationAgentDetail(agent: a, onClose: close),
-          ),
+          onOpenAgent: (a) => widget.onAgent(a),
         );
 
       case _MobileHome.settings:
@@ -4342,8 +4417,11 @@ class _SidebarState extends State<_Sidebar> {
           instances: widget.instances,
           active: widget.active,
           onRemove: widget.onRemoveInstance,
-          // Returning to Chats is the destination switch, so the embedded header
-          // needs no separate "close" affordance.
+          // Drill-down lives on the SHELL (see `_mobileSettingsSection`), so the
+          // back handler and the bar's visibility can both read it. The panel is
+          // told which section is open and reports changes back up.
+          section: widget.settingsSection,
+          onSection: widget.onSettingsSection,
           onClose: () => widget.onMobileHome(_MobileHome.chats),
           embedded: true,
         );
@@ -5849,10 +5927,15 @@ class _SettingsPanel extends StatefulWidget {
   final VoidCallback onClose;
 
   /// True when hosted INSIDE the phone home under the floating bar, rather than
-  /// presented as its own dialog/drawer. Drops the oversized "Settings" title
-  /// (nothing here is a screen title when the bar already names it) and keeps
-  /// the section picker as the top line.
+  /// presented as its own dialog/drawer.
   final bool embedded;
+
+  /// Phone drill-down. Null shows the section list; a value shows that section.
+  ///
+  /// Owned by the SHELL, not by this widget: the back handler and the bar's
+  /// visibility both need to read it, and neither can see inside here.
+  final _SettingsPage? section;
+  final ValueChanged<_SettingsPage?>? onSection;
 
   const _SettingsPanel({
     required this.client,
@@ -5861,6 +5944,8 @@ class _SettingsPanel extends StatefulWidget {
     required this.onRemove,
     required this.onClose,
     this.embedded = false,
+    this.section,
+    this.onSection,
   });
   @override
   State<_SettingsPanel> createState() => _SettingsPanelState();
@@ -5874,11 +5959,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   bool _notifBusy = false;
   _SettingsPage _page = _SettingsPage.general;
 
-  /// Phone drill-down. Null shows the section INDEX; a value shows that section
-  /// with a back row. A horizontal chip strip was the wrong shape on a phone:
-  /// it hides sections off-screen unless you swipe, and each chip is far below
-  /// the 44px touch minimum.
-  _SettingsPage? _mobileSection;
+  /// Phone drill-down, read from the shell. Desktop uses `_page` + the chip
+  /// strip instead, so this is only consulted when `kMobile && embedded`.
+  _SettingsPage? get _mobileSection => widget.section;
 
   static const _nav = [
     (_SettingsPage.general, 'settings', 'General'),
@@ -5988,83 +6071,105 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   /// Phone settings HOME.
   ///
-  /// The light sections render INLINE and only the heavy ones nest. "General"
-  /// holds two things (machines + alerts) — putting that behind a chevron spent
-  /// a tap to reveal one screen of content. Models / Usage / Vault / Scheduled
-  /// each own a real surface, so those are the ones that earn a row.
+  /// Redesigned onto the current language: every group is a `surface2` card with
+  /// hairline separators between its rows, rather than machines and alerts
+  /// floating bare above a lone card of index rows. That mixture was the visual
+  /// inconsistency — half the screen was cards, half was loose rows.
+  ///
+  /// The light sections stay INLINE and only the heavy ones nest: "General"
+  /// holds two things, so hiding it behind a chevron spent a tap to reveal one
+  /// screen of content. Models / Usage / Vault / Scheduled each own a real
+  /// surface, so those earn a row.
   Widget _mobileSettingsHome() {
     return ListView(
-      padding: EdgeInsets.fromLTRB(M.gutter, 12, M.gutter, 24),
+      padding: EdgeInsets.fromLTRB(M.gutter, 14, M.gutter, 28),
       children: [
-        _inlineLabel('Machines'),
-        const SizedBox(height: 6),
-        ..._machineRows(),
+        _inlineLabel('Machine'),
+        const SizedBox(height: 8),
+        _mobileCard(_machineRows()),
         if (kCanNotify) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: 22),
           _inlineLabel('Alerts'),
-          const SizedBox(height: 6),
-          _notifTile(),
+          const SizedBox(height: 8),
+          _mobileCard([_notifTile()]),
         ],
         const SizedBox(height: 22),
-        _inlineLabel('More'),
+        _inlineLabel('Configuration'),
         const SizedBox(height: 8),
-        for (final (page, icon, label) in _nav)
-          if (page != _SettingsPage.general) ...[
-            _mobileIndexRow(page, icon, label),
-            const SizedBox(height: 6),
-          ],
+        _mobileCard([
+          for (final (page, icon, label) in _nav)
+            if (page != _SettingsPage.general)
+              _mobileIndexRow(page, icon, label),
+        ]),
       ],
     );
   }
 
-  /// Section label, shared so the inline and nested settings cannot diverge.
-  Widget _inlineLabel(String t) => Text(t.toUpperCase(),
-      style: sans(kMobile ? 12 : 10,
-          weight: W.label, color: AppColors.fg4, spacing: 0.5));
+  /// One grouped card. Related rows share a surface and a radius, and hairlines
+  /// separate them — the design language's "surface step, not borders" applied
+  /// to a list. Supplying the separators here keeps every group identical,
+  /// which is what stops the screen reverting to mixed loose rows and cards.
+  Widget _mobileCard(List<Widget> children) => Material(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              children[i],
+              if (i < children.length - 1)
+                Divider(height: 1, thickness: 1, color: AppColors.border),
+            ],
+          ],
+        ),
+      );
 
+  /// Section label, shared so the inline and nested settings cannot diverge.
+  Widget _inlineLabel(String t) => Padding(
+        padding: const EdgeInsets.only(left: 2),
+        child: Text(t.toUpperCase(),
+            style: sans(kMobile ? 12 : 10,
+                weight: W.label, color: AppColors.fg4, spacing: 0.5)),
+      );
+
+  /// Machine rows WITHOUT separators — `_mobileCard` supplies those.
   List<Widget> _machineRows() => [
         if (_instances.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             child: Text('No saved connections.',
-                style: sans(12, color: AppColors.fg3)),
+                style: sans(M.meta, color: AppColors.fg3)),
           )
         else
-          for (var i = 0; i < _instances.length; i++) ...[
-            _instanceRow(_instances[i]),
-            if (i < _instances.length - 1)
-              Divider(height: 1, color: AppColors.border),
-          ],
+          for (final i in _instances) _instanceRow(i),
       ];
 
+  /// A navigation row inside a card. Deliberately NOT its own Material: it used
+  /// to be a card, which inside a card read as a box in a box.
   Widget _mobileIndexRow(_SettingsPage page, String icon, String label) {
-    return Material(
-      color: AppColors.surface2,
-      borderRadius: BorderRadius.circular(R.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.md),
-        onTap: () => setState(() => _mobileSection = page),
-        child: Container(
-          height: 60,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Row(children: [
-            AppIcon(icon, size: 21, color: AppColors.fg2),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(label, style: sans(M.rowTitle, color: AppColors.fg1)),
-                  const SizedBox(height: 2),
-                  Text(_sectionSummary(page),
-                      style: sans(M.meta, color: AppColors.fg4)),
-                ],
-              ),
+    return InkWell(
+      onTap: () => widget.onSection?.call(page),
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(children: [
+          AppIcon(icon, size: 21, color: AppColors.fg2),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(label, style: sans(M.rowTitle, color: AppColors.fg1)),
+                const SizedBox(height: 2),
+                Text(_sectionSummary(page),
+                    style: sans(M.meta, color: AppColors.fg4)),
+              ],
             ),
-            AppIcon('chevron-right', size: 17, color: AppColors.fg4),
-          ]),
-        ),
+          ),
+          AppIcon('chevron-right', size: 17, color: AppColors.fg4),
+        ]),
       ),
     );
   }
@@ -6102,23 +6207,11 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     );
   }
 
-  Widget _mobileSectionHeader(String label) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
-        child: Row(children: [
-          IconBtn('arrow-left',
-              size: M.minTarget,
-              iconSize: 19,
-              tooltip: 'Settings',
-              onTap: () => setState(() => _mobileSection = null)),
-          Expanded(
-            child: Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(M.sectionTitle,
-                    weight: W.label, color: AppColors.fg1)),
-          ),
-          const SizedBox(width: 4),
-        ]),
+  /// One phone settings section header — the SHARED back row, so settings and
+  /// agent detail present the same exit in the same place.
+  Widget _mobileSectionHeader(String label) => NavBackRow(
+        title: label,
+        onBack: () => widget.onSection?.call(null),
       );
 
   Widget _navChips() {
@@ -6215,7 +6308,11 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return Material(
       color: Colors.transparent,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+        // 14 horizontally on a phone so the row aligns with the index rows in
+        // the same card; desktop keeps its tighter 10 (it is a sidebar panel,
+        // not a card).
+        padding: EdgeInsets.fromLTRB(
+            kMobile ? 14 : 10, kMobile ? 12 : 8, 4, kMobile ? 12 : 8),
         child: Row(children: [
           AppIcon('cpu',
               size: kMobile ? 17 : 14,
@@ -6256,7 +6353,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   Widget _notifTile() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: EdgeInsets.symmetric(
+          horizontal: kMobile ? 14 : 0, vertical: kMobile ? 12 : 2),
       child: Row(children: [
         AppIcon('zap', size: kMobile ? 17 : 14, color: AppColors.fg3),
         const SizedBox(width: 10),
