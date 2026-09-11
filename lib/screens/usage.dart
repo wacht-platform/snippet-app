@@ -170,7 +170,13 @@ class _ProviderCard extends StatelessWidget {
                   switch (provider.rateLimitsSupported) {
                     true =>
                       'No rate-limit report yet — this provider publishes them, none seen so far.',
-                    false => 'This provider doesn’t publish rate limits.',
+                    // Not "doesn't publish rate limits": xAI does send
+                    // x-ratelimit-* headers, but they are flat API caps with no
+                    // window or reset — not the subscription quota shown here.
+                    // Claiming it publishes nothing would be false, and showing
+                    // those numbers would invent an unrelated figure.
+                    false =>
+                      'Subscription limits aren’t exposed by this provider’s API.',
                     null => 'No reported rate-limit usage.',
                   },
                   style: sans(11.5, height: 1.35, color: AppColors.fg4)),
