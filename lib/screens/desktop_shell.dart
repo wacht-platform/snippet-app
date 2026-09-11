@@ -2670,7 +2670,6 @@ class _DesktopShellState extends State<DesktopShell>
   /// or a rounded card edge — the tab frames need a continuous work surface.
   Widget _paneSurface({required Widget child}) => Container(
         color: AppColors.canvas,
-        clipBehavior: Clip.antiAlias,
         child: child,
       );
 
