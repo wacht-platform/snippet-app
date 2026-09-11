@@ -2665,12 +2665,26 @@ class _DesktopShellState extends State<DesktopShell>
     }));
   }
 
-  /// Both desktop panes share the same canvas. Their separation is the
-  /// explicit divider in [_paneResizeHandle], not a second background colour
-  /// or a rounded card edge — the tab frames need a continuous work surface.
-  Widget _paneSurface({required Widget child}) => Container(
+  /// Both desktop panes share the same canvas. Their separation is a foreground
+  /// hairline: the left pane owns the sidebar/content boundary for its full
+  /// height, while [_paneResizeHandle] owns the continuous split divider.
+  Widget _paneSurface(_Pane pane, {required Widget child}) => Container(
         color: AppColors.canvas,
-        child: child,
+        child: Stack(fit: StackFit.expand, children: [
+          child,
+          if (pane == _Pane.left)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(
+                  width: kPaneHairline,
+                  color: AppColors.fg4,
+                ),
+              ),
+            ),
+        ]),
       );
 
   /// Body for one tab.
@@ -2984,6 +2998,7 @@ class _DesktopShellState extends State<DesktopShell>
     }
 
     return _paneSurface(
+      p,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
