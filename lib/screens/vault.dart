@@ -151,8 +151,10 @@ class _VaultScreenState extends State<VaultScreen> {
     } else {
       final names = _names ?? const [];
       final list = ListView(
-        padding: EdgeInsets.fromLTRB(
-            widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
+        // 16 on BOTH paths: the phone's NavBackRow glyph sits at ~16, so the 18
+        // that the embedded (desktop) case used put content 2px off the shared
+        // axis.
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           Text(
             'The agent can use these as \$NAME in shell commands. Values stay on the daemon and never appear in chat.',

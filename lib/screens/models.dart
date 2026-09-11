@@ -230,8 +230,11 @@ class _ModelsScreenState extends State<ModelsScreen> {
         onTap: () => _edit(p),
         borderRadius: BorderRadius.circular(widget.embedded ? R.sm : R.md),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(widget.embedded ? 10 : 14,
-              widget.embedded ? 8 : 12, 6, widget.embedded ? 8 : 12),
+          // Horizontal inset 0: the LIST already insets by 16, so this padding
+          // stacked on top of it and put row icons ~10px right of the title and
+          // the nav chevron above them. Rows, title and header share one axis.
+          padding: EdgeInsets.fromLTRB(
+              0, widget.embedded ? 8 : 12, 6, widget.embedded ? 8 : 12),
           child: Row(children: [
             AppIcon('cpu',
                 size: widget.embedded ? 14 : 16,

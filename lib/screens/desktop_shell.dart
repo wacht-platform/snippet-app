@@ -69,8 +69,8 @@ enum _MobileHome {
 /// Floating action bar geometry. Kept local: it is the only floating surface in
 /// the app, so it has not earned a shared token — but the radius is deliberately
 /// larger than `R.card` so it reads as a float rather than another card.
-const double _kMobileBarHeight = 52;
-const double _kMobileBarRadius = 16;
+const double _kMobileBarHeight = 58;
+const double _kMobileBarRadius = 18;
 
 /// One open tab in the shell — a live chat session, an opened file, a single git
 /// change, or a terminal, on a given instance.
@@ -4680,11 +4680,11 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
           onTap: enabled ? () => widget.onMobileHome(h) : null,
           child: SizedBox(
-            width: 48,
+            width: 52,
             height: _kMobileBarHeight,
             child: Center(
               child: AppIcon(h.icon,
-                  size: 20, color: active ? AppColors.fg1 : AppColors.fg4),
+                  size: 21, color: active ? AppColors.fg1 : AppColors.fg4),
             ),
           ),
         ),
@@ -4701,11 +4701,11 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
           onTap: onTap,
           child: SizedBox(
-            width: 48,
+            width: 52,
             height: _kMobileBarHeight,
             child: Center(
               child: AppIcon(icon,
-                  size: 20,
+                  size: 21,
                   color: onTap == null ? AppColors.fg4 : AppColors.fg2),
             ),
           ),

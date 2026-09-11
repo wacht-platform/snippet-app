@@ -406,8 +406,9 @@ class _RecurringScreenState extends State<RecurringScreen> {
               }).toList()
             : allJobs;
         final list = ListView(
-          padding: EdgeInsets.fromLTRB(
-              widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
+          // 16 on BOTH paths; see vault.dart. Keeps every nested screen's
+          // content on the same left axis as its NavBackRow.
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             if (jobs.isEmpty)
               Padding(
