@@ -3450,10 +3450,11 @@ class _SessionScreenState extends State<SessionScreen>
                   borderRadius: BorderRadius.circular(R.md),
                   border: Border.all(color: AppColors.border),
                 ),
-                // 12 all round, matching the reference's card inset. The card
-                // owns the inset and the rows sit inside it, so there is no
-                // per-row vertical padding to keep in sync.
-                padding: const EdgeInsets.all(12),
+                // The card owns the inset and the rows sit inside it, so there is
+                // no per-row vertical padding to keep in sync. Slightly taller
+                // than it is wide-padded, so the field reads as a writing area.
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3503,7 +3504,10 @@ class _SessionScreenState extends State<SessionScreen>
                         child: TextField(
                           controller: _input,
                           focusNode: _inputFocus,
-                          minLines: 1,
+                          // Two lines minimum: a single-line field read as a
+                          // cramped search box, and it hid the fact that the
+                          // composer accepts multi-line prose.
+                          minLines: 2,
                           maxLines: 8,
                           cursorColor: AppColors.fg1,
                           onSubmitted: (_) => _sendMessage(),
