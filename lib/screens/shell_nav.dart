@@ -288,36 +288,45 @@ class ShellNavRow extends StatelessWidget {
 /// Header height for a pane. Measured 36px in the reference.
 const double kPaneHeaderHeight = 36;
 
-/// A framed tab occupies the full strip height so its outline reaches the
-/// strip rule. The active state is the 2px top edge inside this frame.
+/// A framed tab sits in the full strip band. The active state is a 1px top
+/// edge inside the frame; passive edges use a 0.5px hairline.
 const double kPaneTabHeight = kPaneHeaderHeight;
+const double kPaneHairline = 0.5;
+const double kPaneActiveStroke = 1.0;
+
+/// Bounded desktop tab widths. A root/session tab never grows to fill an empty
+/// pane; its longer title may grow until the cap, while auxiliary tabs remain
+/// visibly larger than a bare label chip.
+const double kPaneRootTabMinWidth = 260;
+const double kPaneRootTabMaxWidth = 460;
+const double kPaneAuxTabMinWidth = 180;
+const double kPaneAuxTabMaxWidth = 340;
 
 /// Pane tab label size.
 const double kPaneTabText = 12;
 
-/// One tab in a pane header.
+/// One tab in a pane header. Readout tabs may close themselves; the pane never
+/// owns a separate close action.
 class PaneTab {
-  const PaneTab({required this.label, required this.icon});
+  const PaneTab({required this.label, required this.icon, this.onClose});
   final String label;
   final String icon;
+  final VoidCallback? onClose;
 }
 
-/// Shared full-width framed strip for a pane readout. The frame is structural:
-/// a lone tab fills the complete panel up to its actions (for example Git),
-/// while several tabs retain individual outlines inside the ruled band.
+/// Shared joined tab strip for a pane readout. The outside hairline is one
+/// continuous frame; tabs meet directly and share their internal vertical seam.
 class PaneTabStrip extends StatelessWidget {
   const PaneTabStrip({
     super.key,
     required this.tabs,
     required this.activeIndex,
     this.onSelect,
-    this.actions = const [],
   });
 
   final List<PaneTab> tabs;
   final int activeIndex;
   final ValueChanged<int>? onSelect;
-  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -326,88 +335,69 @@ class PaneTabStrip extends StatelessWidget {
       height: kPaneHeaderHeight,
       decoration: BoxDecoration(
         color: AppColors.canvas,
-        border: Border(bottom: BorderSide(color: AppColors.border2)),
+        border: Border.all(color: AppColors.border2, width: kPaneHairline),
       ),
-      child: Row(children: [
-        Expanded(
-          child: tabs.length == 1
-              ? _tab(0, expand: true)
-              : ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(left: 4),
-                  itemCount: tabs.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 2),
-                  itemBuilder: (_, i) => _tab(i),
-                ),
-        ),
-        if (actions.isNotEmpty)
-          Container(
-            width: 32,
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: AppColors.border2)),
-            ),
-            child: Center(
-              child: Row(mainAxisSize: MainAxisSize.min, children: actions),
-            ),
-          ),
-      ]),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        itemCount: tabs.length,
+        separatorBuilder: (_, __) => const SizedBox.shrink(),
+        itemBuilder: (_, i) => _tab(i),
+      ),
     );
   }
 
-  Widget _tab(int i, {bool expand = false}) {
+  Widget _tab(int i) {
     final t = tabs[i];
     final active = i == activeIndex;
     return MouseRegion(
       cursor: onSelect == null ? MouseCursor.defer : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onSelect == null ? null : () => onSelect!(i),
-        child: Container(
-          width: expand ? double.infinity : null,
-          height: kPaneTabHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: AppColors.canvas,
-            border: Border(
-              top: BorderSide(
-                  color: active ? AppColors.fg2 : AppColors.border2,
-                  width: active ? 2 : 1),
-              left: BorderSide(color: AppColors.border2),
-              right: BorderSide(color: AppColors.border2),
-              bottom: BorderSide(color: AppColors.border2),
-            ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: kPaneRootTabMinWidth,
+            maxWidth: kPaneRootTabMaxWidth,
           ),
-          child: expand
-              ? Row(children: [
-                  AppIcon(t.icon,
-                      size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      t.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(kPaneTabText,
-                          weight: active ? W.label : W.body,
-                          color: active ? AppColors.fg1 : AppColors.fg3),
-                    ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.canvas,
+              border: Border(
+                right:
+                    BorderSide(color: AppColors.border2, width: kPaneHairline),
+                top: active
+                    ? BorderSide(color: AppColors.fg3, width: kPaneActiveStroke)
+                    : BorderSide.none,
+              ),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon(t.icon,
+                  size: 14, color: active ? AppColors.fg2 : AppColors.fg4),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  t.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(kPaneTabText,
+                      weight: active ? W.label : W.body,
+                      color: active ? AppColors.fg1 : AppColors.fg3),
+                ),
+              ),
+              if (t.onClose != null) ...[
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: t.onClose,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: AppIcon('x', size: 11, color: AppColors.fg4),
                   ),
-                ])
-              : Row(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon(t.icon,
-                      size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
-                  const SizedBox(width: 7),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 150),
-                    child: Text(
-                      t.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(kPaneTabText,
-                          weight: active ? W.label : W.body,
-                          color: active ? AppColors.fg1 : AppColors.fg3),
-                    ),
-                  ),
-                ]),
+                ),
+              ],
+            ]),
+          ),
         ),
       ),
     );
