@@ -2235,8 +2235,11 @@ class _SessionScreenState extends State<SessionScreen>
                                           reverse: true,
                                           scrollCacheExtent:
                                               ScrollCacheExtent.pixels(400),
-                                          padding: const EdgeInsets.fromLTRB(
-                                              20, 16, 20, 24),
+                                          padding: EdgeInsets.fromLTRB(
+                                              kMobile ? M.gutter : 20,
+                                              16,
+                                              kMobile ? M.gutter : 20,
+                                              24),
                                           itemCount: timeline.length,
                                           itemBuilder: (context, index) {
                                             final child = timeline[
@@ -2284,9 +2287,9 @@ class _SessionScreenState extends State<SessionScreen>
                         if (waiting && _pendingApproval(events))
                           _centerWide(Padding(
                             padding: EdgeInsets.fromLTRB(
-                                widget.embedded ? 0 : 20,
+                                kMobile ? M.gutter : (widget.embedded ? 0 : 20),
                                 6,
-                                widget.embedded ? 0 : 20,
+                                kMobile ? M.gutter : (widget.embedded ? 0 : 20),
                                 0),
                             child: _ApprovalBar(
                                 events: events,
@@ -2297,9 +2300,9 @@ class _SessionScreenState extends State<SessionScreen>
                         if (waiting && s?.pendingQuestion != null)
                           _centerWide(Padding(
                             padding: EdgeInsets.fromLTRB(
-                                widget.embedded ? 0 : 20,
+                                kMobile ? M.gutter : (widget.embedded ? 0 : 20),
                                 6,
-                                widget.embedded ? 0 : 20,
+                                kMobile ? M.gutter : (widget.embedded ? 0 : 20),
                                 0),
                             child: _QuestionBar(
                                 question: s!.pendingQuestion!,
@@ -2385,7 +2388,7 @@ class _SessionScreenState extends State<SessionScreen>
         ? AppColors.accent
         : (running ? AppColors.run : AppColors.fg4);
     return Container(
-      height: 60,
+      height: M.appBarHeight,
       padding: const EdgeInsets.symmetric(horizontal: 6),
       color: AppColors.bg,
       child: Row(children: [
@@ -2405,7 +2408,8 @@ class _SessionScreenState extends State<SessionScreen>
                 Text(_title.isEmpty ? 'Session' : _title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(16, weight: W.label, color: AppColors.fg1)),
+                    style: sans(M.sectionTitle,
+                        weight: W.label, color: AppColors.fg1)),
                 const SizedBox(height: 3),
                 Row(children: [
                   Container(
@@ -2417,7 +2421,7 @@ class _SessionScreenState extends State<SessionScreen>
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text(statusWord, style: sans(11.5, color: AppColors.fg3)),
+                  Text(statusWord, style: sans(M.meta, color: AppColors.fg3)),
                 ]),
               ],
             ),
@@ -3185,9 +3189,9 @@ class _SessionScreenState extends State<SessionScreen>
         // Inset from the pane on EVERY layout. Embedded used to be 0, which is
         // why the composer stuck to the sides of the shell.
         padding: EdgeInsets.fromLTRB(
-            widget.embedded ? kComposerGutter : 20,
+            kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
             8,
-            widget.embedded ? kComposerGutter : 20,
+            kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
             10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
         child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -3261,7 +3265,8 @@ class _SessionScreenState extends State<SessionScreen>
                           maxLines: 8,
                           cursorColor: AppColors.fg1,
                           onSubmitted: (_) => _sendMessage(),
-                          style: sans(15.5, height: 1.45, color: AppColors.fg1),
+                          style: sans(kMobile ? M.body : 15.5,
+                              height: 1.45, color: AppColors.fg1),
                           decoration: InputDecoration(
                             isCollapsed: true,
                             // The card supplies the inset; this only adds the gap
@@ -3270,8 +3275,8 @@ class _SessionScreenState extends State<SessionScreen>
                                 const EdgeInsets.fromLTRB(2, 2, 8, 10),
                             border: InputBorder.none,
                             hintText: 'Ask anything',
-                            hintStyle:
-                                sans(15.5, height: 1.45, color: AppColors.fg4),
+                            hintStyle: sans(kMobile ? M.body : 15.5,
+                                height: 1.45, color: AppColors.fg4),
                           ),
                         ),
                       ),

@@ -297,32 +297,34 @@ class R {
 // ---------------------------------------------------------------------------
 
 class M {
-  /// Content inset for a phone's list/gutter. Wider than the desktop's 8: a
-  /// phone has no sidebar chrome to frame the content, so the page gutter does
-  /// that job.
-  static const gutter = 20.0;
+  /// Phone content follows the desktop pane/composer inset: 16px. Touch targets
+  /// grow on mobile; the visual gutter does not become a second design system.
+  static const gutter = 16.0;
 
-  /// Navigation row height. Desktop is 26 (mouse); a phone row is a tap target.
-  static const navRow = 44.0;
-  static const navText = 16.5;
-  static const navIcon = 22.0;
+  /// Touch geometry. These are hit areas, not typography scales.
+  static const navRow = 52.0;
+  static const minTarget = 44.0;
+  static const appBarHeight = 56.0;
 
-  /// Rows in the session list.
-  static const rowTitle = 14.5;
-  static const rowTime = 11.5;
+  /// Phone reading body stays at 16px for physical legibility; chrome follows
+  /// desktop's 20/16/13/11 hierarchy and the same Geist/Inter family split.
+  static const pageTitle = 20.0;
+  static const sectionTitle = 16.0;
+  static const rowTitle = 13.0;
+  static const body = 16.0;
+  static const meta = 11.0;
+  static const monoMeta = 10.0;
 
-  /// Horizontal padding inside a phone row.
-  static const rowPadH = 14.0;
+  /// Phone row geometry: a 52px visual rhythm with a >=44px target, rather than
+  /// turning every row into a card.
+  static const rowHeight = 52.0;
+  static const rowPadH = 12.0;
 
-  /// Chrome heights. A phone's bar carries a title and an action or two and is
-  /// tapped, so it is taller than the 40px desktop band.
+  /// Legacy shell-strip metrics remain for narrow desktop only; phone navigation
+  /// no longer renders that strip.
   static const tabStripHeight = 56.0;
   static const tabIconSize = 28.0;
   static const tabActionSize = 52.0;
-
-  /// Minimum touch target. Anything tappable must reach this in at least one
-  /// axis; smaller controls visually can still pad out to it.
-  static const minTarget = 44.0;
 }
 
 /// Inset between a pane's edge and the composer card.

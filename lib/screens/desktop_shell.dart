@@ -4262,7 +4262,7 @@ class _SidebarState extends State<_Sidebar> {
         .toList();
     if (mc.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 8),
       child: _missionControlPin(mc.first),
     );
   }
@@ -4274,12 +4274,13 @@ class _SidebarState extends State<_Sidebar> {
     final machine = widget.active;
     final online = machine == null ? null : widget.health[machine.url];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      padding: EdgeInsets.fromLTRB(M.gutter, 12, M.gutter, 10),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (_selecting)
           Row(children: [
             Text('${_selected.length} selected',
-                style: sans(17, weight: W.label, color: AppColors.fg1)),
+                style: sans(M.sectionTitle,
+                    weight: W.label, color: AppColors.fg1)),
             const Spacer(),
             IconBtn('x',
                 size: M.minTarget,
@@ -4295,7 +4296,8 @@ class _SidebarState extends State<_Sidebar> {
         else ...[
           Row(children: [
             Text('Chats',
-                style: sans(22, weight: W.label, color: AppColors.fg1)),
+                style:
+                    sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
             const Spacer(),
             IconBtn('plus',
                 size: M.minTarget,
@@ -4334,13 +4336,13 @@ class _SidebarState extends State<_Sidebar> {
                       machine == null ? 'Add machine' : machine.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13, color: AppColors.fg3),
+                      style: sans(M.rowTitle, color: AppColors.fg3),
                     ),
                   ),
                   Text(machine == null ? '' : hostOf(machine.url),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(10, color: AppColors.fg4)),
+                      style: mono(M.monoMeta, color: AppColors.fg4)),
                   const SizedBox(width: 6),
                   AppIcon('chevron-down', size: 14, color: AppColors.fg4),
                 ]),
@@ -4380,11 +4382,11 @@ class _SidebarState extends State<_Sidebar> {
 
   // Phone metrics come from the shared M table so the two densities cannot
   // drift; desktop values stay local because they are already tokenised.
-  double get _navText => kMobile ? M.navText : 13;
-  double get _navIcon => kMobile ? M.navIcon : 16;
-  double get _navPadV => kMobile ? 13 : 8;
+  double get _navText => kMobile ? M.rowTitle : 13;
+  double get _navIcon => kMobile ? 18 : 16;
+  double get _navPadV => kMobile ? 12 : 8;
   double get _rowTitle => kMobile ? M.rowTitle : 12.5;
-  double get _rowTime => kMobile ? M.rowTime : 10;
+  double get _rowTime => kMobile ? M.meta : 10;
 
   Widget _navRow(String icon, String label,
       {String? sub, VoidCallback? onTap, bool active = false}) {
@@ -4847,15 +4849,15 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(R.sm),
           onTap: open,
           child: Container(
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            height: M.rowHeight,
+            padding: EdgeInsets.symmetric(horizontal: M.rowPadH),
             child: Row(children: [
               AppIcon('layers',
-                  size: 17, color: selected ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 11),
+                  size: 16, color: selected ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text('Mission Control',
-                    style: sans(15,
+                    style: sans(M.rowTitle,
                         weight: W.label,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
@@ -5034,9 +5036,9 @@ class _SidebarState extends State<_Sidebar> {
                 }
               },
         child: SizedBox(
-          height: 56,
+          height: M.rowHeight,
           child: Padding(
-            padding: const EdgeInsets.only(left: 14, right: 6),
+            padding: EdgeInsets.only(left: M.rowPadH, right: 6),
             child: Row(children: [
               if (_selecting) ...[
                 AppIcon(checked ? 'check' : 'plus',
@@ -5061,13 +5063,13 @@ class _SidebarState extends State<_Sidebar> {
                         s.title.isEmpty ? '(untitled)' : s.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(15,
+                        style: sans(M.rowTitle,
                             color: selected ? AppColors.fg1 : AppColors.fg2),
                       ),
               ),
               if (!renaming) ...[
                 Text(relativeTime(s.lastActive),
-                    style: sans(11.5, color: AppColors.fg4)),
+                    style: sans(M.meta, color: AppColors.fg4)),
                 if (!_selecting) ...[
                   const SizedBox(width: 2),
                   IconBtn('more-vertical',
