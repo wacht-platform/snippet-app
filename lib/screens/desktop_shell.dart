@@ -4779,9 +4779,6 @@ class _SidebarState extends State<_Sidebar> {
       children: [
         ShellSectionHeader(
           label: 'Chats',
-          // Chats is the one panel that really collapses, so it keeps a toggle
-          // on the label. The caret is still gone: with no caret to click, the
-          // whole label is the target.
           onToggle: () => setState(() => _toggleCollapsed(_chatsKey)),
           actions: [
             ShellSectionAction(

@@ -163,11 +163,8 @@ const double kNavRowInset = kSidebarContentInset;
 /// axis.
 const double kNavPadH = 12;
 
-/// UPPERCASE section header with a trailing action cluster.
-///
-/// Deliberately NO leading caret: it suggested the header collapsed, but the
-/// panels that use it are either always-expanded or open a different surface,
-/// so the affordance promised something it never did.
+/// UPPERCASE section header with a trailing action cluster. No caret: the
+/// panels using it never collapsed, so it promised a control that didn't exist.
 class ShellSectionHeader extends StatelessWidget {
   const ShellSectionHeader({
     super.key,
@@ -178,8 +175,7 @@ class ShellSectionHeader extends StatelessWidget {
 
   final String label;
 
-  /// Optional tap target on the label itself. Null leaves it inert, which is
-  /// honest for a header that cannot collapse.
+  /// Null for a header that cannot collapse.
   final VoidCallback? onToggle;
 
   /// Rendered right-aligned, smallest-first.

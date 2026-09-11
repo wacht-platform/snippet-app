@@ -152,7 +152,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     }
   }
 
-  /// Where a new entry lands: the root of the tree currently on screen.
   String get _createDir => _listing?.path ?? widget.workspacePath;
 
   Future<void> _newFile() async {
@@ -161,9 +160,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     final trimmed = name?.trim();
     if (trimmed == null || trimmed.isEmpty) return;
     try {
-      // Empty content, so this creates the file rather than truncating one:
-      // the daemon writes a new path, and an existing name is an explicit
-      // overwrite the user just asked for.
       await widget.client.writeFile('$_createDir/$trimmed', '');
       if (!mounted) return;
       await refresh();
@@ -188,8 +184,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     }
   }
 
-  /// One '+' offering file or folder, matching the Chats header's single add
-  /// action instead of spending two slots on it.
   Future<void> _openAddMenu() async {
     final choice = await showAppSheet<String>(context,
         title: 'New',
@@ -251,8 +245,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                 active: _searchOpen,
                 onTap: _toggleSearch,
               ),
-              // Matches the Chats header: one '+' that offers the create
-              // choices, rather than two slots competing for the same idea.
               ShellSectionAction(
                 icon: 'plus',
                 tooltip: 'New file or folder',
