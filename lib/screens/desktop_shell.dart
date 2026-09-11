@@ -2509,32 +2509,36 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _mobileShell() {
     final tab = _activeTab;
-    // The SHELL is the outermost back authority. The session may consume a back
-    // first (an open actions drawer or terminal overlay), but if it does not,
-    // this guarantees the gesture lands on the Chats list instead of closing the
-    // app. `canPop: _mobileChatsOpen` means back only exits once Chats itself is
-    // showing — the root route.
-    return PopScope(
-      canPop: _mobileChatsOpen,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && !_mobileChatsOpen) _showMobileChats();
-      },
-      child: Scaffold(
-        backgroundColor: _mobileChatsOpen ? AppColors.bg : readingBg,
-        body: Stack(children: [
-          // Keep both surfaces mounted while switching. Apart from feeling more
-          // natural than a hard cut, this preserves a live transcript and any
-          // open terminal when the user checks Chats and returns.
-          IgnorePointer(
+    final shell = Scaffold(
+      backgroundColor: _mobileChatsOpen ? AppColors.bg : readingBg,
+      body: Stack(children: [
+        // The session sits UNDERNEATH and stays fully drawn. The Chats panel
+        // slides over it and reveals it again on the way out, so there is no
+        // fade-through or blank frame during the transition.
+        if (tab != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: _mobileChatsOpen,
+              child: SafeArea(
+                bottom: false,
+                child: _tabBody(tab, primary: true),
+              ),
+            ),
+          ),
+        // Full-screen panel that slides in from the left edge, covering the
+        // whole width — Discord's channel-panel behaviour. `Offset(-1, 0)` parks
+        // it entirely off-screen when closed, so it never half-covers the
+        // session; `Positioned.fill` makes it span the full width rather than
+        // shrink-wrapping its content.
+        Positioned.fill(
+          child: IgnorePointer(
             ignoring: !_mobileChatsOpen,
             child: AnimatedSlide(
-              duration: const Duration(milliseconds: 180),
+              duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
-              offset: _mobileChatsOpen ? Offset.zero : const Offset(-0.025, 0),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOut,
-                opacity: _mobileChatsOpen ? 1 : 0,
+              offset: _mobileChatsOpen ? Offset.zero : const Offset(-1, 0),
+              child: Material(
+                color: AppColors.bg,
                 child: SafeArea(
                   child: _sidebar(
                     topInset: false,
@@ -2544,26 +2548,32 @@ class _DesktopShellState extends State<DesktopShell>
               ),
             ),
           ),
-          if (tab != null)
-            IgnorePointer(
-              ignoring: _mobileChatsOpen,
-              child: AnimatedSlide(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
-                offset: _mobileChatsOpen ? const Offset(0.035, 0) : Offset.zero,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 160),
-                  curve: Curves.easeOut,
-                  opacity: _mobileChatsOpen ? 0 : 1,
-                  child: SafeArea(
-                    bottom: false,
-                    child: _tabBody(tab, primary: true),
-                  ),
-                ),
-              ),
-            ),
-        ]),
-      ),
+        ),
+      ]),
+    );
+
+    // Back has exactly ONE owner per state. Every PopScope on a route receives
+    // the callback, so registering two would run both on a single press — one
+    // would close the terminal and the other would jump to Chats.
+    //
+    // Session open → the SESSION owns back (see SessionScreen): its ladder
+    // closes the actions drawer, then the terminal overlay, then returns here.
+    // It passes `mobileActive` so its guard is absent whenever Chats is showing.
+    if (!_mobileChatsOpen) return shell;
+
+    // Chats on screen → the shell IS the app root. Background the app so a
+    // running watcher service keeps working, rather than finishing the activity.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await watcherServiceRunning()) {
+          minimizeApp();
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: shell,
     );
   }
 

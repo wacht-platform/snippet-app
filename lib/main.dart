@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'notifications.dart';
 import 'android_reconciliation.dart';
@@ -99,9 +98,14 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: kMobile
-          ? const WithForegroundTask(child: AdaptiveHome())
-          : const AdaptiveHome(),
+      // Deliberately NOT wrapped in WithForegroundTask. That widget is a
+      // `WillPopScope`, and `Navigator.maybePop` consults WillPopScope callbacks
+      // BEFORE a route's `PopScope` popDisposition. While the watcher service was
+      // running it returned false and called minimizeApp(), which swallowed the
+      // back event entirely — so back from a session backgrounded the app
+      // instead of returning to the chat list. The shell now owns back
+      // explicitly and reproduces the minimize-at-root behaviour itself.
+      home: const AdaptiveHome(),
     );
   }
 }

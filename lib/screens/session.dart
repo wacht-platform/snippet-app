@@ -2457,32 +2457,39 @@ class _SessionScreenState extends State<SessionScreen>
               iconSize: 20,
               tooltip: 'Chats',
               onTap: widget.onMenu),
+        // The whole title block is a tap target, not just the chevron: tapping
+        // the session header is the natural gesture for "show me the list",
+        // and a 44px-tall row is far easier to hit than a 20px glyph.
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_title.isEmpty ? 'Session' : _title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(M.sectionTitle,
-                        weight: W.label, color: AppColors.fg1)),
-                const SizedBox(height: 3),
-                Row(children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      shape: BoxShape.circle,
+          child: InkWell(
+            onTap: widget.onMenu,
+            borderRadius: BorderRadius.circular(R.sm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_title.isEmpty ? 'Session' : _title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(M.sectionTitle,
+                          weight: W.label, color: AppColors.fg1)),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(statusWord, style: sans(M.meta, color: AppColors.fg3)),
-                ]),
-              ],
+                    const SizedBox(width: 6),
+                    Text(statusWord, style: sans(M.meta, color: AppColors.fg3)),
+                  ]),
+                ],
+              ),
             ),
           ),
         ),
