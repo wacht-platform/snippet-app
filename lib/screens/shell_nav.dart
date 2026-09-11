@@ -294,13 +294,17 @@ const double kPaneTabHeight = kPaneHeaderHeight;
 const double kPaneHairline = 0.2;
 const double kPaneActiveStroke = 1.0;
 
-/// Passive pane/tab seam. Very low-alpha white over the canvas, so the boundary
-/// reads as a soft edge that is present but nearly part of the background.
-const double kPaneSeamAlpha = 0.10;
+/// Hit width of the pane split handle. The visible line is one hairline at the
+/// centre; this is only the grab zone around it.
+const double kPaneSplitHandleWidth = 6;
+
+/// Passive pane/tab seam. Low-alpha white over the canvas: clearly present as a
+/// boundary, but still a step below the chrome's own borders.
+const double kPaneSeamAlpha = 0.22;
 
 /// The same seam while the divider is hovered — bright enough to signal that the
 /// line is the resize target, without becoming a drawn border.
-const double kPaneSeamHoverAlpha = 0.30;
+const double kPaneSeamHoverAlpha = 0.42;
 
 /// The one seam colour both panes share, so their boundary cannot render as two
 /// disjoint edges.

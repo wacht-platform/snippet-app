@@ -2927,7 +2927,7 @@ class _DesktopShellState extends State<DesktopShell>
         else
           Expanded(child: _collapsedPaneStub(_Pane.left)),
         if (showRight) ...[
-          _paneResizeHandle(),
+          _paneResizeHandle(joinBaseline: showLeft),
           SizedBox(
             width: _paneWidth.clamp(kPaneMinWidth, double.infinity),
             child: _dropOn(_Pane.right, _paneView(_Pane.right)),
@@ -3253,7 +3253,10 @@ class _DesktopShellState extends State<DesktopShell>
   /// The single shared divider between the two panes. It is one line, not a
   /// per-pane edge, which is what keeps the boundary continuous when both panes
   /// are open — and the wider hit zone makes that same line the resize target.
-  Widget _paneResizeHandle() => MouseRegion(
+  /// When [joinBaseline] is set, a horizontal segment also crosses the handle at
+  /// the pane strips' baseline height. Without it the left and right strips each
+  /// end at their own edge and the boundary reads as two separate borders.
+  Widget _paneResizeHandle({bool joinBaseline = false}) => MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
         onEnter: (_) => setState(() => _paneHandleHover = true),
         onExit: (_) => setState(() => _paneHandleHover = false),
@@ -3267,17 +3270,33 @@ class _DesktopShellState extends State<DesktopShell>
             });
           },
           child: SizedBox(
-            width: 6,
-            child: Center(
-              child: SizedBox(
-                width: kPaneHairline,
-                height: double.infinity,
-                child: ColoredBox(
-                  color:
-                      _paneHandleHover ? kPaneSeamHoverColor : kPaneSeamColor,
+            width: kPaneSplitHandleWidth,
+            child: Stack(children: [
+              Center(
+                child: SizedBox(
+                  width: kPaneHairline,
+                  height: double.infinity,
+                  child: ColoredBox(
+                    color:
+                        _paneHandleHover ? kPaneSeamHoverColor : kPaneSeamColor,
+                  ),
                 ),
               ),
-            ),
+              // Carry the strips' baseline across the handle, so the two pane
+              // tab rows read as one boundary rather than two separate edges.
+              if (joinBaseline)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: kPaneHeaderHeight - kPaneHairline,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: kPaneHairline,
+                      color: kPaneSeamColor,
+                    ),
+                  ),
+                ),
+            ]),
           ),
         ),
       );
