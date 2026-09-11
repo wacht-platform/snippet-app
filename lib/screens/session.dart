@@ -2881,9 +2881,6 @@ class _SessionScreenState extends State<SessionScreen>
       case 'checkpoints':
         _showCheckpoints();
         return;
-      case 'usage':
-        _showUsage();
-        return;
       // Rewind / fork from a checkpoint shown in the shell's right pane. The
       // pane sends the id, so the session resolves it against live state rather
       // than the pane holding a stale Checkpoint copy.
@@ -2938,7 +2935,6 @@ class _SessionScreenState extends State<SessionScreen>
         item('shield', 'Approval: Ask', () => _setApproval(true),
             value: manual ? 'on' : null),
         item('minimize', 'Compact history', _confirmCompact),
-        item('activity', 'Usage', _showUsage),
       ];
     }
     return [
@@ -2990,7 +2986,6 @@ class _SessionScreenState extends State<SessionScreen>
       const PopupMenuDivider(),
       item('minimize', 'Compact history', _confirmCompact),
       item('history', 'Checkpoints', _showCheckpoints),
-      item('activity', 'Usage', _showUsage),
     ];
   }
 
@@ -3064,7 +3059,6 @@ class _SessionScreenState extends State<SessionScreen>
       onRecurring: () => run(_openRecurring),
       onCompact: () => run(_confirmCompact),
       onCheckpoints: () => run(_showCheckpoints),
-      onUsage: () => run(_showUsage),
     );
   }
 
@@ -4093,96 +4087,6 @@ class _SessionScreenState extends State<SessionScreen>
         },
       ),
     );
-  }
-
-  Widget _usageBody(HarnessState s) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (s.contextWindow > 0) ...[
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Context window',
-              style: sans(12.5, weight: W.label, color: AppColors.fg2)),
-          Text('${fmtSi(s.lastPromptTokens)} / ${fmtSi(s.contextWindow)}',
-              style: mono(11.5, color: AppColors.fg3)),
-        ]),
-        const SizedBox(height: 9),
-        Progress(pct: s.lastPromptTokens / s.contextWindow * 100, height: 9),
-        const SizedBox(height: 7),
-        Text('${(s.lastPromptTokens / s.contextWindow * 100).round()}% used',
-            style: mono(11, color: AppColors.accent)),
-        const SizedBox(height: 18),
-      ],
-      const SectionLabel('Tokens'),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(
-            child: StatTile(label: '↑ Input', value: fmtSi(s.promptTokens))),
-        const SizedBox(width: 8),
-        Expanded(
-            child:
-                StatTile(label: '↓ Output', value: fmtSi(s.completionTokens))),
-      ]),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(
-            child:
-                StatTile(label: '↻ Cached', value: fmtSi(s.cacheReadTokens))),
-        const SizedBox(width: 8),
-        Expanded(
-            child: StatTile(
-                label: 'Total', value: fmtSi(s.totalTokens), accent: true)),
-      ]),
-      if (s.ratePrimary != null || s.rateSecondary != null) ...[
-        const SizedBox(height: 18),
-        const SectionLabel('Rate limits · remaining'),
-        const SizedBox(height: 8),
-        for (final w in [s.ratePrimary, s.rateSecondary])
-          if (w != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 11),
-              child: Builder(builder: (_) {
-                final rem = w.leftPercent;
-                final color = rem < 20
-                    ? AppColors.danger
-                    : rem < 50
-                        ? AppColors.run
-                        : AppColors.ok;
-                final reset = rateResetLabel(w.resetsAt);
-                return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(rateWindowLabel(w.windowMinutes),
-                                style: sans(12, color: AppColors.fg2)),
-                            Text('${rem.round()}% left',
-                                style: mono(11, color: color)),
-                          ]),
-                      const SizedBox(height: 6),
-                      Progress(pct: rem, color: color, height: 6),
-                      if (reset != null) ...[
-                        const SizedBox(height: 5),
-                        Text(reset, style: mono(10.5, color: AppColors.fg4)),
-                      ],
-                    ]);
-              }),
-            ),
-      ],
-    ]);
-  }
-
-  void _showUsage() {
-    final s = _state;
-    if (s == null) return;
-    final body = _usageBody(s);
-    if (kMobile) {
-      showAppSheet(context, title: 'Usage', child: body);
-    } else {
-      presentScreen(context,
-          style: PanelStyle.drawer,
-          builder: (_, close) =>
-              _SessionActionPanel(title: 'Usage', onClose: close, child: body));
-    }
   }
 
   void _showCheckpoints() {
@@ -5836,7 +5740,6 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onRecurring;
   final VoidCallback onCompact;
   final VoidCallback onCheckpoints;
-  final VoidCallback onUsage;
   final bool hideShell;
   final bool hideWorkspace;
   final bool hideGoal;
@@ -5857,7 +5760,6 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onRecurring,
     required this.onCompact,
     required this.onCheckpoints,
-    required this.onUsage,
     this.hideShell = false,
     this.hideWorkspace = false,
     this.hideGoal = false,
@@ -6104,11 +6006,6 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Checkpoints',
             detail: 'Restore the workspace to an earlier point',
             onTap: widget.onCheckpoints),
-      _row(
-          icon: 'activity',
-          label: 'Usage',
-          detail: 'Tokens and rate limits',
-          onTap: widget.onUsage),
     ];
 
     return Column(

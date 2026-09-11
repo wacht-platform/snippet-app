@@ -214,14 +214,17 @@ class _MacSessionControls {
 
 /// Session readouts that render in the secondary pane.
 ///
-/// These were drawers. A drawer covers the transcript, but Lanes / Checkpoints /
-/// Usage are exactly the things you check WHILE reading a session — so they
-/// belong beside it, and tapping the same band button again closes the pane.
+/// These were drawers. A drawer covers the transcript, but Lanes / Checkpoints
+/// are exactly the things you check WHILE reading a session — so they belong
+/// beside it, and tapping the same band button again closes the pane.
+///
+/// Usage is deliberately NOT here. It is a per-provider, account-wide view, so
+/// it lives in Settings → Usage rather than being reachable from a single
+/// conversation.
 enum _RightPanel {
   none('', ''),
   lanes('Lanes', 'layers'),
-  checkpoints('Checkpoints', 'history'),
-  usage('Usage', 'activity');
+  checkpoints('Checkpoints', 'history');
 
   const _RightPanel(this.label, this.icon);
   final String label;
@@ -531,11 +534,6 @@ class _DesktopShellState extends State<DesktopShell>
           onTap: tab == null
               ? null
               : () => _toggleRightPanel(_RightPanel.checkpoints)),
-      _railTool('activity',
-          tooltip: 'Usage',
-          active: _rightPanelActive(_RightPanel.usage),
-          onTap:
-              tab == null ? null : () => _toggleRightPanel(_RightPanel.usage)),
       if (mc)
         Builder(
           builder: (ctx) => _railTool('more-horizontal',
@@ -3749,8 +3747,6 @@ class _DesktopShellState extends State<DesktopShell>
           onRewind: (c) => controls?.performAction('rewind', c.id),
           onFork: (c) => controls?.performAction('fork', c.id),
         ),
-      _RightPanel.usage =>
-        s == null ? const SizedBox.shrink() : SessionUsagePanel(state: s),
       _RightPanel.none => const SizedBox.shrink(),
     };
   }
