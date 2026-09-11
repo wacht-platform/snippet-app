@@ -393,6 +393,14 @@ class _DesktopShellState extends State<DesktopShell>
   /// [_dropOn]; cleared on leave and on drop.
   _Pane? _dragOverPane;
 
+  /// True while ANY tab is being dragged.
+  ///
+  /// The secondary pane only renders when it already holds something, so from
+  /// the default state there was no right-hand drop target to drag INTO — the
+  /// feature was unreachable until you had opened that pane some other way.
+  /// A drag now materialises an empty right pane to receive it.
+  bool _dragActive = false;
+
   /// Which contextual sidebar the rail is showing. Purely a shell concern: the
   /// conversation you're reading stays put while this changes.
   ShellSection _section = ShellSection.sessions;
@@ -3203,8 +3211,15 @@ class _DesktopShellState extends State<DesktopShell>
     final leftTabs = _tabsIn(_Pane.left);
     // An explicit collapse wins over content, or the collapse control would
     // appear to do nothing while a terminal is docked.
-    final showRight =
-        !_rightCollapsed && (rightTabs.isNotEmpty || _rightTabs.isNotEmpty);
+    //
+    // `_dragActive` overrides BOTH the collapse and the emptiness: the pane only
+    // renders when it already holds something, so from the default state there
+    // was no right-hand drop target to drag INTO and the feature was unreachable
+    // without opening that pane some other way first. A drag materialises an
+    // empty one to receive it; releasing outside returns to hidden, because this
+    // is transient and never touches `_rightCollapsed`.
+    final showRight = _dragActive ||
+        (!_rightCollapsed && (rightTabs.isNotEmpty || _rightTabs.isNotEmpty));
     // Collapsing the LEFT pane is only meaningful while it holds aux content —
     // it is also the conversation surface, which there must always be a way
     // back to.
@@ -3576,9 +3591,17 @@ class _DesktopShellState extends State<DesktopShell>
     //
     // `onDragEnd` clears the highlight: a drag released outside every target
     // fires no drop callback, so without this the pane stayed outlined until the
-    // next rebuild.
+    // next rebuild. It also ends the drag state that materialises an empty
+    // right pane (see `_dragActive`).
+    void started() => setState(() => _dragActive = true);
+
     void ended(DraggableDetails _) {
-      if (_dragOverPane != null) setState(() => _dragOverPane = null);
+      if (_dragActive || _dragOverPane != null) {
+        setState(() {
+          _dragActive = false;
+          _dragOverPane = null;
+        });
+      }
     }
 
     if (kMobile) {
@@ -3587,6 +3610,7 @@ class _DesktopShellState extends State<DesktopShell>
         dragAnchorStrategy: pointerDragAnchorStrategy,
         feedback: _tabDragFeedback(t),
         childWhenDragging: Opacity(opacity: 0.4, child: chip),
+        onDragStarted: started,
         onDragEnd: ended,
         child: chip,
       );
@@ -3596,6 +3620,7 @@ class _DesktopShellState extends State<DesktopShell>
       dragAnchorStrategy: pointerDragAnchorStrategy,
       feedback: _tabDragFeedback(t),
       childWhenDragging: Opacity(opacity: 0.4, child: chip),
+      onDragStarted: started,
       onDragEnd: ended,
       child: chip,
     );
