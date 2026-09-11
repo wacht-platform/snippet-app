@@ -2668,8 +2668,30 @@ class _DesktopShellState extends State<DesktopShell>
   /// Both desktop panes share the same canvas. Their separation is a foreground
   /// hairline: the left pane owns the sidebar/content boundary for its full
   /// height, while [_paneResizeHandle] owns the continuous split divider.
-  Widget _paneSurface(_Pane pane, {required Widget child}) => Container(
-        color: AppColors.canvas,
+  ///
+  /// Only the OUTER top corners take a radius — the left pane's top-left and the
+  /// right pane's top-right. The inner corners stay square so the two panes meet
+  /// flush at the divider instead of showing two rounded notches, and
+  /// [roundRight] is false for the left pane whenever a right pane is open.
+  Widget _paneSurface(
+    _Pane pane, {
+    required Widget child,
+    bool roundRight = false,
+  }) =>
+      Container(
+        decoration: BoxDecoration(
+          color: AppColors.canvas,
+          borderRadius: BorderRadius.only(
+            topLeft: pane == _Pane.left
+                ? const Radius.circular(R.sheetTop)
+                : Radius.zero,
+            topRight:
+                roundRight ? const Radius.circular(R.sheetTop) : Radius.zero,
+          ),
+        ),
+        // Requires the decoration above: Flutter asserts on a non-default
+        // clipBehavior without one.
+        clipBehavior: Clip.antiAlias,
         child: Stack(fit: StackFit.expand, children: [
           child,
           if (pane == _Pane.left)
@@ -2921,7 +2943,9 @@ class _DesktopShellState extends State<DesktopShell>
           Expanded(
             child: _dropOn(
               _Pane.left,
-              _paneView(_Pane.left),
+              // The left pane's top-RIGHT is only an outer corner when no right
+              // pane is open; otherwise it meets the divider flush and square.
+              _paneView(_Pane.left, roundRight: !showRight),
             ),
           )
         else
@@ -2930,7 +2954,8 @@ class _DesktopShellState extends State<DesktopShell>
           _paneResizeHandle(joinBaseline: showLeft),
           SizedBox(
             width: _paneWidth.clamp(kPaneMinWidth, double.infinity),
-            child: _dropOn(_Pane.right, _paneView(_Pane.right)),
+            child:
+                _dropOn(_Pane.right, _paneView(_Pane.right, roundRight: true)),
           ),
         ],
       ]),
@@ -2973,7 +2998,7 @@ class _DesktopShellState extends State<DesktopShell>
   /// owns its ptys, so unmounting one on a tab switch would kill its terminals.
   /// The same applies to a terminal tab, whose `TerminalHost` lives in the
   /// session that owns it.
-  Widget _paneView(_Pane p) {
+  Widget _paneView(_Pane p, {bool roundRight = false}) {
     final list = _tabsIn(p);
     final active = _activeIn(p);
 
@@ -2999,6 +3024,7 @@ class _DesktopShellState extends State<DesktopShell>
 
     return _paneSurface(
       p,
+      roundRight: roundRight,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
