@@ -6285,11 +6285,36 @@ class _SettingsPanelState extends State<_SettingsPanel> {
             Divider(height: 1, color: AppColors.border),
           ],
           Expanded(
-            child: Column(children: [
-              SizedBox(height: 44, child: _navChips()),
-              Divider(height: 1, color: AppColors.border),
-              Expanded(child: _pageBody()),
-            ]),
+            child: LayoutBuilder(builder: (context, c) {
+              // WIDE: a vertical rail, the shape every desktop settings window
+              // uses. The chip strip was a phone pattern stretched across a
+              // 640px dialog — five pills floating in a row with nothing
+              // anchoring them, leaving the whole left edge empty.
+              //
+              // NARROW: keep the chips. The panel is presented full-screen when
+              // the window is small, and a 196px rail would eat most of it.
+              if (c.maxWidth >= 560) {
+                return Row(children: [
+                  SizedBox(
+                    width: 196,
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                      children: [
+                        for (final (page, icon, label) in _nav)
+                          _settingsNavRow(page, icon, label),
+                      ],
+                    ),
+                  ),
+                  Container(width: 1, color: AppColors.border),
+                  Expanded(child: _pageBody()),
+                ]);
+              }
+              return Column(children: [
+                SizedBox(height: 44, child: _navChips()),
+                Divider(height: 1, color: AppColors.border),
+                Expanded(child: _pageBody()),
+              ]);
+            }),
           ),
         ]),
       ),
@@ -6313,17 +6338,17 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       children: [
         _inlineLabel('Machine'),
         const SizedBox(height: 8),
-        _mobileCard(_machineRows()),
+        _settingsCard(_machineRows()),
         if (kCanNotify) ...[
           const SizedBox(height: 22),
           _inlineLabel('Alerts'),
           const SizedBox(height: 8),
-          _mobileCard([_notifTile()]),
+          _settingsCard([_notifTile()]),
         ],
         const SizedBox(height: 22),
         _inlineLabel('Configuration'),
         const SizedBox(height: 8),
-        _mobileCard([
+        _settingsCard([
           for (final (page, icon, label) in _nav)
             if (page != _SettingsPage.general)
               _mobileIndexRow(page, icon, label),
@@ -6336,7 +6361,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   /// separate them — the design language's "surface step, not borders" applied
   /// to a list. Supplying the separators here keeps every group identical,
   /// which is what stops the screen reverting to mixed loose rows and cards.
-  Widget _mobileCard(List<Widget> children) => Material(
+  Widget _settingsCard(List<Widget> children) => Material(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.md),
         clipBehavior: Clip.antiAlias,
@@ -6360,7 +6385,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 weight: W.label, color: AppColors.fg4, spacing: 0.5)),
       );
 
-  /// Machine rows WITHOUT separators — `_mobileCard` supplies those.
+  /// Machine rows WITHOUT separators — `_settingsCard` supplies those.
   List<Widget> _machineRows() => [
         if (_instances.isEmpty)
           Padding(
@@ -6460,6 +6485,58 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     };
   }
 
+  /// One row in the desktop settings rail.
+  ///
+  /// Selection is NEUTRAL (`surface2` fill, `fg1` icon and label), matching the
+  /// sidebar and the phone index rows. It previously used `accentBg` with an
+  /// accent icon and label — but accent means STATE in this design language
+  /// (running / needs-you), not "you are here". A blue rail row read as an
+  /// alert rather than a location.
+  ///
+  /// Carries the section description as a second line, which is what makes the
+  /// rail worth 196px: the labels alone would not be.
+  Widget _settingsNavRow(_SettingsPage page, String icon, String label) {
+    final selected = _page == page;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: selected ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.sm),
+          onTap: () => setState(() => _page = page),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(children: [
+              AppIcon(icon,
+                  size: 16, color: selected ? AppColors.fg1 : AppColors.fg3),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13,
+                            weight: selected ? W.label : W.body,
+                            color: selected ? AppColors.fg1 : AppColors.fg2)),
+                    const SizedBox(height: 2),
+                    Text(_sectionSummary(page),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(11, color: AppColors.fg4)),
+                  ],
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _navChips() {
     return ListView(
       scrollDirection: Axis.horizontal,
@@ -6469,7 +6546,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Material(
-              color: _page == page ? AppColors.accentBg : Colors.transparent,
+              // Neutral selection here too — see `_settingsNavRow`.
+              color: _page == page ? AppColors.surface3 : Colors.transparent,
               borderRadius: BorderRadius.circular(R.sm),
               child: InkWell(
                 onTap: () => setState(() => _page = page),
@@ -6480,17 +6558,13 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                   child: Row(children: [
                     AppIcon(icon,
                         size: 13,
-                        color:
-                            _page == page ? AppColors.accent : AppColors.fg3),
+                        color: _page == page ? AppColors.fg1 : AppColors.fg3),
                     const SizedBox(width: 5),
                     Text(label,
                         style: sans(11.5,
-                            weight: _page == page
-                                ? FontWeight.w500
-                                : FontWeight.w400,
-                            color: _page == page
-                                ? AppColors.accent
-                                : AppColors.fg2)),
+                            weight: _page == page ? W.label : W.body,
+                            color:
+                                _page == page ? AppColors.fg1 : AppColors.fg2)),
                   ]),
                 ),
               ),
@@ -6516,8 +6590,12 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   ///
   /// [showTitle] is false on the phone drill-down, where the host already draws
   /// a `NavBackRow("General")` above this — the same duplication the model
-  /// editor had with its stacked back rows. Desktop still needs the title,
-  /// because there the section chip strip does not name the current pane.
+  /// editor had with its stacked back rows.
+  ///
+  /// Groups are CARDS on both platforms. Desktop previously drew bare rows with
+  /// dividers floating on the panel surface while the phone drew cards, so the
+  /// same screen had two different structures. One `_settingsCard` helper keeps
+  /// them identical.
   Widget _generalPage({bool showTitle = true}) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
@@ -6532,27 +6610,23 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         const SizedBox(height: 14),
         _inlineLabel('Machines'),
         const SizedBox(height: 6),
-        if (_instances.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text('No saved connections.',
-                style: sans(12, color: AppColors.fg3)),
-          )
-        else
-          Column(
-            children: [
-              for (var i = 0; i < _instances.length; i++) ...[
-                _instanceRow(_instances[i]),
-                if (i < _instances.length - 1)
-                  Divider(height: 1, color: AppColors.border),
-              ],
-            ],
-          ),
+        _settingsCard(
+          _instances.isEmpty
+              ? [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    child: Text('No saved connections.',
+                        style: sans(M.meta, color: AppColors.fg3)),
+                  ),
+                ]
+              : [for (final i in _instances) _instanceRow(i)],
+        ),
         if (kCanNotify) ...[
           const SizedBox(height: 16),
           _inlineLabel('Alerts'),
           const SizedBox(height: 6),
-          _notifTile(),
+          _settingsCard([_notifTile()]),
         ],
       ],
     );
@@ -6563,11 +6637,11 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return Material(
       color: Colors.transparent,
       child: Padding(
-        // 14 horizontally on a phone so the row aligns with the index rows in
-        // the same card; desktop keeps its tighter 10 (it is a sidebar panel,
-        // not a card).
-        padding: EdgeInsets.fromLTRB(
-            kMobile ? 14 : 10, kMobile ? 12 : 8, 4, kMobile ? 12 : 8),
+        // Both platforms now render this row INSIDE a card, so both need the
+        // card's own gutter. The old desktop value (10) was written when this
+        // was a bare sidebar panel row; it is the same row in the same card as
+        // the phone's now, so the insets match too.
+        padding: EdgeInsets.fromLTRB(14, kMobile ? 12 : 9, 4, kMobile ? 12 : 9),
         child: Row(children: [
           // A machine is a SERVER, not a CPU. The old `cpu` glyph described a
           // chip inside the machine, which read as the wrong object entirely.
@@ -6616,8 +6690,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   Widget _notifTile() {
     return Padding(
-      padding: EdgeInsets.symmetric(
-          horizontal: kMobile ? 14 : 0, vertical: kMobile ? 12 : 2),
+      // Non-zero on BOTH platforms: this tile lives inside a `_settingsCard` on
+      // each, and a 0 desktop inset put the bell flush against the card edge.
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: kMobile ? 12 : 9),
       child: Row(children: [
         // A bell for a notification setting. `zap` (a lightning bolt) named
         // nothing about alerts.
