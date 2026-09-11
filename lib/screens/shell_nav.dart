@@ -34,6 +34,112 @@ Color toneColor(ShellTone tone) => switch (tone) {
       ShellTone.neutral => AppColors.fg2,
     };
 
+// ---------------------------------------------------------------------------
+// Run state → icon colour
+//
+// One shared mapping so a conversation's state reads the SAME everywhere it
+// appears: the sidebar row, the phone card, the window-bar tab and the pane
+// tab. A real conversation has three states (working, wants you, idle) rather
+// than two, and "needs input" is deliberately the accent — it is the one state
+// that needs the user, so it should pull the eye harder than "busy".
+// ---------------------------------------------------------------------------
+
+/// True while a conversation is actively working. Drives the pulse animation.
+bool sessionIsActive(String? status) => status == 'running';
+
+/// The one colour for a conversation-state icon.
+Color sessionStateColor(String? status) {
+  switch (status) {
+    case 'running':
+      return AppColors.run; // amber — busy
+    case 'waiting_for_input':
+      return AppColors.accent; // accent — needs you
+    default:
+      return AppColors.fg3; // neutral — idle
+  }
+}
+
+/// A conversation's leading glyph, tinted by run state.
+///
+/// [Mission Control] keeps its own `layers` glyph; every chat is a
+/// `chat-thread`, matching the sidebar's icon vocabulary. The glyph itself
+/// never changes with state — only its colour (and a subtle pulse while
+/// working), so the row does not reflow or swap identity when a run starts.
+class SessionStateIcon extends StatefulWidget {
+  const SessionStateIcon({
+    super.key,
+    required this.status,
+    this.icon = 'chat-thread',
+    this.size = 16,
+    this.activeColor,
+    this.animate = true,
+  });
+
+  final String? status;
+  final String icon;
+  final double size;
+
+  /// Overrides the state colour (e.g. a selected row lifts to `fg1`).
+  final Color? activeColor;
+
+  /// Lets a dense context (a 26px sidebar row) opt out of the pulse.
+  final bool animate;
+
+  @override
+  State<SessionStateIcon> createState() => _SessionStateIconState();
+}
+
+class _SessionStateIconState extends State<SessionStateIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1150),
+  );
+
+  bool get _shouldPulse => widget.animate && sessionIsActive(widget.status);
+
+  @override
+  void initState() {
+    super.initState();
+    // Start once the controller exists, and only when actually working.
+    // `late final` would otherwise construct the controller on FIRST ACCESS —
+    // which can be `dispose()` on an unmounting element.
+    if (_shouldPulse) _c.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant SessionStateIcon old) {
+    super.didUpdateWidget(old);
+    if (_shouldPulse && !_c.isAnimating) {
+      _c.repeat(reverse: true);
+    } else if (!_shouldPulse && _c.isAnimating) {
+      _c.stop();
+      _c.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.activeColor ?? sessionStateColor(widget.status);
+    final icon = AppIcon(widget.icon, size: widget.size, color: color);
+    if (!_shouldPulse) return icon;
+    // A gentle opacity breath — enough to read as "working" at a glance without
+    // a spinner's constant motion competing with the transcript.
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.45, end: 1.0).animate(
+        CurvedAnimation(parent: _c, curve: Curves.easeInOut),
+      ),
+      child: icon,
+    );
+  }
+}
+
 /// Measured metrics.
 const double kNavRowHeight = 26;
 const double kNavHeaderHeight = 32;
@@ -226,6 +332,7 @@ class ShellNavRow extends StatelessWidget {
     this.indent = kNavRowInset,
     this.onTap,
     this.trailing,
+    this.leading,
   });
 
   final String id;
@@ -236,6 +343,13 @@ class ShellNavRow extends StatelessWidget {
   final double indent;
   final VoidCallback? onTap;
   final Widget? trailing;
+
+  /// Replaces the default [AppIcon] in the icon column.
+  ///
+  /// Exists so a caller can supply a state-aware glyph (see
+  /// [SessionStateIcon]) that carries its own colour and animation, which the
+  /// fixed [tone] enum cannot express.
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -258,11 +372,12 @@ class ShellNavRow extends StatelessWidget {
             height: kNavRowHeight,
             padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
             child: Row(children: [
-              AppIcon(
-                icon,
-                size: kNavIcon,
-                color: selected ? AppColors.fg1 : toneColor(tone),
-              ),
+              leading ??
+                  AppIcon(
+                    icon,
+                    size: kNavIcon,
+                    color: selected ? AppColors.fg1 : toneColor(tone),
+                  ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

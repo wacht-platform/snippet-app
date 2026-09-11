@@ -245,6 +245,23 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   String? get _sessionId => _activeTab?.sessionId;
+
+  /// A tab's session run state, for tinting its icon.
+  ///
+  /// Prefers the live status the session publishes (`_macSessionStatuses`, kept
+  /// current by `_setMacSessionStatus`) and falls back to the list's cached
+  /// status, so a tab reads correctly even before its session first reports.
+  String? _statusForTab(_ShellTab t) {
+    final live = _macSessionStatuses[t.key];
+    if (live != null) {
+      return live.state?.status ?? (live.running ? 'running' : 'idle');
+    }
+    for (final s in _sessions ?? const <SessionInfo>[]) {
+      if (s.id == t.sessionId) return s.status;
+    }
+    return null;
+  }
+
   bool _loading = true;
   // Session list lives here (not in the sidebar) so it survives drawer open/close
   // and is shared with the "recent sessions" placeholder.
@@ -2409,8 +2426,13 @@ class _DesktopShellState extends State<DesktopShell>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppIcon(_tabIconKind(t),
-                size: 18, color: isActive ? AppColors.fg2 : AppColors.fg4),
+            // Tinted by run state so the window bar reads status at a glance,
+            // not just which tab is focused.
+            SessionStateIcon(
+              status: _statusForTab(t),
+              icon: _tabIconKind(t),
+              size: 18,
+            ),
             const SizedBox(width: 8),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 160),
@@ -3258,8 +3280,11 @@ class _DesktopShellState extends State<DesktopShell>
                   ),
                 ),
           child: Row(children: [
-            AppIcon(_tabIconKind(t),
-                size: 14, color: active ? AppColors.fg2 : AppColors.fg4),
+            SessionStateIcon(
+              status: _statusForTab(t),
+              icon: _tabIconKind(t),
+              size: 14,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -4802,8 +4827,6 @@ class _SidebarState extends State<_Sidebar> {
   /// row stays a single line; the trailing dot carries run/needs-input state.
   Widget _sidebarSessionRow(SessionInfo s) {
     final selected = s.id == widget.selectedSessionId;
-    final running = s.status == 'running';
-    final waiting = s.status == 'waiting_for_input';
     return ShellNavRow(
       id: s.id,
       label: s.title.trim().isEmpty ? '(untitled)' : s.title,
@@ -4811,18 +4834,10 @@ class _SidebarState extends State<_Sidebar> {
       tone: ShellTone.chat,
       selected: selected,
       onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
-      trailing: Container(
-        width: 6,
-        height: 6,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: waiting
-              ? AppColors.accent
-              : running
-                  ? AppColors.run
-                  : Colors.transparent,
-        ),
-      ),
+      // The icon now carries run state, so the trailing dot would be a second
+      // indicator for one fact. Colour is the state channel — see
+      // `sessionStateColor`: amber busy, accent needs-you, neutral idle.
+      leading: SessionStateIcon(status: s.status, size: kNavIcon),
     );
   }
 
@@ -5014,7 +5029,6 @@ class _SidebarState extends State<_Sidebar> {
   Widget _sessionRow(SessionInfo s) {
     final selected = s.id == widget.selectedSessionId;
     final waiting = s.status == 'waiting_for_input';
-    final running = s.status == 'running';
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
     final hovered = !kMobile && _hoveredId == s.id;
@@ -5059,16 +5073,11 @@ class _SidebarState extends State<_Sidebar> {
                     size: 13,
                     color: checked ? AppColors.accent : AppColors.fg4),
                 const SizedBox(width: 6),
-              ] else if (waiting || running) ...[
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: waiting ? AppColors.accent : AppColors.run,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
+              ] else ...[
+                // Always present, so titles share one left edge; the colour is
+                // what carries state.
+                SessionStateIcon(status: s.status, size: 14),
+                const SizedBox(width: 8),
               ],
               Expanded(
                   child: renaming
@@ -5121,8 +5130,6 @@ class _SidebarState extends State<_Sidebar> {
   }
 
   Widget _sessionCard(SessionInfo s) {
-    final running = s.status == 'running';
-    final waiting = s.status == 'waiting_for_input';
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
     final selected = s.id == widget.selectedSessionId;
@@ -5162,15 +5169,10 @@ class _SidebarState extends State<_Sidebar> {
                     size: 16,
                     color: checked ? AppColors.accent : AppColors.fg4),
                 const SizedBox(width: 10),
-              ] else if (running || waiting) ...[
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: running ? AppColors.run : AppColors.accent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+              ] else ...[
+                // The conversation glyph, tinted by run state (and pulsing while
+                // working). Always present so every row's title aligns.
+                SessionStateIcon(status: s.status, size: 17),
                 const SizedBox(width: 10),
               ],
               Expanded(
