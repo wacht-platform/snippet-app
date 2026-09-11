@@ -2530,18 +2530,20 @@ class _DesktopShellState extends State<DesktopShell>
               ),
             ),
           ),
-        // Full-screen panel that slides in from the left edge, covering the
-        // whole width — Discord's channel-panel behaviour. `Offset(-1, 0)` parks
-        // it entirely off-screen when closed, so it never half-covers the
-        // session; `Positioned.fill` makes it span the full width rather than
-        // shrink-wrapping its content.
+        // Full-screen panel that slides in from the RIGHT edge, covering the
+        // whole width. `Offset(1, 0)` parks it entirely off-screen when closed,
+        // so it never half-covers the session; `Positioned.fill` makes it span
+        // the full width rather than shrink-wrapping its content.
+        //
+        // Right-hand side is deliberate: the left edge belongs to Android's
+        // back-swipe gesture, so a left panel fights the OS gesture area.
         Positioned.fill(
           child: IgnorePointer(
             ignoring: !chatsVisible,
             child: AnimatedSlide(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
-              offset: chatsVisible ? Offset.zero : const Offset(-1, 0),
+              offset: chatsVisible ? Offset.zero : const Offset(1, 0),
               child: Material(
                 color: AppColors.bg,
                 child: SafeArea(
