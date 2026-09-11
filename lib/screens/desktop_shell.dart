@@ -3159,11 +3159,41 @@ class _DesktopShellState extends State<DesktopShell>
     final i = _tabs.indexOf(tab);
     if (i < 0) return;
     if (tab.pane == p) return;
+    // Read the destination's group BEFORE mutating. After the move this tab can
+    // itself become the fallback root (`_groupRootFor` falls back to the active
+    // tab), which would make the lookup self-referential.
+    final targetRoot = _groupRootFor(p);
     setState(() {
       tab.pane = p;
       // Moving an AUXILIARY tab is a pane concern; it must not drag the window
       // bar's selection with it.
       if (!_isAuxiliary(tab)) _activeIndex = i;
+
+      // RE-PARENT into the destination pane's group.
+      //
+      // A tab carries the `groupSessionKey` of the pane it came FROM. That key
+      // matches no root in the destination, and `_tabsIn(p)` keeps a tab only
+      // when it IS the root or shares its group — so the moved tab was filtered
+      // out of the strip entirely and appeared to vanish behind the tabs already
+      // docked there.
+      //
+      // A moved SESSION becomes the pane's root (it is a root by definition); a
+      // moved auxiliary tab adopts the destination's root so it renders as a
+      // sibling of that conversation.
+      if (_isAuxiliary(tab)) {
+        if (targetRoot != null) {
+          tab.groupSessionKey = targetRoot;
+          _groupRootKey[p] = targetRoot;
+        } else {
+          // Destination has no root: keep the tab's own group so it still
+          // belongs to its conversation rather than becoming an orphan.
+          _groupRootKey[p] = tab.groupSessionKey ?? tab.key;
+        }
+      } else {
+        _groupRootKey[p] = tab.key;
+        tab.groupSessionKey = null;
+      }
+
       // Docking reveals the pane: a drop into a collapsed pane would otherwise
       // land somewhere invisible.
       _dockAux(p, tab.key);
