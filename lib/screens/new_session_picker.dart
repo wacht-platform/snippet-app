@@ -10,12 +10,17 @@ import '../widgets.dart';
 /// Open a folder to start a new conversation in.
 ///
 /// ONE screen for both platforms: `presentScreen` picks the shape from the
-/// window width — a centered modal on desktop, a full screen on a phone — so the
-/// two cannot drift apart.
+/// window width — a centered modal on desktop, a full screen on a phone.
 ///
-/// Deliberately NOT a git browser. Starting a chat needs a directory and,
-/// optionally, files uploaded into it; version-control affordances belong to the
-/// session's own tooling, never to this picker.
+/// Deliberately NOT a file browser. Two rules hold this design together:
+///
+///  1. A row tap does exactly ONE thing — navigate in. It never also starts a
+///     conversation, which is what made the previous version ambiguous.
+///  2. There is exactly ONE highlighted action, pinned to the bottom, naming the
+///     folder it will use.
+///
+/// Folders only. Files cannot be opened or picked here, so listing them gave the
+/// eye work with no matching affordance; upload lives in the pinned bar instead.
 class NewSessionPicker extends StatefulWidget {
   const NewSessionPicker({
     super.key,
@@ -28,16 +33,15 @@ class NewSessionPicker extends StatefulWidget {
 
   final DaemonClient client;
 
-  /// Which machine these folders live on — identity, not a switcher. The machine
-  /// is settled before this screen opens.
+  /// Which machine these folders live on — identity, not a switcher.
   final String machineLabel;
 
   /// Start a conversation rooted at the given folder.
   final Future<void> Function(String folder) onOpenFolder;
 
   /// Where to open. Null means the server's home directory, which is the sane
-  /// default: this screen is a FOLDER PICKER, so it must not depend on a session
-  /// already being open, and it must not silently inherit one's workspace.
+  /// default: this screen must not depend on a session already being open, and
+  /// it must not silently inherit one's workspace.
   final String? startPath;
 
   /// Absent when the host owns navigation.
@@ -48,8 +52,12 @@ class NewSessionPicker extends StatefulWidget {
 }
 
 class _NewSessionPickerState extends State<NewSessionPicker> {
-  final TextEditingController _pathCtl = TextEditingController();
   FsListing? _listing;
+
+  /// The server's home directory, learned on the first load. Every breadcrumb is
+  /// expressed relative to this, and the home button returns to it.
+  String? _homePath;
+
   bool _loading = true;
   String? _error;
   String? _busy;
@@ -59,12 +67,6 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   void initState() {
     super.initState();
     _go(widget.startPath);
-  }
-
-  @override
-  void dispose() {
-    _pathCtl.dispose();
-    super.dispose();
   }
 
   Future<void> _go(String? path) async {
@@ -78,9 +80,8 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
       if (!mounted || id != _run) return;
       setState(() {
         _listing = res;
-        _pathCtl.text = res.path;
-        _pathCtl.selection =
-            TextSelection.collapsed(offset: _pathCtl.text.length);
+        // The first successful load of an unspecified path IS home.
+        if (path == null || _homePath == null) _homePath = res.path;
         _loading = false;
       });
     } catch (e) {
@@ -92,28 +93,53 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
     }
   }
 
-  /// Folders first, then files — the thing you can act on leads. Both stay
-  /// alphabetical inside their group so a long listing stays scannable.
-  List<FsEntry> get _entries {
-    final all = [...?_listing?.entries];
-    all.sort((a, b) {
-      if (a.isDir != b.isDir) return a.isDir ? -1 : 1;
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
+  /// Folders only, alphabetical. A folder picker that lists files invites taps
+  /// that can never do anything.
+  List<FsEntry> get _folders {
+    final entries = _listing?.entries ?? const <FsEntry>[];
+    final all = [
+      for (final e in entries)
+        if (e.isDir) e
+    ];
+    all.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return all;
   }
 
-  List<FsEntry> get _dirs => [
-        for (final e in _entries)
-          if (e.isDir) e
-      ];
-  List<FsEntry> get _files => [
-        for (final e in _entries)
-          if (!e.isDir) e
-      ];
+  String get _here => _listing?.path ?? '';
+
+  String get _hereName =>
+      _here.isEmpty ? 'home' : lastPathSegment(_here, ifEmpty: _here);
+
+  bool get _atHome =>
+      _homePath == null || _homePath!.isEmpty || _here == _homePath;
+
+  /// Path split into tappable crumbs, relative to home: `~ › code › repo`.
+  ///
+  /// Each crumb carries the absolute path it jumps to, so tapping a middle one
+  /// goes straight there rather than one level at a time.
+  List<_Crum> get _crumbs {
+    final home = _homePath;
+    final here = _here;
+    if (here.isEmpty) return const [];
+    if (home == null || home.isEmpty) return [_Crum('~', here)];
+    final crumbs = <_Crum>[_Crum('~', home)];
+    if (here == home) return crumbs;
+    // Only a genuine descendant splits into parts — otherwise `~/x` and `~/x-two`
+    // would be conflated by a plain prefix test.
+    if (!here.startsWith('$home/')) {
+      return [...crumbs, _Crum(_hereName, here)];
+    }
+    var acc = home;
+    for (final part in here.substring(home.length + 1).split('/')) {
+      if (part.isEmpty) continue;
+      acc = '$acc/$part';
+      crumbs.add(_Crum(part, acc));
+    }
+    return crumbs;
+  }
 
   Future<void> _open() async {
-    final path = _pathCtl.text.trim();
+    final path = _here;
     if (path.isEmpty) return;
     setState(() => _busy = 'Starting…');
     try {
@@ -127,7 +153,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   }
 
   Future<void> _upload() async {
-    final dir = _listing?.path ?? _pathCtl.text.trim();
+    final dir = _here;
     if (dir.isEmpty) return;
     List<PickedLocalFile> files;
     try {
@@ -140,8 +166,9 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
     var done = 0;
     for (var i = 0; i < files.length; i++) {
       final f = files[i];
-      if (mounted)
+      if (mounted) {
         setState(() => _busy = 'Uploading ${i + 1}/${files.length}…');
+      }
       try {
         await widget.client
             .uploadFile(await f.readAsBytes(), name: f.name, dir: dir);
@@ -161,24 +188,15 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final listing = _listing;
-    final parent = listing?.parent;
-    final folderName = listing == null
-        ? 'this folder'
-        : lastPathSegment(listing.path, ifEmpty: listing.path);
-
+    // A Material ancestor is REQUIRED, not merely for ink: without one every
+    // Text outside a nested Material falls back to DefaultTextStyle.fallback(),
+    // whose yellow double underline is what the phone build showed. The desktop
+    // dialog supplies its own Material; presentScreen's narrow branch does not.
     return Material(
-      // A Material ancestor is REQUIRED here, and not merely for ink: without
-      // one, every Text that is not inside a nested Material falls back to
-      // DefaultTextStyle.fallback(), whose yellow double underline is exactly
-      // what the phone build showed. The desktop dialog supplies its own
-      // Material (which is why only the phone was broken); the narrow branch of
-      // presentScreen returns the child raw.
       color: AppColors.bg,
       child: SafeArea(
         // presentScreen renders edge-to-edge when narrow, so the phone's status
-        // bar and gesture inset have to come from here — the header was sitting
-        // underneath the clock.
+        // bar inset has to come from here.
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -186,39 +204,22 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
             if (_error != null)
               Expanded(child: _errorState())
             else ...[
-              _pathRow(parent),
-              _openRow(folderName),
+              _breadcrumbs(),
               Expanded(
-                child: _loading && listing == null
+                child: _loading && _listing == null
                     ? const Center(
                         child: SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2)))
-                    : ListView(
-                        padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 10, 6,
-                            kMobile ? M.gutter : 10, 16),
-                        children: [
-                          if (listing != null && _entries.isEmpty)
-                            Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(12, 22, 12, 22),
-                              child: Text('This folder is empty.',
-                                  textAlign: TextAlign.center,
-                                  style: sans(12.5, color: AppColors.fg4)),
-                            ),
-                          if (_dirs.isNotEmpty) ...[
-                            _groupLabel('Folders'),
-                            for (final d in _dirs) _folderRow(d),
-                          ],
-                          if (_files.isNotEmpty) ...[
-                            _groupLabel('Files'),
-                            for (final f in _files) _fileRow(f),
-                          ],
-                        ],
+                    : RefreshIndicator(
+                        color: AppColors.accent,
+                        backgroundColor: AppColors.surface3,
+                        onRefresh: () async => _go(_here),
+                        child: _folderList(),
                       ),
               ),
-              _footer(),
+              _actionBar(),
             ],
           ],
         ),
@@ -227,21 +228,12 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   }
 
   Widget _header() => Padding(
-        padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 16, 14, 10, 10),
+        padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 16, 12, 10, 8),
         child: Row(children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('New chat',
-                    style: sans(kMobile ? 17 : 15,
-                        weight: W.label, color: AppColors.fg1)),
-                const SizedBox(height: 2),
-                Text('Pick a folder to work in.',
-                    style: sans(12, color: AppColors.fg3)),
-              ],
-            ),
+            child: Text('New chat',
+                style: sans(kMobile ? 17 : 15,
+                    weight: W.label, color: AppColors.fg1)),
           ),
           if (widget.onClose != null)
             IconBtn('x',
@@ -252,150 +244,119 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         ]),
       );
 
-  /// Path field + up + reload.
-  ///
-  /// The field stays EDITABLE (typing or pasting a path is the shortest route to
-  /// a deep directory), while the folder rows below cover click/tap navigation.
-  Widget _pathRow(String? parent) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            kMobile ? M.gutter : 16, 0, kMobile ? M.gutter : 16, 8),
-        child: Row(children: [
-          Expanded(
-            child: Container(
-              height: kMobile ? M.minTarget : 38,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: AppColors.surface1,
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border2),
+  /// Breadcrumb + home, in place of a raw path field: it shows where you are and
+  /// jumps up several levels in one tap, instead of asking you to edit text.
+  Widget _breadcrumbs() {
+    final crumbs = _crumbs;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: kMobile ? M.gutter : 16),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: AppColors.border),
+          bottom: BorderSide(color: AppColors.border),
+        ),
+      ),
+      child: Row(children: [
+        Expanded(
+          child: SizedBox(
+            height: kMobile ? M.minTarget : 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              // Reversed so the CURRENT folder is always visible; a deep path
+              // scrolls its head off the left rather than hiding where you are.
+              reverse: true,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              itemCount: crumbs.length,
+              separatorBuilder: (_, __) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child:
+                      AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+                ),
               ),
-              child: Row(children: [
-                AppIcon('folder-open', size: 15, color: AppColors.fg3),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: TextField(
-                    controller: _pathCtl,
-                    cursorColor: AppColors.accent,
-                    style: mono(kMobile ? 12.5 : 12, color: AppColors.fg1),
-                    textInputAction: TextInputAction.go,
-                    onSubmitted: _go,
-                    decoration: InputDecoration(
-                      isCollapsed: true,
-                      border: InputBorder.none,
-                      hintText: '~/path/to/folder',
-                      hintStyle: mono(12, color: AppColors.fg4),
+              itemBuilder: (_, i) {
+                final c = crumbs[i];
+                final last = i == crumbs.length - 1;
+                return Center(
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(R.sm),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(R.sm),
+                      onTap: last ? null : () => _go(c.path),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 6),
+                        child: Text(
+                          c.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: mono(kMobile ? 12.5 : 12,
+                              weight: last ? W.label : W.body,
+                              color: last ? AppColors.fg1 : AppColors.fg3),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ]),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Up is a first-class action, not a decoration: it is the only way
-          // back out of a directory without typing.
-          IconBtn('arrow-up',
-              size: kMobile ? M.minTarget : 38,
-              iconSize: 17,
-              tooltip: 'Parent folder',
-              onTap: parent == null ? null : () => _go(parent)),
-          IconBtn('refresh',
-              size: kMobile ? M.minTarget : 38,
-              iconSize: 17,
-              tooltip: 'Reload',
-              onTap: _busy != null ? null : () => _go(_listing?.path)),
-        ]),
-      );
-
-  /// The primary action. Highlighted and full width so the one thing this screen
-  /// is for cannot be missed.
-  Widget _openRow(String folderName) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            kMobile ? M.gutter : 16, 0, kMobile ? M.gutter : 16, 6),
-        child: Material(
-          color: AppColors.accentBg,
-          borderRadius: BorderRadius.circular(R.md),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(R.md),
-            onTap: _busy != null ? null : _open,
-            child: Container(
-              height: kMobile ? 50 : 42,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.md),
-                border:
-                    Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
-              ),
-              child: Row(children: [
-                if (_busy != null)
-                  const SizedBox(
-                      width: 15,
-                      height: 15,
-                      child: CircularProgressIndicator(strokeWidth: 1.6))
-                else
-                  AppIcon('corner-down-right',
-                      size: 16, color: AppColors.accent),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _busy ?? 'Open “$folderName”',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? 14 : 13,
-                        weight: W.label, color: AppColors.accent),
-                  ),
-                ),
-                Text(widget.machineLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(kMobile ? 11 : 10.5, color: AppColors.fg4)),
-              ]),
+                );
+              },
             ),
           ),
         ),
-      );
+        const SizedBox(width: 4),
+        IconBtn('arrow-up',
+            size: kMobile ? M.minTarget : 36,
+            iconSize: 17,
+            tooltip: 'Home',
+            onTap: _atHome ? null : () => _go(_homePath)),
+      ]),
+    );
+  }
 
-  Widget _groupLabel(String label) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-        child: Text(label.toUpperCase(),
-            style:
-                sans(10, weight: W.label, color: AppColors.fg4, spacing: 0.5)),
+  Widget _folderList() {
+    final folders = _folders;
+    if (folders.isEmpty) {
+      // Still a ListView, so RefreshIndicator has a scrollable to attach to.
+      return ListView(
+        padding: const EdgeInsets.symmetric(vertical: 44),
+        children: [
+          Text('No folders here.',
+              textAlign: TextAlign.center,
+              style: sans(12.5, color: AppColors.fg4)),
+        ],
       );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+      itemCount: folders.length,
+      itemBuilder: (_, i) => _folderRow(folders[i]),
+    );
+  }
 
-  /// One row's shared shell: hover feedback, a real touch target, and a pointer
-  /// cursor on desktop so a folder reads as clickable before it is clicked.
-  Widget _rowShell({
-    required String icon,
-    required String name,
-    required bool isDir,
-    required VoidCallback? onTap,
-    double? iconSize,
-  }) {
-    final color = isDir ? AppColors.fg1 : AppColors.fg4;
+  Widget _folderRow(FsEntry e) {
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
       child: InkWell(
         borderRadius: BorderRadius.circular(R.sm),
         hoverColor: AppColors.surface2,
-        onTap: onTap,
+        onTap: _busy == null ? () => _go(e.path) : null,
         child: MouseRegion(
-          cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+          // The desktop half of "this goes somewhere".
+          cursor: SystemMouseCursors.click,
           child: Container(
-            height: kMobile ? 46 : 34,
+            height: kMobile ? 46 : 36,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(children: [
-              AppIcon(icon, size: iconSize ?? (isDir ? 15 : 14), color: color),
-              const SizedBox(width: 10),
+              AppIcon('folder', size: 15, color: AppColors.fg2),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(name,
+                child: Text(e.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? 13.5 : 12.5, color: color)),
+                    style: sans(kMobile ? 13.5 : 12.5, color: AppColors.fg1)),
               ),
-              // The chevron is what makes "this goes somewhere" visible; without
-              // it a folder row and a file row looked identical.
-              if (isDir)
-                AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
             ]),
           ),
         ),
@@ -403,42 +364,58 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
     );
   }
 
-  Widget _folderRow(FsEntry e) => _rowShell(
-        icon: 'folder',
-        name: e.name,
-        isDir: true,
-        onTap: _busy == null ? () => _go(e.path) : null,
-      );
-
-  /// Files are listing CONTEXT (what the folder holds, and what an upload
-  /// produced) — not a destination, so they get no tap target rather than
-  /// pretending to be a dead button.
-  Widget _fileRow(FsEntry e) => _rowShell(
-        icon: 'file',
-        name: e.name,
-        isDir: false,
-        onTap: null,
-      );
-
-  Widget _footer() => Container(
+  /// The single highlighted action, pinned so it never scrolls out of reach.
+  Widget _actionBar() => Container(
         padding: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 16, 8, kMobile ? M.gutter : 16, 10),
         decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: Row(children: [
+          IconBtn('upload',
+              size: kMobile ? M.minTarget : 38,
+              iconSize: 18,
+              tooltip: 'Upload files into this folder',
+              onTap: (_listing == null || _busy != null) ? null : _upload),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              'Files are uploaded into the folder you open.',
-              style: sans(11, color: AppColors.fg4),
+            child: Material(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(R.md),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(R.md),
+                onTap: _busy != null ? null : _open,
+                child: Container(
+                  height: kMobile ? 48 : 40,
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_busy != null)
+                        SizedBox(
+                            width: 15,
+                            height: 15,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 1.6, color: AppColors.accentFg))
+                      else
+                        AppIcon('corner-down-right',
+                            size: 16, color: AppColors.accentFg),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _busy ?? 'Start chat in $_hereName',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(kMobile ? 14 : 13,
+                              weight: W.label, color: AppColors.accentFg),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 8),
-          IconBtn('upload',
-              size: kMobile ? M.minTarget : 36,
-              iconSize: 18,
-              tooltip: 'Upload files here',
-              onTap: (_listing == null || _busy != null) ? null : _upload),
         ]),
       );
 
@@ -452,8 +429,15 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                 textAlign: TextAlign.center,
                 style: sans(12.5, color: AppColors.fg3, height: 1.45)),
             const SizedBox(height: 14),
-            Btn('Retry', small: true, onTap: () => _go(_pathCtl.text.trim())),
+            Btn('Retry', small: true, onTap: () => _go(widget.startPath)),
           ]),
         ),
       );
+}
+
+/// One breadcrumb: the label to draw and the absolute path it jumps to.
+class _Crum {
+  const _Crum(this.label, this.path);
+  final String label;
+  final String path;
 }

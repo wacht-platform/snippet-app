@@ -316,9 +316,14 @@ class M {
   /// desktop's 20/16/13/11 hierarchy and the same Geist/Inter family split.
   static const pageTitle = 20.0;
   static const sectionTitle = 16.0;
-  static const rowTitle = 13.0;
+
+  /// 14, not 13: at 13px a phone row title sat uncomfortably close to the 11px
+  /// meta beside it, so the hierarchy read as "two smalls" rather than
+  /// "title + detail". These two move as a pair — widening only the title would
+  /// have grown the gap between them in the same row.
+  static const rowTitle = 14.0;
   static const body = 16.0;
-  static const meta = 11.0;
+  static const meta = 12.0;
   static const monoMeta = 10.0;
 
   /// Phone row geometry: a 52px visual rhythm with a >=44px target, rather than
