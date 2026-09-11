@@ -228,6 +228,35 @@ enum _RightPanel {
   final String icon;
 }
 
+/// One tab in the secondary pane's readout strip.
+///
+/// Readouts are a LIST, not a single selection. Lanes, Checkpoints, Usage and a
+/// named agent are independent things you may want open at the same time;
+/// keeping one meant closing one to open another, which is why they are tabs
+/// here rather than one exclusive mode.
+class _RightTab {
+  const _RightTab.panel(this.panel) : agent = null;
+  const _RightTab.agent(CoordinationAgent this.agent)
+      : panel = _RightPanel.none;
+
+  final _RightPanel panel;
+  final CoordinationAgent? agent;
+
+  bool get isAgent => agent != null;
+
+  /// Stable identity, so re-opening a panel focuses its tab instead of adding
+  /// a duplicate.
+  String get key => isAgent ? 'agent|${agent!.id}' : 'panel|${panel.name}';
+
+  String get label {
+    final a = agent;
+    if (a == null) return panel.label;
+    return a.displayName.trim().isEmpty ? a.id : a.displayName;
+  }
+
+  String get icon => isAgent ? 'users' : panel.icon;
+}
+
 class _DesktopShellState extends State<DesktopShell>
     with WidgetsBindingObserver {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -363,16 +392,16 @@ class _DesktopShellState extends State<DesktopShell>
   /// Detail shown in the right pane. Null = pane hidden, so the transcript gets
   /// the full width until something asks for detail — a pane that is always
   /// present would cost space even when nothing needs inspecting.
-  CoordinationAgent? _rightAgent;
-
-  /// Session readouts that render in the secondary pane instead of a drawer.
+  /// Tabs open in the secondary pane: session readouts and agent details.
   ///
-  /// Lanes, Checkpoints and Usage are things you glance at WHILE reading the
-  /// transcript, so a modal was the wrong shape for them — it covered the very
-  /// context you were checking against. A readout is exclusive with a
-  /// right-pane TAB: opening one yields the pane, and dropping a tab there
-  /// dismisses the readout.
-  _RightPanel _rightPanel = _RightPanel.none;
+  /// A LIST, not one exclusive selection. Lanes, Checkpoints, Usage and a named
+  /// agent are independent things; keeping one meant closing one to open
+  /// another, which is why the rail buttons behaved like radio buttons.
+  final List<_RightTab> _rightTabs = [];
+
+  /// Which `_RightTab.key` the pane is showing. Null with a non-empty
+  /// `_rightTabs` falls back to the first tab.
+  String? _rightActiveKey;
 
   /// The user collapsed a pane. Hiding a pane is always a view action and never
   /// destroys anything — a terminal tab lives on in the sidebar, and its pty
@@ -397,25 +426,62 @@ class _DesktopShellState extends State<DesktopShell>
   /// through `_ShellTab.groupSessionKey`.
   final Map<_Pane, String> _groupRootKey = {};
 
-  /// Show a session panel in the pane, or close it if it is already showing.
+  /// True when this readout is the tab the pane is currently showing.
+  bool _rightPanelActive(_RightPanel p) =>
+      _rightActiveKey == _RightTab.panel(p).key;
+
+  /// Open a readout in the pane, focusing it if it is already open.
+  ///
+  /// Toggling CLOSED when the same panel is already focused keeps the old
+  /// affordance (tap the lit button to dismiss), while a different panel ADDS a
+  /// tab instead of replacing one — that replacement was the bug.
   void _toggleRightPanel(_RightPanel p) {
+    if (p == _RightPanel.none) return;
+    final key = _RightTab.panel(p).key;
     setState(() {
-      _rightAgent = null;
       _rightCollapsed = false;
-      _rightPanel = _rightPanel == p ? _RightPanel.none : p;
+      if (_rightActiveKey == key) {
+        _closeRightTab(key);
+        return;
+      }
+      if (!_rightTabs.any((t) => t.key == key)) {
+        _rightTabs.add(_RightTab.panel(p));
+      }
+      _rightActiveKey = key;
+    });
+  }
+
+  /// Open an agent's detail as a pane tab, focusing it if already open.
+  void _openRightAgent(CoordinationAgent a) {
+    final key = _RightTab.agent(a).key;
+    setState(() {
+      _rightCollapsed = false;
+      if (!_rightTabs.any((t) => t.key == key)) {
+        _rightTabs.add(_RightTab.agent(a));
+      }
+      _rightActiveKey = key;
+    });
+  }
+
+  /// Close ONE readout tab. Does not collapse the pane — other tabs may remain,
+  /// and even an empty pane stays open so the next rail tap lands somewhere.
+  void _closeRightTab(String key) {
+    if (!mounted) return;
+    setState(() {
+      _rightTabs.removeWhere((t) => t.key == key);
+      if (_rightActiveKey == key) {
+        _rightActiveKey = _rightTabs.isEmpty ? null : _rightTabs.last.key;
+      }
     });
   }
 
   /// Collapse the right pane without touching whatever is in it.
   ///
   /// Never destroys: a terminal tab lives on in the sidebar and its pty stays
-  /// alive, so re-opening is instant and loses no scrollback.
+  /// alive, so re-opening is instant and loses no scrollback. Readout tabs stay
+  /// in `_rightTabs` too, so reopening the pane restores the strip.
   void _closeSplitPane() {
-    setState(() {
-      _rightCollapsed = true;
-      _rightAgent = null;
-      _rightPanel = _RightPanel.none;
-    });
+    setState(() => _rightCollapsed = true);
   }
 
   /// The button list at the far right of the navigation band.
@@ -448,19 +514,19 @@ class _DesktopShellState extends State<DesktopShell>
       ),
       _railTool('layers',
           tooltip: 'Lanes',
-          active: _rightPanel == _RightPanel.lanes,
+          active: _rightPanelActive(_RightPanel.lanes),
           badge: lanes > 0 ? '$lanes' : null,
           onTap:
               tab == null ? null : () => _toggleRightPanel(_RightPanel.lanes)),
       _railTool('history',
           tooltip: 'Checkpoints',
-          active: _rightPanel == _RightPanel.checkpoints,
+          active: _rightPanelActive(_RightPanel.checkpoints),
           onTap: tab == null
               ? null
               : () => _toggleRightPanel(_RightPanel.checkpoints)),
       _railTool('activity',
           tooltip: 'Usage',
-          active: _rightPanel == _RightPanel.usage,
+          active: _rightPanelActive(_RightPanel.usage),
           onTap:
               tab == null ? null : () => _toggleRightPanel(_RightPanel.usage)),
       if (mc)
@@ -472,33 +538,26 @@ class _DesktopShellState extends State<DesktopShell>
     ];
   }
 
-  /// One 24px button in the band, with an optional count badge.
+  /// One button in the band's right cluster.
+  ///
+  /// Delegates to the SHARED `RailIcon`, the same widget the section strip over
+  /// the sidebar uses. This used to be its own `IconBtn` at a different size and
+  /// colour ramp, which is why the two clusters read as two design languages on
+  /// one row.
   Widget _railTool(
     String icon, {
     required String tooltip,
     required VoidCallback? onTap,
     bool active = false,
     String? badge,
-  }) {
-    final button = IconBtn(icon,
-        size: 28, iconSize: 15, active: active, tooltip: tooltip, onTap: onTap);
-    if (badge == null) return button;
-    return Stack(clipBehavior: Clip.none, children: [
-      button,
-      Positioned(
-        right: 1,
-        top: 1,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-          decoration: BoxDecoration(
-            color: AppColors.surface3,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(badge, style: mono(9, color: AppColors.fg2)),
-        ),
-      ),
-    ]);
-  }
+  }) =>
+      RailIcon(
+        icon: icon,
+        tooltip: tooltip,
+        active: active,
+        badge: badge,
+        onTap: onTap,
+      );
 
   /// Anchored goal field, under its button in the band.
   Future<void> _openGoalPopover(BuildContext btnCtx) async {
@@ -1412,20 +1471,47 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  /// An inner tab group is session-rooted: only user-opened supporting content
-  /// can be closed. The session root is permanent for the lifetime of its group.
+  /// Pane-strip rule: an inner tab group is session-rooted, so the conversation
+  /// root itself is permanent for the lifetime of its group and only the
+  /// supporting content beside it closes.
   bool _canCloseTab(_ShellTab t) => _isAuxiliary(t) && !t.isTerminal;
 
-  void _closeTab(int i) {
+  /// Window-bar rule: the FIRST level is a plain list of open workspaces, so any
+  /// of them closes — that is the whole point of a window bar. Only the pinned
+  /// Mission Control tab is exempt.
+  ///
+  /// Using `_canCloseTab` here is what made top tabs unclosable: it is written
+  /// for the pane strip, where a session root must stay, and a session tab is
+  /// never "auxiliary".
+  bool _canCloseTopTab(_ShellTab t) => !t.isMissionControl;
+
+  void _closeTab(int i, {bool force = false}) {
     if (i < 0 || i >= _tabs.length) return;
-    if (!_canCloseTab(_tabs[i])) return;
+    if (!force && !_canCloseTab(_tabs[i])) return;
     final key = _tabs[i].key;
     setState(() {
+      // Closing a level-1 workspace must take its level-2 children with it.
+      // Leaving them behind orphaned the aux tabs: their group root no longer
+      // existed, so `_groupRootFor` fell back to whatever was active and the
+      // strip showed files and terminals belonging to a closed conversation.
+      final orphans = [
+        for (final t in _tabs)
+          if (t.groupSessionKey == key) t,
+      ];
+      for (final t in orphans) {
+        _clearTabState(t.key);
+        _activeKey.removeWhere((_, k) => k == t.key);
+      }
+      _tabs.removeWhere((t) => t.groupSessionKey == key);
+
       _clearTabState(key);
       // A pane selection pointing at a tab that no longer exists would leave
       // that pane blank instead of falling back to its default content.
       _activeKey.removeWhere((_, k) => k == key);
-      _tabs.removeAt(i);
+      _tabs.removeWhere((t) => t.key == key);
+      // Drop group roots that no longer anchor anything, so a reopened
+      // conversation does not inherit a dead group.
+      _groupRootKey.removeWhere((_, root) => !_tabs.any((t) => t.key == root));
       _normalizeActiveIndex(i);
     });
     _persistTabs();
@@ -2027,7 +2113,7 @@ class _DesktopShellState extends State<DesktopShell>
           ? _sidebarUnavailable('Add a machine to see its agents.')
           : AgentsSidebarPanel(
               client: client,
-              onOpenAgent: (a) => setState(() => _rightAgent = a),
+              onOpenAgent: _openRightAgent,
             );
     } else if (_section == ShellSection.git) {
       final client = _client;
@@ -2513,12 +2599,15 @@ class _DesktopShellState extends State<DesktopShell>
                     color: isActive ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
-            if (_canCloseTab(t)) ...[
+            if (_canCloseTopTab(t)) ...[
               const SizedBox(width: 6),
               GestureDetector(
-                onTap: () => _closePaneTab(t),
+                // force: the pane-strip rule refuses to close a session root,
+                // but a window-bar tab IS a top-level workspace and must close.
+                onTap: () => _closeTabAt(t, force: true),
+                behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding: const EdgeInsets.all(2),
+                  padding: const EdgeInsets.all(4),
                   child: AppIcon('x', size: 13, color: AppColors.fg4),
                 ),
               ),
@@ -3051,9 +3140,10 @@ class _DesktopShellState extends State<DesktopShell>
   void _dockAux(_Pane p, String key) {
     _activeKey[p] = key;
     if (p == _Pane.right) {
+      // Reveal the pane. Docked `_ShellTab`s take precedence over readouts in
+      // `_paneView` (it renders `_tabsIn(p)` whenever it is non-empty), so the
+      // readout list is left intact and reappears if the docked tabs close.
       _rightCollapsed = false;
-      _rightPanel = _RightPanel.none;
-      _rightAgent = null;
     }
   }
 
@@ -3061,6 +3151,13 @@ class _DesktopShellState extends State<DesktopShell>
   void _closePaneTab(_ShellTab t) {
     final i = _tabs.indexOf(t);
     if (i >= 0) _closeTab(i);
+  }
+
+  /// Close a tab by IDENTITY. Identity, not index: the window bar lists
+  /// `_mainTabs`, so a chip's position there is not its position in `_tabs`.
+  void _closeTabAt(_ShellTab t, {bool force = false}) {
+    final i = _tabs.indexOf(t);
+    if (i >= 0) _closeTab(i, force: force);
   }
 
   /// Sidebar + the two pane containers. Both are tab containers; which tabs they
@@ -3071,10 +3168,8 @@ class _DesktopShellState extends State<DesktopShell>
     final leftTabs = _tabsIn(_Pane.left);
     // An explicit collapse wins over content, or the collapse control would
     // appear to do nothing while a terminal is docked.
-    final showRight = !_rightCollapsed &&
-        (rightTabs.isNotEmpty ||
-            _rightPanel != _RightPanel.none ||
-            _rightAgent != null);
+    final showRight =
+        !_rightCollapsed && (rightTabs.isNotEmpty || _rightTabs.isNotEmpty);
     // Collapsing the LEFT pane is only meaningful while it holds aux content —
     // it is also the conversation surface, which there must always be a way
     // back to.
@@ -3186,14 +3281,7 @@ class _DesktopShellState extends State<DesktopShell>
   /// What a pane shows when nothing is docked in it.
   Widget _paneFallback(_Pane p) {
     if (p == _Pane.right) {
-      if (_rightPanel != _RightPanel.none) return _rightPanelView();
-      if (_rightAgent != null) {
-        return CoordinationAgentDetail(
-          agent: _rightAgent!,
-          embedded: true,
-          onClose: _closeSplitPane,
-        );
-      }
+      if (_rightTabs.isNotEmpty) return _rightPanelView();
       return _emptyPaneHint();
     }
     return _client == null ? _welcome() : _recentPlaceholder();
@@ -3511,7 +3599,7 @@ class _DesktopShellState extends State<DesktopShell>
         ),
       );
 
-  /// A session readout in the pane: Lanes, Checkpoints or Usage.
+  /// The secondary pane's readout strip: one tab per open readout or agent.
   ///
   /// Content comes from the shared panel widgets so the pane and the session's
   /// drawer can never show a different view of the same thing.
@@ -3520,44 +3608,55 @@ class _DesktopShellState extends State<DesktopShell>
     final controls = tab == null ? null : _macSessionControls[tab.key];
     final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
 
-    Widget body;
-    switch (_rightPanel) {
-      case _RightPanel.lanes:
-        body = SessionLanesPanel(lanes: s?.lanes ?? const []);
-        break;
-      case _RightPanel.checkpoints:
-        body = SessionCheckpointsPanel(
-          checkpoints: s?.checkpoints.reversed.toList() ?? const [],
-          // Route the action back through the session, so rewinding from the
-          // pane behaves exactly as rewinding from the session's own drawer.
-          onRewind: (c) => controls?.performAction('rewind', c.id),
-          onFork: (c) => controls?.performAction('fork', c.id),
-        );
-        break;
-      case _RightPanel.usage:
-        body =
-            s == null ? const SizedBox.shrink() : SessionUsagePanel(state: s);
-        break;
-      case _RightPanel.none:
-        body = const SizedBox.shrink();
-    }
+    // Fall back to the first tab when the selection points at a closed one, so
+    // the pane never renders blank while tabs remain.
+    final activeKey = _rightActiveKey ?? _rightTabs.first.key;
+    var index = _rightTabs.indexWhere((t) => t.key == activeKey);
+    if (index < 0) index = 0;
+    final active = _rightTabs[index];
 
     return Container(
       color: AppColors.canvas,
       child: Column(children: [
         PaneTabStrip(
           tabs: [
-            PaneTab(
-              label: _rightPanel.label,
-              icon: _rightPanel.icon,
-              onClose: _closeSplitPane,
-            ),
+            for (final t in _rightTabs)
+              PaneTab(
+                label: t.label,
+                icon: t.icon,
+                onClose: () => _closeRightTab(t.key),
+              ),
           ],
-          activeIndex: 0,
+          activeIndex: index,
+          onSelect: (i) => setState(() => _rightActiveKey = _rightTabs[i].key),
         ),
-        Expanded(child: body),
+        Expanded(child: _rightTabBody(active, s, controls)),
       ]),
     );
+  }
+
+  Widget _rightTabBody(
+    _RightTab t,
+    HarnessState? s,
+    _MacSessionControls? controls,
+  ) {
+    final agent = t.agent;
+    if (agent != null) {
+      return CoordinationAgentDetail(agent: agent, embedded: true);
+    }
+    return switch (t.panel) {
+      _RightPanel.lanes => SessionLanesPanel(lanes: s?.lanes ?? const []),
+      _RightPanel.checkpoints => SessionCheckpointsPanel(
+          checkpoints: s?.checkpoints.reversed.toList() ?? const [],
+          // Route the action back through the session, so rewinding from the
+          // pane behaves exactly as rewinding from the session's own drawer.
+          onRewind: (c) => controls?.performAction('rewind', c.id),
+          onFork: (c) => controls?.performAction('fork', c.id),
+        ),
+      _RightPanel.usage =>
+        s == null ? const SizedBox.shrink() : SessionUsagePanel(state: s),
+      _RightPanel.none => const SizedBox.shrink(),
+    };
   }
 
   Widget _mainPane({VoidCallback? onMenu}) {

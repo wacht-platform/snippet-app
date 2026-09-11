@@ -85,6 +85,79 @@ class ShellRail extends StatelessWidget {
   }
 }
 
+/// The canonical 24px rail glyph: 24px target around a 16px icon, weight and
+/// colour marking selection.
+///
+/// ONE widget for BOTH clusters — the strip above the sidebar and the tool
+/// buttons at the right of the band. They were two separate implementations at
+/// 16px and 15px with different padding, which is exactly why they read as two
+/// different design languages on the same row.
+class RailIcon extends StatelessWidget {
+  const RailIcon({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+    this.active = false,
+    this.badge,
+  });
+
+  final String icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final bool active;
+
+  /// Small count pill on the top-right of the glyph (e.g. running lanes).
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    final enabled = onTap != null;
+    final button = Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 400),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(R.md),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.md),
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: Center(
+              child: AppIcon(
+                icon,
+                size: 16,
+                color: !enabled
+                    ? AppColors.fg4
+                    : (active ? AppColors.fg1 : AppColors.fg3),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (badge == null) return button;
+    return Stack(clipBehavior: Clip.none, children: [
+      button,
+      Positioned(
+        right: 0,
+        top: 0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: AppColors.surface3,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(badge!, style: mono(9, color: AppColors.fg2)),
+        ),
+      ),
+    ]);
+  }
+}
+
 class _RailButton extends StatelessWidget {
   const _RailButton({
     required this.section,
@@ -97,28 +170,10 @@ class _RailButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Tooltip(
-        message: section.label,
-        waitDuration: const Duration(milliseconds: 400),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(R.md),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(R.md),
-            child: SizedBox(
-              // 24px hit target around a 16px glyph — the reference's ratio.
-              width: 24,
-              height: 24,
-              child: Center(
-                child: AppIcon(
-                  section.icon,
-                  size: 16,
-                  color: selected ? AppColors.fg1 : AppColors.fg4,
-                ),
-              ),
-            ),
-          ),
-        ),
+  Widget build(BuildContext context) => RailIcon(
+        icon: section.icon,
+        tooltip: section.label,
+        active: selected,
+        onTap: onTap,
       );
 }
