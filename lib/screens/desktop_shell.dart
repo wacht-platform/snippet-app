@@ -1621,7 +1621,12 @@ class _DesktopShellState extends State<DesktopShell>
       builder: (_, close) => NewSessionPicker(
         client: c,
         machineLabel: active?.label ?? '',
-        startPath: _activeWorkspaceFolder(),
+        // Deliberately NOT `_activeWorkspaceFolder()`. This picker is the entry
+        // point for a NEW conversation and must stand on its own: inheriting the
+        // open session's workspace both implied a dependency on one existing and
+        // silently narrowed where a new chat could start. Null lets the daemon
+        // answer with its home directory, which is the sane default.
+        startPath: null,
         onClose: close,
         onOpenFolder: (folder) async {
           try {
@@ -5913,14 +5918,19 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    // Phone + embedded in the home: drill down instead of a chip strip.
+    // Phone + embedded in the home: open INLINE, not behind a drill-down.
     final drill = kMobile && widget.embedded;
     if (drill) {
-      return Scaffold(
-        backgroundColor: AppColors.surface1,
-        body: SafeArea(
+      return Material(
+        // Same surface as the other phone destinations (chats, agents). This was
+        // `surface1`, one step lighter, which made Settings read as a different
+        // app the moment you tapped into it.
+        color: AppColors.bg,
+        child: SafeArea(
           bottom: false,
-          child: _mobileSection == null ? _mobileIndex() : _mobileSectionPage(),
+          child: _mobileSection == null
+              ? _mobileSettingsHome()
+              : _mobileSectionPage(),
         ),
       );
     }
@@ -5971,21 +5981,55 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     );
   }
 
-  /// Phone settings INDEX: one full-width row per section.
+  /// Phone settings HOME.
   ///
-  /// A list of destinations rather than a strip of tabs — every row is a 52px
-  /// target, all five are visible at once, and each one says what it holds.
-  Widget _mobileIndex() {
+  /// The light sections render INLINE and only the heavy ones nest. "General"
+  /// holds two things (machines + alerts) — putting that behind a chevron spent
+  /// a tap to reveal one screen of content. Models / Usage / Vault / Scheduled
+  /// each own a real surface, so those are the ones that earn a row.
+  Widget _mobileSettingsHome() {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 24),
+      padding: EdgeInsets.fromLTRB(M.gutter, 12, M.gutter, 24),
       children: [
-        for (final (page, icon, label) in _nav) ...[
-          _mobileIndexRow(page, icon, label),
+        _inlineLabel('Machines'),
+        const SizedBox(height: 6),
+        ..._machineRows(),
+        if (kCanNotify) ...[
+          const SizedBox(height: 18),
+          _inlineLabel('Alerts'),
           const SizedBox(height: 6),
+          _notifTile(),
         ],
+        const SizedBox(height: 22),
+        _inlineLabel('More'),
+        const SizedBox(height: 8),
+        for (final (page, icon, label) in _nav)
+          if (page != _SettingsPage.general) ...[
+            _mobileIndexRow(page, icon, label),
+            const SizedBox(height: 6),
+          ],
       ],
     );
   }
+
+  /// Section label, shared so the inline and nested settings cannot diverge.
+  Widget _inlineLabel(String t) => Text(t.toUpperCase(),
+      style: sans(10, weight: W.label, color: AppColors.fg4, spacing: 0.5));
+
+  List<Widget> _machineRows() => [
+        if (_instances.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text('No saved connections.',
+                style: sans(12, color: AppColors.fg3)),
+          )
+        else
+          for (var i = 0; i < _instances.length; i++) ...[
+            _instanceRow(_instances[i]),
+            if (i < _instances.length - 1)
+              Divider(height: 1, color: AppColors.border),
+          ],
+      ];
 
   Widget _mobileIndexRow(_SettingsPage page, String icon, String label) {
     return Material(
@@ -6132,9 +6176,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         Text('Manage the machine this app connects to and its alerts.',
             style: sans(11.5, color: AppColors.fg3)),
         const SizedBox(height: 14),
-        Text('MACHINES',
-            style:
-                sans(10, weight: W.label, color: AppColors.fg4, spacing: 0.5)),
+        _inlineLabel('Machines'),
         const SizedBox(height: 6),
         if (_instances.isEmpty)
           Padding(
@@ -6154,9 +6196,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           ),
         if (kCanNotify) ...[
           const SizedBox(height: 16),
-          Text('NOTIFICATIONS',
-              style: sans(10,
-                  weight: W.label, color: AppColors.fg4, spacing: 0.5)),
+          _inlineLabel('Alerts'),
           const SizedBox(height: 6),
           _notifTile(),
         ],

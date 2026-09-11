@@ -29,16 +29,18 @@ class NewSessionPicker extends StatefulWidget {
   final DaemonClient client;
 
   /// Which machine these folders live on — identity, not a switcher. The machine
-  /// is settled before this screen opens, so repeating a switcher here would be
-  /// a second way to do one thing.
+  /// is settled before this screen opens.
   final String machineLabel;
 
   /// Start a conversation rooted at the given folder.
   final Future<void> Function(String folder) onOpenFolder;
 
+  /// Where to open. Null means the server's home directory, which is the sane
+  /// default: this screen is a FOLDER PICKER, so it must not depend on a session
+  /// already being open, and it must not silently inherit one's workspace.
   final String? startPath;
 
-  /// Absent when the host owns navigation (the phone full screen).
+  /// Absent when the host owns navigation.
   final VoidCallback? onClose;
 
   @override
@@ -165,49 +167,61 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         ? 'this folder'
         : lastPathSegment(listing.path, ifEmpty: listing.path);
 
-    return Container(
+    return Material(
+      // A Material ancestor is REQUIRED here, and not merely for ink: without
+      // one, every Text that is not inside a nested Material falls back to
+      // DefaultTextStyle.fallback(), whose yellow double underline is exactly
+      // what the phone build showed. The desktop dialog supplies its own
+      // Material (which is why only the phone was broken); the narrow branch of
+      // presentScreen returns the child raw.
       color: AppColors.bg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _header(),
-          if (_error != null)
-            Expanded(child: _errorState())
-          else ...[
-            _pathRow(parent),
-            _openRow(folderName),
-            Expanded(
-              child: _loading && listing == null
-                  ? const Center(
-                      child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2)))
-                  : ListView(
-                      padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 10, 6,
-                          kMobile ? M.gutter : 10, 16),
-                      children: [
-                        if (listing != null && _entries.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 22, 12, 22),
-                            child: Text('This folder is empty.',
-                                textAlign: TextAlign.center,
-                                style: sans(12.5, color: AppColors.fg4)),
-                          ),
-                        if (_dirs.isNotEmpty) ...[
-                          _groupLabel('Folders'),
-                          for (final d in _dirs) _row(d),
+      child: SafeArea(
+        // presentScreen renders edge-to-edge when narrow, so the phone's status
+        // bar and gesture inset have to come from here — the header was sitting
+        // underneath the clock.
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _header(),
+            if (_error != null)
+              Expanded(child: _errorState())
+            else ...[
+              _pathRow(parent),
+              _openRow(folderName),
+              Expanded(
+                child: _loading && listing == null
+                    ? const Center(
+                        child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2)))
+                    : ListView(
+                        padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 10, 6,
+                            kMobile ? M.gutter : 10, 16),
+                        children: [
+                          if (listing != null && _entries.isEmpty)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(12, 22, 12, 22),
+                              child: Text('This folder is empty.',
+                                  textAlign: TextAlign.center,
+                                  style: sans(12.5, color: AppColors.fg4)),
+                            ),
+                          if (_dirs.isNotEmpty) ...[
+                            _groupLabel('Folders'),
+                            for (final d in _dirs) _folderRow(d),
+                          ],
+                          if (_files.isNotEmpty) ...[
+                            _groupLabel('Files'),
+                            for (final f in _files) _fileRow(f),
+                          ],
                         ],
-                        if (_files.isNotEmpty) ...[
-                          _groupLabel('Files'),
-                          for (final f in _files) _row(f),
-                        ],
-                      ],
-                    ),
-            ),
-            _footer(),
+                      ),
+              ),
+              _footer(),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -238,8 +252,10 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         ]),
       );
 
-  /// Path field + parent affordance. The field is monospace because a path is
-  /// data, not prose — character alignment is what makes it readable.
+  /// Path field + up + reload.
+  ///
+  /// The field stays EDITABLE (typing or pasting a path is the shortest route to
+  /// a deep directory), while the folder rows below cover click/tap navigation.
   Widget _pathRow(String? parent) => Padding(
         padding: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 16, 0, kMobile ? M.gutter : 16, 8),
@@ -271,23 +287,17 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                     ),
                   ),
                 ),
-                if (parent != null)
-                  GestureDetector(
-                    onTap: () => _go(parent),
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Tooltip(
-                        message: 'Parent folder',
-                        child:
-                            AppIcon('arrow-up', size: 15, color: AppColors.fg3),
-                      ),
-                    ),
-                  ),
               ]),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
+          // Up is a first-class action, not a decoration: it is the only way
+          // back out of a directory without typing.
+          IconBtn('arrow-up',
+              size: kMobile ? M.minTarget : 38,
+              iconSize: 17,
+              tooltip: 'Parent folder',
+              onTap: parent == null ? null : () => _go(parent)),
           IconBtn('refresh',
               size: kMobile ? M.minTarget : 38,
               iconSize: 17,
@@ -297,7 +307,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
       );
 
   /// The primary action. Highlighted and full width so the one thing this screen
-  /// is for cannot be missed — the reference makes the same move.
+  /// is for cannot be missed.
   Widget _openRow(String folderName) => Padding(
         padding: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 16, 0, kMobile ? M.gutter : 16, 6),
@@ -351,38 +361,64 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                 sans(10, weight: W.label, color: AppColors.fg4, spacing: 0.5)),
       );
 
-  Widget _row(FsEntry e) {
-    // Folders navigate; files are listing CONTEXT (what an upload produced), so
-    // they are rendered muted and without a tap target rather than pretending to
-    // be a dead button.
-    final tappable = e.isDir && _busy == null;
-    final color = e.isDir ? AppColors.fg1 : AppColors.fg4;
+  /// One row's shared shell: hover feedback, a real touch target, and a pointer
+  /// cursor on desktop so a folder reads as clickable before it is clicked.
+  Widget _rowShell({
+    required String icon,
+    required String name,
+    required bool isDir,
+    required VoidCallback? onTap,
+    double? iconSize,
+  }) {
+    final color = isDir ? AppColors.fg1 : AppColors.fg4;
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
       child: InkWell(
         borderRadius: BorderRadius.circular(R.sm),
-        onTap: tappable ? () => _go(e.path) : null,
-        child: Container(
-          height: kMobile ? M.rowHeight : 34,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(children: [
-            AppIcon(e.isDir ? 'folder' : 'file',
-                size: e.isDir ? 15 : 14, color: color),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(e.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(kMobile ? 13.5 : 12.5, color: color)),
-            ),
-            if (e.isDir)
-              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
-          ]),
+        hoverColor: AppColors.surface2,
+        onTap: onTap,
+        child: MouseRegion(
+          cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+          child: Container(
+            height: kMobile ? 46 : 34,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              AppIcon(icon, size: iconSize ?? (isDir ? 15 : 14), color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(kMobile ? 13.5 : 12.5, color: color)),
+              ),
+              // The chevron is what makes "this goes somewhere" visible; without
+              // it a folder row and a file row looked identical.
+              if (isDir)
+                AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+            ]),
+          ),
         ),
       ),
     );
   }
+
+  Widget _folderRow(FsEntry e) => _rowShell(
+        icon: 'folder',
+        name: e.name,
+        isDir: true,
+        onTap: _busy == null ? () => _go(e.path) : null,
+      );
+
+  /// Files are listing CONTEXT (what the folder holds, and what an upload
+  /// produced) — not a destination, so they get no tap target rather than
+  /// pretending to be a dead button.
+  Widget _fileRow(FsEntry e) => _rowShell(
+        icon: 'file',
+        name: e.name,
+        isDir: false,
+        onTap: null,
+      );
 
   Widget _footer() => Container(
         padding: EdgeInsets.fromLTRB(
@@ -406,16 +442,18 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         ]),
       );
 
-  Widget _errorState() => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          AppIcon('wifi-off', size: 22, color: AppColors.fg4),
-          const SizedBox(height: 12),
-          Text(_error!,
-              textAlign: TextAlign.center,
-              style: sans(12.5, color: AppColors.fg3, height: 1.45)),
-          const SizedBox(height: 14),
-          Btn('Retry', small: true, onTap: () => _go(_pathCtl.text.trim())),
-        ]),
+  Widget _errorState() => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon('wifi-off', size: 22, color: AppColors.fg4),
+            const SizedBox(height: 12),
+            Text(_error!,
+                textAlign: TextAlign.center,
+                style: sans(12.5, color: AppColors.fg3, height: 1.45)),
+            const SizedBox(height: 14),
+            Btn('Retry', small: true, onTap: () => _go(_pathCtl.text.trim())),
+          ]),
+        ),
       );
 }
