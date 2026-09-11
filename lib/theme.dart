@@ -106,12 +106,18 @@ ThemePreset _dark({
   // One dark surface ladder for desktop and phone. Reading content is the
   // darkest plane; shell chrome, active rows, and inputs step upward without
   // borders or card shadows inventing a separate visual language.
-  final canvas = const Color(0xFF0C0C0F); // chat / reader — darkest
-  final bg = const Color(0xFF101014); // shell chrome and navigation
-  final floor = const Color(0xFF14141A); // secondary panes and sheets
-  final surface1 = const Color(0xFF16161D); // quiet raised content
-  final surface2 = const Color(0xFF1B1B22); // active row / selection
-  final surface3 = const Color(0xFF22222A); // inputs, menus, hover
+  //
+  // NEUTRAL GREY — deliberately no blue channel offset. The previous ladder
+  // carried a small blue bias (each surface had B = R + 3..8), which is
+  // invisible in isolation but reads as a lavender/purple cast in a large
+  // filled area such as the composer card or a sheet. Depth comes from
+  // lightness alone.
+  final canvas = const Color(0xFF0C0C0C); // chat / reader — darkest
+  final bg = const Color(0xFF101010); // shell chrome and navigation
+  final floor = const Color(0xFF141414); // secondary panes and sheets
+  final surface1 = const Color(0xFF161616); // quiet raised content
+  final surface2 = const Color(0xFF1B1B1B); // active row / selection
+  final surface3 = const Color(0xFF222222); // inputs, menus, hover
 
   return ThemePreset(
     name: name,
@@ -146,7 +152,7 @@ ThemePreset _dark({
     diffDelBg: _withAlpha(danger, 0.10),
     diffAddFg: _lighten(success, 0.14),
     diffDelFg: _lighten(danger, 0.14),
-    diffGutter: const Color(0xFF383846),
+    diffGutter: const Color(0xFF383838),
   );
 }
 

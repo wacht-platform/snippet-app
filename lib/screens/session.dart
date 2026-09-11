@@ -3442,10 +3442,11 @@ class _SessionScreenState extends State<SessionScreen>
               if (_isRecording || _recordingPath != null) _recordingPanel(),
               Container(
                 decoration: BoxDecoration(
-                  // A lifted surface with a hairline edge, matching the composer
-                  // in the reference: the card reads as one control group rather
-                  // than a field floating on the canvas.
-                  color: AppColors.surface1,
+                  // Uses the shell `bg` — the SAME surface as the sidebar — so the
+                  // composer reads as part of the chrome rather than a separate
+                  // raised card. The step above the reading canvas is what keeps
+                  // it visible without a heavier fill.
+                  color: AppColors.bg,
                   borderRadius: BorderRadius.circular(R.md),
                   border: Border.all(color: AppColors.border),
                 ),
