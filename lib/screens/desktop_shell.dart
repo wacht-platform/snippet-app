@@ -491,15 +491,6 @@ class _DesktopShellState extends State<DesktopShell>
     });
   }
 
-  /// Collapse the right pane without touching whatever is in it.
-  ///
-  /// Never destroys: a terminal tab lives on in the sidebar and its pty stays
-  /// alive, so re-opening is instant and loses no scrollback. Readout tabs stay
-  /// in `_rightTabs` too, so reopening the pane restores the strip.
-  void _closeSplitPane() {
-    setState(() => _rightCollapsed = true);
-  }
-
   /// The button list at the far right of the navigation band.
   ///
   /// Same shape as the icon strip over the sidebar, per the steer. Carries the
@@ -4457,6 +4448,14 @@ class _SidebarState extends State<_Sidebar> {
           // scroll-padding hack is needed. It still reads as floating (inset,
           // rounded, raised).
           Expanded(child: _mobileHomeBody(hasClient)),
+          // Context goes BELOW the content and above the nav bar: the machine
+          // these chats live on, and the one pinned destination that is not a
+          // top-level place. Both were in the head, where they cost the top of
+          // every screen — and the head is the first thing to disappear while
+          // searching, so the machine you were looking at vanished exactly when
+          // you were narrowing its chats.
+          if (!_mobileDrilledDown && widget.mobileHome == _MobileHome.chats)
+            _mobileContextBar(hasClient),
           // The bar names the app's TOP LEVEL, so it hides inside a nested
           // screen. Leaving it up would give that screen a second exit that
           // skips the level you are in — and make the bar look like part of the
@@ -4536,17 +4535,6 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  Widget _stickyMissionControl() {
-    final mc = (_sessions ?? const <SessionInfo>[])
-        .where((s) => isDedicatedMcSession(s.id))
-        .toList();
-    if (mc.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 8),
-      child: _missionControlPin(mc.first),
-    );
-  }
-
   /// Full-surface placeholder for a phone destination with no machine.
   ///
   /// Local to the sidebar rather than reusing the shell's `_sidebarUnavailable`:
@@ -4568,15 +4556,15 @@ class _SidebarState extends State<_Sidebar> {
   Widget _mobileHomeBody(bool hasClient) {
     switch (widget.mobileHome) {
       case _MobileHome.chats:
-        // While searching, the head and the pinned Mission Control row step
-        // aside: every line above the results is a line not showing matches, and
-        // the expanded field already states what the screen is doing.
+        // While searching, the head steps aside: every line above the results is
+        // a line not showing matches, and the expanded field already states what
+        // the screen is doing. The head now carries ONLY the selection bar — the
+        // machine switcher and the Mission Control pin moved into the bar below.
         final searching = _mobileSearchOpen && _filterQuery.trim().isNotEmpty;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!searching) _mobileHomeHead(),
-            if (!searching && hasClient && !_selecting) _stickyMissionControl(),
+            if (!searching && _selecting) _mobileHomeHead(),
             Expanded(
               child: !hasClient
                   ? Center(
@@ -4648,76 +4636,135 @@ class _SidebarState extends State<_Sidebar> {
   /// lives in the bar, so repeating either here would be two controls for one
   /// action. What is left is the one thing the bar cannot carry: which machine
   /// these chats belong to.
+  /// The selection bar, shown only while bulk-selecting.
+  ///
+  /// Machine identity and the Mission Control pin used to live here too. They
+  /// moved to `_mobileContextBar` below the list: the head is the first thing
+  /// hidden while searching, so the machine you were looking at disappeared
+  /// precisely when you were narrowing its chats.
   Widget _mobileHomeHead() {
-    if (_selecting) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(M.gutter, 8, M.gutter - 4, 8),
-        child: Row(children: [
-          Text('${_selected.length} selected',
-              style:
-                  sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
-          const Spacer(),
-          _selectAllToggle(),
-          IconBtn('x',
-              size: M.minTarget,
-              iconSize: 18,
-              tooltip: 'Cancel',
-              onTap: _exitSelect),
-          IconBtn('trash',
-              size: M.minTarget,
-              iconSize: 17,
-              tooltip: 'Delete selected',
-              onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
-        ]),
-      );
-    }
-    final machine = widget.active;
-    final online = machine == null ? null : widget.health[machine.url];
     return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 4, M.gutter - 4, 4),
+      padding: EdgeInsets.fromLTRB(M.gutter, 8, M.gutter - 4, 8),
       child: Row(children: [
-        // Machine identity is the left anchor now that the page title is gone:
-        // the switcher is what tells you WHERE these chats live.
-        Expanded(
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(R.sm),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(R.sm),
-              onTap: widget.instances.isEmpty
-                  ? widget.onAddInstance
-                  : _openMachines,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: online == true ? AppColors.ok : AppColors.fg4,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      machine == null ? 'Add machine' : machine.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(M.sectionTitle,
-                          weight: W.label, color: AppColors.fg1),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  AppIcon('chevron-down', size: 14, color: AppColors.fg4),
-                ]),
-              ),
-            ),
-          ),
-        ),
+        Text('${_selected.length} selected',
+            style: sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
+        const Spacer(),
+        _selectAllToggle(),
+        IconBtn('x',
+            size: M.minTarget,
+            iconSize: 18,
+            tooltip: 'Cancel',
+            onTap: _exitSelect),
+        IconBtn('trash',
+            size: M.minTarget,
+            iconSize: 17,
+            tooltip: 'Delete selected',
+            onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
       ]),
     );
   }
+
+  /// The context chips under the list: which machine, and Mission Control.
+  ///
+  /// Below rather than above for two reasons. It costs the top of every screen
+  /// otherwise, and the head is hidden while searching — so the machine you were
+  /// looking at vanished exactly when you were narrowing its chats. Being outside
+  /// the list also means it cannot be confused for a conversation row.
+  Widget _mobileContextBar(bool hasClient) {
+    final machine = widget.active;
+    final online = machine == null ? null : widget.health[machine.url];
+    final mc = (_sessions ?? const <SessionInfo>[])
+        .where((s) => isDedicatedMcSession(s.id))
+        .toList();
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 8),
+      child: Row(children: [
+        Expanded(
+          child: _mobileContextChip(
+            onTap:
+                widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
+            child: Row(children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: online == true ? AppColors.ok : AppColors.fg4,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  machine == null ? 'Add machine' : machine.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(M.meta, weight: W.label, color: AppColors.fg2),
+                ),
+              ),
+              const SizedBox(width: 4),
+              AppIcon('chevron-down', size: 13, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+        if (hasClient && mc.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          _mobileContextChip(
+            onTap: widget.onOpenMissionControl,
+            active: mc.first.id == widget.selectedSessionId,
+            child: Row(children: [
+              AppIcon('layers',
+                  size: 14,
+                  color: mc.first.id == widget.selectedSessionId
+                      ? AppColors.accent
+                      : AppColors.fg3),
+              const SizedBox(width: 7),
+              Text('Mission Control',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(M.meta, weight: W.label, color: AppColors.fg2)),
+              if (mc.first.status == 'waiting_for_input' ||
+                  mc.first.status == 'running') ...[
+                const SizedBox(width: 6),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: mc.first.status == 'waiting_for_input'
+                        ? AppColors.accent
+                        : AppColors.run,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  /// One context chip. Compact and quiet: this is metadata about the list, not a
+  /// destination, so it must not compete with the nav bar's icons.
+  Widget _mobileContextChip({
+    required VoidCallback onTap,
+    required Widget child,
+    bool active = false,
+  }) =>
+      Material(
+        color: active ? AppColors.surface2 : AppColors.surface1,
+        borderRadius: BorderRadius.circular(R.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.md),
+          onTap: onTap,
+          child: Container(
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            alignment: Alignment.centerLeft,
+            child: child,
+          ),
+        ),
+      );
 
   /// The floating action bar: destinations left, quick actions right.
   ///
