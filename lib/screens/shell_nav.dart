@@ -289,9 +289,9 @@ class ShellNavRow extends StatelessWidget {
 const double kPaneHeaderHeight = 36;
 
 /// A framed tab sits in the full strip band. The active state is a 1px top
-/// edge inside the frame; passive edges use a 0.5px hairline.
+/// edge inside the frame; passive edges use a 0.25px neutral-grey hairline.
 const double kPaneTabHeight = kPaneHeaderHeight;
-const double kPaneHairline = 0.5;
+const double kPaneHairline = 0.25;
 const double kPaneActiveStroke = 1.0;
 
 /// Bounded desktop tab widths. A root/session tab never grows to fill an empty
