@@ -386,6 +386,10 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   }
 
   /// The single highlighted action, pinned so it never scrolls out of reach.
+  ///
+  /// Deliberately under the full touch height: as a pinned bar it is always
+  /// present, so a 48px block read as a slab competing with the folder list
+  /// rather than a footer action. The whole row is still the target.
   Widget _actionBar() => Container(
         padding: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 16, 8, kMobile ? M.gutter : 16, 10),
@@ -394,8 +398,8 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         ),
         child: Row(children: [
           IconBtn('upload',
-              size: kMobile ? M.minTarget : 38,
-              iconSize: 18,
+              size: kMobile ? 40 : 34,
+              iconSize: kMobile ? 17 : 15,
               tooltip: 'Upload files into this folder',
               onTap: (_listing == null || _busy != null) ? null : _upload),
           const SizedBox(width: 8),
@@ -407,27 +411,31 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                 borderRadius: BorderRadius.circular(R.md),
                 onTap: _busy != null ? null : _open,
                 child: Container(
-                  height: kMobile ? 48 : 40,
+                  height: kMobile ? 40 : 34,
                   alignment: Alignment.center,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (_busy != null)
                         SizedBox(
-                            width: 15,
-                            height: 15,
+                            width: 14,
+                            height: 14,
                             child: CircularProgressIndicator(
                                 strokeWidth: 1.6, color: AppColors.accentFg))
                       else
-                        AppIcon('corner-down-right',
-                            size: 16, color: AppColors.accentFg),
+                        // `chat-thread` is the app's ONE conversation glyph, used
+                        // by every session row and tab. `corner-down-right`
+                        // rendered as a return/enter arrow, which reads as "send
+                        // message" rather than "start a conversation here".
+                        AppIcon('chat-thread',
+                            size: kMobile ? 15 : 14, color: AppColors.accentFg),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
                           _busy ?? 'Start chat in $_hereName',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(kMobile ? 14 : 13,
+                          style: sans(kMobile ? 13.5 : 12.5,
                               weight: W.label, color: AppColors.accentFg),
                         ),
                       ),

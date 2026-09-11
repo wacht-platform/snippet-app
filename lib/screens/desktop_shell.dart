@@ -1632,8 +1632,12 @@ class _DesktopShellState extends State<DesktopShell>
     await presentScreen(
       context,
       style: PanelStyle.dialog,
-      maxWidth: 620,
-      maxHeight: 720,
+      // Wider and shorter than a default dialog: this is a folder BROWSER, so
+      // horizontal room is what buys legibility (deep paths and long folder
+      // names), while extra height only stretched a list that rarely fills it —
+      // leaving a tall empty box around short content.
+      maxWidth: 800,
+      maxHeight: 560,
       builder: (_, close) => NewSessionPicker(
         client: c,
         machineLabel: active?.label ?? '',
