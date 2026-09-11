@@ -4568,6 +4568,11 @@ class _SidebarState extends State<_Sidebar> {
   void _toggleMobileSearch() {
     final open = !_mobileSearchOpen;
     FocusManager.instance.primaryFocus?.unfocus();
+    // Search only ever matches CONVERSATIONS, so opening it from Agents or
+    // Settings would expand the field over a body with no chat list to filter.
+    // The destination follows the search, the way tapping a result implies a
+    // list: land on Chats first, then open the field.
+    if (open) widget.onMobileHome(_MobileHome.chats);
     setState(() {
       _mobileSearchOpen = open;
       if (!open) {
