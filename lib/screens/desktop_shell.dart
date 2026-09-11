@@ -2531,32 +2531,50 @@ class _DesktopShellState extends State<DesktopShell>
 
   Widget _mobileShell() {
     final tab = _activeTab;
-    // A phone has two explicit destinations: the full Chats home and one
-    // focused reading surface. It never inherits the desktop drawer, tab strip,
-    // or split-pane mechanics just because the screen happens to be narrow.
-    if (_mobileChatsOpen || tab == null) {
-      return Scaffold(
-        backgroundColor: AppColors.bg,
-        body: SafeArea(
-          child: _sidebar(
-            topInset: false,
-            onAfterPick: () => setState(() => _mobileChatsOpen = false),
+    return Scaffold(
+      backgroundColor: _mobileChatsOpen ? AppColors.bg : readingBg,
+      body: Stack(children: [
+        // Keep both surfaces mounted while switching. Apart from feeling more
+        // natural than a hard cut, this preserves a live transcript and any
+        // open terminal when the user checks Chats and returns.
+        IgnorePointer(
+          ignoring: !_mobileChatsOpen,
+          child: AnimatedSlide(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            offset: _mobileChatsOpen ? Offset.zero : const Offset(-0.025, 0),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              opacity: _mobileChatsOpen ? 1 : 0,
+              child: SafeArea(
+                child: _sidebar(
+                  topInset: false,
+                  onAfterPick: () => setState(() => _mobileChatsOpen = false),
+                ),
+              ),
+            ),
           ),
         ),
-      );
-    }
-    return Scaffold(
-      backgroundColor: readingBg,
-      body: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _showMobileChats();
-        },
-        child: SafeArea(
-          bottom: false,
-          child: _tabBody(tab, primary: true),
-        ),
-      ),
+        if (tab != null)
+          IgnorePointer(
+            ignoring: _mobileChatsOpen,
+            child: AnimatedSlide(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              offset: _mobileChatsOpen ? const Offset(0.035, 0) : Offset.zero,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOut,
+                opacity: _mobileChatsOpen ? 0 : 1,
+                child: SafeArea(
+                  bottom: false,
+                  child: _tabBody(tab, primary: true),
+                ),
+              ),
+            ),
+          ),
+      ]),
     );
   }
 
@@ -2745,6 +2763,7 @@ class _DesktopShellState extends State<DesktopShell>
           ? null
           : () => setState(() => t.inboundShare = null),
       acceptDrops: primary,
+      mobileActive: !kMobile || !_mobileChatsOpen,
       onTitle: (title) => _onSessionTitle(t.sessionId!, title),
       onMenu: kMobile ? _showMobileChats : null,
       onOpenFileTab: (path, name) =>

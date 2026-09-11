@@ -1918,7 +1918,6 @@ Future<T?> showAppSheet<T>(BuildContext context,
             color: AppColors.surface1,
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-            border: Border(top: BorderSide(color: AppColors.border2)),
           ),
           constraints: BoxConstraints(
               maxHeight: (media.size.height - media.viewInsets.bottom) * 0.88),
@@ -1932,12 +1931,12 @@ Future<T?> showAppSheet<T>(BuildContext context,
                         color: AppColors.border2,
                         borderRadius: BorderRadius.circular(99)))),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
+              padding: EdgeInsets.fromLTRB(M.gutter, 10, 8, 10),
               child: Row(children: [
                 Expanded(
                     child: Text(title,
-                        style:
-                            sans(14.5, weight: W.label, color: AppColors.fg1))),
+                        style: sans(M.sectionTitle,
+                            weight: W.label, color: AppColors.fg1))),
                 IconBtn('x',
                     size: 32,
                     iconSize: 16,
@@ -1946,7 +1945,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
             ),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 14),
                 child: child,
               ),
             ),

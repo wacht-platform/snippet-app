@@ -102,6 +102,11 @@ class SessionScreen extends StatefulWidget {
   /// tabs, the session list, and the status bar in sync.
   final void Function(String title)? onTitle;
 
+  /// True only while this mobile session is the visible phone surface. The shell
+  /// keeps its session mounted behind Chats for the return animation, but an
+  /// inactive session must never intercept Android back from the Chats home.
+  final bool mobileActive;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -118,6 +123,7 @@ class SessionScreen extends StatefulWidget {
       this.acceptDrops = true,
       this.inboundShare,
       this.onShareConsumed,
+      this.mobileActive = true,
       this.onTitle});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
@@ -2325,11 +2331,48 @@ class _SessionScreenState extends State<SessionScreen>
               ],
             ),
           ),
-          if (kMobile && _termOpen && _terms.isNotEmpty)
-            Positioned.fill(child: _mobileTermTab()),
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              reverseDuration: const Duration(milliseconds: 150),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.025, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: kMobile && _termOpen && _terms.isNotEmpty
+                  ? KeyedSubtree(
+                      key: const ValueKey('mobile-terminal'),
+                      child: _mobileTermTab(),
+                    )
+                  : const SizedBox(key: ValueKey('mobile-chat')),
+            ),
+          ),
         ]),
       ),
     );
+    final guardedScaffold =
+        kMobile && widget.onMenu != null && widget.mobileActive
+            ? PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (didPop) return;
+                  if (_termOpen && _terms.isNotEmpty) {
+                    setState(() => _termOpen = false);
+                  } else {
+                    widget.onMenu?.call();
+                  }
+                },
+                child: scaffold,
+              )
+            : scaffold;
     return kMacOS
         ? DropTarget(
             enable: widget.acceptDrops,
@@ -2342,9 +2385,9 @@ class _SessionScreenState extends State<SessionScreen>
               setState(() => _draggingFiles = false);
             },
             onDragDone: _ingestDroppedFiles,
-            child: scaffold,
+            child: guardedScaffold,
           )
-        : scaffold;
+        : guardedScaffold;
   }
 
   Future<void> _renameCurrent() async {
@@ -2433,6 +2476,12 @@ class _SessionScreenState extends State<SessionScreen>
               iconSize: 18,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
+        if (!_isMissionControl)
+          IconBtn('terminal',
+              size: M.minTarget,
+              iconSize: 19,
+              tooltip: 'Shell',
+              onTap: _openTerm),
         IconBtn('more-vertical',
             size: M.minTarget,
             iconSize: 19,
@@ -5746,7 +5795,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   void _toggle(String id) => setState(() => _open = _open == id ? null : id);
 
   Widget _section(String label) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+        padding: const EdgeInsets.fromLTRB(2, 12, 2, 3),
         child: SectionLabel(label),
       );
 
@@ -5765,35 +5814,40 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
         InkWell(
           onTap: onTap ?? (id == null ? null : () => _toggle(id)),
           borderRadius: BorderRadius.circular(R.sm),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-            child: Row(children: [
-              AppIcon(icon, size: 18, color: AppColors.fg2),
-              const SizedBox(width: 12),
-              Text(label, style: sans(15, color: AppColors.fg1)),
-              const Spacer(),
-              if (value != null) ...[
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: sans(12.5, color: AppColors.fg4)),
+          child: SizedBox(
+            height: M.minTarget,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Row(children: [
+                AppIcon(icon, size: 16, color: AppColors.fg3),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(label,
+                      style: sans(M.rowTitle, color: AppColors.fg1)),
                 ),
-                const SizedBox(width: 6),
-              ],
-              if (id != null)
-                AppIcon(open ? 'chevron-down' : 'chevron-right',
-                    size: 15, color: AppColors.fg4)
-              else
-                const SizedBox(width: 15),
-            ]),
+                if (value != null) ...[
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 132),
+                    child: Text(value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: sans(M.meta, color: AppColors.fg4)),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                if (id != null)
+                  AppIcon(open ? 'chevron-down' : 'chevron-right',
+                      size: 14, color: AppColors.fg4)
+                else
+                  const SizedBox(width: 14),
+              ]),
+            ),
           ),
         ),
         if (open && child != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
             child: child,
           ),
       ],
@@ -5908,7 +5962,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           _section('Workspace'),
           if (!kMacOS)
             _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
-          _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
+          _row(icon: 'folder', label: 'Files', onTap: widget.onFiles),
           if (!widget.hideShell)
             _row(
                 icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),

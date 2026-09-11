@@ -57,6 +57,8 @@ class _FileExplorerState extends State<FileExplorer> {
       _root; // the folder we opened at — the OS back button climbs no higher
   String? _viewingPath;
   String? _viewingName;
+  final TextEditingController _filterCtl = TextEditingController();
+  String _filter = '';
 
   @override
   void initState() {
@@ -64,8 +66,16 @@ class _FileExplorerState extends State<FileExplorer> {
     _future = widget.client.fs(widget.start);
   }
 
+  @override
+  void dispose() {
+    _filterCtl.dispose();
+    super.dispose();
+  }
+
   void _go(String? path) => setState(() {
         _future = widget.client.fs(path);
+        _filterCtl.clear();
+        _filter = '';
         _selecting = false;
         _selected.clear();
       });
@@ -176,12 +186,27 @@ class _FileExplorerState extends State<FileExplorer> {
     // route with an invalid/black surface on Android. Push the viewer as a real
     // page instead; the explorer remains safely below it and back returns here.
     if (kMobile) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => FileViewer(
+      Navigator.of(context).push(PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 180),
+        reverseTransitionDuration: const Duration(milliseconds: 150),
+        pageBuilder: (_, animation, __) => FileViewer(
           client: widget.client,
           path: e.path,
           name: e.name,
           onClose: () => Navigator.of(context).pop(),
+        ),
+        transitionsBuilder: (_, animation, __, child) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.025, 0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
+            child: child,
+          ),
         ),
       ));
       return;
@@ -199,6 +224,58 @@ class _FileExplorerState extends State<FileExplorer> {
         builder: (_, close) =>
             GitScreen(client: widget.client, folder: dir, onClose: close),
       );
+
+  void _showFolderActions(String cwd) {
+    void run(VoidCallback action) {
+      Navigator.of(context).pop();
+      action();
+    }
+
+    showAppSheet(
+      context,
+      title: 'Folder actions',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.onNewChat != null)
+            _FileActionRow(
+              icon: 'plus',
+              label: 'New chat here',
+              onTap: () => run(() => widget.onNewChat!(cwd)),
+            ),
+          _FileActionRow(
+            icon: 'git-branch',
+            label: 'Git',
+            onTap: () => run(() => _openGit(cwd)),
+          ),
+          _FileActionRow(
+            icon: 'upload',
+            label: 'Upload files',
+            onTap: _busy == null ? () => run(() => _upload(cwd)) : null,
+          ),
+          _FileActionRow(
+            icon: 'folder-plus',
+            label: 'New folder',
+            onTap: _busy == null ? () => run(() => _newFolder(cwd)) : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<FsEntry> _visibleEntries(FsListing listing) {
+    final query = _filter.trim().toLowerCase();
+    final entries = [
+      for (final entry in listing.entries)
+        if (query.isEmpty || entry.name.toLowerCase().contains(query)) entry,
+    ];
+    entries.sort((a, b) {
+      if (a.isDir != b.isDir) return a.isDir ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return entries;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -389,9 +466,11 @@ class _FileExplorerState extends State<FileExplorer> {
                   )
                 else ...[
                   SnAppBar(
-                    title: _selecting
-                        ? '${_selected.length} selected'
-                        : widget.title,
+                    title:
+                        _selecting ? '${_selected.length} selected' : 'Files',
+                    subtitle: listing?.path,
+                    titleSize: M.sectionTitle,
+                    compact: true,
                     onBack: _selecting
                         ? _exitSelect
                         : (widget.onClose ?? () => Navigator.pop(context)),
@@ -408,104 +487,14 @@ class _FileExplorerState extends State<FileExplorer> {
                           ]
                         : [
                             if (listing != null)
-                              IconBtn('git-branch',
-                                  tooltip: 'Git',
-                                  onTap: () => _openGit(listing.path)),
-                            if (listing != null)
-                              IconBtn('upload',
-                                  tooltip: 'Upload files',
-                                  onTap: _busy != null
-                                      ? null
-                                      : () => _upload(listing.path)),
-                            if (listing != null)
-                              IconBtn('folder-plus',
-                                  tooltip: 'New folder',
-                                  onTap: _busy != null
-                                      ? null
-                                      : () => _newFolder(listing.path)),
+                              IconBtn('more-vertical',
+                                  tooltip: 'Folder actions',
+                                  onTap: () =>
+                                      _showFolderActions(listing.path)),
                           ],
                   ),
-                  if (segs.isNotEmpty ||
-                      (!_selecting &&
-                          listing != null &&
-                          widget.onNewChat != null))
-                    Container(
-                      height: 38,
-                      decoration: BoxDecoration(
-                          border: Border(
-                              bottom: BorderSide(color: AppColors.border))),
-                      child: Row(children: [
-                        Expanded(
-                          child: segs.isEmpty
-                              ? const SizedBox.shrink()
-                              : SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14),
-                                  child: Row(children: [
-                                    GestureDetector(
-                                      onTap: listing?.parent == null
-                                          ? null
-                                          : () => _go('/'),
-                                      child: Text('/',
-                                          style: mono(11.5,
-                                              color: listing?.parent == null
-                                                  ? AppColors.fg4
-                                                  : AppColors.fg3)),
-                                    ),
-                                    for (var i = 0; i < segs.length; i++) ...[
-                                      if (i > 0)
-                                        Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 2),
-                                            child: AppIcon('chevron-right',
-                                                size: 13,
-                                                color: AppColors.fg4)),
-                                      GestureDetector(
-                                        onTap: i == segs.length - 1
-                                            ? null
-                                            : () => _go(
-                                                '/${segs.sublist(0, i + 1).join('/')}'),
-                                        child: Text(segs[i],
-                                            style: mono(11.5,
-                                                color: i == segs.length - 1
-                                                    ? AppColors.fg1
-                                                    : AppColors.fg3)),
-                                      ),
-                                    ],
-                                  ]),
-                                ),
-                        ),
-                        if (!_selecting &&
-                            listing != null &&
-                            widget.onNewChat != null)
-                          InkWell(
-                            onTap: () => widget.onNewChat!(listing.path),
-                            borderRadius: BorderRadius.circular(R.xs),
-                            child: Container(
-                              margin: const EdgeInsets.only(right: 10),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.accentBg,
-                                borderRadius: BorderRadius.circular(R.xs),
-                                border: Border.all(color: AppColors.accentLine),
-                              ),
-                              child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    AppIcon('plus',
-                                        size: 11, color: AppColors.accent),
-                                    const SizedBox(width: 4),
-                                    Text('New chat',
-                                        style: sans(11,
-                                            weight: FontWeight.w500,
-                                            color: AppColors.accent)),
-                                  ]),
-                            ),
-                          ),
-                      ]),
-                    ),
+                  if (!_selecting && listing != null)
+                    _mobileSwitcherContext(listing),
                 ],
                 Expanded(
                   child: snap.connectionState == ConnectionState.waiting
@@ -522,40 +511,110 @@ class _FileExplorerState extends State<FileExplorer> {
                                   child: Text('${snap.error}',
                                       textAlign: TextAlign.center,
                                       style: sans(12.5, color: AppColors.fg3))))
-                          : ListView(
-                              padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
-                              children: [
-                                if (listing!.parent != null && !_selecting)
-                                  _Row(
-                                      icon: 'folder-open',
-                                      name: '.. (parent directory)',
-                                      muted: true,
-                                      onTap: () => _go(listing.parent)),
-                                ...listing.entries.map((e) => _Row(
-                                      icon: _entryIcon(e.name, e.isDir),
-                                      name: e.name,
-                                      git: e.git,
-                                      chevron:
-                                          e.isDir && kMobile && !_selecting,
-                                      selecting: _selecting,
-                                      selected: _selected.contains(e.path),
-                                      onTap: _selecting
-                                          ? () => _toggle(e)
-                                          : (e.isDir
-                                              ? () => _go(e.path)
-                                              : () => _openFile(e)),
-                                      onLongPress: () => _selecting
-                                          ? _toggle(e)
-                                          : _enterSelect(e),
-                                    )),
-                              ],
-                            ),
+                          : Builder(builder: (context) {
+                              final entries = _visibleEntries(listing!);
+                              return ListView(
+                                padding: EdgeInsets.fromLTRB(
+                                    M.gutter, 4, M.gutter, 16),
+                                children: [
+                                  if (listing.parent != null && !_selecting)
+                                    _Row(
+                                        icon: 'folder-open',
+                                        name: '.. (parent directory)',
+                                        muted: true,
+                                        onTap: () => _go(listing.parent)),
+                                  if (entries.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 28),
+                                      child: Text('No matching files.',
+                                          textAlign: TextAlign.center,
+                                          style: sans(M.meta,
+                                              color: AppColors.fg4)),
+                                    ),
+                                  ...entries.map((e) => _Row(
+                                        icon: _entryIcon(e.name, e.isDir),
+                                        name: e.name,
+                                        git: e.git,
+                                        chevron:
+                                            e.isDir && kMobile && !_selecting,
+                                        selecting: _selecting,
+                                        selected: _selected.contains(e.path),
+                                        onTap: _selecting
+                                            ? () => _toggle(e)
+                                            : (e.isDir
+                                                ? () => _go(e.path)
+                                                : () => _openFile(e)),
+                                        onLongPress: () => _selecting
+                                            ? _toggle(e)
+                                            : _enterSelect(e),
+                                      )),
+                                ],
+                              );
+                            }),
                 ),
               ]),
             );
           },
         ),
       ),
+    );
+  }
+
+  Widget _mobileSwitcherContext(FsListing listing) {
+    final visible = _visibleEntries(listing);
+    final noun = visible.length == 1 ? 'item' : 'items';
+    return Padding(
+      padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 0, 2, 6),
+          child: Row(children: [
+            AppIcon('folder', size: 14, color: AppColors.fg4),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(listing.path,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(M.monoMeta, color: AppColors.fg4)),
+            ),
+            const SizedBox(width: 8),
+            Text('${visible.length} $noun',
+                style: sans(M.meta, color: AppColors.fg4)),
+          ]),
+        ),
+        Container(
+          height: M.minTarget,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+          ),
+          child: Row(children: [
+            AppIcon('search', size: 17, color: AppColors.fg4),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _filterCtl,
+                autofocus: false,
+                onChanged: (value) => setState(() => _filter = value),
+                style: sans(M.rowTitle, color: AppColors.fg1),
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: 'Filter files',
+                  hintStyle: sans(M.rowTitle, color: AppColors.fg4),
+                ),
+              ),
+            ),
+            if (_filter.isNotEmpty)
+              IconBtn('x', size: 32, iconSize: 14, tooltip: 'Clear filter',
+                  onTap: () {
+                _filterCtl.clear();
+                setState(() => _filter = '');
+              }),
+          ]),
+        ),
+      ]),
     );
   }
 
@@ -598,6 +657,45 @@ class _FileExplorerState extends State<FileExplorer> {
   }
 }
 
+class _FileActionRow extends StatelessWidget {
+  const _FileActionRow({
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
+
+  final String icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.sm),
+          onTap: onTap,
+          child: Opacity(
+            opacity: onTap == null ? 0.45 : 1,
+            child: SizedBox(
+              height: M.minTarget,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Row(children: [
+                  AppIcon(icon, size: 16, color: AppColors.fg3),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(label,
+                        style: sans(M.rowTitle, color: AppColors.fg1)),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
 class _Row extends StatelessWidget {
   final String icon, name;
   final bool git, muted, chevron, selecting, selected;
@@ -624,29 +722,34 @@ class _Row extends StatelessWidget {
         onTap: onTap,
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(R.sm),
-        child: Padding(
-          padding:
-              EdgeInsets.symmetric(horizontal: 14, vertical: kMobile ? 12 : 9),
-          child: Row(children: [
-            if (selecting) ...[_checkbox(selected), const SizedBox(width: 11)],
-            AppIcon(icon,
-                size: 16, color: isFolder ? AppColors.accent : AppColors.fg3),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(kMobile ? 13 : 12.5,
-                        color: muted ? AppColors.fg3 : AppColors.fg1))),
-            if (git) ...[
-              AppIcon('git-branch', size: 12, color: AppColors.ok),
-              const SizedBox(width: 4),
-              Text('git', style: mono(10.5, color: AppColors.fg3)),
-              const SizedBox(width: 8),
-            ],
-            if (chevron)
-              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-          ]),
+        child: SizedBox(
+          height: kMobile ? M.rowHeight : 42,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: kMobile ? M.rowPadH : 14),
+            child: Row(children: [
+              if (selecting) ...[
+                _checkbox(selected),
+                const SizedBox(width: 11)
+              ],
+              AppIcon(icon,
+                  size: 16, color: isFolder ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(kMobile ? 13 : 12.5,
+                          color: muted ? AppColors.fg3 : AppColors.fg1))),
+              if (git) ...[
+                AppIcon('git-branch', size: 12, color: AppColors.ok),
+                const SizedBox(width: 4),
+                Text('git', style: mono(10.5, color: AppColors.fg3)),
+                const SizedBox(width: 8),
+              ],
+              if (chevron)
+                AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+            ]),
+          ),
         ),
       ),
     );
