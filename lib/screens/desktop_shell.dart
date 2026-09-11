@@ -385,6 +385,14 @@ class _DesktopShellState extends State<DesktopShell>
   /// always present as a 0.5px hairline and brightens on hover.
   bool _paneHandleHover = false;
 
+  /// The pane a tab is currently being dragged OVER, if any.
+  ///
+  /// Drop targets gave no feedback: `_dropOn` accepted a drag silently, so
+  /// dragging a chip across the divider looked like nothing was happening and
+  /// there was no way to tell a valid drop from a miss. Highlighted by
+  /// [_dropOn]; cleared on leave and on drop.
+  _Pane? _dragOverPane;
+
   /// Which contextual sidebar the rail is showing. Purely a shell concern: the
   /// conversation you're reading stays put while this changes.
   ShellSection _section = ShellSection.sessions;
@@ -2909,37 +2917,64 @@ class _DesktopShellState extends State<DesktopShell>
     _Pane pane, {
     required Widget child,
     bool roundRight = false,
-  }) =>
-      Container(
-        decoration: BoxDecoration(
-          color: AppColors.canvas,
-          borderRadius: BorderRadius.only(
-            topLeft: pane == _Pane.left
-                ? const Radius.circular(R.sheetTop)
-                : Radius.zero,
-            topRight:
-                roundRight ? const Radius.circular(R.sheetTop) : Radius.zero,
-          ),
+  }) {
+    // While a tab is dragged over this pane, outline the whole surface. The
+    // strip alone is a small target to read, and the drop accepts anywhere in
+    // the pane, so the highlight has to cover the region that will actually
+    // take the tab.
+    final droppable = _dragOverPane == pane;
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.canvas,
+        borderRadius: BorderRadius.only(
+          topLeft: pane == _Pane.left
+              ? const Radius.circular(R.sheetTop)
+              : Radius.zero,
+          topRight:
+              roundRight ? const Radius.circular(R.sheetTop) : Radius.zero,
         ),
-        // Requires the decoration above: Flutter asserts on a non-default
-        // clipBehavior without one.
-        clipBehavior: Clip.antiAlias,
-        child: Stack(fit: StackFit.expand, children: [
-          child,
-          if (pane == _Pane.left)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                child: Container(
-                  width: kPaneHairline,
-                  color: kPaneSeamColor,
+      ),
+      // Requires the decoration above: Flutter asserts on a non-default
+      // clipBehavior without one.
+      clipBehavior: Clip.antiAlias,
+      child: Stack(fit: StackFit.expand, children: [
+        child,
+        if (droppable)
+          // IgnorePointer so the highlight cannot swallow the drop it is
+          // advertising; foreground so it paints over the pane's content.
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                      color: AppColors.accent, width: kPaneActiveStroke),
+                  borderRadius: BorderRadius.only(
+                    topLeft: pane == _Pane.left
+                        ? const Radius.circular(R.sheetTop)
+                        : Radius.zero,
+                    topRight: roundRight
+                        ? const Radius.circular(R.sheetTop)
+                        : Radius.zero,
+                  ),
                 ),
               ),
             ),
-        ]),
-      );
+          ),
+        if (pane == _Pane.left)
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: Container(
+                width: kPaneHairline,
+                color: kPaneSeamColor,
+              ),
+            ),
+          ),
+      ]),
+    );
+  }
 
   /// Body for one tab.
   ///
@@ -3220,9 +3255,24 @@ class _DesktopShellState extends State<DesktopShell>
       );
 
   /// A pane is a drop target for a tab dragged out of any strip.
+  ///
+  /// Reports hover through `_dragOverPane` so the pane can show it will accept
+  /// the tab. Without that, a drag across the divider had no feedback at all —
+  /// there was no way to tell a valid drop from a miss.
   Widget _dropOn(_Pane p, Widget child) => DragTarget<_ShellTab>(
         onWillAcceptWithDetails: (d) => d.data.pane != p,
-        onAcceptWithDetails: (d) => _moveTo(p, d.data),
+        onAcceptWithDetails: (d) {
+          setState(() => _dragOverPane = null);
+          _moveTo(p, d.data);
+        },
+        onLeave: (_) {
+          if (_dragOverPane == p) setState(() => _dragOverPane = null);
+        },
+        onMove: (d) {
+          if (d.data.pane != p && _dragOverPane != p) {
+            setState(() => _dragOverPane = p);
+          }
+        },
         builder: (_, __, ___) => child,
       );
 
@@ -3517,13 +3567,36 @@ class _DesktopShellState extends State<DesktopShell>
       ),
     );
 
-    // Dragging a chip to the other pane moves the tab. Long-press because the
-    // strip scrolls horizontally and a plain drag would fight that gesture.
-    return LongPressDraggable<_ShellTab>(
+    // Dragging a chip to the other pane moves the tab.
+    //
+    // Desktop starts the drag IMMEDIATELY; a long-press is a touch affordance,
+    // and requiring one with a mouse made this look unimplemented. Mobile keeps
+    // the long-press, because there a plain drag belongs to the horizontal
+    // strip's own scroll gesture.
+    //
+    // `onDragEnd` clears the highlight: a drag released outside every target
+    // fires no drop callback, so without this the pane stayed outlined until the
+    // next rebuild.
+    void ended(DraggableDetails _) {
+      if (_dragOverPane != null) setState(() => _dragOverPane = null);
+    }
+
+    if (kMobile) {
+      return LongPressDraggable<_ShellTab>(
+        data: t,
+        dragAnchorStrategy: pointerDragAnchorStrategy,
+        feedback: _tabDragFeedback(t),
+        childWhenDragging: Opacity(opacity: 0.4, child: chip),
+        onDragEnd: ended,
+        child: chip,
+      );
+    }
+    return Draggable<_ShellTab>(
       data: t,
       dragAnchorStrategy: pointerDragAnchorStrategy,
       feedback: _tabDragFeedback(t),
       childWhenDragging: Opacity(opacity: 0.4, child: chip),
+      onDragEnd: ended,
       child: chip,
     );
   }
