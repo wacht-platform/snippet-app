@@ -3094,9 +3094,11 @@ class _SessionScreenState extends State<SessionScreen>
       }
       // Approval mode and context remaining now live in the composer, so they
       // are deliberately NOT repeated here.
-      // Show for any provider that reported limits.
+      // Show for any provider that reported limits. An EXPIRED window is
+      // skipped rather than printed: its percentage describes the window that
+      // already rolled over, so showing it would state a stale figure as fact.
       final rp = s.ratePrimary;
-      if (rp != null) {
+      if (rp != null && !rp.isExpired) {
         chips.add(_StatMeta(
             icon: 'clipboard',
             label:

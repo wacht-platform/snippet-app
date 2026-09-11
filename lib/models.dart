@@ -216,6 +216,18 @@ class RateWindow {
       resetsAt > 0 ||
       usedPercent.isFinite && usedPercent > 0;
 
+  /// The window rolled over since this snapshot was taken.
+  ///
+  /// Rate limits are account-wide and only observed when a session runs, so a
+  /// snapshot can outlive its own window. Once `resetsAt` is in the past,
+  /// `usedPercent` describes the PREVIOUS window and the true current usage is
+  /// near zero — so rendering "1% left" with a 99%-full bar asserts a figure we
+  /// know to be wrong.
+  bool get isExpired =>
+      resetsAt > 0 &&
+      DateTime.fromMillisecondsSinceEpoch(resetsAt * 1000)
+          .isBefore(DateTime.now());
+
   double get leftPercent => (100 - usedPercent).clamp(0, 100).toDouble();
 }
 
@@ -645,15 +657,18 @@ String rateWindowLabel(int minutes) {
   return 'limit';
 }
 
-/// "resets in 2h 14m · 15:45" from a Unix-epoch-seconds reset time (null if
-/// unknown or already elapsed). Durations normalize up — minutes → hours → days
-/// (so a weekly window reads "6d 6h", not "150h 54m"). The local clock time is
-/// appended only for near resets (< 1 day out), where it's actually useful.
+/// "resets in 2h 14m · 15:45" from a Unix-epoch-seconds reset time. Durations
+/// normalize up — minutes → hours → days (so a weekly window reads "6d 6h", not
+/// "150h 54m"). The local clock time is appended only for near resets (< 1 day
+/// out), where it's actually useful.
+///
+/// Returns null once the reset has passed: the window rolled over, so there is
+/// no upcoming reset to name. Callers show [RateWindow.isExpired] instead.
 String? rateResetLabel(int resetsAt) {
   if (resetsAt <= 0) return null;
   final reset = DateTime.fromMillisecondsSinceEpoch(resetsAt * 1000);
   final d = reset.difference(DateTime.now());
-  if (d.isNegative) return 'awaiting update';
+  if (d.isNegative) return null;
   final days = d.inDays, h = d.inHours % 24, m = d.inMinutes % 60;
   if (days > 0) return 'resets in ${h > 0 ? '${days}d ${h}h' : '${days}d'}';
   final rel = d.inHours > 0

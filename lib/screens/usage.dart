@@ -185,13 +185,26 @@ class _RateRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reset = rateResetLabel(rate.resetsAt);
+    // The window rolled over since this snapshot was taken. Do NOT draw the bar
+    // or the percentage: both would state the PREVIOUS window's usage as if it
+    // were current (99% used / 1% left on a window that has already reset).
+    if (rate.isExpired) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(rateWindowLabel(rate.windowMinutes),
+            style: sans(11.5, color: AppColors.fg4)),
+        const SizedBox(height: 4),
+        Text('rolled over · awaiting the next report',
+            style: mono(10, color: AppColors.fg4)),
+      ]);
+    }
+
     final remaining = rate.leftPercent;
     final color = remaining < 20
         ? AppColors.danger
         : remaining < 50
             ? AppColors.run
             : AppColors.ok;
-    final reset = rateResetLabel(rate.resetsAt);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text(rateWindowLabel(rate.windowMinutes),
