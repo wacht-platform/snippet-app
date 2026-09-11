@@ -3206,7 +3206,7 @@ class _SessionScreenState extends State<SessionScreen>
   /// those rather than inventing a third the backend cannot honor.
   String get _approvalLabel => (_state?.approvalMode ?? 'auto') == 'manual'
       ? 'Ask first'
-      : 'Auto-approve';
+      : 'Auto approve';
 
   /// Context still free, as a whole percent of the model's window. Null until
   /// the daemon has reported both a window size and a prompt size.
@@ -3362,7 +3362,7 @@ class _SessionScreenState extends State<SessionScreen>
         appMenuRow(
           value: 'auto',
           icon: 'zap',
-          label: 'Auto-approve',
+          label: 'Auto approve',
           description: 'Run shell and file edits without asking',
           selected: current != 'manual',
         ),

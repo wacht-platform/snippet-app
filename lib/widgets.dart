@@ -175,25 +175,36 @@ Future<T?> showAppMenu<T>(
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
           ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const SizedBox(height: 10),
-            Center(
-                child: Container(
-                    width: 32,
-                    height: 3,
-                    decoration: BoxDecoration(
-                        color: AppColors.border2,
-                        borderRadius: BorderRadius.circular(99)))),
-            const SizedBox(height: 6),
-            Flexible(
-              child: SingleChildScrollView(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  for (final item in items) _appMenuSheetEntry(sheet, item),
-                ]),
-              ),
-            ),
-            SizedBox(height: media.padding.bottom + 8),
-          ]),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                Center(
+                    child: Container(
+                        width: 32,
+                        height: 3,
+                        decoration: BoxDecoration(
+                            color: AppColors.border2,
+                            borderRadius: BorderRadius.circular(99)))),
+                const SizedBox(height: 6),
+                Flexible(
+                  child: SingleChildScrollView(
+                    // STRETCH, not the default `center`. A heading is a bare `Text`
+                    // with no width constraint, so under `center` it shrank to its
+                    // intrinsic width and floated to the middle of the sheet while
+                    // every row below it started at the left edge.
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final item in items)
+                            _appMenuSheetEntry(sheet, item),
+                        ]),
+                  ),
+                ),
+                SizedBox(height: media.padding.bottom + 8),
+              ]),
         );
       },
     );
