@@ -288,8 +288,9 @@ class ShellNavRow extends StatelessWidget {
 /// Header height for a pane. Measured 36px in the reference.
 const double kPaneHeaderHeight = 36;
 
-/// Label-row height inside a pane header (36 minus the 2px indicator).
-const double kPaneTabHeight = 34;
+/// A framed tab occupies the full strip height so its outline reaches the
+/// strip rule. The active state is the 2px top edge inside this frame.
+const double kPaneTabHeight = kPaneHeaderHeight;
 
 /// Pane tab label size.
 const double kPaneTabText = 12;
@@ -301,15 +302,9 @@ class PaneTab {
   final String icon;
 }
 
-/// A pane's own header: its tabs on the left, its actions on the right.
-///
-/// Measured from the reference: a 36px row where the ACTIVE tab is marked by a
-/// 2px pill along its top edge, with its label row beneath. No fill and no
-/// border — a pane header never draws a line, which is how two adjacent panes
-/// read as one surface.
-///
-/// Each pane carries its own header so that once a tab can be moved between
-/// panes, the header is what says which tab lives where.
+/// Shared full-width framed strip for a pane readout. The frame is structural:
+/// a lone tab fills the complete panel up to its actions (for example Git),
+/// while several tabs retain individual outlines inside the ruled band.
 class PaneTabStrip extends StatelessWidget {
   const PaneTabStrip({
     super.key,
@@ -322,66 +317,87 @@ class PaneTabStrip extends StatelessWidget {
   final List<PaneTab> tabs;
   final int activeIndex;
   final ValueChanged<int>? onSelect;
-
-  /// Right-aligned 24px icon buttons.
   final List<Widget> actions;
-
-  /// Indicator height. Reserved on inactive tabs too, so selecting cannot shift
-  /// the label down by two pixels.
-  static const double _indicator = 2;
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return SizedBox(
+    return Container(
       height: kPaneHeaderHeight,
-      child: Row(
-        children: [
-          for (var i = 0; i < tabs.length; i++) _tab(i),
-          const Spacer(),
-          if (actions.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: AppColors.canvas,
+        border: Border(bottom: BorderSide(color: AppColors.border2)),
+      ),
+      child: Row(children: [
+        Expanded(
+          child: tabs.length == 1
+              ? _tab(0, expand: true)
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(left: 4),
+                  itemCount: tabs.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 2),
+                  itemBuilder: (_, i) => _tab(i),
+                ),
+        ),
+        if (actions.isNotEmpty)
+          Container(
+            width: 32,
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: AppColors.border2)),
+            ),
+            child: Center(
               child: Row(mainAxisSize: MainAxisSize.min, children: actions),
             ),
-        ],
-      ),
+          ),
+      ]),
     );
   }
 
-  Widget _tab(int i) {
+  Widget _tab(int i, {bool expand = false}) {
     final t = tabs[i];
     final active = i == activeIndex;
     return MouseRegion(
       cursor: onSelect == null ? MouseCursor.defer : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onSelect == null ? null : () => onSelect!(i),
-        // IntrinsicWidth bounds the column to its widest child (the label row),
-        // so `stretch` can mark the indicator across exactly that width.
-        //
-        // Without it the Column sits in a Row — unbounded on the cross axis —
-        // and `stretch` resolves to w=Infinity, which throws during layout.
-        // `flutter analyze` cannot see this: it is a runtime constraint error.
-        child: IntrinsicWidth(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                height: _indicator,
-                decoration: BoxDecoration(
-                  color: active ? AppColors.fg1 : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              Container(
-                height: kPaneTabHeight,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Row(children: [
+        child: Container(
+          width: expand ? double.infinity : null,
+          height: kPaneTabHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.canvas,
+            border: Border(
+              top: BorderSide(
+                  color: active ? AppColors.fg2 : AppColors.border2,
+                  width: active ? 2 : 1),
+              left: BorderSide(color: AppColors.border2),
+              right: BorderSide(color: AppColors.border2),
+              bottom: BorderSide(color: AppColors.border2),
+            ),
+          ),
+          child: expand
+              ? Row(children: [
                   AppIcon(t.icon,
                       size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
-                  const SizedBox(width: 8),
-                  Flexible(
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      t.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(kPaneTabText,
+                          weight: active ? W.label : W.body,
+                          color: active ? AppColors.fg1 : AppColors.fg3),
+                    ),
+                  ),
+                ])
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  AppIcon(t.icon,
+                      size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
+                  const SizedBox(width: 7),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 150),
                     child: Text(
                       t.label,
                       maxLines: 1,
@@ -392,9 +408,6 @@ class PaneTabStrip extends StatelessWidget {
                     ),
                   ),
                 ]),
-              ),
-            ],
-          ),
         ),
       ),
     );

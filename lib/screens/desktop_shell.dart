@@ -2176,16 +2176,8 @@ class _DesktopShellState extends State<DesktopShell>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Right-side utilities: history, settings, and the active
-                    // machine avatar. The avatar is also the machine switcher.
-                    IconBtn(
-                      'history',
-                      size: 24,
-                      iconSize: 16,
-                      tooltip: 'History & Checkpoints',
-                      onTap: _showCheckpointsDrawer,
-                    ),
-                    const SizedBox(width: 2),
+                    // Right-side utilities: settings and the active machine
+                    // avatar. Checkpoints remain in a session's Actions/History.
                     IconBtn(
                       'settings',
                       size: 24,
@@ -2363,12 +2355,6 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _navigateForward() {
     if (_canNavigateForward) _activateTab(_activeIndex + 1);
-  }
-
-  void _showCheckpointsDrawer() {
-    final key = _activeTab?.key;
-    if (key == null) return;
-    _macSessionControls[key]?.performAction('checkpoints');
   }
 
   /// Top-level workspace tab chip in the window bar.
@@ -2679,20 +2665,11 @@ class _DesktopShellState extends State<DesktopShell>
     }));
   }
 
-  /// The chat / content pane. Sits on the darkest canvas surface with a
-  /// rounded top-left corner where it meets the chrome, matching the
-  /// reference's `radius: 10 0 0 0` on the reading surface. No divider is
-  /// drawn against the sidebar — the surface step is the separation.
-  Widget _paneSurface({required Widget child, bool roundRight = false}) =>
-      Container(
-        decoration: BoxDecoration(
-          color: AppColors.canvas,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(R.sheetTop),
-            topRight:
-                roundRight ? const Radius.circular(R.sheetTop) : Radius.zero,
-          ),
-        ),
+  /// Both desktop panes share the same canvas. Their separation is the
+  /// explicit divider in [_paneResizeHandle], not a second background colour
+  /// or a rounded card edge — the tab frames need a continuous work surface.
+  Widget _paneSurface({required Widget child}) => Container(
+        color: AppColors.canvas,
         clipBehavior: Clip.antiAlias,
         child: child,
       );
@@ -2931,7 +2908,7 @@ class _DesktopShellState extends State<DesktopShell>
           Expanded(
             child: _dropOn(
               _Pane.left,
-              _paneView(_Pane.left, roundRight: !showRight),
+              _paneView(_Pane.left),
             ),
           )
         else
@@ -2940,8 +2917,7 @@ class _DesktopShellState extends State<DesktopShell>
           _paneResizeHandle(),
           SizedBox(
             width: _paneWidth.clamp(kPaneMinWidth, double.infinity),
-            child:
-                _dropOn(_Pane.right, _paneView(_Pane.right, roundRight: true)),
+            child: _dropOn(_Pane.right, _paneView(_Pane.right)),
           ),
         ],
       ]),
@@ -2984,7 +2960,7 @@ class _DesktopShellState extends State<DesktopShell>
   /// owns its ptys, so unmounting one on a tab switch would kill its terminals.
   /// The same applies to a terminal tab, whose `TerminalHost` lives in the
   /// session that owns it.
-  Widget _paneView(_Pane p, {required bool roundRight}) {
+  Widget _paneView(_Pane p) {
     final list = _tabsIn(p);
     final active = _activeIn(p);
 
@@ -3009,7 +2985,6 @@ class _DesktopShellState extends State<DesktopShell>
     }
 
     return _paneSurface(
-      roundRight: roundRight,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -3038,31 +3013,41 @@ class _DesktopShellState extends State<DesktopShell>
     return _client == null ? _welcome() : _recentPlaceholder();
   }
 
-  /// A pane's nested tab strip: locked session root, then its user-opened
-  /// files, diffs, and terminals. The only trailing action collapses the view;
-  /// terminal creation and destruction live exclusively in the sidebar.
+  /// A pane's nested tab strip is a full-width tab frame. A single tab (Git,
+  /// Lanes, one file) expands through the available strip; multiple tabs keep
+  /// their own outlined frames inside the same ruled band.
   Widget _paneStrip(_Pane p, List<_ShellTab> list) {
     final active = _activeIn(p);
     return Container(
       height: kPaneHeaderHeight,
-      padding: const EdgeInsets.only(left: 4),
+      decoration: BoxDecoration(
+        color: AppColors.canvas,
+        border: Border(bottom: BorderSide(color: AppColors.border2)),
+      ),
       child: Row(children: [
         Expanded(
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: list.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 2),
-            itemBuilder: (_, i) => _paneTabChip(p, list[i], list[i] == active),
-          ),
+          child: list.length == 1
+              ? _paneTabChip(p, list.first, list.first == active, expand: true)
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(left: 4),
+                  itemCount: list.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 2),
+                  itemBuilder: (_, i) =>
+                      _paneTabChip(p, list[i], list[i] == active),
+                ),
         ),
-        // `×` collapses the pane. It does NOT destroy a shell: a pty is created
-        // and destroyed only from the sidebar's terminal panel, so closing a
-        // view can never take a running shell with it.
-        IconBtn('x',
-            size: 24,
-            iconSize: 12,
-            tooltip: 'Close pane',
-            onTap: () => _collapsePane(p)),
+        Container(
+          width: 32,
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: AppColors.border2)),
+          ),
+          child: IconBtn('x',
+              size: 28,
+              iconSize: 12,
+              tooltip: 'Close pane',
+              onTap: () => _collapsePane(p)),
+        ),
         const SizedBox(width: 4),
       ]),
     );
@@ -3182,45 +3167,79 @@ class _DesktopShellState extends State<DesktopShell>
     });
   }
 
-  Widget _paneTabChip(_Pane p, _ShellTab t, bool active) {
+  Widget _paneTabChip(_Pane p, _ShellTab t, bool active,
+      {bool expand = false}) {
     final chip = GestureDetector(
       onTap: () => _activateIn(p, t),
       child: Container(
+        width: expand ? double.infinity : null,
         height: kPaneTabHeight,
-        padding: const EdgeInsets.only(left: 10, right: 4),
+        padding: const EdgeInsets.only(left: 10, right: 6),
         decoration: BoxDecoration(
-          // Active tab takes the band's own colour so it merges into the body
-          // below, the same browser-tab logic as the window strip.
-          color: active ? AppColors.bg : Colors.transparent,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          AppIcon(_tabIconKind(t),
-              size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
-          const SizedBox(width: 7),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 150),
-            child: Text(
-              t.title.isEmpty ? '(untitled)' : t.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: sans(kPaneTabText,
-                  weight: active ? W.label : W.body,
-                  color: active ? AppColors.fg1 : AppColors.fg3),
-            ),
+          color: AppColors.canvas,
+          border: Border(
+            top: BorderSide(
+                color: active ? AppColors.fg2 : AppColors.border2,
+                width: active ? 2 : 1),
+            left: BorderSide(color: AppColors.border2),
+            right: BorderSide(color: AppColors.border2),
+            bottom: BorderSide(color: AppColors.border2),
           ),
-          if (_canCloseTab(t)) ...[
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: () => _closePaneTab(t),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.all(3),
-                child: AppIcon('x', size: 11, color: AppColors.fg4),
-              ),
-            ),
-          ],
-        ]),
+        ),
+        child: expand
+            ? Row(children: [
+                AppIcon(_tabIconKind(t),
+                    size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    t.title.isEmpty ? '(untitled)' : t.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(kPaneTabText,
+                        weight: active ? W.label : W.body,
+                        color: active ? AppColors.fg1 : AppColors.fg3),
+                  ),
+                ),
+                if (_canCloseTab(t)) ...[
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () => _closePaneTab(t),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: AppIcon('x', size: 11, color: AppColors.fg4),
+                    ),
+                  ),
+                ],
+              ])
+            : Row(mainAxisSize: MainAxisSize.min, children: [
+                AppIcon(_tabIconKind(t),
+                    size: 13, color: active ? AppColors.fg2 : AppColors.fg4),
+                const SizedBox(width: 7),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  child: Text(
+                    t.title.isEmpty ? '(untitled)' : t.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(kPaneTabText,
+                        weight: active ? W.label : W.body,
+                        color: active ? AppColors.fg1 : AppColors.fg3),
+                  ),
+                ),
+                if (_canCloseTab(t)) ...[
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () => _closePaneTab(t),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: AppIcon('x', size: 11, color: AppColors.fg4),
+                    ),
+                  ),
+                ],
+              ]),
       ),
     );
 
@@ -3241,8 +3260,8 @@ class _DesktopShellState extends State<DesktopShell>
             style: sans(12.5, color: AppColors.fg4)),
       );
 
-  /// 6px grab zone between the panes. The reference has no drawn divider — the
-  /// surface step separates them — so the rule only appears on hover.
+  /// A stable 1px divider separates the two equal-canvas panes. The wider hit
+  /// zone remains draggable, but its visual edge no longer disappears at rest.
   Widget _paneResizeHandle() => MouseRegion(
         cursor: SystemMouseCursors.resizeColumn,
         onEnter: (_) => setState(() => _paneHandleHover = true),
@@ -3261,8 +3280,7 @@ class _DesktopShellState extends State<DesktopShell>
             child: Center(
               child: Container(
                 width: 1,
-                color:
-                    _paneHandleHover ? AppColors.border2 : Colors.transparent,
+                color: _paneHandleHover ? AppColors.fg4 : AppColors.border2,
               ),
             ),
           ),
@@ -3301,12 +3319,7 @@ class _DesktopShellState extends State<DesktopShell>
     }
 
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.floor,
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(R.sheetTop),
-        ),
-      ),
+      color: AppColors.canvas,
       child: Column(children: [
         PaneTabStrip(
           tabs: [PaneTab(label: _rightPanel.label, icon: _rightPanel.icon)],
