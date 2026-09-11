@@ -170,8 +170,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
         children: [
           ShellSectionHeader(
             label: 'File Tree',
-            expanded: true,
-            onToggle: () {},
             actions: [
               ShellSectionAction(
                 icon: 'search',

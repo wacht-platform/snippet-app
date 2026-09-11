@@ -84,8 +84,6 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
         children: [
           ShellSectionHeader(
             label: 'Git Diff',
-            expanded: true,
-            onToggle: () {},
             actions: [
               ShellSectionAction(
                 icon: 'refresh',

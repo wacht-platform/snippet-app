@@ -51,8 +51,6 @@ class TerminalsSidebarPanel extends StatelessWidget {
         children: [
           ShellSectionHeader(
             label: 'Terminals',
-            expanded: true,
-            onToggle: () {},
             actions: [
               ShellSectionAction(
                 icon: 'plus',

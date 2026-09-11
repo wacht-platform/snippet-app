@@ -159,24 +159,28 @@ const double kNavRowInset = kSidebarContentInset;
 
 /// Padding inside a row, between its box edge and its content.
 ///
-/// With the box at 8 this puts the icon at 20 — the same column as the section
-/// header's chevron, so header and rows align on one axis.
+/// With the box at 8 this puts the icon at 20, so header and rows align on one
+/// axis.
 const double kNavPadH = 12;
 
-/// UPPERCASE section header with a leading chevron and a trailing action
-/// cluster.
+/// UPPERCASE section header with a trailing action cluster.
+///
+/// Deliberately NO leading caret: it suggested the header collapsed, but the
+/// panels that use it are either always-expanded or open a different surface,
+/// so the affordance promised something it never did.
 class ShellSectionHeader extends StatelessWidget {
   const ShellSectionHeader({
     super.key,
     required this.label,
-    required this.expanded,
-    required this.onToggle,
+    this.onToggle,
     this.actions = const [],
   });
 
   final String label;
-  final bool expanded;
-  final VoidCallback onToggle;
+
+  /// Optional tap target on the label itself. Null leaves it inert, which is
+  /// honest for a header that cannot collapse.
+  final VoidCallback? onToggle;
 
   /// Rendered right-aligned, smallest-first.
   final List<Widget> actions;
@@ -195,22 +199,20 @@ class ShellSectionHeader extends StatelessWidget {
             Expanded(
               child: InkWell(
                 onTap: onToggle,
+                borderRadius: BorderRadius.circular(R.md),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: kNavPadH, vertical: 8),
-                  child: Row(children: [
-                    AppIcon(expanded ? 'chevron-down' : 'chevron-right',
-                        size: 16, color: AppColors.fg4),
-                    const SizedBox(width: 8),
-                    Text(
-                      label.toUpperCase(),
-                      // Measured: 12px/500 in the default body ink (#C1C1C1), not
-                      // the faintest tone. At fg4 the header was nearly invisible
-                      // and read as disabled chrome rather than a section label.
-                      style: sans(12,
-                          weight: W.label, color: AppColors.fg2, spacing: 0.4),
-                    ),
-                  ]),
+                  child: Text(
+                    label.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    // Measured: 12px/500 in the default body ink (#C1C1C1), not
+                    // the faintest tone. At fg4 the header was nearly invisible
+                    // and read as disabled chrome rather than a section label.
+                    style: sans(12,
+                        weight: W.label, color: AppColors.fg2, spacing: 0.4),
+                  ),
                 ),
               ),
             ),
