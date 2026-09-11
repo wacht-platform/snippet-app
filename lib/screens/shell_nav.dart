@@ -312,13 +312,21 @@ Color get kPaneSeamColor => AppColors.fg1.withValues(alpha: kPaneSeamAlpha);
 Color get kPaneSeamHoverColor =>
     AppColors.fg1.withValues(alpha: kPaneSeamHoverAlpha);
 
-/// Bounded desktop tab widths. A root/session tab never grows to fill an empty
-/// pane; its longer title may grow until the cap, while auxiliary tabs remain
-/// visibly larger than a bare label chip.
-const double kPaneRootTabMinWidth = 260;
-const double kPaneRootTabMaxWidth = 460;
-const double kPaneAuxTabMinWidth = 180;
-const double kPaneAuxTabMaxWidth = 340;
+/// Pane tab widths. Tabs open at [kPaneTabMaxWidth] and shrink together as more
+/// are added, down to the fixed [kPaneTabMinWidth] floor — past which the strip
+/// scrolls rather than squeezing labels into nothing.
+const double kPaneTabMinWidth = 140;
+const double kPaneTabMaxWidth = 260;
+
+/// Width one pane tab should take when [count] tabs share [available] width.
+///
+/// Tabs open wide and shrink together as more are added, stopping at
+/// [kPaneTabMinWidth]. Past that floor the strip scrolls instead of squeezing
+/// labels into nothing — so the minimum is a fixed number, not a ratio.
+double kPaneTabWidth(double available, int count) {
+  if (count <= 0) return kPaneTabMaxWidth;
+  return (available / count).clamp(kPaneTabMinWidth, kPaneTabMaxWidth);
+}
 
 /// Pane tab label size.
 const double kPaneTabText = 12;
@@ -353,13 +361,16 @@ class PaneTabStrip extends StatelessWidget {
       height: kPaneHeaderHeight,
       color: AppColors.canvas,
       child: Stack(fit: StackFit.expand, children: [
-        ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.zero,
-          itemCount: tabs.length,
-          separatorBuilder: (_, __) => const SizedBox.shrink(),
-          itemBuilder: (_, i) => _tab(i),
-        ),
+        LayoutBuilder(builder: (context, c) {
+          final w = kPaneTabWidth(c.maxWidth, tabs.length);
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemCount: tabs.length,
+            separatorBuilder: (_, __) => const SizedBox.shrink(),
+            itemBuilder: (_, i) => _tab(i, w),
+          );
+        }),
         // Foreground baseline: the ListView paints over the container's own
         // decoration, so the strip rule must be laid on top of the tabs.
         Positioned(
@@ -374,18 +385,15 @@ class PaneTabStrip extends StatelessWidget {
     );
   }
 
-  Widget _tab(int i) {
+  Widget _tab(int i, double width) {
     final t = tabs[i];
     final active = i == activeIndex;
     return MouseRegion(
       cursor: onSelect == null ? MouseCursor.defer : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onSelect == null ? null : () => onSelect!(i),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            minWidth: kPaneRootTabMinWidth,
-            maxWidth: kPaneRootTabMaxWidth,
-          ),
+        child: SizedBox(
+          width: width,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(

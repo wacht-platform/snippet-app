@@ -3037,13 +3037,17 @@ class _DesktopShellState extends State<DesktopShell>
       height: kPaneHeaderHeight,
       color: AppColors.canvas,
       child: Stack(fit: StackFit.expand, children: [
-        ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.zero,
-          itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox.shrink(),
-          itemBuilder: (_, i) => _paneTabChip(p, list[i], list[i] == active),
-        ),
+        LayoutBuilder(builder: (context, c) {
+          final w = kPaneTabWidth(c.maxWidth, list.length);
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemCount: list.length,
+            separatorBuilder: (_, __) => const SizedBox.shrink(),
+            itemBuilder: (_, i) =>
+                _paneTabChip(p, list[i], list[i] == active, w),
+          );
+        }),
         // Foreground baseline: the ListView paints over the container's own
         // decoration, so the strip rule must be laid on top of the tabs.
         Positioned(
@@ -3172,11 +3176,8 @@ class _DesktopShellState extends State<DesktopShell>
     });
   }
 
-  Widget _paneTabChip(_Pane p, _ShellTab t, bool active) {
-    final isRoot = !_isAuxiliary(t);
+  Widget _paneTabChip(_Pane p, _ShellTab t, bool active, double width) {
     final canDismiss = _canCloseTab(t) || t.isTerminal;
-    final minWidth = isRoot ? kPaneRootTabMinWidth : kPaneAuxTabMinWidth;
-    final maxWidth = isRoot ? kPaneRootTabMaxWidth : kPaneAuxTabMaxWidth;
     void dismiss() {
       // Closing a terminal tab only hides this pane view. Its pty remains alive
       // and traceable from the Terminals panel; file/diff tabs close normally.
@@ -3189,8 +3190,8 @@ class _DesktopShellState extends State<DesktopShell>
 
     final chip = GestureDetector(
       onTap: () => _activateIn(p, t),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: minWidth, maxWidth: maxWidth),
+      child: SizedBox(
+        width: width,
         child: Container(
           height: kPaneTabHeight,
           padding: const EdgeInsets.symmetric(horizontal: 12),

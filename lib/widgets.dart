@@ -835,7 +835,9 @@ class IconBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final btn = Material(
-      color: active ? AppColors.accentBg : Colors.transparent,
+      // Selection is surface-only, matching the sidebar/rail selection
+      // language. The accent is reserved for state, not for "this is on".
+      color: active ? AppColors.surface2 : Colors.transparent,
       borderRadius: BorderRadius.circular(R.md),
       child: InkWell(
         onTap: onTap,
@@ -844,7 +846,7 @@ class IconBtn extends StatelessWidget {
           width: size,
           height: size,
           child: AppIcon(name,
-              size: iconSize, color: active ? AppColors.accent : AppColors.fg2),
+              size: iconSize, color: active ? AppColors.fg1 : AppColors.fg2),
         ),
       ),
     );
