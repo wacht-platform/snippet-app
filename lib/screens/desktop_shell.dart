@@ -2530,20 +2530,16 @@ class _DesktopShellState extends State<DesktopShell>
               ),
             ),
           ),
-        // Full-screen panel that slides in from the RIGHT edge, covering the
-        // whole width. `Offset(1, 0)` parks it entirely off-screen when closed,
-        // so it never half-covers the session; `Positioned.fill` makes it span
-        // the full width rather than shrink-wrapping its content.
-        //
-        // Right-hand side is deliberate: the left edge belongs to Android's
-        // back-swipe gesture, so a left panel fights the OS gesture area.
+        // Chats is the LEFT panel (the chevron beside it points left, and it is
+        // the sidebar). The actions panel is the RIGHT one; the two must come
+        // from opposite edges or they read as the same surface.
         Positioned.fill(
           child: IgnorePointer(
             ignoring: !chatsVisible,
             child: AnimatedSlide(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
-              offset: chatsVisible ? Offset.zero : const Offset(1, 0),
+              offset: chatsVisible ? Offset.zero : const Offset(-1, 0),
               child: Material(
                 color: AppColors.bg,
                 child: SafeArea(

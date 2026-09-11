@@ -2457,12 +2457,13 @@ class _SessionScreenState extends State<SessionScreen>
               iconSize: 20,
               tooltip: 'Chats',
               onTap: widget.onMenu),
-        // The whole title block is a tap target, not just the chevron: tapping
-        // the session header is the natural gesture for "show me the list",
-        // and a 44px-tall row is far easier to hit than a 20px glyph.
+        // Tapping the header opens the ACTIONS panel (the chevron beside it goes
+        // back to Chats). The bar is a 44px tall target, far easier to hit than
+        // a glyph, and it is where a thumb naturally lands to get at "everything
+        // I can do here".
         Expanded(
           child: InkWell(
-            onTap: widget.onMenu,
+            onTap: () => _openActionsDrawer(s),
             borderRadius: BorderRadius.circular(R.sm),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -3237,44 +3238,68 @@ class _SessionScreenState extends State<SessionScreen>
     return (100 - used * 100).clamp(0, 100).round();
   }
 
-  /// The phone's action list, as a right-hand drawer the user drags in from the
-  /// pane edge. It replaces the toolbar's overflow button: the same actions, but
-  /// a full surface with room for labels instead of a cramped popup.
+  /// Open the full-screen actions panel (slides in from the right).
+  ///
+  /// Dismisses the keyboard first: the panel is a navigation surface, and a
+  /// composer keyboard left open underneath makes the slide look broken.
+  void _openActionsDrawer(HarnessState? s) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  /// The phone's action list as a FULL-SCREEN panel entering from the right.
+  ///
+  /// Full width rather than a 320px drawer: the actions carry descriptions and
+  /// expandable forms (goal, lanes), which a narrow drawer squeezes into
+  /// ellipsis. The right edge distinguishes it from the Chats panel on the left.
   Widget _actionsDrawer(HarnessState? s) {
     // Closing the drawer dismisses the host, then runs the action — the drawer
     // is not a route, so `Navigator.pop` (what the sheet uses) would not close
-    // it and the action would fire behind an open drawer.
+    // it and the action would fire behind an open panel.
     void run(VoidCallback f) {
       _scaffoldKey.currentState?.closeEndDrawer();
       f();
     }
 
+    final title = _title.isEmpty ? 'Session' : _title;
     return Drawer(
-      width: math.min(320.0, MediaQuery.sizeOf(context).width * 0.86),
-      backgroundColor: AppColors.surface1,
+      width: MediaQuery.sizeOf(context).width,
+      backgroundColor: AppColors.bg,
       shape: const RoundedRectangleBorder(),
       child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(M.gutter, 12, 8, 8),
+              padding: EdgeInsets.fromLTRB(M.gutter, 10, 8, 6),
               child: Row(children: [
                 Expanded(
-                  child: Text('Actions',
-                      style: sans(M.sectionTitle,
-                          weight: W.label, color: AppColors.fg1)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Actions',
+                          style: sans(M.pageTitle,
+                              weight: W.label, color: AppColors.fg1)),
+                      const SizedBox(height: 2),
+                      Text(title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(M.meta, color: AppColors.fg4)),
+                    ],
+                  ),
                 ),
                 IconBtn('x',
                     size: M.minTarget,
-                    iconSize: 18,
+                    iconSize: 20,
                     tooltip: 'Close',
                     onTap: () => _scaffoldKey.currentState?.closeEndDrawer()),
               ]),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 24),
+                padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter,
+                    28 + MediaQuery.paddingOf(context).bottom),
                 child: _actionsPanel(s, run),
               ),
             ),
@@ -5908,60 +5933,112 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
 
   void _toggle(String id) => setState(() => _open = _open == id ? null : id);
 
-  Widget _section(String label) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 12, 2, 3),
-        child: SectionLabel(label),
-      );
+  /// A titled group of rows, drawn as ONE card.
+  ///
+  /// Grouping into cards rather than a flat column: at full-screen width a bare
+  /// stack of 44px rows leaves the lower half of the screen empty and gives no
+  /// hierarchy, so related actions read as one object instead of an unrelated
+  /// settings dump.
+  Widget _group(String label, List<Widget> rows) {
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+          child: Text(label.toUpperCase(),
+              style: sans(10.5,
+                  weight: W.label, color: AppColors.fg4, spacing: 0.6)),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: AppColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0) Container(height: 1, color: AppColors.border),
+                rows[i],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
+  /// One action row inside a group card.
+  ///
+  /// [detail] is a short explanatory line: at this width the labels alone were
+  /// ambiguous (what does "Processes" or "Compact history" actually do?).
   Widget _row({
     required String icon,
     required String label,
+    String? detail,
     String? value,
     String? id,
     VoidCallback? onTap,
     Widget? child,
   }) {
     final open = id != null && _open == id;
+    final expandable = id != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
-          onTap: onTap ?? (id == null ? null : () => _toggle(id)),
-          borderRadius: BorderRadius.circular(R.sm),
-          child: SizedBox(
-            height: M.minTarget,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap ?? (expandable ? () => _toggle(id) : null),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: M.minTarget + 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(children: [
-                AppIcon(icon, size: 16, color: AppColors.fg3),
-                const SizedBox(width: 10),
+                AppIcon(icon, size: 17, color: AppColors.fg3),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(label,
-                      style: sans(M.rowTitle, color: AppColors.fg1)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: sans(M.rowTitle,
+                              weight: W.label, color: AppColors.fg1)),
+                      if (detail != null) ...[
+                        const SizedBox(height: 2),
+                        Text(detail,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(M.meta, color: AppColors.fg4)),
+                      ],
+                    ],
+                  ),
                 ),
                 if (value != null) ...[
+                  const SizedBox(width: 8),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 132),
+                    constraints: const BoxConstraints(maxWidth: 140),
                     child: Text(value,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.right,
-                        style: sans(M.meta, color: AppColors.fg4)),
+                        style: sans(M.meta, color: AppColors.fg3)),
                   ),
-                  const SizedBox(width: 6),
                 ],
-                if (id != null)
+                const SizedBox(width: 8),
+                if (expandable)
                   AppIcon(open ? 'chevron-down' : 'chevron-right',
-                      size: 14, color: AppColors.fg4)
-                else
-                  const SizedBox(width: 14),
+                      size: 15, color: AppColors.fg4),
               ]),
             ),
           ),
         ),
         if (open && child != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: child,
           ),
       ],
@@ -5972,82 +6049,128 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   Widget build(BuildContext context) {
     final s = widget.session;
     final goalOn = s?.goal?.ongoing ?? false;
+
+    // Session: what this conversation is doing. Rename and Approval are
+    // deliberately NOT here — rename is not an action, and approval lives in the
+    // composer next to what it governs.
+    final sessionRows = <Widget>[
+      if (!widget.hideGoal)
+        _row(
+          icon: 'zap',
+          label: goalOn ? 'Goal' : 'Set a goal',
+          detail: goalOn
+              ? 'The agent is driving toward this autonomously'
+              : 'Give the agent something to work toward on its own',
+          id: 'goal',
+          value: goalOn ? (s!.goal!.paused ? 'paused' : 'running') : null,
+          child: goalOn
+              ? Btn(s!.goal!.paused ? 'Resume goal' : 'Cancel goal',
+                  variant: BtnVariant.secondary,
+                  onTap: s.goal!.paused
+                      ? widget.onResumeGoal
+                      : widget.onCancelGoal)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AppField(
+                        controller: _goalCtl,
+                        hint: 'What should the agent work toward?',
+                        minLines: 2,
+                        maxLines: 4),
+                    const SizedBox(height: 8),
+                    Btn('Set goal', onTap: () {
+                      final t = _goalCtl.text.trim();
+                      if (t.isEmpty) return;
+                      widget.onSetGoal(t);
+                      _goalCtl.clear();
+                    }),
+                  ],
+                ),
+        ),
+      if (!kMacOS && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
+        _row(
+            icon: 'layers',
+            label: 'Lanes',
+            detail: 'Background work running in parallel',
+            onTap: widget.onLanes),
+      if (widget.onTasks != null)
+        _row(
+            icon: 'layers',
+            label: 'Tasks',
+            detail: 'Plan and progress for this run',
+            onTap: widget.onTasks),
+      if (widget.onSessionAgents != null)
+        _row(
+            icon: 'cpu',
+            label: 'Agents in session',
+            detail: 'Which agents are working here',
+            onTap: widget.onSessionAgents),
+      if (widget.onCoordination != null)
+        _row(
+            icon: 'message-text',
+            label: 'Coordination',
+            detail: 'Board, handoffs and activity',
+            onTap: widget.onCoordination),
+      _row(
+          icon: 'scheduled',
+          label: 'Scheduled',
+          detail: 'Recurring jobs on this machine',
+          onTap: widget.onRecurring),
+    ];
+
+    // Workspace: the things that touch files and processes.
+    final workspaceRows = <Widget>[
+      if (!kMacOS)
+        _row(
+            icon: 'git-branch',
+            label: 'Git',
+            detail: 'Status, diffs, stage and commit',
+            onTap: widget.onGit),
+      _row(
+          icon: 'folder',
+          label: 'Files',
+          detail: 'Browse the workspace',
+          onTap: widget.onFiles),
+      if (!widget.hideShell)
+        _row(
+            icon: 'terminal',
+            label: 'Session shell',
+            detail: 'A terminal in this workspace',
+            onTap: widget.onTerm),
+      _row(
+          icon: 'list',
+          label: 'Processes',
+          detail: 'What is running on the machine',
+          onTap: widget.onProcesses),
+    ];
+
+    // History: context management.
+    final historyRows = <Widget>[
+      _row(
+          icon: 'minimize',
+          label: 'Compact history',
+          detail: 'Summarise older turns to free context',
+          onTap: widget.onCompact),
+      if (!widget.hideCheckpoints)
+        _row(
+            icon: 'history',
+            label: 'Checkpoints',
+            detail: 'Restore the workspace to an earlier point',
+            onTap: widget.onCheckpoints),
+      _row(
+          icon: 'activity',
+          label: 'Usage',
+          detail: 'Tokens and rate limits',
+          onTap: widget.onUsage),
+    ];
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _section('Session'),
-        // Rename and Approval are deliberately NOT here: both moved to the
-        // composer / a dedicated affordance, so the actions list stays a list
-        // of actions rather than a settings form.
-        if (!widget.hideGoal)
-          _row(
-            icon: 'zap',
-            label: goalOn ? 'Goal' : 'Set goal',
-            id: 'goal',
-            value: goalOn ? (s!.goal!.paused ? 'paused' : 'running') : null,
-            child: goalOn
-                ? Btn(s!.goal!.paused ? 'Resume goal' : 'Cancel goal',
-                    variant: BtnVariant.secondary,
-                    onTap: s.goal!.paused
-                        ? widget.onResumeGoal
-                        : widget.onCancelGoal)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AppField(
-                          controller: _goalCtl,
-                          hint: 'What should the agent work toward?',
-                          minLines: 2,
-                          maxLines: 4),
-                      const SizedBox(height: 8),
-                      Btn('Set goal', onTap: () {
-                        final t = _goalCtl.text.trim();
-                        if (t.isEmpty) return;
-                        widget.onSetGoal(t);
-                        _goalCtl.clear();
-                      }),
-                    ],
-                  ),
-          ),
-        if (!kMacOS && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
-          _row(icon: 'layers', label: 'Lanes', onTap: widget.onLanes),
-        if (widget.onTasks != null)
-          _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
-        // Which agents are active here — available in every session, so it sits
-        // above the Mission-Control-only directory row.
-        if (widget.onSessionAgents != null)
-          _row(
-              icon: 'cpu',
-              label: 'Agents in session',
-              onTap: widget.onSessionAgents),
-        if (widget.onCoordination != null)
-          _row(
-              icon: 'message-text',
-              label: 'Coordination',
-              onTap: widget.onCoordination),
-        _row(icon: 'scheduled', label: 'Scheduled', onTap: widget.onRecurring),
-        if (!widget.hideWorkspace) ...[
-          _section('Workspace'),
-          if (!kMacOS)
-            _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
-          _row(icon: 'folder', label: 'Files', onTap: widget.onFiles),
-          if (!widget.hideShell)
-            _row(
-                icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
-          _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
-        ],
-        _section('History'),
-        _row(
-            icon: 'minimize',
-            label: 'Compact history',
-            onTap: widget.onCompact),
-        if (!widget.hideCheckpoints)
-          _row(
-              icon: 'history',
-              label: 'Checkpoints',
-              onTap: widget.onCheckpoints),
-        _row(icon: 'activity', label: 'Usage', onTap: widget.onUsage),
+        _group('Session', sessionRows),
+        if (!widget.hideWorkspace) _group('Workspace', workspaceRows),
+        _group('History', historyRows),
       ],
     );
   }
