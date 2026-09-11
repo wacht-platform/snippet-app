@@ -3020,17 +3020,25 @@ class _DesktopShellState extends State<DesktopShell>
     final active = _activeIn(p);
     return Container(
       height: kPaneHeaderHeight,
-      decoration: BoxDecoration(
-        color: AppColors.canvas,
-        border: Border.all(color: AppColors.border2, width: kPaneHairline),
-      ),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: list.length,
-        separatorBuilder: (_, __) => const SizedBox.shrink(),
-        itemBuilder: (_, i) => _paneTabChip(p, list[i], list[i] == active),
-      ),
+      color: AppColors.canvas,
+      child: Stack(fit: StackFit.expand, children: [
+        ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.zero,
+          itemCount: list.length,
+          separatorBuilder: (_, __) => const SizedBox.shrink(),
+          itemBuilder: (_, i) => _paneTabChip(p, list[i], list[i] == active),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.fg4, width: kPaneHairline),
+              ),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 
@@ -3173,7 +3181,7 @@ class _DesktopShellState extends State<DesktopShell>
           decoration: BoxDecoration(
             color: AppColors.canvas,
             border: Border(
-              right: BorderSide(color: AppColors.border2, width: kPaneHairline),
+              right: BorderSide(color: AppColors.fg4, width: kPaneHairline),
               top: active
                   ? BorderSide(color: AppColors.fg3, width: kPaneActiveStroke)
                   : BorderSide.none,

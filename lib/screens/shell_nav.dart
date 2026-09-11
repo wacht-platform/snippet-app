@@ -333,17 +333,25 @@ class PaneTabStrip extends StatelessWidget {
     Theme.of(context);
     return Container(
       height: kPaneHeaderHeight,
-      decoration: BoxDecoration(
-        color: AppColors.canvas,
-        border: Border.all(color: AppColors.border2, width: kPaneHairline),
-      ),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: tabs.length,
-        separatorBuilder: (_, __) => const SizedBox.shrink(),
-        itemBuilder: (_, i) => _tab(i),
-      ),
+      color: AppColors.canvas,
+      child: Stack(fit: StackFit.expand, children: [
+        ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.zero,
+          itemCount: tabs.length,
+          separatorBuilder: (_, __) => const SizedBox.shrink(),
+          itemBuilder: (_, i) => _tab(i),
+        ),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.fg4, width: kPaneHairline),
+              ),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 
@@ -364,8 +372,7 @@ class PaneTabStrip extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.canvas,
               border: Border(
-                right:
-                    BorderSide(color: AppColors.border2, width: kPaneHairline),
+                right: BorderSide(color: AppColors.fg4, width: kPaneHairline),
                 top: active
                     ? BorderSide(color: AppColors.fg3, width: kPaneActiveStroke)
                     : BorderSide.none,
