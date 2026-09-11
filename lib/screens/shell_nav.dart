@@ -91,19 +91,22 @@ class SessionStateIcon extends StatefulWidget {
 
 class _SessionStateIconState extends State<SessionStateIcon>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1150),
-  );
+  // Assigned in initState, NOT as a `late final` initialiser. A lazy
+  // initialiser runs on FIRST ACCESS, and for an idle session nothing touches
+  // `_c` until `dispose()` — which would then construct a controller on an
+  // already-unmounting element. Every idle row would hit that path.
+  late final AnimationController _c;
 
   bool get _shouldPulse => widget.animate && sessionIsActive(widget.status);
 
   @override
   void initState() {
     super.initState();
-    // Start once the controller exists, and only when actually working.
-    // `late final` would otherwise construct the controller on FIRST ACCESS —
-    // which can be `dispose()` on an unmounting element.
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1150),
+    );
+    // Start only when actually working; an idle icon needs no ticker.
     if (_shouldPulse) _c.repeat(reverse: true);
   }
 
