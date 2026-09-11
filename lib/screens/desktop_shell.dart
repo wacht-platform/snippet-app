@@ -4162,48 +4162,11 @@ class _SidebarState extends State<_Sidebar> {
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Chats home: a labelled machine identity, then one simple
-                  // chronological list. The phone has no hidden desktop drawer
-                  // state or folder hierarchy to decode.
-                  _mobileMachineRow(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 16, 8),
-                    child: _selecting
-                        ? Row(children: [
-                            Text('${_selected.length} selected',
-                                style: sans(17,
-                                    weight: W.label, color: AppColors.fg1)),
-                            const Spacer(),
-                            IconBtn('x',
-                                size: M.minTarget,
-                                iconSize: 18,
-                                tooltip: 'Cancel',
-                                onTap: _exitSelect),
-                            IconBtn('trash',
-                                size: M.minTarget,
-                                iconSize: 17,
-                                tooltip: 'Delete selected',
-                                onTap: _selected.isEmpty
-                                    ? null
-                                    : _confirmDeleteSelected),
-                          ])
-                        : Row(children: [
-                            Text('Chats',
-                                style: sans(20,
-                                    weight: W.label, color: AppColors.fg1)),
-                            const Spacer(),
-                            IconBtn('sliders',
-                                size: M.minTarget,
-                                iconSize: 20,
-                                tooltip: 'Filter chats',
-                                onTap: _showFilterSheet),
-                            IconBtn('plus',
-                                size: M.minTarget,
-                                iconSize: 21,
-                                tooltip: 'New chat',
-                                onTap: hasClient ? widget.onNewSession : null),
-                          ]),
-                  ),
+                  // A phone home needs one reading order: destination, machine
+                  // context, search, then the chronological list. The earlier
+                  // machine card + header + bottom toolbar gave every control
+                  // equal priority and made the first action unclear.
+                  _mobileHomeHeader(hasClient),
                   if (hasClient && !_selecting) _stickyMissionControl(),
                   Expanded(
                     child: !hasClient
@@ -4217,8 +4180,9 @@ class _SidebarState extends State<_Sidebar> {
                   ),
                 ]),
           ),
-          // Bottom actions row: search + folder + settings + machine avatar.
-          _mobileBottomBar(),
+          // The Chats header owns search, machine switching, creation, and
+          // settings; another bottom toolbar would split those decisions across
+          // both ends of the phone.
         ],
         if (!kMobile) ...[
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
@@ -4303,117 +4267,113 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
-  /// Phone home owns machine identity. Keeping it as a labelled full-width row
-  /// makes connection state discoverable instead of hiding it behind an avatar.
-  Widget _mobileMachineRow() {
-    final a = widget.active;
-    final online = a == null ? null : widget.health[a.url];
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
-        child: Container(
-          height: 56,
-          margin: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.floor,
-            borderRadius: BorderRadius.circular(R.md),
-          ),
-          child: Row(children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.sm),
-              ),
-              child: a == null
-                  ? AppIcon('plus', size: 17, color: AppColors.fg2)
-                  : Text(
-                      (a.label.isEmpty ? '?' : a.label[0]).toUpperCase(),
-                      style: sans(13, weight: W.label, color: AppColors.fg1),
-                    ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: a == null
-                  ? Text('Add machine', style: sans(14, color: AppColors.fg1))
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(a.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(14,
-                                weight: W.label, color: AppColors.fg1)),
-                        const SizedBox(height: 2),
-                        Text(hostOf(a.url),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: mono(10.5, color: AppColors.fg4)),
-                      ],
-                    ),
-            ),
-            if (online != null)
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: online ? AppColors.ok : AppColors.fg4,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            const SizedBox(width: 10),
-            AppIcon('chevron-right', size: 17, color: AppColors.fg4),
+  /// The one phone-home hierarchy: destination, connection context, discovery,
+  /// then the chat list. Keeping the actions together makes the next step
+  /// obvious instead of splitting navigation across a top card and bottom bar.
+  Widget _mobileHomeHeader(bool hasClient) {
+    final machine = widget.active;
+    final online = machine == null ? null : widget.health[machine.url];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_selecting)
+          Row(children: [
+            Text('${_selected.length} selected',
+                style: sans(17, weight: W.label, color: AppColors.fg1)),
+            const Spacer(),
+            IconBtn('x',
+                size: M.minTarget,
+                iconSize: 18,
+                tooltip: 'Cancel',
+                onTap: _exitSelect),
+            IconBtn('trash',
+                size: M.minTarget,
+                iconSize: 17,
+                tooltip: 'Delete selected',
+                onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
+          ])
+        else ...[
+          Row(children: [
+            Text('Chats',
+                style: sans(22, weight: W.label, color: AppColors.fg1)),
+            const Spacer(),
+            IconBtn('plus',
+                size: M.minTarget,
+                iconSize: 21,
+                tooltip: 'New chat',
+                onTap: hasClient ? widget.onNewSession : null),
+            IconBtn('settings',
+                size: M.minTarget,
+                iconSize: 19,
+                tooltip: 'Settings',
+                onTap: hasClient ? _openSettings : null),
           ]),
-        ),
-      ),
-    );
-  }
-
-  /// Bottom bar on mobile: search plus the app-level settings route.
-  Widget _mobileBottomBar() {
-    final hasClient = widget.client != null;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20,
-          8,
-          20,
-          10 +
-              MediaQuery.of(context)
-                  .padding
-                  .bottom), // safe-area-ish bottom padding
-      // No hairline: the bar sits on its own surface step.
-      decoration: BoxDecoration(color: AppColors.bg),
-      child: Row(children: [
-        // Search pill.
-        Expanded(
-          child: GestureDetector(
-            onTap: hasClient ? _openSearch : null,
-            child: Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: AppColors.surface3,
-                borderRadius: BorderRadius.circular(R.sm),
+          const SizedBox(height: 6),
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(R.sm),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(R.sm),
+              onTap: widget.instances.isEmpty
+                  ? widget.onAddInstance
+                  : _openMachines,
+              child: SizedBox(
+                height: 36,
+                child: Row(children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: online == true ? AppColors.ok : AppColors.fg4,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      machine == null ? 'Add machine' : machine.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13, color: AppColors.fg3),
+                    ),
+                  ),
+                  Text(machine == null ? '' : hostOf(machine.url),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(10, color: AppColors.fg4)),
+                  const SizedBox(width: 6),
+                  AppIcon('chevron-down', size: 14, color: AppColors.fg4),
+                ]),
               ),
-              child: Row(children: [
-                AppIcon('search', size: 16, color: AppColors.fg4),
-                const SizedBox(width: 8),
-                Text('Search…', style: sans(13.5, color: AppColors.fg4)),
-              ]),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        IconBtn('settings',
-            size: M.minTarget,
-            iconSize: 20,
-            tooltip: 'Settings',
-            onTap: hasClient ? _openSettings : null),
+          const SizedBox(height: 6),
+          Material(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(R.md),
+              onTap: hasClient ? _openSearch : null,
+              child: Container(
+                height: M.minTarget,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(children: [
+                  AppIcon('search', size: 18, color: AppColors.fg4),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text('Search chats',
+                        style: sans(13.5, color: AppColors.fg4)),
+                  ),
+                  IconBtn('sliders',
+                      size: 36,
+                      iconSize: 17,
+                      tooltip: 'Filter chats',
+                      onTap: _showFilterSheet),
+                ]),
+              ),
+            ),
+          ),
+        ],
       ]),
     );
   }

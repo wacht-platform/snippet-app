@@ -2379,13 +2379,15 @@ class _SessionScreenState extends State<SessionScreen>
   Widget _mobileHeader(HarnessState? s, bool running, bool waiting) {
     final compacting = s?.compacting ?? false;
     final statusWord = compacting
-        ? 'Compacting history…'
-        : (waiting ? 'Needs input' : (running ? 'Running' : 'Idle'));
-    // Keep the model selector in the composer, where it is always visible.
-    final facts = <String>[statusWord];
+        ? 'Compacting history'
+        : (waiting ? 'Needs input' : (running ? 'Working' : 'Ready'));
+    final statusColor = compacting || waiting
+        ? AppColors.accent
+        : (running ? AppColors.run : AppColors.fg4);
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
-      decoration: BoxDecoration(color: readingBg),
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      color: AppColors.bg,
       child: Row(children: [
         if (widget.onMenu != null)
           IconBtn('chevron-left',
@@ -2394,35 +2396,44 @@ class _SessionScreenState extends State<SessionScreen>
               tooltip: 'Chats',
               onTap: widget.onMenu),
         Expanded(
-          child: InkWell(
-            onTap: () => _openActions(s),
-            borderRadius: BorderRadius.circular(R.sm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_title.isEmpty ? 'session' : _title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(17, weight: W.label, color: AppColors.fg1)),
-                    const SizedBox(height: 3),
-                    Text(facts.join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(12, color: AppColors.fg3)),
-                  ]),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_title.isEmpty ? 'Session' : _title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(16, weight: W.label, color: AppColors.fg1)),
+                const SizedBox(height: 3),
+                Row(children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(statusWord, style: sans(11.5, color: AppColors.fg3)),
+                ]),
+              ],
             ),
           ),
         ),
         if (running)
           IconBtn('stop',
-              tooltip: 'Stop', onTap: () => _send({'kind': 'interrupt'})),
-        if (_isMissionControl)
-          IconBtn('layers', tooltip: 'Tasks', onTap: _showTasks),
-        if (!_isMissionControl)
-          IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
+              size: M.minTarget,
+              iconSize: 18,
+              tooltip: 'Stop',
+              onTap: () => _send({'kind': 'interrupt'})),
+        IconBtn('more-vertical',
+            size: M.minTarget,
+            iconSize: 19,
+            tooltip: 'Session actions',
+            onTap: () => _openActions(s)),
       ]),
     );
   }
