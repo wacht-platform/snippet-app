@@ -3199,9 +3199,11 @@ class _DesktopShellState extends State<DesktopShell>
             color: AppColors.canvas,
             border: Border(
               right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
+              // Every tab is bounded on top, so the pane has a real top edge;
+              // the active tab simply makes its own segment heavier.
               top: active
                   ? BorderSide(color: AppColors.fg1, width: kPaneActiveStroke)
-                  : BorderSide.none,
+                  : BorderSide(color: kPaneSeamColor, width: kPaneHairline),
             ),
           ),
           child: Row(children: [
@@ -3290,6 +3292,20 @@ class _DesktopShellState extends State<DesktopShell>
                   left: 0,
                   right: 0,
                   top: kPaneHeaderHeight - kPaneHairline,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: kPaneHairline,
+                      color: kPaneSeamColor,
+                    ),
+                  ),
+                ),
+              // …and carry the strips' top edge across too: without this the two
+              // panes are each bounded on top but leave a gap between them.
+              if (joinBaseline)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
                   child: IgnorePointer(
                     child: Container(
                       height: kPaneHairline,

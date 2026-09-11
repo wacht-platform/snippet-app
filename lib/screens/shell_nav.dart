@@ -288,11 +288,12 @@ class ShellNavRow extends StatelessWidget {
 /// Header height for a pane. Measured 36px in the reference.
 const double kPaneHeaderHeight = 36;
 
-/// A framed tab sits in the full strip band. The active state is a solid white
-/// top edge; passive seams are a near-background white hairline.
+/// A framed tab sits in the full strip band. Every tab carries the same hairline
+/// top seam, so a pane is bounded on top; the active tab additionally overlays a
+/// heavier white stroke on its own segment.
 const double kPaneTabHeight = kPaneHeaderHeight;
 const double kPaneHairline = 0.2;
-const double kPaneActiveStroke = 1.0;
+const double kPaneActiveStroke = 2.0;
 
 /// Hit width of the pane split handle. The visible line is one hairline at the
 /// centre; this is only the grab zone around it.
@@ -400,9 +401,11 @@ class PaneTabStrip extends StatelessWidget {
               color: AppColors.canvas,
               border: Border(
                 right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
+                // Every tab is bounded on top, so the pane has a real top edge;
+                // the active tab simply makes its own segment heavier.
                 top: active
                     ? BorderSide(color: AppColors.fg1, width: kPaneActiveStroke)
-                    : BorderSide.none,
+                    : BorderSide(color: kPaneSeamColor, width: kPaneHairline),
               ),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
