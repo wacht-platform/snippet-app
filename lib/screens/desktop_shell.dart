@@ -366,18 +366,10 @@ class _DesktopShellState extends State<DesktopShell>
     final tab = _activeTab;
     final mc = tab?.isMissionControl ?? false;
     final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
-    final manual = (s?.approvalMode ?? 'auto') == 'manual';
     final goalRunning = s?.goal?.ongoing ?? false;
     final lanes = s?.lanes.where((l) => l.running).length ?? 0;
 
     return [
-      _railTool('shield',
-          tooltip: manual ? 'Approval: ask' : 'Approval: auto',
-          active: manual,
-          onTap: tab == null
-              ? null
-              : () => _dispatchSessionAction(
-                  manual ? 'approval_auto' : 'approval_ask')),
       Builder(
         builder: (ctx) => _railTool('goal',
             tooltip: goalRunning ? 'Cancel goal' : 'Set goal',

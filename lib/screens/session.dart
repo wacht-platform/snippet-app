@@ -3110,19 +3110,11 @@ class _SessionScreenState extends State<SessionScreen>
           label: lastPathSegment(s.workspace, ifEmpty: s.workspace)));
     }
     if (s != null) {
-      if (s.contextWindow > 0 && s.lastPromptTokens > 0) {
-        chips.add(_StatMeta(
-            icon: 'activity',
-            label:
-                '${(s.lastPromptTokens / s.contextWindow * 100).clamp(0, 999).round()}% ctx'));
-      }
       if (s.totalTokens > 0) {
         chips.add(_StatMeta(icon: 'zap', label: '${fmtSi(s.totalTokens)} tok'));
       }
-      chips.add(_StatMeta(
-          icon: 'shield',
-          label: s.approvalMode == 'auto' ? 'Auto-approve' : 'Ask',
-          tone: s.approvalMode == 'auto' ? 'accent' : 'default'));
+      // Approval mode and context remaining now live in the composer, so they
+      // are deliberately NOT repeated here.
       // Show for any provider that reported limits.
       final rp = s.ratePrimary;
       if (rp != null) {
@@ -3227,6 +3219,125 @@ class _SessionScreenState extends State<SessionScreen>
     await _ingest(files);
   }
 
+  /// Approval mode as shown in the composer.
+  ///
+  /// The daemon models exactly two modes (`auto` / `manual`), so the pill names
+  /// those rather than inventing a third the backend cannot honor.
+  String get _approvalLabel => (_state?.approvalMode ?? 'auto') == 'manual'
+      ? 'Ask first'
+      : 'Auto-approve';
+
+  /// Context still free, as a whole percent of the model's window. Null until
+  /// the daemon has reported both a window size and a prompt size.
+  int? get _contextLeftPct {
+    final s = _state;
+    if (s == null || s.contextWindow <= 0 || s.lastPromptTokens <= 0)
+      return null;
+    final used = s.lastPromptTokens / s.contextWindow;
+    return (100 - used * 100).clamp(0, 100).round();
+  }
+
+  /// One composer footer control: icon + label + disclosure chevron.
+  Widget _composerChip({
+    required String icon,
+    required String label,
+    required VoidCallback onTap,
+  }) =>
+      Material(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon(icon, size: 13, color: AppColors.fg3),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: sans(11.5, weight: W.label, color: AppColors.fg2)),
+              const SizedBox(width: 5),
+              AppIcon('chevron-down', size: 12, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+      );
+
+  /// The composer's status line: where this session runs, and how much context
+  /// is left. Sits under the card so the transcript keeps the full width.
+  Widget _composerMeta(HarnessState? s) {
+    final left = _contextLeftPct;
+    final ws = s?.workspace ?? '';
+    final name = ws.isEmpty ? '' : lastPathSegment(ws, ifEmpty: ws);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 2, right: 2),
+      child: Row(children: [
+        if (name.isNotEmpty) ...[
+          AppIcon('folder', size: 11, color: AppColors.fg4),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(11, color: AppColors.fg4)),
+          ),
+        ],
+        const Spacer(),
+        if (left != null)
+          Text('$left% context left', style: sans(11, color: AppColors.fg4)),
+      ]),
+    );
+  }
+
+  /// Approval picker, anchored under its composer chip.
+  Future<void> _switchApproval([BuildContext? anchor]) async {
+    final current = _state?.approvalMode ?? 'auto';
+    final box = (anchor ?? context).findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    RelativeRect position;
+    if (box != null && overlay != null) {
+      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+      final menuW = math.min(300.0, overlay.size.width - 24);
+      final left = origin.dx.clamp(12.0, overlay.size.width - menuW - 12);
+      position = RelativeRect.fromLTRB(
+        left,
+        origin.dy - 8,
+        overlay.size.width - left - menuW,
+        overlay.size.height - origin.dy + 8,
+      );
+    } else {
+      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+    }
+    final picked = await showMenu<String>(
+      context: context,
+      position: position,
+      color: AppColors.surface1,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      shape: appMenuShape,
+      constraints: const BoxConstraints(minWidth: 260, maxWidth: 320),
+      items: [
+        appMenuRow(
+          value: 'auto',
+          icon: 'zap',
+          label: 'Auto-approve',
+          description: 'Run shell and file edits without asking',
+          selected: current != 'manual',
+        ),
+        appMenuRow(
+          value: 'manual',
+          icon: 'shield',
+          label: 'Ask first',
+          description: 'Pause for approval on each change',
+          selected: current == 'manual',
+        ),
+      ],
+    );
+    if (picked == null || picked == current) return;
+    _setApproval(picked == 'manual');
+  }
+
   Widget _inputBar(bool running) {
     final mq = MediaQuery.of(context);
     final keyboard = mq.viewInsets.bottom;
@@ -3250,12 +3361,12 @@ class _SessionScreenState extends State<SessionScreen>
               if (_isRecording || _recordingPath != null) _recordingPanel(),
               Container(
                 decoration: BoxDecoration(
-                  // The composer sits on the near-black canvas (#010101), so a
-                  // plain `bg` (#171717) fill is already a visible plane. The
-                  // reference draws no border here and uses an 8px radius —
-                  // the surface step is the whole separation.
-                  color: AppColors.bg,
+                  // A lifted surface with a hairline edge, matching the composer
+                  // in the reference: the card reads as one control group rather
+                  // than a field floating on the canvas.
+                  color: AppColors.surface1,
                   borderRadius: BorderRadius.circular(R.md),
+                  border: Border.all(color: AppColors.border),
                 ),
                 // 12 all round, matching the reference's card inset. The card
                 // owns the inset and the rows sit inside it, so there is no
@@ -3346,38 +3457,21 @@ class _SessionScreenState extends State<SessionScreen>
                               ),
                             ),
                             const SizedBox(width: 4),
+                            // Approval mode lives here now instead of the tool
+                            // band, so the setting sits next to what it governs.
+                            Builder(
+                              builder: (ctx) => _composerChip(
+                                icon: 'shield',
+                                label: _approvalLabel,
+                                onTap: () => _switchApproval(ctx),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             Builder(builder: (chipCtx) {
-                              return Material(
-                                color: AppColors.surface2,
-                                // Measured chip: 22px tall, 4px radius, 4px
-                                // horizontal inset, gaps 8/8. The DOM exposes
-                                // icon BOXES (14/16), not glyph sizes, so the
-                                // icon sizes below are approximations of that
-                                // box rather than an equality.
-                                borderRadius: BorderRadius.circular(R.xs),
-                                child: InkWell(
-                                  onTap: () => _switchModel(chipCtx),
-                                  borderRadius: BorderRadius.circular(R.xs),
-                                  child: Container(
-                                    height: 22,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 4),
-                                    child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          AppIcon('sparkles',
-                                              size: 13, color: AppColors.fg2),
-                                          const SizedBox(width: 8),
-                                          Text(_modelLabel ?? 'Auto',
-                                              style: sans(11.5,
-                                                  weight: W.label,
-                                                  color: AppColors.fg2)),
-                                          const SizedBox(width: 8),
-                                          AppIcon('chevron-down',
-                                              size: 12, color: AppColors.fg4),
-                                        ]),
-                                  ),
-                                ),
+                              return _composerChip(
+                                icon: 'sparkles',
+                                label: _modelLabel ?? 'Auto',
+                                onTap: () => _switchModel(chipCtx),
                               );
                             }),
                             const Spacer(),
@@ -3417,6 +3511,7 @@ class _SessionScreenState extends State<SessionScreen>
                           ]),
                     ]),
               ),
+              _composerMeta(_state),
             ]),
       ),
     );
@@ -3913,41 +4008,17 @@ class _SessionScreenState extends State<SessionScreen>
       color: AppColors.surface1,
       elevation: 0,
       shadowColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(R.sm),
-      ),
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
+      shape: appMenuShape,
+      constraints: const BoxConstraints(minWidth: 260, maxWidth: 340),
       items: [
+        appMenuHeading<String>('Model'),
         for (final p in cfg.profiles)
-          PopupMenuItem<String>(
+          appMenuRow<String>(
             value: p.name,
-            height: 48,
-            child: Row(children: [
-              AppIcon('sparkles',
-                  size: 14,
-                  color: p.name == current ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(p.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13,
-                            weight: W.label,
-                            color: p.name == current
-                                ? AppColors.accent
-                                : AppColors.fg1)),
-                    Text('${p.provider} · ${p.model}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg4)),
-                  ],
-                ),
-              ),
-            ]),
+            icon: 'sparkles',
+            label: p.name,
+            description: '${p.provider} · ${p.model}',
+            selected: p.name == current,
           ),
       ],
     );

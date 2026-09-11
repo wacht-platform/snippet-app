@@ -51,6 +51,64 @@ PopupMenuItem<T> appMenuItem<T>({
   );
 }
 
+/// A richer popover row: icon, title, optional one-line description, and a
+/// trailing check when selected. Used by the composer's approval and provider
+/// menus, where the choice needs explaining rather than just naming.
+PopupMenuItem<T> appMenuRow<T>({
+  required T value,
+  required String icon,
+  required String label,
+  String? description,
+  String? trailing,
+  bool selected = false,
+  double height = 54,
+}) {
+  return PopupMenuItem<T>(
+    value: value,
+    height: height,
+    padding: const EdgeInsets.symmetric(horizontal: 12),
+    child: Row(children: [
+      AppIcon(icon, size: 15, color: selected ? AppColors.fg1 : AppColors.fg3),
+      const SizedBox(width: 11),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(13, weight: W.label, color: AppColors.fg1)),
+            if (description != null)
+              Text(description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(11.5, color: AppColors.fg4)),
+          ],
+        ),
+      ),
+      if (trailing != null) ...[
+        const SizedBox(width: 8),
+        Text(trailing, style: sans(11.5, color: AppColors.fg4)),
+      ],
+      if (selected) ...[
+        const SizedBox(width: 8),
+        AppIcon('check', size: 15, color: AppColors.fg1),
+      ],
+    ]),
+  );
+}
+
+/// A menu title placed above a group of rows (showMenu takes these as disabled
+/// items, which is the only way to put non-selectable text in a popup menu).
+PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
+      enabled: false,
+      height: 34,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      child: Text(label.toUpperCase(),
+          style: sans(10, weight: W.label, color: AppColors.fg4)),
+    );
+
 /// A slick, theme-styled toast rendered in the ROOT overlay — so it floats above
 /// panels/dialogs instead of a SnackBar buried behind a modal backdrop. A new one
 /// replaces the previous (no stacking). Use for transient feedback.
