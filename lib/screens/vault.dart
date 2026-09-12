@@ -35,6 +35,9 @@ class _VaultScreenState extends State<VaultScreen> {
   bool _loading = true;
   String? _error;
 
+  /// Desktop only: the inline add form is open in the list.
+  bool _adding = false;
+
   @override
   void initState() {
     super.initState();
@@ -59,20 +62,44 @@ class _VaultScreenState extends State<VaultScreen> {
     }
   }
 
-  /// Add a secret. The sheet owns validation, so a mistake keeps the form OPEN
-  /// with the text intact — the previous flow closed first and then toasted
-  /// "Name and value are required", losing everything the user had typed.
+  /// Add a secret.
+  ///
+  /// DESKTOP opens an INLINE form in the list instead of a sheet. The vault is
+  /// itself a pane inside the Settings dialog, so a modal on top produced a
+  /// dialog-on-dialog — two stacked surfaces for one field pair, and the
+  /// backdrop dimmed the very list you were adding to.
+  ///
+  /// MOBILE keeps the sheet: a form inline in a phone list fights the scroll
+  /// and the keyboard, and `showAppSheet` already handles the insets.
   Future<void> _add() async {
+    if (_adding) return;
+    if (!kMobile) {
+      setState(() => _adding = true);
+      return;
+    }
     final name = await showAppSheet<String>(
       context,
       title: 'Add secret',
-      child: _AddSecretSheet(client: widget.client),
+      child: Builder(
+        builder: (sheetCtx) => _AddSecretForm(
+          client: widget.client,
+          onSaved: (n) => Navigator.pop(sheetCtx, n),
+          onCancel: () => Navigator.pop(sheetCtx),
+        ),
+      ),
     );
     if (name == null || !mounted) return;
+    _afterAdded(name);
+  }
+
+  /// Reflect a newly saved secret in the list.
+  void _afterAdded(String name) {
+    if (!mounted) return;
     setState(() {
       _names ??= [];
       if (!_names!.contains(name)) _names!.add(name);
       _names!.sort();
+      _adding = false;
     });
   }
 
@@ -151,9 +178,25 @@ class _VaultScreenState extends State<VaultScreen> {
             else ...[
               for (final n in names) _secretRow(n),
             ],
+            // Desktop: the form is a ROW IN THE SAME CARD, so it reads as part
+            // of the list rather than a surface floating over it.
+            if (_adding)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: _AddSecretForm(
+                  client: widget.client,
+                  inline: true,
+                  onSaved: _afterAdded,
+                  onCancel: () => setState(() => _adding = false),
+                ),
+              ),
           ]),
-          const SizedBox(height: 12),
-          _addRow(),
+          // The add row hides while the form is open: two ways to do the same
+          // thing at once is what makes a form feel unanchored.
+          if (!_adding) ...[
+            const SizedBox(height: 12),
+            _addRow(),
+          ],
         ],
       );
       body = widget.embedded || kMobile
@@ -295,18 +338,36 @@ class _VaultScreenState extends State<VaultScreen> {
 
 /// The add-secret form.
 ///
-/// A real form rather than a fire-and-forget sheet: it validates BEFORE closing,
-/// shows the reason inline, and only pops once the daemon has accepted the
-/// value. The previous flow popped first and toasted afterwards, so a mistyped
-/// entry lost both fields.
-class _AddSecretSheet extends StatefulWidget {
+/// HOST-AGNOSTIC: it reports success and cancellation through callbacks instead
+/// of calling `Navigator.pop` itself. That is what lets the SAME form serve the
+/// phone sheet and the desktop inline card — popping from inside would have
+/// forced a modal on desktop, where the vault already lives inside the Settings
+/// dialog, so a sheet on top read as a dialog on a dialog.
+///
+/// It validates BEFORE reporting success, shows the reason inline, and only
+/// calls [onSaved] once the daemon has accepted the value. An earlier version
+/// popped first and toasted afterwards, so a mistyped entry lost both fields.
+class _AddSecretForm extends StatefulWidget {
   final DaemonClient client;
-  const _AddSecretSheet({required this.client});
+  final ValueChanged<String> onSaved;
+  final VoidCallback onCancel;
+
+  /// Inline (desktop card) tightens the gaps and drops the second helper line,
+  /// which would otherwise double the height of each field in a list row.
+  final bool inline;
+
+  const _AddSecretForm({
+    required this.client,
+    required this.onSaved,
+    required this.onCancel,
+    this.inline = false,
+  });
+
   @override
-  State<_AddSecretSheet> createState() => _AddSecretSheetState();
+  State<_AddSecretForm> createState() => _AddSecretFormState();
 }
 
-class _AddSecretSheetState extends State<_AddSecretSheet> {
+class _AddSecretFormState extends State<_AddSecretForm> {
   final _name = TextEditingController();
   final _value = TextEditingController();
   String? _error;
@@ -337,7 +398,7 @@ class _AddSecretSheetState extends State<_AddSecretSheet> {
     });
     try {
       await widget.client.vaultSet(n, v);
-      if (mounted) Navigator.pop(context, n);
+      if (mounted) widget.onSaved(n);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -350,6 +411,7 @@ class _AddSecretSheetState extends State<_AddSecretSheet> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final gap = widget.inline ? 10.0 : 14.0;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -358,19 +420,23 @@ class _AddSecretSheetState extends State<_AddSecretSheet> {
           label: 'Name',
           controller: _name,
           mono: true,
-          autofocus: !kMobile,
+          autofocus: true,
           hint: 'STRIPE_KEY',
-          helper: 'Upper-case letters, digits and underscores.',
+          helper: widget.inline
+              ? null
+              : 'Upper-case letters, digits and underscores.',
           onSubmitted: (_) => _save(),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: gap),
         AppField(
           label: 'Value',
           controller: _value,
           mono: true,
           obscure: true,
           hint: 'sk_live_…',
-          helper: 'Stored on the daemon. It cannot be read back after saving.',
+          helper: widget.inline
+              ? null
+              : 'Stored on the daemon. It cannot be read back after saving.',
           onSubmitted: (_) => _save(),
         ),
         if (_error != null) ...[
@@ -384,13 +450,13 @@ class _AddSecretSheetState extends State<_AddSecretSheet> {
             ),
           ]),
         ],
-        const SizedBox(height: 18),
+        SizedBox(height: widget.inline ? 14 : 18),
         Row(children: [
           Expanded(
             child: Btn('Cancel',
                 variant: BtnVariant.ghost,
                 full: true,
-                onTap: _busy ? null : () => Navigator.pop(context)),
+                onTap: _busy ? null : widget.onCancel),
           ),
           const SizedBox(width: 8),
           Expanded(
