@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hugeicons/hugeicons.dart';
 
 import 'package:snippet/api.dart';
 import 'package:snippet/models.dart';
@@ -84,7 +85,8 @@ void main() {
     });
   });
 
-  testWidgets('the + action opens the shared create-agent form', (tester) async {
+  testWidgets('the + action opens the shared create-agent form',
+      (tester) async {
     await asDesktop(() async {
       await pumpPanel(tester);
 
@@ -125,16 +127,28 @@ void main() {
       await pumpPanel(tester);
 
       // The glyphs do not share a fill: at size 16 the circular arrow inks about
-      // 40% more than a plus, so it read as oversized beside it. The correction
-      // is applied inside ShellSectionAction so it cannot drift per call site.
-      final icons = tester.widgetList<AppIcon>(find.byType(AppIcon)).toList();
-      final refresh = icons.firstWhere((i) => i.name == 'refresh');
-      final plus = icons.firstWhere((i) => i.name == 'plus');
+      // 40% more than a plus, so it read as oversized beside it. Measure the
+      // actual ink (`HugeIcon.size`), not the widget's declared size — the
+      // correction is deliberately applied to the ink so layout is unaffected.
+      double inkOf(String name) {
+        final huge = find.descendant(
+          of: find.byWidgetPredicate((w) => w is AppIcon && w.name == name),
+          matching: find.byType(HugeIcon),
+        );
+        return tester.widget<HugeIcon>(huge.first).size!;
+      }
 
-      expect(refresh.size, plus.size,
-          reason: 'both are the 16px spec; only the INK should differ');
-      expect(refresh.visualScale, lessThan(plus.visualScale),
+      final refreshInk = inkOf('refresh');
+      final plusInk = inkOf('plus');
+
+      expect(refreshInk, lessThan(plusInk),
           reason: 'the heavier glyph must be scaled down, not the other up');
+      // Both keep the same BOX, so the row's layout cannot shift.
+      final plusBox = tester.getSize(
+          find.byWidgetPredicate((w) => w is AppIcon && w.name == 'plus'));
+      final refreshBox = tester.getSize(
+          find.byWidgetPredicate((w) => w is AppIcon && w.name == 'refresh'));
+      expect(refreshBox, plusBox);
     });
   });
 }

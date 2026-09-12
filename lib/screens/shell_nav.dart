@@ -265,21 +265,6 @@ class NavBackRow extends StatelessWidget {
 }
 
 /// Small square icon action used inside a section header's cluster.
-/// Optical ink correction per glyph.
-///
-/// Glyphs are NOT drawn to a common fill. Measured at `size: 16` in this 24px
-/// target: `plus` inks ~10px, `refresh` ~14px — so a circular arrow reads ~40%
-/// heavier standing beside a plus, though both are nominally the same size.
-/// Scaling the INK (not the target) is what makes a row of actions read even.
-///
-/// Kept here, keyed by icon, so every call site gets it automatically: a
-/// per-call parameter is exactly how one header drifts from the next.
-double _glyphScale(String icon) => switch (icon) {
-      // 10/14 — brings the circular arrow down to the plus's ink.
-      'refresh' => 0.72,
-      _ => 1.0,
-    };
-
 class ShellSectionAction extends StatelessWidget {
   const ShellSectionAction({
     super.key,
@@ -312,7 +297,6 @@ class ShellSectionAction extends StatelessWidget {
             child: Center(
               child: AppIcon(icon,
                   size: 16,
-                  visualScale: _glyphScale(icon),
                   color: active
                       ? AppColors.accent
                       : (onTap == null ? AppColors.fg4 : AppColors.fg3)),

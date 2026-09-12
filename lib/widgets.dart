@@ -812,6 +812,11 @@ class AppIcon extends StatelessWidget {
   final String name;
   final double size;
   final Color? color;
+
+  /// Extra correction on top of the per-glyph table.
+  ///
+  /// Rarely needed — [glyphInkScale] already normalises the glyphs whose ink
+  /// differs from the norm — so this is a one-off escape hatch.
   final double visualScale;
   const AppIcon(this.name,
       {super.key, this.size = 18, this.color, this.visualScale = 1.0});
@@ -822,7 +827,9 @@ class AppIcon extends StatelessWidget {
         child: Center(
           child: HugeIcon(
             icon: hugeIconFor(name),
-            size: size * visualScale,
+            // Layout keeps the nominal `size`; only the INK is normalised, so a
+            // corrected glyph still occupies the same box as its neighbours.
+            size: size * visualScale * glyphInkScale(name),
             color: color ?? AppColors.fg2,
           ),
         ),
