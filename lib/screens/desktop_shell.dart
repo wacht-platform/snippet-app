@@ -617,11 +617,15 @@ class _DesktopShellState extends State<DesktopShell>
     // Mission Control keeps its own cluster, inline. It is not a workspace
     // session: it orchestrates, so the authoring trio above (goal, lanes,
     // checkpoints) is meaningless here, and what it DOES have is put out in the
-    // open. A "⋯" that hides four one-tap actions behind a menu was friction,
-    // and it made MC the only session whose controls were not visible.
+    // open. A "⋯" that hides one-tap actions behind a menu was friction, and it
+    // made MC the only session whose controls were not visible.
+    //
+    // Deliberately NOT here: Agents (the device-wide directory is a shell-level
+    // surface, and who is working where is already on the session rows as inline
+    // avatars) and Approval (MC runs its own turn; the mode belongs to a session
+    // whose composer it governs).
     if (mc) {
       final enabled = tab != null;
-      final manual = (s?.approvalMode ?? 'auto') == 'manual';
       return [
         // A PANE readout rather than a pushed screen — the board can stay open
         // beside the conversation, like Lanes and Checkpoints do for an
@@ -630,14 +634,6 @@ class _DesktopShellState extends State<DesktopShell>
             tooltip: 'Tasks',
             active: _rightPanelActive(_RightPanel.tasks),
             onTap: enabled ? () => _toggleRightPanel(_RightPanel.tasks) : null),
-        _railTool('users',
-            tooltip: 'Agents',
-            onTap: enabled ? () => _dispatchSessionAction('agents') : null),
-        // One toggle, not two menu rows: the icon shows the current mode.
-        _railTool('shield',
-            tooltip: manual ? 'Approval: Ask' : 'Approval: Auto',
-            active: manual,
-            onTap: enabled ? () => _dispatchSessionAction('approval') : null),
         _railTool('minimize',
             tooltip: 'Compact history',
             onTap: enabled ? () => _dispatchSessionAction('compact') : null),

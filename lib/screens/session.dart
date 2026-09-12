@@ -43,7 +43,6 @@ import 'mission_control/mission_control_state.dart'
         parseBoardMessage,
         BoardMessage,
         MissionEnvelope;
-import 'mission_control/coordination_agent_directory.dart';
 import 'mission_control/task_board_screen.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -2829,16 +2828,6 @@ class _SessionScreenState extends State<SessionScreen>
       case 'model':
         _switchModel(context);
         return;
-      case 'approval':
-        final manual = (s?.approvalMode ?? 'auto') == 'manual';
-        _setApproval(!manual);
-        return;
-      case 'approval_ask':
-        _setApproval(true);
-        return;
-      case 'approval_auto':
-        _setApproval(false);
-        return;
       case 'goal':
         final text = extra?.trim();
         if (text != null && text.isNotEmpty) {
@@ -2919,15 +2908,6 @@ class _SessionScreenState extends State<SessionScreen>
         return;
       case 'fork':
         _confirmFork(_checkpointById(extra));
-        return;
-      // ---- Mission Control only: the actions the LHS panels do not cover ----
-      case 'agents':
-        // The device-wide agent directory. This is the hub's Agents section,
-        // kept as a standalone screen now that the hub is gone.
-        presentScreen(context,
-            style: PanelStyle.drawer,
-            builder: (_, close) =>
-                CoordinationAgentDirectory(client: widget.client));
         return;
     }
   }
