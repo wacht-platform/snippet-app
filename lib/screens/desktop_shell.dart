@@ -2705,7 +2705,16 @@ class _DesktopShellState extends State<DesktopShell>
     // behind it: a blank screen with nothing owning back.
     final chatsVisible = _mobileChatsOpen || tab == null;
     final shell = Scaffold(
-      backgroundColor: chatsVisible ? AppColors.bg : readingBg,
+      // ALWAYS `bg`, never the reading surface. This Scaffold's own background
+      // is visible only in the status-bar inset strip, because the session below
+      // is `Positioned.fill` inside a `SafeArea` and paints its own `readingBg`
+      // over everything else. Painting it `readingBg` therefore left a canvas
+      // band ABOVE the session header while the header itself is `bg` chrome —
+      // three tones, darkest-lightest-darkest, reading as a stray strip.
+      //
+      // `bg` makes the strip continuous with the header, and matches Chats,
+      // where the panel behind the status bar is `bg` too.
+      backgroundColor: AppColors.bg,
       body: Stack(children: [
         // The session sits UNDERNEATH and stays fully drawn. The Chats panel
         // slides over it and reveals it again on the way out, so there is no
