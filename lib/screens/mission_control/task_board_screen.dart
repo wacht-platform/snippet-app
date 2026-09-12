@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api.dart';
@@ -44,24 +46,50 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
   bool loading = true;
   String? error;
 
-  /// Null shows every column.
-  TaskStatus? filter;
+  /// Auto-refresh cadence. 25s sits inside the 20–30s window the board asked
+  /// for; tune it here.
+  static const _autoRefreshInterval = Duration(seconds: 25);
+
+  Timer? _autoRefreshTimer;
+
+  /// Guards against overlapping fetches: a background tick that lands while a
+  /// request is already in flight is dropped rather than stacked.
+  bool _fetching = false;
+
+  /// Statuses to show. EMPTY means "every column" — the inverse of the old
+  /// single nullable filter, and what makes multi-select work.
+  Set<TaskStatus> filter = {};
 
   @override
   void initState() {
     super.initState();
     refresh();
     widget.refreshSignal?.addListener(refresh);
+    _autoRefreshTimer =
+        Timer.periodic(_autoRefreshInterval, (_) => _load(silent: true));
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
     widget.refreshSignal?.removeListener(refresh);
     super.dispose();
   }
 
-  Future<void> refresh() async {
-    if (mounted) setState(() => loading = tasks.isEmpty);
+  /// User-initiated load: may show the full-screen spinner and may report
+  /// errors. Pull-to-refresh and the first paint both go through here.
+  Future<void> refresh() => _load(silent: false);
+
+  /// Fetch tasks. [silent] is the background/auto-refresh path, and it differs
+  /// from the user-initiated one in three ways that matter:
+  ///  - it never touches [loading], so it cannot blank the list it updates;
+  ///  - it swallows transient failures instead of replacing the board with an
+  ///    error state every 25 seconds;
+  ///  - it bails if a fetch is already running, so ticks cannot stack.
+  Future<void> _load({required bool silent}) async {
+    if (_fetching) return;
+    _fetching = true;
+    if (!silent && mounted) setState(() => loading = tasks.isEmpty);
     try {
       final fetched = await widget.client.tasks();
       if (!mounted) return;
@@ -70,9 +98,12 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
         error = null;
       });
     } catch (e) {
-      if (mounted) setState(() => error = '$e');
+      // Background failures are dropped: a stale-but-visible board beats an
+      // error screen the user never asked for. Only an explicit load reports.
+      if (!silent && mounted) setState(() => error = '$e');
     } finally {
-      if (mounted) setState(() => loading = false);
+      _fetching = false;
+      if (!silent && mounted) setState(() => loading = false);
     }
   }
 
@@ -105,40 +136,76 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
     if (mounted) await refresh();
   }
 
-  List<TaskItem> get _visible =>
-      filter == null ? tasks : tasks.where((t) => t.status == filter).toList();
+  /// Empty [filter] means every column; otherwise only the selected statuses.
+  List<TaskItem> get _visible => filter.isEmpty
+      ? tasks
+      : tasks.where((t) => filter.contains(t.status)).toList();
+
+  /// Counts per column across ALL tasks, so the panel beside a label always
+  /// shows the column's true size rather than the filtered subset.
+  Map<TaskStatus, int> get _counts => {
+        for (final s in TaskStatus.values)
+          s: tasks.where((t) => t.status == s).length,
+      };
+
+  Future<void> _openFilter() async {
+    final picked = await showAppSheet<Set<TaskStatus>>(
+      context,
+      title: 'Filter by status',
+      child: _FilterPanel(selected: filter, counts: _counts),
+    );
+    if (picked != null && mounted) setState(() => filter = {...picked});
+  }
+
+  /// The filter affordance, defined once for both hosts. The standalone route
+  /// puts it in `SnAppBar.actions`; the embedded pane, which has no bar of its
+  /// own, renders it in a slim band so the control is not lost when embedded.
+  ///
+  /// `active` is a surface STEP, not the accent hue: the doc reserves the accent
+  /// for state, and "a filter is applied" is selection, not state.
+  Widget _filterButton() => IconBtn('sliders',
+      // 16px glyph in a 24px slot — the doc's icon relationship.
+      size: kMobile ? M.minTarget : 24,
+      iconSize: 16,
+      active: filter.isNotEmpty,
+      tooltip:
+          filter.isEmpty ? 'Filter' : 'Filter (${filter.length} selected)',
+      onTap: _openFilter);
 
   @override
   Widget build(BuildContext context) {
-    // The chip row belongs to the CHROME plane and the list to the reading
-    // plane, so exactly one surface step separates them and no hairline is
+    // The list belongs to the reading plane; the filter lives in the bar above
+    // it, so exactly one surface step separates the two and no hairline is
     // needed. Painted explicitly rather than inherited: the embedded host is a
     // canvas pane and the standalone route is a bg scaffold, and the two must
     // still read the same.
-    final body = ColoredBox(
-      color: AppColors.bg,
-      child: Column(children: [
-        _FilterBar(
-          filter: filter,
-          counts: {
-            for (final s in TaskStatus.values)
-              s: tasks.where((t) => t.status == s).length,
-          },
-          onSelect: (s) => setState(() => filter = s),
-        ),
-        Expanded(
-          child: ColoredBox(
-            color: AppColors.canvas,
-            child: _content(),
-          ),
-        ),
-      ]),
+    final list = ColoredBox(
+      color: AppColors.canvas,
+      child: _content(),
     );
 
-    if (widget.embedded) return body;
+    if (widget.embedded) {
+      // The pane host draws its own strip, so there is no `SnAppBar` to hang the
+      // filter on. A slim chrome band keeps the control reachable — otherwise
+      // embedding would silently drop the page's only filter affordance.
+      return ColoredBox(
+        color: AppColors.bg,
+        child: Column(children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+              child: _filterButton(),
+            ),
+          ),
+          Expanded(child: list),
+        ]),
+      );
+    }
+
     return Scaffold(
       // bg, not canvas: the notch/status-bar strip sits on the BAR's plane, so
-      // there is no third rung above the chip row.
+      // there is no third rung above the list.
       backgroundColor: AppColors.bg,
       // REQUIRED, not cosmetic: the Material `AppBar` this replaced reserved the
       // status bar's height for us. A bare `Column` started at y=0, so Android's
@@ -156,14 +223,11 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
             background: AppColors.bg,
             bordered: false,
             actions: [
-              IconBtn('refresh',
-                  // 16px glyph in a 24px slot — the doc's icon relationship,
-                  // and the pair the window bar already uses for its actions.
-                  // The glyph never fills its slot.
-                  size: kMobile ? M.minTarget : 24,
-                  iconSize: 16,
-                  tooltip: 'Refresh',
-                  onTap: refresh),
+              // The filter lives IN the bar rather than as a row of pills above
+              // the list: one control that opens a panel replaces the scrolling
+              // chip row entirely. There is deliberately no refresh icon —
+              // pull-to-refresh and the 25s auto-refresh cover it.
+              _filterButton(),
               const SizedBox(width: 6),
               // The action sits IN the bar rather than floating over the list: a
               // Material FAB carried an elevation shadow (the doc has none) and
@@ -176,7 +240,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
               const SizedBox(width: 2),
             ],
           ),
-          Expanded(child: body),
+          Expanded(child: list),
         ]),
       ),
     );
@@ -210,16 +274,24 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
             )
           : _list();
 
+  /// Empty-state title for a filtered board: names the single column when one
+  /// is selected, and counts when several are.
+  String _nothingTitle() {
+    if (filter.length == 1) return 'Nothing in ${filter.first.label}';
+    return 'Nothing in ${filter.length} columns';
+  }
+
   Widget _list() {
     final visible = _visible;
     if (visible.isEmpty) {
       // Two different empties: a board with nothing on it is a prompt to start,
       // a filter with nothing is a prompt to widen. Saying "no tasks" for both
-      // hides which one you are looking at.
+      // hides which one you are looking at. With multi-select the filtered case
+      // has to name zero, one, or several columns.
       return EmptyState(
         icon: 'layers',
-        title: filter == null ? 'No tasks yet' : 'Nothing in ${filter!.label}',
-        body: filter == null
+        title: filter.isEmpty ? 'No tasks yet' : _nothingTitle(),
+        body: filter.isEmpty
             ? 'Create a task and Mission Control picks it up.'
             : 'Try another column, or clear the filter.',
       );
@@ -249,88 +321,126 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
   }
 }
 
-/// Column selector with live counts. The counts are what make the filter
-/// legible: "Blocked 0" reads as good news, where a bare label reads as nothing.
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({
-    required this.filter,
-    required this.counts,
-    required this.onSelect,
-  });
+/// Multi-select status filter, presented as a panel.
+///
+/// Replaces the scrolling chip row: one icon in the bar opens this, and the
+/// categories the row used to scatter are now visible together with their live
+/// counts. Selection is a `Set`, so several columns can be read at once — an
+/// empty set means "every column".
+class _FilterPanel extends StatefulWidget {
+  const _FilterPanel({required this.selected, required this.counts});
 
-  final TaskStatus? filter;
+  final Set<TaskStatus> selected;
   final Map<TaskStatus, int> counts;
-  final ValueChanged<TaskStatus?> onSelect;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        // A chip is a 20px inline token, not a 40px bordered pill.
-        height: 28,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          // The list owns the inset, matching the body's own gutter above.
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          children: [
-            _chip(context,
-                label: 'All',
-                selected: filter == null,
-                onTap: () => onSelect(null)),
-            for (final s in TaskStatus.values)
-              _chip(context,
-                  label: '${s.label} ${counts[s] ?? 0}',
-                  selected: filter == s,
-                  // State stays visible, but as a MARK rather than by tinting
-                  // the label — colour is state here, not decoration.
-                  dot: statusColor(s),
-                  onTap: () => onSelect(filter == s ? null : s)),
-          ],
-        ),
+  State<_FilterPanel> createState() => _FilterPanelState();
+}
+
+class _FilterPanelState extends State<_FilterPanel> {
+  late final Set<TaskStatus> _selected = {...widget.selected};
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // "All" lives INSIDE the panel rather than as a pill beside the
+          // categories. Clearing the set IS selecting every column, so this row
+          // is selected exactly when nothing is filtered.
+          _row(
+            label: 'All statuses',
+            selected: _selected.isEmpty,
+            onTap: () => setState(() => _selected.clear()),
+          ),
+          const SizedBox(height: 2),
+          for (final s in TaskStatus.values)
+            _row(
+              label: s.label,
+              count: widget.counts[s] ?? 0,
+              // State stays visible, but as a MARK rather than by tinting the
+              // label — colour is state here, not decoration.
+              dot: statusColor(s),
+              selected: _selected.contains(s),
+              onTap: () => setState(() {
+                if (!_selected.remove(s)) _selected.add(s);
+              }),
+            ),
+          const SizedBox(height: 14),
+          // Labelled "Apply", not "Done": the panel already has a `Done` status
+          // row, and two identical labels would be ambiguous to both a reader
+          // and a widget test.
+          Btn('Apply',
+              full: true,
+              onTap: () => Navigator.pop<Set<TaskStatus>>(context, _selected)),
+        ],
       );
 
-  Widget _chip(BuildContext context,
-          {required String label,
-          required bool selected,
-          required VoidCallback onTap,
-          Color? dot}) =>
-      Padding(
-        // 4px between chips: these are inline marks, not controls with their
-        // own hit boxes to keep apart.
-        padding: const EdgeInsets.only(right: 4, top: 4, bottom: 4),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(R.chip),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                // Separation by surface STEP, never a hairline. Unselected
-                // sits on the chip step; selecting promotes it one further
-                // rung, so selection reads as "pressed in" rather than tinted.
-                color: selected ? AppColors.surface2 : AppColors.surface3,
-                borderRadius: BorderRadius.circular(R.chip),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                if (dot != null) ...[
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration:
-                        BoxDecoration(color: dot, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                Text(label,
-                    style: sans(12,
-                        weight: selected ? W.label : W.body,
-                        // The normal text ramp for both states. White is
-                        // reserved for the active row and the page title, and
-                        // the per-status hue was decoration, not state.
-                        color: selected ? AppColors.fg1 : AppColors.fg2)),
-              ]),
-            ),
+  Widget _row({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    int? count,
+    Color? dot,
+  }) =>
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(R.md),
+        child: Container(
+          // A phone touch target; compact on desktop.
+          height: kMobile ? M.minTarget : 34,
+          margin: const EdgeInsets.only(bottom: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            // Separation by surface STEP, never a hairline and never the accent
+            // hue — the doc reserves the accent for state, and the selected row
+            // is the ladder's "active row" rung.
+            color: selected ? AppColors.surface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(R.md),
           ),
+          child: Row(children: [
+            // The dot slot is reserved even when there is no dot, so every
+            // label shares one left edge whether or not it carries a mark.
+            SizedBox(
+              width: 6,
+              child: dot == null
+                  ? null
+                  : Container(
+                      width: 6,
+                      height: 6,
+                      decoration:
+                          BoxDecoration(color: dot, shape: BoxShape.circle),
+                    ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13,
+                      weight: selected ? W.label : W.body,
+                      // The normal text ramp: white is the selected/active row,
+                      // and the rest default to the doc's light grey.
+                      color: selected ? AppColors.fg1 : AppColors.fg2)),
+            ),
+            if (count != null) ...[
+              const SizedBox(width: 8),
+              // A count is information, not a placeholder: the muted ramp.
+              Text('$count', style: sans(11, color: AppColors.fg3)),
+            ],
+            // Selection is carried by the surface step AND a mark, so the state
+            // is unambiguous where the step alone is subtle. 16px glyph in a
+            // 24px slot — the doc's icon relationship.
+            SizedBox(
+              width: 24,
+              child: selected
+                  ? const Align(
+                      alignment: Alignment.centerRight,
+                      child: AppIcon('check', size: 16),
+                    )
+                  : null,
+            ),
+          ]),
         ),
       );
 }
