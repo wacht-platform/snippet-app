@@ -82,6 +82,14 @@ class SessionScreen extends StatefulWidget {
   /// (it is the only side holding the pty). See [TerminalHost].
   final void Function(TerminalHost host, bool open)? onTerminalHost;
 
+  /// Desktop: open Scheduled as a right-pane READOUT instead of the drawer.
+  ///
+  /// The shell owns the panes, so a session cannot open one itself. Scheduled
+  /// is a property of the conversation it governs, so it belongs beside the
+  /// chat — the same treatment Tasks, Lanes and Checkpoints get. Null on mobile,
+  /// where there are no panes and the drawer is the right shape for a phone.
+  final VoidCallback? onOpenScheduled;
+
   /// Desktop PageView keeps every tab mounted. Only the visible session should
   /// accept file drops — otherwise every keep-alive DropTarget ingests the same
   /// file and the composer chips leak across tabs.
@@ -117,6 +125,7 @@ class SessionScreen extends StatefulWidget {
       this.onMacStatus,
       this.onMacControls,
       this.onTerminalHost,
+      this.onOpenScheduled,
       this.acceptDrops = true,
       this.inboundShare,
       this.onShareConsumed,
@@ -2800,6 +2809,15 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _openRecurring() {
+    // Desktop: the shell owns the panes and opens this as a right-pane readout,
+    // the same shape Tasks/Lanes/Checkpoints get. A session cannot toggle a pane
+    // itself, so it asks. Null on mobile, where there are no panes and the
+    // drawer is the right shape for a phone.
+    final toPane = widget.onOpenScheduled;
+    if (toPane != null) {
+      toPane();
+      return;
+    }
     presentScreen(context,
         style: PanelStyle.drawer,
         builder: (_, close) => RecurringScreen(
@@ -2889,9 +2907,6 @@ class _SessionScreenState extends State<SessionScreen>
                 client: widget.client,
                 sessionId: widget.sessionId,
                 onClose: close));
-        return;
-      case 'recurring':
-        _openRecurring();
         return;
       case 'compact':
         _confirmCompact();

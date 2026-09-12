@@ -255,6 +255,7 @@ enum _RightPanel {
   none('', ''),
   lanes('Lanes', 'layers'),
   tasks('Tasks', 'layers'),
+  recurring('Scheduled', 'scheduled'),
   checkpoints('Checkpoints', 'history');
 
   const _RightPanel(this.label, this.icon);
@@ -637,9 +638,13 @@ class _DesktopShellState extends State<DesktopShell>
         _railTool('minimize',
             tooltip: 'Compact history',
             onTap: enabled ? () => _dispatchSessionAction('compact') : null),
+        // A pane readout like Tasks — same treatment in every conversation.
         _railTool('scheduled',
             tooltip: 'Scheduled',
-            onTap: enabled ? () => _dispatchSessionAction('recurring') : null),
+            active: _rightPanelActive(_RightPanel.recurring),
+            onTap: enabled
+                ? () => _toggleRightPanel(_RightPanel.recurring)
+                : null),
       ];
     }
 
@@ -666,6 +671,16 @@ class _DesktopShellState extends State<DesktopShell>
           onTap: tab == null
               ? null
               : () => _toggleRightPanel(_RightPanel.checkpoints)),
+      // Scheduled is a property of THIS conversation — the jobs it re-runs — so
+      // it belongs in every session's cluster, not only Mission Control's. It
+      // opens a pane readout rather than the drawer it used to be, so it can
+      // stay beside the chat it governs.
+      _railTool('scheduled',
+          tooltip: 'Scheduled',
+          active: _rightPanelActive(_RightPanel.recurring),
+          onTap: tab == null
+              ? null
+              : () => _toggleRightPanel(_RightPanel.recurring)),
     ];
   }
 
@@ -3148,6 +3163,11 @@ class _DesktopShellState extends State<DesktopShell>
           : null,
       onTerminalHost:
           !kMobile ? (host, open) => _setTerminalHost(t.key, host, open) : null,
+      // Desktop only: Scheduled opens as a right-pane readout. The shell owns
+      // the panes, so the session routes through here; on a phone the callback
+      // is null and the session falls back to its own drawer.
+      onOpenScheduled:
+          !kMobile ? () => _toggleRightPanel(_RightPanel.recurring) : null,
     );
   }
 
@@ -4035,6 +4055,18 @@ class _DesktopShellState extends State<DesktopShell>
       _RightPanel.tasks => _client == null
           ? _emptyPaneHint()
           : TaskBoardScreen(client: _client!, embedded: true),
+      // A PANE readout, not the pushed drawer it used to be: Scheduled belongs
+      // beside the conversation like Lanes and Checkpoints, not over it. The
+      // active session is passed through so a job created here targets the chat
+      // you are looking at — the drawer carried the same context.
+      _RightPanel.recurring => _client == null
+          ? _emptyPaneHint()
+          : RecurringScreen(
+              client: _client!,
+              embedded: true,
+              sessionId: _activeTab?.sessionId,
+              workspace: s?.workspace,
+            ),
       _RightPanel.checkpoints => SessionCheckpointsPanel(
           checkpoints: s?.checkpoints.reversed.toList() ?? const [],
           // Route the action back through the session, so rewinding from the
