@@ -8,6 +8,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
+import 'shell_rail.dart';
 
 /// Nesting step for a tree level.
 ///
@@ -70,13 +71,14 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     }
   }
 
-  /// Search is a POPOVER, not an inline field.
+  /// Search opens as a POPOVER anchored under its button, not a centered dialog.
   ///
-  /// The same floating card the chat search uses, so "search" is one interaction
-  /// everywhere in the shell. An inline field spent a slab of the panel's height
-  /// on something used occasionally and pushed the tree itself down.
-  Future<void> _openFileSearch() => showFileSearchDialog(
+  /// An inline field would spend a slab of the panel's height on something used
+  /// occasionally and push the tree down; a dialog takes over the whole window
+  /// and puts the results nowhere near the control that asked for them.
+  Future<void> _openFileSearch(BuildContext anchor) => showFileSearchDialog(
         context,
+        anchor: anchor,
         client: widget.client,
         root: widget.workspacePath,
         onOpen: widget.onOpenFile,
@@ -166,41 +168,39 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     }
   }
 
-  Future<void> _openAddMenu() async {
-    final choice = await showAppSheet<String>(context,
-        title: 'New',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _addRow('file-plus', 'New file',
-                onTap: () => Navigator.pop(context, 'file')),
-            _addRow('folder-plus', 'New folder',
-                onTap: () => Navigator.pop(context, 'folder')),
-          ],
-        ));
+  /// The "+" menu, anchored under its own button.
+  ///
+  /// This was a modal sheet — a full barrier and a centered card for two items,
+  /// which read as leaving the panel rather than adding to it. `below` because
+  /// the button sits at the top of the window, `alignEnd` because it is at the
+  /// right end of the header.
+  Future<void> _openAddMenu(BuildContext anchor) async {
+    final choice = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      below: true,
+      alignEnd: true,
+      minWidth: 200,
+      maxWidth: 240,
+      items: [
+        appMenuItem(
+          value: 'file',
+          label: 'New file',
+          icon: 'file-plus',
+          height: 36,
+        ),
+        appMenuItem(
+          value: 'folder',
+          label: 'New folder',
+          icon: 'folder-plus',
+          height: 36,
+        ),
+      ],
+    );
     if (!mounted) return;
     if (choice == 'file') await _newFile();
     if (choice == 'folder') await _newFolder();
   }
-
-  Widget _addRow(String icon, String label, {required VoidCallback onTap}) =>
-      Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 13),
-            child: Row(children: [
-              AppIcon(icon, size: 16, color: AppColors.fg3),
-              const SizedBox(width: 12),
-              Text(label, style: sans(13.5, color: AppColors.fg1)),
-            ]),
-          ),
-        ),
-      );
 
   @override
   Widget build(BuildContext context) {
@@ -220,15 +220,23 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
           ShellSectionHeader(
             label: 'File Tree',
             actions: [
-              ShellSectionAction(
-                icon: 'search',
-                tooltip: 'Search files',
-                onTap: _openFileSearch,
+              // `Builder` gives each menu a context that anchors to its OWN
+              // button: `Element.findRenderObject` walks DOWN to the button's
+              // box, so the popover opens under the control that summoned it
+              // rather than at the panel's corner.
+              Builder(
+                builder: (ctx) => ShellSectionAction(
+                  icon: 'search',
+                  tooltip: 'Search files',
+                  onTap: () => _openFileSearch(ctx),
+                ),
               ),
-              ShellSectionAction(
-                icon: 'plus',
-                tooltip: 'New file or folder',
-                onTap: _listing == null ? null : _openAddMenu,
+              Builder(
+                builder: (ctx) => ShellSectionAction(
+                  icon: 'plus',
+                  tooltip: 'New file or folder',
+                  onTap: _listing == null ? null : () => _openAddMenu(ctx),
+                ),
               ),
             ],
           ),
@@ -429,14 +437,18 @@ class _FileHit {
   const _FileHit(this.name, this.path);
 }
 
-/// File search: a centered floating card on desktop, a bottom sheet on mobile.
+/// File search: a popover anchored under its button on desktop, a bottom sheet
+/// on mobile.
 ///
-/// Deliberately the SAME shape as the chat command palette, so searching files
-/// and searching chats are one interaction. Matches come from a bounded walk of
-/// the workspace, cached for the lifetime of the popover so typing filters
-/// locally instead of re-fetching the tree on every keystroke.
+/// Anchored rather than centered so the results appear at the control that asked
+/// for them, matching every other desktop popover in the shell. Matches come
+/// from a bounded walk of the workspace, cached for the lifetime of the popover
+/// so typing filters locally instead of re-fetching the tree on every keystroke.
 Future<void> showFileSearchDialog(
   BuildContext context, {
+  /// The control this popover belongs to. Desktop anchors to it; without one
+  /// (or if it has no box) the popover falls back to the window's top-left.
+  BuildContext? anchor,
   required DaemonClient client,
   required String root,
   required void Function(String path, String name) onOpen,
@@ -446,28 +458,55 @@ Future<void> showFileSearchDialog(
       view.physicalSize.width / view.devicePixelRatio >= kDesktopBreakpoint;
   Widget body() => _FileSearch(client: client, root: root, onOpen: onOpen);
   if (desktop) {
+    // Sized to the sidebar it belongs to, not a wide centered card. This is a
+    // popover on a sidebar control: 640px of centered card dwarfed the panel,
+    // and even a 380px column overhung it. Basing the width on `kSidebarWidth`
+    // keeps the popover inside the very column whose button opened it — and it
+    // still fits the narrower compact-window drawer, whose minimum is 280.
+    final width = kSidebarWidth - 24;
+    final screen = MediaQuery.sizeOf(context);
+    var left = 16.0;
+    var top = 96.0;
+    final box = anchor?.findRenderObject() as RenderBox?;
+    if (box != null) {
+      final origin = box.localToGlobal(Offset.zero);
+      // Right-aligned to the button (both actions sit at the header's right
+      // end), and clamped so it can never leave the window.
+      left = (origin.dx + box.size.width - width).clamp(
+          12.0, (screen.width - width - 12).clamp(12.0, double.infinity));
+      top = origin.dy + box.size.height + 6;
+    }
+    final maxHeight = (screen.height - top - 16).clamp(220.0, 460.0);
     return showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'file search',
-      barrierColor: Colors.black.withValues(alpha: 0.45),
+      // Transparent: this is a popover beside the panel, not a modal over it.
+      // A dimmed barrier would black out the tree you are searching.
+      barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 140),
-      pageBuilder: (ctx, _, __) => Align(
-        alignment: const Alignment(0, -0.5),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+      pageBuilder: (ctx, _, __) => Stack(children: [
+        Positioned(
+          left: left,
+          top: top,
+          width: width,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640, maxHeight: 520),
+            constraints: BoxConstraints(maxHeight: maxHeight),
             child: _fileSearchFrame(body()),
           ),
         ),
-      ),
+      ]),
       transitionBuilder: (ctx, anim, _, child) {
         final c = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
         return FadeTransition(
-            opacity: c,
-            child: ScaleTransition(
-                scale: Tween(begin: 0.98, end: 1.0).animate(c), child: child));
+          opacity: c,
+          child: ScaleTransition(
+            // Grows from its top-right, i.e. out of the button it is anchored to.
+            alignment: Alignment.topRight,
+            scale: Tween(begin: 0.97, end: 1.0).animate(c),
+            child: child,
+          ),
+        );
       },
     );
   }

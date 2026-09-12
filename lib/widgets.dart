@@ -158,6 +158,12 @@ Future<T?> showAppMenu<T>(
   /// Open BELOW the anchor instead of above it. Set for controls at the TOP of
   /// the window (the shell menu), where an upward menu would be clipped offscreen.
   bool below = false,
+
+  /// Align the popover's RIGHT edge with the anchor's, instead of its left.
+  /// Set for a control at the right end of a narrow bar — a section header's
+  /// actions, say — where a left-aligned popover would open away from the button
+  /// it belongs to.
+  bool alignEnd = false,
 }) {
   final bg = color ?? AppColors.surface1;
 
@@ -225,7 +231,14 @@ Future<T?> showAppMenu<T>(
       position = const RelativeRect.fromLTRB(16, 80, 16, 80);
     } else {
       final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      final left = origin.dx.clamp(12.0, overlay.size.width - minWidth - 12);
+      // Right-aligning means the popover's right edge tracks the anchor's, so
+      // its left is measured back from that edge instead of from the anchor's
+      // left. Clamped either way, so it cannot leave the window.
+      final alignRight = origin.dx + box.size.width;
+      final left = alignEnd
+          ? (alignRight - minWidth)
+              .clamp(12.0, overlay.size.width - minWidth - 12)
+          : origin.dx.clamp(12.0, overlay.size.width - minWidth - 12);
       if (below) {
         // Anchored under a control at the TOP of the window (the shell menu),
         // where an upward menu would be clipped offscreen.
