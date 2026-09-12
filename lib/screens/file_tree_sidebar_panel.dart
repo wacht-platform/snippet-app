@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../desktop_pick.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
@@ -51,6 +52,10 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   final Set<String> _loadingFolders = {};
   final Map<String, List<FsEntry>> _childrenByPath = {};
   final Map<String, String> _folderErrors = {};
+
+  /// True while an upload is in flight. Guards the header action so a second
+  /// tap cannot start an overlapping batch, and drives the icon's spinner.
+  bool _uploading = false;
 
   @override
   void initState() {
@@ -168,6 +173,51 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     }
   }
 
+  /// Upload files from this machine into the folder being browsed.
+  ///
+  /// Lands in the directory currently LISTED (`_createDir`), so an upload goes
+  /// where you are looking rather than always to the workspace root.
+  Future<void> _uploadFiles() async {
+    if (_uploading) return;
+    List<PickedLocalFile> picked;
+    try {
+      picked = await pickLocalFiles();
+    } catch (e) {
+      if (mounted) {
+        toast(context, 'Could not open the file picker: $e', danger: true);
+      }
+      return;
+    }
+    if (picked.isEmpty || !mounted) return;
+
+    // Capture the destination ONCE: `_createDir` is derived from the listing,
+    // and the listing is refreshed below, so reading it per iteration could send
+    // later files somewhere else mid-upload.
+    final dir = _createDir;
+    setState(() => _uploading = true);
+    var uploaded = 0;
+    try {
+      for (final f in picked) {
+        try {
+          await widget.client
+              .uploadFile(await f.readAsBytes(), name: f.name, dir: dir);
+          uploaded++;
+        } catch (e) {
+          if (mounted) toast(context, '${f.name}: $e', danger: true);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+    if (!mounted) return;
+    if (uploaded > 0) {
+      await refresh();
+      if (mounted) {
+        toast(context, 'Uploaded $uploaded file${uploaded == 1 ? '' : 's'}');
+      }
+    }
+  }
+
   /// The "+" menu, anchored under its own button.
   ///
   /// This was a modal sheet — a full barrier and a centered card for two items,
@@ -229,6 +279,18 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                   icon: 'search',
                   tooltip: 'Search files',
                   onTap: () => _openFileSearch(ctx),
+                ),
+              ),
+              Builder(
+                builder: (ctx) => ShellSectionAction(
+                  icon: 'upload',
+                  tooltip: 'Upload files',
+                  // Enabled before the first listing arrives: `_createDir` falls
+                  // back to the workspace root, so an upload is valid even while
+                  // the tree is still loading. Tinted while busy — accent is the
+                  // state channel, and "uploading" is a state.
+                  active: _uploading,
+                  onTap: _uploading ? null : _uploadFiles,
                 ),
               ),
               Builder(
@@ -476,7 +538,11 @@ Future<void> showFileSearchDialog(
           12.0, (screen.width - width - 12).clamp(12.0, double.infinity));
       top = origin.dy + box.size.height + 6;
     }
-    final maxHeight = (screen.height - top - 16).clamp(220.0, 460.0);
+    // Capped well below the window: at the previous 460px this could fill most
+    // of a laptop viewport, which is the opposite of a compact popover. With the
+    // 26px result rows this shows roughly ten matches, and the list scrolls past
+    // that rather than growing the card.
+    final maxHeight = (screen.height - top - 16).clamp(200.0, 340.0);
     return showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -553,13 +619,22 @@ class _FileSearch extends StatefulWidget {
 class _FileSearchState extends State<_FileSearch> {
   final _ctrl = TextEditingController();
   Timer? _debounce;
-  int _run = 0;
-  bool _loading = false;
-  List<_FileHit> _hits = const [];
 
-  /// Every file discovered by the one bounded walk. Null until the first
-  /// non-empty query, so opening the popover does not crawl the whole tree.
+  /// True while the ONE crawl is running.
+  ///
+  /// Deliberately not tied to the query. An earlier version guarded the walk
+  /// with a run id bumped per query, so every keystroke aborted the crawl
+  /// in flight — and because the result is CACHED, the index stayed truncated
+  /// for the life of the popover and later searches silently missed files.
+  /// Typing now filters what has already arrived; the crawl runs to completion
+  /// on its own.
+  bool _crawling = false;
+
+  /// Every file discovered by the crawl. Null until it has been started, so
+  /// opening the popover does not crawl the whole tree.
   List<_FileHit>? _all;
+
+  List<_FileHit> _hits = const [];
 
   @override
   void initState() {
@@ -575,64 +650,88 @@ class _FileSearchState extends State<_FileSearch> {
   }
 
   void _onQuery() {
-    // Rebuild immediately so the hint/results swap on the keystroke, then
-    // debounce the walk itself.
-    setState(() {});
+    // Filter against what the crawl has ALREADY found, so typing is instant even
+    // mid-walk, then debounce the START of the crawl (once).
+    _applyFilter();
+    if (_all != null || _crawling) return;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 220), () {
-      _walk(_ctrl.text.trim());
-    });
+    _debounce = Timer(const Duration(milliseconds: 220), _startCrawl);
   }
 
-  /// Bounded breadth-first walk of the workspace, cached after the first run.
-  /// Limits keep a huge repo (or a slow tunnel) from making the popover hang.
-  Future<void> _walk(String query) async {
-    final q = query.toLowerCase();
-    if (q.isEmpty) {
-      setState(() {
-        _hits = const [];
-        _loading = false;
-      });
-      return;
-    }
-    if (_all == null) {
-      setState(() => _loading = true);
-      final id = ++_run;
-      final all = <_FileHit>[];
-      final queue = <String>[widget.root];
-      var dirs = 0;
-      var visited = 0;
-      const maxDirs = 200;
-      const maxEntries = 6000;
-      while (queue.isNotEmpty && dirs < maxDirs && visited < maxEntries) {
-        final dir = queue.removeAt(0);
-        dirs++;
-        FsListing listing;
+  /// Filter whatever `_all` currently holds against the live query.
+  void _applyFilter() {
+    final q = _ctrl.text.trim().toLowerCase();
+    final all = _all;
+    final next = (q.isEmpty || all == null)
+        ? const <_FileHit>[]
+        : all.where((h) => h.name.toLowerCase().contains(q)).take(80).toList();
+    if (mounted) setState(() => _hits = next);
+  }
+
+  /// Crawl the workspace ONCE, to completion.
+  ///
+  /// Bounded so a huge repo (or a slow tunnel) cannot hang the popover.
+  Future<void> _startCrawl() async {
+    if (_crawling || _all != null) return;
+    setState(() => _crawling = true);
+
+    final all = <_FileHit>[];
+    var wave = <String>[widget.root];
+    var dirs = 0;
+    var visited = 0;
+    const maxDirs = 200;
+    const maxEntries = 6000;
+    // Directories fetched at once. High enough that a real repo finishes in a
+    // few rounds, low enough not to flood the daemon (or a tunnel).
+    const maxConcurrent = 24;
+
+    // Breadth-first, one LEVEL per round, each round fired CONCURRENTLY.
+    //
+    // This used to await one directory at a time, so a 200-directory workspace
+    // cost 200 sequential round trips — the whole reason search felt slow. That
+    // is latency-bound rather than CPU-bound, so overlapping the requests is the
+    // fix rather than a faster walk.
+    while (wave.isNotEmpty && dirs < maxDirs && visited < maxEntries) {
+      final batch = wave.take(maxConcurrent).toList();
+      wave = wave.skip(batch.length).toList();
+      dirs += batch.length;
+
+      final listings = await Future.wait(batch.map((dir) async {
         try {
-          listing = await widget.client.fs(dir.isEmpty ? null : dir);
+          return await widget.client.fs(dir.isEmpty ? null : dir);
         } catch (_) {
-          continue;
+          // One unreadable directory must not abort the whole walk.
+          return null;
         }
-        if (!mounted || id != _run) return;
+      }));
+      if (!mounted) return;
+
+      var grew = false;
+      for (final listing in listings) {
+        if (listing == null) continue;
         visited += listing.entries.length;
         for (final e in listing.entries) {
           if (e.isDir) {
-            queue.add(e.path);
+            wave.add(e.path);
           } else {
             all.add(_FileHit(e.name, e.path));
+            grew = true;
           }
         }
       }
-      if (!mounted || id != _run) return;
-      _all = all;
+
+      // Publish each completed round, so matches appear while it is still
+      // walking instead of only at the end.
+      if (grew) {
+        _all = all;
+        _applyFilter();
+      }
     }
-    final hits =
-        _all!.where((h) => h.name.toLowerCase().contains(q)).take(80).toList();
+
     if (!mounted) return;
-    setState(() {
-      _hits = hits;
-      _loading = false;
-    });
+    _all = all;
+    setState(() => _crawling = false);
+    _applyFilter();
   }
 
   String _dirLabel(String path) {
@@ -647,57 +746,64 @@ class _FileSearchState extends State<_FileSearch> {
     Theme.of(context); // Rebuild on theme change
     final typed = _ctrl.text.trim();
     return Column(mainAxisSize: MainAxisSize.min, children: [
+      // Compact header. The previous 14/12/10 padding around a 14px field made
+      // the search row taller than any row in the panel it opens from.
       Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 8),
         child: Row(children: [
-          AppIcon('search', size: 16, color: AppColors.fg3),
-          const SizedBox(width: 10),
+          AppIcon('search', size: 14, color: AppColors.fg4),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _ctrl,
               autofocus: true,
               cursorColor: AppColors.accent,
-              style: sans(14, color: AppColors.fg1),
+              style: sans(13, color: AppColors.fg1),
               decoration: InputDecoration(
                 isCollapsed: true,
                 border: InputBorder.none,
                 hintText: 'Search files',
-                hintStyle: sans(14, color: AppColors.fg4),
+                hintStyle: sans(13, color: AppColors.fg4),
               ),
             ),
           ),
-          if (_loading)
+          if (_crawling)
             const SizedBox(
-                width: 14,
-                height: 14,
+                width: 12,
+                height: 12,
                 child: CircularProgressIndicator(strokeWidth: 1.5)),
         ]),
       ),
-      Divider(height: 1, thickness: 1, color: AppColors.border),
+      // A sub-pixel seam, not a drawn rule. The language separates by surface
+      // step and hairline; a 1px `Divider` made this popover read heavier than
+      // the panel it belongs to. Same token the pane strips use.
+      Container(height: kPaneHairline, color: kPaneSeamColor),
       Flexible(
         child: typed.isEmpty
             ? Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(12),
                 child: Center(
                     child: Text('Type to search the workspace',
-                        style: sans(12.5, color: AppColors.fg4))),
+                        style: sans(12, color: AppColors.fg4))),
               )
-            : (_hits.isEmpty && !_loading
+            : (_hits.isEmpty && !_crawling
                 ? Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(12),
                     child: Center(
                         child: Text('No matching files',
-                            style: sans(12.5, color: AppColors.fg4))),
+                            style: sans(12, color: AppColors.fg4))),
                   )
                 : ListView(
                     shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     children: [for (final h in _hits) _row(h)],
                   )),
       ),
     ]);
   }
 
+  /// One result, at the sidebar's own row height (26px) so the list matches the
+  /// tree it is searching rather than reading as a separate, roomier surface.
   Widget _row(_FileHit h) => Material(
         color: Colors.transparent,
         child: InkWell(
@@ -705,17 +811,18 @@ class _FileSearchState extends State<_FileSearch> {
             Navigator.pop(context);
             widget.onOpen(h.path, h.name);
           },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          child: Container(
+            height: kNavRowHeight,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(children: [
-              AppIcon('file', size: 15, color: AppColors.fg2),
-              const SizedBox(width: 10),
+              AppIcon('file', size: 13, color: AppColors.fg3),
+              const SizedBox(width: 8),
               Expanded(
                   child: Text(h.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13, color: AppColors.fg1))),
-              Text(_dirLabel(h.path), style: mono(11, color: AppColors.fg4)),
+                      style: sans(12.5, color: AppColors.fg1))),
+              Text(_dirLabel(h.path), style: mono(10, color: AppColors.fg4)),
             ]),
           ),
         ),
