@@ -2148,187 +2148,217 @@ class _SessionScreenState extends State<SessionScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (kMobile)
-                          _mobileHeader(s)
-                        else if (!kMacOS)
-                          _desktopBar(s, running),
-                        // Desktop keeps the detailed chip strip.
-                        if (!kMobile && !kMacOS) _statusStrip(s, running),
-                        if (_connError != null) _disconnectedBanner(),
-                        Expanded(
-                          child: Stack(children: [
-                            s == null
-                                ? Center(
-                                    child: SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: AppColors.fg3)))
-                                : NotificationListener<ScrollNotification>(
-                                    onNotification: _onScroll,
-                                    child: Builder(builder: (context) {
-                                      final timeline = <Widget>[
-                                        if (items.isEmpty && !running)
-                                          const EmptyState(
-                                              icon: 'terminal',
-                                              title: 'Session ready',
-                                              body:
-                                                  'Send a task to get started.'),
-                                        ...items,
-                                        // Optimistic bubbles for messages sent but not yet echoed.
-                                        for (var pi = 0;
-                                            pi < _pending.length;
-                                            pi++)
-                                          Opacity(
-                                              key: ValueKey(
-                                                  'pending-$pi-${_pending[pi].hashCode}'),
-                                              opacity: 0.5,
-                                              child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          bottom: 12),
-                                                  child: Bubble(
-                                                      mine: true,
-                                                      text: _pending[pi],
-                                                      selectable: false))),
-                                        if (_heldQueue.isNotEmpty) ...[
-                                          const SizedBox(height: 8),
-                                          _QueuedSection(
-                                            count: _heldQueue.length,
-                                            showBulkActions: !kMobile ||
-                                                _heldQueue.length > 1,
-                                            onSendAll: _steerAllQueued,
-                                            onCancelAll: _cancelAllQueued,
-                                            children: [
-                                              for (var qi = 0;
-                                                  qi < _heldQueue.length;
-                                                  qi++)
-                                                KeyedSubtree(
-                                                  key: ValueKey(
-                                                      'queued-$qi-${_heldQueue[qi].id}'),
-                                                  child: _QueuedBubble(
-                                                    text: _queuedText(
-                                                        _heldQueue[qi].text),
-                                                    audio: _queuedAttachCounts(
-                                                            _heldQueue[qi].text)
-                                                        .$1,
-                                                    images: _queuedAttachCounts(
-                                                            _heldQueue[qi].text)
-                                                        .$2,
-                                                    files: _queuedAttachCounts(
-                                                            _heldQueue[qi].text)
-                                                        .$3,
-                                                    onCancel: () =>
-                                                        _cancelQueuedAt(qi),
-                                                    onSteer: () =>
-                                                        _steerQueuedAt(qi),
+                  // The bottom chrome is NON-FLEX, so Flutter lays it out at its
+                  // natural height BEFORE the transcript's Expanded claims what
+                  // is left. A question or approval card carrying a long
+                  // agent-authored body could therefore exceed the pane outright
+                  // and push its own actions off the bottom edge — which is why a
+                  // big question was impossible to answer. Measuring the pane
+                  // here is what lets the cards be capped and scroll instead.
+                  child: LayoutBuilder(builder: (context, pane) {
+                    final barsCap = pane.maxHeight * 0.6;
+                    return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (kMobile)
+                            _mobileHeader(s)
+                          else if (!kMacOS)
+                            _desktopBar(s, running),
+                          // Desktop keeps the detailed chip strip.
+                          if (!kMobile && !kMacOS) _statusStrip(s, running),
+                          if (_connError != null) _disconnectedBanner(),
+                          Expanded(
+                            child: Stack(children: [
+                              s == null
+                                  ? Center(
+                                      child: SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: AppColors.fg3)))
+                                  : NotificationListener<ScrollNotification>(
+                                      onNotification: _onScroll,
+                                      child: Builder(builder: (context) {
+                                        final timeline = <Widget>[
+                                          if (items.isEmpty && !running)
+                                            const EmptyState(
+                                                icon: 'terminal',
+                                                title: 'Session ready',
+                                                body:
+                                                    'Send a task to get started.'),
+                                          ...items,
+                                          // Optimistic bubbles for messages sent but not yet echoed.
+                                          for (var pi = 0;
+                                              pi < _pending.length;
+                                              pi++)
+                                            Opacity(
+                                                key: ValueKey(
+                                                    'pending-$pi-${_pending[pi].hashCode}'),
+                                                opacity: 0.5,
+                                                child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            bottom: 12),
+                                                    child: Bubble(
+                                                        mine: true,
+                                                        text: _pending[pi],
+                                                        selectable: false))),
+                                          if (_heldQueue.isNotEmpty) ...[
+                                            const SizedBox(height: 8),
+                                            _QueuedSection(
+                                              count: _heldQueue.length,
+                                              showBulkActions: !kMobile ||
+                                                  _heldQueue.length > 1,
+                                              onSendAll: _steerAllQueued,
+                                              onCancelAll: _cancelAllQueued,
+                                              children: [
+                                                for (var qi = 0;
+                                                    qi < _heldQueue.length;
+                                                    qi++)
+                                                  KeyedSubtree(
+                                                    key: ValueKey(
+                                                        'queued-$qi-${_heldQueue[qi].id}'),
+                                                    child: _QueuedBubble(
+                                                      text: _queuedText(
+                                                          _heldQueue[qi].text),
+                                                      audio:
+                                                          _queuedAttachCounts(
+                                                                  _heldQueue[qi]
+                                                                      .text)
+                                                              .$1,
+                                                      images:
+                                                          _queuedAttachCounts(
+                                                                  _heldQueue[qi]
+                                                                      .text)
+                                                              .$2,
+                                                      files:
+                                                          _queuedAttachCounts(
+                                                                  _heldQueue[qi]
+                                                                      .text)
+                                                              .$3,
+                                                      onCancel: () =>
+                                                          _cancelQueuedAt(qi),
+                                                      onSteer: () =>
+                                                          _steerQueuedAt(qi),
+                                                    ),
                                                   ),
-                                                ),
-                                            ],
+                                              ],
+                                            ),
+                                          ],
+                                          _LiveStreamRow(
+                                            key: const ValueKey(
+                                                'live-stream-row'),
+                                            frame: _liveFrame,
+                                            running: running,
+                                            compacting: s.compacting,
+                                            startedAt: s.turnStartedAt,
+                                            hasVisibleAction:
+                                                _turnHasVisibleAction(events),
+                                            compactionDetail:
+                                                _latestCompactionDetail(events),
                                           ),
-                                        ],
-                                        _LiveStreamRow(
-                                          key:
-                                              const ValueKey('live-stream-row'),
-                                          frame: _liveFrame,
-                                          running: running,
-                                          compacting: s.compacting,
-                                          startedAt: s.turnStartedAt,
-                                          hasVisibleAction:
-                                              _turnHasVisibleAction(events),
-                                          compactionDetail:
-                                              _latestCompactionDetail(events),
-                                        ),
-                                      ];
-                                      return ScrollConfiguration(
-                                        behavior:
-                                            ScrollConfiguration.of(context)
-                                                .copyWith(scrollbars: false),
-                                        child: ListView.builder(
-                                          controller: _scroll,
-                                          reverse: true,
-                                          scrollCacheExtent:
-                                              ScrollCacheExtent.pixels(400),
-                                          padding: EdgeInsets.fromLTRB(
-                                              kMobile ? M.gutter : 20,
-                                              16,
-                                              kMobile ? M.gutter : 20,
-                                              24),
-                                          itemCount: timeline.length,
-                                          itemBuilder: (context, index) {
-                                            final child = timeline[
-                                                timeline.length - 1 - index];
-                                            return KeyedSubtree(
-                                              key: child.key ??
-                                                  ValueKey('timeline-$index'),
-                                              child: _centerWide(
-                                                RepaintBoundary(child: child),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      );
-                                    })),
-                            if (!_stickToBottom && s != null)
-                              Positioned(
-                                right: 16,
-                                bottom: 12,
-                                child: Material(
-                                  color: AppColors.surface1,
-                                  shape: const CircleBorder(),
-                                  elevation: 0,
-                                  child: InkWell(
-                                    customBorder: const CircleBorder(),
-                                    onTap: () {
-                                      _stickToBottom = true;
-                                      setState(() {});
-                                      _scheduleBottom(
-                                          settle: true, smooth: true);
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8),
-                                      child: AppIcon('chevron-down',
-                                          size: 16, color: AppColors.fg3),
+                                        ];
+                                        return ScrollConfiguration(
+                                          behavior:
+                                              ScrollConfiguration.of(context)
+                                                  .copyWith(scrollbars: false),
+                                          child: ListView.builder(
+                                            controller: _scroll,
+                                            reverse: true,
+                                            scrollCacheExtent:
+                                                ScrollCacheExtent.pixels(400),
+                                            padding: EdgeInsets.fromLTRB(
+                                                kMobile ? M.gutter : 20,
+                                                16,
+                                                kMobile ? M.gutter : 20,
+                                                24),
+                                            itemCount: timeline.length,
+                                            itemBuilder: (context, index) {
+                                              final child = timeline[
+                                                  timeline.length - 1 - index];
+                                              return KeyedSubtree(
+                                                key: child.key ??
+                                                    ValueKey('timeline-$index'),
+                                                child: _centerWide(
+                                                  RepaintBoundary(child: child),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      })),
+                              if (!_stickToBottom && s != null)
+                                Positioned(
+                                  right: 16,
+                                  bottom: 12,
+                                  child: Material(
+                                    color: AppColors.surface1,
+                                    shape: const CircleBorder(),
+                                    elevation: 0,
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () {
+                                        _stickToBottom = true;
+                                        setState(() {});
+                                        _scheduleBottom(
+                                            settle: true, smooth: true);
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: AppIcon('chevron-down',
+                                            size: 16, color: AppColors.fg3),
+                                      ),
                                     ),
                                   ),
                                 ),
+                            ]),
+                          ),
+                          // The question/approval bars are PINNED here (not inside the scroll
+                          // list) so a "needs input" request is always visible — buried at the
+                          // bottom of a scrolled-up transcript it read as "the agent is stuck".
+                          if (waiting && _pendingApproval(events))
+                            _centerWide(ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: barsCap),
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    6,
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    0),
+                                child: ApprovalBar(
+                                    events: events,
+                                    onSend: _sendDecision,
+                                    showApproveAll:
+                                        _pendingApprovalTotal(events) > 1),
                               ),
-                          ]),
-                        ),
-                        // The question/approval bars are PINNED here (not inside the scroll
-                        // list) so a "needs input" request is always visible — buried at the
-                        // bottom of a scrolled-up transcript it read as "the agent is stuck".
-                        if (waiting && _pendingApproval(events))
-                          _centerWide(Padding(
-                            padding: EdgeInsets.fromLTRB(
-                                kMobile ? M.gutter : (widget.embedded ? 0 : 20),
-                                6,
-                                kMobile ? M.gutter : (widget.embedded ? 0 : 20),
-                                0),
-                            child: _ApprovalBar(
-                                events: events,
-                                onSend: _sendDecision,
-                                showApproveAll:
-                                    _pendingApprovalTotal(events) > 1),
-                          )),
-                        if (waiting && s?.pendingQuestion != null)
-                          _centerWide(Padding(
-                            padding: EdgeInsets.fromLTRB(
-                                kMobile ? M.gutter : (widget.embedded ? 0 : 20),
-                                6,
-                                kMobile ? M.gutter : (widget.embedded ? 0 : 20),
-                                0),
-                            child: _QuestionBar(
-                                question: s!.pendingQuestion!,
-                                onSend: _sendDecision),
-                          )),
-                        if (!(waiting && s?.pendingQuestion != null))
-                          _centerWide(_inputBar(running)),
-                      ]),
+                            )),
+                          if (waiting && s?.pendingQuestion != null)
+                            _centerWide(ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: barsCap),
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    6,
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    0),
+                                child: QuestionBar(
+                                    question: s!.pendingQuestion!,
+                                    onSend: _sendDecision),
+                              ),
+                            )),
+                          if (!(waiting && s?.pendingQuestion != null))
+                            _centerWide(_inputBar(running)),
+                        ]);
+                  }),
                 ),
                 // Desktop, standalone: the terminal is a second pane BESIDE the
                 // chat. When embedded, the SHELL owns this pane instead — a
@@ -5092,7 +5122,7 @@ class _BoardMessageCard extends StatelessWidget {
 }
 
 /// Transcript card for a past `ask_user` turn: the prompt plus the user's
-/// answer (parsed from the following `user_input` that `_QuestionBar` sent).
+/// answer (parsed from the following `user_input` that `QuestionBar` sent).
 class _QuestionRecord extends StatelessWidget {
   final Map<String, dynamic> event;
   final String? answer;
@@ -5210,19 +5240,19 @@ class _QuestionRecord extends StatelessWidget {
   }
 }
 
-class _ApprovalBar extends StatefulWidget {
+class ApprovalBar extends StatefulWidget {
   final List<Map<String, dynamic>> events;
   final void Function(Map<String, dynamic>) onSend;
   final bool showApproveAll; // only when >1 tool is pending this batch
-  const _ApprovalBar(
+  const ApprovalBar(
       {required this.events,
       required this.onSend,
       this.showApproveAll = false});
   @override
-  State<_ApprovalBar> createState() => _ApprovalBarState();
+  State<ApprovalBar> createState() => ApprovalBarState();
 }
 
-class _ApprovalBarState extends State<_ApprovalBar> {
+class ApprovalBarState extends State<ApprovalBar> {
   // Disable after the first tap — the bar stays on screen until the next frame
   // flips status, so an impatient double-tap fired the decision twice.
   bool _sent = false;
@@ -5261,6 +5291,8 @@ class _ApprovalBarState extends State<_ApprovalBar> {
           borderRadius: BorderRadius.circular(R.md),
         ),
         child: Column(
+          // Content-sized up to the pane-derived cap its host wraps it in.
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
@@ -5271,10 +5303,20 @@ class _ApprovalBarState extends State<_ApprovalBar> {
               Text(total > 1 ? '$index of $total' : 'Input required',
                   style: sans(12, color: AppColors.accent)),
             ]),
-            if (detail.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(detail, style: sans(13, height: 1.45, color: AppColors.fg3)),
-            ],
+            // The tool summary is the part that can be long, so IT scrolls and
+            // the actions stay pinned. A long summary used to grow the whole
+            // card unchecked — as a non-flex child of the session Column it
+            // could exceed the pane and push Approve/Reject off the bottom edge.
+            if (detail.isNotEmpty)
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(detail,
+                        style: sans(13, height: 1.45, color: AppColors.fg3)),
+                  ),
+                ),
+              ),
             const SizedBox(height: 14),
             Opacity(
               opacity: _sent ? 0.5 : 1,
@@ -5357,15 +5399,15 @@ class _NoteLineState extends State<_NoteLine> {
 /// Renders an `ask_user` pending question (status waiting_for_input) and sends the
 /// answer back as a LoopInput::Answer. Handles free_text / single_choice / yes_no /
 /// confirm answer kinds.
-class _QuestionBar extends StatefulWidget {
+class QuestionBar extends StatefulWidget {
   final Map<String, dynamic> question; // {questions:[...], context}
   final void Function(Map<String, dynamic>) onSend;
-  const _QuestionBar({required this.question, required this.onSend});
+  const QuestionBar({required this.question, required this.onSend});
   @override
-  State<_QuestionBar> createState() => _QuestionBarState();
+  State<QuestionBar> createState() => QuestionBarState();
 }
 
-class _QuestionBarState extends State<_QuestionBar> {
+class QuestionBarState extends State<QuestionBar> {
   final Map<String, TextEditingController> _text = {};
   final Map<String, String> _choice = {};
   final Set<String> _skipped = {};
@@ -5601,52 +5643,72 @@ class _QuestionBarState extends State<_QuestionBar> {
           color: AppColors.surface2,
           borderRadius: BorderRadius.circular(R.md),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(
-              child: Text(_sent ? 'Sending…' : 'Question',
-                  style: sans(15.5, weight: W.label, color: AppColors.fg1)),
-            ),
-            Text(
-              total > 1 ? '${_step + 1} of $total' : 'Input required',
-              style: sans(12, color: AppColors.accent),
-            ),
-          ]),
-          if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
-            const SizedBox(height: 8),
-            Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg3)),
-          ],
-          ...() {
-            final q = _currentQuestion;
-            if (q == null) return <Widget>[];
-            return <Widget>[
-              const SizedBox(height: 12),
-              Text(q['text']?.toString() ?? '',
-                  style: sans(14, height: 1.45, color: AppColors.fg1)),
-              const SizedBox(height: 10),
-              ..._inputFor(q),
-            ];
-          }(),
-          const SizedBox(height: 14),
-          Row(children: [
-            _skipButton(),
-            if (_step > 0) ...[
-              const SizedBox(width: 4),
-              Btn('Back',
-                  small: true,
-                  variant: BtnVariant.ghost,
-                  onTap: _sent ? null : () => setState(() => _step--)),
-            ],
-            const Spacer(),
-            Btn(
-                _sent
-                    ? 'Sending…'
-                    : (_step < total - 1 ? 'Continue' : 'Submit'),
-                small: true,
-                disabled: !_ready || _sent,
-                onTap: (_ready && !_sent) ? _submit : null),
-          ]),
-        ]),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Expanded(
+                  child: Text(_sent ? 'Sending…' : 'Question',
+                      style: sans(15.5, weight: W.label, color: AppColors.fg1)),
+                ),
+                Text(
+                  total > 1 ? '${_step + 1} of $total' : 'Input required',
+                  style: sans(12, color: AppColors.accent),
+                ),
+              ]),
+              // The question body SCROLLS; the header and the actions stay pinned.
+              // A long context or question used to grow the card unbounded — as a
+              // non-flex child of the session Column it could exceed the pane and
+              // push the choices and Submit off the bottom edge, which is exactly
+              // what made a big question impossible to answer.
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
+                        const SizedBox(height: 8),
+                        Text(ctx,
+                            style:
+                                sans(13, height: 1.45, color: AppColors.fg3)),
+                      ],
+                      ...() {
+                        final q = _currentQuestion;
+                        if (q == null) return <Widget>[];
+                        return <Widget>[
+                          const SizedBox(height: 12),
+                          Text(q['text']?.toString() ?? '',
+                              style:
+                                  sans(14, height: 1.45, color: AppColors.fg1)),
+                          const SizedBox(height: 10),
+                          ..._inputFor(q),
+                        ];
+                      }(),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(children: [
+                _skipButton(),
+                if (_step > 0) ...[
+                  const SizedBox(width: 4),
+                  Btn('Back',
+                      small: true,
+                      variant: BtnVariant.ghost,
+                      onTap: _sent ? null : () => setState(() => _step--)),
+                ],
+                const Spacer(),
+                Btn(
+                    _sent
+                        ? 'Sending…'
+                        : (_step < total - 1 ? 'Continue' : 'Submit'),
+                    small: true,
+                    disabled: !_ready || _sent,
+                    onTap: (_ready && !_sent) ? _submit : null),
+              ]),
+            ]),
       ),
     );
   }
