@@ -36,9 +36,9 @@ bool _usesOpenAiAdapter(String p) =>
     p == 'opencode-zen' ||
     p == 'opencode-go';
 
-class ModelEditorScreen extends StatefulWidget {
+class InferenceProfileEditor extends StatefulWidget {
   final DaemonClient client;
-  final ModelProfile? existing;
+  final InferenceProfile? existing;
   final String? delegateName;
 
   /// Skip Scaffold / app bar and fill the parent (settings Models pane).
@@ -49,7 +49,7 @@ class ModelEditorScreen extends StatefulWidget {
 
   /// Called after a successful save, before [onClose].
   final VoidCallback? onSaved;
-  const ModelEditorScreen(
+  const InferenceProfileEditor(
       {super.key,
       required this.client,
       this.existing,
@@ -58,10 +58,10 @@ class ModelEditorScreen extends StatefulWidget {
       this.onClose,
       this.onSaved});
   @override
-  State<ModelEditorScreen> createState() => _ModelEditorScreenState();
+  State<InferenceProfileEditor> createState() => _InferenceProfileEditorState();
 }
 
-class _ModelEditorScreenState extends State<ModelEditorScreen> {
+class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   late String _provider;
   late final TextEditingController _name;
   late final TextEditingController _baseUrl;
@@ -239,7 +239,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     final pills = [..._providers];
     if (!pills.any((p) => p.$1 == _provider))
       pills.insert(0, (_provider, _provider));
-    final title = _isEdit ? 'Edit model' : 'Add model';
+    final title = _isEdit ? 'Edit profile' : 'Add profile';
     final form = Expanded(
       child: ListView(
         padding: EdgeInsets.fromLTRB(
@@ -431,25 +431,11 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
       ),
     );
     final body = Column(children: [
-      if (widget.embedded)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(6, 6, 16, 4),
-          child: Row(children: [
-            IconBtn('chevron-left',
-                size: 30,
-                iconSize: 18,
-                tooltip: 'Back to models',
-                onTap: _dismiss),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(title,
-                  style: sans(14.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
-            ),
-          ]),
-        )
-      else
-        SnAppBar(title: title, onBack: _dismiss),
+      // No embedded header. When embedded, the HOST level owns the header
+      // (inference_profiles.dart draws "Edit profile" / "Add profile"), so
+      // drawing one here stacked a second back row under it — two rows, two
+      // exits, same screen.
+      if (!widget.embedded) SnAppBar(title: title, onBack: _dismiss),
       form,
       footer,
     ]);
@@ -506,66 +492,133 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                       MediaQuery.of(context).viewInsets.bottom) *
                   0.75),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const SizedBox(height: 10),
-            Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.surface3,
-                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 8),
+            // Grab handle: the only cue that this is a sheet rather than a
+            // dialog, so it stays.
+            Center(
+              child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: AppColors.surface3,
+                      borderRadius: BorderRadius.circular(2))),
+            ),
+            // Header: title, count, close. The old sheet had no title at all --
+            // just a grab handle and a labelled field, so nothing named the
+            // surface or offered a visible way out.
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+              child: Row(children: [
+                AppIcon('cpu', size: 16, color: AppColors.fg2),
+                const SizedBox(width: 9),
+                Text('Inference profiles',
+                    style: sans(15, weight: W.label, color: AppColors.fg1)),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface3,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text('${widget.models.length}',
+                      style: mono(10.5, color: AppColors.fg3)),
+                ),
+                const Spacer(),
+                IconBtn('x',
+                    size: 32,
+                    iconSize: 16,
+                    tooltip: 'Close',
+                    onTap: () => Navigator.pop(context)),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: AppField(
-                label: 'Models (${widget.models.length})',
                 controller: _query,
                 mono: true,
-                hint: 'filter…',
+                hint: 'Search profiles…',
               ),
             ),
             Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: filtered.length,
-                itemBuilder: (ctx, i) {
-                  final m = filtered[i];
-                  final meta = <String>[
-                    if (m.efforts != null)
-                      m.efforts!.isEmpty
-                          ? 'no effort control'
-                          : 'effort: ${m.efforts!.join('/')}'
-                    else if (m.reasoning != null)
-                      m.reasoning! ? 'reasoning' : 'no reasoning',
-                    if ((m.contextWindow ?? 0) > 0)
-                      _ModelEditorScreenState._fmtCtx(m.contextWindow!),
-                  ];
-                  return InkWell(
-                    onTap: () => Navigator.pop(ctx, m),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(m.id, style: mono(13, color: AppColors.fg1)),
-                            if (m.displayName != null || meta.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                [
-                                  if (m.displayName != null) m.displayName!,
-                                  ...meta
-                                ].join(' · '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(11.5, color: AppColors.fg3),
-                              ),
-                            ],
-                          ]),
+              child: filtered.isEmpty
+                  // An empty filter result used to render as a blank sheet --
+                  // indistinguishable from "still loading".
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 28, 16, 32),
+                      child: Column(children: [
+                        AppIcon('search', size: 18, color: AppColors.fg4),
+                        const SizedBox(height: 9),
+                        Text('No profile matches “${_query.text.trim()}”',
+                            textAlign: TextAlign.center,
+                            style: sans(12.5, color: AppColors.fg3)),
+                      ]),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, i) => _modelRow(ctx, filtered[i]),
                     ),
-                  );
-                },
-              ),
             ),
           ]),
+        ),
+      ),
+    );
+  }
+
+  /// One model row: the ID is what actually gets sent, so it leads; everything
+  /// else is supporting detail on the second line.
+  Widget _modelRow(BuildContext ctx, CatalogModel m) {
+    final meta = <String>[
+      if (m.efforts != null)
+        m.efforts!.isEmpty
+            ? 'no effort control'
+            : 'effort: ${m.efforts!.join('/')}'
+      else if (m.reasoning != null)
+        m.reasoning! ? 'reasoning' : 'no reasoning',
+      if ((m.contextWindow ?? 0) > 0)
+        _InferenceProfileEditorState._fmtCtx(m.contextWindow!),
+    ];
+    final subtitle = [
+      if (m.displayName != null) m.displayName!,
+      ...meta,
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.sm),
+          hoverColor: AppColors.surface2,
+          onTap: () => Navigator.pop(ctx, m),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(m.id,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: mono(13, color: AppColors.fg1)),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(11.5, color: AppColors.fg4)),
+                      ],
+                    ]),
+              ),
+              const SizedBox(width: 8),
+              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+            ]),
+          ),
         ),
       ),
     );
@@ -690,7 +743,7 @@ class _SubSignInState extends State<_SubSignIn> {
         const SizedBox(height: 8),
         Row(children: [
           Text(_code!,
-              style: mono(18, weight: FontWeight.w600, color: AppColors.fg1)),
+              style: mono(18, weight: FontWeight.w500, color: AppColors.fg1)),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () => Clipboard.setData(ClipboardData(text: _code!)),

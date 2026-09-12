@@ -32,7 +32,7 @@ String hostOf(String url) {
 
 /// A configured model profile (from GET /config). Keys are never sent back — only
 /// [hasKey] tells whether one is set.
-class ModelProfile {
+class InferenceProfile {
   final String name;
   final String provider;
   final String baseUrl;
@@ -45,7 +45,7 @@ class ModelProfile {
   final bool? supportsImages; // null on daemons that don't report it yet
   final bool xSearch; // xAI server-side X search
 
-  ModelProfile.fromJson(Map<String, dynamic> j)
+  InferenceProfile.fromJson(Map<String, dynamic> j)
       : name = j['name'] as String? ?? '',
         provider = j['provider'] as String? ?? '',
         baseUrl = j['base_url'] as String? ?? '',
@@ -66,7 +66,7 @@ class ModelProfile {
 }
 
 class ServerConfig {
-  final List<ModelProfile> profiles;
+  final List<InferenceProfile> profiles;
   final String? active;
 
   /// Profile that delegated lanes run on; null → they use the active model.
@@ -76,7 +76,7 @@ class ServerConfig {
 
   ServerConfig.fromJson(Map<String, dynamic> j)
       : profiles = ((j['profiles'] as List?) ?? const [])
-            .map((e) => ModelProfile.fromJson(e as Map<String, dynamic>))
+            .map((e) => InferenceProfile.fromJson(e as Map<String, dynamic>))
             .toList(),
         active = j['active'] as String?,
         delegate = j['delegate'] as String?,
@@ -216,6 +216,18 @@ class RateWindow {
       resetsAt > 0 ||
       usedPercent.isFinite && usedPercent > 0;
 
+  /// The window rolled over since this snapshot was taken.
+  ///
+  /// Rate limits are account-wide and only observed when a session runs, so a
+  /// snapshot can outlive its own window. Once `resetsAt` is in the past,
+  /// `usedPercent` describes the PREVIOUS window and the true current usage is
+  /// near zero — so rendering "1% left" with a 99%-full bar asserts a figure we
+  /// know to be wrong.
+  bool get isExpired =>
+      resetsAt > 0 &&
+      DateTime.fromMillisecondsSinceEpoch(resetsAt * 1000)
+          .isBefore(DateTime.now());
+
   double get leftPercent => (100 - usedPercent).clamp(0, 100).toDouble();
 }
 
@@ -230,6 +242,19 @@ class UsageProvider {
   final int cacheReadTokens;
   final List<RateWindow> rateLimits;
 
+  /// Whether this provider can report rate limits at all.
+  ///
+  /// Only the ChatGPT/Codex subscription exposes them; every other provider
+  /// hardcodes no snapshot, and opencode returns no such headers even in
+  /// principle. So an empty [rateLimits] means one of two very different things,
+  /// and the card must not blur them: a provider that CAN report just hasn't yet,
+  /// whereas one that cannot will never show a number.
+  ///
+  /// Null means UNKNOWN — a daemon predating this field. Kept distinct from
+  /// false so we never assert a provider *cannot* report when we simply haven't
+  /// been told; the UI falls back to neutral wording in that case.
+  final bool? rateLimitsSupported;
+
   UsageProvider.fromJson(Map<String, dynamic> j)
       : provider = j['provider'] as String? ?? '',
         profile = j['profile'] as String?,
@@ -239,6 +264,7 @@ class UsageProvider {
         promptTokens = (j['prompt_tokens'] as num?)?.toInt() ?? 0,
         completionTokens = (j['completion_tokens'] as num?)?.toInt() ?? 0,
         cacheReadTokens = (j['cache_read_tokens'] as num?)?.toInt() ?? 0,
+        rateLimitsSupported = j['rate_limits_supported'] as bool?,
         rateLimits = _reportedRateWindows(j['rate_limits']);
 
   static List<RateWindow> _reportedRateWindows(dynamic raw) {
@@ -645,15 +671,18 @@ String rateWindowLabel(int minutes) {
   return 'limit';
 }
 
-/// "resets in 2h 14m · 15:45" from a Unix-epoch-seconds reset time (null if
-/// unknown or already elapsed). Durations normalize up — minutes → hours → days
-/// (so a weekly window reads "6d 6h", not "150h 54m"). The local clock time is
-/// appended only for near resets (< 1 day out), where it's actually useful.
+/// "resets in 2h 14m · 15:45" from a Unix-epoch-seconds reset time. Durations
+/// normalize up — minutes → hours → days (so a weekly window reads "6d 6h", not
+/// "150h 54m"). The local clock time is appended only for near resets (< 1 day
+/// out), where it's actually useful.
+///
+/// Returns null once the reset has passed: the window rolled over, so there is
+/// no upcoming reset to name. Callers show [RateWindow.isExpired] instead.
 String? rateResetLabel(int resetsAt) {
   if (resetsAt <= 0) return null;
   final reset = DateTime.fromMillisecondsSinceEpoch(resetsAt * 1000);
   final d = reset.difference(DateTime.now());
-  if (d.isNegative) return 'awaiting update';
+  if (d.isNegative) return null;
   final days = d.inDays, h = d.inHours % 24, m = d.inMinutes % 60;
   if (days > 0) return 'resets in ${h > 0 ? '${days}d ${h}h' : '${days}d'}';
   final rel = d.inHours > 0
@@ -788,6 +817,152 @@ class NotificationMarker {
         delivered = j['delivered'] as bool? ?? false;
 }
 
+/// A specialized worker identity in the SQLite coordination directory.
+class CoordinationAgent {
+  final String id;
+  final String displayName;
+  final String handle;
+  final String kind;
+  final String status;
+  final String role;
+  final List<String> capabilities;
+  final int maxConcurrentAssignments;
+  final int maxConcurrentSessions;
+  final int version;
+
+  CoordinationAgent.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        displayName = j['display_name'] as String? ?? '',
+        handle = j['handle'] as String? ?? '',
+        kind = j['kind'] as String? ?? 'worker',
+        status = j['status'] as String? ?? 'active',
+        role = j['role'] as String? ?? 'implementer',
+        capabilities = ((j['capabilities'] as List?) ?? const [])
+            .whereType<String>()
+            .toList(),
+        maxConcurrentAssignments =
+            (j['max_concurrent_assignments'] as num?)?.toInt() ?? 0,
+        maxConcurrentSessions =
+            (j['max_concurrent_sessions'] as num?)?.toInt() ?? 0,
+        version = (j['version'] as num?)?.toInt() ?? 0;
+
+  bool get available => status == 'active';
+}
+
+/// One agent's participation in one session — a lease period joined to the
+/// agent's identity. Answers "when is an agent active in this session": an
+/// agent that held the turn twice appears twice, which is the activity history.
+class CoordinationSessionAgent {
+  final String agentId;
+  final String displayName;
+  final String handle;
+  final String role;
+  final String status;
+
+  /// True while this lease is the session's current, unexpired holder.
+  final bool active;
+  final String assignmentId;
+  final String acquiredAt;
+
+  /// Null while the agent still holds the turn.
+  final String? releasedAt;
+
+  /// Why it ended (released/expired/handoff); null while active.
+  final String? releaseReason;
+
+  CoordinationSessionAgent.fromJson(Map<String, dynamic> j)
+      : agentId = j['agent_id'] as String? ?? '',
+        displayName = j['display_name'] as String? ?? '',
+        handle = j['handle'] as String? ?? '',
+        role = j['role'] as String? ?? '',
+        status = j['status'] as String? ?? '',
+        active = j['active'] as bool? ?? false,
+        assignmentId = j['assignment_id'] as String? ?? '',
+        acquiredAt = j['acquired_at'] as String? ?? '',
+        releasedAt = j['released_at'] as String?,
+        releaseReason = j['release_reason'] as String?;
+
+  /// How the hold ended, in words. Empty while the agent is still active.
+  String get outcome {
+    if (active) return 'active';
+    final reason = releaseReason?.trim() ?? '';
+    return reason.isEmpty ? 'finished' : reason;
+  }
+}
+
+class CoordinationAssignment {
+  final String id;
+  final String goalId;
+  final String sessionId;
+  final String agentId;
+  final String status;
+  final String scope;
+  final String definitionOfDone;
+
+  CoordinationAssignment.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        goalId = j['goal_id'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '',
+        agentId = j['agent_id'] as String? ?? '',
+        status = j['status'] as String? ?? 'offered',
+        scope = j['scope'] as String? ?? '',
+        definitionOfDone = j['definition_of_done'] as String? ?? '';
+}
+
+class CoordinationLease {
+  final String sessionId;
+  final String leaseId;
+  final String assignmentId;
+  final String agentId;
+  final int fencingToken;
+  final String acquiredAt;
+  final String renewedAt;
+  final String expiresAt;
+
+  CoordinationLease.fromJson(Map<String, dynamic> j)
+      : sessionId = j['session_id'] as String? ?? '',
+        leaseId = j['lease_id'] as String? ?? '',
+        assignmentId = j['assignment_id'] as String? ?? '',
+        agentId = j['agent_id'] as String? ?? '',
+        fencingToken = (j['fencing_token'] as num?)?.toInt() ?? 0,
+        acquiredAt = j['acquired_at'] as String? ?? '',
+        renewedAt = j['renewed_at'] as String? ?? '',
+        expiresAt = j['expires_at'] as String? ?? '';
+}
+
+class CoordinationEvent {
+  final String eventId;
+  final String threadId;
+  final String partitionKey;
+  final int sequence;
+  final String eventType;
+  final String actorKind;
+  final String actorId;
+  final int payloadVersion;
+  final Map<String, dynamic> payload;
+  final String? causationId;
+  final String? correlationId;
+  final String idempotencyKey;
+  final String createdAt;
+
+  CoordinationEvent.fromJson(Map<String, dynamic> j)
+      : eventId = j['event_id'] as String? ?? '',
+        threadId = j['thread_id'] as String? ?? '',
+        partitionKey = j['partition_key'] as String? ?? '',
+        sequence = (j['sequence'] as num?)?.toInt() ?? 0,
+        eventType = j['event_type'] as String? ?? '',
+        actorKind = j['actor_kind'] as String? ?? '',
+        actorId = j['actor_id'] as String? ?? '',
+        payloadVersion = (j['payload_version'] as num?)?.toInt() ?? 1,
+        payload = (j['payload'] as Map?)?.cast<String, dynamic>() ?? const {},
+        causationId = j['causation_id'] as String?,
+        correlationId = j['correlation_id'] as String?,
+        idempotencyKey = j['idempotency_key'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '';
+
+  String get body => payload['body'] is String ? payload['body'] as String : '';
+}
+
 /// A task tracked by Mission Control.
 class MissionControlTask {
   final String id;
@@ -918,6 +1093,166 @@ class RecurringJob {
   }
 }
 
+/// A handoff transferring work from one assignment to a successor. A successor
+/// cannot take the turn until it acknowledges the exact record.
+class CoordinationHandoff {
+  final String id;
+  final String goalId;
+  final String sessionId;
+  final String sourceAssignmentId;
+  final String targetAssignmentId;
+  final String contextMode;
+  final String objective;
+  final String definitionOfDone;
+  final String scope;
+  final String completedSummary;
+  final String nextAction;
+  final List<String> blockers;
+  final List<String> risks;
+  final String contentHash;
+  final String createdAt;
+
+  CoordinationHandoff.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        goalId = j['goal_id'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '',
+        sourceAssignmentId = j['source_assignment_id'] as String? ?? '',
+        targetAssignmentId = j['target_assignment_id'] as String? ?? '',
+        contextMode = j['context_mode'] as String? ?? '',
+        objective = j['objective'] as String? ?? '',
+        definitionOfDone = j['definition_of_done'] as String? ?? '',
+        scope = j['scope'] as String? ?? '',
+        completedSummary = j['completed_summary'] as String? ?? '',
+        nextAction = j['next_action'] as String? ?? '',
+        blockers =
+            ((j['blockers'] as List?) ?? const []).whereType<String>().toList(),
+        risks =
+            ((j['risks'] as List?) ?? const []).whereType<String>().toList(),
+        contentHash = j['content_hash'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '';
+}
+
 /// Global notifier bumped whenever model profiles are added, updated, or deleted
 /// so open session views, composers, and settings can refresh their pickers live.
 final ValueNotifier<int> modelsRevision = ValueNotifier<int>(0);
+
+/// Lifecycle of a task on the board.
+///
+/// Deliberately smaller than the assignment states: a task is what a HUMAN
+/// filed, so it carries the columns a person works in and nothing about
+/// dispatch, which is Mission Control's concern.
+enum TaskStatus {
+  todo('todo', 'Todo'),
+  inProgress('in_progress', 'In progress'),
+  blocked('blocked', 'Blocked'),
+  done('done', 'Done'),
+  cancelled('cancelled', 'Cancelled');
+
+  const TaskStatus(this.wire, this.label);
+  final String wire;
+  final String label;
+
+  static TaskStatus parse(String? value) => TaskStatus.values.firstWhere(
+        (s) => s.wire == value,
+        // An unknown status from a newer daemon must not crash the board; Todo
+        // is the safe column because it is the one that still needs action.
+        orElse: () => TaskStatus.todo,
+      );
+}
+
+/// How two tasks relate. `blocks` is an ordering constraint, `relatesTo` is
+/// context — one field with a discriminator so the board draws both without
+/// guessing intent.
+enum TaskLinkKind {
+  blocks('blocks'),
+  relatesTo('relates_to');
+
+  const TaskLinkKind(this.wire);
+  final String wire;
+
+  static TaskLinkKind parse(String? value) => TaskLinkKind.values.firstWhere(
+        (k) => k.wire == value,
+        orElse: () => TaskLinkKind.relatesTo,
+      );
+}
+
+class TaskLink {
+  final String fromTaskId;
+  final String toTaskId;
+  final TaskLinkKind kind;
+  final String createdAt;
+
+  TaskLink.fromJson(Map<String, dynamic> j)
+      : fromTaskId = j['from_task_id'] as String? ?? '',
+        toTaskId = j['to_task_id'] as String? ?? '',
+        kind = TaskLinkKind.parse(j['kind'] as String?),
+        createdAt = j['created_at'] as String? ?? '';
+}
+
+class TaskAgent {
+  final String taskId;
+  final String agentId;
+  final String role;
+  final String addedAt;
+  final String? removedAt;
+
+  /// Still on the task. A removed member is kept for history, so callers must
+  /// ask rather than assume presence means membership.
+  bool get active => removedAt == null;
+
+  TaskAgent.fromJson(Map<String, dynamic> j)
+      : taskId = j['task_id'] as String? ?? '',
+        agentId = j['agent_id'] as String? ?? '',
+        role = j['role'] as String? ?? '',
+        addedAt = j['added_at'] as String? ?? '',
+        removedAt = j['removed_at'] as String?;
+}
+
+/// One task on the board. The thread that carries its conversation is derived
+/// from the id by the daemon, so a client never has to invent one.
+class TaskItem {
+  final String id;
+  final String title;
+  final String description;
+  final TaskStatus status;
+  final int priority;
+  final String createdByKind;
+  final String createdById;
+  final String createdAt;
+  final String updatedAt;
+  final String? completedAt;
+  final String threadId;
+
+  TaskItem.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        description = j['description'] as String? ?? '',
+        status = TaskStatus.parse(j['status'] as String?),
+        priority = (j['priority'] as num?)?.toInt() ?? 0,
+        createdByKind = j['created_by_kind'] as String? ?? '',
+        createdById = j['created_by_id'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '',
+        updatedAt = j['updated_at'] as String? ?? '',
+        completedAt = j['completed_at'] as String?,
+        threadId = j['thread_id'] as String? ?? '';
+}
+
+/// A task's links plus its resolved blockers.
+///
+/// `blockedBy` is separate from `links` because it is the REVERSE of the stored
+/// edge: "a blocks b" is read from b as "b is blocked by a", and a board that
+/// only drew outgoing edges would render a blocked task as unblocked.
+class TaskLinks {
+  final List<TaskLink> links;
+  final List<String> blockedBy;
+
+  const TaskLinks({this.links = const [], this.blockedBy = const []});
+
+  TaskLinks.fromJson(Map<String, dynamic> j)
+      : links = ((j['links'] as List?) ?? const [])
+            .map((e) => TaskLink.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        blockedBy = ((j['blocked_by'] as List?) ?? const [])
+            .whereType<String>()
+            .toList();
+}

@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -47,6 +48,272 @@ PopupMenuItem<T> appMenuItem<T>({
       ),
       if (detail != null) Text(detail, style: sans(11.5, color: AppColors.fg4)),
     ]),
+  );
+}
+
+/// A richer popover row: icon, title, optional one-line description, and a
+/// trailing check when selected. Used by the composer's approval and provider
+/// menus, where the choice needs explaining rather than just naming.
+PopupMenuItem<T> appMenuRow<T>({
+  required T value,
+  required String icon,
+  required String label,
+  String? description,
+  String? trailing,
+  bool selected = false,
+  double height = 54,
+}) {
+  return PopupMenuItem<T>(
+    value: value,
+    height: height,
+    // Deliberately small: the row draws its own rounded, filled hit area, so a
+    // large outer padding would double up and inset the fill too far.
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
+      ),
+      child: Row(children: [
+        // Icon in a tinted tile. A bare 15px glyph floating beside two lines of
+        // text had no visual anchor, which is most of why these menus read flat.
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.accentBg : AppColors.surface3,
+            borderRadius: BorderRadius.circular(R.xs),
+          ),
+          child: AppIcon(icon,
+              size: 14, color: selected ? AppColors.accent : AppColors.fg3),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, weight: W.label, color: AppColors.fg1)),
+              if (description != null)
+                Text(description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(11.5, color: AppColors.fg4)),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          Text(trailing, style: sans(11.5, color: AppColors.fg4)),
+        ],
+        // The check is the one saturated mark in the row, so "this is the
+        // current setting" is legible at a glance rather than one grey glyph
+        // among four.
+        if (selected) ...[
+          const SizedBox(width: 8),
+          AppIcon('check', size: 15, color: AppColors.accent),
+        ],
+      ]),
+    ),
+  );
+}
+
+/// A menu title placed above a group of rows (showMenu takes these as disabled
+/// items, which is the only way to put non-selectable text in a popup menu).
+PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
+      enabled: false,
+      height: 34,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      child: Text(label.toUpperCase(),
+          style: sans(10, weight: W.label, color: AppColors.fg4)),
+    );
+
+/// Present a menu in the shape the platform expects.
+///
+/// ONE entry point for every `appMenuItem`/`appMenuRow` menu in the app: a bottom
+/// sheet on a phone (full width, rows at real touch height, thumb reachable) and
+/// an anchored popover on desktop.
+///
+/// Callers previously each computed a `RelativeRect` and called `showMenu`
+/// directly, which is why the same menu opened as a cramped floating card on a
+/// phone — 40px rows, 12px padding, no grab handle, no sheet affordance.
+Future<T?> showAppMenu<T>(
+  BuildContext context, {
+  required List<PopupMenuEntry<T>> items,
+
+  /// The control this menu belongs to; the desktop popover anchors to it.
+  BuildContext? anchor,
+
+  /// Explicit screen point (long-press / right-click). Wins over [anchor].
+  Offset? point,
+  double minWidth = 260,
+  double maxWidth = 340,
+  Color? color,
+
+  /// Open BELOW the anchor instead of above it. Set for controls at the TOP of
+  /// the window (the shell menu), where an upward menu would be clipped offscreen.
+  bool below = false,
+
+  /// Align the popover's RIGHT edge with the anchor's, instead of its left.
+  /// Set for a control at the right end of a narrow bar — a section header's
+  /// actions, say — where a left-aligned popover would open away from the button
+  /// it belongs to.
+  bool alignEnd = false,
+}) {
+  final bg = color ?? AppColors.surface1;
+
+  if (kMobile) {
+    return showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: const Color(0x9E000000),
+      isScrollControlled: true,
+      builder: (sheet) {
+        final media = MediaQuery.of(sheet);
+        return Container(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+          ),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                Center(
+                    child: Container(
+                        width: 32,
+                        height: 3,
+                        decoration: BoxDecoration(
+                            color: AppColors.border2,
+                            borderRadius: BorderRadius.circular(99)))),
+                const SizedBox(height: 6),
+                Flexible(
+                  child: SingleChildScrollView(
+                    // STRETCH, not the default `center`. A heading is a bare `Text`
+                    // with no width constraint, so under `center` it shrank to its
+                    // intrinsic width and floated to the middle of the sheet while
+                    // every row below it started at the left edge.
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final item in items)
+                            _appMenuSheetEntry(sheet, item),
+                        ]),
+                  ),
+                ),
+                SizedBox(height: media.padding.bottom + 8),
+              ]),
+        );
+      },
+    );
+  }
+
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+  RelativeRect position;
+  if (overlay == null) {
+    position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+  } else if (point != null) {
+    position = RelativeRect.fromRect(
+      Rect.fromCircle(center: point, radius: 0),
+      Offset.zero & overlay.size,
+    );
+  } else if (anchor != null) {
+    final box = anchor.findRenderObject() as RenderBox?;
+    if (box == null) {
+      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+    } else {
+      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+      // Right-aligning means the popover's right edge tracks the anchor's, so
+      // its left is measured back from that edge instead of from the anchor's
+      // left. Clamped either way, so it cannot leave the window.
+      final alignRight = origin.dx + box.size.width;
+      final left = alignEnd
+          ? (alignRight - minWidth)
+              .clamp(12.0, overlay.size.width - minWidth - 12)
+          : origin.dx.clamp(12.0, overlay.size.width - minWidth - 12);
+      if (below) {
+        // Anchored under a control at the TOP of the window (the shell menu),
+        // where an upward menu would be clipped offscreen.
+        position = RelativeRect.fromLTRB(
+          left,
+          origin.dy + box.size.height + 4,
+          overlay.size.width - left - minWidth,
+          0,
+        );
+      } else {
+        // Above the control: the composer chips sit at the bottom of the window,
+        // so a menu opening downward would be clipped.
+        position = RelativeRect.fromLTRB(
+          left,
+          origin.dy - 8,
+          overlay.size.width - left - minWidth,
+          overlay.size.height - origin.dy + 8,
+        );
+      }
+    }
+  } else {
+    position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+  }
+
+  return showMenu<T>(
+    context: context,
+    position: position,
+    color: bg,
+    elevation: 0,
+    shadowColor: Colors.transparent,
+    surfaceTintColor: Colors.transparent,
+    shape: appMenuShape,
+    constraints: BoxConstraints(minWidth: minWidth, maxWidth: maxWidth),
+    items: items,
+  );
+}
+
+/// One entry inside the phone menu sheet.
+///
+/// Mirrors what `PopupMenuItem` draws, so a helper-built row needs no
+/// mobile-specific variant — but sized to a real touch target, which the popup
+/// defaults are not.
+Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
+  if (entry is PopupMenuDivider) {
+    return Divider(height: 13, thickness: 1, color: AppColors.border);
+  }
+  if (entry is! PopupMenuItem<T>) {
+    return const SizedBox.shrink();
+  }
+  final pad = entry.padding ?? const EdgeInsets.symmetric(horizontal: M.gutter);
+  // A heading is a section label and is deliberately NOT tappable.
+  if (!entry.enabled) {
+    return Padding(
+      padding: pad,
+      child: SizedBox(height: entry.height, child: entry.child),
+    );
+  }
+  return InkWell(
+    onTap: () => Navigator.pop(sheet, entry.value),
+    child: Padding(
+      // The row now draws its own rounded, filled hit area for desktop, where a
+      // 4px outer inset is right — the popover supplies the surrounding gutter.
+      // A SHEET does not: it is full width, so inheriting 4px would run the fill
+      // nearly edge-to-edge. Impose the sheet's own gutter here and let the row's
+      // fill sit inside it.
+      padding: EdgeInsets.symmetric(
+        horizontal: pad.horizontal < M.gutter ? M.gutter : pad.horizontal,
+        vertical: 2,
+      ),
+      child: SizedBox(
+        // Never below the 44px touch minimum, whatever the desktop helper used.
+        height: entry.height < 48 ? 52 : entry.height,
+        child: entry.child,
+      ),
+    ),
   );
 }
 
@@ -139,9 +406,19 @@ class _ToastCard extends StatefulWidget {
 
 class _ToastCardState extends State<_ToastCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 220))
-    ..forward();
+  /// Eager, in initState — a lazy `late final` makes `dispose` the first access
+  /// when `build` never runs, constructing a controller on a dead element. Same
+  /// defect class as `_StatusDotState`; fixed together so it cannot recur.
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 220))
+      ..forward();
+  }
+
   @override
   void dispose() {
     _c.dispose();
@@ -189,10 +466,9 @@ class _ToastCardState extends State<_ToastCard>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(a.label,
-                        style: sans(12,
-                                weight: FontWeight.w600,
-                                color: AppColors.accent)
-                            .copyWith(decoration: TextDecoration.none)),
+                        style:
+                            sans(12, weight: W.label, color: AppColors.accent)
+                                .copyWith(decoration: TextDecoration.none)),
                   ),
                 ),
               ],
@@ -259,7 +535,7 @@ class Pills<T> extends StatelessWidget {
               ),
               child: Text(label,
                   style: sans(12.5,
-                      weight: FontWeight.w500,
+                      weight: W.label,
                       color:
                           selected == val ? AppColors.accent : AppColors.fg2)),
             ),
@@ -292,11 +568,11 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     p: sans(16, height: 1.5, color: AppColors.fg1),
     pPadding: EdgeInsets.zero,
     a: sans(16, height: 1.5, color: AppColors.accent),
-    h1: sans(21, weight: FontWeight.w600, height: 1.25, color: AppColors.fg1),
+    h1: sans(21, weight: W.label, height: 1.25, color: AppColors.fg1),
     h1Padding: const EdgeInsets.only(top: 8, bottom: 4),
-    h2: sans(18, weight: FontWeight.w600, height: 1.28, color: AppColors.fg1),
+    h2: sans(18, weight: W.label, height: 1.28, color: AppColors.fg1),
     h2Padding: const EdgeInsets.only(top: 8, bottom: 3),
-    h3: sans(16.5, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
+    h3: sans(16.5, weight: W.label, height: 1.3, color: AppColors.fg1),
     h3Padding: const EdgeInsets.only(top: 6, bottom: 2),
     listIndent: 18,
     listBulletPadding: const EdgeInsets.only(right: 6),
@@ -343,13 +619,13 @@ MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
     pPadding: EdgeInsets.zero,
     em: sans(13.5, height: 1.45, color: dim)
         .copyWith(fontStyle: FontStyle.italic),
-    strong: sans(13.5, height: 1.45, color: dim, weight: FontWeight.w600),
+    strong: sans(13.5, height: 1.45, color: dim, weight: W.label),
     a: sans(13.5, height: 1.45, color: AppColors.accent),
-    h1: sans(15, weight: FontWeight.w600, height: 1.3, color: dim),
+    h1: sans(15, weight: W.label, height: 1.3, color: dim),
     h1Padding: const EdgeInsets.only(top: 4, bottom: 2),
-    h2: sans(14.5, weight: FontWeight.w600, height: 1.3, color: dim),
+    h2: sans(14.5, weight: W.label, height: 1.3, color: dim),
     h2Padding: const EdgeInsets.only(top: 4, bottom: 2),
-    h3: sans(14, weight: FontWeight.w600, height: 1.3, color: dim),
+    h3: sans(14, weight: W.label, height: 1.3, color: dim),
     h3Padding: const EdgeInsets.only(top: 2, bottom: 1),
     code: mono(12.5, color: dim2),
     codeblockPadding: EdgeInsets.zero,
@@ -529,15 +805,35 @@ class _MdCodeBlock extends StatelessWidget {
   }
 }
 
-/// Line icon (Material outlined, mapped from the handoff's Lucide names).
+/// HugeIcons sit inside an explicit square and are optically scaled below its
+/// layout bound. This prevents round/full-canvas SVGs from reading larger than
+/// adjacent text or controls.
 class AppIcon extends StatelessWidget {
   final String name;
   final double size;
   final Color? color;
-  const AppIcon(this.name, {super.key, this.size = 18, this.color});
+
+  /// Extra correction on top of the per-glyph table.
+  ///
+  /// Rarely needed — [glyphInkScale] already normalises the glyphs whose ink
+  /// differs from the norm — so this is a one-off escape hatch.
+  final double visualScale;
+  const AppIcon(this.name,
+      {super.key, this.size = 18, this.color, this.visualScale = 1.0});
+
   @override
-  Widget build(BuildContext context) =>
-      Icon(iconFor(name), size: size, color: color ?? AppColors.fg2);
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: size,
+        child: Center(
+          child: HugeIcon(
+            icon: hugeIconFor(name),
+            // Layout keeps the nominal `size`; only the INK is normalised, so a
+            // corrected glyph still occupies the same box as its neighbours.
+            size: size * visualScale * glyphInkScale(name),
+            color: color ?? AppColors.fg2,
+          ),
+        ),
+      );
 }
 
 /// Glowing status dot.
@@ -551,9 +847,23 @@ class StatusDot extends StatefulWidget {
 
 class _StatusDotState extends State<StatusDot>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1200))
-    ..repeat(reverse: true);
+  /// Assigned in initState, NOT as a lazy `late final` initialiser.
+  ///
+  /// A lazy initialiser is evaluated on FIRST ACCESS, and for a static status
+  /// ('online'/'offline') `build` never reads it — so `dispose` became the first
+  /// access and constructed an AnimationController on an element that was
+  /// already unmounting, throwing "the widget's element tree is no longer
+  /// stable". Creating it eagerly removes the ordering dependency entirely.
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
   @override
   void dispose() {
     _c.dispose();
@@ -620,7 +930,7 @@ class StatusPill extends StatelessWidget {
             height: 6,
             decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
         const SizedBox(width: 6),
-        Text(label, style: sans(11, weight: FontWeight.w500, color: c)),
+        Text(label, style: sans(11, weight: W.label, color: c)),
       ]),
     );
   }
@@ -658,7 +968,20 @@ class AppCard extends StatelessWidget {
   }
 }
 
-enum BtnVariant { primary, secondary, outline, ghost, danger }
+enum BtnVariant {
+  primary,
+  secondary,
+
+  /// A surface STEP, no border.
+  ///
+  /// The design language has no borders and reserves the accent hue for state,
+  /// so neither [primary] (accent fill) nor [secondary] (hairline) is right for
+  /// a plain action. This is the doc's chip/active ladder doing the work.
+  surface,
+  outline,
+  ghost,
+  danger,
+}
 
 class Btn extends StatelessWidget {
   final String label;
@@ -689,6 +1012,8 @@ class Btn extends StatelessWidget {
           AppColors.fg1,
           AppColors.border
         ),
+      // Ladder, not a line: the fill is the separation.
+      BtnVariant.surface => (AppColors.surface3, AppColors.fg2, null),
       BtnVariant.outline => (
           Colors.transparent,
           AppColors.fg1,
@@ -712,8 +1037,7 @@ class Btn extends StatelessWidget {
           const SizedBox(width: 8)
         ],
         Text(label,
-            style:
-                sans(small ? 12.5 : 13.5, weight: FontWeight.w500, color: fg)),
+            style: sans(small ? 12.5 : 13.5, weight: W.label, color: fg)),
         if (iconRight != null) ...[
           const SizedBox(width: 8),
           AppIcon(iconRight!, size: small ? 15 : 17, color: fg)
@@ -772,7 +1096,7 @@ class PillBtn extends StatelessWidget {
               ],
               Text(label,
                   style: sans(kMobile ? 14.5 : 13,
-                      weight: FontWeight.w500, color: AppColors.accentFg)),
+                      weight: W.label, color: AppColors.accentFg)),
             ]),
           ),
         ),
@@ -799,7 +1123,9 @@ class IconBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final btn = Material(
-      color: active ? AppColors.accentBg : Colors.transparent,
+      // Selection is surface-only, matching the sidebar/rail selection
+      // language. The accent is reserved for state, not for "this is on".
+      color: active ? AppColors.surface2 : Colors.transparent,
       borderRadius: BorderRadius.circular(R.md),
       child: InkWell(
         onTap: onTap,
@@ -807,8 +1133,8 @@ class IconBtn extends StatelessWidget {
         child: SizedBox(
           width: size,
           height: size,
-          child: Icon(iconFor(name),
-              size: iconSize, color: active ? AppColors.accent : AppColors.fg2),
+          child: AppIcon(name,
+              size: iconSize, color: active ? AppColors.fg1 : AppColors.fg2),
         ),
       ),
     );
@@ -838,8 +1164,7 @@ class AddCard extends StatelessWidget {
             const AppIcon('plus', size: 15),
             const SizedBox(width: 8),
             Text(label,
-                style:
-                    sans(12.5, weight: FontWeight.w500, color: AppColors.fg2)),
+                style: sans(12.5, weight: W.label, color: AppColors.fg2)),
           ]),
         ),
       ),
@@ -1346,7 +1671,7 @@ class StatTile extends StatelessWidget {
             const SizedBox(height: 5),
             Text(value,
                 style: mono(16,
-                    weight: FontWeight.w500,
+                    weight: W.label,
                     color: accent ? AppColors.accent : AppColors.fg1)),
             if (sub != null) ...[
               const SizedBox(height: 4),
@@ -1390,8 +1715,7 @@ class WarnChip extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         AppIcon('alert-triangle', size: 11, color: AppColors.run),
         const SizedBox(width: 5),
-        Text(label,
-            style: sans(10.5, weight: FontWeight.w500, color: AppColors.run)),
+        Text(label, style: sans(10.5, weight: W.label, color: AppColors.run)),
       ]),
     );
   }
@@ -1421,33 +1745,41 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 28),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(R.md),
+    // Fills the box it is handed and centers inside it. Call sites give this the
+    // whole body of a pane or an `Expanded`, and a shrink-wrapping child there
+    // aligns to the top-left instead of the middle — so the centering has to
+    // live here rather than be repeated at every call site.
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 28),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              // Separation by surface step, not a hairline — the design
+              // language's first rule. surface2 is the ladder's "quiet raised
+              // content" step, which is what this tile is; the border was
+              // standing in for a step that already existed.
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(R.md),
+            ),
+            child: AppIcon(icon, size: 24, color: AppColors.fg3),
           ),
-          child: AppIcon(icon, size: 24, color: AppColors.fg3),
-        ),
-        const SizedBox(height: 12),
-        Text(title,
-            style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
-        if (body != null) ...[
-          const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 240),
-            child: Text(body!,
-                textAlign: TextAlign.center,
-                style: sans(12.5, height: 1.5, color: AppColors.fg3)),
-          ),
-        ],
-        if (action != null) ...[const SizedBox(height: 16), action!],
-      ]),
+          const SizedBox(height: 12),
+          Text(title, style: sans(15, weight: W.label, color: AppColors.fg1)),
+          if (body != null) ...[
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 240),
+              child: Text(body!,
+                  textAlign: TextAlign.center,
+                  style: sans(12.5, height: 1.5, color: AppColors.fg3)),
+            ),
+          ],
+          if (action != null) ...[const SizedBox(height: 16), action!],
+        ]),
+      ),
     );
   }
 }
@@ -1461,6 +1793,20 @@ class SnAppBar extends StatelessWidget {
   final List<Widget> actions;
   final double titleSize;
   final bool compact;
+
+  /// Which surface the bar sits on. Defaults to the ambient scaffold colour,
+  /// which is what the desktop panels re-theme.
+  final Color? background;
+
+  /// Draws the 1px bottom hairline.
+  ///
+  /// The design language uses NO borders — separation comes from the surface
+  /// ladder — so a page that pairs a chrome bar with a canvas body passes
+  /// `false` and lets the step do the work. Defaulted to true rather than
+  /// flipped globally: the existing call sites share the scaffold's own colour,
+  /// where the hairline is currently the only separation they have. Removing it
+  /// for them is a follow-up, not something to fold into one page's fix.
+  final bool bordered;
   const SnAppBar(
       {super.key,
       required this.title,
@@ -1469,7 +1815,9 @@ class SnAppBar extends StatelessWidget {
       this.leading,
       this.actions = const [],
       this.titleSize = 17,
-      this.compact = false});
+      this.compact = false,
+      this.background,
+      this.bordered = true});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -1479,8 +1827,10 @@ class SnAppBar extends StatelessWidget {
       decoration: BoxDecoration(
         // Follows the ambient shell surface — desktop panels re-theme this to
         // surface1 so the bar never reads as a darker strip (mobile: still bg).
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+        color: background ?? Theme.of(context).scaffoldBackgroundColor,
+        border: bordered
+            ? Border(bottom: BorderSide(color: AppColors.border))
+            : null,
       ),
       child: Row(children: [
         if (leading != null)
@@ -1572,7 +1922,7 @@ class _AppFieldState extends State<AppField> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (widget.label != null) ...[
         Text(widget.label!,
-            style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+            style: sans(12, weight: W.label, color: AppColors.fg2)),
         const SizedBox(height: 7),
       ],
       AnimatedContainer(
@@ -1640,40 +1990,65 @@ Future<bool> confirmAction(
   String confirmLabel = 'Delete',
   bool danger = true,
 }) async {
+  final accent = danger ? AppColors.danger : AppColors.accent;
   final result = await showDialog<bool>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.58),
     builder: (ctx) {
       return BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: Dialog(
           backgroundColor: AppColors.surface1,
           elevation: 0,
           insetPadding:
-              EdgeInsets.symmetric(horizontal: kMobile ? 28 : 40, vertical: 24),
+              EdgeInsets.symmetric(horizontal: kMobile ? 24 : 40, vertical: 24),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.md),
+            borderRadius: BorderRadius.circular(R.card),
             side: BorderSide(color: AppColors.border2),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: const BoxConstraints(maxWidth: 400),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(title,
-                        style: sans(15,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(width: 16),
+                    // Tinted badge: a destructive confirm should look
+                    // destructive before you read a word of it.
+                    Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: AppIcon(danger ? 'alert-triangle' : 'alert-circle',
+                          size: 16, color: accent),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(body,
-                          style: sans(13, height: 1.45, color: AppColors.fg3)),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Text(title,
+                            style: sans(14.5,
+                                weight: W.label, color: AppColors.fg1)),
+                      ),
                     ),
                   ]),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
+                  // The body gets its OWN line, aligned under the title rather
+                  // than beside it. Sharing one Row made the body wrap into a
+                  // narrow column next to a one-line title, so the dialog read
+                  // as two unrelated fragments.
+                  Padding(
+                    padding: const EdgeInsets.only(left: 44),
+                    child: Text(body,
+                        style: sans(12.5, height: 1.5, color: AppColors.fg3)),
+                  ),
+                  const SizedBox(height: 18),
                   Row(children: [
                     const Spacer(),
                     Btn('Cancel',
@@ -1730,8 +2105,8 @@ Future<String?> promptText(BuildContext context,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(title,
-                        style: sans(13.5,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+                        style:
+                            sans(13.5, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     _TextPromptSheet(
                         initial: initial,
@@ -1849,8 +2224,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                       Expanded(
                           child: Text(title,
                               style: sans(13.5,
-                                  weight: FontWeight.w600,
-                                  color: AppColors.fg1))),
+                                  weight: W.label, color: AppColors.fg1))),
                       IconBtn('x',
                           size: 28,
                           iconSize: 14,
@@ -1887,7 +2261,6 @@ Future<T?> showAppSheet<T>(BuildContext context,
             color: AppColors.surface1,
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-            border: Border(top: BorderSide(color: AppColors.border2)),
           ),
           constraints: BoxConstraints(
               maxHeight: (media.size.height - media.viewInsets.bottom) * 0.88),
@@ -1901,12 +2274,12 @@ Future<T?> showAppSheet<T>(BuildContext context,
                         color: AppColors.border2,
                         borderRadius: BorderRadius.circular(99)))),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
+              padding: EdgeInsets.fromLTRB(M.gutter, 10, 8, 10),
               child: Row(children: [
                 Expanded(
                     child: Text(title,
-                        style: sans(14.5,
-                            weight: FontWeight.w600, color: AppColors.fg1))),
+                        style: sans(M.sectionTitle,
+                            weight: W.label, color: AppColors.fg1))),
                 IconBtn('x',
                     size: 32,
                     iconSize: 16,
@@ -1915,7 +2288,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
             ),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 14),
                 child: child,
               ),
             ),
@@ -1925,6 +2298,78 @@ Future<T?> showAppSheet<T>(BuildContext context,
       );
     },
   );
+}
+
+/// A theme-styled switch track + thumb.
+///
+/// Extracted so a settings row can use the switch WITHOUT the card chrome that
+/// [AppToggle] wraps around it. Call sites previously reached for
+/// `Transform.scale(child: Switch(...))` to size a Material switch down, which
+/// scales the whole widget including its touch target and distorts Material's
+/// fixed internal proportions — that is why the result looked wrong.
+class AppSwitch extends StatelessWidget {
+  final bool on;
+  final ValueChanged<bool> onChanged;
+
+  /// Whole-track size. The thumb and its inset derive from this, so the
+  /// proportions hold at any size.
+  final double width;
+  final double height;
+  final double thumb;
+
+  const AppSwitch({
+    super.key,
+    required this.on,
+    required this.onChanged,
+    this.width = 44,
+    this.height = 26,
+    this.thumb = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    const inset = 3.0;
+    return Semantics(
+      toggled: on,
+      child: GestureDetector(
+        onTap: () => onChanged(!on),
+        // The visible track is small; this keeps the tappable area comfortable
+        // without scaling the drawing.
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: width,
+          height: height + 12,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              width: width,
+              height: height,
+              decoration: BoxDecoration(
+                color: on ? AppColors.accent : AppColors.surface3,
+                borderRadius: BorderRadius.circular(height / 2),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: inset),
+                  child: Container(
+                    width: thumb,
+                    height: thumb,
+                    decoration: const BoxDecoration(
+                        color: Colors.white, shape: BoxShape.circle),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class AppToggle extends StatelessWidget {
@@ -1956,8 +2401,7 @@ class AppToggle extends StatelessWidget {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(label,
-                  style:
-                      sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
+                  style: sans(13, weight: W.label, color: AppColors.fg1)),
               if (sub != null) ...[
                 const SizedBox(height: 3),
                 Text(sub!, style: sans(11, color: AppColors.fg3))
@@ -1965,26 +2409,7 @@ class AppToggle extends StatelessWidget {
             ]),
           ),
           const SizedBox(width: 12),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 40,
-            height: 24,
-            decoration: BoxDecoration(
-                color: on ? AppColors.accent : AppColors.surface3,
-                borderRadius: BorderRadius.circular(99)),
-            child: AnimatedAlign(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.all(3),
-                width: 18,
-                height: 18,
-                decoration: const BoxDecoration(
-                    color: Colors.white, shape: BoxShape.circle),
-              ),
-            ),
-          ),
+          AppSwitch(on: on, onChanged: onChanged),
         ]),
       ),
     );

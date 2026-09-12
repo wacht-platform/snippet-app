@@ -236,7 +236,7 @@ class _SessionTermViewState extends State<SessionTermView> {
           padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
           child: Row(children: [
             Text(widget.alive ? 'Shell' : 'Shell · starting',
-                style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+                style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
             const Spacer(),
             if (widget.onNew != null)
               IconBtn('plus',
@@ -315,5 +315,28 @@ class _SessionTermViewState extends State<SessionTermView> {
           ),
         ),
     ]);
+  }
+}
+
+/// A `Terminal` that fixes `clear`.
+///
+/// CSI 2J only blanks the viewport, so fish's `clear` (CUP 1;1 then reprint)
+/// leaves the last history line glued to the new prompt. Pushing the screen into
+/// scrollback first matches gnome-terminal / iTerm. Lives here rather than in
+/// session.dart so the global-shell controller can share it without importing
+/// the session screen.
+class ClearScrollTerminal extends Terminal {
+  ClearScrollTerminal() : super(maxLines: 5000);
+
+  @override
+  void eraseDisplay() {
+    if (!buffer.isAltBuffer) {
+      final n = viewHeight;
+      for (var i = 0; i < n; i++) {
+        buffer.index();
+      }
+    }
+    buffer.eraseDisplay();
+    buffer.setCursor(0, 0);
   }
 }

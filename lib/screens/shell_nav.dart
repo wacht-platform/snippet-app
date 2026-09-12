@@ -1,0 +1,640 @@
+import 'package:flutter/material.dart';
+
+import '../theme.dart';
+import '../widgets.dart';
+
+/// Design-language primitives for the shell sidebar.
+///
+/// Metrics are measured from the reference, not eyeballed:
+///   1. SECTION header — 32px tall, 8px/12px padding, uppercase, muted
+///   2. GROUP header   — 26px tall, same padding, collapsible
+///   3. ROW            — 26px tall, 8px radius, icon + label
+///
+/// Separation comes from the surface ladder, never from drawn lines: the
+/// reference contains no borders at all.
+///
+/// Kept in one file so the sidebar's look is reviewable in one place rather
+/// than scattered through a 4k-line screen.
+
+/// Rows are colour-coded by kind. Colour here is *information* — which list a
+/// row belongs to — which is why the reference can afford several hues: they
+/// are rationed to iconography, never used as surfaces.
+///
+/// Chat rows in particular stay neutral: every conversation sharing one
+/// saturated accent turned the list into a wall of blue and buried the
+/// selection state.
+enum ShellTone { chat, ticket, artifact, review, agent, neutral }
+
+Color toneColor(ShellTone tone) => switch (tone) {
+      ShellTone.chat => AppColors.fg3,
+      ShellTone.ticket => AppColors.run,
+      ShellTone.review => AppColors.ok,
+      ShellTone.artifact => AppColors.fg3,
+      ShellTone.agent => AppColors.fg2,
+      ShellTone.neutral => AppColors.fg2,
+    };
+
+// ---------------------------------------------------------------------------
+// Run state → icon colour
+//
+// One shared mapping so a conversation's state reads the SAME everywhere it
+// appears: the sidebar row, the phone card, the window-bar tab and the pane
+// tab. A real conversation has three states (working, wants you, idle) rather
+// than two, and "needs input" is deliberately the accent — it is the one state
+// that needs the user, so it should pull the eye harder than "busy".
+// ---------------------------------------------------------------------------
+
+/// True while a conversation is actively working. Drives the pulse animation.
+bool sessionIsActive(String? status) => status == 'running';
+
+/// The one colour for a conversation-state icon.
+Color sessionStateColor(String? status) {
+  switch (status) {
+    case 'running':
+      return AppColors.run; // amber — busy
+    case 'waiting_for_input':
+      return AppColors.accent; // accent — needs you
+    default:
+      return AppColors.fg3; // neutral — idle
+  }
+}
+
+/// A conversation's leading glyph, tinted by run state.
+///
+/// [Mission Control] keeps its own `layers` glyph; every chat is a
+/// `chat-thread`, matching the sidebar's icon vocabulary. The glyph itself
+/// never changes with state — only its colour (and a subtle pulse while
+/// working), so the row does not reflow or swap identity when a run starts.
+class SessionStateIcon extends StatefulWidget {
+  const SessionStateIcon({
+    super.key,
+    required this.status,
+    this.icon = 'chat-thread',
+    this.size = 16,
+    this.activeColor,
+    this.animate = true,
+  });
+
+  final String? status;
+  final String icon;
+  final double size;
+
+  /// Overrides the state colour (e.g. a selected row lifts to `fg1`).
+  final Color? activeColor;
+
+  /// Lets a dense context (a 26px sidebar row) opt out of the pulse.
+  final bool animate;
+
+  @override
+  State<SessionStateIcon> createState() => _SessionStateIconState();
+}
+
+class _SessionStateIconState extends State<SessionStateIcon>
+    with SingleTickerProviderStateMixin {
+  // Assigned in initState, NOT as a `late final` initialiser. A lazy
+  // initialiser runs on FIRST ACCESS, and for an idle session nothing touches
+  // `_c` until `dispose()` — which would then construct a controller on an
+  // already-unmounting element. Every idle row would hit that path.
+  late final AnimationController _c;
+
+  bool get _shouldPulse => widget.animate && sessionIsActive(widget.status);
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1150),
+    );
+    // Start only when actually working; an idle icon needs no ticker.
+    if (_shouldPulse) _c.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant SessionStateIcon old) {
+    super.didUpdateWidget(old);
+    if (_shouldPulse && !_c.isAnimating) {
+      _c.repeat(reverse: true);
+    } else if (!_shouldPulse && _c.isAnimating) {
+      _c.stop();
+      _c.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.activeColor ?? sessionStateColor(widget.status);
+    final icon = AppIcon(widget.icon, size: widget.size, color: color);
+    if (!_shouldPulse) return icon;
+    // A gentle opacity breath — enough to read as "working" at a glance without
+    // a spinner's constant motion competing with the transcript.
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.45, end: 1.0).animate(
+        CurvedAnimation(parent: _c, curve: Curves.easeInOut),
+      ),
+      child: icon,
+    );
+  }
+}
+
+/// Measured metrics.
+const double kNavRowHeight = 26;
+const double kNavHeaderHeight = 32;
+const double kNavIcon = 16;
+
+/// Outer padding on sidebar sections.
+const double kSidebarContentInset = 8;
+
+/// A row's box sits at the SAME inset as a section header — measured x8 for
+/// both. An earlier version inset rows one step further, which pushed every
+/// list 10px right of its own header and off the sidebar's left edge.
+/// Deeper nesting still adds `kTreeIndentStep` per level via a row's `indent`.
+const double kNavRowInset = kSidebarContentInset;
+
+/// Padding inside a row, between its box edge and its content.
+///
+/// With the box at 8 this puts the icon at 20, so header and rows align on one
+/// axis.
+const double kNavPadH = 12;
+
+/// UPPERCASE section header with a trailing action cluster. No caret: the
+/// panels using it never collapsed, so it promised a control that didn't exist.
+class ShellSectionHeader extends StatelessWidget {
+  const ShellSectionHeader({
+    super.key,
+    required this.label,
+    this.onToggle,
+    this.actions = const [],
+  });
+
+  final String label;
+
+  /// Null for a header that cannot collapse.
+  final VoidCallback? onToggle;
+
+  /// Rendered right-aligned, smallest-first.
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    return SizedBox(
+      height: kNavHeaderHeight,
+      child: Padding(
+        // Headers sit at the outer section inset; the rows beneath them are
+        // inset one step further, which is what creates the hierarchy.
+        padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(R.md),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: kNavPadH, vertical: 8),
+                  child: Text(
+                    label.toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    // Measured: 12px/500 in the default body ink (#C1C1C1), not
+                    // the faintest tone. At fg4 the header was nearly invisible
+                    // and read as disabled chrome rather than a section label.
+                    style: sans(12,
+                        weight: W.label, color: AppColors.fg2, spacing: 0.4),
+                  ),
+                ),
+              ),
+            ),
+            ...actions,
+            const SizedBox(width: kNavPadH),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The ONE navigation header for a drilled-down phone screen.
+///
+/// Every nested surface under the phone home — a settings section, an agent's
+/// detail — uses this, so the back affordance and title sit in the same place at
+/// the same size wherever you are. Per-screen headers are how the two drifted:
+/// settings had a 16px title behind an arrow-left, agent detail its own behind
+/// an x. Two screens inside one shell should not offer two different exits.
+class NavBackRow extends StatelessWidget {
+  const NavBackRow({
+    super.key,
+    required this.title,
+    required this.onBack,
+    this.trailing = const [],
+  });
+
+  final String title;
+  final VoidCallback onBack;
+
+  /// Rendered right-aligned, after the title.
+  final List<Widget> trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
+      child: Row(children: [
+        IconBtn('arrow-left',
+            size: M.minTarget, iconSize: 19, tooltip: 'Back', onTap: onBack),
+        const SizedBox(width: 2),
+        Expanded(
+          child: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
+        ),
+        ...trailing,
+      ]),
+    );
+  }
+}
+
+/// Small square icon action used inside a section header's cluster.
+class ShellSectionAction extends StatelessWidget {
+  const ShellSectionAction({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+    this.active = false,
+  });
+
+  final String icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  /// Tints the glyph with the accent. Used to show that a toggle in the cluster
+  /// is currently on — e.g. a text filter is active — so the state is visible
+  /// without opening the control.
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: tooltip,
+        waitDuration: const Duration(milliseconds: 400),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.md),
+          child: SizedBox(
+            // 24px target around a 16px glyph.
+            width: 24,
+            height: 24,
+            child: Center(
+              child: AppIcon(icon,
+                  size: 16,
+                  color: active
+                      ? AppColors.accent
+                      : (onTap == null ? AppColors.fg4 : AppColors.fg3)),
+            ),
+          ),
+        ),
+      );
+}
+
+/// Title-case collapsible group inside a section (e.g. a folder).
+class ShellGroupHeader extends StatelessWidget {
+  const ShellGroupHeader({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.tone,
+    required this.expanded,
+    required this.onToggle,
+    this.indent = kNavRowInset,
+    this.trailing,
+  });
+
+  final String label;
+  final String icon;
+  final ShellTone tone;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final double indent;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return SizedBox(
+      height: kNavRowHeight,
+      child: Padding(
+        padding: EdgeInsets.only(left: indent, right: kSidebarContentInset),
+        child: InkWell(
+          onTap: onToggle,
+          borderRadius: BorderRadius.circular(R.md),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+            child: Row(children: [
+              AppIcon(expanded ? 'chevron-down' : 'chevron-right',
+                  size: 16, color: AppColors.fg4),
+              const SizedBox(width: 8),
+              AppIcon(icon, size: kNavIcon, color: toneColor(tone)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, weight: W.label, color: AppColors.fg2)),
+              ),
+              if (trailing != null) trailing!,
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The leaf: one nav row.
+///
+/// Selection is expressed by surface alone — `surface1` (#222222) behind the
+/// row with 8px radius and no border — exactly as the reference does it. Text
+/// lifts from the default `#C1C1C1` to white only on the active row.
+class ShellNavRow extends StatelessWidget {
+  const ShellNavRow({
+    super.key,
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.tone,
+    this.selected = false,
+    this.indent = kNavRowInset,
+    this.onTap,
+    this.trailing,
+    this.leading,
+  });
+
+  final String id;
+  final String label;
+  final String icon;
+  final ShellTone tone;
+  final bool selected;
+  final double indent;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
+  /// Replaces the default [AppIcon] in the icon column.
+  ///
+  /// Exists so a caller can supply a state-aware glyph (see
+  /// [SessionStateIcon]) that carries its own colour and animation, which the
+  /// fixed [tone] enum cannot express.
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Padding(
+      // The row box sits at the same inset as the section header, so header and
+      // rows share one left edge and one icon column.
+      //
+      // No vertical padding: measured rows are exactly 26px with zero gap, so
+      // any margin here would space the list out at 28 and drift from the
+      // reference's rhythm.
+      padding: EdgeInsets.only(left: indent, right: kSidebarContentInset),
+      child: Material(
+        color: selected ? AppColors.surface1 : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.md),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.md),
+          child: Container(
+            height: kNavRowHeight,
+            padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+            child: Row(children: [
+              leading ??
+                  AppIcon(
+                    icon,
+                    size: kNavIcon,
+                    color: selected ? AppColors.fg1 : toneColor(tone),
+                  ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(
+                    13,
+                    weight: selected ? W.label : W.body,
+                    color: selected ? AppColors.fg1 : AppColors.fg2,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Header height for a pane. Measured 36px in the reference.
+const double kPaneHeaderHeight = 36;
+
+/// A framed tab sits in the full strip band. Every tab carries the same hairline
+/// top seam, so a pane is bounded on top; the active tab additionally overlays a
+/// heavier white stroke on its own segment.
+const double kPaneTabHeight = kPaneHeaderHeight;
+const double kPaneHairline = 0.2;
+const double kPaneActiveStroke = 2.0;
+
+/// Hit width of the pane split handle. The visible line is one hairline at the
+/// centre; this is only the grab zone around it.
+const double kPaneSplitHandleWidth = 6;
+
+/// Passive pane/tab seam. Low-alpha white over the canvas: clearly present as a
+/// boundary, but still a step below the chrome's own borders.
+const double kPaneSeamAlpha = 0.22;
+
+/// The same seam while the divider is hovered — bright enough to signal that the
+/// line is the resize target, without becoming a drawn border.
+const double kPaneSeamHoverAlpha = 0.42;
+
+/// The one seam colour both panes share, so their boundary cannot render as two
+/// disjoint edges.
+Color get kPaneSeamColor => AppColors.fg1.withValues(alpha: kPaneSeamAlpha);
+Color get kPaneSeamHoverColor =>
+    AppColors.fg1.withValues(alpha: kPaneSeamHoverAlpha);
+
+/// Pane tab widths. Tabs open at [kPaneTabMaxWidth] and shrink together as more
+/// are added, down to the fixed [kPaneTabMinWidth] floor — past which the strip
+/// scrolls rather than squeezing labels into nothing.
+const double kPaneTabMinWidth = 140;
+const double kPaneTabMaxWidth = 260;
+
+/// Width one pane tab should take when [count] tabs share [available] width.
+///
+/// Tabs open wide and shrink together as more are added, stopping at
+/// [kPaneTabMinWidth]. Past that floor the strip scrolls instead of squeezing
+/// labels into nothing — so the minimum is a fixed number, not a ratio.
+double kPaneTabWidth(double available, int count) {
+  if (count <= 0) return kPaneTabMaxWidth;
+  return (available / count).clamp(kPaneTabMinWidth, kPaneTabMaxWidth);
+}
+
+/// Whether a tab belongs in a pane's nested strip whose root session is
+/// [rootKey].
+///
+/// A pane that HAS a root shows that root plus the content tabs filed under it.
+/// A pane with NO root shows ONLY its auxiliary content (files, diffs,
+/// terminals) — never a top-level workspace tab.
+///
+/// That last rule is the whole point. A rootless pane is what a pane becomes
+/// once its session is dragged to the other side, so admitting every docked tab
+/// there made the pane re-render a workspace tab the window bar already owns,
+/// duplicating a top-level tab inside an inner strip.
+bool paneTabBelongsInGroup({
+  required String? rootKey,
+  required String tabKey,
+  required String? groupSessionKey,
+  required bool isAuxiliary,
+}) {
+  if (rootKey == null) return isAuxiliary;
+  return tabKey == rootKey || groupSessionKey == rootKey;
+}
+
+/// Pane tab label size.
+const double kPaneTabText = 12;
+
+/// One tab in a pane header. Readout tabs may close themselves; the pane never
+/// owns a separate close action.
+class PaneTab {
+  const PaneTab({required this.label, required this.icon, this.onClose});
+  final String label;
+  final String icon;
+  final VoidCallback? onClose;
+}
+
+/// Shared joined tab strip for a pane readout. Tabs meet directly and share one
+/// near-background baseline; the active tab carries a solid white top edge.
+class PaneTabStrip extends StatelessWidget {
+  const PaneTabStrip({
+    super.key,
+    required this.tabs,
+    required this.activeIndex,
+    this.onSelect,
+  });
+
+  final List<PaneTab> tabs;
+  final int activeIndex;
+  final ValueChanged<int>? onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Container(
+      height: kPaneHeaderHeight,
+      color: AppColors.canvas,
+      child: Stack(fit: StackFit.expand, children: [
+        LayoutBuilder(builder: (context, c) {
+          final w = kPaneTabWidth(c.maxWidth, tabs.length);
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemCount: tabs.length,
+            separatorBuilder: (_, __) => const SizedBox.shrink(),
+            itemBuilder: (_, i) => _tab(i, w),
+          );
+        }),
+        // Foreground baseline: the ListView paints over the container's own
+        // decoration, so the strip rule must be laid on top of the tabs.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: IgnorePointer(
+            child: Container(height: kPaneHairline, color: kPaneSeamColor),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _tab(int i, double width) {
+    final t = tabs[i];
+    final active = i == activeIndex;
+    return MouseRegion(
+      cursor: onSelect == null ? MouseCursor.defer : SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onSelect == null ? null : () => onSelect!(i),
+        child: SizedBox(
+          width: width,
+          // Every tab carries the SAME hairline top border, so selection cannot
+          // move anything. The active tab's heavier stroke is a
+          // `foregroundDecoration`: it paints above the child and takes no part
+          // in layout. A thicker `Border` insets the active tab's content, which
+          // jogs its label by the width difference every time you switch tabs.
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.canvas,
+              border: Border(
+                right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
+                top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
+              ),
+            ),
+            foregroundDecoration: !active
+                ? null
+                : BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                          color: AppColors.fg1, width: kPaneActiveStroke),
+                    ),
+                  ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon(t.icon,
+                  size: 14, color: active ? AppColors.fg2 : AppColors.fg4),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  t.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(kPaneTabText,
+                      weight: active ? W.label : W.body,
+                      color: active ? AppColors.fg1 : AppColors.fg3),
+                ),
+              ),
+              if (t.onClose != null) ...[
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: t.onClose,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: AppIcon('x', size: 11, color: AppColors.fg4),
+                  ),
+                ),
+              ],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Secondary pane width. Width-driven rather than a flex ratio: a fixed flex
+/// ratio cannot be dragged, and a terminal needs a column count while a readout
+/// should not stretch to 45% of a 4K window.
+const double kPaneDefaultWidth = 420;
+
+/// Smallest usable pane width. Below this a terminal loses its columns and a
+/// readout starts wrapping every label.
+const double kPaneMinWidth = 280;

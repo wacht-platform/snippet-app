@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 
 import '../../../theme.dart';
 import '../../../widgets.dart';
+import '../../../panel.dart';
+import '../../mission_control/coordination_agent_directory.dart';
+import '../task_board_screen.dart';
 import '../mission_control_state.dart';
 import '../mobile/mobile_mc.dart' show showNotificationInbox;
 
@@ -55,7 +58,7 @@ class MissionControlHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(_compact ? 17 : 16.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                        weight: FontWeight.w500, color: AppColors.fg1)),
                 const SizedBox(height: 3),
                 Row(children: [
                   if (state.loading)
@@ -80,6 +83,31 @@ class MissionControlHeader extends StatelessWidget {
                   ),
                 ]),
               ],
+            ),
+          ),
+        ),
+        IconBtn(
+          'users',
+          size: 40,
+          iconSize: 18,
+          tooltip: 'Agents',
+          onTap: () => presentScreen(
+            context,
+            style: PanelStyle.drawer,
+            builder: (_, close) =>
+                CoordinationAgentDirectory(client: state.client),
+          ),
+        ),
+        IconBtn(
+          'layers',
+          size: 40,
+          iconSize: 18,
+          tooltip: 'Tasks',
+          onTap: () => presentScreen(
+            context,
+            style: PanelStyle.drawer,
+            builder: (_, close) => TaskBoardScreen(
+              client: state.client,
             ),
           ),
         ),

@@ -514,7 +514,7 @@ List<Widget> _webReadView(Map? a, Map? d) {
   final title = d?['title']?.toString() ?? '';
   if (title.isNotEmpty) {
     out.add(Text(title,
-        style: sans(14.5, weight: FontWeight.w600, color: AppColors.fg1)));
+        style: sans(14.5, weight: FontWeight.w500, color: AppColors.fg1)));
     out.add(const SizedBox(height: 4));
   }
   if (d?['published_date'] != null) {
@@ -536,7 +536,7 @@ List<Widget> _titleView(Map? a, Map? d) {
   }
   return [
     Text(title,
-        style: sans(14.5, weight: FontWeight.w600, color: AppColors.fg1)),
+        style: sans(14.5, weight: FontWeight.w500, color: AppColors.fg1)),
   ];
 }
 
@@ -546,7 +546,7 @@ List<Widget> _memoryView(String tool, Map? a, Map? d) {
   final content = (d?['content'] ?? a?['content'])?.toString() ?? '';
   if (id.isNotEmpty) {
     out.add(Text(id,
-        style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)));
+        style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)));
   }
   if (content.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -565,7 +565,7 @@ List<Widget> _skillView(String tool, Map? a, Map? d) {
   final out = <Widget>[];
   if (name.isNotEmpty) {
     out.add(Text(name,
-        style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)));
+        style: sans(13.5, weight: FontWeight.w500, color: AppColors.fg1)));
   }
   if (text.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -583,7 +583,7 @@ List<Widget> _monitorView(Map? a, Map? d) {
   final filter = (a?['filter'] ?? d?['filter'])?.toString() ?? '';
   final out = <Widget>[
     Text(action,
-        style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+        style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
   ];
   if (path.isNotEmpty) {
     out.add(const SizedBox(height: 4));
@@ -602,7 +602,7 @@ List<Widget> _presentView(Map? a, Map? d) {
   return [
     if (path.isNotEmpty)
       Text(path,
-          style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)),
+          style: sans(13.5, weight: FontWeight.w500, color: AppColors.fg1)),
     if (caption.isNotEmpty) ...[
       const SizedBox(height: 4),
       Text(caption, style: sans(13, color: AppColors.fg3)),
@@ -787,7 +787,7 @@ Widget _highlightedLine(String text, String query) {
     spans.add(TextSpan(
       text: text.substring(at, at + needle.length),
       style: mono(11.5,
-              height: 1.45, color: AppColors.accent, weight: FontWeight.w600)
+              height: 1.45, color: AppColors.accent, weight: FontWeight.w500)
           .copyWith(backgroundColor: AppColors.accentBg),
     ));
     i = at + needle.length;
@@ -853,7 +853,7 @@ class _ResultCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style:
-                  sans(13.5, weight: FontWeight.w600, color: AppColors.accent)),
+                  sans(13.5, weight: FontWeight.w500, color: AppColors.accent)),
         if (url.isNotEmpty) ...[
           if (title.isNotEmpty) const SizedBox(height: 2),
           Text(url,

@@ -35,48 +35,15 @@ import 'processes.dart';
 import 'git.dart';
 import 'lanes.dart';
 import 'recurring.dart';
+import 'session_panels.dart';
 import 'mission_control/mission_control_state.dart'
-    show isDedicatedMcSession, parseMissionEnvelope, MissionEnvelope;
-import 'mission_control/widgets/mission_control_tasks.dart';
-
-String formatCheckpointDate(String raw) {
-  final parsed = DateTime.tryParse(raw)?.toLocal();
-  if (parsed == null) return raw;
-
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(parsed.year, parsed.month, parsed.day);
-  final daysAgo = today.difference(day).inDays;
-  final hour = parsed.hour == 0
-      ? 12
-      : (parsed.hour > 12 ? parsed.hour - 12 : parsed.hour);
-  final minute = parsed.minute.toString().padLeft(2, '0');
-  final meridiem = parsed.hour >= 12 ? 'PM' : 'AM';
-  final time = '$hour:$minute $meridiem';
-
-  if (daysAgo == 0) return 'Today · $time';
-  if (daysAgo == 1) return 'Yesterday · $time';
-  if (daysAgo >= 0 && daysAgo < 7) {
-    const weekdays = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return '${weekdays[parsed.weekday - 1]} · $time';
-  }
-  const months = <String>[
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  final date = '${months[parsed.month - 1]} ${parsed.day}, ${parsed.year}';
-  return '$date · $time';
-}
+    show
+        isDedicatedMcSession,
+        parseMissionEnvelope,
+        parseBoardMessage,
+        BoardMessage,
+        MissionEnvelope;
+import 'mission_control/task_board_screen.dart';
 
 class SessionScreen extends StatefulWidget {
   final DaemonClient client;
@@ -108,6 +75,21 @@ class SessionScreen extends StatefulWidget {
           void Function(String action, [String? extra]) performAction)?
       onMacControls;
 
+  /// Publishes this session's terminals to the shell as a render host. Called
+  /// only when the terminal set or focus changes, never on output.
+  ///
+  /// The shell owns WHERE a terminal renders; the session owns its lifecycle
+  /// (it is the only side holding the pty). See [TerminalHost].
+  final void Function(TerminalHost host, bool open)? onTerminalHost;
+
+  /// Desktop: open Scheduled as a right-pane READOUT instead of the drawer.
+  ///
+  /// The shell owns the panes, so a session cannot open one itself. Scheduled
+  /// is a property of the conversation it governs, so it belongs beside the
+  /// chat — the same treatment Tasks, Lanes and Checkpoints get. Null on mobile,
+  /// where there are no panes and the drawer is the right shape for a phone.
+  final VoidCallback? onOpenScheduled;
+
   /// Desktop PageView keeps every tab mounted. Only the visible session should
   /// accept file drops — otherwise every keep-alive DropTarget ingests the same
   /// file and the composer chips leak across tabs.
@@ -125,6 +107,11 @@ class SessionScreen extends StatefulWidget {
   /// tabs, the session list, and the status bar in sync.
   final void Function(String title)? onTitle;
 
+  /// True only while this mobile session is the visible phone surface. The shell
+  /// keeps its session mounted behind Chats for the return animation, but an
+  /// inactive session must never intercept Android back from the Chats home.
+  final bool mobileActive;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -137,9 +124,12 @@ class SessionScreen extends StatefulWidget {
       this.onOpenSession,
       this.onMacStatus,
       this.onMacControls,
+      this.onTerminalHost,
+      this.onOpenScheduled,
       this.acceptDrops = true,
       this.inboundShare,
       this.onShareConsumed,
+      this.mobileActive = true,
       this.onTitle});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
@@ -163,8 +153,7 @@ class _SessionActionPanel extends StatelessWidget {
             child: Row(children: [
               Expanded(
                   child: Text(title,
-                      style: sans(16,
-                          weight: FontWeight.w600, color: AppColors.fg1))),
+                      style: sans(16, weight: W.label, color: AppColors.fg1))),
               IconBtn('x',
                   size: 34, iconSize: 18, tooltip: 'Close', onTap: onClose),
             ]),
@@ -207,13 +196,20 @@ class _SessionScreenState extends State<SessionScreen>
   final List<_LiveTerm> _terms = [];
   int _termFocus = 0;
   int _termSeq = 0;
-  double _termHeight = 280;
+
+  /// Width of the desktop terminal split pane. Height is not tracked: the pane
+  /// is full-height beside the chat.
+  double _termWidth = 420;
   int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _currentProfile;
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
+
+  /// Owns the mobile end-drawer so the actions panel can close it directly.
+  /// `Navigator.pop` does NOT close a drawer, so the closer must be this key.
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   StreamSubscription<Amplitude>? _amplitudeSub;
@@ -295,17 +291,35 @@ class _SessionScreenState extends State<SessionScreen>
   /// (e.g. late snapshot after a missed delta, or reconnect race).
   void _retirePendingAlreadyEchoed(List<Map<String, dynamic>> events) {
     if (_pending.isEmpty) return;
+    Iterable<String> attachmentPaths(String text) => RegExp(
+          r'\[attached (?:image|file) —[^\]]*exact path(?: to view it)?: ([^\]]+)\]',
+        )
+            .allMatches(text)
+            .map((m) => m.group(1)?.trim() ?? '')
+            .where((path) => path.isNotEmpty);
     final echoed = <String>{};
+    final echoedAttachments = <String>{};
     for (final e in events) {
       final kind = e['kind'];
       if (kind != 'user_input' && kind != 'steer') continue;
       final t = e['text'];
-      if (t is String && t.trim().isNotEmpty) echoed.add(_normEchoText(t));
+      if (t is String && t.trim().isNotEmpty) {
+        echoed.add(_normEchoText(t));
+        for (final path in attachmentPaths(t)) {
+          echoedAttachments.add(path);
+        }
+      }
     }
     if (echoed.isEmpty) return;
+    bool attachmentEchoed(String pending) {
+      final paths = attachmentPaths(pending).toList();
+      return paths.isNotEmpty && paths.every(echoedAttachments.contains);
+    }
+
     var i = 0;
     while (i < _pending.length) {
-      if (echoed.contains(_normEchoText(_pending[i]))) {
+      if (echoed.contains(_normEchoText(_pending[i])) ||
+          attachmentEchoed(_pending[i])) {
         _removePendingAt(i);
       } else {
         i++;
@@ -649,7 +663,7 @@ class _SessionScreenState extends State<SessionScreen>
         }
       }
 
-      ModelProfile? p;
+      InferenceProfile? p;
       if (wanted != null) {
         for (final m in cfg.profiles) {
           if (m.name == wanted) {
@@ -1146,6 +1160,10 @@ class _SessionScreenState extends State<SessionScreen>
       if (rows != null) pane.rows = rows;
       if (op == 'out') pane.live = true;
     });
+    // Only an `alive`/`live` transition or a new terminal changes what the
+    // sidebar shows. Output frames must not republish: that would rebuild the
+    // shell on every byte the pty writes.
+    _publishTerminals();
     if (op == 'out' && j['alive'] == false) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _closeTerm(id);
@@ -1172,6 +1190,8 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _openTerm({bool fresh = false}) {
+    // Mission Control orchestrates; it has no working tree to shell into. Its
+    // rail slot carries the TASK BOARD toggle instead.
     if (_isMissionControl) return;
     // Second click on Shell hides the drawer — keep the pty so reopening is instant.
     if (!fresh && _termOpen && _terms.isNotEmpty) {
@@ -1188,6 +1208,7 @@ class _SessionScreenState extends State<SessionScreen>
         'cols': t.cols,
         'rows': t.rows,
       });
+      _publishTerminals();
       return;
     }
     final used = _terms.map((t) => int.tryParse(t.id) ?? 0).fold(0, math.max);
@@ -1204,6 +1225,7 @@ class _SessionScreenState extends State<SessionScreen>
       'cols': 80,
       'rows': 24,
     });
+    _publishTerminals();
   }
 
   void _closeTerm(String id) {
@@ -1216,6 +1238,109 @@ class _SessionScreenState extends State<SessionScreen>
       } else {
         _termFocus = _termFocus.clamp(0, _terms.length - 1);
       }
+    });
+    _publishTerminals();
+  }
+
+  /// Focus an existing terminal by index, opening the drawer if it is closed.
+  ///
+  /// Selecting a row in the shell's terminal panel must land on *that*
+  /// terminal, so this takes an index rather than toggling whatever was last
+  /// focused.
+  void _focusTerm(int i) {
+    if (_isMissionControl || i < 0 || i >= _terms.length) return;
+    setState(() {
+      _termOpen = true;
+      _termFocus = i;
+    });
+    final t = _terms[i];
+    _send({
+      'wire': 'term',
+      'op': 'open',
+      'id': t.id,
+      'cols': t.cols,
+      'rows': t.rows,
+    });
+    _publishTerminals();
+  }
+
+  /// Hand the shell a host for this session's terminals, plus whether the pane
+  /// should currently be showing.
+  ///
+  /// Cheap and idempotent; called from the paths that can change the set, the
+  /// focus, or the open flag — never from the output stream.
+  void _publishTerminals() {
+    final publish = widget.onTerminalHost;
+    if (publish == null) return;
+    publish(
+      TerminalHost(
+        terms: [
+          for (final t in _terms)
+            TerminalInfo(
+              id: t.id,
+              title: t.title,
+              alive: t.alive,
+              live: t.live,
+            ),
+        ],
+        focus: _termFocus,
+        buildView: _buildTermView,
+        onFocus: _focusTermById,
+        onRequestNew: () => _openTerm(fresh: true),
+        onRequestClose: _closeTerm,
+      ),
+      // `_termOpen` is the "not minimized" flag. Minimizing hides the pane but
+      // deliberately keeps the pty alive — only the sidebar destroys a shell.
+      _termOpen,
+    );
+  }
+
+  /// Render one terminal by id, for whichever pane is currently hosting it.
+  ///
+  /// The shell owns the pane; the session owns the socket and the view's input
+  /// wiring, so it must supply the widget rather than expose the `Terminal`.
+  Widget _buildTermView(String id, {required bool mobileKeys}) {
+    final t = _terms.firstWhere((e) => e.id == id, orElse: () => _terms.first);
+    return SessionTermView(
+      alive: t.alive,
+      terminal: t.terminal,
+      onInput: (bytes) => _termInFor(t.id, bytes),
+      onResize: (cols, rows) => _termResizeFor(t.id, cols, rows),
+      onClose: () => _closeTerm(t.id),
+      mobileKeys: mobileKeys,
+      showChrome: false,
+    );
+  }
+
+  /// Focus a terminal by id. The shell knows ids; the session knows order.
+  void _focusTermById(String id) {
+    final i = _terms.indexWhere((t) => t.id == id);
+    if (i >= 0) _focusTerm(i);
+  }
+
+  void _termInFor(String id, Uint8List bytes) {
+    _send({
+      'wire': 'term',
+      'op': 'in',
+      'id': id,
+      'data': base64Encode(bytes),
+    });
+  }
+
+  void _termResizeFor(String id, int cols, int rows) {
+    for (final t in _terms) {
+      if (t.id == id) {
+        t.cols = cols;
+        t.rows = rows;
+        break;
+      }
+    }
+    _send({
+      'wire': 'term',
+      'op': 'resize',
+      'id': id,
+      'cols': cols,
+      'rows': rows,
     });
   }
 
@@ -2012,182 +2137,298 @@ class _SessionScreenState extends State<SessionScreen>
       _transcriptDirty = false;
     }
     final items = _transcriptCache!;
+    // The mobile end-drawer is the ONLY host for the action list on a phone, so
+    // the scaffold needs a key (Navigator.pop cannot close a drawer) and the
+    // drawer itself. Desktop keeps the pull-up sheet.
+    final useDrawer = kMobile && widget.onMenu != null;
     final scaffold = Scaffold(
+      key: useDrawer ? _scaffoldKey : null,
+      endDrawer: useDrawer ? _actionsDrawer(s) : null,
+      // Tap-only: the default edge drag competes with transcript gestures.
+      endDrawerEnableOpenDragGesture: false,
       backgroundColor: readingBg,
       resizeToAvoidBottomInset: false,
       body: SafeArea(
         bottom: false,
         child: Stack(children: [
           Positioned.fill(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (kMobile)
-                    _mobileHeader(s, running, waiting)
-                  else if (!kMacOS)
-                    _desktopBar(s, running),
-                  // Desktop keeps the detailed chip strip.
-                  if (!kMobile && !kMacOS) _statusStrip(s, running),
-                  if (_connError != null) _disconnectedBanner(),
-                  Expanded(
-                    child: Stack(children: [
-                      s == null
-                          ? Center(
-                              child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.fg3)))
-                          : NotificationListener<ScrollNotification>(
-                              onNotification: _onScroll,
-                              child: Builder(builder: (context) {
-                                final timeline = <Widget>[
-                                  if (items.isEmpty && !running)
-                                    const EmptyState(
-                                        icon: 'terminal',
-                                        title: 'Session ready',
-                                        body: 'Send a task to get started.'),
-                                  ...items,
-                                  // Optimistic bubbles for messages sent but not yet echoed.
-                                  for (var pi = 0; pi < _pending.length; pi++)
-                                    Opacity(
-                                        key: ValueKey(
-                                            'pending-$pi-${_pending[pi].hashCode}'),
-                                        opacity: 0.5,
-                                        child: Padding(
-                                            padding: const EdgeInsets.only(
-                                                bottom: 12),
-                                            child: Bubble(
-                                                mine: true,
-                                                text: _pending[pi],
-                                                selectable: false))),
-                                  if (_heldQueue.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    _QueuedSection(
-                                      count: _heldQueue.length,
-                                      showBulkActions:
-                                          !kMobile || _heldQueue.length > 1,
-                                      onSendAll: _steerAllQueued,
-                                      onCancelAll: _cancelAllQueued,
-                                      children: [
-                                        for (var qi = 0;
-                                            qi < _heldQueue.length;
-                                            qi++)
-                                          KeyedSubtree(
-                                            key: ValueKey(
-                                                'queued-$qi-${_heldQueue[qi].id}'),
-                                            child: _QueuedBubble(
-                                              text: _queuedText(
-                                                  _heldQueue[qi].text),
-                                              audio: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$1,
-                                              images: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$2,
-                                              files: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$3,
-                                              onCancel: () =>
-                                                  _cancelQueuedAt(qi),
-                                              onSteer: () => _steerQueuedAt(qi),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  // The bottom chrome is NON-FLEX, so Flutter lays it out at its
+                  // natural height BEFORE the transcript's Expanded claims what
+                  // is left. A question or approval card carrying a long
+                  // agent-authored body could therefore exceed the pane outright
+                  // and push its own actions off the bottom edge — which is why a
+                  // big question was impossible to answer. Measuring the pane
+                  // here is what lets the cards be capped and scroll instead.
+                  child: LayoutBuilder(builder: (context, pane) {
+                    final barsCap = pane.maxHeight * 0.6;
+                    return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (kMobile)
+                            _mobileHeader(s)
+                          else if (!kMacOS)
+                            _desktopBar(s, running),
+                          // Desktop keeps the detailed chip strip.
+                          if (!kMobile && !kMacOS) _statusStrip(s, running),
+                          if (_connError != null) _disconnectedBanner(),
+                          Expanded(
+                            child: Stack(children: [
+                              s == null
+                                  ? Center(
+                                      child: SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: AppColors.fg3)))
+                                  : NotificationListener<ScrollNotification>(
+                                      onNotification: _onScroll,
+                                      child: Builder(builder: (context) {
+                                        final timeline = <Widget>[
+                                          if (items.isEmpty && !running)
+                                            const EmptyState(
+                                                icon: 'terminal',
+                                                title: 'Session ready',
+                                                body:
+                                                    'Send a task to get started.'),
+                                          ...items,
+                                          // Optimistic bubbles for messages sent but not yet echoed.
+                                          for (var pi = 0;
+                                              pi < _pending.length;
+                                              pi++)
+                                            Opacity(
+                                                key: ValueKey(
+                                                    'pending-$pi-${_pending[pi].hashCode}'),
+                                                opacity: 0.5,
+                                                child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            bottom: 12),
+                                                    child: Bubble(
+                                                        mine: true,
+                                                        text: _pending[pi],
+                                                        selectable: false))),
+                                          if (_heldQueue.isNotEmpty) ...[
+                                            const SizedBox(height: 8),
+                                            _QueuedSection(
+                                              count: _heldQueue.length,
+                                              showBulkActions: !kMobile ||
+                                                  _heldQueue.length > 1,
+                                              onSendAll: _steerAllQueued,
+                                              onCancelAll: _cancelAllQueued,
+                                              children: [
+                                                for (var qi = 0;
+                                                    qi < _heldQueue.length;
+                                                    qi++)
+                                                  KeyedSubtree(
+                                                    key: ValueKey(
+                                                        'queued-$qi-${_heldQueue[qi].id}'),
+                                                    child: _QueuedBubble(
+                                                      text: _queuedText(
+                                                          _heldQueue[qi].text),
+                                                      audio:
+                                                          _queuedAttachCounts(
+                                                                  _heldQueue[qi]
+                                                                      .text)
+                                                              .$1,
+                                                      images:
+                                                          _queuedAttachCounts(
+                                                                  _heldQueue[qi]
+                                                                      .text)
+                                                              .$2,
+                                                      files:
+                                                          _queuedAttachCounts(
+                                                                  _heldQueue[qi]
+                                                                      .text)
+                                                              .$3,
+                                                      onCancel: () =>
+                                                          _cancelQueuedAt(qi),
+                                                      onSteer: () =>
+                                                          _steerQueuedAt(qi),
+                                                    ),
+                                                  ),
+                                              ],
                                             ),
+                                          ],
+                                          _LiveStreamRow(
+                                            key: const ValueKey(
+                                                'live-stream-row'),
+                                            frame: _liveFrame,
+                                            running: running,
+                                            compacting: s.compacting,
+                                            startedAt: s.turnStartedAt,
+                                            hasVisibleAction:
+                                                _turnHasVisibleAction(events),
+                                            compactionDetail:
+                                                _latestCompactionDetail(events),
                                           ),
-                                      ],
+                                        ];
+                                        return ScrollConfiguration(
+                                          behavior:
+                                              ScrollConfiguration.of(context)
+                                                  .copyWith(scrollbars: false),
+                                          child: ListView.builder(
+                                            controller: _scroll,
+                                            reverse: true,
+                                            scrollCacheExtent:
+                                                ScrollCacheExtent.pixels(400),
+                                            padding: EdgeInsets.fromLTRB(
+                                                kMobile ? M.gutter : 20,
+                                                16,
+                                                kMobile ? M.gutter : 20,
+                                                24),
+                                            itemCount: timeline.length,
+                                            itemBuilder: (context, index) {
+                                              final child = timeline[
+                                                  timeline.length - 1 - index];
+                                              return KeyedSubtree(
+                                                key: child.key ??
+                                                    ValueKey('timeline-$index'),
+                                                child: _centerWide(
+                                                  RepaintBoundary(child: child),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      })),
+                              if (!_stickToBottom && s != null)
+                                Positioned(
+                                  right: 16,
+                                  bottom: 12,
+                                  child: Material(
+                                    color: AppColors.surface1,
+                                    shape: const CircleBorder(),
+                                    elevation: 0,
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () {
+                                        _stickToBottom = true;
+                                        setState(() {});
+                                        _scheduleBottom(
+                                            settle: true, smooth: true);
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: AppIcon('chevron-down',
+                                            size: 16, color: AppColors.fg3),
+                                      ),
                                     ),
-                                  ],
-                                  _LiveStreamRow(
-                                    key: const ValueKey('live-stream-row'),
-                                    frame: _liveFrame,
-                                    running: running,
-                                    compacting: s.compacting,
-                                    startedAt: s.turnStartedAt,
-                                    hasVisibleAction:
-                                        _turnHasVisibleAction(events),
-                                    compactionDetail:
-                                        _latestCompactionDetail(events),
                                   ),
-                                ];
-                                return ScrollConfiguration(
-                                  behavior: ScrollConfiguration.of(context)
-                                      .copyWith(scrollbars: false),
-                                  child: ListView.builder(
-                                    controller: _scroll,
-                                    reverse: true,
-                                    scrollCacheExtent:
-                                        ScrollCacheExtent.pixels(400),
-                                    padding: const EdgeInsets.fromLTRB(
-                                        20, 16, 20, 24),
-                                    itemCount: timeline.length,
-                                    itemBuilder: (context, index) {
-                                      final child =
-                                          timeline[timeline.length - 1 - index];
-                                      return KeyedSubtree(
-                                        key: child.key ??
-                                            ValueKey('timeline-$index'),
-                                        child: _centerWide(
-                                          RepaintBoundary(child: child),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                );
-                              })),
-                      if (!_stickToBottom && s != null)
-                        Positioned(
-                          right: 16,
-                          bottom: 12,
-                          child: Material(
-                            color: AppColors.surface1,
-                            shape: const CircleBorder(),
-                            elevation: 0,
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: () {
-                                _stickToBottom = true;
-                                setState(() {});
-                                _scheduleBottom(settle: true, smooth: true);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: AppIcon('chevron-down',
-                                    size: 16, color: AppColors.fg3),
-                              ),
-                            ),
+                                ),
+                            ]),
                           ),
-                        ),
-                    ]),
-                  ),
-                  // The question/approval bars are PINNED here (not inside the scroll
-                  // list) so a "needs input" request is always visible — buried at the
-                  // bottom of a scrolled-up transcript it read as "the agent is stuck".
-                  if (waiting && _pendingApproval(events))
-                    _centerWide(Padding(
-                      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 6,
-                          widget.embedded ? 0 : 20, 0),
-                      child: _ApprovalBar(
-                          events: events,
-                          onSend: _sendDecision,
-                          showApproveAll: _pendingApprovalTotal(events) > 1),
-                    )),
-                  if (waiting && s?.pendingQuestion != null)
-                    _centerWide(Padding(
-                      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 6,
-                          widget.embedded ? 0 : 20, 0),
-                      child: _QuestionBar(
-                          question: s!.pendingQuestion!, onSend: _sendDecision),
-                    )),
-                  if (!(waiting && s?.pendingQuestion != null))
-                    _centerWide(_inputBar(running)),
-                  if (_termOpen && _terms.isNotEmpty && !kMobile)
-                    _desktopTermDrawer(),
-                ]),
+                          // The question/approval bars are PINNED here (not inside the scroll
+                          // list) so a "needs input" request is always visible — buried at the
+                          // bottom of a scrolled-up transcript it read as "the agent is stuck".
+                          if (waiting && _pendingApproval(events))
+                            _centerWide(ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: barsCap),
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    6,
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    0),
+                                child: ApprovalBar(
+                                    events: events,
+                                    onSend: _sendDecision,
+                                    showApproveAll:
+                                        _pendingApprovalTotal(events) > 1),
+                              ),
+                            )),
+                          if (waiting && s?.pendingQuestion != null)
+                            _centerWide(ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: barsCap),
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    6,
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    0),
+                                child: QuestionBar(
+                                    question: s!.pendingQuestion!,
+                                    onSend: _sendDecision),
+                              ),
+                            )),
+                          if (!(waiting && s?.pendingQuestion != null))
+                            _centerWide(_inputBar(running)),
+                        ]);
+                  }),
+                ),
+                // Desktop, standalone: the terminal is a second pane BESIDE the
+                // chat. When embedded, the SHELL owns this pane instead — a
+                // terminal must survive switching sessions, which a session-local
+                // pane cannot do, so the session only renders it when it is the
+                // outermost desktop surface.
+                if (_termOpen &&
+                    _terms.isNotEmpty &&
+                    !kMobile &&
+                    !widget.embedded)
+                  _desktopTermPane(),
+              ],
+            ),
           ),
-          if (kMobile && _termOpen && _terms.isNotEmpty)
-            Positioned.fill(child: _mobileTermTab()),
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              reverseDuration: const Duration(milliseconds: 150),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.025, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: kMobile && _termOpen && _terms.isNotEmpty
+                  ? KeyedSubtree(
+                      key: const ValueKey('mobile-terminal'),
+                      child: _mobileTermTab(),
+                    )
+                  : const SizedBox(key: ValueKey('mobile-chat')),
+            ),
+          ),
         ]),
       ),
     );
+    final guardedScaffold =
+        kMobile && widget.onMenu != null && widget.mobileActive
+            ? PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (didPop) return;
+                  // One authority, innermost first: an open actions drawer
+                  // closes, then the terminal overlay, then the session yields
+                  // back to the Chats list. Only Chats may exit the app.
+                  final scaf = _scaffoldKey.currentState;
+                  if (scaf != null && scaf.isEndDrawerOpen) {
+                    scaf.closeEndDrawer();
+                  } else if (_termOpen && _terms.isNotEmpty) {
+                    setState(() => _termOpen = false);
+                  } else {
+                    widget.onMenu?.call();
+                  }
+                },
+                child: scaffold,
+              )
+            : scaffold;
     return kMacOS
         ? DropTarget(
             enable: widget.acceptDrops,
@@ -2200,9 +2441,9 @@ class _SessionScreenState extends State<SessionScreen>
               setState(() => _draggingFiles = false);
             },
             onDragDone: _ingestDroppedFiles,
-            child: scaffold,
+            child: guardedScaffold,
           )
-        : scaffold;
+        : guardedScaffold;
   }
 
   Future<void> _renameCurrent() async {
@@ -2237,100 +2478,120 @@ class _SessionScreenState extends State<SessionScreen>
   // title with a live status dot, and a compact subtitle folding in the key
   // facts (status · model · context · approval) — so there's no separate,
   // cramped desktop toolbar + scrolling chip strip on a phone.
-  Widget _mobileHeader(HarnessState? s, bool running, bool waiting) {
-    final compacting = s?.compacting ?? false;
-    final statusWord = compacting
-        ? 'Compacting history…'
-        : (waiting ? 'Needs input' : (running ? 'Running' : 'Idle'));
-    // Keep the model selector in the composer, where it is always visible.
-    final facts = <String>[statusWord];
+  /// Phone session bar: back, title, and the shell action. Deliberately NO run
+  /// state — the chat canvas already carries working/idle, so a second readout
+  /// here was one more thing competing with the title for the same 56px.
+  Widget _mobileHeader(HarnessState? s) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
-      decoration: BoxDecoration(color: readingBg),
+      height: M.appBarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      color: AppColors.bg,
       child: Row(children: [
+        if (widget.onMenu != null)
+          IconBtn('chevron-left',
+              size: M.minTarget,
+              iconSize: 20,
+              tooltip: 'Chats',
+              onTap: widget.onMenu),
+        // Tapping the header opens the ACTIONS panel (the chevron beside it goes
+        // back to Chats). The bar is a 44px tall target, far easier to hit than
+        // a glyph, and it is where a thumb naturally lands to get at "everything
+        // I can do here".
         Expanded(
           child: InkWell(
-            onTap: () => _openActions(s),
+            onTap: () => _openActionsDrawer(s),
             borderRadius: BorderRadius.circular(R.sm),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_title.isEmpty ? 'session' : _title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(17,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(height: 3),
-                    Text(facts.join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(12, color: AppColors.fg3)),
-                  ]),
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              // CENTERED, not baseline-stacked: with the status line gone the
+              // title is the sole element, so it should sit on the bar's optical
+              // centre rather than hug the top of a now-empty column.
+              child: Text(
+                _title.isEmpty ? 'Session' : _title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    sans(M.sectionTitle, weight: W.label, color: AppColors.fg1),
+              ),
             ),
           ),
         ),
-        if (running)
-          IconBtn('stop',
-              tooltip: 'Stop', onTap: () => _send({'kind': 'interrupt'})),
+        // Mission Control orchestrates other sessions' work and has no working
+        // tree of its own, so it gets no shell. Its slot carries the TASK BOARD
+        // instead — the thing you keep returning to from here — mirroring the
+        // desktop rail, which swaps its whole cluster for the board and agents.
         if (_isMissionControl)
-          IconBtn('layers', tooltip: 'Tasks', onTap: _showTasks),
-        if (!_isMissionControl)
-          IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
+          IconBtn('layers',
+              size: M.minTarget,
+              iconSize: 19,
+              tooltip: 'Tasks',
+              onTap: _showTasks)
+        else
+          IconBtn('terminal',
+              size: M.minTarget,
+              iconSize: 19,
+              tooltip: 'Shell',
+              onTap: _openTerm),
       ]),
     );
   }
 
-  Widget _desktopTermDrawer() {
+  /// Desktop terminal pane: a resizable split BESIDE the chat.
+  ///
+  /// Replaces the bottom drawer. The drawer stacked under the transcript and
+  /// competed with it for height, hiding the composer; a side pane keeps both
+  /// usable and is the same shape as the reference's chat/split arrangement.
+  Widget _desktopTermPane() {
     final i = _termFocus.clamp(0, _terms.length - 1);
     final t = _terms[i];
-    return ColoredBox(
-      color: const Color(0xff0a0a0a),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          GestureDetector(
+    final maxW = MediaQuery.sizeOf(context).width * 0.72;
+    return Row(
+      // Sized to content: this is a non-flex child of the chat Row, so it must
+      // not try to expand.
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 6px grab zone carrying a 1px rule. A chunky grab bar would eat
+        // transcript width for no benefit.
+        MouseRegion(
+          cursor: SystemMouseCursors.resizeColumn,
+          child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onVerticalDragUpdate: (d) {
-              final maxH = MediaQuery.sizeOf(context).height * 0.72;
+            onHorizontalDragUpdate: (d) {
               setState(() {
-                _termHeight = (_termHeight - d.delta.dy).clamp(140.0, maxH);
+                _termWidth = (_termWidth - d.delta.dx).clamp(280.0, maxW);
               });
             },
-            child: MouseRegion(
-              cursor: SystemMouseCursors.resizeRow,
-              child: SizedBox(
-                height: 18,
-                child: Center(
-                  child: Container(
-                    width: 36,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: AppColors.border2,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
+            child: Container(
+              width: 6,
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: AppColors.border2)),
               ),
             ),
           ),
-          _termTabStrip(i, compact: true),
-          SizedBox(
-            height: _termHeight,
-            child: SessionTermView(
-              alive: t.alive,
-              terminal: t.terminal,
-              onInput: _termIn,
-              onResize: _termResize,
-              onClose: () => _closeTerm(t.id),
-              mobileKeys: false,
-              showChrome: false,
-            ),
+        ),
+        Container(
+          width: _termWidth,
+          color: const Color(0xff0a0a0a),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _termTabStrip(i, compact: true),
+              Expanded(
+                child: SessionTermView(
+                  alive: t.alive,
+                  terminal: t.terminal,
+                  onInput: _termIn,
+                  onResize: _termResize,
+                  onClose: () => _closeTerm(t.id),
+                  mobileKeys: false,
+                  showChrome: false,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -2366,6 +2627,20 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
+  /// Rename a terminal from its tab. Titles are local to this client (the pty
+  /// has no notion of a name), so this only has to republish to the sidebar.
+  Future<void> _renameTerm(String id) async {
+    final t = _terms.firstWhere((e) => e.id == id, orElse: () => _terms.first);
+    final name = await promptText(context,
+        title: 'Rename terminal',
+        initial: t.title,
+        hint: 'Terminal name',
+        saveLabel: 'Rename');
+    if (name == null || name.trim().isEmpty) return;
+    setState(() => t.title = name.trim());
+    _publishTerminals();
+  }
+
   Widget _termTabStrip(int focus, {required bool compact}) {
     return SizedBox(
       height: compact ? 30 : 36,
@@ -2383,28 +2658,40 @@ class _SessionScreenState extends State<SessionScreen>
                 color: on ? AppColors.surface2 : Colors.transparent,
                 borderRadius: BorderRadius.circular(R.xs),
                 child: InkWell(
-                  onTap: () => setState(() => _termFocus = n),
+                  onTap: () {
+                    setState(() => _termFocus = n);
+                    _publishTerminals();
+                  },
+                  // Right-click / long-press renames. A dedicated pencil button
+                  // per tab would crowd a strip that already carries a close,
+                  // and the gesture is discoverable in the tooltip below.
+                  onSecondaryTap: () => _renameTerm(pane.id),
+                  onLongPress: () => _renameTerm(pane.id),
                   borderRadius: BorderRadius.circular(R.xs),
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 6, 4, 6),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(
-                        pane.title,
-                        style: sans(compact ? 12 : 13,
-                            weight: on ? FontWeight.w600 : FontWeight.w400,
-                            color: on ? AppColors.fg1 : AppColors.fg3),
-                      ),
-                      const SizedBox(width: 2),
-                      GestureDetector(
-                        onTap: () => _closeTerm(pane.id),
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.all(3),
-                          child: AppIcon('x',
-                              size: compact ? 10 : 12, color: AppColors.fg4),
+                  child: Tooltip(
+                    message: '${pane.title} — right-click to rename',
+                    waitDuration: const Duration(milliseconds: 500),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 6, 4, 6),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(
+                          pane.title,
+                          style: sans(compact ? 12 : 13,
+                              weight: on ? FontWeight.w500 : FontWeight.w400,
+                              color: on ? AppColors.fg1 : AppColors.fg3),
                         ),
-                      ),
-                    ]),
+                        const SizedBox(width: 2),
+                        GestureDetector(
+                          onTap: () => _closeTerm(pane.id),
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.all(3),
+                            child: AppIcon('x',
+                                size: compact ? 10 : 12, color: AppColors.fg4),
+                          ),
+                        ),
+                      ]),
+                    ),
                   ),
                 ),
               );
@@ -2444,7 +2731,7 @@ class _SessionScreenState extends State<SessionScreen>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: sans(mac ? 13.5 : 16.5,
-                  weight: FontWeight.w500, color: AppColors.fg1)),
+                  weight: W.label, color: AppColors.fg1)),
         ),
         if (mac && running)
           IconBtn('stop',
@@ -2452,18 +2739,6 @@ class _SessionScreenState extends State<SessionScreen>
               iconSize: 15,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
-        if (mac && _isMissionControl)
-          IconBtn('layers',
-              size: 30, iconSize: 15, tooltip: 'Tasks', onTap: _showTasks),
-        if (mac && !_isMissionControl)
-          IconBtn('terminal',
-              size: 30, iconSize: 15, tooltip: 'Shell', onTap: _openTerm),
-        if (mac)
-          IconBtn('more-horizontal',
-              size: 30,
-              iconSize: 17,
-              tooltip: 'More',
-              onTap: () => _openActions(s)),
         if (!mac && running)
           IconBtn('stop',
               size: 32,
@@ -2471,13 +2746,14 @@ class _SessionScreenState extends State<SessionScreen>
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
         if (!mac) ...[
-          if (_isMissionControl)
-            IconBtn('layers',
-                size: 32, iconSize: 16, tooltip: 'Tasks', onTap: _showTasks),
           if (!_isMissionControl)
             IconBtn('terminal',
                 size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
-          _menu(s),
+          // Mission Control's controls are ALL in the rail above, in the open.
+          // A second copy behind a "⋯" here was the menu to remove, and a Tasks
+          // button would have been a third door to the board the rail already
+          // toggles. Ordinary sessions keep their own actions menu.
+          if (!_isMissionControl) _menu(s),
         ],
       ]),
     );
@@ -2522,12 +2798,26 @@ class _SessionScreenState extends State<SessionScreen>
     _toast('Goal set — the agent will drive toward it');
   }
 
+  void _resumeGoal() {
+    _send({'kind': 'resume_goal'});
+    _toast('Resuming the goal');
+  }
+
   void _cancelGoal() {
     _send({'kind': 'cancel_goal'});
     _toast('Cancelling the goal');
   }
 
   void _openRecurring() {
+    // Desktop: the shell owns the panes and opens this as a right-pane readout,
+    // the same shape Tasks/Lanes/Checkpoints get. A session cannot toggle a pane
+    // itself, so it asks. Null on mobile, where there are no panes and the
+    // drawer is the right shape for a phone.
+    final toPane = widget.onOpenScheduled;
+    if (toPane != null) {
+      toPane();
+      return;
+    }
     presentScreen(context,
         style: PanelStyle.drawer,
         builder: (_, close) => RecurringScreen(
@@ -2556,16 +2846,6 @@ class _SessionScreenState extends State<SessionScreen>
       case 'model':
         _switchModel(context);
         return;
-      case 'approval':
-        final manual = (s?.approvalMode ?? 'auto') == 'manual';
-        _setApproval(!manual);
-        return;
-      case 'approval_ask':
-        _setApproval(true);
-        return;
-      case 'approval_auto':
-        _setApproval(false);
-        return;
       case 'goal':
         final text = extra?.trim();
         if (text != null && text.isNotEmpty) {
@@ -2576,6 +2856,9 @@ class _SessionScreenState extends State<SessionScreen>
         } else {
           _setGoal();
         }
+        return;
+      case 'resume_goal':
+        _resumeGoal();
         return;
       case 'lanes':
         _showLanes();
@@ -2597,6 +2880,26 @@ class _SessionScreenState extends State<SessionScreen>
       case 'shell':
         if (!_isMissionControl) _openTerm();
         return;
+      case 'shell_new':
+        if (!_isMissionControl) _openTerm(fresh: true);
+        return;
+      // Called from the SIDEBAR's terminal panel. Creating a shell is the
+      // sidebar's job; showing the resulting pane is the shell's. Kept separate
+      // from `shell_new` so the sidebar's + does not depend on the pane's own
+      // toggle logic.
+      case 'shell_create':
+        if (!_isMissionControl) _openTerm(fresh: true);
+        return;
+      // Destroy a shell. Only the sidebar can do this — the pane may only
+      // minimize, so a pty is never lost by collapsing a view.
+      case 'shell_close':
+        if (extra != null && extra.isNotEmpty) _closeTerm(extra);
+        return;
+      case 'shell_focus':
+        // `extra` is the terminal index, from the shell's terminal panel.
+        final i = extra == null ? null : int.tryParse(extra);
+        if (i != null) _focusTerm(i);
+        return;
       case 'processes':
         presentScreen(context,
             style: PanelStyle.drawer,
@@ -2605,17 +2908,21 @@ class _SessionScreenState extends State<SessionScreen>
                 sessionId: widget.sessionId,
                 onClose: close));
         return;
-      case 'recurring':
-        _openRecurring();
-        return;
       case 'compact':
         _confirmCompact();
         return;
       case 'checkpoints':
         _showCheckpoints();
         return;
-      case 'usage':
-        _showUsage();
+      // Rewind / fork from a checkpoint shown in the shell's right pane. The
+      // pane sends the id, so the session resolves it against live state rather
+      // than the pane holding a stale Checkpoint copy.
+      case 'rewind':
+        final cp = _checkpointById(extra);
+        if (cp != null) _confirmRewind(cp);
+        return;
+      case 'fork':
+        _confirmFork(_checkpointById(extra));
         return;
     }
   }
@@ -2631,18 +2938,6 @@ class _SessionScreenState extends State<SessionScreen>
           label: label,
           detail: value,
         );
-    if (_isMissionControl) {
-      return [
-        item('layers', 'Tasks', _showTasks),
-        item('scheduled', 'Scheduled', _openRecurring),
-        item('shield', 'Approval: Auto', () => _setApproval(false),
-            value: manual ? null : 'on'),
-        item('shield', 'Approval: Ask', () => _setApproval(true),
-            value: manual ? 'on' : null),
-        item('minimize', 'Compact history', _confirmCompact),
-        item('activity', 'Usage', _showUsage),
-      ];
-    }
     return [
       item('edit', 'Rename session', _renameCurrent),
       item('shield', 'Approval: Auto', () => _setApproval(false),
@@ -2650,8 +2945,9 @@ class _SessionScreenState extends State<SessionScreen>
       item('shield', 'Approval: Ask', () => _setApproval(true),
           value: manual ? 'on' : null),
       (s?.goal?.ongoing ?? false)
-          ? item('zap', 'Cancel goal', _cancelGoal,
-              value: s!.goal!.paused ? 'paused' : 'running')
+          ? (s!.goal!.paused
+              ? item('play', 'Resume goal', _resumeGoal, value: 'paused')
+              : item('zap', 'Cancel goal', _cancelGoal, value: 'running'))
           : item('zap', 'Set goal', _setGoal),
       if ((s?.lanes.isNotEmpty ?? false))
         item('layers', 'Lanes', _showLanes,
@@ -2691,77 +2987,65 @@ class _SessionScreenState extends State<SessionScreen>
       const PopupMenuDivider(),
       item('minimize', 'Compact history', _confirmCompact),
       item('history', 'Checkpoints', _showCheckpoints),
-      item('activity', 'Usage', _showUsage),
     ];
   }
 
   void _openActions(HarnessState? s) {
-    final ws = s?.workspace ?? '';
     void run(VoidCallback f) {
       Navigator.pop(context);
       f();
     }
 
-    showAppSheet(context,
-        title: 'Actions',
-        child: _SessionActionsPanel(
-          session: s,
-          title: _title,
-          hideRename: _isMissionControl,
-          hideWorkspace: _isMissionControl,
-          hideGoal: _isMissionControl,
-          hideCheckpoints: _isMissionControl,
-          onRename: (name) async {
-            if (_isMissionControl) return;
-            try {
-              await widget.client.renameSession(widget.sessionId, name);
-              if (mounted) {
-                setState(() => _publishTitle(name));
-              } else {
-                _publishTitle(name);
-              }
-            } catch (e) {
-              if (mounted) _toast('$e');
-            }
-          },
-          onApproval: _setApproval,
-          onSetGoal: (text) {
-            _send({'kind': 'set_goal', 'value': text});
-            _toast('Goal set — the agent will drive toward it');
-          },
-          onCancelGoal: _cancelGoal,
-          onLanes: () => run(_showLanes),
-          onTasks: _isMissionControl ? () => run(_showTasks) : null,
-          onTerm: () => run(_openTerm),
-          hideShell: _isMissionControl,
-          onGit: () => run(() => presentScreen(context,
-              builder: (_, close) => GitScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-          onFiles: () => run(() {
-            final name = lastPathSegment(ws, ifEmpty: 'Files');
-            presentScreen(context,
-                maxWidth: 1060,
-                maxHeight: 760,
-                builder: (_, close) => FileExplorer(
-                    client: widget.client,
-                    title: name,
-                    start: ws.isEmpty ? null : ws,
-                    onClose: close,
-                    onOpenFile: widget.onOpenFileTab));
-          }),
-          onProcesses: () => run(() => presentScreen(context,
-              style: PanelStyle.drawer,
-              builder: (_, close) => ProcessesScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-          onRecurring: () => run(_openRecurring),
-          onCompact: () => run(_confirmCompact),
-          onCheckpoints: () => run(_showCheckpoints),
-          onUsage: () => run(_showUsage),
-        ));
+    showAppSheet(context, title: 'Actions', child: _actionsPanel(s, run));
+  }
+
+  /// The action list, shared by the mobile end-drawer and the pull-up sheet so
+  /// the two hosts cannot offer different actions. [run] dismisses the host,
+  /// then performs the action.
+  Widget _actionsPanel(HarnessState? s, void Function(VoidCallback) run) {
+    final ws = s?.workspace ?? '';
+    return _SessionActionsPanel(
+      session: s,
+      hideWorkspace: _isMissionControl,
+      hideGoal: _isMissionControl,
+      hideCheckpoints: _isMissionControl,
+      onSetGoal: (text) {
+        _send({'kind': 'set_goal', 'value': text});
+        _toast('Goal set — the agent will drive toward it');
+      },
+      onCancelGoal: _cancelGoal,
+      onResumeGoal: _resumeGoal,
+      onLanes: () => run(_showLanes),
+      onTasks: _isMissionControl ? () => run(_showTasks) : null,
+      hideShell: _isMissionControl,
+      onTerm: () => run(_openTerm),
+      onGit: () => run(() => presentScreen(context,
+          builder: (_, close) => GitScreen(
+              client: widget.client,
+              sessionId: widget.sessionId,
+              onClose: close))),
+      onFiles: () => run(() {
+        final name = lastPathSegment(ws, ifEmpty: 'Files');
+        presentScreen(context,
+            maxWidth: 1060,
+            maxHeight: 760,
+            builder: (_, close) => FileExplorer(
+                client: widget.client,
+                title: name,
+                start: ws.isEmpty ? null : ws,
+                onClose: close,
+                onOpenFile: widget.onOpenFileTab));
+      }),
+      onProcesses: () => run(() => presentScreen(context,
+          style: PanelStyle.drawer,
+          builder: (_, close) => ProcessesScreen(
+              client: widget.client,
+              sessionId: widget.sessionId,
+              onClose: close))),
+      onRecurring: () => run(_openRecurring),
+      onCompact: () => run(_confirmCompact),
+      onCheckpoints: () => run(_showCheckpoints),
+    );
   }
 
   List<Widget> _statusChips(HarnessState? s, bool running) {
@@ -2779,7 +3063,7 @@ class _SessionScreenState extends State<SessionScreen>
                 ? 'Compacting'
                 : (running ? 'Running' : 'Idle'),
             style: sans(12.5,
-                weight: FontWeight.w600,
+                weight: W.label,
                 color: s?.compacting == true
                     ? AppColors.accent
                     : (running ? AppColors.run : AppColors.fg2))),
@@ -2791,22 +3075,16 @@ class _SessionScreenState extends State<SessionScreen>
           label: lastPathSegment(s.workspace, ifEmpty: s.workspace)));
     }
     if (s != null) {
-      if (s.contextWindow > 0 && s.lastPromptTokens > 0) {
-        chips.add(_StatMeta(
-            icon: 'activity',
-            label:
-                '${(s.lastPromptTokens / s.contextWindow * 100).clamp(0, 999).round()}% ctx'));
-      }
       if (s.totalTokens > 0) {
         chips.add(_StatMeta(icon: 'zap', label: '${fmtSi(s.totalTokens)} tok'));
       }
-      chips.add(_StatMeta(
-          icon: 'shield',
-          label: s.approvalMode == 'auto' ? 'Auto-approve' : 'Ask',
-          tone: s.approvalMode == 'auto' ? 'accent' : 'default'));
-      // Show for any provider that reported limits.
+      // Approval mode and context remaining now live in the composer, so they
+      // are deliberately NOT repeated here.
+      // Show for any provider that reported limits. An EXPIRED window is
+      // skipped rather than printed: its percentage describes the window that
+      // already rolled over, so showing it would state a stale figure as fact.
       final rp = s.ratePrimary;
-      if (rp != null) {
+      if (rp != null && !rp.isExpired) {
         chips.add(_StatMeta(
             icon: 'clipboard',
             label:
@@ -2863,8 +3141,7 @@ class _SessionScreenState extends State<SessionScreen>
             AppIcon('refresh', size: 13, color: AppColors.danger),
             const SizedBox(width: 5),
             Text('Retry now',
-                style:
-                    sans(12, weight: FontWeight.w600, color: AppColors.danger)),
+                style: sans(12, weight: W.label, color: AppColors.danger)),
           ]),
         ),
       ]),
@@ -2909,6 +3186,185 @@ class _SessionScreenState extends State<SessionScreen>
     await _ingest(files);
   }
 
+  /// Approval mode as shown in the composer.
+  ///
+  /// The daemon models exactly two modes (`auto` / `manual`), so the pill names
+  /// those rather than inventing a third the backend cannot honor.
+  String get _approvalLabel => (_state?.approvalMode ?? 'auto') == 'manual'
+      ? 'Ask first'
+      : 'Auto approve';
+
+  /// Context still free, as a whole percent of the model's window. Null until
+  /// the daemon has reported both a window size and a prompt size.
+  int? get _contextLeftPct {
+    final s = _state;
+    if (s == null || s.contextWindow <= 0 || s.lastPromptTokens <= 0)
+      return null;
+    final used = s.lastPromptTokens / s.contextWindow;
+    return (100 - used * 100).clamp(0, 100).round();
+  }
+
+  /// Open the full-screen actions panel (slides in from the right).
+  ///
+  /// Dismisses the keyboard first: the panel is a navigation surface, and a
+  /// composer keyboard left open underneath makes the slide look broken.
+  void _openActionsDrawer(HarnessState? s) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  /// The phone's action list as a FULL-SCREEN panel entering from the right.
+  ///
+  /// Full width rather than a 320px drawer: the actions carry descriptions and
+  /// expandable forms (goal, lanes), which a narrow drawer squeezes into
+  /// ellipsis. The right edge distinguishes it from the Chats panel on the left.
+  Widget _actionsDrawer(HarnessState? s) {
+    // Closing the drawer dismisses the host, then runs the action — the drawer
+    // is not a route, so `Navigator.pop` (what the sheet uses) would not close
+    // it and the action would fire behind an open panel.
+    void run(VoidCallback f) {
+      _scaffoldKey.currentState?.closeEndDrawer();
+      f();
+    }
+
+    final title = _title.isEmpty ? 'Session' : _title;
+    return Drawer(
+      width: MediaQuery.sizeOf(context).width,
+      backgroundColor: AppColors.bg,
+      shape: const RoundedRectangleBorder(),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(M.gutter, 10, 8, 6),
+              child: Row(children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Actions',
+                          style: sans(M.pageTitle,
+                              weight: W.label, color: AppColors.fg1)),
+                      const SizedBox(height: 2),
+                      Text(title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(M.meta, color: AppColors.fg4)),
+                    ],
+                  ),
+                ),
+                IconBtn('x',
+                    size: M.minTarget,
+                    iconSize: 20,
+                    tooltip: 'Close',
+                    onTap: () => _scaffoldKey.currentState?.closeEndDrawer()),
+              ]),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter,
+                    28 + MediaQuery.paddingOf(context).bottom),
+                child: _actionsPanel(s, run),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One composer footer control: icon + label + disclosure chevron.
+  Widget _composerChip({
+    required String icon,
+    required String label,
+    required VoidCallback onTap,
+  }) =>
+      Material(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon(icon, size: 13, color: AppColors.fg3),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: sans(11.5, weight: W.label, color: AppColors.fg2)),
+              const SizedBox(width: 5),
+              AppIcon('chevron-down', size: 12, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+      );
+
+  /// The composer's status line: where this session runs, and how much context
+  /// is left. Sits under the card so the transcript keeps the full width.
+  Widget _composerMeta(HarnessState? s) {
+    final left = _contextLeftPct;
+    final ws = s?.workspace ?? '';
+    final name = ws.isEmpty ? '' : lastPathSegment(ws, ifEmpty: ws);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 2, right: 2),
+      child: Row(children: [
+        // ONE tight flex child absorbs the free space, pinning the trailing
+        // readout to the card's right edge. A loose `Flexible` beside a
+        // `Spacer` splits the free space and leaves the leftover AFTER the
+        // readout, so it stops short of the edge instead of reaching it.
+        Expanded(
+          child: name.isEmpty
+              ? const SizedBox.shrink()
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  AppIcon('folder', size: 11, color: AppColors.fg4),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(11, color: AppColors.fg4)),
+                  ),
+                ]),
+        ),
+        if (left != null) ...[
+          const SizedBox(width: 8),
+          Text('$left% context left', style: sans(11, color: AppColors.fg4)),
+        ],
+      ]),
+    );
+  }
+
+  /// Approval picker, anchored under its composer chip.
+  Future<void> _switchApproval([BuildContext? anchor]) async {
+    final current = _state?.approvalMode ?? 'auto';
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor ?? context,
+      minWidth: 260,
+      maxWidth: 320,
+      items: [
+        appMenuRow(
+          value: 'auto',
+          icon: 'zap',
+          label: 'Auto approve',
+          description: 'Run shell and file edits without asking',
+          selected: current != 'manual',
+        ),
+        appMenuRow(
+          value: 'manual',
+          icon: 'shield',
+          label: 'Ask first',
+          description: 'Pause for approval on each change',
+          selected: current == 'manual',
+        ),
+      ],
+    );
+    if (picked == null || picked == current) return;
+    _setApproval(picked == 'manual');
+  }
+
   Widget _inputBar(bool running) {
     final mq = MediaQuery.of(context);
     final keyboard = mq.viewInsets.bottom;
@@ -2917,10 +3373,12 @@ class _SessionScreenState extends State<SessionScreen>
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: keyboard),
       child: Container(
+        // Inset from the pane on EVERY layout. Embedded used to be 0, which is
+        // why the composer stuck to the sides of the shell.
         padding: EdgeInsets.fromLTRB(
-            widget.embedded ? 0 : 20,
+            kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
             8,
-            widget.embedded ? 0 : 20,
+            kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
             10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
         child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2930,11 +3388,19 @@ class _SessionScreenState extends State<SessionScreen>
               if (_isRecording || _recordingPath != null) _recordingPanel(),
               Container(
                 decoration: BoxDecoration(
+                  // Uses the shell `bg` — the SAME surface as the sidebar — so the
+                  // composer reads as part of the chrome rather than a separate
+                  // raised card. The step above the reading canvas is what keeps
+                  // it visible without a heavier fill.
                   color: AppColors.bg,
                   borderRadius: BorderRadius.circular(R.md),
                   border: Border.all(color: AppColors.border),
                 ),
-                padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
+                // The card owns the inset and the rows sit inside it, so there is
+                // no per-row vertical padding to keep in sync. Slightly taller
+                // than it is wide-padded, so the field reads as a writing area.
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2984,19 +3450,25 @@ class _SessionScreenState extends State<SessionScreen>
                         child: TextField(
                           controller: _input,
                           focusNode: _inputFocus,
-                          minLines: 1,
+                          // Two lines minimum: a single-line field read as a
+                          // cramped search box, and it hid the fact that the
+                          // composer accepts multi-line prose.
+                          minLines: 2,
                           maxLines: 8,
                           cursorColor: AppColors.fg1,
                           onSubmitted: (_) => _sendMessage(),
-                          style: sans(15.5, height: 1.45, color: AppColors.fg1),
+                          style: sans(kMobile ? M.body : 15.5,
+                              height: 1.45, color: AppColors.fg1),
                           decoration: InputDecoration(
                             isCollapsed: true,
+                            // The card supplies the inset; this only adds the gap
+                            // between the text and the control row beneath it.
                             contentPadding:
-                                const EdgeInsets.fromLTRB(2, 2, 8, 14),
+                                const EdgeInsets.fromLTRB(2, 2, 8, 10),
                             border: InputBorder.none,
                             hintText: 'Ask anything',
-                            hintStyle:
-                                sans(15.5, height: 1.45, color: AppColors.fg4),
+                            hintStyle: sans(kMobile ? M.body : 15.5,
+                                height: 1.45, color: AppColors.fg4),
                           ),
                         ),
                       ),
@@ -3017,32 +3489,21 @@ class _SessionScreenState extends State<SessionScreen>
                               ),
                             ),
                             const SizedBox(width: 4),
+                            // Approval mode lives here now instead of the tool
+                            // band, so the setting sits next to what it governs.
+                            Builder(
+                              builder: (ctx) => _composerChip(
+                                icon: 'shield',
+                                label: _approvalLabel,
+                                onTap: () => _switchApproval(ctx),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             Builder(builder: (chipCtx) {
-                              return Material(
-                                color: AppColors.surface2,
-                                borderRadius: BorderRadius.circular(R.sm),
-                                child: InkWell(
-                                  onTap: () => _switchModel(chipCtx),
-                                  borderRadius: BorderRadius.circular(R.sm),
-                                  child: Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(8, 5, 7, 5),
-                                    child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          AppIcon('sparkles',
-                                              size: 11, color: AppColors.fg2),
-                                          const SizedBox(width: 5),
-                                          Text(_modelLabel ?? 'Auto',
-                                              style: sans(11.5,
-                                                  weight: FontWeight.w500,
-                                                  color: AppColors.fg2)),
-                                          const SizedBox(width: 3),
-                                          AppIcon('chevron-down',
-                                              size: 10, color: AppColors.fg4),
-                                        ]),
-                                  ),
-                                ),
+                              return _composerChip(
+                                icon: 'sparkles',
+                                label: _modelLabel ?? 'Auto',
+                                onTap: () => _switchModel(chipCtx),
                               );
                             }),
                             const Spacer(),
@@ -3082,6 +3543,7 @@ class _SessionScreenState extends State<SessionScreen>
                           ]),
                     ]),
               ),
+              _composerMeta(_state),
             ]),
       ),
     );
@@ -3315,6 +3777,13 @@ class _SessionScreenState extends State<SessionScreen>
             addEvent(key, _MissionEnvelopeCard(envelope: envelope));
             break;
           }
+          // A board message routed into this session renders as a compact
+          // card — never the raw envelope text.
+          final board = parseBoardMessage(text);
+          if (board != null) {
+            addEvent(key, _BoardMessageCard(message: board));
+            break;
+          }
           addEvent(
               key,
               KeyedSubtree(
@@ -3424,20 +3893,20 @@ class _SessionScreenState extends State<SessionScreen>
       child: AppCard(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-                color: AppColors.accentBg,
-                borderRadius: BorderRadius.circular(R.sm)),
-            child: AppIcon('file', size: 16, color: AppColors.accent),
-          ),
-          const SizedBox(width: 10),
+          // The icon is INSIDE the tap target. It was outside, so tapping the
+          // most obviously tappable part of the card did nothing.
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
+                // ON PHONES: a full-screen route, exactly as the browser does.
+                // `onOpenFileTab` creates a shell TAB, which the phone shell
+                // never draws (see `openFileForViewing`), so calling it here
+                // made the card inert — tapping did nothing at all.
+                if (openFileForViewing(context,
+                    client: widget.client, path: path, name: name)) {
+                  return;
+                }
                 if (widget.onOpenFileTab != null) {
                   widget.onOpenFileTab!(path, name);
                 } else {
@@ -3451,19 +3920,33 @@ class _SessionScreenState extends State<SessionScreen>
                   );
                 }
               },
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: mono(13, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text(caption.isNotEmpty ? caption : path,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11.5, color: AppColors.fg3)),
-                  ]),
+              child: Row(children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                      color: AppColors.accentBg,
+                      borderRadius: BorderRadius.circular(R.sm)),
+                  child: AppIcon('file', size: 16, color: AppColors.accent),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: mono(13, color: AppColors.fg1)),
+                        const SizedBox(height: 2),
+                        Text(caption.isNotEmpty ? caption : path,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(11.5, color: AppColors.fg3)),
+                      ]),
+                ),
+              ]),
             ),
           ),
           const SizedBox(width: 6),
@@ -3489,8 +3972,7 @@ class _SessionScreenState extends State<SessionScreen>
                   borderRadius: BorderRadius.circular(4)),
             ),
             child: Text('Download',
-                style: sans(12,
-                    weight: FontWeight.w600, color: AppColors.accentFg)),
+                style: sans(12, weight: W.label, color: AppColors.accentFg)),
           ),
         ]),
       ),
@@ -3543,70 +4025,24 @@ class _SessionScreenState extends State<SessionScreen>
     }
     if (!mounted) return;
     if (cfg.profiles.isEmpty) {
-      _toast('No model profiles');
+      _toast('No inference profiles');
       return;
     }
-    final box = (anchor ?? context).findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    RelativeRect position;
-    if (box != null && overlay != null) {
-      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      final menuW = math.min(280.0, overlay.size.width - 24);
-      final left = origin.dx.clamp(12.0, overlay.size.width - menuW - 12);
-      // Sit just above the chip. A tiny top inset (16) used to pin the menu
-      // to the status bar on phones.
-      position = RelativeRect.fromLTRB(
-        left,
-        origin.dy - 8,
-        overlay.size.width - left - menuW,
-        overlay.size.height - origin.dy + 8,
-      );
-    } else {
-      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
-    }
     final current = _modelLabel;
-    final picked = await showMenu<String>(
-      context: context,
-      position: position,
-      color: AppColors.surface1,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(R.sm),
-      ),
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor ?? context,
+      minWidth: 260,
+      maxWidth: 340,
       items: [
+        appMenuHeading<String>('Inference profile'),
         for (final p in cfg.profiles)
-          PopupMenuItem<String>(
+          appMenuRow<String>(
             value: p.name,
-            height: 48,
-            child: Row(children: [
-              AppIcon('sparkles',
-                  size: 14,
-                  color: p.name == current ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(p.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13,
-                            weight: FontWeight.w500,
-                            color: p.name == current
-                                ? AppColors.accent
-                                : AppColors.fg1)),
-                    Text('${p.provider} · ${p.model}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg4)),
-                  ],
-                ),
-              ),
-            ]),
+            icon: 'sparkles',
+            label: p.name,
+            description: '${p.provider} · ${p.model}',
+            selected: p.name == current,
           ),
       ],
     );
@@ -3636,113 +4072,18 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
+  /// The task board. ONE destination: it carries the tasks, the agents on
+  /// them, and the handoffs between them, so the old coordination hub — with
+  /// its separate Active/Handoffs sections — is gone.
   void _showTasks() {
     if (!_isMissionControl) return;
     presentScreen(
       context,
-      builder: (_, close) => MissionControlTasksScreen(
-        client: widget.client,
-        onClose: close,
-        onAskTask: (task) {
-          final title = task.title.isEmpty ? task.id : task.title;
-          _input.text =
-              'Tell me about task "$title" — what\'s the current status?';
-          _input.selection =
-              TextSelection.collapsed(offset: _input.text.length);
-          _sendMessage();
-        },
-      ),
+      style: PanelStyle.drawer,
+      maxWidth: 820,
+      maxHeight: 760,
+      builder: (_, close) => TaskBoardScreen(client: widget.client),
     );
-  }
-
-  Widget _usageBody(HarnessState s) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (s.contextWindow > 0) ...[
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Context window',
-              style: sans(12.5, weight: FontWeight.w500, color: AppColors.fg2)),
-          Text('${fmtSi(s.lastPromptTokens)} / ${fmtSi(s.contextWindow)}',
-              style: mono(11.5, color: AppColors.fg3)),
-        ]),
-        const SizedBox(height: 9),
-        Progress(pct: s.lastPromptTokens / s.contextWindow * 100, height: 9),
-        const SizedBox(height: 7),
-        Text('${(s.lastPromptTokens / s.contextWindow * 100).round()}% used',
-            style: mono(11, color: AppColors.accent)),
-        const SizedBox(height: 18),
-      ],
-      const SectionLabel('Tokens'),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(
-            child: StatTile(label: '↑ Input', value: fmtSi(s.promptTokens))),
-        const SizedBox(width: 8),
-        Expanded(
-            child:
-                StatTile(label: '↓ Output', value: fmtSi(s.completionTokens))),
-      ]),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(
-            child:
-                StatTile(label: '↻ Cached', value: fmtSi(s.cacheReadTokens))),
-        const SizedBox(width: 8),
-        Expanded(
-            child: StatTile(
-                label: 'Total', value: fmtSi(s.totalTokens), accent: true)),
-      ]),
-      if (s.ratePrimary != null || s.rateSecondary != null) ...[
-        const SizedBox(height: 18),
-        const SectionLabel('Rate limits · remaining'),
-        const SizedBox(height: 8),
-        for (final w in [s.ratePrimary, s.rateSecondary])
-          if (w != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 11),
-              child: Builder(builder: (_) {
-                final rem = w.leftPercent;
-                final color = rem < 20
-                    ? AppColors.danger
-                    : rem < 50
-                        ? AppColors.run
-                        : AppColors.ok;
-                final reset = rateResetLabel(w.resetsAt);
-                return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(rateWindowLabel(w.windowMinutes),
-                                style: sans(12, color: AppColors.fg2)),
-                            Text('${rem.round()}% left',
-                                style: mono(11, color: color)),
-                          ]),
-                      const SizedBox(height: 6),
-                      Progress(pct: rem, color: color, height: 6),
-                      if (reset != null) ...[
-                        const SizedBox(height: 5),
-                        Text(reset, style: mono(10.5, color: AppColors.fg4)),
-                      ],
-                    ]);
-              }),
-            ),
-      ],
-    ]);
-  }
-
-  void _showUsage() {
-    final s = _state;
-    if (s == null) return;
-    final body = _usageBody(s);
-    if (kMobile) {
-      showAppSheet(context, title: 'Usage', child: body);
-    } else {
-      presentScreen(context,
-          style: PanelStyle.drawer,
-          builder: (_, close) =>
-              _SessionActionPanel(title: 'Usage', onClose: close, child: body));
-    }
   }
 
   void _showCheckpoints() {
@@ -3777,7 +4118,7 @@ class _SessionScreenState extends State<SessionScreen>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: sans(13,
-                                weight: FontWeight.w500,
+                                weight: W.label,
                                 height: 1.2,
                                 color: AppColors.fg1)),
                         const SizedBox(height: 3),
@@ -3802,6 +4143,16 @@ class _SessionScreenState extends State<SessionScreen>
           builder: (_, close) => _SessionActionPanel(
               title: 'Checkpoints', onClose: close, child: content));
     }
+  }
+
+  /// Resolve a checkpoint id sent from the shell's right pane against live
+  /// state, so the pane never holds a stale copy.
+  Checkpoint? _checkpointById(String? id) {
+    if (id == null || id.isEmpty) return null;
+    for (final c in _state?.checkpoints ?? const <Checkpoint>[]) {
+      if (c.id == id) return c;
+    }
+    return null;
   }
 
   Future<void> _confirmRewind(Checkpoint c) async {
@@ -3879,7 +4230,7 @@ class _SessionScreenState extends State<SessionScreen>
                       children: [
                         Text('Full history',
                             style: sans(13,
-                                weight: FontWeight.w500, color: AppColors.fg1)),
+                                weight: W.label, color: AppColors.fg1)),
                         const SizedBox(height: 3),
                         Text('Branch everything so far',
                             style: mono(11, color: AppColors.fg3)),
@@ -3915,7 +4266,7 @@ class _SessionScreenState extends State<SessionScreen>
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: sans(13,
-                                    weight: FontWeight.w500,
+                                    weight: W.label,
                                     height: 1.2,
                                     color: AppColors.fg1)),
                             const SizedBox(height: 3),
@@ -4046,8 +4397,7 @@ class _CompactingStatusState extends State<_CompactingStatus> {
               child: Text.rich(TextSpan(children: [
                 TextSpan(
                     text: 'Compacting',
-                    style: sans(13,
-                        weight: FontWeight.w600, color: AppColors.accent)),
+                    style: sans(13, weight: W.label, color: AppColors.accent)),
                 TextSpan(
                     text: ' $_elapsed',
                     style: sans(13,
@@ -4162,8 +4512,8 @@ class _ChurningStatusState extends State<_ChurningStatus> {
                   child: Text(_verb,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13,
-                          weight: FontWeight.w600, color: AppColors.accent)),
+                      style:
+                          sans(13, weight: W.label, color: AppColors.accent)),
                 ),
                 const SizedBox(width: 8),
                 Text(_elapsed,
@@ -4285,12 +4635,108 @@ class _LiveFrame {
 class _LiveTerm {
   _LiveTerm(this.id, {required this.title}) : terminal = _ClearScrollTerminal();
   final String id;
-  final String title;
+
+  /// Mutable: the user can rename a terminal from its tab.
+  String title;
   final Terminal terminal;
   int cols = 80;
   int rows = 24;
   bool alive = false;
   bool live = false;
+}
+
+/// A terminal as the shell's sidebar needs to see it: enough to render a row
+/// and focus it, without exposing the `Terminal` itself.
+///
+/// Published upward only when the terminal *set* changes (open/close/focus or
+/// an alive transition) — never per output frame, which would rebuild the whole
+/// shell on every byte the pty writes.
+class TerminalInfo {
+  const TerminalInfo({
+    required this.id,
+    required this.title,
+    required this.alive,
+    required this.live,
+  });
+
+  final String id;
+  final String title;
+
+  /// The pty is still running.
+  final bool alive;
+
+  /// At least one output frame has arrived, so the terminal has a prompt.
+  final bool live;
+}
+
+/// The bridge that lets the SHELL render a terminal the session owns.
+///
+/// Why a host object and not just the `Terminal`: a `Terminal` is a live view
+/// model with a view attached — it can only be mounted in one place at a time.
+/// The session owns these (it holds the pty socket), but the pane they render
+/// in belongs to the shell. Handing the shell the object directly would mean two
+/// widgets racing for one terminal.
+///
+/// So the shell holds this host and asks it to render by id. Creation and
+/// destruction stay with the session, which is the only thing that can talk to
+/// the socket — matching the rule that a shell is created and destroyed from the
+/// sidebar's terminal panel, never from the pane itself.
+///
+/// The view builder is a closure rather than a public `Terminal` so the terminal
+/// cannot be captured twice: the session decides how its terminals are rendered,
+/// and the shell decides where.
+class TerminalHost {
+  TerminalHost({
+    required this.terms,
+    required this.focus,
+    required this.buildView,
+    required void Function(String id) onFocus,
+    required void Function() onRequestNew,
+    required void Function(String id) onRequestClose,
+  })  : _focus = onFocus,
+        _new = onRequestNew,
+        _close = onRequestClose;
+
+  /// Snapshot of the terminals the session currently holds.
+  final List<TerminalInfo> terms;
+
+  /// Index of the focused terminal, or -1 when none is selected.
+  final int focus;
+
+  /// Renders one terminal by id. Supplied by the session, which owns the view's
+  /// input and resize wiring.
+  final Widget Function(String id, {required bool mobileKeys}) buildView;
+
+  final void Function(String id) _focus;
+  final void Function() _new;
+  final void Function(String id) _close;
+
+  /// Focus a terminal by id — the shell knows ids, the session knows order.
+  void focusTerm(String id) => _focus(id);
+
+  /// Ask the session to create a terminal. The session mints the id, because it
+  /// is the only side that can open a pty.
+  void newTerminal() => _new();
+
+  /// Destroy a terminal. Only the session can close the pty.
+  void closeTerm(String id) => _close(id);
+
+  /// The id to render: the focused one, else the first, else none.
+  String? get activeId {
+    if (terms.isEmpty) return null;
+    final i = focus >= 0 && focus < terms.length ? focus : 0;
+    return terms[i].id;
+  }
+
+  /// The focused terminal's descriptor, or null when there are none.
+  TerminalInfo? get active {
+    final id = activeId;
+    if (id == null) return null;
+    for (final t in terms) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
 }
 
 class _QueuedBubble extends StatelessWidget {
@@ -4360,8 +4806,7 @@ class _QueuedBubble extends StatelessWidget {
                               horizontal: 6, vertical: 3),
                           child: Text('Send now',
                               style: sans(kMobile ? 12 : 10.5,
-                                  weight: FontWeight.w600,
-                                  color: AppColors.accent)),
+                                  weight: W.label, color: AppColors.accent)),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -4415,9 +4860,7 @@ class _QueuedSection extends StatelessWidget {
             child: Row(children: [
               Text('QUEUED ($count)',
                   style: sans(10.5,
-                      weight: FontWeight.w600,
-                      spacing: 0.6,
-                      color: AppColors.fg4)),
+                      weight: W.label, spacing: 0.6, color: AppColors.fg4)),
               const Spacer(),
               if (showBulk) ...[
                 Material(
@@ -4431,8 +4874,7 @@ class _QueuedSection extends StatelessWidget {
                           horizontal: 8, vertical: 3),
                       child: Text('Send all',
                           style: sans(10.5,
-                              weight: FontWeight.w600,
-                              color: AppColors.accent)),
+                              weight: W.label, color: AppColors.accent)),
                     ),
                   ),
                 ),
@@ -4489,8 +4931,7 @@ class _GoalCard extends StatelessWidget {
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Text(paused ? 'Goal paused' : 'Working toward goal',
-                  style: sans(12.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
+                  style: sans(12.5, weight: W.label, color: AppColors.fg1)),
             ]),
             if (goal.text.trim().isNotEmpty) ...[
               const SizedBox(height: 3),
@@ -4577,8 +5018,62 @@ class _MissionEnvelopeCard extends StatelessWidget {
   }
 }
 
+/// Transcript card for a message routed from the coordination board. Shows the
+/// sender and the message itself — the internal envelope never surfaces.
+class _BoardMessageCard extends StatelessWidget {
+  const _BoardMessageCard({required this.message});
+  final BoardMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final from = message.fromId.trim().isEmpty ? 'someone' : message.fromId;
+    final label =
+        message.threadId.isEmpty ? 'board' : 'board · ${message.threadId}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                  color: AppColors.accent, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(from,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13.5, color: AppColors.fg1)),
+                  ),
+                  Text(label, style: sans(12, color: AppColors.fg4)),
+                ]),
+                if (message.body.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(message.body.trim(),
+                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Transcript card for a past `ask_user` turn: the prompt plus the user's
-/// answer (parsed from the following `user_input` that `_QuestionBar` sent).
+/// answer (parsed from the following `user_input` that `QuestionBar` sent).
 class _QuestionRecord extends StatelessWidget {
   final Map<String, dynamic> event;
   final String? answer;
@@ -4656,8 +5151,7 @@ class _QuestionRecord extends StatelessWidget {
             Row(children: [
               Expanded(
                 child: Text('Question',
-                    style: sans(15.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                    style: sans(15.5, weight: W.label, color: AppColors.fg1)),
               ),
               Text(answers.isEmpty ? 'Asked' : 'Answered',
                   style: sans(12, color: AppColors.accent)),
@@ -4697,19 +5191,19 @@ class _QuestionRecord extends StatelessWidget {
   }
 }
 
-class _ApprovalBar extends StatefulWidget {
+class ApprovalBar extends StatefulWidget {
   final List<Map<String, dynamic>> events;
   final void Function(Map<String, dynamic>) onSend;
   final bool showApproveAll; // only when >1 tool is pending this batch
-  const _ApprovalBar(
+  const ApprovalBar(
       {required this.events,
       required this.onSend,
       this.showApproveAll = false});
   @override
-  State<_ApprovalBar> createState() => _ApprovalBarState();
+  State<ApprovalBar> createState() => ApprovalBarState();
 }
 
-class _ApprovalBarState extends State<_ApprovalBar> {
+class ApprovalBarState extends State<ApprovalBar> {
   // Disable after the first tap — the bar stays on screen until the next frame
   // flips status, so an impatient double-tap fired the decision twice.
   bool _sent = false;
@@ -4748,21 +5242,32 @@ class _ApprovalBarState extends State<_ApprovalBar> {
           borderRadius: BorderRadius.circular(R.md),
         ),
         child: Column(
+          // Content-sized up to the pane-derived cap its host wraps it in.
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
               Expanded(
                 child: Text(_sent ? 'Sending…' : title,
-                    style: sans(15.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                    style: sans(15.5, weight: W.label, color: AppColors.fg1)),
               ),
               Text(total > 1 ? '$index of $total' : 'Input required',
                   style: sans(12, color: AppColors.accent)),
             ]),
-            if (detail.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(detail, style: sans(13, height: 1.45, color: AppColors.fg3)),
-            ],
+            // The tool summary is the part that can be long, so IT scrolls and
+            // the actions stay pinned. A long summary used to grow the whole
+            // card unchecked — as a non-flex child of the session Column it
+            // could exceed the pane and push Approve/Reject off the bottom edge.
+            if (detail.isNotEmpty)
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(detail,
+                        style: sans(13, height: 1.45, color: AppColors.fg3)),
+                  ),
+                ),
+              ),
             const SizedBox(height: 14),
             Opacity(
               opacity: _sent ? 0.5 : 1,
@@ -4845,15 +5350,15 @@ class _NoteLineState extends State<_NoteLine> {
 /// Renders an `ask_user` pending question (status waiting_for_input) and sends the
 /// answer back as a LoopInput::Answer. Handles free_text / single_choice / yes_no /
 /// confirm answer kinds.
-class _QuestionBar extends StatefulWidget {
+class QuestionBar extends StatefulWidget {
   final Map<String, dynamic> question; // {questions:[...], context}
   final void Function(Map<String, dynamic>) onSend;
-  const _QuestionBar({required this.question, required this.onSend});
+  const QuestionBar({required this.question, required this.onSend});
   @override
-  State<_QuestionBar> createState() => _QuestionBarState();
+  State<QuestionBar> createState() => QuestionBarState();
 }
 
-class _QuestionBarState extends State<_QuestionBar> {
+class QuestionBarState extends State<QuestionBar> {
   final Map<String, TextEditingController> _text = {};
   final Map<String, String> _choice = {};
   final Set<String> _skipped = {};
@@ -4990,7 +5495,7 @@ class _QuestionBarState extends State<_QuestionBar> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(label,
                 style: sans(13,
-                    weight: FontWeight.w600,
+                    weight: W.label,
                     color: sel ? AppColors.accent : AppColors.fg2)),
           ),
         ),
@@ -5016,7 +5521,7 @@ class _QuestionBarState extends State<_QuestionBar> {
                   child: Text(label,
                       style: sans(14,
                           height: 1.4,
-                          weight: sel ? FontWeight.w600 : FontWeight.w500,
+                          weight: sel ? FontWeight.w500 : FontWeight.w500,
                           color: sel ? AppColors.fg1 : AppColors.fg2))),
               if (sel) ...[
                 const SizedBox(width: 10),
@@ -5089,53 +5594,72 @@ class _QuestionBarState extends State<_QuestionBar> {
           color: AppColors.surface2,
           borderRadius: BorderRadius.circular(R.md),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(
-              child: Text(_sent ? 'Sending…' : 'Question',
-                  style: sans(15.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
-            ),
-            Text(
-              total > 1 ? '${_step + 1} of $total' : 'Input required',
-              style: sans(12, color: AppColors.accent),
-            ),
-          ]),
-          if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
-            const SizedBox(height: 8),
-            Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg3)),
-          ],
-          ...() {
-            final q = _currentQuestion;
-            if (q == null) return <Widget>[];
-            return <Widget>[
-              const SizedBox(height: 12),
-              Text(q['text']?.toString() ?? '',
-                  style: sans(14, height: 1.45, color: AppColors.fg1)),
-              const SizedBox(height: 10),
-              ..._inputFor(q),
-            ];
-          }(),
-          const SizedBox(height: 14),
-          Row(children: [
-            _skipButton(),
-            if (_step > 0) ...[
-              const SizedBox(width: 4),
-              Btn('Back',
-                  small: true,
-                  variant: BtnVariant.ghost,
-                  onTap: _sent ? null : () => setState(() => _step--)),
-            ],
-            const Spacer(),
-            Btn(
-                _sent
-                    ? 'Sending…'
-                    : (_step < total - 1 ? 'Continue' : 'Submit'),
-                small: true,
-                disabled: !_ready || _sent,
-                onTap: (_ready && !_sent) ? _submit : null),
-          ]),
-        ]),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Expanded(
+                  child: Text(_sent ? 'Sending…' : 'Question',
+                      style: sans(15.5, weight: W.label, color: AppColors.fg1)),
+                ),
+                Text(
+                  total > 1 ? '${_step + 1} of $total' : 'Input required',
+                  style: sans(12, color: AppColors.accent),
+                ),
+              ]),
+              // The question body SCROLLS; the header and the actions stay pinned.
+              // A long context or question used to grow the card unbounded — as a
+              // non-flex child of the session Column it could exceed the pane and
+              // push the choices and Submit off the bottom edge, which is exactly
+              // what made a big question impossible to answer.
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
+                        const SizedBox(height: 8),
+                        Text(ctx,
+                            style:
+                                sans(13, height: 1.45, color: AppColors.fg3)),
+                      ],
+                      ...() {
+                        final q = _currentQuestion;
+                        if (q == null) return <Widget>[];
+                        return <Widget>[
+                          const SizedBox(height: 12),
+                          Text(q['text']?.toString() ?? '',
+                              style:
+                                  sans(14, height: 1.45, color: AppColors.fg1)),
+                          const SizedBox(height: 10),
+                          ..._inputFor(q),
+                        ];
+                      }(),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(children: [
+                _skipButton(),
+                if (_step > 0) ...[
+                  const SizedBox(width: 4),
+                  Btn('Back',
+                      small: true,
+                      variant: BtnVariant.ghost,
+                      onTap: _sent ? null : () => setState(() => _step--)),
+                ],
+                const Spacer(),
+                Btn(
+                    _sent
+                        ? 'Sending…'
+                        : (_step < total - 1 ? 'Continue' : 'Submit'),
+                    small: true,
+                    disabled: !_ready || _sent,
+                    onTap: (_ready && !_sent) ? _submit : null),
+              ]),
+            ]),
       ),
     );
   }
@@ -5203,9 +5727,10 @@ class _SendBtn extends StatelessWidget {
   const _SendBtn({required this.enabled, this.running = false, this.onTap});
   @override
   Widget build(BuildContext context) {
-    final size = kMobile ? 42.0 : 34.0;
-    final iconSize =
-        running ? (kMobile ? 16.0 : 13.0) : (kMobile ? 18.0 : 15.0);
+    // Measured: the reference's send control is 28x28. Ours was 34, which made
+    // the whole control row taller than the 52px the reference allots it.
+    final size = kMobile ? M.minTarget : 28.0;
+    final iconSize = running ? 14.0 : 15.0;
     return Material(
       color: enabled ? AppColors.fg1 : AppColors.surface2,
       shape: const CircleBorder(),
@@ -5227,13 +5752,15 @@ class _SendBtn extends StatelessWidget {
 
 class _SessionActionsPanel extends StatefulWidget {
   final HarnessState? session;
-  final String title;
-  final Future<void> Function(String name) onRename;
-  final void Function(bool manual) onApproval;
   final void Function(String text) onSetGoal;
   final VoidCallback onCancelGoal;
+  final VoidCallback onResumeGoal;
   final VoidCallback onLanes;
   final VoidCallback? onTasks;
+
+  /// Hides the workspace rows Mission Control has no use for. MC orchestrates
+  /// other sessions' work; it has no working tree of its own.
+  final bool hideShell;
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
@@ -5241,21 +5768,17 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onRecurring;
   final VoidCallback onCompact;
   final VoidCallback onCheckpoints;
-  final VoidCallback onUsage;
-  final bool hideShell;
-  final bool hideRename;
   final bool hideWorkspace;
   final bool hideGoal;
   final bool hideCheckpoints;
   const _SessionActionsPanel({
     required this.session,
-    required this.title,
-    required this.onRename,
-    required this.onApproval,
     required this.onSetGoal,
     required this.onCancelGoal,
+    required this.onResumeGoal,
     required this.onLanes,
     this.onTasks,
+    this.hideShell = false,
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
@@ -5263,9 +5786,6 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onRecurring,
     required this.onCompact,
     required this.onCheckpoints,
-    required this.onUsage,
-    this.hideShell = false,
-    this.hideRename = false,
     this.hideWorkspace = false,
     this.hideGoal = false,
     this.hideCheckpoints = false,
@@ -5277,70 +5797,122 @@ class _SessionActionsPanel extends StatefulWidget {
 
 class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   String? _open;
-  bool? _manualOverride;
-  late final TextEditingController _titleCtl =
-      TextEditingController(text: widget.title);
   late final TextEditingController _goalCtl = TextEditingController();
-  bool _savingTitle = false;
 
   @override
   void dispose() {
-    _titleCtl.dispose();
     _goalCtl.dispose();
     super.dispose();
   }
 
   void _toggle(String id) => setState(() => _open = _open == id ? null : id);
 
-  Widget _section(String label) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
-        child: SectionLabel(label),
-      );
+  /// A titled group of rows, drawn as ONE card.
+  ///
+  /// Grouping into cards rather than a flat column: at full-screen width a bare
+  /// stack of 44px rows leaves the lower half of the screen empty and gives no
+  /// hierarchy, so related actions read as one object instead of an unrelated
+  /// settings dump.
+  Widget _group(String label, List<Widget> rows) {
+    if (rows.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+          child: Text(label.toUpperCase(),
+              style: sans(10.5,
+                  weight: W.label, color: AppColors.fg4, spacing: 0.6)),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: AppColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0) Container(height: 1, color: AppColors.border),
+                rows[i],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
+  /// One action row inside a group card.
+  ///
+  /// [detail] is a short explanatory line: at this width the labels alone were
+  /// ambiguous (what does "Processes" or "Compact history" actually do?).
   Widget _row({
     required String icon,
     required String label,
+    String? detail,
     String? value,
     String? id,
     VoidCallback? onTap,
     Widget? child,
   }) {
     final open = id != null && _open == id;
+    final expandable = id != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        InkWell(
-          onTap: onTap ?? (id == null ? null : () => _toggle(id)),
-          borderRadius: BorderRadius.circular(R.sm),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-            child: Row(children: [
-              AppIcon(icon, size: 18, color: AppColors.fg2),
-              const SizedBox(width: 12),
-              Text(label, style: sans(15, color: AppColors.fg1)),
-              const Spacer(),
-              if (value != null) ...[
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: sans(12.5, color: AppColors.fg4)),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap ?? (expandable ? () => _toggle(id) : null),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: M.minTarget + 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(children: [
+                AppIcon(icon, size: 17, color: AppColors.fg3),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label,
+                          style: sans(M.rowTitle,
+                              weight: W.label, color: AppColors.fg1)),
+                      if (detail != null) ...[
+                        const SizedBox(height: 2),
+                        Text(detail,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(M.meta, color: AppColors.fg4)),
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 6),
-              ],
-              if (id != null)
-                AppIcon(open ? 'chevron-down' : 'chevron-right',
-                    size: 15, color: AppColors.fg4)
-              else
-                const SizedBox(width: 15),
-            ]),
+                if (value != null) ...[
+                  const SizedBox(width: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 140),
+                    child: Text(value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: sans(M.meta, color: AppColors.fg3)),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                if (expandable)
+                  AppIcon(open ? 'chevron-down' : 'chevron-right',
+                      size: 15, color: AppColors.fg4),
+              ]),
+            ),
           ),
         ),
         if (open && child != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: child,
           ),
       ],
@@ -5350,125 +5922,113 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
-    final manual = _manualOverride ?? ((s?.approvalMode ?? 'auto') == 'manual');
     final goalOn = s?.goal?.ongoing ?? false;
+
+    // Session: what this conversation is doing. Rename and Approval are
+    // deliberately NOT here — rename is not an action, and approval lives in the
+    // composer next to what it governs.
+    final sessionRows = <Widget>[
+      if (!widget.hideGoal)
+        _row(
+          icon: 'zap',
+          label: goalOn ? 'Goal' : 'Set a goal',
+          detail: goalOn
+              ? 'The agent is driving toward this autonomously'
+              : 'Give the agent something to work toward on its own',
+          id: 'goal',
+          value: goalOn ? (s!.goal!.paused ? 'paused' : 'running') : null,
+          child: goalOn
+              ? Btn(s!.goal!.paused ? 'Resume goal' : 'Cancel goal',
+                  variant: BtnVariant.secondary,
+                  onTap: s.goal!.paused
+                      ? widget.onResumeGoal
+                      : widget.onCancelGoal)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AppField(
+                        controller: _goalCtl,
+                        hint: 'What should the agent work toward?',
+                        minLines: 2,
+                        maxLines: 4),
+                    const SizedBox(height: 8),
+                    Btn('Set goal', onTap: () {
+                      final t = _goalCtl.text.trim();
+                      if (t.isEmpty) return;
+                      widget.onSetGoal(t);
+                      _goalCtl.clear();
+                    }),
+                  ],
+                ),
+        ),
+      if (!kMacOS && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
+        _row(
+            icon: 'layers',
+            label: 'Lanes',
+            detail: 'Background work running in parallel',
+            onTap: widget.onLanes),
+      if (widget.onTasks != null)
+        _row(
+            icon: 'layers',
+            label: 'Tasks',
+            detail: 'Plan and progress for this run',
+            onTap: widget.onTasks),
+      _row(
+          icon: 'scheduled',
+          label: 'Scheduled',
+          detail: 'Recurring jobs on this machine',
+          onTap: widget.onRecurring),
+    ];
+
+    // Workspace: the things that touch files and processes.
+    final workspaceRows = <Widget>[
+      if (!kMacOS)
+        _row(
+            icon: 'git-branch',
+            label: 'Git',
+            detail: 'Status, diffs, stage and commit',
+            onTap: widget.onGit),
+      _row(
+          icon: 'folder',
+          label: 'Files',
+          detail: 'Browse the workspace',
+          onTap: widget.onFiles),
+      if (!widget.hideShell)
+        _row(
+            icon: 'terminal',
+            label: 'Session shell',
+            detail: 'A terminal in this workspace',
+            onTap: widget.onTerm),
+      _row(
+          icon: 'list',
+          label: 'Processes',
+          detail: 'What is running on the machine',
+          onTap: widget.onProcesses),
+    ];
+
+    // History: context management.
+    final historyRows = <Widget>[
+      _row(
+          icon: 'minimize',
+          label: 'Compact history',
+          detail: 'Summarise older turns to free context',
+          onTap: widget.onCompact),
+      if (!widget.hideCheckpoints)
+        _row(
+            icon: 'history',
+            label: 'Checkpoints',
+            detail: 'Restore the workspace to an earlier point',
+            onTap: widget.onCheckpoints),
+    ];
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _section('Session'),
-        if (!widget.hideRename)
-          _row(
-            icon: 'edit',
-            label: 'Rename',
-            id: 'rename',
-            value: widget.title.isEmpty ? null : widget.title,
-            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Expanded(
-                child: AppField(
-                    controller: _titleCtl,
-                    hint: 'Session title',
-                    onSubmitted: (_) => _saveTitle()),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 1),
-                child: Btn(_savingTitle ? '…' : 'Save',
-                    small: true, disabled: _savingTitle, onTap: _saveTitle),
-              ),
-            ]),
-          ),
-        if (!kMacOS)
-          _row(
-            icon: 'shield',
-            label: 'Approval',
-            id: 'approval',
-            value: manual ? 'Ask' : 'Auto',
-            child: Row(children: [
-              Expanded(
-                child: Btn('Auto',
-                    variant: manual ? BtnVariant.secondary : BtnVariant.primary,
-                    onTap: () {
-                  setState(() => _manualOverride = false);
-                  widget.onApproval(false);
-                }),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Btn('Ask',
-                    variant: manual ? BtnVariant.primary : BtnVariant.secondary,
-                    onTap: () {
-                  setState(() => _manualOverride = true);
-                  widget.onApproval(true);
-                }),
-              ),
-            ]),
-          ),
-        if (!kMacOS && !widget.hideGoal)
-          _row(
-            icon: 'zap',
-            label: goalOn ? 'Goal' : 'Set goal',
-            id: 'goal',
-            value: goalOn ? (s!.goal!.paused ? 'paused' : 'running') : null,
-            child: goalOn
-                ? Btn('Cancel goal',
-                    variant: BtnVariant.secondary, onTap: widget.onCancelGoal)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AppField(
-                          controller: _goalCtl,
-                          hint: 'What should the agent work toward?',
-                          minLines: 2,
-                          maxLines: 4),
-                      const SizedBox(height: 8),
-                      Btn('Set goal', onTap: () {
-                        final t = _goalCtl.text.trim();
-                        if (t.isEmpty) return;
-                        widget.onSetGoal(t);
-                        _goalCtl.clear();
-                      }),
-                    ],
-                  ),
-          ),
-        if (!kMacOS && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
-          _row(icon: 'layers', label: 'Lanes', onTap: widget.onLanes),
-        if (widget.onTasks != null)
-          _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
-        _row(icon: 'scheduled', label: 'Scheduled', onTap: widget.onRecurring),
-        if (!widget.hideWorkspace) ...[
-          _section('Workspace'),
-          if (!kMacOS)
-            _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
-          _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
-          if (!widget.hideShell)
-            _row(
-                icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
-          _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
-        ],
-        _section('History'),
-        _row(
-            icon: 'minimize',
-            label: 'Compact history',
-            onTap: widget.onCompact),
-        if (!widget.hideCheckpoints)
-          _row(
-              icon: 'history',
-              label: 'Checkpoints',
-              onTap: widget.onCheckpoints),
-        _row(icon: 'activity', label: 'Usage', onTap: widget.onUsage),
+        _group('Session', sessionRows),
+        if (!widget.hideWorkspace) _group('Workspace', workspaceRows),
+        _group('History', historyRows),
       ],
     );
-  }
-
-  Future<void> _saveTitle() async {
-    final name = _titleCtl.text.trim();
-    if (name.isEmpty || _savingTitle) return;
-    setState(() => _savingTitle = true);
-    try {
-      await widget.onRename(name);
-    } finally {
-      if (mounted) setState(() => _savingTitle = false);
-    }
   }
 }

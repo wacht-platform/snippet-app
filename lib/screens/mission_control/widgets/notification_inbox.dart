@@ -93,7 +93,7 @@ class _InboxRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(13,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                        weight: FontWeight.w500, color: AppColors.fg1)),
                 const SizedBox(height: 2),
                 Text(entry.notification.message as String,
                     maxLines: 2,

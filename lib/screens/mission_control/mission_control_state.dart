@@ -39,6 +39,15 @@ class UserMessageItem extends FeedItem {
   final bool failed;
 }
 
+class BoardMessageItem extends FeedItem {
+  const BoardMessageItem({
+    required super.id,
+    required super.timestamp,
+    required this.message,
+  });
+  final BoardMessage message;
+}
+
 class AgentTextItem extends FeedItem {
   const AgentTextItem({
     required super.id,
@@ -182,6 +191,47 @@ MissionEnvelope? parseMissionEnvelope(String text) {
   );
 }
 
+/// A human/agent message routed from the coordination board into a session's
+/// transcript. Rendered as a compact card so the raw envelope never appears.
+class BoardMessage {
+  const BoardMessage({
+    required this.threadId,
+    required this.fromId,
+    required this.fromKind,
+    required this.body,
+  });
+  final String threadId;
+  final String fromId;
+  final String fromKind;
+  final String body;
+}
+
+BoardMessage? parseBoardMessage(String text) {
+  final t = text.trim();
+  if (!t.contains('[coordination_board_message]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  // The body is the final field before the closing tag. Anchor to the last
+  // line-starting `body: ` so a prior message that happens to contain the text
+  // "body: " in its history digest can't be mistaken for the field.
+  final end = t.lastIndexOf('[/coordination_board_message]');
+  final bodyMarker = t.lastIndexOf('\nbody: ');
+  var body = (bodyMarker >= 0 && end > bodyMarker)
+      ? t.substring(bodyMarker + '\nbody: '.length, end).trim()
+      : '';
+
+  return BoardMessage(
+    threadId: field('thread_id'),
+    fromId: field('from_id'),
+    fromKind: field('from_kind'),
+    body: body,
+  );
+}
+
 /// Project harness events into the Mission Control chat feed.
 List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
   final out = <FeedItem>[];
@@ -206,6 +256,15 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
               'status': envelope.isReport ? envelope.status : 'pending',
             }),
             kind: envelope.eventKind,
+          ));
+          break;
+        }
+        final board = parseBoardMessage(text);
+        if (board != null) {
+          out.add(BoardMessageItem(
+            id: 'h-b-$i',
+            timestamp: now,
+            message: board,
           ));
           break;
         }

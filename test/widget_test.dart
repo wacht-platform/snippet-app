@@ -11,6 +11,7 @@ import 'package:snippet/notifications.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/mission_control/mission_control_state.dart';
 import 'package:snippet/tool_views.dart';
+import 'package:snippet/theme.dart';
 import 'package:snippet/transcript.dart';
 import 'package:snippet/widgets.dart';
 
@@ -463,6 +464,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('audio attachment echo retires optimistic pending message', () {
+    // The daemon appends the transcript after the marker, so exact text matching
+    // cannot acknowledge this local optimistic bubble. Attachment path matching
+    // is the stable correlation key.
+    final original =
+        '[attached file — read it at this exact path: /tmp/voice.m4a]';
+    final echoed =
+        '$original\n\n[Audio transcript for /tmp/voice.m4a]\nhello there';
+    expect(
+      RegExp(
+        r'\[attached (?:image|file) —[^\]]*exact path: ([^\]]+)\]',
+      )
+          .allMatches(echoed)
+          .map((m) => m.group(1)?.trim())
+          .contains('/tmp/voice.m4a'),
+      isTrue,
+    );
+  });
+
   testWidgets('tool run stays expanded when live rows grow', (tester) async {
     final open = ValueNotifier(false);
     addTearDown(open.dispose);
@@ -584,5 +604,105 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull, reason: entry.key);
     }
+  });
+
+  test('parseBoardMessage extracts sender and preserves a multi-line body', () {
+    const envelope = '[coordination_board_message]\n'
+        'thread_id: system\n'
+        'from_id: human\n'
+        'from_kind: human\n'
+        'rules: board message, not an ordinary chat turn. Reply on this same thread.\n'
+        'body: first line\n'
+        'second line\n'
+        '[/coordination_board_message]';
+
+    final parsed = parseBoardMessage(envelope);
+    expect(parsed, isNotNull);
+    expect(parsed!.threadId, 'system');
+    expect(parsed.fromId, 'human');
+    expect(parsed.fromKind, 'human');
+    // The body keeps its newlines and never swallows the closing tag.
+    expect(parsed.body, 'first line\nsecond line');
+
+    // Ordinary chat text is not a board message.
+    expect(parseBoardMessage('just a normal message'), isNull);
+  });
+
+
+  test('parseBoardMessage ignores a "body:" inside the history digest', () {
+    // A prior room message that literally contains "body: " must not be mistaken
+    // for the new message: the real field is the final line before the tag.
+    const envelope = '[coordination_board_message]\n'
+        'thread_id: system\n'
+        'from_id: human\n'
+        'from_kind: human\n'
+        'rules: board message, not an ordinary chat turn.\n'
+        'history: last 1 message(s), oldest first\n'
+        '  4 [agent] mission-control: earlier note about body: parsing\n'
+        'body: the real current message\n'
+        '[/coordination_board_message]';
+
+    final parsed = parseBoardMessage(envelope);
+    expect(parsed, isNotNull);
+    expect(parsed!.body, 'the real current message');
+  });
+
+
+  // --- Design token guards -------------------------------------------------
+  // These lock two defects that were silent and app-wide:
+  //   1. every weight was capped at 400, so 119 call sites asking for emphasis
+  //      rendered regular and hierarchy came from size alone;
+  //   2. palette values drifting below accessible contrast on the dark canvas.
+
+  test('sans() honours the requested weight (no silent 400 cap)', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    expect(sans(15, weight: FontWeight.w500).fontWeight, FontWeight.w500);
+    expect(sans(15, weight: FontWeight.w600).fontWeight, FontWeight.w600);
+    expect(sans(15, weight: FontWeight.w700).fontWeight, FontWeight.w700);
+    // Default body stays regular.
+    expect(sans(15).fontWeight, FontWeight.w400);
+    // The ramp is reachable through mono() as well.
+    expect(mono(13, weight: FontWeight.w600).fontWeight, FontWeight.w600);
+  });
+
+  test('display() keeps its weight instead of flattening', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    expect(display(22).fontWeight, W.title);
+  });
+
+  test('dark palette clears accessible contrast on every surface', () {
+    // Color.computeLuminance() is Flutter's WCAG relative luminance.
+    double ratio(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      final hi = la > lb ? la : lb;
+      final lo = la > lb ? lb : la;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    final surfaces = [
+      AppColors.canvas,
+      AppColors.surface1,
+      AppColors.surface2,
+      AppColors.surface3,
+    ];
+
+    // Body text must clear AA (4.5:1) wherever it can land.
+    for (final s in surfaces) {
+      expect(ratio(AppColors.fg1, s), greaterThanOrEqualTo(4.5),
+          reason: 'fg1 must meet AA on its surface');
+      expect(ratio(AppColors.fg2, s), greaterThanOrEqualTo(4.5),
+          reason: 'fg2 carries secondary body text');
+    }
+    // Meta/tertiary text only needs the large-text threshold.
+    expect(ratio(AppColors.fg3, AppColors.canvas), greaterThanOrEqualTo(3.0));
+    // The text ladder must stay ordered, or "fainter" stops meaning anything.
+    final l1 = AppColors.fg1.computeLuminance();
+    final l2 = AppColors.fg2.computeLuminance();
+    final l3 = AppColors.fg3.computeLuminance();
+    final l4 = AppColors.fg4.computeLuminance();
+    expect(l1, greaterThan(l2));
+    expect(l2, greaterThan(l3));
+    expect(l3, greaterThan(l4));
   });
 }
