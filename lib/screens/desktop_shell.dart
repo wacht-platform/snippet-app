@@ -6748,30 +6748,29 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 
   /// A navigation row inside a card. Deliberately NOT its own Material: it used
   /// to be a card, which inside a card read as a box in a box.
+  ///
+  /// One line, title only. The summary under it described what each section is
+  /// for, but this card sits under a "Configuration" heading that already says
+  /// as much — and at phone widths the longest ("Secrets the agent can use")
+  /// ellipsized, so a row of truncated descriptions read as broken rather than
+  /// informative. The label alone is unambiguous here.
   Widget _mobileIndexRow(_SettingsPage page, String icon, String label) {
     return InkWell(
       onTap: () => widget.onSection?.call(page),
       child: Container(
-        height: 60,
+        // A full 52px target, matching every other phone list row. At the old
+        // 60px the row was tall for a two-line stack; with one line it only read
+        // as an oversized gap.
+        height: M.rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(children: [
           AppIcon(icon, size: 20, color: AppColors.fg2),
           const SizedBox(width: 13),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Deliberately BELOW `M.rowTitle` (14): these are navigation
-                // labels in a two-line stack, not the primary content of a list
-                // row. Sized locally so the session list — which the same tokens
-                // drive, and which was deliberately enlarged — keeps its size.
-                Text(label, style: sans(13.5, color: AppColors.fg1)),
-                const SizedBox(height: 2),
-                Text(_sectionSummary(page),
-                    style: sans(11.5, color: AppColors.fg4)),
-              ],
-            ),
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(M.rowTitle, color: AppColors.fg1)),
           ),
           AppIcon('chevron-right', size: 16, color: AppColors.fg4),
         ]),
