@@ -6,6 +6,7 @@ import '../../panel.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 
+import '../create_agent_form.dart';
 import 'coordination_agent_detail.dart';
 
 class CoordinationAgentDirectory extends StatefulWidget {
@@ -70,7 +71,7 @@ class _CoordinationAgentDirectoryState
     final created = await showAppSheet<bool>(
       context,
       title: 'Create agent',
-      child: _CreateAgentForm(client: widget.client),
+      child: CreateAgentForm(client: widget.client),
     );
     if (created == true) await refresh();
   }
@@ -205,89 +206,5 @@ class _MessageState extends StatelessWidget {
           const SizedBox(height: 22),
           Center(child: action),
         ],
-      );
-}
-
-class _CreateAgentForm extends StatefulWidget {
-  const _CreateAgentForm({required this.client});
-  final DaemonClient client;
-
-  @override
-  State<_CreateAgentForm> createState() => _CreateAgentFormState();
-}
-
-class _CreateAgentFormState extends State<_CreateAgentForm> {
-  final _prompt = TextEditingController();
-  bool _busy = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _prompt.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final prompt = _prompt.text.trim();
-    if (prompt.length < 12) {
-      setState(() => _error = 'Describe the agent you want it to become.');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await widget.client.buildCoordinationAgent(prompt);
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = '$e';
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Describe the agent in plain language. It will research the role, create its identity, and propose the tools it needs.',
-              style: sans(13, color: AppColors.fg3, height: 1.45),
-            ),
-            const SizedBox(height: 18),
-            AppField(
-              controller: _prompt,
-              label: 'What should this agent become?',
-              hint:
-                  'Create a Rust security reviewer that researches current dependency auditing practices and can inspect repositories without modifying them.',
-              minLines: 5,
-              maxLines: 8,
-              autofocus: true,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'The agent chooses its name, personality, capabilities, and initial tool proposals from this brief.',
-              style: sans(12, color: AppColors.fg4, height: 1.4),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 14),
-              Text(_error!, style: sans(12, color: AppColors.danger)),
-            ],
-            const SizedBox(height: 20),
-            Btn(
-              _busy ? 'Starting build…' : 'Build agent',
-              full: true,
-              disabled: _busy,
-              icon: 'sparkles',
-              onTap: _submit,
-            ),
-          ],
-        ),
       );
 }

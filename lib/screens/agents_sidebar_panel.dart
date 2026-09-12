@@ -5,6 +5,8 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'create_agent_form.dart';
+import 'shell_nav.dart';
 
 /// The agent team, as a sidebar panel — the reference app's "People with
 /// access" slot, holding our agents instead of collaborators.
@@ -36,6 +38,14 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   Map<String, String> activeBySession = const {};
   String? error;
   bool loading = true;
+
+  /// True from submitting a build prompt until the new agent appears.
+  ///
+  /// `/agents/build` is asynchronous (202): the daemon hands the prompt to the
+  /// Mission Control session, which researches and registers the agent. So
+  /// there is no id to await — the only honest signal is the agent showing up
+  /// in a later list, which is what [_awaitNewAgent] polls for.
+  bool busy = false;
 
   @override
   void initState() {
@@ -78,6 +88,102 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       .map((e) => e.key)
       .toList(growable: false);
 
+  /// Open the "describe an agent" popover, anchored under its button.
+  ///
+  /// A popover rather than a dialog: this is one field that belongs to the "+"
+  /// you just pressed, and on desktop it should appear beside the panel instead
+  /// of dimming the whole window. `showGeneralDialog` with a transparent barrier
+  /// is the same mechanism the shell's goal popover uses.
+  Future<void> _openCreateAgent(BuildContext btnCtx) async {
+    final box = btnCtx.findRenderObject() as RenderBox?;
+    // A 300px panel cannot host a 340px popover, so on desktop it opens to the
+    // RIGHT of the button (where the pane's content is) and falls back to
+    // left-aligned-under only if there is no room there.
+    const width = 340.0;
+    final screen = MediaQuery.sizeOf(context);
+    var left = 24.0;
+    var top = 96.0;
+    if (box != null) {
+      final origin = box.localToGlobal(Offset.zero);
+      final rightOfButton = origin.dx + box.size.width + 8;
+      left = rightOfButton + width <= screen.width - 12
+          ? rightOfButton
+          : (origin.dx + box.size.width - width).clamp(
+              12.0, (screen.width - width - 12).clamp(12.0, double.infinity));
+      top = origin.dy
+          .clamp(12.0, (screen.height - 320).clamp(12.0, double.infinity));
+    }
+    final submitted = await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'create agent',
+      // Transparent: a popover beside the panel, not a modal over the app.
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 140),
+      pageBuilder: (ctx, _, __) => Stack(children: [
+        Positioned(
+          left: left,
+          top: top,
+          width: width,
+          child: Material(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.md),
+            elevation: 12,
+            shadowColor: Colors.black87,
+            // The SHARED form, the same one Mission Control's directory uses. It
+            // submits itself and pops `true`, so this host only waits for the
+            // agent to appear — a second local copy is how the two drifted.
+            child: CreateAgentForm(client: widget.client),
+          ),
+        ),
+      ]),
+    );
+    if (!mounted || submitted != true) return;
+    toast(context, 'Building agent — researching your description…');
+    await _awaitNewAgent();
+  }
+
+  /// Poll until an agent appears that was not in the list at the start.
+  ///
+  /// `/agents/build` returns 202 with no id: the prompt is handed to the Mission
+  /// Control session, which researches and registers the agent on its own
+  /// schedule. So the completion signal is the agent EXISTING, not a response —
+  /// and the list refreshes on every pass, so the row appears as soon as it is
+  /// registered rather than only at the end.
+  ///
+  /// Bounded so a failed build cannot spin forever; MC's own session shows what
+  /// went wrong.
+  Future<void> _awaitNewAgent() async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      final before = agents.map((a) => a.id).toSet();
+      for (var i = 0; i < 20; i++) {
+        await Future<void>.delayed(const Duration(seconds: 3));
+        if (!mounted) return;
+        try {
+          final latest = await widget.client.coordinationAgents();
+          if (!mounted) return;
+          if (latest.any((a) => !before.contains(a.id))) {
+            await refresh();
+            if (mounted) toast(context, 'New agent is ready');
+            return;
+          }
+          // Keep the list live while the build runs.
+          setState(() => agents = latest);
+        } catch (_) {
+          // A transient failure mid-poll is not fatal; keep waiting.
+        }
+      }
+      if (mounted) {
+        toast(context, 'Still building — check Mission Control for progress.',
+            danger: true);
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading && agents.isEmpty) {
@@ -118,18 +224,57 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 14, 10),
-            child: Row(children: [
-              Text('Agents',
-                  style: sans(15, weight: W.title, color: AppColors.fg1)),
-              const SizedBox(width: 8),
-              Text('${agents.length}', style: sans(12, color: AppColors.fg4)),
-              const Spacer(),
-              IconBtn('refresh',
-                  size: 28, iconSize: 15, tooltip: 'Refresh', onTap: refresh),
-            ]),
-          ),
+          // The SAME section header every sibling panel uses.
+          //
+          // This panel drew its own 15px title while Terminals, Git Diff and the
+          // file tree all render the shared `ShellSectionHeader` (12px uppercase),
+          // which is why the agents panel read as heavier than the rest of the
+          // rail. The count is gone from here deliberately: the two group
+          // headings below already carry "Active now N" / "Idle N", so it was
+          // saying the same thing twice.
+          if (!kMobile)
+            ShellSectionHeader(
+              label: 'Agents',
+              actions: [
+                // `Builder` so the popover anchors to THIS button — the context's
+                // render object is the button's box (same mechanism the file
+                // tree's actions use).
+                Builder(
+                  builder: (ctx) => ShellSectionAction(
+                    icon: 'plus',
+                    tooltip: 'Create agent',
+                    onTap: busy ? null : () => _openCreateAgent(ctx),
+                  ),
+                ),
+                ShellSectionAction(
+                  icon: 'refresh',
+                  tooltip: 'Refresh',
+                  onTap: busy ? null : refresh,
+                ),
+              ],
+            )
+          else
+            Padding(
+              padding: EdgeInsets.fromLTRB(M.gutter, 12, M.gutter - 6, 8),
+              child: Row(children: [
+                Text('Agents',
+                    style: sans(M.sectionTitle,
+                        weight: W.label, color: AppColors.fg1)),
+                const Spacer(),
+                Builder(
+                  builder: (ctx) => IconBtn('plus',
+                      size: M.minTarget,
+                      iconSize: 18,
+                      tooltip: 'Create agent',
+                      onTap: busy ? null : () => _openCreateAgent(ctx)),
+                ),
+                IconBtn('refresh',
+                    size: M.minTarget,
+                    iconSize: 18,
+                    tooltip: 'Refresh',
+                    onTap: busy ? null : refresh),
+              ]),
+            ),
           Expanded(
             child: agents.isEmpty
                 ? _EmptyTeam()
@@ -248,8 +393,12 @@ class _AgentSidebarRow extends StatelessWidget {
                   Text(name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      // W.body (400), matching the canonical `ShellNavRow` —
+                      // which is `selected ? W.label : W.body`. At W.label every
+                      // agent name rendered heavier than every session row
+                      // beside it, which is most of why this panel read "bold".
                       style: sans(kMobile ? M.rowTitle : 13,
-                          weight: W.label, color: AppColors.fg1)),
+                          weight: W.body, color: AppColors.fg1)),
                   const SizedBox(height: 2),
                   Text(
                     isActive ? _sessionSummary(sessions) : agent.role,
