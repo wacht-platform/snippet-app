@@ -130,6 +130,7 @@ class _SidebarEmpty extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         child: Text(message,
+            textAlign: TextAlign.center,
             style: sans(12.5, color: AppColors.fg4, height: 1.45)),
       );
 }

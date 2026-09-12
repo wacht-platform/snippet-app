@@ -3895,10 +3895,15 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  Widget _emptyPaneHint() => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Text('Drag a tab here, or open a terminal from the sidebar.',
-            style: sans(12.5, color: AppColors.fg4)),
+  /// A pane that holds nothing to show. Centred, so it reads as the pane's own
+  /// placeholder rather than a stray line of text pinned to its top-left corner.
+  Widget _emptyPaneHint() => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text('Drag a tab here, or open a terminal from the sidebar.',
+              textAlign: TextAlign.center,
+              style: sans(12.5, color: AppColors.fg4)),
+        ),
       );
 
   /// The single shared divider between the two panes. It is one line, not a

@@ -656,21 +656,36 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
 
   Widget _diffBody(String patch) {
     final lines = patch.split('\n');
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        // IntrinsicWidth bounds the horizontal scroll to the widest line so each
-        // line's `width: double.infinity` background resolves (no infinite-width crash).
-        child: IntrinsicWidth(
-          child: SelectionArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: lines.map(_diffLine).toList(),
+    return LayoutBuilder(builder: (context, c) {
+      // The horizontal extent has to be the widest line, so each line's
+      // `width: double.infinity` background has something finite to resolve
+      // against. `IntrinsicWidth` alone does that, but it also SHRINK-WRAPS: a
+      // diff whose longest line is narrower than the pane renders as a narrow
+      // column instead of filling it. Flooring the width at the pane's own width
+      // makes the rows span the pane, while a line wider than the pane still
+      // scrolls horizontally.
+      //
+      // The floor must sit OUTSIDE `IntrinsicWidth`: its `tighten` clamps the
+      // intrinsic width into the incoming range, so a minimum applied inside
+      // would be clamped back down to the intrinsic width and do nothing.
+      final paneWidth = c.maxWidth.isFinite ? c.maxWidth : 0.0;
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: paneWidth),
+            child: IntrinsicWidth(
+              child: SelectionArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: lines.map(_diffLine).toList(),
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   Widget _diffLine(String line) {

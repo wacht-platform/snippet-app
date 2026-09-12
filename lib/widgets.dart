@@ -1710,32 +1710,38 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 28),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(R.md),
+    // Fills the box it is handed and centers inside it. Call sites give this the
+    // whole body of a pane or an `Expanded`, and a shrink-wrapping child there
+    // aligns to the top-left instead of the middle — so the centering has to
+    // live here rather than be repeated at every call site.
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 28),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.surface2,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(R.md),
+            ),
+            child: AppIcon(icon, size: 24, color: AppColors.fg3),
           ),
-          child: AppIcon(icon, size: 24, color: AppColors.fg3),
-        ),
-        const SizedBox(height: 12),
-        Text(title, style: sans(15, weight: W.label, color: AppColors.fg1)),
-        if (body != null) ...[
-          const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 240),
-            child: Text(body!,
-                textAlign: TextAlign.center,
-                style: sans(12.5, height: 1.5, color: AppColors.fg3)),
-          ),
-        ],
-        if (action != null) ...[const SizedBox(height: 16), action!],
-      ]),
+          const SizedBox(height: 12),
+          Text(title, style: sans(15, weight: W.label, color: AppColors.fg1)),
+          if (body != null) ...[
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 240),
+              child: Text(body!,
+                  textAlign: TextAlign.center,
+                  style: sans(12.5, height: 1.5, color: AppColors.fg3)),
+            ),
+          ],
+          if (action != null) ...[const SizedBox(height: 16), action!],
+        ]),
+      ),
     );
   }
 }
