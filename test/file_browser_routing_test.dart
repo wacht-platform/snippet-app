@@ -141,4 +141,56 @@ void main() {
       expect(iconNamesFor('lib'), contains('folder'));
     });
   });
+
+  testWidgets('openFileForViewing routes the viewer on a phone',
+      (tester) async {
+    // The ONE seam both call sites use. It was fixed twice — first for the file
+    // browser, then again for the agent's `present_file` card, which had been
+    // calling the tab callback directly and stayed inert. Asserting the seam
+    // itself is what stops a third call site repeating it.
+    //
+    // Two separate tests, not two phases in one: `pumpWidget` with the same
+    // widget TYPE updates the tree instead of replacing it, so the Navigator
+    // kept the route pushed in the first phase and it leaked into the second.
+    await asPlatform(TargetPlatform.android, () async {
+      late BuildContext ctx;
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(builder: (c) {
+          ctx = c;
+          return const SizedBox();
+        }),
+      ));
+
+      final handled = openFileForViewing(ctx,
+          client: _FakeFilesClient(), path: '/root/notes.txt', name: 'notes.txt');
+      // Settle, not a single pump: the push runs a route transition, and the
+      // viewer is only built once that transition starts.
+      await tester.pumpAndSettle();
+
+      expect(handled, isTrue,
+          reason: 'a phone must be handled here, not by the caller');
+      expect(find.byType(FileViewer), findsOneWidget);
+    });
+  });
+
+  testWidgets('openFileForViewing defers to the caller on desktop',
+      (tester) async {
+    await asPlatform(TargetPlatform.macOS, () async {
+      late BuildContext ctx;
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(builder: (c) {
+          ctx = c;
+          return const SizedBox();
+        }),
+      ));
+
+      final handled = openFileForViewing(ctx,
+          client: _FakeFilesClient(), path: '/root/notes.txt', name: 'notes.txt');
+      await tester.pumpAndSettle();
+
+      expect(handled, isFalse,
+          reason: 'desktop must fall through to its own tab/panel path');
+      expect(find.byType(FileViewer), findsNothing);
+    });
+  });
 }

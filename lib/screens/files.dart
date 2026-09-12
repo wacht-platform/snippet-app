@@ -177,38 +177,11 @@ class _FileExplorerState extends State<FileExplorer> {
       pick(e.path);
       return;
     }
-    // ON PHONES the viewer is a full route, whatever the host offered.
-    //
-    // `onOpenFile` opens the file as a shell TAB, which is a desktop concept:
-    // the phone shell renders `_activeTab`, and a file tab is AUXILIARY, so
-    // `_activeTab` skips it and `_mobileShell` never draws it. Honouring the
-    // callback first therefore closed the explorer and pushed a view the phone
-    // does not render — tapping a file appeared to do nothing. Desktop keeps the
-    // tab behaviour below.
-    if (kMobile) {
-      Navigator.of(context).push(PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 180),
-        reverseTransitionDuration: const Duration(milliseconds: 150),
-        pageBuilder: (_, animation, __) => FileViewer(
-          client: widget.client,
-          path: e.path,
-          name: e.name,
-          onClose: () => Navigator.of(context).pop(),
-        ),
-        transitionsBuilder: (_, animation, __, child) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.025, 0),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-            )),
-            child: child,
-          ),
-        ),
-      ));
+    // ON PHONES the viewer is a full route, whatever the host offered. See
+    // `openFileForViewing` — `onOpenFile` opens a shell TAB, which the phone
+    // shell never draws. Desktop keeps the tab behaviour below.
+    if (openFileForViewing(context,
+        client: widget.client, path: e.path, name: e.name)) {
       return;
     }
     final open = widget.onOpenFile;
@@ -815,6 +788,70 @@ class _Row extends StatelessWidget {
         child:
             on ? AppIcon('check', size: 12, color: AppColors.accentFg) : null,
       );
+}
+
+/// Push the file viewer as a full-screen route.
+///
+/// The surface a phone can show. `onOpenFile` opens the file as a shell TAB,
+/// which is a desktop concept: the phone shell renders `_activeTab`, and a file
+/// tab is AUXILIARY, so `_activeTab` skips it and `_mobileShell` never draws it.
+/// Honouring that callback on a phone therefore pushed a view the phone does not
+/// render, and tapping a file appeared to do nothing.
+///
+/// Shared so a file reached from the browser and one reached from an agent's
+/// `present_file` card cannot diverge — the card called the tab callback
+/// directly and so kept the old, dead behaviour after the browser was fixed.
+Future<void> pushFileViewerRoute(
+  BuildContext context, {
+  required DaemonClient client,
+  required String path,
+  required String name,
+}) {
+  return Navigator.of(context).push(PageRouteBuilder<void>(
+    transitionDuration: const Duration(milliseconds: 180),
+    reverseTransitionDuration: const Duration(milliseconds: 150),
+    pageBuilder: (_, animation, __) => FileViewer(
+      client: client,
+      path: path,
+      name: name,
+      onClose: () => Navigator.of(context).pop(),
+    ),
+    transitionsBuilder: (_, animation, __, child) => FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0.025, 0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        )),
+        child: child,
+      ),
+    ),
+  ));
+}
+
+/// Open a file for viewing, choosing the surface the CURRENT platform can show.
+///
+/// Returns true when this handled the open (a phone route was pushed); false
+/// means the caller should run its own desktop path — a shell tab, or a panel.
+///
+/// Phones MUST take the route. `onOpenFileTab` creates a shell TAB, and the
+/// phone shell renders `_activeTab`, which skips auxiliary tabs — so a file tab
+/// is never drawn and the tap appears to do nothing. Both the file browser and
+/// the agent's `present_file` card got this wrong by calling the tab callback
+/// directly, so the decision lives in ONE place and a third call site cannot
+/// repeat it.
+bool openFileForViewing(
+  BuildContext context, {
+  required DaemonClient client,
+  required String path,
+  required String name,
+}) {
+  if (!kMobile) return false;
+  pushFileViewerRoute(context, client: client, path: path, name: name);
+  return true;
 }
 
 /// Read-only viewer for one file.

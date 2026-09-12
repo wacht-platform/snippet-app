@@ -3907,20 +3907,20 @@ class _SessionScreenState extends State<SessionScreen>
       child: AppCard(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-                color: AppColors.accentBg,
-                borderRadius: BorderRadius.circular(R.sm)),
-            child: AppIcon('file', size: 16, color: AppColors.accent),
-          ),
-          const SizedBox(width: 10),
+          // The icon is INSIDE the tap target. It was outside, so tapping the
+          // most obviously tappable part of the card did nothing.
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
+                // ON PHONES: a full-screen route, exactly as the browser does.
+                // `onOpenFileTab` creates a shell TAB, which the phone shell
+                // never draws (see `openFileForViewing`), so calling it here
+                // made the card inert — tapping did nothing at all.
+                if (openFileForViewing(context,
+                    client: widget.client, path: path, name: name)) {
+                  return;
+                }
                 if (widget.onOpenFileTab != null) {
                   widget.onOpenFileTab!(path, name);
                 } else {
@@ -3934,19 +3934,33 @@ class _SessionScreenState extends State<SessionScreen>
                   );
                 }
               },
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: mono(13, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text(caption.isNotEmpty ? caption : path,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11.5, color: AppColors.fg3)),
-                  ]),
+              child: Row(children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                      color: AppColors.accentBg,
+                      borderRadius: BorderRadius.circular(R.sm)),
+                  child: AppIcon('file', size: 16, color: AppColors.accent),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: mono(13, color: AppColors.fg1)),
+                        const SizedBox(height: 2),
+                        Text(caption.isNotEmpty ? caption : path,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(11.5, color: AppColors.fg3)),
+                      ]),
+                ),
+              ]),
             ),
           ),
           const SizedBox(width: 6),
