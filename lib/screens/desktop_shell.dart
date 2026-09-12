@@ -238,12 +238,23 @@ enum _RightPanel {
 /// keeping one meant closing one to open another, which is why they are tabs
 /// here rather than one exclusive mode.
 class _RightTab {
-  const _RightTab.panel(this.panel) : agent = null;
-  const _RightTab.agent(CoordinationAgent this.agent)
-      : panel = _RightPanel.none;
+  _RightTab.panel(this.panel)
+      : agent = null,
+        pane = _Pane.right;
+  _RightTab.agent(CoordinationAgent this.agent)
+      : panel = _RightPanel.none,
+        pane = _Pane.right;
 
   final _RightPanel panel;
   final CoordinationAgent? agent;
+
+  /// Which pane holds this readout.
+  ///
+  /// Mutable, and the reason a readout is a TAB rather than a read-only panel:
+  /// anything in a pane's strip can be dragged to the other pane. Without this
+  /// the secondary pane had nothing draggable at all when it held a readout,
+  /// so right-to-left drags simply never started.
+  _Pane pane;
 
   bool get isAgent => agent != null;
 
@@ -416,11 +427,11 @@ class _DesktopShellState extends State<DesktopShell>
   /// A LIST, not one exclusive selection. Lanes, Checkpoints, Usage and a named
   /// agent are independent things; keeping one meant closing one to open
   /// another, which is why the rail buttons behaved like radio buttons.
+  ///
+  /// These share ONE strip and ONE selection with docked `_ShellTab`s — see
+  /// `_activeKey`. Rendering them as a separate, mutually-exclusive view is what
+  /// made a dropped tab hide the readout that was already there.
   final List<_RightTab> _rightTabs = [];
-
-  /// Which `_RightTab.key` the pane is showing. Null with a non-empty
-  /// `_rightTabs` falls back to the first tab.
-  String? _rightActiveKey;
 
   /// The user collapsed a pane. Hiding a pane is always a view action and never
   /// destroys anything — a terminal tab lives on in the sidebar, and its pty
@@ -446,8 +457,13 @@ class _DesktopShellState extends State<DesktopShell>
   final Map<_Pane, String> _groupRootKey = {};
 
   /// True when this readout is the tab the pane is currently showing.
-  bool _rightPanelActive(_RightPanel p) =>
-      _rightActiveKey == _RightTab.panel(p).key;
+  ///
+  /// Reads the pane's ONE selection slot, which docked `_ShellTab`s share — a
+  /// readout and a docked tab can never both be "active".
+  bool _rightPanelActive(_RightPanel p) {
+    final key = _RightTab.panel(p).key;
+    return _activeKey[_Pane.right] == key || _activeKey[_Pane.left] == key;
+  }
 
   /// Open a readout in the pane, focusing it if it is already open.
   ///
@@ -459,14 +475,24 @@ class _DesktopShellState extends State<DesktopShell>
     final key = _RightTab.panel(p).key;
     setState(() {
       _rightCollapsed = false;
-      if (_rightActiveKey == key) {
+      // Focused already? Dismiss it, wherever it currently lives.
+      if (_activeKey[_Pane.right] == key) {
         _closeRightTab(key);
         return;
       }
-      if (!_rightTabs.any((t) => t.key == key)) {
-        _rightTabs.add(_RightTab.panel(p));
+      if (_activeKey[_Pane.left] == key) {
+        _closeRightTab(key);
+        return;
       }
-      _rightActiveKey = key;
+      // The rail button opens a readout in the SECONDARY pane, so re-target it
+      // if a drag previously parked it on the left.
+      final existing = _rightTabs.where((t) => t.key == key).firstOrNull;
+      if (existing == null) {
+        _rightTabs.add(_RightTab.panel(p));
+      } else {
+        existing.pane = _Pane.right;
+      }
+      _activeKey[_Pane.right] = key;
     });
   }
 
@@ -475,10 +501,13 @@ class _DesktopShellState extends State<DesktopShell>
     final key = _RightTab.agent(a).key;
     setState(() {
       _rightCollapsed = false;
-      if (!_rightTabs.any((t) => t.key == key)) {
+      final existing = _rightTabs.where((t) => t.key == key).firstOrNull;
+      if (existing == null) {
         _rightTabs.add(_RightTab.agent(a));
+      } else {
+        existing.pane = _Pane.right;
       }
-      _rightActiveKey = key;
+      _activeKey[_Pane.right] = key;
     });
   }
 
@@ -488,8 +517,19 @@ class _DesktopShellState extends State<DesktopShell>
     if (!mounted) return;
     setState(() {
       _rightTabs.removeWhere((t) => t.key == key);
-      if (_rightActiveKey == key) {
-        _rightActiveKey = _rightTabs.isEmpty ? null : _rightTabs.last.key;
+      for (final pane in _Pane.values) {
+        if (_activeKey[pane] != key) continue;
+        // Fall back to another readout in the SAME pane, else hand the slot
+        // back to that pane's docked tabs (or leave it empty).
+        final rest = [
+          for (final r in _rightTabs)
+            if (r.pane == pane) r,
+        ];
+        if (rest.isNotEmpty) {
+          _activeKey[pane] = rest.last.key;
+        } else {
+          _activeKey.remove(pane);
+        }
       }
     });
   }
@@ -3116,18 +3156,6 @@ class _DesktopShellState extends State<DesktopShell>
     ];
   }
 
-  /// The tab a pane is showing, or null when its selected group has no content.
-  _ShellTab? _activeIn(_Pane p) {
-    final list = _tabsIn(p);
-    final key = _activeKey[p];
-    if (key != null) {
-      for (final t in list) {
-        if (t.key == key) return t;
-      }
-    }
-    return list.isEmpty ? null : list.first;
-  }
-
   String? _activeGroupKeyFor(_Pane p) =>
       _groupRootFor(p) ?? (_activeTab?.pane == p ? _activeTab?.key : null);
 
@@ -3254,7 +3282,9 @@ class _DesktopShellState extends State<DesktopShell>
     // empty one to receive it; releasing outside returns to hidden, because this
     // is transient and never touches `_rightCollapsed`.
     final showRight = _dragActive ||
-        (!_rightCollapsed && (rightTabs.isNotEmpty || _rightTabs.isNotEmpty));
+        (!_rightCollapsed &&
+            (rightTabs.isNotEmpty ||
+                _rightTabs.any((r) => r.pane == _Pane.right)));
     // Collapsing the LEFT pane is only meaningful while it holds aux content —
     // it is also the conversation surface, which there must always be a way
     // back to.
@@ -3309,22 +3339,56 @@ class _DesktopShellState extends State<DesktopShell>
   /// Reports hover through `_dragOverPane` so the pane can show it will accept
   /// the tab. Without that, a drag across the divider had no feedback at all —
   /// there was no way to tell a valid drop from a miss.
-  Widget _dropOn(_Pane p, Widget child) => DragTarget<_ShellTab>(
-        onWillAcceptWithDetails: (d) => d.data.pane != p,
+  /// A pane is a drop target for ANY pane tab — a docked `_ShellTab` or a
+  /// session readout.
+  ///
+  /// The payload is `Object` precisely because those are two different classes.
+  /// Readouts used to be non-draggable, so a pane holding one (Usage, Lanes, an
+  /// agent) had NOTHING to start a drag from — which is why right-to-left drags
+  /// never happened at all.
+  Widget _dropOn(_Pane p, Widget child) => DragTarget<Object>(
+        onWillAcceptWithDetails: (d) => _dragOriginOf(d.data) != p,
         onAcceptWithDetails: (d) {
           setState(() => _dragOverPane = null);
-          _moveTo(p, d.data);
+          final data = d.data;
+          if (data is _ShellTab) {
+            _moveTo(p, data);
+          } else if (data is _RightTab) {
+            _moveReadout(p, data);
+          }
         },
         onLeave: (_) {
           if (_dragOverPane == p) setState(() => _dragOverPane = null);
         },
         onMove: (d) {
-          if (d.data.pane != p && _dragOverPane != p) {
+          if (_dragOriginOf(d.data) != p && _dragOverPane != p) {
             setState(() => _dragOverPane = p);
           }
         },
         builder: (_, __, ___) => child,
       );
+
+  /// Which pane a dragged payload currently lives in, or null if it is neither
+  /// kind of pane tab.
+  _Pane? _dragOriginOf(Object? data) {
+    if (data is _ShellTab) return data.pane;
+    if (data is _RightTab) return data.pane;
+    return null;
+  }
+
+  /// Move a readout to another pane — the readout twin of `_moveTo`.
+  void _moveReadout(_Pane p, _RightTab r) {
+    if (r.pane == p) return;
+    setState(() {
+      final from = r.pane;
+      r.pane = p;
+      _rightCollapsed = false;
+      // Release the selection in the pane it LEFT, or that pane keeps pointing
+      // at a tab it no longer holds and renders blank.
+      if (_activeKey[from] == r.key) _activeKey.remove(from);
+      _activeKey[p] = r.key;
+    });
+  }
 
   /// One pane.
   ///
@@ -3341,25 +3405,52 @@ class _DesktopShellState extends State<DesktopShell>
   /// session that owns it.
   Widget _paneView(_Pane p, {bool roundRight = false}) {
     final list = _tabsIn(p);
-    final active = _activeIn(p);
+    // Readouts are pane-aware: a readout can be dragged between panes like any
+    // other tab, so filter by WHERE it currently lives rather than assuming the
+    // secondary pane.
+    final readouts = [
+      for (final r in _rightTabs)
+        if (r.pane == p) r
+    ];
+    final key = _activeKey[p];
+
+    final selectedTab = list.where((t) => t.key == key).firstOrNull;
+    _RightTab? selectedReadout;
+    for (final r in readouts) {
+      if (r.key == key) selectedReadout = r;
+    }
+    // No valid selection: prefer a DOCKED tab, matching the previous behaviour
+    // where readouts showed only when the pane held no docked tabs. Without this
+    // guard a readout would jump in front of the tabs the user was working with.
+    final shownTab = selectedTab ??
+        (selectedReadout == null && list.isNotEmpty ? list.first : null);
+    final shownReadout = selectedReadout ??
+        (shownTab == null && readouts.isNotEmpty ? readouts.first : null);
+
+    final tab = _activeTab;
+    final controls = tab == null ? null : _macSessionControls[tab.key];
+    final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
 
     Widget content;
-    if (list.isEmpty) {
-      // Nothing docked: the pane's own default surface.
+    if (list.isEmpty && readouts.isEmpty) {
       content = _paneFallback(p);
     } else {
       content = Stack(children: [
+        // EVERY docked tab stays mounted, selected or not. That is a
+        // correctness requirement, not an optimisation: a `SessionScreen` owns
+        // its ptys, so unmounting one on a tab switch would kill its terminals.
         for (final t in list)
           Offstage(
-            offstage: t != active,
+            offstage: t != shownTab,
             child: _tabBody(
               t,
               // `primary` gates file drops and inbound shares. Several sessions
               // can be mounted at once, so exactly one may claim them: the
               // active tab, in the focused pane.
-              primary: t == active && _focusedPane == p,
+              primary: t == shownTab && _focusedPane == p,
             ),
           ),
+        if (shownReadout != null) _rightTabBody(shownReadout, s, controls),
       ]);
     }
 
@@ -3369,21 +3460,20 @@ class _DesktopShellState extends State<DesktopShell>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // The strip renders whenever this pane hosts tabs, so there is always
-          // a way to switch between them and to re-open a collapsed one.
-          if (list.isNotEmpty) _paneStrip(p, list),
+          // The strip renders whenever this pane hosts ANY tab, and lists both
+          // kinds, so there is always a way to reach a readout that a dropped
+          // tab would otherwise have covered.
+          if (list.isNotEmpty || readouts.isNotEmpty)
+            _paneStrip(p, list, readouts, key),
           Expanded(child: content),
         ],
       ),
     );
   }
 
-  /// What a pane shows when nothing is docked in it.
+  /// What a pane shows when it holds nothing at all.
   Widget _paneFallback(_Pane p) {
-    if (p == _Pane.right) {
-      if (_rightTabs.isNotEmpty) return _rightPanelView();
-      return _emptyPaneHint();
-    }
+    if (p == _Pane.right) return _emptyPaneHint();
     return _client == null ? _welcome() : _recentPlaceholder();
   }
 
@@ -3391,21 +3481,36 @@ class _DesktopShellState extends State<DesktopShell>
   /// near-background baseline, with the active tab marked by a solid white top
   /// edge. A session root stays a capped, locked first tab; supporting tabs are
   /// larger bounded frames with their close action inside the tab itself.
-  Widget _paneStrip(_Pane p, List<_ShellTab> list) {
-    final active = _activeIn(p);
+  ///
+  /// Lists BOTH kinds of tab in ONE strip: docked `_ShellTab`s first, then
+  /// session readouts. They previously had separate strips in separate views, so
+  /// dropping a tab into a pane that held a readout hid that readout completely.
+  Widget _paneStrip(
+    _Pane p,
+    List<_ShellTab> list,
+    List<_RightTab> readouts,
+    String? activeKey,
+  ) {
+    final count = list.length + readouts.length;
     return Container(
       height: kPaneHeaderHeight,
       color: AppColors.canvas,
       child: Stack(fit: StackFit.expand, children: [
         LayoutBuilder(builder: (context, c) {
-          final w = kPaneTabWidth(c.maxWidth, list.length);
+          final w = kPaneTabWidth(c.maxWidth, count);
           return ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.zero,
-            itemCount: list.length,
+            itemCount: count,
             separatorBuilder: (_, __) => const SizedBox.shrink(),
-            itemBuilder: (_, i) =>
-                _paneTabChip(p, list[i], list[i] == active, w),
+            itemBuilder: (_, i) {
+              if (i < list.length) {
+                final t = list[i];
+                return _paneTabChip(p, t, t.key == activeKey, w);
+              }
+              final r = readouts[i - list.length];
+              return _readoutChip(p, r, r.key == activeKey, w);
+            },
           );
         }),
         // Foreground baseline: the ListView paints over the container's own
@@ -3421,6 +3526,117 @@ class _DesktopShellState extends State<DesktopShell>
       ]),
     );
   }
+
+  /// One readout tab (Lanes / Checkpoints / Usage / an agent) in a pane strip.
+  ///
+  /// A `_ShellTab` chip's twin: same geometry, same selected stroke, same close
+  /// position — a readout is a tab like any other, so it must not read as a
+  /// different control class sitting in the same strip.
+  Widget _readoutChip(_Pane p, _RightTab r, bool active, double width) {
+    final chip = GestureDetector(
+      onTap: () => setState(() => _activeKey[p] = r.key),
+      child: SizedBox(
+        width: width,
+        child: Container(
+          height: kPaneTabHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.canvas,
+            border: Border(
+              right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
+              top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
+            ),
+          ),
+          foregroundDecoration: !active
+              ? null
+              : BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                        color: AppColors.fg1, width: kPaneActiveStroke),
+                  ),
+                ),
+          child: Row(children: [
+            AppIcon(r.icon,
+                size: 14, color: active ? AppColors.fg1 : AppColors.fg3),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                r.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(kPaneTabText,
+                    weight: active ? W.label : W.body,
+                    color: active ? AppColors.fg1 : AppColors.fg3),
+              ),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => _closeRightTab(r.key),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(3),
+                child: AppIcon('x', size: 11, color: AppColors.fg4),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+
+    // A readout drags between panes exactly like a docked tab. Without this the
+    // secondary pane had NOTHING draggable whenever it held a readout, so a
+    // right-to-left drag could never even start.
+    void started() => setState(() => _dragActive = true);
+    void ended(DraggableDetails _) {
+      if (_dragActive || _dragOverPane != null) {
+        setState(() {
+          _dragActive = false;
+          _dragOverPane = null;
+        });
+      }
+    }
+
+    if (kMobile) {
+      return LongPressDraggable<_RightTab>(
+        data: r,
+        dragAnchorStrategy: pointerDragAnchorStrategy,
+        feedback: _readoutDragFeedback(r),
+        childWhenDragging: Opacity(opacity: 0.4, child: chip),
+        onDragStarted: started,
+        onDragEnd: ended,
+        child: chip,
+      );
+    }
+    return Draggable<_RightTab>(
+      data: r,
+      dragAnchorStrategy: pointerDragAnchorStrategy,
+      feedback: _readoutDragFeedback(r),
+      childWhenDragging: Opacity(opacity: 0.4, child: chip),
+      onDragStarted: started,
+      onDragEnd: ended,
+      child: chip,
+    );
+  }
+
+  /// Drag ghost for a readout chip, matching `_tabDragFeedback`'s shape so the
+  /// two kinds of dragged tab look like the same thing in flight.
+  Widget _readoutDragFeedback(_RightTab r) => Material(
+        color: Colors.transparent,
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface3,
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: AppColors.border2),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(r.icon, size: 13, color: AppColors.accent),
+            const SizedBox(width: 7),
+            Text(r.label, style: sans(12.5, color: AppColors.fg1)),
+          ]),
+        ),
+      );
 
   /// The sidebar is the only shell creator. Its controller listener adds the
   /// acknowledged shell to the active inner group exactly once.
@@ -3731,42 +3947,6 @@ class _DesktopShellState extends State<DesktopShell>
           ),
         ),
       );
-
-  /// The secondary pane's readout strip: one tab per open readout or agent.
-  ///
-  /// Content comes from the shared panel widgets so the pane and the session's
-  /// drawer can never show a different view of the same thing.
-  Widget _rightPanelView() {
-    final tab = _activeTab;
-    final controls = tab == null ? null : _macSessionControls[tab.key];
-    final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
-
-    // Fall back to the first tab when the selection points at a closed one, so
-    // the pane never renders blank while tabs remain.
-    final activeKey = _rightActiveKey ?? _rightTabs.first.key;
-    var index = _rightTabs.indexWhere((t) => t.key == activeKey);
-    if (index < 0) index = 0;
-    final active = _rightTabs[index];
-
-    return Container(
-      color: AppColors.canvas,
-      child: Column(children: [
-        PaneTabStrip(
-          tabs: [
-            for (final t in _rightTabs)
-              PaneTab(
-                label: t.label,
-                icon: t.icon,
-                onClose: () => _closeRightTab(t.key),
-              ),
-          ],
-          activeIndex: index,
-          onSelect: (i) => setState(() => _rightActiveKey = _rightTabs[i].key),
-        ),
-        Expanded(child: _rightTabBody(active, s, controls)),
-      ]),
-    );
-  }
 
   Widget _rightTabBody(
     _RightTab t,
