@@ -112,13 +112,20 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
     }
   }
 
-  /// Folders only, alphabetical. A folder picker that lists files invites taps
-  /// that can never do anything.
-  List<FsEntry> get _folders {
+  /// Folders first (tappable), then files (inert), each alphabetical.
+  ///
+  /// Files are LISTED but not tappable. Hiding them made "New file" look broken
+  /// — you could create one and never see it — and a folder browser that hides
+  /// the files you just made reads as a failed write. They stay non-interactive
+  /// because a tap here can only mean "navigate in", which a file cannot do.
+  List<FsEntry> get _dirs => _sorted(true);
+  List<FsEntry> get _files => _sorted(false);
+
+  List<FsEntry> _sorted(bool dirs) {
     final entries = _listing?.entries ?? const <FsEntry>[];
     final all = [
       for (final e in entries)
-        if (e.isDir) e
+        if (e.isDir == dirs) e
     ];
     all.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return all;
@@ -168,6 +175,71 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         setState(() => _busy = null);
         toast(context, '$e', danger: true);
       }
+    }
+  }
+
+  /// Normalize a typed name into a safe RELATIVE path, or null if unusable.
+  ///
+  /// Splitting on `/` is what makes nesting work: `src/api/v2` becomes three
+  /// levels in one step. `..` is rejected so a name cannot walk out of the
+  /// folder you are looking at — the daemon would happily create it, and the
+  /// picker would then be browsing somewhere the user did not choose.
+  String? _sanitizeRel(String raw) {
+    final parts = raw
+        .split('/')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty && p != '.')
+        .toList();
+    if (parts.isEmpty) return null;
+    if (parts.any((p) => p == '..')) return null;
+    return parts.join('/');
+  }
+
+  /// Create a folder inside the current one.
+  ///
+  /// The name may contain `/`, so a whole nested chain is created at once — the
+  /// daemon's `/fs/mkdir` calls `create_dir_all`, which builds the intermediate
+  /// levels for free. No per-level round trip needed.
+  Future<void> _newFolder() => _create(isDir: true);
+
+  /// Create an empty file inside the current one, with the same nesting rule.
+  /// A file has no content to type here; this is for placing structure, and the
+  /// editor (or upload) fills it in afterwards.
+  Future<void> _newFile() => _create(isDir: false);
+
+  Future<void> _create({required bool isDir}) async {
+    final dir = _here;
+    if (dir.isEmpty) return;
+    final name = await promptText(
+      context,
+      title: isDir ? 'New folder' : 'New file',
+      hint: isDir ? 'name, or path/in/one/go' : 'name, or path/in/one.go',
+      saveLabel: 'Create',
+    );
+    if (name == null || !mounted) return;
+    final rel = _sanitizeRel(name);
+    if (rel == null) {
+      toast(context, 'Enter a name, with no leading / or ..', danger: true);
+      return;
+    }
+    setState(() => _busy = 'Creating…');
+    try {
+      final path = '$dir/$rel';
+      if (isDir) {
+        await widget.client.mkdir(path);
+      } else {
+        await widget.client.writeFile(path, '');
+      }
+      if (!mounted) return;
+      setState(() => _busy = null);
+      // Reload so the new entry appears. The picker lists FOLDERS only, so a new
+      // file is confirmed by its toast rather than by a row.
+      await _go(dir);
+      if (mounted) toast(context, 'Created $rel');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = null);
+      toast(context, '$e', danger: true);
     }
   }
 
@@ -335,22 +407,52 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   }
 
   Widget _folderList() {
-    final folders = _folders;
-    if (folders.isEmpty) {
+    final dirs = _dirs;
+    final files = _files;
+    if (dirs.isEmpty && files.isEmpty) {
       // Still a ListView, so RefreshIndicator has a scrollable to attach to.
       return ListView(
         padding: const EdgeInsets.symmetric(vertical: 44),
         children: [
-          Text('No folders here.',
+          Text('This folder is empty.',
               textAlign: TextAlign.center,
               style: sans(12.5, color: AppColors.fg4)),
         ],
       );
     }
+    // Folders first so the tappable rows are always above the fold; files
+    // follow as context. One flat list keeps the index arithmetic simple and
+    // lets a single ListView.builder do both.
+    final rows = <Widget>[
+      for (final d in dirs) _folderRow(d),
+      if (dirs.isNotEmpty && files.isNotEmpty) const SizedBox(height: 6),
+      for (final f in files) _fileRow(f),
+    ];
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-      itemCount: folders.length,
-      itemBuilder: (_, i) => _folderRow(folders[i]),
+      itemCount: rows.length,
+      itemBuilder: (_, i) => rows[i],
+    );
+  }
+
+  /// A file: shown for context, deliberately NOT tappable.
+  ///
+  /// Visually muted and without a chevron, so it does not invite a tap that
+  /// cannot go anywhere.
+  Widget _fileRow(FsEntry e) {
+    return Container(
+      height: kMobile ? 40 : 32,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(children: [
+        AppIcon('file', size: 14, color: AppColors.fg4),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(e.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(kMobile ? 12.5 : 12, color: AppColors.fg3)),
+        ),
+      ]),
     );
   }
 
@@ -397,6 +499,18 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: Row(children: [
+          IconBtn('folder-plus',
+              size: kMobile ? 40 : 34,
+              iconSize: kMobile ? 17 : 15,
+              tooltip: 'New folder here',
+              onTap: (_listing == null || _busy != null) ? null : _newFolder),
+          const SizedBox(width: 2),
+          IconBtn('file-plus',
+              size: kMobile ? 40 : 34,
+              iconSize: kMobile ? 17 : 15,
+              tooltip: 'New file here',
+              onTap: (_listing == null || _busy != null) ? null : _newFile),
+          const SizedBox(width: 2),
           IconBtn('upload',
               size: kMobile ? 40 : 34,
               iconSize: kMobile ? 17 : 15,
