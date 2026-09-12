@@ -110,83 +110,105 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final body = Column(children: [
-      _FilterBar(
-        filter: filter,
-        counts: {
-          for (final s in TaskStatus.values)
-            s: tasks.where((t) => t.status == s).length,
-        },
-        onSelect: (s) => setState(() => filter = s),
-      ),
-      Expanded(
-        child: loading
-            ? const Center(
-                child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2)))
-            : error != null
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Text(error!,
-                            textAlign: TextAlign.center,
-                            // 13, not 12.5: the doc's scale is 11-13 with no
-                            // half steps.
-                            style: sans(13, color: AppColors.danger)),
-                        const SizedBox(height: 12),
-                        Btn('Retry', small: true, onTap: refresh),
-                      ]),
-                    ),
-                  )
-                : _list(),
-      ),
-    ]);
+    // The chip row belongs to the CHROME plane and the list to the reading
+    // plane, so exactly one surface step separates them and no hairline is
+    // needed. Painted explicitly rather than inherited: the embedded host is a
+    // canvas pane and the standalone route is a bg scaffold, and the two must
+    // still read the same.
+    final body = ColoredBox(
+      color: AppColors.bg,
+      child: Column(children: [
+        _FilterBar(
+          filter: filter,
+          counts: {
+            for (final s in TaskStatus.values)
+              s: tasks.where((t) => t.status == s).length,
+          },
+          onSelect: (s) => setState(() => filter = s),
+        ),
+        Expanded(
+          child: ColoredBox(
+            color: AppColors.canvas,
+            child: _content(),
+          ),
+        ),
+      ]),
+    );
 
     if (widget.embedded) return body;
     return Scaffold(
-      // The list is the READING plane (the darkest surface), and the bar sits
-      // one rung above it on the chrome surface — the doc's own relationship
-      // (its strip #171717 sits above a chat #010101). That step is the whole
-      // separation, which is what `bordered: false` is for: no hairline.
-      backgroundColor: AppColors.canvas,
-      body: Column(children: [
-        SnAppBar(
-          title: 'Tasks',
-          // The doc's page title is 20px; SnAppBar defaults to 17. Its WEIGHT
-          // stays at the app's `display()` 500 rather than the doc's 600 —
-          // forcing 600 would mean either changing SnAppBar for every screen or
-          // bypassing the shared helper, and both reach outside this page.
-          titleSize: 20,
-          background: AppColors.bg,
-          bordered: false,
-          actions: [
-            IconBtn('refresh',
-                // 16px glyph in a 24px slot — the doc's icon relationship, and
-                // the same pair the window bar already uses for its actions.
-                // The glyph never fills its slot.
-                size: kMobile ? M.minTarget : 24,
-                iconSize: 16,
-                tooltip: 'Refresh',
-                onTap: refresh),
-            const SizedBox(width: 6),
-            // The action sits IN the bar rather than floating over the list: a
-            // Material FAB carried an elevation shadow (the doc has none) and
-            // the accent fill, which this app reserves for state.
-            Btn('New task',
-                small: true,
-                icon: 'plus',
-                variant: BtnVariant.surface,
-                onTap: _create),
-            const SizedBox(width: 2),
-          ],
-        ),
-        Expanded(child: body),
-      ]),
+      // bg, not canvas: the notch/status-bar strip sits on the BAR's plane, so
+      // there is no third rung above the chip row.
+      backgroundColor: AppColors.bg,
+      // REQUIRED, not cosmetic: the Material `AppBar` this replaced reserved the
+      // status bar's height for us. A bare `Column` started at y=0, so Android's
+      // clock and carrier icons drew straight over the title.
+      body: SafeArea(
+        bottom: false,
+        child: Column(children: [
+          SnAppBar(
+            title: 'Tasks',
+            // The doc's page title is 20px; SnAppBar defaults to 17. Its WEIGHT
+            // stays at the app's `display()` 500 rather than the doc's 600 —
+            // forcing 600 would mean either changing SnAppBar for every screen
+            // or bypassing the shared helper, and both reach outside this page.
+            titleSize: 20,
+            background: AppColors.bg,
+            bordered: false,
+            actions: [
+              IconBtn('refresh',
+                  // 16px glyph in a 24px slot — the doc's icon relationship,
+                  // and the pair the window bar already uses for its actions.
+                  // The glyph never fills its slot.
+                  size: kMobile ? M.minTarget : 24,
+                  iconSize: 16,
+                  tooltip: 'Refresh',
+                  onTap: refresh),
+              const SizedBox(width: 6),
+              // The action sits IN the bar rather than floating over the list: a
+              // Material FAB carried an elevation shadow (the doc has none) and
+              // the accent fill, which this app reserves for state.
+              Btn('New task',
+                  small: true,
+                  icon: 'plus',
+                  variant: BtnVariant.surface,
+                  onTap: _create),
+              const SizedBox(width: 2),
+            ],
+          ),
+          Expanded(child: body),
+        ]),
+      ),
     );
   }
+
+  /// The list area: spinner, error, or the grouped rows.
+  ///
+  /// Split out of `build` so the embedded and standalone hosts share ONE
+  /// definition of the content — the two had to agree about the filter bar's
+  /// plane, and duplicating it is how they drift.
+  Widget _content() => loading
+      ? const Center(
+          child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2)))
+      : error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text(error!,
+                      textAlign: TextAlign.center,
+                      // 13, not 12.5: the doc's scale is 11-13 with no half
+                      // steps.
+                      style: sans(13, color: AppColors.danger)),
+                  const SizedBox(height: 12),
+                  Btn('Retry', small: true, onTap: refresh),
+                ]),
+              ),
+            )
+          : _list();
 
   Widget _list() {
     final visible = _visible;
