@@ -29,7 +29,6 @@ import 'vault.dart';
 import 'recurring.dart';
 import 'agents_sidebar_panel.dart';
 import 'terminals_sidebar_panel.dart';
-import 'mission_control/coordination_activity_screen.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'git_diff_sidebar_panel.dart';
 import 'file_tree_sidebar_panel.dart';
@@ -43,6 +42,36 @@ import 'mission_control.dart';
 /// Desktop two-pane shell: a persistent left sidebar (instances + sessions) and
 /// a main pane showing the selected session. Tools (git/files/editor/models)
 /// open as floating panels/drawers from within the session, or the sidebar.
+/// Session id -> the initials of the agents working in it.
+///
+/// Pure so it can be tested directly: the join between a lease (which says WHERE
+/// an agent works) and the directory (which says what to call it) is exactly
+/// where a wrong key or a stale name would hide, and the whole thing is a
+/// decoration on the session list that no build or analyzer would catch.
+///
+/// An unknown agent falls back to its id rather than being dropped: a lease for
+/// an agent the directory does not list yet still means someone is working here.
+Map<String, List<String>> sessionAgentInitialsFrom(
+  List<CoordinationLease> leases,
+  List<CoordinationAgent> agents,
+) {
+  final byId = {for (final a in agents) a.id: a};
+  final bySession = <String, List<String>>{};
+  for (final lease in leases) {
+    if (lease.sessionId.isEmpty) continue;
+    // A blank display_name is as unusable as a missing agent, and both fall back
+    // to the id: `rust-reviewer` gives an "R", where "?" would say only that
+    // someone is here without saying who.
+    final agent = byId[lease.agentId];
+    final display = agent?.displayName.trim() ?? '';
+    final name = display.isEmpty ? lease.agentId : display;
+    final trimmed = name.trim();
+    final initial = trimmed.isEmpty ? '?' : trimmed[0].toUpperCase();
+    bySession.putIfAbsent(lease.sessionId, () => <String>[]).add(initial);
+  }
+  return bySession;
+}
+
 class DesktopShell extends StatefulWidget {
   const DesktopShell({super.key});
   @override
@@ -389,6 +418,14 @@ class _DesktopShellState extends State<DesktopShell>
   // Live status from /events (and open-tab callbacks). Survives a slow
   // /sessions refetch so the list doesn't flicker back to stale.
   final Map<String, String> _liveStatus = {};
+
+  /// Which agents are working in each session, as display initials.
+  ///
+  /// Keyed by session id. Shown inline on the session rows — the phone card and
+  /// the desktop sidebar row both render it — so "who is working where" is
+  /// answerable without opening anything. Kept separate from [_sessions] so a
+  /// coordination failure can never take the session list down with it.
+  final Map<String, List<String>> _sessionAgentInitials = {};
   bool _sidebarGit = false;
 
   /// Secondary-pane width, dragged by its handle. Width-driven rather than a
@@ -683,12 +720,11 @@ class _DesktopShellState extends State<DesktopShell>
 
     // ---- Session ----
     if (mc) {
+      // Two destinations. The task board absorbed coordination and handoffs —
+      // a task carries the agents on it and the handoffs between them — so the
+      // separate Coordination hub has nothing left to show.
       items.add(item('layers', 'Tasks', 'tasks'));
       items.add(item('users', 'Agents', 'agents'));
-      // One destination, not three. This menu still had the pre-hub rows: a
-      // 'Coordination board' item that actually opened the hub, plus a
-      // 'Coordination activity' row duplicating the hub's Active section.
-      items.add(item('coordination', 'Coordination', 'coordination'));
     } else {
       items.add(item('edit', 'Rename session', 'rename'));
       items.add(item('shield', 'Approval: Auto', 'approval_auto',
@@ -1743,6 +1779,9 @@ class _DesktopShellState extends State<DesktopShell>
           _sessionsError = null;
         });
       }
+      // Decoration only, fired after the list is already on screen. Kept out of
+      // the request above so a coordination outage can never blank the list.
+      unawaited(_loadSessionAgents(c));
     } catch (_) {
       // Unreachable daemon must not masquerade as "No chats yet" — surface it.
       if (identical(c, _client) && mounted) {
@@ -1752,6 +1791,34 @@ class _DesktopShellState extends State<DesktopShell>
               'Can\'t reach this machine — check the daemon/tunnel.';
         });
       }
+    }
+  }
+
+  /// Which agents are working in each session, as initials for the row avatars.
+  ///
+  /// Two calls, because a lease carries only the agent ID: the lease says WHERE
+  /// an agent is working, the directory says what to call it. Failures are
+  /// swallowed — this decorates the list, and a coordination outage must not
+  /// look like an empty session list.
+  Future<void> _loadSessionAgents(DaemonClient c) async {
+    try {
+      final results = await Future.wait([
+        c.coordinationActiveLeases(),
+        c.coordinationAgents(),
+      ]);
+      // A slow response for a PREVIOUS instance must not decorate this list.
+      if (!identical(c, _client) || !mounted) return;
+      final bySession = sessionAgentInitialsFrom(
+        results[0] as List<CoordinationLease>,
+        results[1] as List<CoordinationAgent>,
+      );
+      setState(() {
+        _sessionAgentInitials
+          ..clear()
+          ..addAll(bySession);
+      });
+    } catch (_) {
+      // Decoration, not data.
     }
   }
 
@@ -2246,6 +2313,7 @@ class _DesktopShellState extends State<DesktopShell>
         onSettingsSection: (s) => setState(() => _mobileSettingsSection = s),
         agent: _mobileAgent,
         onAgent: (a) => setState(() => _mobileAgent = a),
+        sessionAgentInitials: _sessionAgentInitials,
       );
     }
 
@@ -4556,6 +4624,12 @@ class _Sidebar extends StatefulWidget {
   final CoordinationAgent? agent;
   final ValueChanged<CoordinationAgent?> onAgent;
 
+  /// Session id -> the initials of the agents working in it.
+  ///
+  /// Shell-owned, like [sessions]: this widget renders the list, the shell
+  /// fetches it, so the fetch is not duplicated per host.
+  final Map<String, List<String>> sessionAgentInitials;
+
   const _Sidebar({
     required this.instances,
     required this.active,
@@ -4583,6 +4657,7 @@ class _Sidebar extends StatefulWidget {
     required this.onSettingsSection,
     required this.agent,
     required this.onAgent,
+    this.sessionAgentInitials = const {},
   });
   @override
   State<_Sidebar> createState() => _SidebarState();
@@ -5543,6 +5618,8 @@ class _SidebarState extends State<_Sidebar> {
       // indicator for one fact. Colour is the state channel — see
       // `sessionStateColor`: amber busy, accent needs-you, neutral idle.
       leading: SessionStateIcon(status: s.status, size: kNavIcon),
+      // Who is working here, inline. Same treatment as the phone card.
+      trailing: _agentAvatars(s.id, size: 15),
     );
   }
 
@@ -5791,6 +5868,56 @@ class _SidebarState extends State<_Sidebar> {
     );
   }
 
+  /// Overlapping initial avatars for the agents working in [sessionId].
+  ///
+  /// Inline and compact by design: this answers "who is in here" on the row
+  /// itself, so it needs no screen of its own. Rendered only when someone is
+  /// actually working, so an idle list stays quiet.
+  Widget _agentAvatars(String sessionId, {double size = 16}) {
+    final initials = widget.sessionAgentInitials[sessionId];
+    if (initials == null || initials.isEmpty) return const SizedBox.shrink();
+    // Cap the strip: past a few discs the row is a nest of circles, and the
+    // count is the useful fact rather than the identities.
+    const max = 3;
+    final shown = initials.take(max).toList();
+    final overflow = initials.length - shown.length;
+    const overlap = 5.0;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      // A Stack, not a Row with negative gaps: padding cannot be negative, and
+      // translating would leave the layout width too large.
+      SizedBox(
+        width: size + (shown.length - 1) * (size - overlap),
+        height: size,
+        child: Stack(children: [
+          for (var i = 0; i < shown.length; i++)
+            Positioned(
+              left: i * (size - overlap),
+              child: Container(
+                width: size,
+                height: size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.accentBg,
+                  shape: BoxShape.circle,
+                  // A ring in the surface colour so overlapping discs read as
+                  // separate rather than as one blob.
+                  border: Border.all(color: AppColors.bg, width: 1),
+                ),
+                child: Text(shown[i],
+                    style: sans(size * 0.56,
+                        weight: W.label, color: AppColors.accent)),
+              ),
+            ),
+        ]),
+      ),
+      if (overflow > 0)
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text('+$overflow', style: sans(10, color: AppColors.fg4)),
+        ),
+    ]);
+  }
+
   Widget _sessionCard(SessionInfo s) {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
@@ -5856,6 +5983,9 @@ class _SidebarState extends State<_Sidebar> {
               // long one fills the full width and butts straight against the
               // time — the two run together with no separation.
               if (!renaming) ...[
+                // Who is working in this session, inline. Empty renders nothing,
+                // so the 10px gap below is the row's original spacing.
+                _agentAvatars(s.id),
                 const SizedBox(width: 10),
                 Text(relativeTime(s.lastActive),
                     style: sans(M.meta, color: AppColors.fg4)),

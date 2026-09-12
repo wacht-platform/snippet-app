@@ -43,10 +43,9 @@ import 'mission_control/mission_control_state.dart'
         parseBoardMessage,
         BoardMessage,
         MissionEnvelope;
-import 'mission_control/coordination_hub.dart';
-import 'mission_control/coordination_activity_screen.dart';
+import 'mission_control/coordination_agent_directory.dart';
 import 'mission_control/coordination_session_agents.dart';
-import 'mission_control/widgets/mission_control_tasks.dart';
+import 'mission_control/task_board_screen.dart';
 
 class SessionScreen extends StatefulWidget {
   final DaemonClient client;
@@ -2926,21 +2925,12 @@ class _SessionScreenState extends State<SessionScreen>
         _showTasks();
         return;
       case 'agents':
-        presentScreen(context,
-            style: PanelStyle.drawer,
-            builder: (_, close) => SessionAgentsPanel(
-                client: widget.client, sessionId: widget.sessionId));
-        return;
-      case 'coordination':
-        presentScreen(context,
-            style: PanelStyle.drawer,
-            builder: (_, close) => CoordinationHub(client: widget.client));
-        return;
-      case 'coordination_activity':
+        // The device-wide agent directory. This is the hub's Agents section,
+        // kept as a standalone screen now that the hub is gone.
         presentScreen(context,
             style: PanelStyle.drawer,
             builder: (_, close) =>
-                CoordinationActivityScreen(client: widget.client));
+                CoordinationAgentDirectory(client: widget.client));
         return;
     }
   }
@@ -3053,14 +3043,6 @@ class _SessionScreenState extends State<SessionScreen>
           builder: (_, close) => SessionAgentsPanel(
               client: widget.client, sessionId: widget.sessionId))),
       onTasks: _isMissionControl ? () => run(_showTasks) : null,
-      // One coordination destination instead of three sibling drawers with
-      // handoffs nested inside the board. Device-wide, so Mission-Control
-      // gated.
-      onCoordination: _isMissionControl
-          ? () => run(() => presentScreen(context,
-              style: PanelStyle.drawer,
-              builder: (_, close) => CoordinationHub(client: widget.client)))
-          : null,
       onTerm: () => run(_openTerm),
       hideShell: _isMissionControl,
       onGit: () => run(() => presentScreen(context,
@@ -4116,22 +4098,17 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
+  /// The task board. ONE destination: it carries the tasks, the agents on
+  /// them, and the handoffs between them, so the old coordination hub — with
+  /// its separate Active/Handoffs sections — is gone.
   void _showTasks() {
     if (!_isMissionControl) return;
     presentScreen(
       context,
-      builder: (_, close) => MissionControlTasksScreen(
-        client: widget.client,
-        onClose: close,
-        onAskTask: (task) {
-          final title = task.title.isEmpty ? task.id : task.title;
-          _input.text =
-              'Tell me about task "$title" — what\'s the current status?';
-          _input.selection =
-              TextSelection.collapsed(offset: _input.text.length);
-          _sendMessage();
-        },
-      ),
+      style: PanelStyle.drawer,
+      maxWidth: 820,
+      maxHeight: 760,
+      builder: (_, close) => TaskBoardScreen(client: widget.client),
     );
   }
 
@@ -5810,7 +5787,6 @@ class _SessionActionsPanel extends StatefulWidget {
   /// Which agents are (and were) active in THIS session. Present for every
   /// session, not just Mission Control.
   final VoidCallback? onSessionAgents;
-  final VoidCallback? onCoordination;
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
@@ -5830,7 +5806,6 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onLanes,
     this.onTasks,
     this.onSessionAgents,
-    this.onCoordination,
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
@@ -6032,12 +6007,6 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Agents in session',
             detail: 'Which agents are working here',
             onTap: widget.onSessionAgents),
-      if (widget.onCoordination != null)
-        _row(
-            icon: 'message-text',
-            label: 'Coordination',
-            detail: 'Board, handoffs and activity',
-            onTap: widget.onCoordination),
       _row(
           icon: 'scheduled',
           label: 'Scheduled',
