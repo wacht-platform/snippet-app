@@ -104,6 +104,19 @@ void main() {
     });
   });
 
+  testWidgets('the folder path is shown once, not repeated in the header',
+      (tester) async {
+    await asPlatform(TargetPlatform.android, () async {
+      await pumpExplorer(tester);
+
+      // The banner carried the path as BOTH the app bar subtitle and the meta
+      // row under the divider, so the same long string appeared twice within
+      // ~40dp and the header read as broken.
+      expect(find.text('/root'), findsOneWidget,
+          reason: 'the folder path belongs to the list row, not the app bar too');
+    });
+  });
+
   testWidgets('media and documents get their own row glyphs', (tester) async {
     await asPlatform(TargetPlatform.android, () async {
       await pumpExplorer(tester);

@@ -474,7 +474,11 @@ class _FileExplorerState extends State<FileExplorer> {
                   SnAppBar(
                     title:
                         _selecting ? '${_selected.length} selected' : 'Files',
-                    subtitle: listing?.path,
+                    // No subtitle. The folder path was printed TWICE — here and
+                    // again in the row below the divider — so the same long
+                    // string appeared twice within ~40dp and the header read as
+                    // broken. The path describes the LIST, so it belongs in that
+                    // row (with the item count); this bar names the screen.
                     titleSize: M.sectionTitle,
                     compact: true,
                     onBack: _selecting
@@ -570,7 +574,10 @@ class _FileExplorerState extends State<FileExplorer> {
     final visible = _visibleEntries(listing);
     final noun = visible.length == 1 ? 'item' : 'items';
     return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 8),
+      // Top inset is NOT 0. The app bar draws a divider along its bottom edge,
+      // and with no inset the path row started ~3dp under it — the text read as
+      // touching the rule above it rather than sitting below it.
+      padding: EdgeInsets.fromLTRB(M.gutter, 10, M.gutter, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(2, 0, 2, 6),
