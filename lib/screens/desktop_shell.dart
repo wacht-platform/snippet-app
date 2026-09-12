@@ -4609,6 +4609,37 @@ class _SidebarState extends State<_Sidebar> {
   bool get _mobileDrilledDown =>
       widget.settingsSection != null || widget.agent != null;
 
+  /// Identity of the phone screen the home is showing, so the switcher animates
+  /// a real CHANGE of screen rather than every ordinary rebuild.
+  ///
+  /// The settings SECTION is deliberately left out of this key. Keying on it
+  /// would rebuild `_SettingsPanel`, re-running its `initState` notification
+  /// fetch and flickering the switch; a section change should instead cross-fade
+  /// the panel's own body, which `_SettingsPanelState` does.
+  String get _sideKey => widget.agent != null
+      ? 'agent|${widget.agent!.id}'
+      : widget.mobileHome.name;
+
+  /// True when the last navigation moved FORWARD through the shell — a later
+  /// destination, or into a nested screen — rather than back out of one.
+  ///
+  /// Sets the slide's direction, so going back retraces the motion you arrived
+  /// with instead of repeating it. Captured in `didUpdateWidget` because the
+  /// previous value is already gone by the time `build` runs.
+  bool _forward = true;
+
+  @override
+  void didUpdateWidget(covariant _Sidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mobileHome != widget.mobileHome) {
+      _forward = widget.mobileHome.index > oldWidget.mobileHome.index;
+    } else if (oldWidget.agent == null && widget.agent != null) {
+      _forward = true;
+    } else if (oldWidget.agent != null && widget.agent == null) {
+      _forward = false;
+    }
+  }
+
   /// Folder groups the user has collapsed. Keyed by folder path; a group is
   /// expanded by default, so a fresh session list is fully visible.
   final Set<String> _collapsed = {};
@@ -4685,7 +4716,45 @@ class _SidebarState extends State<_Sidebar> {
           // gets the remaining height, so nothing hides behind the bar and no
           // scroll-padding hack is needed. It still reads as floating (inset,
           // rounded, raised).
-          Expanded(child: _mobileHomeBody(hasClient)),
+          // Animate a real change of DESTINATION or drill-down. Keyed on the
+          // screen's identity rather than the whole widget, so an ordinary
+          // rebuild — a session arriving, a health dot updating — does not
+          // replay the transition, and `_SettingsPanel` keeps its state across
+          // them.
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              reverseDuration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              // The default layout is `Stack(alignment: center)`, which hands
+              // each child LOOSE constraints — an empty state would then centre
+              // itself in the corner rather than fill the body. `StackFit.expand`
+              // keeps every child pane-sized while they cross-fade.
+              layoutBuilder: (current, previous) => Stack(
+                fit: StackFit.expand,
+                children: [...previous, if (current != null) current],
+              ),
+              transitionBuilder: (child, anim) {
+                // Enter from the side you travelled from, so going back
+                // retraces the motion you arrived with instead of repeating it.
+                final dx = _forward ? 0.06 : -0.06;
+                return FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position:
+                        Tween<Offset>(begin: Offset(dx, 0), end: Offset.zero)
+                            .animate(anim),
+                    child: child,
+                  ),
+                );
+              },
+              child: KeyedSubtree(
+                key: ValueKey(_sideKey),
+                child: _mobileHomeBody(hasClient),
+              ),
+            ),
+          ),
           // The bar names the app's TOP LEVEL, so it hides inside a nested
           // screen. Leaving it up would give that screen a second exit that
           // skips the level you are in — and make the bar look like part of the
@@ -6431,6 +6500,20 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   /// strip instead, so this is only consulted when `kMobile && embedded`.
   _SettingsPage? get _mobileSection => widget.section;
 
+  /// True when the last move through Settings went deeper, rather than back out
+  /// of a section. Sets the slide direction between sections the same way the
+  /// shell does between destinations. Captured from the PREVIOUS widget in
+  /// `didUpdateWidget`, because that value is gone by the time `build` runs.
+  bool _sectionForward = true;
+
+  @override
+  void didUpdateWidget(covariant _SettingsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final before = oldWidget.section?.index ?? -1;
+    final after = widget.section?.index ?? -1;
+    if (before != after) _sectionForward = after > before;
+  }
+
   static const _nav = [
     (_SettingsPage.general, 'server', 'General'),
     (_SettingsPage.models, 'ai-chip', 'Inference profiles'),
@@ -6484,9 +6567,39 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         color: AppColors.bg,
         child: SafeArea(
           bottom: false,
-          child: _mobileSection == null
-              ? _mobileSettingsHome()
-              : _mobileSectionPage(),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            reverseDuration: const Duration(milliseconds: 170),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            // `StackFit.expand`, not the default centered `Stack`: these are
+            // full-body screens, and loose constraints would let each one
+            // shrink-wrap into the middle of the transition.
+            layoutBuilder: (current, previous) => Stack(
+              fit: StackFit.expand,
+              children: [...previous, if (current != null) current],
+            ),
+            transitionBuilder: (child, anim) {
+              final dx = _sectionForward ? 0.06 : -0.06;
+              return FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position:
+                      Tween<Offset>(begin: Offset(dx, 0), end: Offset.zero)
+                          .animate(anim),
+                  child: child,
+                ),
+              );
+            },
+            // Keyed so entering a section and leaving it are two different
+            // children — the switcher only animates a genuine change of screen.
+            child: KeyedSubtree(
+              key: ValueKey(_mobileSection?.name ?? 'home'),
+              child: _mobileSection == null
+                  ? _mobileSettingsHome()
+                  : _mobileSectionPage(),
+            ),
+          ),
         ),
       );
     }
