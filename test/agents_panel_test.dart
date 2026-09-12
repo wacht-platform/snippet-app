@@ -8,6 +8,7 @@ import 'package:snippet/screens/agents_sidebar_panel.dart';
 import 'package:snippet/screens/create_agent_form.dart';
 import 'package:snippet/screens/shell_nav.dart';
 import 'package:snippet/theme.dart';
+import 'package:snippet/widgets.dart';
 
 /// The agents panel must read like every other sidebar panel.
 ///
@@ -95,6 +96,45 @@ void main() {
       // offer different fields.
       expect(find.byType(CreateAgentForm), findsOneWidget);
       expect(find.text('Build agent'), findsOneWidget);
+    });
+  });
+
+  testWidgets('rows land on the same left inset as every sibling panel',
+      (tester) async {
+    await asDesktop(() async {
+      await pumpPanel(tester);
+
+      // Canonical content x is list inset 8 + kNavPadH 12 = 20. This panel's
+      // group labels and rows were both at 16 (8 + its own 8), which is what
+      // read as inset differently from the rest of the rail.
+      const expected = kSidebarContentInset + kNavPadH;
+
+      final group = tester.getTopLeft(find.text('IDLE')).dx;
+      expect(group, closeTo(expected, 0.5),
+          reason: 'group labels must share the header/row content x');
+
+      final avatar = tester.getTopLeft(find.byType(CircleAvatar)).dx;
+      expect(avatar, closeTo(expected, 0.5),
+          reason: 'row content must share the same x as the header above it');
+    });
+  });
+
+  testWidgets('the refresh glyph is scaled down to match its neighbours',
+      (tester) async {
+    await asDesktop(() async {
+      await pumpPanel(tester);
+
+      // The glyphs do not share a fill: at size 16 the circular arrow inks about
+      // 40% more than a plus, so it read as oversized beside it. The correction
+      // is applied inside ShellSectionAction so it cannot drift per call site.
+      final icons = tester.widgetList<AppIcon>(find.byType(AppIcon)).toList();
+      final refresh = icons.firstWhere((i) => i.name == 'refresh');
+      final plus = icons.firstWhere((i) => i.name == 'plus');
+
+      expect(refresh.size, plus.size,
+          reason: 'both are the 16px spec; only the INK should differ');
+      expect(refresh.visualScale, lessThan(plus.visualScale),
+          reason: 'the heavier glyph must be scaled down, not the other up');
     });
   });
 }

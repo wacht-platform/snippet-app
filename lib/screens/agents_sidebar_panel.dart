@@ -334,7 +334,12 @@ class _GroupLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+        // Desktop: list inset 8 + kNavPadH 12 = content x20, the same x the
+        // shared ShellSectionHeader and every sibling panel's rows land on.
+        // It was 8 total (x16), which is what read as inset differently from
+        // the rest of the rail. Mobile keeps its existing 16 unchanged.
+        padding: EdgeInsets.fromLTRB(
+            kMobile ? 8 : kNavPadH, 6, kMobile ? 8 : kNavPadH, 6),
         child: Row(children: [
           Text(label.toUpperCase(),
               style: sans(kMobile ? 12 : 10.5,
@@ -373,7 +378,11 @@ class _AgentSidebarRow extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(R.md),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          // Same alignment as _GroupLabel: x20 on desktop (list 8 + 12), so the
+          // avatar lines up under the header's own inset instead of sitting
+          // 4px left of it. Mobile unchanged.
+          padding: EdgeInsets.symmetric(
+              horizontal: kMobile ? 8 : kNavPadH, vertical: 7),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             CircleAvatar(
               radius: 13,
