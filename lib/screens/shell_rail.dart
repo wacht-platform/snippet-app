@@ -32,10 +32,19 @@ class ShellRail extends StatelessWidget {
     required this.section,
     required this.onSelect,
     this.tools = const [],
+    this.hidden = const {},
   });
 
   final ShellSection section;
   final ValueChanged<ShellSection> onSelect;
+
+  /// Sections to leave out of the strip.
+  ///
+  /// Some sections belong to a session that owns a working tree — Terminal and
+  /// Git Diff are both empty states for Mission Control, which orchestrates
+  /// other sessions rather than having a tree of its own. Hiding them is honest
+  /// about what MC can do; leaving them draws two buttons that lead nowhere.
+  final Set<ShellSection> hidden;
 
   /// Tool buttons pinned to the extreme right of the band.
   ///
@@ -43,6 +52,15 @@ class ShellRail extends StatelessWidget {
   /// in the removed bottom status strip. The band was the only full-width
   /// chrome row left, so they live here rather than being dropped.
   final List<Widget> tools;
+
+  /// The strip's sections, in enum order, minus the hidden ones.
+  ///
+  /// Guarded against hiding everything: an empty strip is a dead band with no
+  /// way back, and the section shown must always be representable.
+  List<ShellSection> get _visible {
+    final shown = ShellSection.values.where((s) => !hidden.contains(s)).toList();
+    return shown.isEmpty ? ShellSection.values : shown;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,14 +79,13 @@ class ShellRail extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (final item in ShellSection.values) ...[
+                for (final item in _visible) ...[
                   _RailButton(
                     section: item,
                     selected: item == section,
                     onTap: () => onSelect(item),
                   ),
-                  if (item != ShellSection.values.last)
-                    const SizedBox(width: 8),
+                  if (item != _visible.last) const SizedBox(width: 8),
                 ],
               ],
             ),

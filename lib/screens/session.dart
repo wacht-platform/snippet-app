@@ -44,7 +44,6 @@ import 'mission_control/mission_control_state.dart'
         BoardMessage,
         MissionEnvelope;
 import 'mission_control/coordination_agent_directory.dart';
-import 'mission_control/coordination_session_agents.dart';
 import 'mission_control/task_board_screen.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -1183,6 +1182,8 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _openTerm({bool fresh = false}) {
+    // Mission Control orchestrates; it has no working tree to shell into. Its
+    // rail slot carries the TASK BOARD toggle instead.
     if (_isMissionControl) return;
     // Second click on Shell hides the drawer — keep the pty so reopening is instant.
     if (!fresh && _termOpen && _terms.isNotEmpty) {
@@ -2507,7 +2508,17 @@ class _SessionScreenState extends State<SessionScreen>
             ),
           ),
         ),
-        if (!_isMissionControl)
+        // Mission Control orchestrates other sessions' work and has no working
+        // tree of its own, so it gets no shell. Its slot carries the TASK BOARD
+        // instead — the thing you keep returning to from here — mirroring the
+        // desktop rail, which swaps its whole cluster for the board and agents.
+        if (_isMissionControl)
+          IconBtn('layers',
+              size: M.minTarget,
+              iconSize: 19,
+              tooltip: 'Tasks',
+              onTap: _showTasks)
+        else
           IconBtn('terminal',
               size: M.minTarget,
               iconSize: 19,
@@ -2720,18 +2731,6 @@ class _SessionScreenState extends State<SessionScreen>
               iconSize: 15,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
-        if (mac && _isMissionControl)
-          IconBtn('layers',
-              size: 30, iconSize: 15, tooltip: 'Tasks', onTap: _showTasks),
-        if (mac && !_isMissionControl)
-          IconBtn('terminal',
-              size: 30, iconSize: 15, tooltip: 'Shell', onTap: _openTerm),
-        if (mac)
-          IconBtn('more-horizontal',
-              size: 30,
-              iconSize: 17,
-              tooltip: 'More',
-              onTap: () => _openActions(s)),
         if (!mac && running)
           IconBtn('stop',
               size: 32,
@@ -2739,13 +2738,14 @@ class _SessionScreenState extends State<SessionScreen>
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
         if (!mac) ...[
-          if (_isMissionControl)
-            IconBtn('layers',
-                size: 32, iconSize: 16, tooltip: 'Tasks', onTap: _showTasks),
           if (!_isMissionControl)
             IconBtn('terminal',
                 size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
-          _menu(s),
+          // Mission Control's controls are ALL in the rail above, in the open.
+          // A second copy behind a "⋯" here was the menu to remove, and a Tasks
+          // button would have been a third door to the board the rail already
+          // toggles. Ordinary sessions keep their own actions menu.
+          if (!_isMissionControl) _menu(s),
         ],
       ]),
     );
@@ -2921,9 +2921,6 @@ class _SessionScreenState extends State<SessionScreen>
         _confirmFork(_checkpointById(extra));
         return;
       // ---- Mission Control only: the actions the LHS panels do not cover ----
-      case 'tasks':
-        _showTasks();
-        return;
       case 'agents':
         // The device-wide agent directory. This is the hub's Agents section,
         // kept as a standalone screen now that the hub is gone.
@@ -2946,17 +2943,6 @@ class _SessionScreenState extends State<SessionScreen>
           label: label,
           detail: value,
         );
-    if (_isMissionControl) {
-      return [
-        item('layers', 'Tasks', _showTasks),
-        item('scheduled', 'Scheduled', _openRecurring),
-        item('shield', 'Approval: Auto', () => _setApproval(false),
-            value: manual ? null : 'on'),
-        item('shield', 'Approval: Ask', () => _setApproval(true),
-            value: manual ? 'on' : null),
-        item('minimize', 'Compact history', _confirmCompact),
-      ];
-    }
     return [
       item('edit', 'Rename session', _renameCurrent),
       item('shield', 'Approval: Auto', () => _setApproval(false),
@@ -3035,16 +3021,9 @@ class _SessionScreenState extends State<SessionScreen>
       onCancelGoal: _cancelGoal,
       onResumeGoal: _resumeGoal,
       onLanes: () => run(_showLanes),
-      // Session agents are available in EVERY session, not just Mission
-      // Control: which agent is working here is a property of the session,
-      // and gating it behind MC hid it from ordinary chats.
-      onSessionAgents: () => run(() => presentScreen(context,
-          style: PanelStyle.drawer,
-          builder: (_, close) => SessionAgentsPanel(
-              client: widget.client, sessionId: widget.sessionId))),
       onTasks: _isMissionControl ? () => run(_showTasks) : null,
-      onTerm: () => run(_openTerm),
       hideShell: _isMissionControl,
+      onTerm: () => run(_openTerm),
       onGit: () => run(() => presentScreen(context,
           builder: (_, close) => GitScreen(
               client: widget.client,
@@ -5784,9 +5763,9 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onLanes;
   final VoidCallback? onTasks;
 
-  /// Which agents are (and were) active in THIS session. Present for every
-  /// session, not just Mission Control.
-  final VoidCallback? onSessionAgents;
+  /// Hides the workspace rows Mission Control has no use for. MC orchestrates
+  /// other sessions' work; it has no working tree of its own.
+  final bool hideShell;
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
@@ -5794,7 +5773,6 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onRecurring;
   final VoidCallback onCompact;
   final VoidCallback onCheckpoints;
-  final bool hideShell;
   final bool hideWorkspace;
   final bool hideGoal;
   final bool hideCheckpoints;
@@ -5805,7 +5783,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onResumeGoal,
     required this.onLanes,
     this.onTasks,
-    this.onSessionAgents,
+    this.hideShell = false,
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
@@ -5813,7 +5791,6 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onRecurring,
     required this.onCompact,
     required this.onCheckpoints,
-    this.hideShell = false,
     this.hideWorkspace = false,
     this.hideGoal = false,
     this.hideCheckpoints = false,
@@ -6001,12 +5978,6 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Tasks',
             detail: 'Plan and progress for this run',
             onTap: widget.onTasks),
-      if (widget.onSessionAgents != null)
-        _row(
-            icon: 'cpu',
-            label: 'Agents in session',
-            detail: 'Which agents are working here',
-            onTap: widget.onSessionAgents),
       _row(
           icon: 'scheduled',
           label: 'Scheduled',

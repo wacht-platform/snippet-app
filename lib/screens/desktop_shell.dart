@@ -30,6 +30,7 @@ import 'recurring.dart';
 import 'agents_sidebar_panel.dart';
 import 'terminals_sidebar_panel.dart';
 import 'mission_control/coordination_agent_detail.dart';
+import 'mission_control/task_board_screen.dart';
 import 'git_diff_sidebar_panel.dart';
 import 'file_tree_sidebar_panel.dart';
 import 'new_session_picker.dart';
@@ -253,6 +254,7 @@ class _MacSessionControls {
 enum _RightPanel {
   none('', ''),
   lanes('Lanes', 'layers'),
+  tasks('Tasks', 'layers'),
   checkpoints('Checkpoints', 'history');
 
   const _RightPanel(this.label, this.icon);
@@ -578,15 +580,72 @@ class _DesktopShellState extends State<DesktopShell>
   /// LHS panels do NOT provide: Git, Files and Terminals have panels of their
   /// own, so repeating them here would be two doors to one room.
   ///
-  /// Approval is a TOGGLE: the button shows its state and flips it inline, since
-  /// a popover to flip a boolean is pure friction. Goal opens an anchored
-  /// popover for its text. Lanes, Checkpoints and Usage render in the pane.
+  /// The cluster is inline for EVERY session, including Mission Control: a "⋯"
+  /// that hides four one-tap actions behind a menu is friction, and it made MC
+  /// the only session whose controls were not visible.
+  ///
+  /// What differs is the CONTENT, because MC is not a workspace session. It
+  /// orchestrates, so it gets the board and the agents it assigns; the
+  /// authoring trio (goal, lanes, checkpoints) belongs to a session that owns a
+  /// working tree, and MC's own menus never offered them.
+  /// Sections the sidebar strip hides for the ACTIVE session.
+  ///
+  /// Mission Control has no working tree — it orchestrates other sessions — so
+  /// its Terminal and Git Diff are two buttons that open empty panels. Hiding
+  /// them is honest about what MC can do.
+  Set<ShellSection> get _hiddenSections =>
+      (_activeTab?.isMissionControl ?? false)
+          ? const {ShellSection.terminal, ShellSection.git}
+          : const {};
+
+  /// The section actually rendered.
+  ///
+  /// `_section` is sticky, so switching to Mission Control while Terminal is
+  /// selected would leave a hidden section live — the strip would show no lit
+  /// button while the panel below still rendered a terminal MC cannot have. The
+  /// clamp falls back to Sessions, which is never hidden.
+  ShellSection get _effectiveSection =>
+      _hiddenSections.contains(_section) ? ShellSection.sessions : _section;
+
   List<Widget> _railTools() {
     final tab = _activeTab;
     final mc = tab?.isMissionControl ?? false;
     final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
     final goalRunning = s?.goal?.ongoing ?? false;
     final lanes = s?.lanes.where((l) => l.running).length ?? 0;
+
+    // Mission Control keeps its own cluster, inline. It is not a workspace
+    // session: it orchestrates, so the authoring trio above (goal, lanes,
+    // checkpoints) is meaningless here, and what it DOES have is put out in the
+    // open. A "⋯" that hides four one-tap actions behind a menu was friction,
+    // and it made MC the only session whose controls were not visible.
+    if (mc) {
+      final enabled = tab != null;
+      final manual = (s?.approvalMode ?? 'auto') == 'manual';
+      return [
+        // A PANE readout rather than a pushed screen — the board can stay open
+        // beside the conversation, like Lanes and Checkpoints do for an
+        // ordinary session, and the button shows when it is.
+        _railTool('layers',
+            tooltip: 'Tasks',
+            active: _rightPanelActive(_RightPanel.tasks),
+            onTap: enabled ? () => _toggleRightPanel(_RightPanel.tasks) : null),
+        _railTool('users',
+            tooltip: 'Agents',
+            onTap: enabled ? () => _dispatchSessionAction('agents') : null),
+        // One toggle, not two menu rows: the icon shows the current mode.
+        _railTool('shield',
+            tooltip: manual ? 'Approval: Ask' : 'Approval: Auto',
+            active: manual,
+            onTap: enabled ? () => _dispatchSessionAction('approval') : null),
+        _railTool('minimize',
+            tooltip: 'Compact history',
+            onTap: enabled ? () => _dispatchSessionAction('compact') : null),
+        _railTool('scheduled',
+            tooltip: 'Scheduled',
+            onTap: enabled ? () => _dispatchSessionAction('recurring') : null),
+      ];
+    }
 
     return [
       Builder(
@@ -611,12 +670,6 @@ class _DesktopShellState extends State<DesktopShell>
           onTap: tab == null
               ? null
               : () => _toggleRightPanel(_RightPanel.checkpoints)),
-      if (mc)
-        Builder(
-          builder: (ctx) => _railTool('more-horizontal',
-              tooltip: 'Mission Control actions',
-              onTap: () => _openShellMenu(ctx)),
-        ),
     ];
   }
 
@@ -679,80 +732,6 @@ class _DesktopShellState extends State<DesktopShell>
         ),
       ]),
     );
-  }
-
-  Future<void> _openShellMenu(BuildContext btnCtx) async {
-    final sel = await showAppMenu<VoidCallback>(
-      context,
-      anchor: btnCtx,
-      color: AppColors.surface3,
-      minWidth: 240,
-      maxWidth: 300,
-      // The trigger is in the window bar at the very top, so the menu must open
-      // downward — an upward one would be clipped offscreen.
-      below: true,
-      items: _shellMenuItems(),
-    );
-    sel?.call();
-  }
-
-  /// Menu rows for everything the LHS panels do not cover.
-  List<PopupMenuEntry<VoidCallback>> _shellMenuItems() {
-    final tab = _activeTab;
-    final mc = tab?.isMissionControl ?? false;
-    final controls = tab == null ? null : _macSessionControls[tab.key];
-    final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
-    final manual = (s?.approvalMode ?? 'auto') == 'manual';
-
-    PopupMenuItem<VoidCallback> item(String icon, String label, String action,
-            {String? extra, String? value}) =>
-        appMenuItem(
-          value: () => controls?.performAction(action, extra),
-          icon: icon,
-          label: label,
-          detail: value,
-        );
-    PopupMenuItem<VoidCallback> run(
-            String icon, String label, VoidCallback fn) =>
-        appMenuItem(value: fn, icon: icon, label: label);
-
-    final items = <PopupMenuEntry<VoidCallback>>[];
-
-    // ---- Session ----
-    if (mc) {
-      // Two destinations. The task board absorbed coordination and handoffs —
-      // a task carries the agents on it and the handoffs between them — so the
-      // separate Coordination hub has nothing left to show.
-      items.add(item('layers', 'Tasks', 'tasks'));
-      items.add(item('users', 'Agents', 'agents'));
-    } else {
-      items.add(item('edit', 'Rename session', 'rename'));
-      items.add(item('shield', 'Approval: Auto', 'approval_auto',
-          value: manual ? null : 'on'));
-      items.add(item('shield', 'Approval: Ask', 'approval_ask',
-          value: manual ? 'on' : null));
-      final goal = s?.goal;
-      if (goal?.ongoing ?? false) {
-        items.add(goal!.paused
-            ? item('play', 'Resume goal', 'resume_goal', value: 'paused')
-            : item('zap', 'Cancel goal', 'goal', value: 'running'));
-      } else {
-        items.add(item('zap', 'Set goal', 'goal'));
-      }
-      if (s?.lanes.isNotEmpty ?? false) {
-        items.add(item('layers', 'Lanes', 'lanes',
-            value: '${s!.lanes.where((l) => l.running).length} running'));
-      }
-      items.add(item('scheduled', 'Scheduled', 'recurring'));
-    }
-
-    // ---- History ----
-    items.add(const PopupMenuDivider());
-    items.add(item('minimize', 'Compact history', 'compact'));
-    if (!mc) items.add(item('history', 'Checkpoints', 'checkpoints'));
-    items.add(item('activity', 'Usage', 'usage'));
-
-    return items;
   }
 
   @override
@@ -2196,7 +2175,7 @@ class _DesktopShellState extends State<DesktopShell>
     Widget panel;
     // The rail switches which panel occupies the sidebar. Git stays a mode of
     // the sessions panel — you inspect a session's diff, not the agent list.
-    if (_section == ShellSection.terminal) {
+    if (_effectiveSection == ShellSection.terminal) {
       // DAEMON-WIDE shells, not the session's. A shell belongs to the machine, so
       // this panel is the same list whichever session is open — and it is the
       // only place a shell is created or destroyed.
@@ -2220,7 +2199,7 @@ class _DesktopShellState extends State<DesktopShell>
         },
         onCloseTerminal: _closeGlobalShell,
       );
-    } else if (_section == ShellSection.agents) {
+    } else if (_effectiveSection == ShellSection.agents) {
       final client = _client;
       panel = client == null
           ? _sidebarUnavailable('Add a machine to see its agents.')
@@ -2228,7 +2207,7 @@ class _DesktopShellState extends State<DesktopShell>
               client: client,
               onOpenAgent: _openRightAgent,
             );
-    } else if (_section == ShellSection.git) {
+    } else if (_effectiveSection == ShellSection.git) {
       final client = _client;
       panel = client == null
           ? _sidebarUnavailable('Add a machine to see Git diff.')
@@ -2245,7 +2224,7 @@ class _DesktopShellState extends State<DesktopShell>
                 f,
               ),
             );
-    } else if (_section == ShellSection.files) {
+    } else if (_effectiveSection == ShellSection.files) {
       final client = _client;
       panel = client == null
           ? _sidebarUnavailable('Add a machine to browse its files.')
@@ -2992,9 +2971,10 @@ class _DesktopShellState extends State<DesktopShell>
               // The navigation band is a shell-level row: full window width,
               // directly between the title bar and the body.
               ShellRail(
-                section: _section,
+                section: _effectiveSection,
                 onSelect: (s) => setState(() => _section = s),
                 tools: _railTools(),
+                hidden: _hiddenSections,
               ),
               _bodyRow(topInset: false),
             ]),
@@ -3009,9 +2989,10 @@ class _DesktopShellState extends State<DesktopShell>
             // The navigation band is a shell-level row: full window width,
             // directly above the body.
             ShellRail(
-              section: _section,
+              section: _effectiveSection,
               onSelect: (s) => setState(() => _section = s),
               tools: _railTools(),
+              hidden: _hiddenSections,
             ),
             _bodyRow(topInset: true),
           ]),
@@ -4051,6 +4032,13 @@ class _DesktopShellState extends State<DesktopShell>
     }
     return switch (t.panel) {
       _RightPanel.lanes => SessionLanesPanel(lanes: s?.lanes ?? const []),
+      // The board as a PANE readout, not a pushed screen: Mission Control is a
+      // work surface, so its board belongs beside the conversation where it can
+      // stay open while you talk to the agent, exactly like Lanes and
+      // Checkpoints do for an ordinary session.
+      _RightPanel.tasks => _client == null
+          ? _emptyPaneHint()
+          : TaskBoardScreen(client: _client!, embedded: true),
       _RightPanel.checkpoints => SessionCheckpointsPanel(
           checkpoints: s?.checkpoints.reversed.toList() ?? const [],
           // Route the action back through the session, so rewinding from the
