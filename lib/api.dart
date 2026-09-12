@@ -988,6 +988,138 @@ class DaemonClient {
         jsonDecode(r.body) as Map<String, dynamic>);
   }
 
+  /// GET /coordination/tasks/{id} — one task.
+  Future<TaskItem> getTask(String id) async {
+    final r =
+        await http.get(_uri('/coordination/tasks/${Uri.encodeComponent(id)}'));
+    if (r.statusCode != 200) throw _err('get task', r);
+    return TaskItem.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /coordination/tasks — the board, ordered by priority then age.
+  Future<List<TaskItem>> tasks({
+    String? status,
+    String? agentId,
+    int limit = 200,
+  }) async {
+    final query = <String, String>{'limit': '$limit'};
+    if (status != null && status.isNotEmpty) query['status'] = status;
+    if (agentId != null && agentId.isNotEmpty) query['agent_id'] = agentId;
+    final r = await http.get(_uri('/coordination/tasks', query));
+    if (r.statusCode != 200) throw _err('list tasks', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/tasks.
+  Future<TaskItem> createTask({
+    required String title,
+    String description = '',
+    int priority = 0,
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/tasks'),
+      headers: _json,
+      body: jsonEncode({
+        'title': title,
+        'description': description,
+        'priority': priority,
+      }),
+    );
+    if (r.statusCode != 201) throw _err('create task', r);
+    return TaskItem.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// PATCH /coordination/tasks/{id} — only the fields supplied are changed.
+  Future<TaskItem> updateTask(
+    String id, {
+    String? title,
+    String? description,
+    int? priority,
+  }) async {
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (description != null) body['description'] = description;
+    if (priority != null) body['priority'] = priority;
+    final r = await http.patch(
+      _uri('/coordination/tasks/${Uri.encodeComponent(id)}'),
+      headers: _json,
+      body: jsonEncode(body),
+    );
+    if (r.statusCode != 200) throw _err('update task', r);
+    return TaskItem.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/tasks/{id}/status — move between board columns.
+  Future<TaskItem> setTaskStatus(String id, TaskStatus status) async {
+    final r = await http.post(
+      _uri('/coordination/tasks/${Uri.encodeComponent(id)}/status'),
+      headers: _json,
+      body: jsonEncode({'status': status.wire}),
+    );
+    if (r.statusCode != 200) throw _err('set task status', r);
+    return TaskItem.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /coordination/tasks/{id}/links — edges in BOTH directions, plus the
+  /// blockers resolved from the reverse edge.
+  Future<TaskLinks> taskLinks(String id) async {
+    final r = await http
+        .get(_uri('/coordination/tasks/${Uri.encodeComponent(id)}/links'));
+    if (r.statusCode != 200) throw _err('task links', r);
+    return TaskLinks.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/tasks/{id}/links — `blocks` by default.
+  Future<void> linkTasks(
+    String fromId,
+    String toId, {
+    TaskLinkKind kind = TaskLinkKind.blocks,
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/tasks/${Uri.encodeComponent(fromId)}/links'),
+      headers: _json,
+      body: jsonEncode({'to_task_id': toId, 'kind': kind.wire}),
+    );
+    if (r.statusCode != 201) throw _err('link tasks', r);
+  }
+
+  Future<void> unlinkTasks(String a, String b) async {
+    final r = await http.delete(_uri(
+        '/coordination/tasks/${Uri.encodeComponent(a)}/links/${Uri.encodeComponent(b)}'));
+    if (r.statusCode != 204) throw _err('unlink tasks', r);
+  }
+
+  /// GET /coordination/tasks/{id}/agents — the roster, active members first.
+  Future<List<TaskAgent>> taskAgents(String id) async {
+    final r = await http
+        .get(_uri('/coordination/tasks/${Uri.encodeComponent(id)}/agents'));
+    if (r.statusCode != 200) throw _err('task agents', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => TaskAgent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/tasks/{id}/agents — also joins the task's message room.
+  Future<void> addTaskAgent(String id, String agentId,
+      {String role = ''}) async {
+    final r = await http.post(
+      _uri('/coordination/tasks/${Uri.encodeComponent(id)}/agents'),
+      headers: _json,
+      body: jsonEncode({'agent_id': agentId, 'role': role}),
+    );
+    if (r.statusCode != 204) throw _err('add task agent', r);
+  }
+
+  Future<void> removeTaskAgent(String id, String agentId) async {
+    final r = await http.delete(_uri(
+        '/coordination/tasks/${Uri.encodeComponent(id)}/agents/${Uri.encodeComponent(agentId)}'));
+    if (r.statusCode != 204) throw _err('remove task agent', r);
+  }
+
   /// Opens the live coordination event stream. Events are also persisted and can
   /// be replayed with [coordinationEvents] after reconnect.
   WebSocketChannel attachCoordinationEvents() {

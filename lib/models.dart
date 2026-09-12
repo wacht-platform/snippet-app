@@ -1135,3 +1135,124 @@ class CoordinationHandoff {
 /// Global notifier bumped whenever model profiles are added, updated, or deleted
 /// so open session views, composers, and settings can refresh their pickers live.
 final ValueNotifier<int> modelsRevision = ValueNotifier<int>(0);
+
+/// Lifecycle of a task on the board.
+///
+/// Deliberately smaller than the assignment states: a task is what a HUMAN
+/// filed, so it carries the columns a person works in and nothing about
+/// dispatch, which is Mission Control's concern.
+enum TaskStatus {
+  todo('todo', 'Todo'),
+  inProgress('in_progress', 'In progress'),
+  blocked('blocked', 'Blocked'),
+  done('done', 'Done'),
+  cancelled('cancelled', 'Cancelled');
+
+  const TaskStatus(this.wire, this.label);
+  final String wire;
+  final String label;
+
+  static TaskStatus parse(String? value) => TaskStatus.values.firstWhere(
+        (s) => s.wire == value,
+        // An unknown status from a newer daemon must not crash the board; Todo
+        // is the safe column because it is the one that still needs action.
+        orElse: () => TaskStatus.todo,
+      );
+}
+
+/// How two tasks relate. `blocks` is an ordering constraint, `relatesTo` is
+/// context — one field with a discriminator so the board draws both without
+/// guessing intent.
+enum TaskLinkKind {
+  blocks('blocks'),
+  relatesTo('relates_to');
+
+  const TaskLinkKind(this.wire);
+  final String wire;
+
+  static TaskLinkKind parse(String? value) => TaskLinkKind.values.firstWhere(
+        (k) => k.wire == value,
+        orElse: () => TaskLinkKind.relatesTo,
+      );
+}
+
+class TaskLink {
+  final String fromTaskId;
+  final String toTaskId;
+  final TaskLinkKind kind;
+  final String createdAt;
+
+  TaskLink.fromJson(Map<String, dynamic> j)
+      : fromTaskId = j['from_task_id'] as String? ?? '',
+        toTaskId = j['to_task_id'] as String? ?? '',
+        kind = TaskLinkKind.parse(j['kind'] as String?),
+        createdAt = j['created_at'] as String? ?? '';
+}
+
+class TaskAgent {
+  final String taskId;
+  final String agentId;
+  final String role;
+  final String addedAt;
+  final String? removedAt;
+
+  /// Still on the task. A removed member is kept for history, so callers must
+  /// ask rather than assume presence means membership.
+  bool get active => removedAt == null;
+
+  TaskAgent.fromJson(Map<String, dynamic> j)
+      : taskId = j['task_id'] as String? ?? '',
+        agentId = j['agent_id'] as String? ?? '',
+        role = j['role'] as String? ?? '',
+        addedAt = j['added_at'] as String? ?? '',
+        removedAt = j['removed_at'] as String?;
+}
+
+/// One task on the board. The thread that carries its conversation is derived
+/// from the id by the daemon, so a client never has to invent one.
+class TaskItem {
+  final String id;
+  final String title;
+  final String description;
+  final TaskStatus status;
+  final int priority;
+  final String createdByKind;
+  final String createdById;
+  final String createdAt;
+  final String updatedAt;
+  final String? completedAt;
+  final String threadId;
+
+  TaskItem.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        description = j['description'] as String? ?? '',
+        status = TaskStatus.parse(j['status'] as String?),
+        priority = (j['priority'] as num?)?.toInt() ?? 0,
+        createdByKind = j['created_by_kind'] as String? ?? '',
+        createdById = j['created_by_id'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '',
+        updatedAt = j['updated_at'] as String? ?? '',
+        completedAt = j['completed_at'] as String?,
+        threadId = j['thread_id'] as String? ?? '';
+}
+
+/// A task's links plus its resolved blockers.
+///
+/// `blockedBy` is separate from `links` because it is the REVERSE of the stored
+/// edge: "a blocks b" is read from b as "b is blocked by a", and a board that
+/// only drew outgoing edges would render a blocked task as unblocked.
+class TaskLinks {
+  final List<TaskLink> links;
+  final List<String> blockedBy;
+
+  const TaskLinks({this.links = const [], this.blockedBy = const []});
+
+  TaskLinks.fromJson(Map<String, dynamic> j)
+      : links = ((j['links'] as List?) ?? const [])
+            .map((e) => TaskLink.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        blockedBy = ((j['blocked_by'] as List?) ?? const [])
+            .whereType<String>()
+            .toList();
+}

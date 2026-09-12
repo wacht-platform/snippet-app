@@ -9,7 +9,7 @@ import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../../../panel.dart';
 import '../coordination_agent_directory.dart';
-import '../coordination_board_screen.dart';
+import '../task_board_screen.dart';
 import '../mission_control_screen.dart' show ChangeNotifierProvider;
 import '../mission_control_state.dart';
 import '../widgets/mission_control_header.dart';
@@ -154,17 +154,15 @@ class _LeftRail extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Btn('Board',
+                child: Btn('Tasks',
                     small: true,
-                    icon: 'message-text',
+                    icon: 'layers',
                     full: true,
                     onTap: () => presentScreen(
                           context,
                           style: PanelStyle.drawer,
-                          builder: (_, close) => CoordinationBoardScreen(
+                          builder: (_, close) => TaskBoardScreen(
                             client: state.client,
-                            threadId: 'system',
-                            actorId: 'human',
                           ),
                         )),
               ),

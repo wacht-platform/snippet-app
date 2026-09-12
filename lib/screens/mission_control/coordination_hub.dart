@@ -6,8 +6,8 @@ import '../../widgets.dart';
 
 import 'coordination_activity_screen.dart';
 import 'coordination_agent_directory.dart';
-import 'coordination_board_screen.dart';
 import 'coordination_handoffs_screen.dart';
+import 'task_board_screen.dart';
 
 /// One home for coordination, instead of four unrelated drawers.
 ///
@@ -18,7 +18,7 @@ import 'coordination_handoffs_screen.dart';
 enum CoordinationSection {
   active('Active'),
   agents('Agents'),
-  board('Board'),
+  tasks('Tasks'),
   handoffs('Handoffs');
 
   const CoordinationSection(this.label);
@@ -87,10 +87,8 @@ class _CoordinationHubState extends State<CoordinationHub> {
               embedded: true,
               refreshSignal: _refreshSignal,
             ),
-            CoordinationBoardScreen(
+            TaskBoardScreen(
               client: widget.client,
-              threadId: 'system',
-              actorId: 'human',
               embedded: true,
               refreshSignal: _refreshSignal,
             ),

@@ -685,9 +685,10 @@ class _DesktopShellState extends State<DesktopShell>
     if (mc) {
       items.add(item('layers', 'Tasks', 'tasks'));
       items.add(item('users', 'Agents', 'agents'));
-      items.add(item('coordination', 'Coordination board', 'coordination'));
-      items.add(
-          item('activity', 'Coordination activity', 'coordination_activity'));
+      // One destination, not three. This menu still had the pre-hub rows: a
+      // 'Coordination board' item that actually opened the hub, plus a
+      // 'Coordination activity' row duplicating the hub's Active section.
+      items.add(item('coordination', 'Coordination', 'coordination'));
     } else {
       items.add(item('edit', 'Rename session', 'rename'));
       items.add(item('shield', 'Approval: Auto', 'approval_auto',

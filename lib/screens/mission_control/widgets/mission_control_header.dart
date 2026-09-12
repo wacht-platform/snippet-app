@@ -9,7 +9,7 @@ import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../../../panel.dart';
 import '../../mission_control/coordination_agent_directory.dart';
-import '../../mission_control/coordination_board_screen.dart';
+import '../task_board_screen.dart';
 import '../mission_control_state.dart';
 import '../mobile/mobile_mc.dart' show showNotificationInbox;
 
@@ -99,17 +99,15 @@ class MissionControlHeader extends StatelessWidget {
           ),
         ),
         IconBtn(
-          'message-text',
+          'layers',
           size: 40,
           iconSize: 18,
-          tooltip: 'Coordination board',
+          tooltip: 'Tasks',
           onTap: () => presentScreen(
             context,
             style: PanelStyle.drawer,
-            builder: (_, close) => CoordinationBoardScreen(
+            builder: (_, close) => TaskBoardScreen(
               client: state.client,
-              threadId: 'system',
-              actorId: 'human',
             ),
           ),
         ),
