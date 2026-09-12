@@ -968,7 +968,20 @@ class AppCard extends StatelessWidget {
   }
 }
 
-enum BtnVariant { primary, secondary, outline, ghost, danger }
+enum BtnVariant {
+  primary,
+  secondary,
+
+  /// A surface STEP, no border.
+  ///
+  /// The design language has no borders and reserves the accent hue for state,
+  /// so neither [primary] (accent fill) nor [secondary] (hairline) is right for
+  /// a plain action. This is the doc's chip/active ladder doing the work.
+  surface,
+  outline,
+  ghost,
+  danger,
+}
 
 class Btn extends StatelessWidget {
   final String label;
@@ -999,6 +1012,8 @@ class Btn extends StatelessWidget {
           AppColors.fg1,
           AppColors.border
         ),
+      // Ladder, not a line: the fill is the separation.
+      BtnVariant.surface => (AppColors.surface3, AppColors.fg2, null),
       BtnVariant.outline => (
           Colors.transparent,
           AppColors.fg1,
@@ -1742,8 +1757,11 @@ class EmptyState extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
+              // Separation by surface step, not a hairline — the design
+              // language's first rule. surface2 is the ladder's "quiet raised
+              // content" step, which is what this tile is; the border was
+              // standing in for a step that already existed.
               color: AppColors.surface2,
-              border: Border.all(color: AppColors.border),
               borderRadius: BorderRadius.circular(R.md),
             ),
             child: AppIcon(icon, size: 24, color: AppColors.fg3),
@@ -1775,6 +1793,20 @@ class SnAppBar extends StatelessWidget {
   final List<Widget> actions;
   final double titleSize;
   final bool compact;
+
+  /// Which surface the bar sits on. Defaults to the ambient scaffold colour,
+  /// which is what the desktop panels re-theme.
+  final Color? background;
+
+  /// Draws the 1px bottom hairline.
+  ///
+  /// The design language uses NO borders — separation comes from the surface
+  /// ladder — so a page that pairs a chrome bar with a canvas body passes
+  /// `false` and lets the step do the work. Defaulted to true rather than
+  /// flipped globally: the existing call sites share the scaffold's own colour,
+  /// where the hairline is currently the only separation they have. Removing it
+  /// for them is a follow-up, not something to fold into one page's fix.
+  final bool bordered;
   const SnAppBar(
       {super.key,
       required this.title,
@@ -1783,7 +1815,9 @@ class SnAppBar extends StatelessWidget {
       this.leading,
       this.actions = const [],
       this.titleSize = 17,
-      this.compact = false});
+      this.compact = false,
+      this.background,
+      this.bordered = true});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -1793,8 +1827,10 @@ class SnAppBar extends StatelessWidget {
       decoration: BoxDecoration(
         // Follows the ambient shell surface — desktop panels re-theme this to
         // surface1 so the bar never reads as a darker strip (mobile: still bg).
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+        color: background ?? Theme.of(context).scaffoldBackgroundColor,
+        border: bordered
+            ? Border(bottom: BorderSide(color: AppColors.border))
+            : null,
       ),
       child: Row(children: [
         if (leading != null)

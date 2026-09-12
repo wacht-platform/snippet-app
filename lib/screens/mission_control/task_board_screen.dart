@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../api.dart';
 import '../../models.dart';
 import '../../panel.dart';
+import '../../platform.dart';
+import '../shell_nav.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import 'task_detail_screen.dart';
@@ -131,7 +133,9 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                         Text(error!,
                             textAlign: TextAlign.center,
-                            style: sans(12.5, color: AppColors.danger)),
+                            // 13, not 12.5: the doc's scale is 11-13 with no
+                            // half steps.
+                            style: sans(13, color: AppColors.danger)),
                         const SizedBox(height: 12),
                         Btn('Retry', small: true, onTap: refresh),
                       ]),
@@ -143,22 +147,44 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
 
     if (widget.embedded) return body;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tasks'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: refresh,
-            icon: AppIcon('refresh', size: 19, color: AppColors.fg2),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _create,
-        icon: AppIcon('plus', size: 18, color: AppColors.accentFg),
-        label: const Text('New task'),
-      ),
-      body: body,
+      // The list is the READING plane (the darkest surface), and the bar sits
+      // one rung above it on the chrome surface — the doc's own relationship
+      // (its strip #171717 sits above a chat #010101). That step is the whole
+      // separation, which is what `bordered: false` is for: no hairline.
+      backgroundColor: AppColors.canvas,
+      body: Column(children: [
+        SnAppBar(
+          title: 'Tasks',
+          // The doc's page title is 20px; SnAppBar defaults to 17. Its WEIGHT
+          // stays at the app's `display()` 500 rather than the doc's 600 —
+          // forcing 600 would mean either changing SnAppBar for every screen or
+          // bypassing the shared helper, and both reach outside this page.
+          titleSize: 20,
+          background: AppColors.bg,
+          bordered: false,
+          actions: [
+            IconBtn('refresh',
+                // 16px glyph in a 24px slot — the doc's icon relationship, and
+                // the same pair the window bar already uses for its actions.
+                // The glyph never fills its slot.
+                size: kMobile ? M.minTarget : 24,
+                iconSize: 16,
+                tooltip: 'Refresh',
+                onTap: refresh),
+            const SizedBox(width: 6),
+            // The action sits IN the bar rather than floating over the list: a
+            // Material FAB carried an elevation shadow (the doc has none) and
+            // the accent fill, which this app reserves for state.
+            Btn('New task',
+                small: true,
+                icon: 'plus',
+                variant: BtnVariant.surface,
+                onTap: _create),
+            const SizedBox(width: 2),
+          ],
+        ),
+        Expanded(child: body),
+      ]),
     );
   }
 
@@ -186,7 +212,9 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
     return RefreshIndicator(
       onRefresh: refresh,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
+        // The 96 bottom inset was clearance for the floating button; with the
+        // action in the bar it is just dead space under the last row.
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
         children: [
           for (final entry in groups.entries) ...[
             _StatusHeader(status: entry.key, count: entry.value.length),
@@ -214,10 +242,12 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 40,
+        // A chip is a 20px inline token, not a 40px bordered pill.
+        height: 28,
         child: ListView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          // The list owns the inset, matching the body's own gutter above.
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           children: [
             _chip(context,
                 label: 'All',
@@ -227,7 +257,9 @@ class _FilterBar extends StatelessWidget {
               _chip(context,
                   label: '${s.label} ${counts[s] ?? 0}',
                   selected: filter == s,
-                  tint: statusColor(s),
+                  // State stays visible, but as a MARK rather than by tinting
+                  // the label — colour is state here, not decoration.
+                  dot: statusColor(s),
                   onTap: () => onSelect(filter == s ? null : s)),
           ],
         ),
@@ -237,9 +269,11 @@ class _FilterBar extends StatelessWidget {
           {required String label,
           required bool selected,
           required VoidCallback onTap,
-          Color? tint}) =>
+          Color? dot}) =>
       Padding(
-        padding: const EdgeInsets.only(right: 6, top: 6, bottom: 6),
+        // 4px between chips: these are inline marks, not controls with their
+        // own hit boxes to keep apart.
+        padding: const EdgeInsets.only(right: 4, top: 4, bottom: 4),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -249,17 +283,30 @@ class _FilterBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                // Selection is a neutral surface step, never the accent — the
-                // accent already means state elsewhere in this app.
-                color: selected ? AppColors.surface2 : Colors.transparent,
-                border: Border.all(color: AppColors.border),
+                // Separation by surface STEP, never a hairline. Unselected
+                // sits on the chip step; selecting promotes it one further
+                // rung, so selection reads as "pressed in" rather than tinted.
+                color: selected ? AppColors.surface2 : AppColors.surface3,
                 borderRadius: BorderRadius.circular(R.chip),
               ),
-              child: Text(label,
-                  style: sans(12,
-                      weight: selected ? W.label : W.body,
-                      color:
-                          selected ? AppColors.fg1 : (tint ?? AppColors.fg3))),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (dot != null) ...[
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration:
+                        BoxDecoration(color: dot, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(label,
+                    style: sans(12,
+                        weight: selected ? W.label : W.body,
+                        // The normal text ramp for both states. White is
+                        // reserved for the active row and the page title, and
+                        // the per-status hue was decoration, not state.
+                        color: selected ? AppColors.fg1 : AppColors.fg2)),
+              ]),
             ),
           ),
         ),
@@ -283,8 +330,13 @@ class _StatusHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 14, 4, 6),
+        // 12 left, so the status DOT sits at the same x as the row TITLES below
+        // it (list inset 12 + row padding 12) — the doc's rule that a header and
+        // its rows share one left edge.
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
         child: Row(children: [
+          // State stays a MARK. The doc's section marker slot is its own thing;
+          // a 6px dot is the app's existing status mark.
           Container(
             width: 6,
             height: 6,
@@ -293,10 +345,16 @@ class _StatusHeader extends StatelessWidget {
           ),
           const SizedBox(width: 7),
           Text(status.label.toUpperCase(),
-              style: sans(11,
-                  weight: W.label, color: AppColors.fg3, spacing: 0.5)),
+              // The doc's 11px label is INTER 500 at #C1C1C1, not Geist and not
+              // the muted grey: `fg2` IS #C1C1C1 in this theme. Tracking comes
+              // from `_tracking`, which already gives -0.05 at 11px — the
+              // measured value. The previous +0.5 was tracked OUT, the opposite
+              // direction, and tightens small caps.
+              style: inter(11, weight: W.label, color: AppColors.fg2)),
           const SizedBox(width: 6),
-          Text('$count', style: sans(11, color: AppColors.fg4)),
+          // A count is information, not a placeholder: the muted tone (`fg3`),
+          // never `fg4` which is the disabled/placeholder ramp.
+          Text('$count', style: sans(11, color: AppColors.fg3)),
         ]),
       );
 }
@@ -308,15 +366,24 @@ class _TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
+        // The doc's row gap is 8; between 26px rows a hair more reads as a list
+        // rather than a stack of cards.
+        padding: const EdgeInsets.only(bottom: 8),
         child: Material(
+          // The doc puts CARDS on the chrome rung, and separation comes from
+          // that step rather than a hairline — this row had the fill right and
+          // the border was never there.
           color: AppColors.surface1,
           borderRadius: BorderRadius.circular(R.card),
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(R.card),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Container(
+              // The doc's row metric: 26px tall, radius 8, `5px 12px`. Phone
+              // keeps its own touch height — 26 is a desktop measurement and
+              // sits well under the 44px minimum target.
+              height: kMobile ? M.rowHeight : kNavRowHeight,
+              padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
               child: Row(children: [
                 // Priority is a mark, not a badge: at 0 (the default) it draws
                 // nothing, so an ordinary task stays quiet and a raised one
@@ -329,8 +396,9 @@ class _TaskRow extends StatelessWidget {
                         color: AppColors.accentBg,
                         borderRadius: BorderRadius.circular(R.xs)),
                     child: Text('P${task.priority}',
+                        // 11 is the doc's type floor; 10 was below it.
                         style:
-                            sans(10, weight: W.label, color: AppColors.accent)),
+                            sans(11, weight: W.label, color: AppColors.accent)),
                   ),
                   const SizedBox(width: 8),
                 ],
@@ -338,10 +406,14 @@ class _TaskRow extends StatelessWidget {
                   child: Text(task.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13.5, color: AppColors.fg1)),
+                      // The doc's row title: 13 / 500 / #C1C1C1 (`fg2`).
+                      // 13.5 was off the scale, and white is reserved for the
+                      // active row and the page title — a resting row is not it.
+                      style: sans(13, weight: W.label, color: AppColors.fg2)),
                 ),
                 const SizedBox(width: 8),
-                AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+                // 16px glyph, never filling its slot.
+                AppIcon('chevron-right', size: 16, color: AppColors.fg4),
               ]),
             ),
           ),

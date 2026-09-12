@@ -278,10 +278,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
+                              // Same chip rule as the board's filter bar: the
+                              // surface STEP separates, never a hairline.
                               color: s == t.status
                                   ? AppColors.surface2
-                                  : Colors.transparent,
-                              border: Border.all(color: AppColors.border),
+                                  : AppColors.surface3,
                               borderRadius: BorderRadius.circular(R.chip),
                             ),
                             child: Text(s.label,

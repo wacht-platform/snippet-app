@@ -385,6 +385,25 @@ TextStyle sans(double size,
       color: color ?? AppColors.fg2,
     );
 
+/// Inter — the doc's SECONDARY family, kept for incidental labels.
+///
+/// Geist is the primary family; the measured reference uses Inter for the small
+/// uppercase section label (11px / 500 / #C1C1C1) and little else. It has its own
+/// helper rather than being folded into [sans] so the family split stays
+/// explicit at the call site.
+TextStyle inter(double size,
+        {FontWeight weight = W.body,
+        double? height,
+        double? spacing,
+        Color? color}) =>
+    GoogleFonts.inter(
+      fontSize: size,
+      fontWeight: weight,
+      height: height ?? 1.33,
+      letterSpacing: spacing ?? _tracking(size),
+      color: color ?? AppColors.fg2,
+    );
+
 TextStyle display(double size,
         {FontWeight weight = W.title, Color? color, double? height}) =>
     GoogleFonts.geist(
