@@ -604,6 +604,12 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedActivity01;
     case 'image':
       return HugeIcons.strokeRoundedImage01;
+    case 'film':
+      return HugeIcons.strokeRoundedFilm01;
+    case 'music':
+      return HugeIcons.strokeRoundedMusicNote01;
+    case 'pdf':
+      return HugeIcons.strokeRoundedPdf01;
     case 'scan':
       return HugeIcons.strokeRoundedScan;
     case 'camera':
@@ -633,8 +639,6 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedHome01;
     case 'scheduled':
       return HugeIcons.strokeRoundedCalendar01;
-    case 'more-horizontal':
-      return HugeIcons.strokeRoundedMoreHorizontal;
     case 'coordination':
       return HugeIcons.strokeRoundedRoute01;
     case 'split':
