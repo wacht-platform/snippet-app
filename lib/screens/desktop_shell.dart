@@ -6300,19 +6300,13 @@ class _SettingsPanelState extends State<_SettingsPanel> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
               child: Row(children: [
+                // Title only. The subtitle ("Configure this workspace and its
+                // inference profiles.") restated what the panel already is —
+                // it is titled Settings and every section is visible in the
+                // rail beside it, so the line spent height saying nothing new.
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Settings',
-                          style: sans(14.5,
-                              weight: W.label, color: AppColors.fg1)),
-                      const SizedBox(height: 2),
-                      Text(
-                          'Configure this workspace and its inference profiles.',
-                          style: sans(11.5, color: AppColors.fg3)),
-                    ],
-                  ),
+                  child: Text('Settings',
+                      style: sans(14.5, weight: W.label, color: AppColors.fg1)),
                 ),
                 IconBtn('x',
                     size: 26,
