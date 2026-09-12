@@ -85,4 +85,67 @@ void main() {
     // move the label — otherwise tabs jitter horizontally as you click them.
     expect(await rectFor(0), equals(await rectFor(1)));
   });
+
+  group('paneTabBelongsInGroup', () {
+    bool belongs({
+      required String? rootKey,
+      required String tabKey,
+      String? groupSessionKey,
+      required bool isAuxiliary,
+    }) =>
+        paneTabBelongsInGroup(
+          rootKey: rootKey,
+          tabKey: tabKey,
+          groupSessionKey: groupSessionKey,
+          isAuxiliary: isAuxiliary,
+        );
+
+    test('a pane with a root shows it and the content filed under it', () {
+      expect(belongs(rootKey: 's1', tabKey: 's1', isAuxiliary: false), isTrue);
+      expect(
+          belongs(
+              rootKey: 's1',
+              tabKey: 'f1',
+              groupSessionKey: 's1',
+              isAuxiliary: true),
+          isTrue);
+    });
+
+    test('a pane with a root hides a tab from another group', () {
+      expect(
+          belongs(
+              rootKey: 's1',
+              tabKey: 'f2',
+              groupSessionKey: 's2',
+              isAuxiliary: true),
+          isFalse);
+    });
+
+    test('a rootless pane still shows its auxiliary content', () {
+      // A file dragged into the secondary pane keeps the group key of the
+      // conversation it came from, which lives in the other pane — so the
+      // destination has no root. Requiring one here made the tab vanish.
+      expect(
+          belongs(
+              rootKey: null,
+              tabKey: 'f1',
+              groupSessionKey: 's1',
+              isAuxiliary: true),
+          isTrue);
+    });
+
+    test('a rootless pane never re-renders a workspace tab', () {
+      // The regression: after its session is dragged to the other pane, that
+      // pane holds no root. Admitting every docked tab here made the abandoned
+      // pane paint a full duplicate of a top-level tab the window bar owns.
+      expect(belongs(rootKey: null, tabKey: 'mc', isAuxiliary: false), isFalse);
+      expect(
+          belongs(
+              rootKey: null,
+              tabKey: 'f1',
+              groupSessionKey: 's1',
+              isAuxiliary: false),
+          isFalse);
+    });
+  });
 }

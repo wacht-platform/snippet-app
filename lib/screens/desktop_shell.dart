@@ -3126,32 +3126,50 @@ class _DesktopShellState extends State<DesktopShell>
   /// Root-session identity for the inner tab group displayed by [p].
   /// Every group is anchored by one always-open conversation; files, diffs and
   /// terminals are merely sibling content tabs in that group.
+  ///
+  /// The stored assignment stops counting once it no longer names a tab living
+  /// in THIS pane — the normal state after a session is dragged to the other
+  /// pane, since the key it left behind names a session this pane no longer
+  /// holds. Falling through to the active tab (which `_activeTab` guarantees is
+  /// non-auxiliary) supplies the anchor it should then have, and a pane with
+  /// neither is rootless, which `_tabsIn` handles by showing content only.
   String? _groupRootFor(_Pane p) {
-    final root = _groupRootKey[p];
-    if (root != null && _tabs.any((t) => t.key == root && t.pane == p)) {
-      return root;
+    final stored = _groupRootKey[p];
+    if (stored != null && _tabs.any((t) => t.key == stored && t.pane == p)) {
+      return stored;
     }
     final active = _activeTab;
-    return active?.pane == p ? active?.key : null;
+    return active != null && active.pane == p ? active.key : null;
   }
 
   /// Items in one nested tab group. The root is deliberately first and locked;
   /// the rest are user-opened files, diffs and terminals for that conversation.
   ///
-  /// A pane with NO root still lists whatever is docked in it. That case is what
-  /// made a moved tab vanish: a file or terminal dragged to the secondary pane
-  /// keeps the `groupSessionKey` of the conversation it belongs to, and that
-  /// conversation lives in the LEFT pane — so `_groupRootFor(right)` returned
-  /// null, this returned empty, and `showRight` then collapsed the very pane the
-  /// tab had just been dropped into. Requiring a root here only makes sense for
-  /// the pane that actually holds one.
+  /// A pane with NO root still lists whatever is docked in it, but ONLY its
+  /// auxiliary content. Both halves of that rule earn their keep:
+  ///
+  ///  - A file or terminal dragged into the secondary pane must still render.
+  ///    It keeps the `groupSessionKey` of the conversation it came from, which
+  ///    lives in the LEFT pane — so `_groupRootFor(right)` is null, and a strip
+  ///    that required a root returned nothing. The tab vanished and `showRight`
+  ///    then collapsed the very pane it had just been dropped into.
+  ///  - But a pane whose SESSION was dragged out keeps no root either. Admitting
+  ///    every docked tab there made it re-render a workspace tab the window bar
+  ///    already owns, filling the pane with a duplicate of a top-level tab.
+  ///
+  /// Rootless therefore means content-only; see [paneTabBelongsInGroup].
   List<_ShellTab> _tabsIn(_Pane p) {
     final root = _groupRootFor(p);
     return [
       for (final t in _tabs)
         if (t.pane == p &&
             !_hiddenTabs.contains(t.key) &&
-            (root == null || t.key == root || t.groupSessionKey == root))
+            paneTabBelongsInGroup(
+              rootKey: root,
+              tabKey: t.key,
+              groupSessionKey: t.groupSessionKey,
+              isAuxiliary: _isAuxiliary(t),
+            ))
           t,
     ];
   }

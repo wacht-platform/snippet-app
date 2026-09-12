@@ -488,6 +488,27 @@ double kPaneTabWidth(double available, int count) {
   return (available / count).clamp(kPaneTabMinWidth, kPaneTabMaxWidth);
 }
 
+/// Whether a tab belongs in a pane's nested strip whose root session is
+/// [rootKey].
+///
+/// A pane that HAS a root shows that root plus the content tabs filed under it.
+/// A pane with NO root shows ONLY its auxiliary content (files, diffs,
+/// terminals) — never a top-level workspace tab.
+///
+/// That last rule is the whole point. A rootless pane is what a pane becomes
+/// once its session is dragged to the other side, so admitting every docked tab
+/// there made the pane re-render a workspace tab the window bar already owns,
+/// duplicating a top-level tab inside an inner strip.
+bool paneTabBelongsInGroup({
+  required String? rootKey,
+  required String tabKey,
+  required String? groupSessionKey,
+  required bool isAuxiliary,
+}) {
+  if (rootKey == null) return isAuxiliary;
+  return tabKey == rootKey || groupSessionKey == rootKey;
+}
+
 /// Pane tab label size.
 const double kPaneTabText = 12;
 
