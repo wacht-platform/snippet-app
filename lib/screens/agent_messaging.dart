@@ -383,7 +383,6 @@ class AgentThreadScreen extends StatefulWidget {
     required this.agentId,
     required this.agentName,
     this.subtitle,
-    this.embedded = false,
     this.onClose,
   });
 
@@ -395,9 +394,6 @@ class AgentThreadScreen extends StatefulWidget {
   /// caller, which owns the agent record.
   final String? subtitle;
 
-  /// True when this is a pane inside the shell rather than a pushed screen: the
-  /// header then keeps its own close affordance and no app bar is implied.
-  final bool embedded;
   final VoidCallback? onClose;
 
   @override
