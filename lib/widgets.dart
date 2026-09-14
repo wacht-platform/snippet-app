@@ -2195,7 +2195,12 @@ class _TextPromptSheetState extends State<_TextPromptSheet> {
 }
 
 Future<T?> showAppSheet<T>(BuildContext context,
-    {required String title, required Widget child}) {
+    {required String title,
+    required Widget child,
+    // Per-caller sizing. A dialog has room for a wider sheet than the 340px
+    // default, which is what the agent picker uses to fit names and roles.
+    double maxWidth = 340,
+    double maxHeight = 520}) {
   if (!kMobile) {
     return showDialog<T>(
       context: context,
@@ -2213,7 +2218,8 @@ Future<T?> showAppSheet<T>(BuildContext context,
               side: BorderSide(color: AppColors.border2),
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 340, maxHeight: 520),
+              constraints:
+                  BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
                 child: Column(
@@ -2254,6 +2260,10 @@ Future<T?> showAppSheet<T>(BuildContext context,
     isScrollControlled: true,
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
+      // Never taller than the caller asked, and never taller than the space
+      // above the keyboard.
+      final available = (media.size.height - media.viewInsets.bottom) * 0.88;
+      final limit = available < maxHeight ? available : maxHeight;
       return BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
         child: Container(
@@ -2262,8 +2272,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
           ),
-          constraints: BoxConstraints(
-              maxHeight: (media.size.height - media.viewInsets.bottom) * 0.88),
+          constraints: BoxConstraints(maxHeight: limit),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const SizedBox(height: 10),
             Center(

@@ -11,11 +11,17 @@ import '../widgets.dart';
 /// Returns null when dismissed. Shared by the composer's recipient picker and
 /// the "give work" sheet so both offer the same list, in the same order, with
 /// the same description.
+///
+/// Mission Control is listed like any other agent: every session needs to be
+/// able to reach the coordinator, so it is never filtered out. [currentAgentId]
+/// marks the agent that IS this session, which is the one addressed by simply
+/// sending to the chat.
 Future<CoordinationAgent?> pickAgentId(
   BuildContext context,
   DaemonClient client, {
   String title = 'Select an agent',
   Set<String> exclude = const {},
+  String? currentAgentId,
 }) async {
   List<CoordinationAgent> agents;
   try {
@@ -30,53 +36,76 @@ Future<CoordinationAgent?> pickAgentId(
     toast(context, 'No agents available');
     return null;
   }
-  final picked = await showAppSheet<String>(
-    context,
-    title: title,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final a in candidates)
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => Navigator.of(context).pop(a.id),
-              borderRadius: BorderRadius.circular(R.sm),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                child: Row(children: [
-                  AppIcon('users',
-                      size: 16,
-                      color: a.available ? AppColors.accent : AppColors.fg4),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          a.displayName.trim().isEmpty ? a.id : a.displayName,
-                          style: sans(13.5,
-                              weight: W.label, color: AppColors.fg1),
-                        ),
-                        const SizedBox(height: 2),
-                        Text('${a.handle} · ${a.role} · ${a.status}',
-                            style: mono(10, color: AppColors.fg4)),
-                      ],
-                    ),
+
+  // Longest-first by name so the rows read as a stable list.
+  candidates.sort((a, b) => a.displayName.compareTo(b.displayName));
+
+  final list = Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (final a in candidates)
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Navigator.of(context).pop(a.id),
+            borderRadius: BorderRadius.circular(R.sm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+              child: Row(children: [
+                AppIcon('users',
+                    size: 16,
+                    color: a.available ? AppColors.accent : AppColors.fg4),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        a.displayName.trim().isEmpty ? a.id : a.displayName,
+                        style:
+                            sans(13.5, weight: W.label, color: AppColors.fg1),
+                      ),
+                      const SizedBox(height: 2),
+                      Text('${a.handle} · ${a.role} · ${a.status}',
+                          style: mono(10, color: AppColors.fg4)),
+                    ],
                   ),
-                ]),
-              ),
+                ),
+                // The agent that IS this session: sending to the chat already
+                // reaches it, so naming it avoids a confused second path.
+                if (currentAgentId != null && a.id == currentAgentId)
+                  Text('this chat', style: mono(10, color: AppColors.fg4)),
+              ]),
             ),
           ),
-      ],
-    ),
+        ),
+    ],
   );
-  if (picked == null) return null;
-  for (final a in candidates) {
-    if (a.id == picked) return a;
-  }
-  return null;
+
+  // Both platforms go through showAppSheet, which is already a dialog on
+  // desktop and a bottom sheet on mobile. The picker only asks for more room
+  // than the default, so the chrome stays in one place.
+  return showAppSheet<String>(
+    context,
+    title: title,
+    maxWidth: 420,
+    maxHeight: 560,
+    child: list,
+  ).then(_resolvePicked(candidates));
+}
+
+/// Map a picked id back to its agent, or null when dismissed.
+CoordinationAgent? Function(String?) _resolvePicked(
+  List<CoordinationAgent> candidates,
+) {
+  return (picked) {
+    if (picked == null) return null;
+    for (final a in candidates) {
+      if (a.id == picked) return a;
+    }
+    return null;
+  };
 }
 
 /// Give one agent work in one session, in a single step.

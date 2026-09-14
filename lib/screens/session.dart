@@ -210,6 +210,10 @@ class _SessionScreenState extends State<SessionScreen>
   String? _recipientAgentId;
   String? _recipientAgentName;
 
+  /// Agent ids pinned to THIS session from the directory, so the composer shows
+  /// who can be reached here without re-reading the whole directory.
+  final Set<String> _sessionAgentIds = {};
+
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
@@ -3250,8 +3254,8 @@ class _SessionScreenState extends State<SessionScreen>
   /// The daemon models exactly two modes (`auto` / `manual`), so the pill names
   /// those rather than inventing a third the backend cannot honor.
   String get _approvalLabel => (_state?.approvalMode ?? 'auto') == 'manual'
-      ? 'Ask first'
-      : 'Auto approve';
+      ? 'Ask'
+      : 'Auto';
 
   /// Context still free, as a whole percent of the model's window. Null until
   /// the daemon has reported both a window size and a prompt size.
@@ -3339,12 +3343,9 @@ class _SessionScreenState extends State<SessionScreen>
     required String icon,
     required String label,
     required VoidCallback onTap,
-    /// Highlights the chip when the choice is NOT the default — a selected
-    /// recipient, say, since sending elsewhere is a meaningful mode change.
-    bool active = false,
   }) =>
       Material(
-        color: active ? AppColors.accentBg : AppColors.surface2,
+        color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           onTap: onTap,
@@ -3352,13 +3353,10 @@ class _SessionScreenState extends State<SessionScreen>
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(icon,
-                  size: 13, color: active ? AppColors.accent : AppColors.fg3),
+              AppIcon(icon, size: 13, color: AppColors.fg3),
               const SizedBox(width: 6),
               Text(label,
-                  style: sans(11.5,
-                      weight: W.label,
-                      color: active ? AppColors.accent : AppColors.fg2)),
+                  style: sans(11.5, weight: W.label, color: AppColors.fg2)),
               const SizedBox(width: 5),
               AppIcon('chevron-down', size: 12, color: AppColors.fg4),
             ]),
@@ -3368,12 +3366,15 @@ class _SessionScreenState extends State<SessionScreen>
 
   /// Pick (or clear) the direct-message recipient for the composer.
   Future<void> _pickRecipient(BuildContext anchor) async {
+    final current = _recipientAgentId;
     final picked = await pickAgentId(
       context,
       widget.client,
-      title: _recipientAgentId == null
-          ? 'Message an agent'
-          : 'Message an agent (${_recipientAgentName ?? _recipientAgentId})',
+      title: 'Add an agent',
+      // An agent already on this session is not offered again: it is reached by
+      // messaging the session itself, so listing it twice would be ambiguous.
+      exclude: _sessionAgentIds,
+      currentAgentId: current,
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -3381,7 +3382,27 @@ class _SessionScreenState extends State<SessionScreen>
       _recipientAgentName =
           picked.displayName.trim().isEmpty ? picked.id : picked.displayName;
     });
+    // Pin it to the session so the composer shows WHO can be reached without
+    // walking the directory again next time.
+    _pinSessionAgent(picked.id);
     _toast('Messages now go to ${_recipientAgentName} only');
+  }
+
+  void _clearRecipient() {
+    setState(() {
+      _recipientAgentId = null;
+      _recipientAgentName = null;
+    });
+  }
+
+  /// Record that `agentId` belongs to this session's roster.
+  ///
+  /// Session membership is tracked locally for now: choosing an agent here is
+  /// what puts it on this session, and the set is what stops the picker
+  /// offering the same agent twice.
+  void _pinSessionAgent(String agentId) {
+    if (agentId.isEmpty) return;
+    setState(() => _sessionAgentIds.add(agentId));
   }
 
   /// The composer's status line: where this session runs, and how much context
@@ -3431,14 +3452,14 @@ class _SessionScreenState extends State<SessionScreen>
         appMenuRow(
           value: 'auto',
           icon: 'zap',
-          label: 'Auto approve',
+          label: 'Auto',
           description: 'Run shell and file edits without asking',
           selected: current != 'manual',
         ),
         appMenuRow(
           value: 'manual',
           icon: 'shield',
-          label: 'Ask first',
+          label: 'Ask',
           description: 'Pause for approval on each change',
           selected: current == 'manual',
         ),
@@ -3516,6 +3537,55 @@ class _SessionScreenState extends State<SessionScreen>
                           ]),
                         ),
                       ],
+                      // Recipient lives ABOVE the field: choosing who to message
+                      // is a mode for the whole composer, so it reads as a header
+                      // over the input rather than one more control buried among
+                      // the buttons. Sending then routes a direct message to that
+                      // agent's own thread — NOT into this chat.
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_recipientAgentId == null)
+                              _composerChip(
+                                icon: 'users',
+                                label: 'Add agent',
+                                onTap: () => _pickRecipient(context),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.fromLTRB(9, 4, 3, 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentBg,
+                                  borderRadius: BorderRadius.circular(R.sm),
+                                  border:
+                                      Border.all(color: AppColors.accentLine),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    AppIcon('users',
+                                        size: 13, color: AppColors.accent),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'To: ${_recipientAgentName ?? _recipientAgentId}',
+                                      style: sans(11.5,
+                                          weight: W.label,
+                                          color: AppColors.accent),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    IconBtn('x',
+                                        size: 22,
+                                        iconSize: 12,
+                                        tooltip: 'Clear recipient',
+                                        onTap: _clearRecipient),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                       CallbackShortcuts(
                         bindings: {
                           const SingleActivator(LogicalKeyboardKey.enter): () {
@@ -3572,35 +3642,37 @@ class _SessionScreenState extends State<SessionScreen>
                               ),
                             ),
                             const SizedBox(width: 4),
-                            // Recipient selector: when set, the composer sends a
-                            // DIRECT MESSAGE to that agent instead of a turn here.
-                            Builder(
-                              builder: (ctx) => _composerChip(
-                                icon: 'users',
-                                label: _recipientAgentName ?? 'Agent',
-                                active: _recipientAgentId != null,
-                                onTap: () => _pickRecipient(ctx),
+                            // The chip group SCROLLS and the mic/send controls are
+                            // pinned outside it. Three chips plus two buttons
+                            // overflowed a narrow phone, which pushed Send off the
+                            // card; a scrolling group plus fixed trailing controls
+                            // cannot.
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(children: [
+                                  // Approval mode lives here instead of the tool
+                                  // band, so the setting sits next to what it
+                                  // governs.
+                                  Builder(
+                                    builder: (ctx) => _composerChip(
+                                      icon: 'shield',
+                                      label: _approvalLabel,
+                                      onTap: () => _switchApproval(ctx),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Builder(builder: (chipCtx) {
+                                    return _composerChip(
+                                      icon: 'sparkles',
+                                      label: _modelLabel ?? 'Auto',
+                                      onTap: () => _switchModel(chipCtx),
+                                    );
+                                  }),
+                                ]),
                               ),
                             ),
                             const SizedBox(width: 6),
-                            // Approval mode lives here now instead of the tool
-                            // band, so the setting sits next to what it governs.
-                            Builder(
-                              builder: (ctx) => _composerChip(
-                                icon: 'shield',
-                                label: _approvalLabel,
-                                onTap: () => _switchApproval(ctx),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Builder(builder: (chipCtx) {
-                              return _composerChip(
-                                icon: 'sparkles',
-                                label: _modelLabel ?? 'Auto',
-                                onTap: () => _switchModel(chipCtx),
-                              );
-                            }),
-                            const Spacer(),
                             if (kCanRecord) ...[
                               Material(
                                 color: Colors.transparent,
