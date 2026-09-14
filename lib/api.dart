@@ -778,8 +778,6 @@ class DaemonClient {
     String status = 'active',
     String role = 'implementer',
     List<String> capabilities = const [],
-    int maxConcurrentAssignments = 1,
-    int maxConcurrentSessions = 1,
   }) async {
     final r = await http.post(
       _uri('/agents'),
@@ -792,8 +790,6 @@ class DaemonClient {
         'status': status,
         'role': role,
         'capabilities': capabilities,
-        'max_concurrent_assignments': maxConcurrentAssignments,
-        'max_concurrent_sessions': maxConcurrentSessions,
       }),
     );
     if (r.statusCode != 201) throw _err('create coordination agent', r);
@@ -825,6 +821,134 @@ class DaemonClient {
     if (r.statusCode != 201) throw _err('create coordination assignment', r);
     return CoordinationAssignment.fromJson(
         jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/dispatch — give an agent work in a session.
+  ///
+  /// One call, because the server mints the ids a client cannot safely invent:
+  /// the goal, the assignment id, and the turn lease. Pass [profile] to run THIS
+  /// dispatch on a specific inference profile; omit it to leave the session's own.
+  Future<CoordinationAssignment> dispatchAgentWork({
+    required String sessionId,
+    String? agentId,
+    required String scope,
+    required String definitionOfDone,
+    String? profile,
+    String? goalId,
+  }) async {
+    final payload = <String, dynamic>{
+      'session_id': sessionId,
+      'scope': scope,
+      'definition_of_done': definitionOfDone,
+    };
+    if (agentId != null && agentId.isNotEmpty) payload['agent_id'] = agentId;
+    if (profile != null && profile.isNotEmpty) payload['profile'] = profile;
+    if (goalId != null && goalId.isNotEmpty) payload['goal_id'] = goalId;
+    final r = await http.post(
+      _uri('/coordination/dispatch'),
+      headers: _json,
+      body: jsonEncode(payload),
+    );
+    if (r.statusCode != 202 && r.statusCode != 200) {
+      throw _err('dispatch agent work', r);
+    }
+    return CoordinationAssignment.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/direct/messages — send a direct message to an agent.
+  ///
+  /// A conversation, not a command: it never creates a task or authorises a
+  /// workspace change. The daemon accepts it durably and wakes the recipient, so
+  /// [idempotencyKey] makes a retry safe.
+  Future<CoordinationEvent> sendAgentMessage({
+    required String toAgentId,
+    required String body,
+    String fromKind = 'human',
+    String fromId = 'local',
+    String? idempotencyKey,
+  }) async {
+    final payload = <String, dynamic>{
+      'from_kind': fromKind,
+      'from_id': fromId,
+      'to_kind': 'agent',
+      'to_id': toAgentId,
+      'body': body,
+    };
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+      payload['idempotency_key'] = idempotencyKey;
+    }
+    final r = await http.post(
+      _uri('/coordination/direct/messages'),
+      headers: _json,
+      body: jsonEncode(payload),
+    );
+    if (r.statusCode != 202 && r.statusCode != 200) {
+      throw _err('send agent message', r);
+    }
+    return CoordinationEvent.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /coordination/direct/messages — one page of a direct conversation.
+  ///
+  /// The thread is derived from the pair server-side, so a client never needs to
+  /// know or remember a thread id.
+  Future<List<CoordinationEvent>> agentThread({
+    required String peerId,
+    String actorKind = 'human',
+    String actorId = 'local',
+    int afterSequence = 0,
+    int limit = 100,
+  }) async {
+    final r = await http.get(_uri('/coordination/direct/messages', {
+      'actor_kind': actorKind,
+      'actor_id': actorId,
+      'peer_kind': peerId == 'local' ? 'human' : 'agent',
+      'peer_id': peerId,
+      'after_sequence': '$afterSequence',
+      'limit': '$limit',
+    }));
+    if (r.statusCode != 200) throw _err('read agent thread', r);
+    final events = (jsonDecode(r.body) as Map<String, dynamic>)['events'];
+    return ((events as List?) ?? const [])
+        .map((e) => CoordinationEvent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /coordination/direct/threads — conversations with unread counts.
+  Future<List<DirectThreadSummary>> directThreads({
+    String actorKind = 'human',
+    String actorId = 'local',
+  }) async {
+    final r = await http.get(_uri('/coordination/direct/threads', {
+      'actor_kind': actorKind,
+      'actor_id': actorId,
+    }));
+    if (r.statusCode != 200) throw _err('list direct threads', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => DirectThreadSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/direct/read — mark a conversation read.
+  Future<void> markAgentThreadRead({
+    required String peerId,
+    String actorKind = 'human',
+    String actorId = 'local',
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/direct/read'),
+      headers: _json,
+      body: jsonEncode({
+        'actor_kind': actorKind,
+        'actor_id': actorId,
+        'peer_kind': peerId == 'local' ? 'human' : 'agent',
+        'peer_id': peerId,
+      }),
+    );
+    if (r.statusCode != 200) throw _err('mark thread read', r);
   }
 
   /// POST /coordination/sessions/{sessionId}/lease — acquire a fenced turn lease.

@@ -28,6 +28,7 @@ import '../term.dart';
 import '../panel.dart';
 import '../share_inbound.dart';
 import '../widgets.dart';
+import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';
 import 'editor.dart';
 import 'files.dart';
@@ -203,6 +204,12 @@ class _SessionScreenState extends State<SessionScreen>
   int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _currentProfile;
+
+  /// When set, the composer sends a DIRECT MESSAGE to this agent instead of a
+  /// turn in the current session. Null means ordinary chat input.
+  String? _recipientAgentId;
+  String? _recipientAgentName;
+
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
@@ -1421,6 +1428,16 @@ class _SessionScreenState extends State<SessionScreen>
     final t = _input.text.trim();
     final ready = _attachments.where((a) => a.remotePath != null).toList();
     if (t.isEmpty && ready.isEmpty) return;
+
+    // A selected recipient turns this into a DIRECT MESSAGE to that agent: it
+    // goes to the agent's own inbox and never becomes a turn in this session, so
+    // the conversation and the work stay separate.
+    final recipient = _recipientAgentId;
+    if (recipient != null && recipient.isNotEmpty) {
+      _sendDirectMessage(recipient, t, ready);
+      return;
+    }
+
     final running = _state?.status == 'running';
     // Reference each upload by its exact path so the agent reads it this turn.
     final markers = ready
@@ -1448,6 +1465,47 @@ class _SessionScreenState extends State<SessionScreen>
     // Sending is an explicit action — re-pin and jump to the bottom.
     _stickToBottom = true;
     _scheduleBottom();
+  }
+
+  /// Send the composer's text to a selected agent as a direct message.
+  ///
+  /// Deliberately separate from the session send path: a direct message goes to
+  /// the agent's own inbox and must NOT become a turn in this session's
+  /// transcript, so nothing here touches the socket. The recipient is cleared
+  /// afterwards because the message will not appear in this transcript — leaving
+  /// the composer targeted would invite sending the next thought to the wrong
+  /// place.
+  Future<void> _sendDirectMessage(
+    String agentId,
+    String text,
+    List<_Attachment> ready,
+  ) async {
+    if (text.isEmpty && ready.isEmpty) return;
+    final markers = ready
+        .map((a) => a.isImage
+            ? '[attached image — call read_image on this exact path to view it: ${a.remotePath}]'
+            : '[attached file — read it at this exact path: ${a.remotePath}]')
+        .join('\n');
+    final body = markers.isEmpty ? text : (text.isEmpty ? markers : '$text\n\n$markers');
+    final name = _recipientAgentName ?? agentId;
+    setState(() {
+      _recipientAgentId = null;
+      _recipientAgentName = null;
+      _attachments.clear();
+    });
+    _input.clear();
+    try {
+      await widget.client.sendAgentMessage(
+        toAgentId: agentId,
+        body: body,
+        idempotencyKey: _nextNonce(),
+      );
+      _toast('Sent to $name');
+    } catch (e) {
+      // Put the text back: a failed send must not cost the user what they wrote.
+      _input.text = body;
+      _toast('$e');
+    }
   }
 
   bool _isImageName(String n) {
@@ -3017,6 +3075,7 @@ class _SessionScreenState extends State<SessionScreen>
       onResumeGoal: _resumeGoal,
       onLanes: () => run(_showLanes),
       onTasks: _isMissionControl ? () => run(_showTasks) : null,
+      onGiveWork: _giveWork,
       hideShell: _isMissionControl,
       onTerm: () => run(_openTerm),
       onGit: () => run(() => presentScreen(context,
@@ -3280,9 +3339,12 @@ class _SessionScreenState extends State<SessionScreen>
     required String icon,
     required String label,
     required VoidCallback onTap,
+    /// Highlights the chip when the choice is NOT the default — a selected
+    /// recipient, say, since sending elsewhere is a meaningful mode change.
+    bool active = false,
   }) =>
       Material(
-        color: AppColors.surface2,
+        color: active ? AppColors.accentBg : AppColors.surface2,
         borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           onTap: onTap,
@@ -3290,16 +3352,37 @@ class _SessionScreenState extends State<SessionScreen>
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(icon, size: 13, color: AppColors.fg3),
+              AppIcon(icon,
+                  size: 13, color: active ? AppColors.accent : AppColors.fg3),
               const SizedBox(width: 6),
               Text(label,
-                  style: sans(11.5, weight: W.label, color: AppColors.fg2)),
+                  style: sans(11.5,
+                      weight: W.label,
+                      color: active ? AppColors.accent : AppColors.fg2)),
               const SizedBox(width: 5),
               AppIcon('chevron-down', size: 12, color: AppColors.fg4),
             ]),
           ),
         ),
       );
+
+  /// Pick (or clear) the direct-message recipient for the composer.
+  Future<void> _pickRecipient(BuildContext anchor) async {
+    final picked = await pickAgentId(
+      context,
+      widget.client,
+      title: _recipientAgentId == null
+          ? 'Message an agent'
+          : 'Message an agent (${_recipientAgentName ?? _recipientAgentId})',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _recipientAgentId = picked.id;
+      _recipientAgentName =
+          picked.displayName.trim().isEmpty ? picked.id : picked.displayName;
+    });
+    _toast('Messages now go to ${_recipientAgentName} only');
+  }
 
   /// The composer's status line: where this session runs, and how much context
   /// is left. Sits under the card so the transcript keeps the full width.
@@ -3489,6 +3572,17 @@ class _SessionScreenState extends State<SessionScreen>
                               ),
                             ),
                             const SizedBox(width: 4),
+                            // Recipient selector: when set, the composer sends a
+                            // DIRECT MESSAGE to that agent instead of a turn here.
+                            Builder(
+                              builder: (ctx) => _composerChip(
+                                icon: 'users',
+                                label: _recipientAgentName ?? 'Agent',
+                                active: _recipientAgentId != null,
+                                onTap: () => _pickRecipient(ctx),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             // Approval mode lives here now instead of the tool
                             // band, so the setting sits next to what it governs.
                             Builder(
@@ -4075,6 +4169,22 @@ class _SessionScreenState extends State<SessionScreen>
   /// The task board. ONE destination: it carries the tasks, the agents on
   /// them, and the handoffs between them, so the old coordination hub — with
   /// its separate Active/Handoffs sections — is gone.
+  /// Put an agent to work in THIS session, with an optional inference profile.
+  ///
+  /// The daemon mints the goal, assignment, and lease, so this only has to
+  /// describe the work — the client never invents server-owned state.
+  Future<void> _giveWork() async {
+    final dispatched = await showAgentWorkSheet(
+      context,
+      client: widget.client,
+      sessionId: widget.sessionId,
+      workspaceLabel: _state?.workspace,
+    );
+    if (dispatched && mounted) {
+      _toast('Dispatched — the agent will report on the task board');
+    }
+  }
+
   void _showTasks() {
     if (!_isMissionControl) return;
     presentScreen(
@@ -5758,6 +5868,11 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onLanes;
   final VoidCallback? onTasks;
 
+  /// Opens the "give an agent work" sheet. Available in ANY session, not only
+  /// Mission Control: a user can put an agent to work in the session they are
+  /// already looking at.
+  final VoidCallback? onGiveWork;
+
   /// Hides the workspace rows Mission Control has no use for. MC orchestrates
   /// other sessions' work; it has no working tree of its own.
   final bool hideShell;
@@ -5778,6 +5893,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onResumeGoal,
     required this.onLanes,
     this.onTasks,
+    this.onGiveWork,
     this.hideShell = false,
     required this.onTerm,
     required this.onGit,
@@ -5973,6 +6089,12 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Tasks',
             detail: 'Plan and progress for this run',
             onTap: widget.onTasks),
+      if (widget.onGiveWork != null)
+        _row(
+            icon: 'users',
+            label: 'Give an agent work',
+            detail: 'Dispatch a task to an agent with an inference profile',
+            onTap: widget.onGiveWork),
       _row(
           icon: 'scheduled',
           label: 'Scheduled',

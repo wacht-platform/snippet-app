@@ -826,9 +826,6 @@ class CoordinationAgent {
   final String status;
   final String role;
   final List<String> capabilities;
-  final int maxConcurrentAssignments;
-  final int maxConcurrentSessions;
-  final int version;
 
   CoordinationAgent.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -839,14 +836,33 @@ class CoordinationAgent {
         role = j['role'] as String? ?? 'implementer',
         capabilities = ((j['capabilities'] as List?) ?? const [])
             .whereType<String>()
-            .toList(),
-        maxConcurrentAssignments =
-            (j['max_concurrent_assignments'] as num?)?.toInt() ?? 0,
-        maxConcurrentSessions =
-            (j['max_concurrent_sessions'] as num?)?.toInt() ?? 0,
-        version = (j['version'] as num?)?.toInt() ?? 0;
+            .toList();
 
   bool get available => status == 'active';
+}
+
+/// A direct conversation as listed for a participant, with its unread count.
+class DirectThreadSummary {
+  final String threadId;
+  final String title;
+
+  /// The other participant: `human` or `agent`.
+  final String peerKind;
+  final String peerId;
+  final int unread;
+  final int lastSequence;
+  final String createdAt;
+
+  DirectThreadSummary.fromJson(Map<String, dynamic> j)
+      : threadId = j['thread_id'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        peerKind = j['peer_kind'] as String? ?? '',
+        peerId = j['peer_id'] as String? ?? '',
+        unread = (j['unread'] as num?)?.toInt() ?? 0,
+        lastSequence = (j['last_sequence'] as num?)?.toInt() ?? 0,
+        createdAt = j['created_at'] as String? ?? '';
+
+  bool get hasUnread => unread > 0;
 }
 
 /// One agent's participation in one session — a lease period joined to the
@@ -899,6 +915,10 @@ class CoordinationAssignment {
   final String scope;
   final String definitionOfDone;
 
+  /// Inference profile this dispatch runs on. Null means the session's own
+  /// profile is used — the daemon only sends a value when one was chosen.
+  final String? profile;
+
   CoordinationAssignment.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         goalId = j['goal_id'] as String? ?? '',
@@ -906,7 +926,16 @@ class CoordinationAssignment {
         agentId = j['agent_id'] as String? ?? '',
         status = j['status'] as String? ?? 'offered',
         scope = j['scope'] as String? ?? '',
-        definitionOfDone = j['definition_of_done'] as String? ?? '';
+        definitionOfDone = j['definition_of_done'] as String? ?? '',
+        profile = _optionalText(j['profile']);
+}
+
+/// A trimmed, non-empty string, or null. Used for optional server fields that
+/// may arrive as `null`, `''`, or absent.
+String? _optionalText(Object? raw) {
+  if (raw is! String) return null;
+  final text = raw.trim();
+  return text.isEmpty ? null : text;
 }
 
 class CoordinationLease {

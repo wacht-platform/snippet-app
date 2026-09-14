@@ -99,15 +99,6 @@ class CoordinationAgentDetail extends StatelessWidget {
             _Field('Kind', agent.kind),
             _Field('Role', agent.role),
             _Field('Status', agent.status),
-            _Field('Version', 'v${agent.version}'),
-          ],
-        ),
-        const SizedBox(height: 20),
-        _Section(
-          title: 'Capacity',
-          children: [
-            _Field(
-                'Concurrent assignments', '${agent.maxConcurrentAssignments}'),
           ],
         ),
         if (agent.capabilities.isNotEmpty) ...[
