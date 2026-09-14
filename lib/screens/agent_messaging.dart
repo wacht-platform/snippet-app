@@ -382,12 +382,22 @@ class AgentThreadScreen extends StatefulWidget {
     required this.client,
     required this.agentId,
     required this.agentName,
+    this.subtitle,
+    this.embedded = false,
     this.onClose,
   });
 
   final DaemonClient client;
   final String agentId;
   final String agentName;
+
+  /// Identity line under the name (`@handle · role · status`). Supplied by the
+  /// caller, which owns the agent record.
+  final String? subtitle;
+
+  /// True when this is a pane inside the shell rather than a pushed screen: the
+  /// header then keeps its own close affordance and no app bar is implied.
+  final bool embedded;
   final VoidCallback? onClose;
 
   @override
@@ -469,13 +479,16 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // SafeArea clears the status bar and the home indicator. Without it the
-    // header sat under the clock and the composer under the gesture bar, which
-    // is what made the top of this screen read as cramped and clipped.
-    return SafeArea(
-      top: true,
-      bottom: true,
-      child: Column(
+    // Wrapped in Material because `presentScreen`'s non-rounded frames are plain
+    // Containers — no Material ancestor — while a TextField and the icon buttons
+    // here require one. Without this the screen threw "No Material widget found"
+    // and rendered blank.
+    return Material(
+      color: AppColors.bg,
+      child: SafeArea(
+        top: true,
+        bottom: true,
+        child: Column(
         children: [
           _header(),
           Divider(height: 1, color: AppColors.border),
@@ -483,11 +496,13 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           Divider(height: 1, color: AppColors.border),
           _composer(),
         ],
+        ),
       ),
     );
   }
 
   Widget _header() {
+    final subtitle = widget.subtitle?.trim() ?? '';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
       child: Row(children: [
@@ -498,15 +513,26 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(widget.agentName,
-                  style: sans(14, weight: W.label, color: AppColors.fg1)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(14, weight: W.title, color: AppColors.fg1)),
               const SizedBox(height: 2),
-              Text('direct message · conversation only',
+              Text(
+                  subtitle.isEmpty
+                      ? 'direct message · conversation only'
+                      : '$subtitle · conversation only',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: mono(10, color: AppColors.fg4)),
             ],
           ),
         ),
         if (widget.onClose != null)
-          IconBtn('x', size: 28, iconSize: 14, tooltip: 'Close', onTap: widget.onClose!),
+          IconBtn('x',
+              size: 28,
+              iconSize: 14,
+              tooltip: 'Close',
+              onTap: widget.onClose!),
       ]),
     );
   }

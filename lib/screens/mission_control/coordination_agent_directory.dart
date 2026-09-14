@@ -102,7 +102,8 @@ class _CoordinationAgentDirectoryState
                       itemCount: agents.length,
                       separatorBuilder: (_, __) =>
                           Divider(color: AppColors.border, height: 1),
-                      itemBuilder: (_, index) => _AgentRow(agents[index]),
+                      itemBuilder: (_, index) =>
+                          _AgentRow(agents[index], widget.client),
                     ),
     );
 
@@ -141,8 +142,9 @@ class _CoordinationAgentDirectoryState
 }
 
 class _AgentRow extends StatelessWidget {
-  const _AgentRow(this.agent);
+  const _AgentRow(this.agent, this.client);
   final CoordinationAgent agent;
+  final DaemonClient client;
 
   @override
   Widget build(BuildContext context) {
@@ -154,10 +156,13 @@ class _AgentRow extends StatelessWidget {
         : '${agent.role} · ${agent.capabilities.take(3).join(' · ')}';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 8),
+      // Opens the CONVERSATION, not a read-only profile: talking to the agent is
+      // what an agent row is for.
       onTap: () => presentScreen(
         context,
         style: PanelStyle.drawer,
-        builder: (_, __) => CoordinationAgentDetail(agent: agent),
+        builder: (_, __) =>
+            CoordinationAgentDetail(agent: agent, client: client),
       ),
       leading: CircleAvatar(
         backgroundColor: AppColors.accentBg,
