@@ -43,6 +43,7 @@ import 'mission_control/mission_control_state.dart'
         parseMissionEnvelope,
         parseBoardMessage,
         parseDirectMessage,
+        parseCoordinationReply,
         parseAssignmentEnvelope,
         BoardMessage,
         DirectMessage,
@@ -1643,6 +1644,10 @@ class _SessionScreenState extends State<SessionScreen>
         toAgentId: agentId,
         body: body,
         idempotencyKey: _nextNonce(),
+        // Ask FROM this session, so the agent's reply comes back here rather
+        // than only into its own inbox. Without it the exchange is one-way from
+        // the session's point of view: nothing here records what was asked.
+        originSession: widget.sessionId,
       );
       // Show it HERE. The message lives in the agent's own thread, not this
       // transcript, so without a row of its own a send looks like it did
@@ -4104,6 +4109,13 @@ class _SessionScreenState extends State<SessionScreen>
             addEvent(key, _DirectMessageCard(message: direct));
             break;
           }
+          // An agent's ANSWER to something this session asked. Same card shape,
+          // but it reads as a reply rather than a new message.
+          final reply = parseCoordinationReply(text);
+          if (reply != null) {
+            addEvent(key, _DirectMessageCard(message: reply));
+            break;
+          }
           final assignment = parseAssignmentEnvelope(text);
           if (assignment != null) {
             addEvent(key, _AssignmentCard(assignment: assignment));
@@ -5451,12 +5463,16 @@ class _DirectMessageCard extends StatelessWidget {
               children: [
                 Row(children: [
                   Expanded(
-                    child: Text('Message from $from',
+                    child: Text(
+                        message.isReply
+                            ? 'Reply from $from'
+                            : 'Message from $from',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: sans(13.5, color: AppColors.fg1)),
                   ),
-                  Text('direct', style: sans(12, color: AppColors.fg4)),
+                  Text(message.isReply ? 'reply' : 'direct',
+                      style: sans(12, color: AppColors.fg4)),
                 ]),
                 if (message.body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),

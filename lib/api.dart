@@ -885,12 +885,18 @@ class DaemonClient {
   /// A conversation, not a command: it never creates a task or authorises a
   /// workspace change. The daemon accepts it durably and wakes the recipient, so
   /// [idempotencyKey] makes a retry safe.
+  ///
+  /// Pass [originSession] when the message is asked FROM a session. It is
+  /// recorded on the event, and the recipient's reply is routed back to that
+  /// session — which is where the human is reading and where the exchange is
+  /// kept.
   Future<CoordinationEvent> sendAgentMessage({
     required String toAgentId,
     required String body,
     String fromKind = 'human',
     String fromId = 'local',
     String? idempotencyKey,
+    String? originSession,
   }) async {
     final payload = <String, dynamic>{
       'from_kind': fromKind,
@@ -901,6 +907,9 @@ class DaemonClient {
     };
     if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
       payload['idempotency_key'] = idempotencyKey;
+    }
+    if (originSession != null && originSession.isNotEmpty) {
+      payload['origin_session'] = originSession;
     }
     final r = await http.post(
       _uri('/coordination/direct/messages'),

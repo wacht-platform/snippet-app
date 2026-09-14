@@ -243,11 +243,16 @@ class DirectMessage {
     required this.fromId,
     required this.fromKind,
     required this.body,
+    this.isReply = false,
   });
   final String threadId;
   final String fromId;
   final String fromKind;
   final String body;
+
+  /// True when this is an ANSWER to a question this session asked, rather than
+  /// a message addressed to this session's agent. The two read differently.
+  final bool isReply;
 
   /// How to name the sender in a one-line label.
   String get fromLabel {
@@ -281,6 +286,39 @@ DirectMessage? parseDirectMessage(String text) {
     fromId: field('from'),
     fromKind: field('from_kind'),
     body: body,
+  );
+}
+
+/// The REPLY an agent sent back into a session that asked it something.
+///
+/// Delivered as a user-turn so the session's own agent sees the answer and the
+/// transcript keeps a record of the exchange — which is the whole point of
+/// asking from inside a session rather than in the agent's inbox.
+DirectMessage? parseCoordinationReply(String text) {
+  final t = text.trim();
+  if (!t.contains('[coordination_reply]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  final end = t.lastIndexOf('[/coordination_reply]');
+  final bodyMarker = t.lastIndexOf('\nbody: ');
+  final body = (bodyMarker >= 0 && end > bodyMarker)
+      ? t.substring(bodyMarker + '\nbody: '.length, end).trim()
+      : '';
+
+  // The envelope writes `from: <kind>:<id>`, so split it rather than expecting
+  // a separate field.
+  final raw = field('from');
+  final split = raw.indexOf(':');
+  return DirectMessage(
+    threadId: field('thread_id'),
+    fromId: split > 0 ? raw.substring(split + 1) : raw,
+    fromKind: split > 0 ? raw.substring(0, split) : 'agent',
+    body: body,
+    isReply: true,
   );
 }
 

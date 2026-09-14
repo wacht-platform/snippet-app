@@ -469,14 +469,21 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _header(),
-        Divider(height: 1, color: AppColors.border),
-        Expanded(child: _body()),
-        Divider(height: 1, color: AppColors.border),
-        _composer(),
-      ],
+    // SafeArea clears the status bar and the home indicator. Without it the
+    // header sat under the clock and the composer under the gesture bar, which
+    // is what made the top of this screen read as cramped and clipped.
+    return SafeArea(
+      top: true,
+      bottom: true,
+      child: Column(
+        children: [
+          _header(),
+          Divider(height: 1, color: AppColors.border),
+          Expanded(child: _body()),
+          Divider(height: 1, color: AppColors.border),
+          _composer(),
+        ],
+      ),
     );
   }
 
@@ -527,7 +534,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     }
     return ListView.builder(
       controller: _scroll,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       itemCount: _events.length,
       itemBuilder: (_, i) => _bubble(_events[i]),
     );
@@ -537,17 +544,19 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     // The local human is the only `human` actor, so everything else is the peer.
     final mine = e.actorKind == 'human';
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Column(
         crossAxisAlignment:
             mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          Text(mine ? 'you' : '${e.actorKind}:${e.actorId}',
-              style: mono(9.5, color: AppColors.fg4)),
-          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 3),
+            child: Text(mine ? 'you' : '${e.actorKind}:${e.actorId}',
+                style: mono(9.5, color: AppColors.fg4)),
+          ),
           Container(
             constraints: const BoxConstraints(maxWidth: 520),
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
             decoration: BoxDecoration(
               color: mine ? AppColors.accentBg : AppColors.surface2,
               borderRadius: BorderRadius.circular(R.sm),
@@ -555,7 +564,10 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                   color: mine ? AppColors.accentLine : AppColors.border),
             ),
             child: Text(e.body,
-                style: sans(13, height: 1.4, color: AppColors.fg1)),
+                // 1.35 rather than 1.4: a long reply is a wall of text either
+                // way, and the tighter leading keeps it from dominating the
+                // screen without making it hard to read.
+                style: sans(13, height: 1.35, color: AppColors.fg1)),
           ),
         ],
       ),
