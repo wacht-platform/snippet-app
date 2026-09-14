@@ -3486,6 +3486,7 @@ class _SessionScreenState extends State<SessionScreen>
       // messaging the session itself, so listing it twice would be ambiguous.
       exclude: _sessionAgentIds,
       currentAgentId: current,
+      anchor: anchor,
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -3659,10 +3660,15 @@ class _SessionScreenState extends State<SessionScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (_recipientAgentId == null)
-                              _composerChip(
-                                icon: 'users',
-                                label: 'Add agent',
-                                onTap: () => _pickRecipient(context),
+                              // Anchored to this chip so the dropdown opens
+                              // under it, exactly like the approval and model
+                              // chips beside it.
+                              Builder(
+                                builder: (ctx) => _composerChip(
+                                  icon: 'users',
+                                  label: 'Add agent',
+                                  onTap: () => _pickRecipient(ctx),
+                                ),
                               )
                             else
                               Container(

@@ -12,16 +12,22 @@ import '../widgets.dart';
 /// the "give work" sheet so both offer the same list, in the same order, with
 /// the same description.
 ///
-/// Mission Control is listed like any other agent: every session needs to be
-/// able to reach the coordinator, so it is never filtered out. [currentAgentId]
-/// marks the agent that IS this session, which is the one addressed by simply
-/// sending to the chat.
+/// Pick one agent from the directory, as an anchored DROPDOWN.
+///
+/// Returns null when dismissed. Shared by the composer's recipient picker and
+/// the "give work" sheet so both offer the same list, in the same order.
+///
+/// Mission Control is NOT offered. It is the coordinator, reached by opening its
+/// own session, so listing it as a recipient elsewhere would be a second path to
+/// the same place — and would let a message meant for a worker land on the
+/// dispatcher. Agents reach Mission Control through their own tools, not here.
 Future<CoordinationAgent?> pickAgentId(
   BuildContext context,
   DaemonClient client, {
   String title = 'Select an agent',
   Set<String> exclude = const {},
   String? currentAgentId,
+  BuildContext? anchor,
 }) async {
   List<CoordinationAgent> agents;
   try {
@@ -30,82 +36,44 @@ Future<CoordinationAgent?> pickAgentId(
     if (context.mounted) toast(context, '$e', danger: true);
     return null;
   }
-  final candidates = agents.where((a) => !exclude.contains(a.id)).toList();
+  final candidates = agents
+      .where((a) =>
+          !exclude.contains(a.id) &&
+          a.kind != 'mission_control' &&
+          a.id != 'mission-control')
+      .toList();
   if (!context.mounted) return null;
   if (candidates.isEmpty) {
     toast(context, 'No agents available');
     return null;
   }
-
-  // Longest-first by name so the rows read as a stable list.
   candidates.sort((a, b) => a.displayName.compareTo(b.displayName));
 
-  final list = Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
+  // A dropdown, the SAME control as the approval and inference pickers: an
+  // anchored popover on desktop, a bottom sheet on mobile. A centered dialog
+  // for a short list of destinations was heavier than the thing it replaced.
+  final picked = await showAppMenu<String>(
+    context,
+    anchor: anchor ?? context,
+    minWidth: 260,
+    maxWidth: 340,
+    items: [
+      appMenuHeading<String>(title),
       for (final a in candidates)
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => Navigator.of(context).pop(a.id),
-            borderRadius: BorderRadius.circular(R.sm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-              child: Row(children: [
-                AppIcon('users',
-                    size: 16,
-                    color: a.available ? AppColors.accent : AppColors.fg4),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        a.displayName.trim().isEmpty ? a.id : a.displayName,
-                        style:
-                            sans(13.5, weight: W.label, color: AppColors.fg1),
-                      ),
-                      const SizedBox(height: 2),
-                      Text('${a.handle} · ${a.role} · ${a.status}',
-                          style: mono(10, color: AppColors.fg4)),
-                    ],
-                  ),
-                ),
-                // The agent that IS this session: sending to the chat already
-                // reaches it, so naming it avoids a confused second path.
-                if (currentAgentId != null && a.id == currentAgentId)
-                  Text('this chat', style: mono(10, color: AppColors.fg4)),
-              ]),
-            ),
-          ),
+        appMenuRow<String>(
+          value: a.id,
+          icon: 'users',
+          label: a.displayName.trim().isEmpty ? a.id : a.displayName,
+          description: '${a.handle} · ${a.role} · ${a.status}',
+          selected: a.id == currentAgentId,
         ),
     ],
   );
-
-  // Both platforms go through showAppSheet, which is already a dialog on
-  // desktop and a bottom sheet on mobile. The picker only asks for more room
-  // than the default, so the chrome stays in one place.
-  return showAppSheet<String>(
-    context,
-    title: title,
-    maxWidth: 420,
-    maxHeight: 560,
-    child: list,
-  ).then(_resolvePicked(candidates));
-}
-
-/// Map a picked id back to its agent, or null when dismissed.
-CoordinationAgent? Function(String?) _resolvePicked(
-  List<CoordinationAgent> candidates,
-) {
-  return (picked) {
-    if (picked == null) return null;
-    for (final a in candidates) {
-      if (a.id == picked) return a;
-    }
-    return null;
-  };
+  if (picked == null) return null;
+  for (final a in candidates) {
+    if (a.id == picked) return a;
+  }
+  return null;
 }
 
 /// Give one agent work in one session, in a single step.
@@ -195,8 +163,8 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
     }
   }
 
-  Future<void> _chooseAgent() async {
-    final picked = await pickAgentId(context, widget.client);
+  Future<void> _chooseAgent(BuildContext anchor) async {
+    final picked = await pickAgentId(context, widget.client, anchor: anchor);
     if (picked == null || !mounted) return;
     setState(() {
       _agentId = picked.id;
@@ -269,9 +237,10 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
         Material(
           color: AppColors.surface2,
           borderRadius: BorderRadius.circular(R.sm),
-          child: InkWell(
-            onTap: _sending ? null : _chooseAgent,
-            borderRadius: BorderRadius.circular(R.sm),
+          child: Builder(
+            builder: (ctx) => InkWell(
+              onTap: _sending ? null : () => _chooseAgent(ctx),
+              borderRadius: BorderRadius.circular(R.sm),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
               child: Row(children: [
@@ -288,6 +257,7 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
               ]),
             ),
           ),
+        ),
         ),
         const SizedBox(height: 14),
         AppField(
@@ -313,9 +283,10 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
         Material(
           color: AppColors.surface2,
           borderRadius: BorderRadius.circular(R.sm),
-          child: InkWell(
-            onTap: _sending ? null : _chooseProfile,
-            borderRadius: BorderRadius.circular(R.sm),
+          child: Builder(
+            builder: (ctx) => InkWell(
+              onTap: _sending ? null : () => _chooseProfile(ctx),
+              borderRadius: BorderRadius.circular(R.sm),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
               child: Row(children: [
@@ -332,6 +303,7 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
               ]),
             ),
           ),
+        ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -364,58 +336,35 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
     );
   }
 
-  Future<void> _chooseProfile() async {
-    final picked = await showAppSheet<String>(
+  Future<void> _chooseProfile(BuildContext anchor) async {
+    final picked = await showAppMenu<String>(
       context,
-      title: 'Inference profile',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => Navigator.of(context).pop(''),
-              borderRadius: BorderRadius.circular(R.sm),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                child: Text("Session's own profile",
-                    style: sans(13.5, color: AppColors.fg2)),
-              ),
-            ),
+      anchor: anchor,
+      minWidth: 260,
+      maxWidth: 340,
+      items: [
+        appMenuHeading<String>('Inference profile'),
+        // Clearing the choice is a real option: it means "use whatever the
+        // session already runs on", not "no model".
+        appMenuRow<String>(
+          value: '',
+          icon: 'sparkles',
+          label: "Session's own profile",
+          description: 'Use the model this session already runs on',
+          selected: _profile == null,
+        ),
+        for (final p in _profiles)
+          appMenuRow<String>(
+            value: p.name,
+            icon: 'sparkles',
+            label: p.name,
+            // Only a usable profile can actually run the dispatch.
+            description: p.usable
+                ? '${p.provider} · ${p.model}'
+                : '${p.provider} · ${p.model} — unusable',
+            selected: _profile == p.name,
           ),
-          for (final p in _profiles)
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => Navigator.of(context).pop(p.name),
-                borderRadius: BorderRadius.circular(R.sm),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                  child: Row(children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.name,
-                              style: sans(13.5,
-                                  weight: W.label, color: AppColors.fg1)),
-                          const SizedBox(height: 2),
-                          Text('${p.provider} · ${p.model}',
-                              style: mono(10, color: AppColors.fg4)),
-                        ],
-                      ),
-                    ),
-                    // Only a usable profile can actually run the dispatch.
-                    if (!p.usable)
-                      Text('unusable',
-                          style: mono(10, color: AppColors.danger)),
-                  ]),
-                ),
-              ),
-            ),
-        ],
-      ),
+      ],
     );
     if (picked == null || !mounted) return;
     setState(() => _profile = picked.isEmpty ? null : picked);
