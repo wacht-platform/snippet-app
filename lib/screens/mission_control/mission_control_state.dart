@@ -232,6 +232,94 @@ BoardMessage? parseBoardMessage(String text) {
   );
 }
 
+/// A DIRECT message delivered into an agent's inbox session.
+///
+/// Same shape of problem as [BoardMessage]: the envelope is an internal
+/// transport, and rendering it raw puts `rules:`, history rows, and the closing
+/// tag in the user's transcript. Parsed so only who-and-what is shown.
+class DirectMessage {
+  const DirectMessage({
+    required this.threadId,
+    required this.fromId,
+    required this.fromKind,
+    required this.body,
+  });
+  final String threadId;
+  final String fromId;
+  final String fromKind;
+  final String body;
+
+  /// How to name the sender in a one-line label.
+  String get fromLabel {
+    final id = fromId.trim();
+    if (id.isEmpty) return 'someone';
+    if (fromKind == 'human' || id == 'local') return 'you';
+    return id;
+  }
+}
+
+DirectMessage? parseDirectMessage(String text) {
+  final t = text.trim();
+  if (!t.contains('[direct_message]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  // The body is the final field before the closing tag, and the history digest
+  // above it can itself contain "body: ", so anchor to the LAST occurrence —
+  // the same rule the board message uses.
+  final end = t.lastIndexOf('[/direct_message]');
+  final bodyMarker = t.lastIndexOf('\nbody: ');
+  final body = (bodyMarker >= 0 && end > bodyMarker)
+      ? t.substring(bodyMarker + '\nbody: '.length, end).trim()
+      : '';
+
+  return DirectMessage(
+    threadId: field('thread_id'),
+    fromId: field('from'),
+    fromKind: field('from_kind'),
+    body: body,
+  );
+}
+
+/// The assignment envelope handed to a session that is being given work.
+///
+/// A third internal transport with the same problem: the raw form is a field
+/// list plus a paragraph of rules, none of which belongs in a transcript.
+class AssignmentEnvelope {
+  const AssignmentEnvelope({
+    required this.assignmentId,
+    required this.goalId,
+    required this.agentId,
+    required this.scope,
+    required this.definitionOfDone,
+  });
+  final String assignmentId;
+  final String goalId;
+  final String agentId;
+  final String scope;
+  final String definitionOfDone;
+}
+
+AssignmentEnvelope? parseAssignmentEnvelope(String text) {
+  final t = text.trim();
+  if (!t.contains('[coordination_assignment]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+  return AssignmentEnvelope(
+    assignmentId: field('assignment_id'),
+    goalId: field('goal_id'),
+    agentId: field('agent_id'),
+    scope: field('scope'),
+    definitionOfDone: field('definition_of_done'),
+  );
+}
+
 /// Project harness events into the Mission Control chat feed.
 List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
   final out = <FeedItem>[];

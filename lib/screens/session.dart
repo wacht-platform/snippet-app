@@ -42,7 +42,11 @@ import 'mission_control/mission_control_state.dart'
         isDedicatedMcSession,
         parseMissionEnvelope,
         parseBoardMessage,
+        parseDirectMessage,
+        parseAssignmentEnvelope,
         BoardMessage,
+        DirectMessage,
+        AssignmentEnvelope,
         MissionEnvelope;
 import 'mission_control/task_board_screen.dart';
 
@@ -655,6 +659,32 @@ class _SessionScreenState extends State<SessionScreen>
           detail: profile == null || profile.isEmpty
               ? 'from Mission Control'
               : 'from Mission Control · profile $profile',
+        ),
+      );
+    }
+    if (kind == 'sent') {
+      // A direct message the user just sent. Rendering it here is what makes
+      // the send visible at all: the message lives in the agent's own thread,
+      // so without a row the composer cleared and nothing appeared to happen.
+      final agent = e['agent']?.toString() ?? '';
+      final id = e['agent_id']?.toString() ?? '';
+      return KeyedSubtree(
+        key: ValueKey('agent-sent-$index-$id'),
+        child: GestureDetector(
+          onTap: id.isEmpty
+              ? null
+              : () => openAgentThread(
+                    context,
+                    client: widget.client,
+                    agentId: id,
+                    agentName: agent.isEmpty ? id : agent,
+                  ),
+          child: AgentEventRow(
+            icon: 'send',
+            label: 'Sent to ${agent.isEmpty ? id : agent}',
+            detail: 'Open the conversation to see the reply',
+            accent: true,
+          ),
         ),
       );
     }
@@ -1614,6 +1644,19 @@ class _SessionScreenState extends State<SessionScreen>
         body: body,
         idempotencyKey: _nextNonce(),
       );
+      // Show it HERE. The message lives in the agent's own thread, not this
+      // transcript, so without a row of its own a send looks like it did
+      // nothing at all — which is exactly how it read before.
+      if (mounted) {
+        setState(() {
+          _agentEvents.add({
+            'event': 'sent',
+            'agent_id': agentId,
+            'agent': name,
+          });
+          _transcriptDirty = true;
+        });
+      }
       _toast('Sent to $name');
     } catch (e) {
       // Put the text back: a failed send must not cost the user what they wrote.
@@ -4052,6 +4095,20 @@ class _SessionScreenState extends State<SessionScreen>
             addEvent(key, _BoardMessageCard(message: board));
             break;
           }
+          // The same rule for the two coordination envelopes: a direct message
+          // delivered into this agent's inbox, and the assignment handed to a
+          // session. Both are internal transports whose raw form would put
+          // `rules:`, field lists, and closing tags in the transcript.
+          final direct = parseDirectMessage(text);
+          if (direct != null) {
+            addEvent(key, _DirectMessageCard(message: direct));
+            break;
+          }
+          final assignment = parseAssignmentEnvelope(text);
+          if (assignment != null) {
+            addEvent(key, _AssignmentCard(assignment: assignment));
+            break;
+          }
           addEvent(
               key,
               KeyedSubtree(
@@ -5351,6 +5408,122 @@ class _BoardMessageCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(message.body.trim(),
                       style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Transcript card for a DIRECT message delivered into an agent's inbox.
+///
+/// Shows who it is from and what it says. The envelope's `rules:` block and
+/// history digest are transport, not content, so they are never rendered.
+class _DirectMessageCard extends StatelessWidget {
+  const _DirectMessageCard({required this.message});
+  final DirectMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final from = message.fromLabel;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                  color: AppColors.accent, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text('Message from $from',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13.5, color: AppColors.fg1)),
+                  ),
+                  Text('direct', style: sans(12, color: AppColors.fg4)),
+                ]),
+                if (message.body.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(message.body.trim(),
+                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Transcript card for an assignment handed to this session.
+///
+/// The line a worker actually needs: what the work is, and how it knows it is
+/// finished. The lease/turn instructions in the envelope are transport.
+class _AssignmentCard extends StatelessWidget {
+  const _AssignmentCard({required this.assignment});
+  final AssignmentEnvelope assignment;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final agent = assignment.agentId.trim();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                  color: AppColors.run, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(
+                        agent.isEmpty
+                            ? 'Work assigned here'
+                            : 'Work assigned to $agent',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13.5, color: AppColors.fg1)),
+                  ),
+                  Text('assigned', style: sans(12, color: AppColors.fg4)),
+                ]),
+                if (assignment.scope.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(assignment.scope.trim(),
+                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                ],
+                if (assignment.definitionOfDone.trim().isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text('done when: ${assignment.definitionOfDone.trim()}',
+                      style: sans(12, height: 1.35, color: AppColors.fg4)),
                 ],
               ],
             ),
