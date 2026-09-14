@@ -415,6 +415,14 @@ class _SessionScreenState extends State<SessionScreen>
   bool _activeToolRunOpen = false;
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
+
+  /// Coordination events concerning this session's agent, shown inline in the
+  /// conversation: a direct message arriving for it, or work dispatched out of
+  /// it. Kept separate from `_state.events` because these are DEVICE events —
+  /// they belong to the agent and the coordination plane, not to this session's
+  /// transcript, and folding them in would put them in the model's history.
+  final List<Map<String, dynamic>> _agentEvents = [];
+  StreamSubscription<dynamic>? _agentEventsSub;
   static const _transcriptPageSize = 160;
   int _transcriptStart = 0;
   bool _loadingOlderTranscript = false;
@@ -545,6 +553,7 @@ class _SessionScreenState extends State<SessionScreen>
     });
     if (!widget.acceptDrops && _state != null) _parked = true;
     _startSession();
+    _startAgentEvents();
     _loadModel();
     modelsRevision.addListener(_loadModel);
     unawaited(widget.client.getConfig());
@@ -559,6 +568,107 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   bool get _isMissionControl => isDedicatedMcSession(widget.sessionId);
+
+  /// Watch the device event stream for coordination activity about THIS session:
+  /// work dispatched into it, and — when this session is an agent's inbox —
+  /// messages arriving for that agent.
+  ///
+  /// These are DEVICE events, not transcript events, so they are kept out of
+  /// `_state.events`: folding them in would put coordination chatter into the
+  /// model's history, which is not what happened in the conversation.
+  void _startAgentEvents() {
+    _agentEventsSub?.cancel();
+    _agentEventsSub = widget.client.events().stream.listen((raw) {
+      if (!mounted || _closed) return;
+      final Map<String, dynamic> frame;
+      try {
+        final decoded = jsonDecode(raw as String);
+        if (decoded is! Map) return;
+        frame = decoded.cast<String, dynamic>();
+      } catch (_) {
+        return;
+      }
+      final entry = _agentEventFor(frame);
+      if (entry == null) return;
+      setState(() {
+        _agentEvents.add(entry);
+        _transcriptDirty = true;
+      });
+    }, onError: (_) {});
+  }
+
+  /// Map one coordination frame to an inline row, or null when it does not
+  /// concern this session.
+  Map<String, dynamic>? _agentEventFor(Map<String, dynamic> frame) {
+    final kind = frame['kind']?.toString() ?? '';
+    if (kind == 'dispatch') {
+      // Dispatches name their target session, so this is an exact match.
+      if (frame['session']?.toString() != widget.sessionId) return null;
+      return {
+        'event': 'dispatch',
+        'agent': frame['agent']?.toString() ?? '',
+        'assignment': frame['assignment']?.toString() ?? '',
+        'profile': frame['profile']?.toString(),
+      };
+    }
+    if (kind == 'direct_message') {
+      // A message concerns this session only when this session IS that agent's
+      // inbox. The binding is in the session id, so it needs no round trip.
+      final agent = _inboxAgentId(widget.sessionId);
+      if (agent == null) return null;
+      if (frame['to']?.toString() != 'agent:$agent') return null;
+      return {
+        'event': 'direct_message',
+        'from': frame['from']?.toString() ?? '',
+        'thread': frame['thread_id']?.toString() ?? '',
+      };
+    }
+    return null;
+  }
+
+  /// `inbox-<agent>/state.json` → `<agent>`, else null. Mirrors
+  /// `session::is_inbox_session_id` on the service side.
+  static String? _inboxAgentId(String sessionId) {
+    const prefix = 'inbox-';
+    const suffix = '/state.json';
+    if (!sessionId.startsWith(prefix) || !sessionId.endsWith(suffix)) {
+      return null;
+    }
+    final id =
+        sessionId.substring(prefix.length, sessionId.length - suffix.length);
+    return id.isEmpty ? null : id;
+  }
+
+  /// One inline coordination row.
+  Widget _agentEventRow(Map<String, dynamic> e, int index) {
+    final kind = e['event']?.toString() ?? '';
+    if (kind == 'dispatch') {
+      final agent = e['agent']?.toString() ?? '';
+      final profile = e['profile']?.toString();
+      return KeyedSubtree(
+        key: ValueKey('agent-dispatch-$index-${e['assignment']}'),
+        child: AgentEventRow(
+          icon: 'send',
+          label: agent.isEmpty
+              ? 'Work dispatched here'
+              : 'Work dispatched to $agent',
+          detail: profile == null || profile.isEmpty
+              ? 'from Mission Control'
+              : 'from Mission Control · profile $profile',
+        ),
+      );
+    }
+    final from = e['from']?.toString() ?? '';
+    return KeyedSubtree(
+      key: ValueKey('agent-message-$index-${e['thread']}'),
+      child: AgentEventRow(
+        icon: 'message',
+        label: 'Message from ${from.isEmpty ? 'an agent' : from}',
+        detail: 'Direct message — open the agent to read and reply',
+        accent: true,
+      ),
+    );
+  }
 
   Future<void> _startSession() async {
     if (_isMissionControl) {
@@ -2126,6 +2236,7 @@ class _SessionScreenState extends State<SessionScreen>
   @override
   void dispose() {
     _closed = true;
+    _agentEventsSub?.cancel();
     modelsRevision.removeListener(_loadModel);
     _input.removeListener(_interceptBigPaste);
     _inputFocus.unfocus();
@@ -4047,6 +4158,11 @@ class _SessionScreenState extends State<SessionScreen>
     // user/assistant message would flush them. Without this, live tools
     // remain invisible until the next chat message.
     endTools('transcript-tools-tail');
+    // Coordination rows go LAST: they are the most recent thing to happen to
+    // this session's agent, and they read as a live footer under the work.
+    for (var i = 0; i < _agentEvents.length; i++) {
+      out.add(_agentEventRow(_agentEvents[i], i));
+    }
     return out;
   }
 

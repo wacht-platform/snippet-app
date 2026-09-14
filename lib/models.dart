@@ -841,6 +841,41 @@ class CoordinationAgent {
   bool get available => status == 'active';
 }
 
+/// One row of an agent's coordination memory: what it dispatched, what came
+/// back, or what it concluded.
+class BoardEntry {
+  final int id;
+  final String agentId;
+
+  /// `dispatched`, `reported`, or `noted`.
+  final String kind;
+  final String? sessionId;
+
+  /// The folder the row concerns, when it concerns one.
+  final String? workspace;
+  final String summary;
+
+  /// Links a dispatch to its later report.
+  final String? correlationId;
+  final String createdAt;
+
+  BoardEntry.fromJson(Map<String, dynamic> j)
+      : id = (j['id'] as num?)?.toInt() ?? 0,
+        agentId = j['agent_id'] as String? ?? '',
+        kind = j['kind'] as String? ?? '',
+        sessionId = (j['session_id'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['session_id'] as String).trim(),
+        workspace = (j['workspace'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['workspace'] as String).trim(),
+        summary = j['summary'] as String? ?? '',
+        correlationId = (j['correlation_id'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['correlation_id'] as String).trim(),
+        createdAt = j['created_at'] as String? ?? '';
+}
+
 /// A direct conversation as listed for a participant, with its unread count.
 class DirectThreadSummary {
   final String threadId;

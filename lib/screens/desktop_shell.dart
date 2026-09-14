@@ -4044,7 +4044,8 @@ class _DesktopShellState extends State<DesktopShell>
   ) {
     final agent = t.agent;
     if (agent != null) {
-      return CoordinationAgentDetail(agent: agent, embedded: true);
+      return CoordinationAgentDetail(
+          agent: agent, client: _client, embedded: true);
     }
     return switch (t.panel) {
       _RightPanel.lanes => SessionLanesPanel(lanes: s?.lanes ?? const []),
@@ -4982,7 +4983,8 @@ class _SidebarState extends State<_Sidebar> {
               NavBackRow(
                   title: agent.displayName, onBack: () => widget.onAgent(null)),
               Expanded(
-                child: CoordinationAgentDetail(agent: agent, embedded: true),
+                child: CoordinationAgentDetail(
+                    agent: agent, client: client, embedded: true),
               ),
             ],
           );

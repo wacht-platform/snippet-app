@@ -759,6 +759,30 @@ class DaemonClient {
         .toList();
   }
 
+  /// GET /agents/{id}/board — this agent's coordination memory, newest first.
+  ///
+  /// Optional [workspace] scopes to one folder, [contains] searches the
+  /// summaries, and [kind] narrows to dispatched/reported/noted.
+  Future<List<BoardEntry>> agentBoard(
+    String agentId, {
+    String? workspace,
+    String? contains,
+    String? kind,
+    int limit = 50,
+  }) async {
+    final query = <String, String>{'limit': '$limit'};
+    if (workspace != null && workspace.isNotEmpty) query['workspace'] = workspace;
+    if (contains != null && contains.isNotEmpty) query['contains'] = contains;
+    if (kind != null && kind.isNotEmpty) query['kind'] = kind;
+    final r = await http.get(
+        _uri('/agents/${Uri.encodeComponent(agentId)}/board', query));
+    if (r.statusCode != 200) throw _err('load agent board', r);
+    final entries = (jsonDecode(r.body) as Map<String, dynamic>)['entries'];
+    return ((entries as List?) ?? const [])
+        .map((e) => BoardEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// POST /agents/build — ask the runtime to research and build an agent from one prompt.
   Future<void> buildCoordinationAgent(String prompt) async {
     final r = await http.post(

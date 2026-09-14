@@ -395,6 +395,63 @@ class SystemRow extends StatelessWidget {
   }
 }
 
+/// A coordination event in the chat canvas: this agent was messaged, or this
+/// agent dispatched work into a session.
+///
+/// Rendered in the CONVERSATION because the event concerns THIS session's agent
+/// — a message arriving for it, or work it handed out. It is deliberately a
+/// quiet one-line notice, not a chat bubble: the message itself lives in the
+/// agent's direct thread, and pretending otherwise here would suggest you are
+/// talking in this chat when you are not.
+class AgentEventRow extends StatelessWidget {
+  const AgentEventRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.detail,
+    this.accent = false,
+  });
+
+  final String icon;
+  final String label;
+  final String detail;
+  final bool accent;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final color = accent ? AppColors.accent : AppColors.fg3;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: AppIcon(icon, size: 13, color: color),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: sans(12.5, weight: W.label, color: color)),
+                if (detail.trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12, height: 1.35, color: AppColors.fg4)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Full-width card for goal events in the chat canvas — a distinct block with
 /// an accent rail and a status label, instead of a faint one-liner.
 /// Centered hairline + label — used for compaction and tool-prune boundaries.
