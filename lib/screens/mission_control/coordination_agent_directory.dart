@@ -60,7 +60,11 @@ class _CoordinationAgentDirectoryState
       });
     }
     try {
-      agents = await widget.client.coordinationAgents();
+      // Mission Control has its own pinned chat, so it is not one of the agents
+      // offered here — this list is the workers a user dispatches to.
+      agents = (await widget.client.coordinationAgents())
+          .where((a) => !a.isMissionControl)
+          .toList();
     } catch (e) {
       error = '$e';
     }

@@ -39,8 +39,10 @@ Future<CoordinationAgent?> pickAgentId(
   final candidates = agents
       .where((a) =>
           !exclude.contains(a.id) &&
-          a.kind != 'mission_control' &&
-          a.id != 'mission-control')
+          // Mission Control is reached through its own chat, not picked here.
+          // Offering it would let a message aimed at a worker land on the
+          // dispatcher.
+          !a.isMissionControl)
       .toList();
   if (!context.mounted) return null;
   if (candidates.isEmpty) {

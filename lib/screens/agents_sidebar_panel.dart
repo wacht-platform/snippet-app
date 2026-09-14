@@ -69,7 +69,11 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       if (!mounted) return;
       final leases = results[1] as List<CoordinationLease>;
       setState(() {
-        agents = results[0] as List<CoordinationAgent>;
+        // Mission Control is excluded: it has its own pinned chat, so it is not
+        // one of the workers this panel lists.
+        agents = (results[0] as List<CoordinationAgent>)
+            .where((a) => !a.isMissionControl)
+            .toList();
         activeBySession = {
           for (final l in leases) l.sessionId: l.agentId,
         };
@@ -162,7 +166,12 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         await Future<void>.delayed(const Duration(seconds: 3));
         if (!mounted) return;
         try {
-          final latest = await widget.client.coordinationAgents();
+          // Filtered the SAME way `agents` is. `before` comes from the filtered
+          // list, so an unfiltered poll would report Mission Control as a
+          // brand-new agent on every check and claim a build had finished.
+          final latest = (await widget.client.coordinationAgents())
+              .where((a) => !a.isMissionControl)
+              .toList();
           if (!mounted) return;
           if (latest.any((a) => !before.contains(a.id))) {
             await refresh();

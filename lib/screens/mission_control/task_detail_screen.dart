@@ -104,7 +104,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final agents = await widget.client.coordinationAgents();
     if (!mounted) return;
     final onTask = roster.where((r) => r.active).map((r) => r.agentId).toSet();
-    final candidates = agents.where((a) => !onTask.contains(a.id)).toList();
+    // Mission Control is not a task agent — it coordinates — so it is not
+    // offered for membership either.
+    final candidates = agents
+        .where((a) => !onTask.contains(a.id) && !a.isMissionControl)
+        .toList();
     if (candidates.isEmpty) {
       toast(context, 'Every agent is already on this task');
       return;

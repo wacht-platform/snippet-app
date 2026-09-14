@@ -839,6 +839,14 @@ class CoordinationAgent {
             .toList();
 
   bool get available => status == 'active';
+
+  /// True for Mission Control, the coordinator.
+  ///
+  /// It is not a peer agent: it has its own pinned chat, and it does not take
+  /// work the way a worker does. Any list of agents a user picks FROM should
+  /// exclude it — it is a destination reached by its own session, not an entry
+  /// in a list of workers.
+  bool get isMissionControl => kind == 'mission_control' || id == 'mission-control';
 }
 
 /// One row of an agent's coordination memory: what it dispatched, what came
