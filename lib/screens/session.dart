@@ -3450,26 +3450,43 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   /// One composer footer control: icon + label + disclosure chevron.
+  /// A composer chip. When [onClear] is set the chip is in a CHOSEN state: it
+  /// shows the value, and the trailing affordance clears it instead of opening
+  /// the picker — so a selected dispatch is dismissible without a second trip
+  /// through the menu.
   Widget _composerChip({
     required String icon,
     required String label,
     required VoidCallback onTap,
+    VoidCallback? onClear,
+    bool selected = false,
   }) =>
       Material(
-        color: AppColors.surface2,
+        color: selected ? AppColors.accentBg : AppColors.surface2,
         borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(R.sm),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            padding: EdgeInsets.fromLTRB(8, 0, onClear == null ? 8 : 0, 0),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(icon, size: 13, color: AppColors.fg3),
+              AppIcon(icon,
+                  size: 13, color: selected ? AppColors.accent : AppColors.fg3),
               const SizedBox(width: 6),
               Text(label,
-                  style: sans(11.5, weight: W.label, color: AppColors.fg2)),
-              const SizedBox(width: 5),
-              AppIcon('chevron-down', size: 12, color: AppColors.fg4),
+                  style: sans(11.5,
+                      weight: W.label,
+                      color: selected ? AppColors.accent : AppColors.fg2)),
+              if (onClear != null)
+                IconBtn('x',
+                    size: 22,
+                    iconSize: 12,
+                    tooltip: 'Clear',
+                    onTap: onClear)
+              else ...[
+                const SizedBox(width: 5),
+                AppIcon('chevron-down', size: 12, color: AppColors.fg4),
+              ],
             ]),
           ),
         ),
@@ -3481,7 +3498,7 @@ class _SessionScreenState extends State<SessionScreen>
     final picked = await pickAgentId(
       context,
       widget.client,
-      title: 'Add an agent',
+      title: 'Dispatch to',
       // An agent already on this session is not offered again: it is reached by
       // messaging the session itself, so listing it twice would be ambiguous.
       exclude: _sessionAgentIds,
@@ -3497,7 +3514,7 @@ class _SessionScreenState extends State<SessionScreen>
     // Pin it to the session so the composer shows WHO can be reached without
     // walking the directory again next time.
     _pinSessionAgent(picked.id);
-    _toast('Messages now go to ${_recipientAgentName} only');
+    _toast('Dispatching to ${_recipientAgentName}');
   }
 
   void _clearRecipient() {
@@ -3505,6 +3522,7 @@ class _SessionScreenState extends State<SessionScreen>
       _recipientAgentId = null;
       _recipientAgentName = null;
     });
+    _toast('Back to this chat');
   }
 
   /// Record that `agentId` belongs to this session's roster.
@@ -3649,60 +3667,6 @@ class _SessionScreenState extends State<SessionScreen>
                           ]),
                         ),
                       ],
-                      // Recipient lives ABOVE the field: choosing who to message
-                      // is a mode for the whole composer, so it reads as a header
-                      // over the input rather than one more control buried among
-                      // the buttons. Sending then routes a direct message to that
-                      // agent's own thread — NOT into this chat.
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_recipientAgentId == null)
-                              // Anchored to this chip so the dropdown opens
-                              // under it, exactly like the approval and model
-                              // chips beside it.
-                              Builder(
-                                builder: (ctx) => _composerChip(
-                                  icon: 'users',
-                                  label: 'Add agent',
-                                  onTap: () => _pickRecipient(ctx),
-                                ),
-                              )
-                            else
-                              Container(
-                                padding: const EdgeInsets.fromLTRB(9, 4, 3, 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accentBg,
-                                  borderRadius: BorderRadius.circular(R.sm),
-                                  border:
-                                      Border.all(color: AppColors.accentLine),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    AppIcon('users',
-                                        size: 13, color: AppColors.accent),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'To: ${_recipientAgentName ?? _recipientAgentId}',
-                                      style: sans(11.5,
-                                          weight: W.label,
-                                          color: AppColors.accent),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    IconBtn('x',
-                                        size: 22,
-                                        iconSize: 12,
-                                        tooltip: 'Clear recipient',
-                                        onTap: _clearRecipient),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
                       CallbackShortcuts(
                         bindings: {
                           const SingleActivator(LogicalKeyboardKey.enter): () {
@@ -3768,6 +3732,27 @@ class _SessionScreenState extends State<SessionScreen>
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Row(children: [
+                                  // Dispatch leads the group: it is the most
+                                  // consequential control here — it decides
+                                  // WHERE what you type is going. Anchored to
+                                  // itself so the menu opens under the chip.
+                                  Builder(
+                                    builder: (ctx) => _recipientAgentId == null
+                                        ? _composerChip(
+                                            icon: 'users',
+                                            label: 'Dispatch',
+                                            onTap: () => _pickRecipient(ctx),
+                                          )
+                                        : _composerChip(
+                                            icon: 'users',
+                                            label: _recipientAgentName ??
+                                                _recipientAgentId!,
+                                            selected: true,
+                                            onTap: () => _pickRecipient(ctx),
+                                            onClear: _clearRecipient,
+                                          ),
+                                  ),
+                                  const SizedBox(width: 6),
                                   // Approval mode lives here instead of the tool
                                   // band, so the setting sits next to what it
                                   // governs.
