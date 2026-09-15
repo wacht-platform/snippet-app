@@ -84,7 +84,7 @@ class _CreateAgentFormState extends State<CreateAgentForm> {
             const SizedBox(height: 10),
             Text(
               'The agent chooses its name, personality, capabilities, and initial tool proposals from this brief.',
-              style: sans(12, color: AppColors.fg4, height: 1.4),
+              style: sans(12, color: AppColors.fg3, height: 1.4),
             ),
             if (_error != null) ...[
               const SizedBox(height: 14),

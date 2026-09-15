@@ -74,7 +74,7 @@ class TerminalsSidebarPanel extends StatelessWidget {
                   child: Text(displayPath,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(11.5, color: AppColors.fg3)),
+                      style: mono(11, color: AppColors.fg3)),
                 ),
               ]),
             ),
@@ -131,6 +131,6 @@ class _SidebarEmpty extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
         child: Text(message,
             textAlign: TextAlign.center,
-            style: sans(12.5, color: AppColors.fg4, height: 1.45)),
+            style: sans(12, color: AppColors.fg3, height: 1.45)),
       );
 }

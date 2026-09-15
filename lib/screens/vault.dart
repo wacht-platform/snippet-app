@@ -148,11 +148,11 @@ class _VaultScreenState extends State<VaultScreen> {
             AppIcon('alert-triangle', size: 20, color: AppColors.danger),
             const SizedBox(height: 10),
             Text("Couldn't load secrets",
-                style: sans(13.5, weight: W.label, color: AppColors.fg1)),
+                style: sans(13, weight: W.label, color: AppColors.fg1)),
             const SizedBox(height: 5),
             Text(_error!,
                 textAlign: TextAlign.center,
-                style: sans(11.5, height: 1.4, color: AppColors.fg4)),
+                style: sans(11, height: 1.4, color: AppColors.fg3)),
             const SizedBox(height: 14),
             Btn('Retry', small: true, onTap: _load),
           ]),
@@ -167,7 +167,7 @@ class _VaultScreenState extends State<VaultScreen> {
           Text(
             'Use these as \$NAME in shell commands. Values stay on the daemon and are never shown again.',
             style:
-                sans(kMobile ? M.meta : 12, height: 1.45, color: AppColors.fg4),
+                sans(kMobile ? M.meta : 12, height: 1.45, color: AppColors.fg3),
           ),
           const SizedBox(height: 16),
           _inlineLabel('Secrets'),
@@ -234,8 +234,7 @@ class _VaultScreenState extends State<VaultScreen> {
   Widget _inlineLabel(String t) => Padding(
         padding: const EdgeInsets.only(left: 2),
         child: Text(t.toUpperCase(),
-            style: sans(kMobile ? 11 : 10,
-                weight: W.label, color: AppColors.fg4, spacing: 0.5)),
+            style: caps(kMobile ? 11 : 10, color: AppColors.fg3)),
       );
 
   /// Grouped surface with hairline separators — the same treatment as every
@@ -295,11 +294,11 @@ class _VaultScreenState extends State<VaultScreen> {
             child: Text(name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: mono(kMobile ? 13 : 12.5, color: AppColors.fg1)),
+                style: mono(kMobile ? 13 : 12, color: AppColors.fg1)),
           ),
           // A masked placeholder, not the value — the value never leaves the
           // daemon, so there is nothing here to reveal.
-          Text('••••••', style: mono(11.5, color: AppColors.fg4)),
+          Text('••••••', style: mono(11, color: AppColors.fg4)),
           const SizedBox(width: 4),
           IconBtn('trash',
               size: kMobile ? M.minTarget : 34,
@@ -327,7 +326,7 @@ class _VaultScreenState extends State<VaultScreen> {
             child: Row(children: [
               AppIcon('plus', size: 16, color: AppColors.accent),
               const SizedBox(width: 12),
-              Text('Add secret', style: sans(13.5, color: AppColors.fg1)),
+              Text('Add secret', style: sans(13, color: AppColors.fg1)),
             ]),
           ),
         ),
@@ -446,7 +445,7 @@ class _AddSecretFormState extends State<_AddSecretForm> {
             const SizedBox(width: 7),
             Expanded(
               child: Text(_error!,
-                  style: sans(11.5, height: 1.4, color: AppColors.danger)),
+                  style: sans(11, height: 1.4, color: AppColors.danger)),
             ),
           ]),
         ],

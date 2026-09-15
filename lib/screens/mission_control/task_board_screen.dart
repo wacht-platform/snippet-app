@@ -427,7 +427,7 @@ class _FilterPanelState extends State<_FilterPanel> {
             if (count != null) ...[
               const SizedBox(width: 8),
               // A count is information, not a placeholder: the muted ramp.
-              Text('$count', style: sans(11, color: AppColors.fg3)),
+              Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
             ],
             // Selection is carried by the surface step AND a mark, so the state
             // is unambiguous where the step alone is subtle. 16px glyph in a
@@ -477,17 +477,17 @@ class _StatusHeader extends StatelessWidget {
                 color: statusColor(status), shape: BoxShape.circle),
           ),
           const SizedBox(width: 7),
+          // `caps()`: Geist (not Inter — two near-identical sans-serifs read as
+          // a mistake) at 500, `fg2` (#C1C1C1), and POSITIVE tracking. The note
+          // that stood here claimed -0.05 was correct for small caps; that is
+          // backwards. Upper case carries more visual mass, so it needs a little
+          // POSITIVE letter-spacing or the letters crowd.
           Text(status.label.toUpperCase(),
-              // The doc's 11px label is INTER 500 at #C1C1C1, not Geist and not
-              // the muted grey: `fg2` IS #C1C1C1 in this theme. Tracking comes
-              // from `_tracking`, which already gives -0.05 at 11px — the
-              // measured value. The previous +0.5 was tracked OUT, the opposite
-              // direction, and tightens small caps.
-              style: inter(11, weight: W.label, color: AppColors.fg2)),
+              style: caps(11, color: AppColors.fg2)),
           const SizedBox(width: 6),
           // A count is information, not a placeholder: the muted tone (`fg3`),
           // never `fg4` which is the disabled/placeholder ramp.
-          Text('$count', style: sans(11, color: AppColors.fg3)),
+          Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
         ]),
       );
 }
@@ -694,7 +694,7 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
               autofocus: true,
             ),
             const SizedBox(height: 12),
-            Text('session', style: mono(10, color: AppColors.fg4)),
+            Text('session', style: mono(10, color: AppColors.fg3)),
             const SizedBox(height: 4),
             Material(
               color: AppColors.surface2,

@@ -250,7 +250,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           const SizedBox(height: 7),
           if (_isEdit)
             Text(_providerLabel(_provider),
-                style: sans(15, color: AppColors.fg1))
+                style: sans(16, color: AppColors.fg1))
           else
             Pills<String>(
               items: pills,
@@ -322,7 +322,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           const SizedBox(height: 6),
           Text(
               "Higher means more thinking — better on hard problems, more tokens. Default uses the provider's own; Off disables reasoning. X-High/Max are the top tiers (gpt-5.1-codex-max, gpt-5.6, Claude). If a model rejects a tier, snippet steps down automatically instead of failing.",
-              style: sans(11.5, height: 1.4, color: AppColors.fg4)),
+              style: sans(11, height: 1.4, color: AppColors.fg3)),
           const SizedBox(height: 16),
           if (_isChatgpt)
             _SubSignIn(
@@ -512,7 +512,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                 AppIcon('cpu', size: 16, color: AppColors.fg2),
                 const SizedBox(width: 9),
                 Text('Inference profiles',
-                    style: sans(15, weight: W.label, color: AppColors.fg1)),
+                    style: sans(16, weight: W.label, color: AppColors.fg1)),
                 const SizedBox(width: 8),
                 Container(
                   padding:
@@ -522,7 +522,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text('${widget.models.length}',
-                      style: mono(10.5, color: AppColors.fg3)),
+                      style: mono(10, color: AppColors.fg3)),
                 ),
                 const Spacer(),
                 IconBtn('x',
@@ -551,7 +551,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                         const SizedBox(height: 9),
                         Text('No profile matches “${_query.text.trim()}”',
                             textAlign: TextAlign.center,
-                            style: sans(12.5, color: AppColors.fg3)),
+                            style: sans(12, color: AppColors.fg3)),
                       ]),
                     )
                   : ListView.builder(
@@ -611,7 +611,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                         Text(subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(11.5, color: AppColors.fg4)),
+                            style: sans(11, color: AppColors.fg3)),
                       ],
                     ]),
               ),
@@ -737,9 +737,9 @@ class _SubSignInState extends State<_SubSignIn> {
     if (_code != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Open this URL and enter the code:',
-            style: sans(12.5, height: 1.4, color: AppColors.fg2)),
+            style: sans(12, height: 1.4, color: AppColors.fg2)),
         const SizedBox(height: 8),
-        SelectableText(_url ?? '', style: mono(12.5, color: AppColors.accent)),
+        SelectableText(_url ?? '', style: mono(12, color: AppColors.accent)),
         const SizedBox(height: 8),
         Row(children: [
           Text(_code!,

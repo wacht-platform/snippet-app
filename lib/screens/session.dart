@@ -1254,7 +1254,7 @@ class _SessionScreenState extends State<SessionScreen>
     if (!_scroll.hasClients) return;
     if (smooth) {
       _scroll.animateTo(0,
-          duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+          duration: Motion.base, curve: Motion.enter);
     } else if (_scroll.offset != 0) {
       _scroll.jumpTo(0);
     }
@@ -2568,10 +2568,10 @@ class _SessionScreenState extends State<SessionScreen>
           ),
           Positioned.fill(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              reverseDuration: const Duration(milliseconds: 150),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
+              duration: Motion.fast,
+              reverseDuration: Motion.quick,
+              switchInCurve: Motion.enter,
+              switchOutCurve: Motion.exit,
               transitionBuilder: (child, animation) => FadeTransition(
                 opacity: animation,
                 child: SlideTransition(
@@ -2915,7 +2915,7 @@ class _SessionScreenState extends State<SessionScreen>
           child: Text(title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: sans(mac ? 13.5 : 16.5,
+              style: sans(mac ? 13 : 16,
                   weight: W.label, color: AppColors.fg1)),
         ),
         if (mac && running)
@@ -3248,7 +3248,7 @@ class _SessionScreenState extends State<SessionScreen>
             s?.compacting == true
                 ? 'Compacting'
                 : (running ? 'Running' : 'Idle'),
-            style: sans(12.5,
+            style: sans(12,
                 weight: W.label,
                 color: s?.compacting == true
                     ? AppColors.accent
@@ -3437,7 +3437,7 @@ class _SessionScreenState extends State<SessionScreen>
                       Text(title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(M.meta, color: AppColors.fg4)),
+                          style: sans(M.meta, color: AppColors.fg3)),
                     ],
                   ),
                 ),
@@ -3486,7 +3486,7 @@ class _SessionScreenState extends State<SessionScreen>
                   size: 13, color: selected ? AppColors.accent : AppColors.fg3),
               const SizedBox(width: 6),
               Text(label,
-                  style: sans(11.5,
+                  style: sans(11,
                       weight: W.label,
                       color: selected ? AppColors.accent : AppColors.fg2)),
               if (onClear != null)
@@ -3570,13 +3570,16 @@ class _SessionScreenState extends State<SessionScreen>
                     child: Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg4)),
+                        style: sans(11, color: AppColors.fg3)),
                   ),
                 ]),
         ),
         if (left != null) ...[
           const SizedBox(width: 8),
-          Text('$left% context left', style: sans(11, color: AppColors.fg4)),
+          // Changes as the session runs, so it needs tabular figures; and it is
+          // information, not a placeholder, so `fg3` not `fg4`.
+          Text('$left% context left',
+              style: sans(11, tabular: true, color: AppColors.fg3)),
         ],
       ]),
     );
@@ -3615,8 +3618,8 @@ class _SessionScreenState extends State<SessionScreen>
     final mq = MediaQuery.of(context);
     final keyboard = mq.viewInsets.bottom;
     return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
+      duration: Motion.fast,
+      curve: Motion.enter,
       padding: EdgeInsets.only(bottom: keyboard),
       child: Container(
         // Inset from the pane on EVERY layout. Embedded used to be 0, which is
@@ -3669,7 +3672,7 @@ class _SessionScreenState extends State<SessionScreen>
                                   style: sans(12, color: AppColors.fg2)),
                             ),
                             Text(_state!.goal!.paused ? 'paused' : 'active',
-                                style: mono(9.5, color: AppColors.accent)),
+                                style: mono(10, color: AppColors.accent)),
                             const SizedBox(width: 5),
                             IconBtn('x',
                                 size: 26,
@@ -3703,7 +3706,7 @@ class _SessionScreenState extends State<SessionScreen>
                           maxLines: 8,
                           cursorColor: AppColors.fg1,
                           onSubmitted: (_) => _sendMessage(),
-                          style: sans(kMobile ? M.body : 15.5,
+                          style: sans(kMobile ? M.body : 16,
                               height: 1.45, color: AppColors.fg1),
                           decoration: InputDecoration(
                             isCollapsed: true,
@@ -3713,7 +3716,7 @@ class _SessionScreenState extends State<SessionScreen>
                                 const EdgeInsets.fromLTRB(2, 2, 8, 10),
                             border: InputBorder.none,
                             hintText: 'Ask anything',
-                            hintStyle: sans(kMobile ? M.body : 15.5,
+                            hintStyle: sans(kMobile ? M.body : 16,
                                 height: 1.45, color: AppColors.fg4),
                           ),
                         ),
@@ -4263,7 +4266,7 @@ class _SessionScreenState extends State<SessionScreen>
                         Text(caption.isNotEmpty ? caption : path,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(11.5, color: AppColors.fg3)),
+                            style: sans(11, color: AppColors.fg3)),
                       ]),
                 ),
               ]),
@@ -4429,7 +4432,7 @@ class _SessionScreenState extends State<SessionScreen>
         Padding(
             padding: const EdgeInsets.all(20),
             child: Text('No checkpoints yet.',
-                style: sans(12.5, color: AppColors.fg3))),
+                style: sans(12, color: AppColors.fg3))),
       ...cps.map((c) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: AppCard(
@@ -4523,7 +4526,7 @@ class _SessionScreenState extends State<SessionScreen>
             child: Text(
               'Creates a new session with history up to the point you pick. '
               'This chat is left unchanged. Workspace files are shared.',
-              style: sans(12.5, height: 1.45, color: AppColors.fg3),
+              style: sans(12, height: 1.45, color: AppColors.fg3),
             ),
           ),
           if (cps.isEmpty)
@@ -4534,7 +4537,7 @@ class _SessionScreenState extends State<SessionScreen>
                 children: [
                   Text(
                       'No checkpoints yet — you can still fork the full history.',
-                      style: sans(12.5, color: AppColors.fg3)),
+                      style: sans(12, color: AppColors.fg3)),
                   const SizedBox(height: 12),
                   Btn('Fork full history', onTap: () => _confirmFork(null)),
                 ],
@@ -4670,7 +4673,7 @@ class _StatMeta extends StatelessWidget {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       AppIcon(icon, size: 14, color: tone == 'default' ? AppColors.fg4 : c),
       const SizedBox(width: 6),
-      Text(label, style: mono(12.5, color: c)),
+      Text(label, style: mono(12, color: c)),
     ]);
   }
 }
@@ -4734,7 +4737,10 @@ class _CompactingStatusState extends State<_CompactingStatus> {
                     style: sans(13, weight: W.label, color: AppColors.accent)),
                 TextSpan(
                     text: ' $_elapsed',
+                    // Ticks once a second: proportional digits would make the
+                    // counter shimmer and shift the label beside it.
                     style: sans(13,
+                        tabular: true,
                         color: AppColors.accent.withValues(alpha: 0.72))),
               ])),
             ),
@@ -4851,7 +4857,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
                 ),
                 const SizedBox(width: 8),
                 Text(_elapsed,
-                    style: mono(11.5,
+                    style: mono(11,
                         color: AppColors.accent.withValues(alpha: 0.72))),
                 if (thought.isNotEmpty) ...[
                   const SizedBox(width: 6),
@@ -5112,7 +5118,7 @@ class _QueuedBubble extends StatelessWidget {
                   children: [
                     if (text.isNotEmpty)
                       Text(text,
-                          style: sans(15.5, height: 1.5, color: AppColors.fg1)),
+                          style: sans(16, height: 1.5, color: AppColors.fg1)),
                     if (images + files + audio > 0) ...[
                       if (text.isNotEmpty) const SizedBox(height: 6),
                       AttachmentPill(
@@ -5129,7 +5135,7 @@ class _QueuedBubble extends StatelessWidget {
                   children: [
                     Text('Queued',
                         style:
-                            sans(kMobile ? 11.5 : 10.5, color: AppColors.fg4)),
+                            sans(kMobile ? 11 : 10, color: AppColors.fg3)),
                     const SizedBox(width: 10),
                     if (onSteer != null) ...[
                       GestureDetector(
@@ -5139,7 +5145,7 @@ class _QueuedBubble extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 3),
                           child: Text('Send now',
-                              style: sans(kMobile ? 12 : 10.5,
+                              style: sans(kMobile ? 12 : 10,
                                   weight: W.label, color: AppColors.accent)),
                         ),
                       ),
@@ -5152,7 +5158,7 @@ class _QueuedBubble extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 3),
                         child: Text('Cancel',
-                            style: sans(kMobile ? 12 : 10.5,
+                            style: sans(kMobile ? 12 : 10,
                                 color: AppColors.fg4)),
                       ),
                     ),
@@ -5193,7 +5199,7 @@ class _QueuedSection extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
             child: Row(children: [
               Text('QUEUED ($count)',
-                  style: sans(10.5,
+                  style: sans(10,
                       weight: W.label, spacing: 0.6, color: AppColors.fg4)),
               const Spacer(),
               if (showBulk) ...[
@@ -5207,7 +5213,7 @@ class _QueuedSection extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       child: Text('Send all',
-                          style: sans(10.5,
+                          style: sans(10,
                               weight: W.label, color: AppColors.accent)),
                     ),
                   ),
@@ -5223,7 +5229,7 @@ class _QueuedSection extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 3),
                       child: Text('Cancel all',
-                          style: sans(10.5, color: AppColors.fg4)),
+                          style: sans(10, color: AppColors.fg3)),
                     ),
                   ),
                 ),
@@ -5265,14 +5271,14 @@ class _GoalCard extends StatelessWidget {
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Text(paused ? 'Goal paused' : 'Working toward goal',
-                  style: sans(12.5, weight: W.label, color: AppColors.fg1)),
+                  style: sans(12, weight: W.label, color: AppColors.fg1)),
             ]),
             if (goal.text.trim().isNotEmpty) ...[
               const SizedBox(height: 3),
               Text(goal.text,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(11.5, height: 1.35, color: AppColors.fg3)),
+                  style: sans(11, height: 1.35, color: AppColors.fg3)),
             ],
           ]),
         ),
@@ -5332,16 +5338,16 @@ class _MissionEnvelopeCard extends StatelessWidget {
                     child: Text(title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(13.5, color: AppColors.fg1)),
+                        style: sans(13, color: AppColors.fg1)),
                   ),
-                  Text(label, style: sans(12, color: AppColors.fg4)),
+                  Text(label, style: sans(12, color: AppColors.fg3)),
                 ]),
                 if (summary.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(summary,
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
                 ],
               ],
             ),
@@ -5388,14 +5394,14 @@ class _BoardMessageCard extends StatelessWidget {
                     child: Text(from,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(13.5, color: AppColors.fg1)),
+                        style: sans(13, color: AppColors.fg1)),
                   ),
-                  Text(label, style: sans(12, color: AppColors.fg4)),
+                  Text(label, style: sans(12, color: AppColors.fg3)),
                 ]),
                 if (message.body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(message.body.trim(),
-                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
                 ],
               ],
             ),
@@ -5445,15 +5451,15 @@ class _DirectMessageCard extends StatelessWidget {
                             : 'Message from $from',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(13.5, color: AppColors.fg1)),
+                        style: sans(13, color: AppColors.fg1)),
                   ),
                   Text(message.isReply ? 'reply' : 'direct',
-                      style: sans(12, color: AppColors.fg4)),
+                      style: sans(12, color: AppColors.fg3)),
                 ]),
                 if (message.body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(message.body.trim(),
-                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
                 ],
               ],
             ),
@@ -5510,15 +5516,15 @@ class _AgentMessageCard extends StatelessWidget {
                             : 'Reply from $agentId',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(13.5, color: AppColors.fg1)),
+                        style: sans(13, color: AppColors.fg1)),
                   ),
                   Text(outbound ? 'sent' : 'reply',
-                      style: sans(12, color: AppColors.fg4)),
+                      style: sans(12, color: AppColors.fg3)),
                 ]),
                 if (body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(body.trim(),
-                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
                 ],
               ],
             ),
@@ -5568,19 +5574,19 @@ class _AssignmentCard extends StatelessWidget {
                             : 'Work assigned to $agent',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(13.5, color: AppColors.fg1)),
+                        style: sans(13, color: AppColors.fg1)),
                   ),
-                  Text('assigned', style: sans(12, color: AppColors.fg4)),
+                  Text('assigned', style: sans(12, color: AppColors.fg3)),
                 ]),
                 if (assignment.scope.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(assignment.scope.trim(),
-                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
                 ],
                 if (assignment.definitionOfDone.trim().isNotEmpty) ...[
                   const SizedBox(height: 3),
                   Text('done when: ${assignment.definitionOfDone.trim()}',
-                      style: sans(12, height: 1.35, color: AppColors.fg4)),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
                 ],
               ],
             ),
@@ -5670,7 +5676,7 @@ class _QuestionRecord extends StatelessWidget {
             Row(children: [
               Expanded(
                 child: Text('Question',
-                    style: sans(15.5, weight: W.label, color: AppColors.fg1)),
+                    style: sans(16, weight: W.label, color: AppColors.fg1)),
               ),
               Text(answers.isEmpty ? 'Asked' : 'Answered',
                   style: sans(12, color: AppColors.accent)),
@@ -5685,7 +5691,7 @@ class _QuestionRecord extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text('${i + 1} of ${qs.length}',
-                      style: sans(12, color: AppColors.fg4)),
+                      style: sans(12, color: AppColors.fg3)),
                 ),
               Text(qs[i]['text']?.toString() ?? '',
                   style: sans(14, height: 1.45, color: AppColors.fg1)),
@@ -5694,7 +5700,7 @@ class _QuestionRecord extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   answers[qs[i]['id']?.toString()] ?? answers['0'] ?? '',
-                  style: sans(13.5, height: 1.45, color: AppColors.fg2),
+                  style: sans(13, height: 1.45, color: AppColors.fg2),
                 ),
               ],
             ],
@@ -5768,7 +5774,7 @@ class ApprovalBarState extends State<ApprovalBar> {
             Row(children: [
               Expanded(
                 child: Text(_sent ? 'Sending…' : title,
-                    style: sans(15.5, weight: W.label, color: AppColors.fg1)),
+                    style: sans(16, weight: W.label, color: AppColors.fg1)),
               ),
               Text(total > 1 ? '$index of $total' : 'Input required',
                   style: sans(12, color: AppColors.accent)),
@@ -5854,7 +5860,7 @@ class _NoteLineState extends State<_NoteLine> {
                   const SizedBox(height: 4),
                   Text(
                     _open ? 'collapse' : 'expand',
-                    style: mono(10.5, color: AppColors.fg4),
+                    style: mono(10, color: AppColors.fg3),
                   ),
                 ],
               ],
@@ -6120,7 +6126,7 @@ class QuestionBarState extends State<QuestionBar> {
               Row(children: [
                 Expanded(
                   child: Text(_sent ? 'Sending…' : 'Question',
-                      style: sans(15.5, weight: W.label, color: AppColors.fg1)),
+                      style: sans(16, weight: W.label, color: AppColors.fg1)),
                 ),
                 Text(
                   total > 1 ? '${_step + 1} of $total' : 'Input required',
@@ -6346,8 +6352,9 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
           child: Text(label.toUpperCase(),
-              style: sans(10.5,
-                  weight: W.label, color: AppColors.fg4, spacing: 0.6)),
+              // `caps()`: uppercase needs POSITIVE tracking, and a section
+              // label is content — `fg3`, not the `fg4` placeholder rung.
+              style: caps(10, color: AppColors.fg3)),
         ),
         Container(
           decoration: BoxDecoration(
@@ -6411,7 +6418,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                         Text(detail,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(M.meta, color: AppColors.fg4)),
+                            style: sans(M.meta, color: AppColors.fg3)),
                       ],
                     ],
                   ),

@@ -83,7 +83,7 @@ class _NoConnection extends StatelessWidget {
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(15, weight: W.title, color: AppColors.fg1)),
+                    style: sans(16, weight: W.title, color: AppColors.fg1)),
               ),
               if (onClose != null)
                 IconBtn('x',
@@ -100,7 +100,7 @@ class _NoConnection extends StatelessWidget {
                 padding: const EdgeInsets.all(28),
                 child: Text('Connect to a machine to message this agent.',
                     textAlign: TextAlign.center,
-                    style: sans(12.5, color: AppColors.fg4)),
+                    style: sans(12, color: AppColors.fg3)),
               ),
             ),
           ),

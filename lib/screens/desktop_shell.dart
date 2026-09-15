@@ -686,7 +686,7 @@ class _DesktopShellState extends State<DesktopShell>
       barrierDismissible: true,
       barrierLabel: 'goal',
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 120),
+      transitionDuration: Motion.press,
       pageBuilder: (_, __, ___) => Stack(children: [
         Positioned(
           left: left,
@@ -1189,8 +1189,8 @@ class _DesktopShellState extends State<DesktopShell>
     if (ctx != null) {
       Scrollable.ensureVisible(ctx,
           alignment: 0.5,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut);
+          duration: Motion.base,
+          curve: Motion.enter);
     }
   }
 
@@ -1504,7 +1504,7 @@ class _DesktopShellState extends State<DesktopShell>
         child: Row(children: [
           AppIcon(icon, size: 16, color: color),
           const SizedBox(width: 12),
-          Text(label, style: sans(13.5, color: color)),
+          Text(label, style: sans(13, color: color)),
         ]),
       ),
     );
@@ -1626,7 +1626,7 @@ class _DesktopShellState extends State<DesktopShell>
         padding: const EdgeInsets.symmetric(vertical: 7),
         child: Row(children: [
           Expanded(child: Text(label, style: sans(13, color: AppColors.fg1))),
-          Text(keys, style: mono(11.5, color: AppColors.fg3)),
+          Text(keys, style: mono(11, color: AppColors.fg3)),
         ]),
       );
 
@@ -1923,7 +1923,7 @@ class _DesktopShellState extends State<DesktopShell>
                       : (t.title.trim().isEmpty ? '(untitled)' : t.title),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(15,
+                  style: sans(16,
                       weight: t.isMissionControl
                           ? FontWeight.w500
                           : FontWeight.w400,
@@ -1934,7 +1934,7 @@ class _DesktopShellState extends State<DesktopShell>
                       : 'Open tab',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg4)),
+                  style: sans(12, color: AppColors.fg3)),
               onTap: () => Navigator.pop(context,
                   t.isMissionControl ? 'mission-control' : t.sessionId),
             ),
@@ -1943,9 +1943,9 @@ class _DesktopShellState extends State<DesktopShell>
               contentPadding: EdgeInsets.zero,
               leading: AppIcon('layers', size: 18, color: AppColors.accent),
               title: Text('Mission Control',
-                  style: sans(15, weight: W.label, color: AppColors.fg1)),
+                  style: sans(16, weight: W.label, color: AppColors.fg1)),
               subtitle: Text(_active?.label ?? 'this machine',
-                  style: sans(12, color: AppColors.fg4)),
+                  style: sans(12, color: AppColors.fg3)),
               onTap: () => Navigator.pop(context, 'mission-control'),
             ),
           for (final s in rest)
@@ -1955,14 +1955,14 @@ class _DesktopShellState extends State<DesktopShell>
               title: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(15, color: AppColors.fg1)),
+                  style: sans(16, color: AppColors.fg1)),
               subtitle: Text(
                   s.displayAgentId == null || s.displayAgentId!.trim().isEmpty
                       ? (s.folder.trim().isEmpty ? 'session' : s.folder)
                       : '${s.folder.trim().isEmpty ? 'session' : s.folder} · ${s.displayAgentId}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg4)),
+                  style: sans(12, color: AppColors.fg3)),
               onTap: () => Navigator.pop(context, s.id),
             ),
         ],
@@ -2255,7 +2255,7 @@ class _DesktopShellState extends State<DesktopShell>
         color: AppColors.bg,
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
         child:
-            Text(message, style: sans(12.5, color: AppColors.fg4, height: 1.5)),
+            Text(message, style: sans(12, color: AppColors.fg3, height: 1.5)),
       );
 
   void _onSessionDeleted(String id) {
@@ -2441,7 +2441,7 @@ class _DesktopShellState extends State<DesktopShell>
                     ),
                     child: Text(
                       initial,
-                      style: sans(10.5, weight: W.title, color: AppColors.fg1),
+                      style: sans(10, weight: W.title, color: AppColors.fg1),
                     ),
                   ),
                 ),
@@ -2484,7 +2484,7 @@ class _DesktopShellState extends State<DesktopShell>
       barrierDismissible: true,
       barrierLabel: 'machines',
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 120),
+      transitionDuration: Motion.press,
       pageBuilder: (_, __, ___) => Stack(children: [
         Positioned(
           right:
@@ -2582,7 +2582,7 @@ class _DesktopShellState extends State<DesktopShell>
             AppIcon(_tabIconKind(t), size: 13, color: AppColors.accent),
             const SizedBox(width: 7),
             Text(t.title.isEmpty ? '(untitled)' : t.title,
-                style: sans(12.5, color: AppColors.fg1)),
+                style: sans(12, color: AppColors.fg1)),
           ]),
         ),
       );
@@ -2776,8 +2776,8 @@ class _DesktopShellState extends State<DesktopShell>
           child: IgnorePointer(
             ignoring: !chatsVisible,
             child: AnimatedSlide(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
+              duration: Motion.base,
+              curve: Motion.enter,
               offset: chatsVisible ? Offset.zero : const Offset(-1, 0),
               child: Material(
                 color: AppColors.bg,
@@ -3658,7 +3658,7 @@ class _DesktopShellState extends State<DesktopShell>
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             AppIcon(r.icon, size: 13, color: AppColors.accent),
             const SizedBox(width: 7),
-            Text(r.label, style: sans(12.5, color: AppColors.fg1)),
+            Text(r.label, style: sans(12, color: AppColors.fg1)),
           ]),
         ),
       );
@@ -3909,7 +3909,7 @@ class _DesktopShellState extends State<DesktopShell>
           padding: const EdgeInsets.all(24),
           child: Text('Drag a tab here, or open a terminal from the sidebar.',
               textAlign: TextAlign.center,
-              style: sans(12.5, color: AppColors.fg4)),
+              style: sans(12, color: AppColors.fg3)),
         ),
       );
 
@@ -4194,8 +4194,8 @@ class _DesktopShellState extends State<DesktopShell>
         onTap: () => _activateTab(i),
         onLongPress: () => _tabMenu(i),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          curve: Curves.easeOutCubic,
+          duration: Motion.quick,
+          curve: Motion.enter,
           key: key,
           margin: const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
           padding: const EdgeInsets.only(left: 12, right: 6),
@@ -4219,7 +4219,7 @@ class _DesktopShellState extends State<DesktopShell>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style:
-                    sans(12.5, color: active ? AppColors.fg1 : AppColors.fg3),
+                    sans(12, color: active ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
             if (_canCloseTab(t)) ...[
@@ -4243,8 +4243,8 @@ class _DesktopShellState extends State<DesktopShell>
       onTap: () => _activateTab(i),
       onLongPress: () => _tabMenu(i),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
+        duration: Motion.press,
+        curve: Motion.enter,
         key: key,
         width: 220,
         margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
@@ -4274,7 +4274,7 @@ class _DesktopShellState extends State<DesktopShell>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(
-                      11.5,
+                      11,
                       weight: active ? W.label : W.body,
                       color: active ? AppColors.fg1 : AppColors.fg3,
                     ),
@@ -4283,7 +4283,7 @@ class _DesktopShellState extends State<DesktopShell>
                     _tabSubtitle(t),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(10, color: AppColors.fg4),
+                    style: sans(10, color: AppColors.fg3),
                   ),
                 ],
               ),
@@ -4331,7 +4331,7 @@ class _DesktopShellState extends State<DesktopShell>
               const SizedBox(height: 6),
               Text(
                   'Pick up where you left off, or start a new chat from Browse.',
-                  style: sans(12.5, height: 1.4, color: AppColors.fg3)),
+                  style: sans(12, height: 1.4, color: AppColors.fg3)),
               const SizedBox(height: 18),
               if (_sessionsLoading && _sessions == null)
                 Center(
@@ -4346,7 +4346,7 @@ class _DesktopShellState extends State<DesktopShell>
                 Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Text('No sessions yet.',
-                        style: sans(12.5, color: AppColors.fg4)))
+                        style: sans(12, color: AppColors.fg3)))
               else
                 ...sessions.map((s) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -4361,19 +4361,19 @@ class _DesktopShellState extends State<DesktopShell>
                                   Text(s.title.isEmpty ? '(untitled)' : s.title,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: sans(13.5, color: AppColors.fg1)),
+                                      style: sans(13, color: AppColors.fg1)),
                                   const SizedBox(height: 3),
                                   Text(
                                       lastPathSegment(s.folder,
                                           ifEmpty: s.folder),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: mono(10.5, color: AppColors.fg4)),
+                                      style: mono(10, color: AppColors.fg3)),
                                 ]),
                           ),
                           const SizedBox(width: 8),
                           Text(relativeTime(s.lastActive),
-                              style: mono(10, color: AppColors.fg4)),
+                              style: mono(10, color: AppColors.fg3)),
                         ]),
                       ),
                     )),
@@ -4424,11 +4424,11 @@ class _DesktopShellState extends State<DesktopShell>
                 const SizedBox(height: 18),
                 Text('No instance connected',
                     textAlign: TextAlign.center,
-                    style: sans(15.5, color: AppColors.fg1)),
+                    style: sans(16, color: AppColors.fg1)),
                 const SizedBox(height: 8),
                 Text.rich(
                   TextSpan(
-                      style: sans(12.5, height: 1.5, color: AppColors.fg3),
+                      style: sans(12, height: 1.5, color: AppColors.fg3),
                       children: [
                         const TextSpan(text: 'Run '),
                         TextSpan(
@@ -4481,7 +4481,7 @@ class _GoalPopoverState extends State<_GoalPopover> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('Set goal',
-            style: sans(12.5, weight: W.label, color: AppColors.fg1)),
+            style: sans(12, weight: W.label, color: AppColors.fg1)),
         const SizedBox(height: 8),
         AppField(
           controller: _ctl,
@@ -4544,7 +4544,7 @@ class _SidebarEmpty extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
         child: Text(message,
             textAlign: TextAlign.center,
-            style: sans(12.5, color: AppColors.fg4, height: 1.45)),
+            style: sans(12, color: AppColors.fg3, height: 1.45)),
       );
 }
 
@@ -4709,7 +4709,7 @@ class _SidebarState extends State<_Sidebar> {
               const SizedBox(height: 10),
               Text('No chats match “${_filterQuery.trim()}”',
                   textAlign: TextAlign.center,
-                  style: sans(12.5, color: AppColors.fg3)),
+                  style: sans(12, color: AppColors.fg3)),
             ],
           ),
         ),
@@ -4750,10 +4750,10 @@ class _SidebarState extends State<_Sidebar> {
           // them.
           Expanded(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              reverseDuration: const Duration(milliseconds: 180),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
+              duration: Motion.base,
+              reverseDuration: Motion.fast,
+              switchInCurve: Motion.enter,
+              switchOutCurve: Motion.exit,
               // The default layout is `Stack(alignment: center)`, which hands
               // each child LOOSE constraints — an empty state would then centre
               // itself in the corner rather than fill the body. `StackFit.expand`
@@ -4794,7 +4794,7 @@ class _SidebarState extends State<_Sidebar> {
               padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
               child: Row(children: [
                 Text('${_selected.length} selected',
-                    style: sans(11.5, color: AppColors.fg3)),
+                    style: sans(11, color: AppColors.fg3)),
                 const Spacer(),
                 _selectAllToggle(),
                 IconBtn('x',
@@ -4851,7 +4851,7 @@ class _SidebarState extends State<_Sidebar> {
                         style: sans(14, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 1),
                     Text('files · new chat',
-                        style: sans(11.5, color: AppColors.fg4)),
+                        style: sans(11, color: AppColors.fg3)),
                   ]),
             ),
             AppIcon('chevron-right', size: 16, color: AppColors.fg4),
@@ -4870,7 +4870,7 @@ class _SidebarState extends State<_Sidebar> {
           padding: const EdgeInsets.all(24),
           child: Text(message,
               textAlign: TextAlign.center,
-              style: sans(12.5, color: AppColors.fg4, height: 1.5)),
+              style: sans(12, color: AppColors.fg3, height: 1.5)),
         ),
       );
 
@@ -4896,7 +4896,7 @@ class _SidebarState extends State<_Sidebar> {
                           padding: const EdgeInsets.all(20),
                           child: Text('Add a machine to begin.',
                               textAlign: TextAlign.center,
-                              style: sans(12.5, color: AppColors.fg4))))
+                              style: sans(12, color: AppColors.fg3))))
                   : _sessionList(),
             ),
           ],
@@ -5096,9 +5096,9 @@ class _SidebarState extends State<_Sidebar> {
     return Padding(
       padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter, 8),
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 170),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
+        duration: Motion.fast,
+        switchInCurve: Motion.enter,
+        switchOutCurve: Motion.exit,
         child: searching
             ? _mobileBarPill(radius, key: 'search', child: _mobileSearchRow())
             // `Align` sizes itself to the parent but hands the child LOOSE
@@ -5179,12 +5179,12 @@ class _SidebarState extends State<_Sidebar> {
           cursorColor: AppColors.accent,
           textInputAction: TextInputAction.search,
           onChanged: (v) => setState(() => _filterQuery = v),
-          style: sans(13.5, color: AppColors.fg1),
+          style: sans(13, color: AppColors.fg1),
           decoration: InputDecoration(
             isCollapsed: true,
             border: InputBorder.none,
             hintText: 'Search chats',
-            hintStyle: sans(13.5, color: AppColors.fg4),
+            hintStyle: sans(13, color: AppColors.fg4),
           ),
         ),
       ),
@@ -5297,7 +5297,7 @@ class _SidebarState extends State<_Sidebar> {
                 child: Row(children: [
                   AppIcon(icon, size: 15, color: AppColors.fg3),
                   const SizedBox(width: 10),
-                  Text(label, style: sans(12.5, color: AppColors.fg1)),
+                  Text(label, style: sans(12, color: AppColors.fg1)),
                 ]),
               ),
             ),
@@ -5322,7 +5322,7 @@ class _SidebarState extends State<_Sidebar> {
                     children: [
                       Text(label, style: sans(_navText, color: AppColors.fg1)),
                       if (sub != null)
-                        Text(sub, style: sans(12, color: AppColors.fg4)),
+                        Text(sub, style: sans(12, color: AppColors.fg3)),
                     ]),
               ),
             ]),
@@ -5365,12 +5365,12 @@ class _SidebarState extends State<_Sidebar> {
                     const SizedBox(height: 10),
                     Text(widget.sessionsError!,
                         textAlign: TextAlign.center,
-                        style: sans(12.5, color: AppColors.fg3)),
+                        style: sans(12, color: AppColors.fg3)),
                     const SizedBox(height: 12),
                     TextButton(
                         onPressed: widget.onRefreshSessions,
                         child: Text('Retry',
-                            style: sans(12.5, color: AppColors.accent))),
+                            style: sans(12, color: AppColors.accent))),
                   ])),
             ]);
       }
@@ -5382,7 +5382,7 @@ class _SidebarState extends State<_Sidebar> {
                 padding: const EdgeInsets.all(20),
                 child: Text('No chats yet.',
                     textAlign: TextAlign.center,
-                    style: sans(12.5, color: AppColors.fg4))),
+                    style: sans(12, color: AppColors.fg3))),
           ]);
     }
     final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
@@ -5460,7 +5460,7 @@ class _SidebarState extends State<_Sidebar> {
           padding: const EdgeInsets.all(20),
           child: Text('Nothing here.',
               textAlign: TextAlign.center,
-              style: sans(12.5, color: AppColors.fg4))));
+              style: sans(12, color: AppColors.fg3))));
     }
     final listView = ListView(
         padding: EdgeInsets.fromLTRB(
@@ -5618,7 +5618,7 @@ class _SidebarState extends State<_Sidebar> {
               ),
               // A collapsed group still tells you how much is inside it.
               if (collapsed && count > 0)
-                Text('$count', style: sans(11, color: AppColors.fg4)),
+                Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
             ]),
           ),
         ),
@@ -5641,10 +5641,10 @@ class _SidebarState extends State<_Sidebar> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.left,
-                  style: sans(11.5, weight: W.title, color: AppColors.fg3)),
+                  style: sans(11, weight: W.title, color: AppColors.fg3)),
             ),
             if (collapsed && count > 0)
-              Text('$count', style: sans(10.5, color: AppColors.fg4)),
+              Text('$count', style: sans(10, tabular: true, color: AppColors.fg3)),
           ]),
         ),
       ),
@@ -5699,7 +5699,11 @@ class _SidebarState extends State<_Sidebar> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
       child: Material(
-        color: selected ? AppColors.accentBg : Colors.transparent,
+        // Surface step, matching the mobile branch above AND every other
+        // selection in the shell. This one used `accentBg`, so the same pinned
+        // row changed colour with the window width and read as an alert on
+        // desktop — accent is reserved for state (running / needs-attention).
+        color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           borderRadius: BorderRadius.circular(R.sm),
@@ -5708,11 +5712,13 @@ class _SidebarState extends State<_Sidebar> {
             height: 32,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(children: [
-              AppIcon('layers', size: 14, color: AppColors.accent),
+              AppIcon('layers',
+                  size: 14,
+                  color: selected ? AppColors.fg1 : AppColors.fg3),
               const SizedBox(width: 8),
               Expanded(
                 child: Text('Mission Control',
-                    style: sans(12.5,
+                    style: sans(12,
                         weight: W.label,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
@@ -5785,7 +5791,7 @@ class _SidebarState extends State<_Sidebar> {
                       : Text(s.title.isEmpty ? '(untitled)' : s.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(12.5,
+                          style: sans(12,
                               color:
                                   selected ? AppColors.fg1 : AppColors.fg2))),
               if (!renaming) ...[
@@ -5818,8 +5824,9 @@ class _SidebarState extends State<_Sidebar> {
                 ] else ...[
                   const SizedBox(width: 8),
                   Text(relativeTime(s.lastActive),
+                      // A timestamp is content, not a placeholder.
                       style: mono(10,
-                          color: waiting ? AppColors.accent : AppColors.fg4)),
+                          color: waiting ? AppColors.accent : AppColors.fg3)),
                 ],
               ],
             ]),
@@ -5910,7 +5917,7 @@ class _SidebarState extends State<_Sidebar> {
               if (!renaming) ...[
                 const SizedBox(width: 10),
                 Text(relativeTime(s.lastActive),
-                    style: sans(M.meta, color: AppColors.fg4)),
+                    style: sans(M.meta, tabular: true, color: AppColors.fg3)),
               ],
             ]),
           ),
@@ -5978,7 +5985,7 @@ class _SidebarState extends State<_Sidebar> {
           child: Row(children: [
             AppIcon(icon, size: 16, color: color),
             const SizedBox(width: 12),
-            Text(label, style: sans(13.5, color: color)),
+            Text(label, style: sans(13, color: color)),
           ]),
         ),
       ),
@@ -6053,7 +6060,7 @@ class _SidebarState extends State<_Sidebar> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(all ? 'Unselect all' : 'Select all',
-                style: sans(kMobile ? M.rowTitle : 11.5,
+                style: sans(kMobile ? M.rowTitle : 11,
                     weight: W.label, color: AppColors.fg3)),
           ),
         ),
@@ -6082,7 +6089,7 @@ class _SidebarState extends State<_Sidebar> {
       focusNode: _renameFocus,
       autofocus: true,
       maxLines: 1,
-      style: sans(compact ? 12.5 : 16, color: AppColors.fg1),
+      style: sans(compact ? 12 : 16, color: AppColors.fg1),
       cursorColor: AppColors.fg1,
       decoration: const InputDecoration(
         isCollapsed: true,
@@ -6180,20 +6187,20 @@ class _SidebarState extends State<_Sidebar> {
                     ? AppIcon('plus', size: 18, color: AppColors.fg2)
                     : Text(
                         (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
-                        style: sans(17, weight: W.label, color: AppColors.fg1),
+                        style: sans(18, weight: W.label, color: AppColors.fg1),
                       ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: a == null
-                    ? Text('Add machine', style: sans(15, color: AppColors.fg1))
+                    ? Text('Add machine', style: sans(16, color: AppColors.fg1))
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(a.label,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: sans(15,
+                              style: sans(16,
                                   weight: W.label, color: AppColors.fg1)),
                           const SizedBox(height: 2),
                           Row(children: [
@@ -6210,7 +6217,7 @@ class _SidebarState extends State<_Sidebar> {
                               child: Text(hostOf(a.url),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: mono(11, color: AppColors.fg4)),
+                                  style: mono(11, color: AppColors.fg3)),
                             ),
                           ]),
                         ],
@@ -6236,7 +6243,7 @@ class _SidebarState extends State<_Sidebar> {
                   ? Row(children: [
                       AppIcon('plus', size: 18, color: AppColors.fg1),
                       const SizedBox(width: 9),
-                      Text('Add machine', style: display(17)),
+                      Text('Add machine', style: display(18)),
                     ])
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -6246,7 +6253,7 @@ class _SidebarState extends State<_Sidebar> {
                               child: Text(a.label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: display(17))),
+                                  style: display(18))),
                           const SizedBox(width: 8),
                           Container(
                               width: 8,
@@ -6263,7 +6270,7 @@ class _SidebarState extends State<_Sidebar> {
                         Text(hostOf(a.url),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: mono(11, color: AppColors.fg4)),
+                            style: mono(11, color: AppColors.fg3)),
                       ],
                     ),
             ),
@@ -6312,7 +6319,7 @@ class _SidebarState extends State<_Sidebar> {
       barrierDismissible: true, // click-away and Esc dismiss
       barrierLabel: 'machines',
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 120),
+      transitionDuration: Motion.press,
       pageBuilder: (_, __, ___) => Stack(children: [
         // Inset from the edge-to-edge header so it reads as a popover.
         Positioned(
@@ -6340,7 +6347,7 @@ class _SidebarState extends State<_Sidebar> {
       ]),
       transitionBuilder: (_, anim, __, child) {
         final curved =
-            CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+            CurvedAnimation(parent: anim, curve: Motion.enter);
         return BackdropFilter(
           filter: ImageFilter.blur(
               sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
@@ -6467,12 +6474,12 @@ class _MachineListState extends State<_MachineList> {
               Text(i.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(kMobile ? 14 : 12.5, color: AppColors.fg1)),
+                  style: sans(kMobile ? 14 : 12, color: AppColors.fg1)),
               const SizedBox(height: 1),
               Text(hostOf(i.url),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: mono(kMobile ? 11 : 10, color: AppColors.fg4)),
+                  style: mono(kMobile ? 11 : 10, color: AppColors.fg3)),
             ]),
           ),
           if (selected) AppIcon('check', size: 14, color: AppColors.accent),
@@ -6499,7 +6506,7 @@ class _MachineListState extends State<_MachineList> {
           AppIcon('plus', size: 15, color: AppColors.accent),
           const SizedBox(width: 10),
           Text('Add machine',
-              style: sans(kMobile ? 14 : 12.5,
+              style: sans(kMobile ? 14 : 12,
                   weight: W.label, color: AppColors.accent)),
         ]),
       ),
@@ -6621,10 +6628,10 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         child: SafeArea(
           bottom: false,
           child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            reverseDuration: const Duration(milliseconds: 170),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
+            duration: Motion.base,
+            reverseDuration: Motion.fast,
+            switchInCurve: Motion.enter,
+            switchOutCurve: Motion.exit,
             // `StackFit.expand`, not the default centered `Stack`: these are
             // full-body screens, and loose constraints would let each one
             // shrink-wrap into the middle of the transition.
@@ -6675,7 +6682,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 // rail beside it, so the line spent height saying nothing new.
                 Expanded(
                   child: Text('Settings',
-                      style: sans(14.5, weight: W.label, color: AppColors.fg1)),
+                      style: sans(14, weight: W.label, color: AppColors.fg1)),
                 ),
                 IconBtn('x',
                     size: 26,
@@ -6783,8 +6790,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   Widget _inlineLabel(String t) => Padding(
         padding: const EdgeInsets.only(left: 2),
         child: Text(t.toUpperCase(),
-            style: sans(kMobile ? 11 : 10,
-                weight: W.label, color: AppColors.fg4, spacing: 0.5)),
+            style: caps(kMobile ? 11 : 10, color: AppColors.fg3)),
       );
 
   /// Machine rows WITHOUT separators — `_settingsCard` supplies those.
@@ -6931,7 +6937,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                     Text(_sectionSummary(page),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg4)),
+                        style: sans(11, color: AppColors.fg3)),
                   ],
                 ),
               ),
@@ -6966,7 +6972,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                         color: _page == page ? AppColors.fg1 : AppColors.fg3),
                     const SizedBox(width: 5),
                     Text(label,
-                        style: sans(11.5,
+                        style: sans(11,
                             weight: _page == page ? W.label : W.body,
                             color:
                                 _page == page ? AppColors.fg1 : AppColors.fg2)),
@@ -7015,7 +7021,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         ],
         if (showBlurb) ...[
           Text('Manage the machine this app connects to and its alerts.',
-              style: sans(11.5, color: AppColors.fg3)),
+              style: sans(11, color: AppColors.fg3)),
           const SizedBox(height: 18),
         ],
         _inlineLabel('Machines'),
@@ -7068,7 +7074,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 child: Text(i.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? 13.5 : 12.5,
+                    style: sans(kMobile ? 13 : 12,
                         weight: W.label, color: AppColors.fg1)),
               ),
               const SizedBox(width: 8),
@@ -7078,7 +7084,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                 child: Text(hostOf(i.url),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: mono(kMobile ? 11 : 10.5, color: AppColors.fg4)),
+                    style: mono(kMobile ? 11 : 10, color: AppColors.fg3)),
               ),
             ]),
           ),
@@ -7114,7 +7120,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
             // No "Alerts" title here: every call site already prints an ALERTS
             // section label directly above, so the row was repeating it.
             Text('Notify when a session needs input',
-                style: sans(kMobile ? M.rowTitle : 12.5, color: AppColors.fg1)),
+                style: sans(kMobile ? M.rowTitle : 12, color: AppColors.fg1)),
           ]),
         ),
         _notifBusy
@@ -7143,8 +7149,18 @@ class _PulsingDotState extends State<_PulsingDot>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat(reverse: true);
+        vsync: this, duration: const Duration(milliseconds: 1200));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (reduceMotion(context)) {
+      if (_ctrl.isAnimating) _ctrl.stop();
+      _ctrl.value = 1;
+    } else if (!_ctrl.isAnimating) {
+      _ctrl.repeat(reverse: true);
+    }
   }
 
   @override
@@ -7204,7 +7220,7 @@ class _AgentBadge extends StatelessWidget {
             agentId,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: sans(10.5, weight: W.label, color: fg),
+            style: sans(10, weight: W.label, color: fg),
           ),
         ),
       ]),

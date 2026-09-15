@@ -320,7 +320,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
               child: Text('Empty directory',
-                  style: sans(12.5, color: AppColors.fg4)),
+                  style: sans(12, color: AppColors.fg3)),
             )
           else ...[
             const SizedBox(height: 4),
@@ -394,7 +394,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_error!,
-              style: sans(12.5, color: AppColors.danger, height: 1.4)),
+              style: sans(12, color: AppColors.danger, height: 1.4)),
           const SizedBox(height: 10),
           Btn('Retry', small: true, onTap: refresh),
         ]),
@@ -550,7 +550,7 @@ Future<void> showFileSearchDialog(
       // Transparent: this is a popover beside the panel, not a modal over it.
       // A dimmed barrier would black out the tree you are searching.
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 140),
+      transitionDuration: Motion.quick,
       pageBuilder: (ctx, _, __) => Stack(children: [
         Positioned(
           left: left,
@@ -563,7 +563,7 @@ Future<void> showFileSearchDialog(
         ),
       ]),
       transitionBuilder: (ctx, anim, _, child) {
-        final c = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        final c = CurvedAnimation(parent: anim, curve: Motion.enter);
         return FadeTransition(
           opacity: c,
           child: ScaleTransition(
@@ -784,14 +784,14 @@ class _FileSearchState extends State<_FileSearch> {
                 padding: const EdgeInsets.all(12),
                 child: Center(
                     child: Text('Type to search the workspace',
-                        style: sans(12, color: AppColors.fg4))),
+                        style: sans(12, color: AppColors.fg3))),
               )
             : (_hits.isEmpty && !_crawling
                 ? Padding(
                     padding: const EdgeInsets.all(12),
                     child: Center(
                         child: Text('No matching files',
-                            style: sans(12, color: AppColors.fg4))),
+                            style: sans(12, color: AppColors.fg3))),
                   )
                 : ListView(
                     shrinkWrap: true,
@@ -821,8 +821,8 @@ class _FileSearchState extends State<_FileSearch> {
                   child: Text(h.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(12.5, color: AppColors.fg1))),
-              Text(_dirLabel(h.path), style: mono(10, color: AppColors.fg4)),
+                      style: sans(12, color: AppColors.fg1))),
+              Text(_dirLabel(h.path), style: mono(10, color: AppColors.fg3)),
             ]),
           ),
         ),

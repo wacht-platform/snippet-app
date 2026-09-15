@@ -366,7 +366,8 @@ class _FileExplorerState extends State<FileExplorer> {
                       const SizedBox(width: 8),
                       if (_selecting) ...[
                         Text('${_selected.length} selected',
-                            style: sans(12, color: AppColors.accent)),
+                            style: sans(12,
+                                tabular: true, color: AppColors.accent)),
                         const SizedBox(width: 8),
                         IconBtn('trash',
                             size: 28,
@@ -493,7 +494,7 @@ class _FileExplorerState extends State<FileExplorer> {
                                   padding: const EdgeInsets.all(24),
                                   child: Text('${snap.error}',
                                       textAlign: TextAlign.center,
-                                      style: sans(12.5, color: AppColors.fg3))))
+                                      style: sans(12, color: AppColors.fg3))))
                           : Builder(builder: (context) {
                               final entries = _visibleEntries(listing!);
                               return ListView(
@@ -512,7 +513,7 @@ class _FileExplorerState extends State<FileExplorer> {
                                       child: Text('No matching files.',
                                           textAlign: TextAlign.center,
                                           style: sans(M.meta,
-                                              color: AppColors.fg4)),
+                                              color: AppColors.fg3)),
                                     ),
                                   ...entries.map((e) => _Row(
                                         icon: _entryIcon(e.name, e.isDir),
@@ -561,11 +562,11 @@ class _FileExplorerState extends State<FileExplorer> {
               child: Text(listing.path,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: mono(M.monoMeta, color: AppColors.fg4)),
+                  style: mono(M.monoMeta, color: AppColors.fg3)),
             ),
             const SizedBox(width: 8),
             Text('${visible.length} $noun',
-                style: sans(M.meta, color: AppColors.fg4)),
+                style: sans(M.meta, tabular: true, color: AppColors.fg3)),
           ]),
         ),
         Container(
@@ -734,7 +735,9 @@ class _Row extends StatelessWidget {
     // distinct by icon alone, which is what the desktop panel does.
     final iconColor = AppColors.fg3;
     return Material(
-      color: selected ? AppColors.accentBg : Colors.transparent,
+      // Selection is a neutral surface step; the accent is reserved for
+      // STATE. An accent-filled row among files read as an alert.
+      color: selected ? AppColors.surface2 : Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
       child: InkWell(
         onTap: onTap,
@@ -763,7 +766,7 @@ class _Row extends StatelessWidget {
               if (git) ...[
                 AppIcon('git-branch', size: 12, color: AppColors.ok),
                 const SizedBox(width: 4),
-                Text('git', style: mono(10.5, color: AppColors.fg3)),
+                Text('git', style: mono(10, color: AppColors.fg3)),
                 const SizedBox(width: 8),
               ],
               if (chevron)
@@ -808,8 +811,8 @@ Future<void> pushFileViewerRoute(
   required String name,
 }) {
   return Navigator.of(context).push(PageRouteBuilder<void>(
-    transitionDuration: const Duration(milliseconds: 180),
-    reverseTransitionDuration: const Duration(milliseconds: 150),
+    transitionDuration: Motion.fast,
+    reverseTransitionDuration: Motion.quick,
     pageBuilder: (_, animation, __) => FileViewer(
       client: client,
       path: path,
@@ -824,7 +827,7 @@ Future<void> pushFileViewerRoute(
           end: Offset.zero,
         ).animate(CurvedAnimation(
           parent: animation,
-          curve: Curves.easeOutCubic,
+          curve: Motion.enter,
         )),
         child: child,
       ),
@@ -1089,7 +1092,7 @@ class _FileViewerState extends State<FileViewer> {
                   border: Border(bottom: BorderSide(color: AppColors.border))),
               child: Text(
                   '${f.content.split('\n').length} lines · ${formatBytes(f.size)}${f.truncated ? ' · truncated' : ''}',
-                  style: mono(10.5, color: AppColors.fg4)),
+                  style: mono(10, color: AppColors.fg3)),
             ),
             Expanded(
               child: CodeEditor(
@@ -1361,9 +1364,9 @@ class _AudioViewState extends State<_AudioView> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(_clock(_position),
-                    style: mono(10.5, color: AppColors.fg4)),
+                    style: mono(10, color: AppColors.fg3)),
                 Text(_clock(_duration),
-                    style: mono(10.5, color: AppColors.fg4)),
+                    style: mono(10, color: AppColors.fg3)),
               ],
             ),
           ),

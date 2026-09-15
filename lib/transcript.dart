@@ -34,9 +34,12 @@ class _DenseToolRowState extends State<DenseToolRow> {
   Widget build(BuildContext context) {
     Theme.of(context);
     final canExpand = toolIsExpandable(widget.tool, widget.args, widget.result);
-    final summary = widget.tool == 'bash'
-        ? 'shell command'
-        : toolArgSummary(widget.tool, widget.args);
+    final summary = toolArgSummary(widget.tool, widget.args);
+    // A failed call must not look like a successful one. The row previously
+    // rendered identically whatever the outcome, so the only way to find a
+    // failure was to expand every tool in the run.
+    final failed = widget.result is Map &&
+        (widget.result['status'] ?? '').toString() == 'error';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -46,11 +49,17 @@ class _DenseToolRowState extends State<DenseToolRow> {
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Row(children: [
-              AppIcon(toolIcon(widget.tool), size: 15, color: AppColors.fg3),
+              // The state glyph carries the outcome: a failure turns it red and
+              // changes the mark, so a broken call is visible while scrolling
+              // rather than only after expanding it.
+              AppIcon(failed ? 'alert-triangle' : toolIcon(widget.tool),
+                  size: 15,
+                  color: failed ? AppColors.danger : AppColors.fg3),
               const SizedBox(width: 8),
               Text(toolTitle(widget.tool),
-                  style:
-                      sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
+                  style: sans(13,
+                      weight: FontWeight.w500,
+                      color: failed ? AppColors.danger : AppColors.fg1)),
               if (summary.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Flexible(
@@ -64,11 +73,23 @@ class _DenseToolRowState extends State<DenseToolRow> {
                     child: Text(summary,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(12.5, color: AppColors.fg3)),
+                        // The summary is the only place a command or path is
+                        // legible without expanding, so it reads at `fg2` — the
+                        // normal body tone — rather than one step below the
+                        // title beside it.
+                        style: mono(12, color: AppColors.fg2)),
                   ),
                 ),
               ],
               ..._metaWidgets(),
+              // The row is tappable only when there is more to see; without a
+              // chevron that affordance was invisible and Discoverable only by
+              // guessing.
+              if (canExpand) ...[
+                const SizedBox(width: 6),
+                AppIcon(_open ? 'chevron-down' : 'chevron-right',
+                    size: 14, color: AppColors.fg4),
+              ],
             ]),
           ),
         ),
@@ -79,7 +100,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
               constraints: const BoxConstraints(maxHeight: 220),
               child: SingleChildScrollView(
                 child: DefaultTextStyle(
-                  style: mono(11.5, height: 1.4, color: AppColors.fg3),
+                  style: mono(11, height: 1.4, color: AppColors.fg3),
                   child: safeToolDetailView(context,
                       tool: widget.tool,
                       args: widget.args,
@@ -206,11 +227,36 @@ class _ToolRunState extends State<ToolRun> {
           ]),
         ),
         if (widget.open) ...[
-          const SizedBox(height: 8),
-          for (var i = 0; i < widget.rows.length; i++) ...[
-            if (i > 0) const SizedBox(height: 2),
-            widget.rows[i],
-          ],
+          const SizedBox(height: 6),
+          // Expanded rows are indented under the header AND bracketed by a left
+          // rule, so a run reads as one group. Without this the children sat at
+          // the header's own indent and the whole run dissolved into the
+          // transcript as a flat sequence of unrelated lines — the header's
+          // chevron was the only clue anything was contained.
+          //
+          // A rule is legitimate here: the design language reserves borders for
+          // STRUCTURE, and "these calls belong together" is structure, not
+          // decoration.
+          Padding(
+            padding: const EdgeInsets.only(left: 7),
+            child: Container(
+              padding: const EdgeInsets.only(left: 11),
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: AppColors.border, width: 1),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < widget.rows.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 2),
+                    widget.rows[i],
+                  ],
+                ],
+              ),
+            ),
+          ),
         ],
       ]),
     );
@@ -274,12 +320,12 @@ class LaneNotice extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(12.5,
+                      style: sans(12,
                           weight: FontWeight.w500, color: AppColors.fg2),
                     ),
                   ),
                   const SizedBox(width: 9),
-                  Text(status, style: mono(9.5, color: color)),
+                  Text(status, style: mono(10, color: color)),
                   const SizedBox(width: 5),
                   SizedBox(
                     width: 24,
@@ -388,7 +434,7 @@ class SystemRow extends StatelessWidget {
           child: Text(reasoning,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: sans(11.5, height: 1.4, color: AppColors.fg4)),
+              style: sans(11, height: 1.4, color: AppColors.fg3)),
         ),
       ]),
     );
@@ -435,13 +481,13 @@ class AgentEventRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: sans(12.5, weight: W.label, color: color)),
+                Text(label, style: sans(12, weight: W.label, color: color)),
                 if (detail.trim().isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(detail,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(12, height: 1.35, color: AppColors.fg4)),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
                 ],
               ],
             ),
@@ -462,7 +508,7 @@ class _SystemDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final style = mono(10.5, color: AppColors.fg4);
+    final style = mono(10, color: AppColors.fg3);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
       child: Row(children: [

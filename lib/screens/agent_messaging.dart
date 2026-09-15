@@ -208,15 +208,15 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (workspace.isNotEmpty) ...[
-          Text('workspace', style: mono(10, color: AppColors.fg4)),
+          Text('workspace', style: mono(10, color: AppColors.fg3)),
           const SizedBox(height: 4),
           Text(workspace,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: sans(12.5, color: AppColors.fg2)),
+              style: sans(12, color: AppColors.fg2)),
           const SizedBox(height: 14),
         ],
-        Text('agent', style: mono(10, color: AppColors.fg4)),
+        Text('agent', style: mono(10, color: AppColors.fg3)),
         const SizedBox(height: 4),
         Material(
           color: AppColors.surface2,
@@ -427,7 +427,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                       : '$subtitle · conversation only',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: mono(10, color: AppColors.fg4)),
+                  style: mono(10, color: AppColors.fg3)),
             ],
           ),
         ),
@@ -449,7 +449,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(_error!, style: sans(12.5, color: AppColors.danger)),
+          child: Text(_error!, style: sans(12, color: AppColors.danger)),
         ),
       );
     }
@@ -458,7 +458,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text('No messages yet. Say something to start.',
-              style: sans(12.5, color: AppColors.fg4)),
+              style: sans(12, color: AppColors.fg3)),
         ),
       );
     }
@@ -482,7 +482,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 3),
             child: Text(mine ? 'you' : '${e.actorKind}:${e.actorId}',
-                style: mono(9.5, color: AppColors.fg4)),
+                style: mono(10, color: AppColors.fg3)),
           ),
           Container(
             constraints: const BoxConstraints(maxWidth: 520),
@@ -517,11 +517,11 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               maxLines: 4,
               cursorColor: AppColors.fg1,
               onSubmitted: (_) => _send(),
-              style: sans(13.5, color: AppColors.fg1),
+              style: sans(13, color: AppColors.fg1),
               decoration: InputDecoration(
                 isDense: true,
                 hintText: 'Message ${widget.agentName}',
-                hintStyle: sans(13.5, color: AppColors.fg4),
+                hintStyle: sans(13, color: AppColors.fg4),
                 filled: true,
                 fillColor: AppColors.surface2,
                 border: OutlineInputBorder(

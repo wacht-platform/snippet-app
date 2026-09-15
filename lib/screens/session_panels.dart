@@ -76,7 +76,7 @@ class SessionCheckpointsPanel extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.all(20),
         child: Text('No checkpoints yet.',
-            style: sans(12.5, color: AppColors.fg3)),
+            style: sans(12, color: AppColors.fg3)),
       );
     }
     return ListView(

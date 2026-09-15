@@ -359,16 +359,16 @@ class _RecurringScreenState extends State<RecurringScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: EdgeInsets.symmetric(
+            horizontal: 10, vertical: kMobile ? 14 : 6),
         decoration: BoxDecoration(
-          color: on
-              ? AppColors.accent.withValues(alpha: 0.16)
-              : AppColors.surface2,
+          // Selection = a NEUTRAL surface step, accent reserved for state.
+          color: on ? AppColors.surface3 : AppColors.surface2,
           borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(color: on ? AppColors.accent : AppColors.border),
+          border: Border.all(color: on ? AppColors.border2 : AppColors.border),
         ),
         child: Text(label,
-            style: sans(12, color: on ? AppColors.accent : AppColors.fg2)),
+            style: sans(12, color: on ? AppColors.fg1 : AppColors.fg2)),
       ),
     );
   }
@@ -425,8 +425,10 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   onTap: _add,
                   borderRadius: BorderRadius.circular(R.md),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    // ~39px at 10; the primary action of the screen needs the
+                    // 44pt floor on a phone.
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 8, vertical: kMobile ? 14 : 10),
                     child: Row(children: [
                       AppIcon('plus', size: 16, color: AppColors.fg3),
                       const SizedBox(width: 12),
@@ -541,7 +543,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
             Text(job.title.isEmpty ? job.id : job.title,
                 style: sans(14, color: paused ? AppColors.fg3 : AppColors.fg1)),
             const SizedBox(height: 2),
-            Text(sub, style: sans(12, color: AppColors.fg4)),
+            Text(sub, style: sans(12, tabular: true, color: AppColors.fg3)),
             if (job.lastError != null && job.lastError!.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(job.lastError!,
