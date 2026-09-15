@@ -134,7 +134,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     Expanded(
                       child: Text(
                           a.displayName.trim().isEmpty ? a.id : a.displayName,
-                          style: sans(13.5, color: AppColors.fg1)),
+                          style: sans(13, color: AppColors.fg1)),
                     ),
                   ]),
                 ),
@@ -182,7 +182,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   child: Text(t.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13.5, color: AppColors.fg1)),
+                      style: sans(13, color: AppColors.fg1)),
                 ),
               ),
             ),
@@ -239,7 +239,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     padding: const EdgeInsets.all(24),
                     child: Text(error!,
                         textAlign: TextAlign.center,
-                        style: sans(12.5, color: AppColors.danger)),
+                        style: sans(12, color: AppColors.danger)),
                   ),
                 )
               : t == null
@@ -306,7 +306,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             _section('Agents', onAdd: _addAgent),
             if (roster.isEmpty)
               Text('Nobody assigned yet.',
-                  style: sans(12.5, color: AppColors.fg4))
+                  style: sans(12, color: AppColors.fg3))
             else
               Wrap(
                 spacing: 6,
@@ -326,10 +326,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             style: sans(12,
                                 color: a.active
                                     ? AppColors.accent
-                                    : AppColors.fg4)),
+                                    : AppColors.fg3)),
                         if (!a.active) ...[
                           const SizedBox(width: 5),
-                          Text('left', style: sans(10, color: AppColors.fg4)),
+                          Text('left', style: sans(10, color: AppColors.fg3)),
                         ],
                       ]),
                     ),
@@ -338,7 +338,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             const SizedBox(height: 14),
             _section('Related', onAdd: _linkTask),
             if (links.links.isEmpty && links.blockedBy.isEmpty)
-              Text('No linked tasks.', style: sans(12.5, color: AppColors.fg4))
+              Text('No linked tasks.', style: sans(12, color: AppColors.fg3))
             else ...[
               // Blockers first: "what is holding this up" is the question the
               // links exist to answer.
@@ -358,9 +358,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Widget _section(String label, {required VoidCallback onAdd}) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Row(children: [
-          Text(label.toUpperCase(),
-              style: sans(11,
-                  weight: W.label, color: AppColors.fg3, spacing: 0.5)),
+          Text(label.toUpperCase(), style: caps(11, color: AppColors.fg3)),
           const Spacer(),
           GestureDetector(
             onTap: onAdd,
@@ -376,7 +374,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Widget _linkRow(String prefix, String id, Color color) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Row(children: [
-          Text('$prefix  ', style: sans(11.5, color: color)),
+          Text('$prefix  ', style: sans(11, color: color)),
           Expanded(
             child: Text(id,
                 maxLines: 1,
@@ -423,7 +421,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 3),
                     child: Text(e.actorId,
-                        style: sans(10.5,
+                        style: sans(10,
                             weight: W.label, color: AppColors.accent)),
                   ),
                 Text(body, style: sans(13, color: AppColors.fg1, height: 1.4)),

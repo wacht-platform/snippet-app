@@ -59,10 +59,29 @@ void main() {
   });
 
   testWidgets('state colours are distinct and stable', (t) async {
-    // The mapping is the contract the whole shell relies on.
-    expect(sessionStateColor('running'), isNot(sessionStateColor('idle')));
-    expect(sessionStateColor('waiting_for_input'),
-        isNot(sessionStateColor('running')));
+    // The mapping is the contract the whole shell relies on. `isNot` alone is
+    // NOT enough: two colours can differ while being indistinguishable. State is
+    // carried by colour alone, so each pair must also SEPARATE in luminance.
+    double ratio(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      final hi = la > lb ? la : lb;
+      final lo = la > lb ? lb : la;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    final idle = sessionStateColor('idle');
+    final busy = sessionStateColor('running');
+    final wants = sessionStateColor('waiting_for_input');
+
+    expect(wants, isNot(idle));
+    expect(wants, isNot(busy));
+    expect(ratio(wants, idle), greaterThanOrEqualTo(2.0),
+        reason: 'the accent is neutral, so "needs you" must out-brighten idle '
+            'rather than differ by hue');
+    expect(ratio(wants, busy), greaterThanOrEqualTo(2.0),
+        reason: '"needs you" must not read as "busy"');
+
     expect(sessionIsActive('running'), isTrue);
     expect(sessionIsActive('idle'), isFalse);
     expect(sessionIsActive('waiting_for_input'), isFalse);

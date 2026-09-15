@@ -98,7 +98,9 @@ class _FeedRow extends StatelessWidget {
           child: Center(
             child: Text(s.text,
                 textAlign: TextAlign.center,
-                style: sans(12, color: AppColors.fg4)),
+                // Information, not a placeholder: `fg3`, never `fg4` (the
+                // disabled ramp). Same rule the board's count already states.
+                style: sans(12, color: AppColors.fg3)),
           ),
         ),
     };
@@ -137,10 +139,10 @@ class _TaskEventRow extends StatelessWidget {
                 item.task.title.isEmpty ? item.kind : item.task.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(13.5, color: AppColors.fg1),
+                style: sans(13, color: AppColors.fg1),
               ),
             ),
-            Text(item.kind, style: sans(12, color: AppColors.fg4)),
+            Text(item.kind, style: sans(12, color: AppColors.fg3)),
           ]),
         ),
       ),
@@ -181,14 +183,14 @@ class _BoardMessageRow extends StatelessWidget {
                     child: Text(from,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(13.5, color: AppColors.fg1)),
+                        style: sans(13, color: AppColors.fg1)),
                   ),
-                  Text(label, style: sans(12, color: AppColors.fg4)),
+                  Text(label, style: sans(12, color: AppColors.fg3)),
                 ]),
                 if (message.body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(message.body.trim(),
-                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
                 ],
               ],
             ),
@@ -221,7 +223,7 @@ class _QuestionRow extends StatelessWidget {
                 children: [
                   Text('Needs input', style: sans(12, color: AppColors.fg3)),
                   const SizedBox(height: 4),
-                  Text(item.question, style: sans(15.5, color: AppColors.fg1)),
+                  Text(item.question, style: sans(16, color: AppColors.fg1)),
                 ],
               ),
             ),

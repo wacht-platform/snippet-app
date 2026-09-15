@@ -69,7 +69,7 @@ class _UsageScreenState extends State<UsageScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text('${snap.error}',
                     textAlign: TextAlign.center,
-                    style: mono(10.5, color: AppColors.fg4)),
+                    style: mono(10, color: AppColors.fg3)),
               ),
               const SizedBox(height: 10),
               Btn('Retry', small: true, onTap: _refresh),
@@ -80,7 +80,7 @@ class _UsageScreenState extends State<UsageScreen> {
         if (summary.providers.isEmpty) {
           return Center(
               child: Text('No provider usage has been reported yet.',
-                  style: sans(12.5, color: AppColors.fg3)));
+                  style: sans(12, color: AppColors.fg3)));
         }
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
@@ -129,7 +129,7 @@ class _ProviderCard extends StatelessWidget {
           ),
           Text(
               '${provider.sessions} session${provider.sessions == 1 ? '' : 's'}',
-              style: mono(10.5, color: AppColors.fg4)),
+              style: mono(10, color: AppColors.fg3)),
         ]),
         if (provider.profile != null || provider.model.isNotEmpty) ...[
           const SizedBox(height: 3),
@@ -179,7 +179,7 @@ class _ProviderCard extends StatelessWidget {
                       'Subscription limits aren’t exposed by this provider’s API.',
                     null => 'No reported rate-limit usage.',
                   },
-                  style: sans(11.5, height: 1.35, color: AppColors.fg4)),
+                  style: sans(11, height: 1.35, color: AppColors.fg3)),
             ),
           ]),
         ] else ...[
@@ -203,7 +203,7 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: sans(10.5, color: AppColors.fg4)),
+          Text(label, style: sans(10, color: AppColors.fg3)),
           const SizedBox(height: 2),
           Text(value, style: mono(12, color: AppColors.fg2)),
         ],
@@ -223,10 +223,10 @@ class _RateRow extends StatelessWidget {
     if (rate.isExpired) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(rateWindowLabel(rate.windowMinutes),
-            style: sans(11.5, color: AppColors.fg4)),
+            style: sans(11, color: AppColors.fg3)),
         const SizedBox(height: 4),
         Text('rolled over · awaiting the next report',
-            style: mono(10, color: AppColors.fg4)),
+            style: mono(10, color: AppColors.fg3)),
       ]);
     }
 
@@ -239,14 +239,14 @@ class _RateRow extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text(rateWindowLabel(rate.windowMinutes),
-            style: sans(11.5, color: AppColors.fg2)),
-        Text('${remaining.round()}% left', style: mono(10.5, color: color)),
+            style: sans(11, color: AppColors.fg2)),
+        Text('${remaining.round()}% left', style: mono(10, color: color)),
       ]),
       const SizedBox(height: 5),
       Progress(pct: remaining, color: color, height: 6),
       if (reset != null) ...[
         const SizedBox(height: 4),
-        Text(reset, style: mono(10, color: AppColors.fg4)),
+        Text(reset, style: mono(10, color: AppColors.fg3)),
       ],
     ]);
   }

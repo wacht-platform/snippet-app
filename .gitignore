@@ -61,3 +61,6 @@ dist/
 # Release APKs are deliverables, and .snippet/ is this tool's own runtime
 # state — neither belongs in the repo.
 .snippet/
+
+# Golden-test diff artifacts (regenerated on every mismatch; never commit).
+test/visual/failures/

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -295,7 +296,7 @@ class _GitScreenState extends State<GitScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(st.branch.isEmpty ? '(no branch)' : st.branch,
-                      style: sans(15.5,
+                      style: sans(16,
                           weight: FontWeight.w500, color: AppColors.fg1)),
                   if (hasUp)
                     Padding(
@@ -306,7 +307,7 @@ class _GitScreenState extends State<GitScreen> {
                           if (st.ahead > 0) '↑${st.ahead}',
                           if (st.behind > 0) '↓${st.behind}',
                         ].join('  '),
-                        style: mono(11.5, color: AppColors.fg3),
+                        style: mono(11, color: AppColors.fg3),
                       ),
                     ),
                 ],
@@ -347,16 +348,25 @@ class _GitScreenState extends State<GitScreen> {
         child: Row(children: [
           Expanded(
               child: Text(title,
-                  style: sans(11.5,
+                  // The title carries a live count ("Staged (3)").
+                  style: sans(11,
                       weight: FontWeight.w500,
+                      tabular: true,
                       color: AppColors.fg3,
                       spacing: 0.3))),
           if (trailing != null)
             GestureDetector(
               onTap: _busy ? null : onTrailing,
-              child: Text(trailing,
-                  style: sans(11.5,
-                      weight: FontWeight.w500, color: AppColors.accent)),
+              // "Stage all" / "Unstage all" was bare ~15px text in a
+              // GestureDetector — no target at all. HitTestBehavior.opaque plus
+              // a real min height makes the whole area tappable.
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                constraints: BoxConstraints(minHeight: kMobile ? M.minTarget : 0),
+                alignment: Alignment.centerRight,
+                child: Text(trailing,
+                    style: sans(11,
+                        weight: FontWeight.w500, color: AppColors.accent))),
             ),
         ]),
       );
@@ -379,7 +389,7 @@ class _GitScreenState extends State<GitScreen> {
               child: Text(f.path,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: mono(12.5, color: AppColors.fg1))),
+                  style: mono(12, color: AppColors.fg1))),
           IconBtn(staged ? 'rotate' : 'plus',
               size: 34,
               iconSize: 16,
@@ -466,7 +476,7 @@ class _BranchPickerState extends State<_BranchPicker> {
         const SizedBox(height: 10),
         if (local.isNotEmpty) ...[
           Text('Local',
-              style: sans(11.5, weight: FontWeight.w500, color: AppColors.fg3)),
+              style: sans(11, weight: FontWeight.w500, color: AppColors.fg3)),
           const SizedBox(height: 6),
           ...local.map((b) => _row(
                 name: b,
@@ -479,7 +489,7 @@ class _BranchPickerState extends State<_BranchPicker> {
         ],
         if (remotes.isNotEmpty) ...[
           Text('Remote',
-              style: sans(11.5, weight: FontWeight.w500, color: AppColors.fg3)),
+              style: sans(11, weight: FontWeight.w500, color: AppColors.fg3)),
           const SizedBox(height: 6),
           ...remotes.map((b) => _row(
                 name: b,
@@ -536,7 +546,7 @@ class _BranchPickerState extends State<_BranchPicker> {
             Text('current', style: sans(11, color: AppColors.accent))
           else if (remote)
             Text(_localNameForRemote(name),
-                style: sans(11, color: AppColors.fg4)),
+                style: sans(11, color: AppColors.fg3)),
         ]),
       ),
     );
@@ -703,7 +713,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
         line.startsWith('index ') ||
         line.startsWith('+++') ||
         line.startsWith('---')) {
-      fg = AppColors.fg4;
+      fg = AppColors.fg3;
     }
     return Container(
       width: double.infinity,

@@ -39,10 +39,10 @@ Future<Instance?> showAddMachineDialog(BuildContext context) {
     barrierDismissible: true,
     barrierLabel: 'add-machine',
     barrierColor: Colors.black.withValues(alpha: 0.5),
-    transitionDuration: const Duration(milliseconds: 160),
+    transitionDuration: Motion.fast,
     pageBuilder: (_, __, ___) => const Center(child: _AddMachineDialog()),
     transitionBuilder: (_, anim, __, child) {
-      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+      final curved = CurvedAnimation(parent: anim, curve: Motion.enter);
       return FadeTransition(
         opacity: curved,
         child: ScaleTransition(
@@ -141,7 +141,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                           Text('Connect a machine', style: display(16)),
                           const SizedBox(height: 2),
                           Text('Control another machine from here',
-                              style: sans(11.5, color: AppColors.fg4)),
+                              style: sans(11, color: AppColors.fg3)),
                         ]),
                   ),
                   IconBtn('x',
@@ -217,7 +217,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                     Expanded(
                       child: Text(_error!,
                           style:
-                              sans(11.5, height: 1.4, color: AppColors.danger)),
+                              sans(11, height: 1.4, color: AppColors.danger)),
                     ),
                   ]),
                 ),
@@ -240,7 +240,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                     Text('Connecting…', style: sans(12, color: AppColors.fg3)),
                   ] else
                     Text('Connection stays on this device',
-                        style: sans(11, color: AppColors.fg4)),
+                        style: sans(11, color: AppColors.fg3)),
                   const Spacer(),
                   Btn('Connect',
                       small: true,
@@ -276,7 +276,7 @@ class _StepLabel extends StatelessWidget {
             Text(step, style: sans(10, weight: W.label, color: AppColors.fg3)),
       ),
       const SizedBox(width: 8),
-      Text(text, style: sans(11.5, weight: W.label, color: AppColors.fg2)),
+      Text(text, style: sans(11, weight: W.label, color: AppColors.fg2)),
     ]);
   }
 }
@@ -397,14 +397,14 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
               const SizedBox(height: 12),
               Text('Camera access needed',
                   style:
-                      sans(15, weight: FontWeight.w500, color: AppColors.fg1)),
+                      sans(16, weight: FontWeight.w500, color: AppColors.fg1)),
               const SizedBox(height: 8),
               ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: 250),
                   child: Text(
                       'Grant camera access to scan a QR, or paste your connection string below.',
                       textAlign: TextAlign.center,
-                      style: sans(12.5, height: 1.5, color: AppColors.fg3))),
+                      style: sans(12, height: 1.5, color: AppColors.fg3))),
               const SizedBox(height: 16),
               Btn('Grant camera access',
                   variant: BtnVariant.secondary, icon: 'camera', onTap: () {
@@ -455,7 +455,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
                     border: Border.all(color: AppColors.border),
                     borderRadius: BorderRadius.circular(99)),
                 child: Text.rich(
-                  TextSpan(style: sans(12.5, color: AppColors.fg1), children: [
+                  TextSpan(style: sans(12, color: AppColors.fg1), children: [
                     const TextSpan(text: 'Scan the QR from '),
                     TextSpan(
                         text: 'snippet serve',
@@ -509,7 +509,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
             ]),
             if (_error != null) ...[
               SizedBox(height: 10),
-              Text(_error!, style: sans(11.5, color: AppColors.danger))
+              Text(_error!, style: sans(11, color: AppColors.danger))
             ],
           ]),
     );

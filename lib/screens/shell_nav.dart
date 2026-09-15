@@ -48,12 +48,19 @@ Color toneColor(ShellTone tone) => switch (tone) {
 bool sessionIsActive(String? status) => status == 'running';
 
 /// The one colour for a conversation-state icon.
+///
+/// The state is carried by COLOUR alone, so each state must be tellable from the
+/// others at a glance. That is why "needs you" is `fg1` and not the accent: the
+/// accent is a neutral slate, which sits within 1.26:1 of the idle grey (`fg3`)
+/// and is therefore indistinguishable from "doing nothing at all". `fg1` reads
+/// at 3.23:1 against idle and 3.13:1 against the amber "busy" tone, so all three
+/// states separate cleanly.
 Color sessionStateColor(String? status) {
   switch (status) {
     case 'running':
       return AppColors.run; // amber — busy
     case 'waiting_for_input':
-      return AppColors.accent; // accent — needs you
+      return AppColors.fg1; // brightest — needs you
     default:
       return AppColors.fg3; // neutral — idle
   }
@@ -104,10 +111,25 @@ class _SessionStateIconState extends State<SessionStateIcon>
     super.initState();
     _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1150),
+      duration: Motion.pulse,
     );
     // Start only when actually working; an idle icon needs no ticker.
     if (_shouldPulse) _c.repeat(reverse: true);
+  }
+
+  /// Reduced motion holds the icon steady; its colour already carries the
+  /// state, so the pulse is the only thing lost.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (reduceMotion(context)) {
+      if (_c.isAnimating) {
+        _c.stop();
+        _c.value = 1;
+      }
+    } else if (_shouldPulse && !_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
   }
 
   @override
@@ -136,7 +158,7 @@ class _SessionStateIconState extends State<SessionStateIcon>
     // a spinner's constant motion competing with the transcript.
     return FadeTransition(
       opacity: Tween<double>(begin: 0.45, end: 1.0).animate(
-        CurvedAnimation(parent: _c, curve: Curves.easeInOut),
+        CurvedAnimation(parent: _c, curve: Motion.move),
       ),
       child: icon,
     );
@@ -203,11 +225,12 @@ class ShellSectionHeader extends StatelessWidget {
                     label.toUpperCase(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    // Measured: 12px/500 in the default body ink (#C1C1C1), not
-                    // the faintest tone. At fg4 the header was nearly invisible
-                    // and read as disabled chrome rather than a section label.
-                    style: sans(12,
-                        weight: W.label, color: AppColors.fg2, spacing: 0.4),
+                    // 12px/500 in the default body ink (#C1C1C1), not the
+                    // faintest tone — at fg4 the header was nearly invisible and
+                    // read as disabled chrome rather than a section label.
+                    // `caps()` owns the tracking: upper case needs POSITIVE
+                    // letter-spacing, which `_tracking()` never returns.
+                    style: caps(12, color: AppColors.fg2),
                   ),
                 ),
               ),
@@ -362,9 +385,14 @@ class ShellGroupHeader extends StatelessWidget {
 
 /// The leaf: one nav row.
 ///
-/// Selection is expressed by surface alone — `surface1` (#222222) behind the
+/// Selection is expressed by surface alone — `surface2` (#1B1B1B) behind the
 /// row with 8px radius and no border — exactly as the reference does it. Text
 /// lifts from the default `#C1C1C1` to white only on the active row.
+///
+/// `surface2` is the app's one selection step (see `theme.dart`); this row used
+/// `surface1`, one stop weaker, so the sidebar—the list people look at most—had
+/// a fainter selection than the task board, the machine rows and the phone
+/// index. The hex in this comment was also wrong (`#222222` is `surface3`).
 class ShellNavRow extends StatelessWidget {
   const ShellNavRow({
     super.key,
@@ -407,7 +435,7 @@ class ShellNavRow extends StatelessWidget {
       // reference's rhythm.
       padding: EdgeInsets.only(left: indent, right: kSidebarContentInset),
       child: Material(
-        color: selected ? AppColors.surface1 : Colors.transparent,
+        color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.md),
         child: InkWell(
           onTap: onTap,

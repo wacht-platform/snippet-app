@@ -323,7 +323,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         child: Row(children: [
           Expanded(
             child: Text('New chat',
-                style: sans(kMobile ? 17 : 15,
+                style: sans(kMobile ? 18 : 16,
                     weight: W.label, color: AppColors.fg1)),
           ),
           if (widget.onClose != null)
@@ -384,7 +384,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                           c.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: mono(kMobile ? 12.5 : 12,
+                          style: mono(kMobile ? 12 : 12,
                               weight: last ? W.label : W.body,
                               color: last ? AppColors.fg1 : AppColors.fg3),
                         ),
@@ -416,7 +416,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         children: [
           Text('This folder is empty.',
               textAlign: TextAlign.center,
-              style: sans(12.5, color: AppColors.fg4)),
+              style: sans(12, color: AppColors.fg3)),
         ],
       );
     }
@@ -450,7 +450,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           child: Text(e.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: sans(kMobile ? 12.5 : 12, color: AppColors.fg3)),
+              style: sans(kMobile ? 12 : 12, color: AppColors.fg3)),
         ),
       ]),
     );
@@ -477,7 +477,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                 child: Text(e.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? 13.5 : 12.5, color: AppColors.fg1)),
+                    style: sans(kMobile ? 13 : 12, color: AppColors.fg1)),
               ),
               AppIcon('chevron-right', size: 14, color: AppColors.fg4),
             ]),
@@ -549,7 +549,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                           _busy ?? 'Start chat in $_hereName',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(kMobile ? 13.5 : 12.5,
+                          style: sans(kMobile ? 13 : 12,
                               weight: W.label, color: AppColors.accentFg),
                         ),
                       ),
@@ -570,7 +570,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
             const SizedBox(height: 12),
             Text(_error!,
                 textAlign: TextAlign.center,
-                style: sans(12.5, color: AppColors.fg3, height: 1.45)),
+                style: sans(12, color: AppColors.fg3, height: 1.45)),
             const SizedBox(height: 14),
             Btn('Retry', small: true, onTap: () => _go(widget.startPath)),
           ]),

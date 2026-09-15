@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -195,7 +196,9 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             TextButton(
                 onPressed: () => _kill(id),
                 style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 0),
+                    // 'Stop' is a destructive action on a live process; 22px was
+                    // well under the 44pt floor on a phone.
+                    minimumSize: Size(0, kMobile ? M.minTarget : 0),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4)),
@@ -203,15 +206,16 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
         ]),
         const SizedBox(height: 4),
         Row(children: [
-          Text('pid $pid', style: mono(10.5, color: AppColors.fg4)),
+          Text('pid $pid', style: mono(10, color: AppColors.fg3)),
           const SizedBox(width: 12),
-          Text(statusLabel, style: mono(10.5, color: AppColors.fg4)),
+          Text(statusLabel, style: mono(10, color: AppColors.fg3)),
           const Spacer(),
           GestureDetector(
               onTap: () => _toggleLog(id),
               behavior: HitTestBehavior.opaque,
               child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  // A 24px target; the text itself is only ~16px.
+                  padding: EdgeInsets.all(kMobile ? 14 : 4),
                   child: Text(open ? 'hide log' : 'log',
                       style: mono(11,
                           color: open ? AppColors.accent : AppColors.fg3)))),
@@ -235,7 +239,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                             strokeWidth: 2, color: AppColors.fg3)))
                 : SingleChildScrollView(
                     child: Text(_log.trim().isEmpty ? '(empty)' : _log,
-                        style: mono(10.5, height: 1.4, color: AppColors.fg2))),
+                        style: mono(10, height: 1.4, color: AppColors.fg2))),
           ),
         ],
       ]),

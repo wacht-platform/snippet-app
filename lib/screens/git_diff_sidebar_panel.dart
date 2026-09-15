@@ -138,7 +138,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             const SizedBox(width: 6),
             Text(
               changes == 0 ? 'clean' : '$changes changed',
-              style: sans(12, color: AppColors.fg4),
+              style: sans(12, color: AppColors.fg3),
             ),
           ]),
         ),
@@ -178,7 +178,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
               style: sans(13, weight: W.label, color: AppColors.fg2)),
           const SizedBox(height: 3),
           Text('Last updated ${_timeAgo(_lastUpdated)}',
-              style: sans(12, color: AppColors.fg4)),
+              style: sans(12, color: AppColors.fg3)),
         ]),
       );
 
@@ -186,7 +186,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_error!,
-              style: sans(12.5, color: AppColors.danger, height: 1.4)),
+              style: sans(12, color: AppColors.danger, height: 1.4)),
           const SizedBox(height: 10),
           Btn('Retry', small: true, onTap: refresh),
         ]),

@@ -57,7 +57,7 @@ class MissionControlHeader extends StatelessWidget {
                 Text('Mission Control',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(_compact ? 17 : 16.5,
+                    style: sans(_compact ? 18 : 16,
                         weight: FontWeight.w500, color: AppColors.fg1)),
                 const SizedBox(height: 3),
                 Row(children: [

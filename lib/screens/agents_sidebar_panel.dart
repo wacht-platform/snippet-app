@@ -105,7 +105,7 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       barrierLabel: 'create agent',
       // Transparent: a popover beside the panel, not a modal over the app.
       barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 140),
+      transitionDuration: Motion.quick,
       pageBuilder: (ctx, _, __) => Stack(children: [
         Positioned(
           left: left,
@@ -287,7 +287,7 @@ class _EmptyTeam extends StatelessWidget {
         child: Text(
           'No agents yet.\n\nBuild one and it appears here, along with the '
           'sessions it is working in.',
-          style: sans(12.5, color: AppColors.fg4, height: 1.5),
+          style: sans(12, color: AppColors.fg3, height: 1.5),
         ),
       );
 }
@@ -326,7 +326,7 @@ class _AgentSidebarRow extends StatelessWidget {
               backgroundColor: AppColors.surface2,
               foregroundColor: AppColors.fg3,
               child: Text(initial,
-                  style: sans(kMobile ? 13 : 11.5,
+                  style: sans(kMobile ? 13 : 11,
                       weight: W.title, color: AppColors.fg3)),
             ),
             const SizedBox(width: 10),
@@ -348,7 +348,7 @@ class _AgentSidebarRow extends StatelessWidget {
                     agent.role,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? M.meta : 11.5,
+                    style: sans(kMobile ? M.meta : 11,
                         color: AppColors.fg4, height: 1.35),
                   ),
                 ],

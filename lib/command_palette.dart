@@ -32,7 +32,7 @@ Future<void> showCommandPalette(
       barrierDismissible: true,
       barrierLabel: 'palette',
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      transitionDuration: const Duration(milliseconds: 140),
+      transitionDuration: Motion.quick,
       pageBuilder: (ctx, _, __) => Align(
         alignment: const Alignment(0, -0.5),
         child: Padding(
@@ -44,7 +44,7 @@ Future<void> showCommandPalette(
         ),
       ),
       transitionBuilder: (ctx, anim, _, child) {
-        final c = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        final c = CurvedAnimation(parent: anim, curve: Motion.enter);
         return FadeTransition(
             opacity: c,
             child: ScaleTransition(
@@ -182,7 +182,7 @@ class _PaletteState extends State<_Palette> {
                   padding: EdgeInsets.all(20),
                   child: Center(
                       child: Text('No matches',
-                          style: sans(12.5, color: AppColors.fg4)))),
+                          style: sans(12, color: AppColors.fg3)))),
           ],
         ),
       ),
@@ -213,7 +213,7 @@ class _PaletteState extends State<_Palette> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(13, color: AppColors.fg1))),
-            if (hint != null) Text(hint, style: mono(11, color: AppColors.fg4)),
+            if (hint != null) Text(hint, style: mono(11, color: AppColors.fg3)),
           ]),
         ),
       ),

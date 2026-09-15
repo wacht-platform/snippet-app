@@ -191,7 +191,7 @@ class _LeftRail extends StatelessWidget {
 
   Widget _emptyHint(String text) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Text(text, style: sans(12, color: AppColors.fg4)),
+        child: Text(text, style: sans(12, color: AppColors.fg3)),
       );
 }
 
@@ -430,7 +430,7 @@ class _SessionInspector extends StatelessWidget {
             (session.title as String).isEmpty
                 ? session.folder as String
                 : session.title as String,
-            style: sans(15, weight: FontWeight.w500, color: AppColors.fg1),
+            style: sans(16, weight: FontWeight.w500, color: AppColors.fg1),
           ),
           const SizedBox(height: 4),
           Text(session.folder as String, style: mono(11, color: AppColors.fg3)),

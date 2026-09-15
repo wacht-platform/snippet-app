@@ -704,5 +704,19 @@ void main() {
     expect(l1, greaterThan(l2));
     expect(l2, greaterThan(l3));
     expect(l3, greaterThan(l4));
+
+    // The ACCENT is the gap that let white-on-accent ship. It carries two roles
+    // at once, and they pull in opposite directions: as text/icon on the dark
+    // canvas it must be LIGHT, and as a button fill under `accentFg` it must be
+    // light enough for that ink. Both are asserted, so an accent can never be
+    // swapped in without checking the label that sits on it.
+    expect(ratio(AppColors.accent, AppColors.canvas), greaterThanOrEqualTo(4.5),
+        reason: 'accent is used AS text (links, selected labels, state)');
+    expect(ratio(AppColors.accentFg, AppColors.accent), greaterThanOrEqualTo(4.5),
+        reason: 'accentFg is the label ON an accent-filled button');
+    // And the label on an accent fill must not be the same tone as the fill.
+    expect(AppColors.accentFg.computeLuminance(),
+        isNot(closeTo(AppColors.accent.computeLuminance(), 0.05)),
+        reason: 'label and fill must differ in brightness, not just hue');
   });
 }

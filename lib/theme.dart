@@ -138,7 +138,12 @@ ThemePreset _dark({
     border2: const Color(0xFF333333),
     accent: accent,
     accentHover: _lighten(accent, 0.10),
-    accentFg: const Color(0xFFFFFFFF),
+    // Near-black ink, not white. A filled accent button is `accentFg` on
+    // `accent`, and white-on-accent cannot clear WCAG AA for ANY usable accent
+    // hue: accent-as-text needs a light colour, while white-on-fill needs a dark
+    // one, and those two windows never overlap. Dark ink clears both roles for
+    // the chosen slate (8.6:1 as text on the canvas, 8.4:1 on the fill).
+    accentFg: const Color(0xFF0C0C0C),
     accentBg: _withAlpha(accent, 0.14),
     accentLine: _withAlpha(accent, 0.38),
     accentRing: _withAlpha(accent, 0.45),
@@ -160,7 +165,15 @@ ThemePreset _dark({
 final _amoled = _dark(
   name: 'amoled',
   label: 'Dark',
-  accent: const Color(0xFF4E88FF), // vibrant blue
+  // Slate, not blue. A neutral accent keeps the accent channel about BRIGHTNESS
+  // rather than hue, so it cannot be mistaken for a status colour (green =
+  // online, amber = busy, red = danger). #94A3B8.
+  //
+  // One cost: it is close to the neutral ink it sits beside (fg2 #C1C1C1 and
+  // fg3 #8F8F8F), so a state that uses accent as its ONLY channel stops reading.
+  // `sessionStateColor` therefore stops painting "needs you" with the accent and
+  // uses `fg1`; see the note there.
+  accent: const Color(0xFF94A3B8), // slate
   ink: const Color(0xFFFFFFFF), // white — emphasis only
   inkMuted: const Color(0xFFC1C1C1), // DEFAULT body text
   inkSubtle: const Color(0xFF8F8F8F), // muted
@@ -292,6 +305,53 @@ class R {
 }
 
 // ---------------------------------------------------------------------------
+// Motion — the ONE place durations and curves are decided.
+//
+// Transitions used to pick their own number at each call site (11 distinct
+// durations under 400ms), so the same gesture read differently on different
+// screens. The stock Flutter curves are also too weak to read as intentional;
+// these are the stronger custom variants.
+// ---------------------------------------------------------------------------
+
+class Motion {
+  /// Press feedback — the fastest thing in the app.
+  static const press = Duration(milliseconds: 120);
+
+  /// Hover, colour and opacity swaps on high-frequency controls.
+  static const quick = Duration(milliseconds: 150);
+
+  /// A small surface appearing or changing: pills, chips, inline rows.
+  static const fast = Duration(milliseconds: 180);
+
+  /// The standard transition — panels, drawers, switches.
+  static const base = Duration(milliseconds: 220);
+
+  /// A deliberate, infrequent change. Never for a repeated interaction.
+  static const slow = Duration(milliseconds: 300);
+
+  /// One direction of the looping "working" breath on a live status glyph.
+  static const pulse = Duration(milliseconds: 1150);
+
+  /// Entrances start fast and settle; the first frame must carry the motion.
+  static const enter = Curves.easeOutCubic;
+
+  /// Exits leave the same way but shorter — an exit must never be waited on.
+  static const exit = Curves.easeInCubic;
+
+  /// On-screen movement that is neither an arrival nor a departure.
+  static const move = Curves.easeInOut;
+}
+
+/// True when the platform asks for motion to be reduced.
+///
+/// Reduced motion means FEWER and gentler animations, not zero: opacity and
+/// colour still help a person follow what changed, while position, scale and
+/// looping motion are dropped. Every animated state change keeps a static cue
+/// (colour, icon, label) regardless — motion is never the only channel.
+bool reduceMotion(BuildContext context) =>
+    MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+// ---------------------------------------------------------------------------
 // Mobile metrics.
 //
 // The design language is one system at two densities, not two designs. Phones
@@ -376,32 +436,19 @@ TextStyle sans(double size,
         {FontWeight weight = W.body,
         double? height,
         double? spacing,
-        Color? color}) =>
+        Color? color,
+        bool tabular = false}) =>
     GoogleFonts.geist(
       fontSize: size,
       fontWeight: weight,
       height: height ?? 1.33,
       letterSpacing: spacing ?? _tracking(size),
       color: color ?? AppColors.fg2,
-    );
-
-/// Inter — the doc's SECONDARY family, kept for incidental labels.
-///
-/// Geist is the primary family; the measured reference uses Inter for the small
-/// uppercase section label (11px / 500 / #C1C1C1) and little else. It has its own
-/// helper rather than being folded into [sans] so the family split stays
-/// explicit at the call site.
-TextStyle inter(double size,
-        {FontWeight weight = W.body,
-        double? height,
-        double? spacing,
-        Color? color}) =>
-    GoogleFonts.inter(
-      fontSize: size,
-      fontWeight: weight,
-      height: height ?? 1.33,
-      letterSpacing: spacing ?? _tracking(size),
-      color: color ?? AppColors.fg2,
+      // Proportional digits have different widths, so a ticking timer or a
+      // counter shimmers and reflows as it updates. Geist ships `tnum`
+      // (verified in the font's GSUB table), so this is a real substitution.
+      fontFeatures:
+          tabular ? const [FontFeature.tabularFigures()] : null,
     );
 
 TextStyle display(double size,
@@ -415,13 +462,34 @@ TextStyle display(double size,
     );
 
 TextStyle mono(double size,
-        {FontWeight weight = W.body, double? height, Color? color}) =>
+        {FontWeight weight = W.body,
+        double? height,
+        double? spacing,
+        Color? color,
+        bool tabular = true}) =>
+    // A monospace face is fixed-width already, so `tabular` defaults on and is
+    // accepted only so call sites can share one signature with `sans()`.
     GoogleFonts.jetBrainsMono(
       fontSize: size,
       fontWeight: weight,
       height: height ?? 1.45,
+      letterSpacing: spacing,
       color: color ?? AppColors.fg1,
+      fontFeatures:
+          tabular ? const [FontFeature.tabularFigures()] : null,
     );
+
+/// The ONE uppercase label style: small, 500, with POSITIVE tracking.
+///
+/// Small capitals need a little positive letter-spacing or the letters crowd
+/// together. `_tracking()` returns a NEGATIVE value at every size (it is built
+/// for sentence-case UI text), so any uppercase label that did not pass its own
+/// `spacing:` was tracked the wrong way — the opposite of what it needs.
+/// Five call sites had drifted into three different treatments (no spacing,
+/// `0.4`, `0.5`) with three different inks; this is the single replacement.
+TextStyle caps(double size,
+        {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
+    sans(size, weight: weight, color: color, spacing: spacing);
 
 String get monoFamily => GoogleFonts.jetBrainsMono().fontFamily ?? 'monospace';
 
@@ -470,7 +538,12 @@ ThemeData buildAppTheme() {
           borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(color: c.border)),
     ),
-    textTheme: _weightedTextTheme(GoogleFonts.interTextTheme(base.textTheme)
+    // Geist, not Inter. Inter was a second near-identical sans-serif: at UI
+    // sizes the two are almost indistinguishable, so every Material widget
+    // (menus, tooltips, dialogs, text fields) rendered in a different family
+    // than the app's own text around it — which reads as a mistake rather than
+    // a pairing. One UI family.
+    textTheme: _weightedTextTheme(GoogleFonts.geistTextTheme(base.textTheme)
         .apply(bodyColor: c.fg1, displayColor: c.fg1)),
     dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 12),
   );

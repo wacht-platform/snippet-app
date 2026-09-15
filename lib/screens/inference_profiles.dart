@@ -161,7 +161,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                       ],
                       Text(
                           'Choose the profile used for new sessions and delegated work.',
-                          style: sans(widget.embedded ? 12 : 12.5,
+                          style: sans(widget.embedded ? 12 : 12,
                               color: AppColors.fg3)),
                     ],
                   ),
@@ -251,7 +251,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                       child: Text(p.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(widget.embedded ? 12.5 : 14,
+                          style: sans(widget.embedded ? 12 : 14,
                               weight: FontWeight.w500, color: AppColors.fg1)),
                     ),
                     if (p.active) ...[
@@ -271,7 +271,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                   Text('${p.provider} · ${p.model}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(widget.embedded ? 10.5 : 11.5,
+                      style: mono(widget.embedded ? 10 : 11,
                           color: AppColors.fg4)),
                 ],
               ),
