@@ -1957,9 +1957,9 @@ class _DesktopShellState extends State<DesktopShell>
                   overflow: TextOverflow.ellipsis,
                   style: sans(15, color: AppColors.fg1)),
               subtitle: Text(
-                  s.agentId == null || s.agentId!.trim().isEmpty
+                  s.displayAgentId == null || s.displayAgentId!.trim().isEmpty
                       ? (s.folder.trim().isEmpty ? 'session' : s.folder)
-                      : '${s.folder.trim().isEmpty ? 'session' : s.folder} · ${s.agentId}',
+                      : '${s.folder.trim().isEmpty ? 'session' : s.folder} · ${s.displayAgentId}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(12, color: AppColors.fg4)),
@@ -5571,14 +5571,14 @@ class _SidebarState extends State<_Sidebar> {
       // `sessionStateColor`: amber busy, accent needs-you, neutral idle.
       leading: SessionStateIcon(status: s.status, size: kNavIcon),
       // Who is working here, inline. Same treatment as the phone card: an agent
-      // bound to this chat is shown on the row itself, so "which session is an
+      // working in this chat is shown on the row itself, so "which session is an
       // agent working in" is answerable from the list without opening anything.
       // `working` tints it by run state, so a chat an agent merely owns reads
       // differently from one it is mid-turn in.
-      trailing: s.agentId == null || s.agentId!.trim().isEmpty
+      trailing: s.displayAgentId == null || s.displayAgentId!.trim().isEmpty
           ? null
           : _AgentBadge(
-              agentId: s.agentId!,
+              agentId: s.displayAgentId!,
               working: sessionIsActive(s.status),
             ),
     );

@@ -111,9 +111,22 @@ class SessionInfo {
   final int lastActive;
   final bool running;
   final String? profile;
-  /// The agent bound to this session, if any. Shown in the session list so a
-  /// chat an agent is working in is visible without opening it.
+  /// The agent this session IS, if any — an inbox belongs to an agent, and a
+  /// specialized session runs as one. A durable property of the session.
   final String? agentId;
+
+  /// The agent dispatched to work here right now, from the task board's roster.
+  ///
+  /// A different question from [agentId]: a plain project session is nobody's,
+  /// yet Mission Control can dispatch an agent into it — and that is exactly the
+  /// case the session list needs to show. [agentId] alone could never answer it,
+  /// because dispatch writes the roster, not the session's identity.
+  final String? workerAgentId;
+
+  /// Who to name on a session row: whoever is working here, else whoever the
+  /// session belongs to. Precedence lives here so every row agrees, and so the
+  /// rule is stated once rather than repeated at each call site.
+  String? get displayAgentId => workerAgentId ?? agentId;
 
   SessionInfo.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -124,7 +137,8 @@ class SessionInfo {
         lastActive = (j['last_active'] as num?)?.toInt() ?? 0,
         running = j['running'] == true,
         profile = j['profile'] as String?,
-        agentId = j['agent_id'] as String?;
+        agentId = j['agent_id'] as String?,
+        workerAgentId = j['worker_agent_id'] as String?;
 
   SessionInfo withTitle(String title) => SessionInfo._(
         id: id,
@@ -136,6 +150,7 @@ class SessionInfo {
         running: running,
         profile: profile,
         agentId: agentId,
+        workerAgentId: workerAgentId,
       );
 
   SessionInfo withStatus(String status) => SessionInfo._(
@@ -148,6 +163,7 @@ class SessionInfo {
         running: status == 'running',
         profile: profile,
         agentId: agentId,
+        workerAgentId: workerAgentId,
       );
 
   const SessionInfo._({
@@ -160,6 +176,7 @@ class SessionInfo {
     required this.running,
     required this.profile,
     this.agentId,
+    this.workerAgentId,
   });
 }
 
