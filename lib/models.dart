@@ -111,6 +111,9 @@ class SessionInfo {
   final int lastActive;
   final bool running;
   final String? profile;
+  /// The agent bound to this session, if any. Shown in the session list so a
+  /// chat an agent is working in is visible without opening it.
+  final String? agentId;
 
   SessionInfo.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -120,7 +123,8 @@ class SessionInfo {
         status = j['status'] as String? ?? '',
         lastActive = (j['last_active'] as num?)?.toInt() ?? 0,
         running = j['running'] == true,
-        profile = j['profile'] as String?;
+        profile = j['profile'] as String?,
+        agentId = j['agent_id'] as String?;
 
   SessionInfo withTitle(String title) => SessionInfo._(
         id: id,
@@ -131,6 +135,7 @@ class SessionInfo {
         lastActive: lastActive,
         running: running,
         profile: profile,
+        agentId: agentId,
       );
 
   SessionInfo withStatus(String status) => SessionInfo._(
@@ -142,6 +147,7 @@ class SessionInfo {
         lastActive: lastActive,
         running: status == 'running',
         profile: profile,
+        agentId: agentId,
       );
 
   const SessionInfo._({
@@ -153,6 +159,7 @@ class SessionInfo {
     required this.lastActive,
     required this.running,
     required this.profile,
+    this.agentId,
   });
 }
 
@@ -908,99 +915,6 @@ class DirectThreadSummary {
   bool get hasUnread => unread > 0;
 }
 
-/// One agent's participation in one session — a lease period joined to the
-/// agent's identity. Answers "when is an agent active in this session": an
-/// agent that held the turn twice appears twice, which is the activity history.
-class CoordinationSessionAgent {
-  final String agentId;
-  final String displayName;
-  final String handle;
-  final String role;
-  final String status;
-
-  /// True while this lease is the session's current, unexpired holder.
-  final bool active;
-  final String assignmentId;
-  final String acquiredAt;
-
-  /// Null while the agent still holds the turn.
-  final String? releasedAt;
-
-  /// Why it ended (released/expired/handoff); null while active.
-  final String? releaseReason;
-
-  CoordinationSessionAgent.fromJson(Map<String, dynamic> j)
-      : agentId = j['agent_id'] as String? ?? '',
-        displayName = j['display_name'] as String? ?? '',
-        handle = j['handle'] as String? ?? '',
-        role = j['role'] as String? ?? '',
-        status = j['status'] as String? ?? '',
-        active = j['active'] as bool? ?? false,
-        assignmentId = j['assignment_id'] as String? ?? '',
-        acquiredAt = j['acquired_at'] as String? ?? '',
-        releasedAt = j['released_at'] as String?,
-        releaseReason = j['release_reason'] as String?;
-
-  /// How the hold ended, in words. Empty while the agent is still active.
-  String get outcome {
-    if (active) return 'active';
-    final reason = releaseReason?.trim() ?? '';
-    return reason.isEmpty ? 'finished' : reason;
-  }
-}
-
-class CoordinationAssignment {
-  final String id;
-  final String goalId;
-  final String sessionId;
-  final String agentId;
-  final String status;
-  final String scope;
-  final String definitionOfDone;
-
-  /// Inference profile this dispatch runs on. Null means the session's own
-  /// profile is used — the daemon only sends a value when one was chosen.
-  final String? profile;
-
-  CoordinationAssignment.fromJson(Map<String, dynamic> j)
-      : id = j['id'] as String? ?? '',
-        goalId = j['goal_id'] as String? ?? '',
-        sessionId = j['session_id'] as String? ?? '',
-        agentId = j['agent_id'] as String? ?? '',
-        status = j['status'] as String? ?? 'offered',
-        scope = j['scope'] as String? ?? '',
-        definitionOfDone = j['definition_of_done'] as String? ?? '',
-        profile = _optionalText(j['profile']);
-}
-
-/// A trimmed, non-empty string, or null. Used for optional server fields that
-/// may arrive as `null`, `''`, or absent.
-String? _optionalText(Object? raw) {
-  if (raw is! String) return null;
-  final text = raw.trim();
-  return text.isEmpty ? null : text;
-}
-
-class CoordinationLease {
-  final String sessionId;
-  final String leaseId;
-  final String assignmentId;
-  final String agentId;
-  final int fencingToken;
-  final String acquiredAt;
-  final String renewedAt;
-  final String expiresAt;
-
-  CoordinationLease.fromJson(Map<String, dynamic> j)
-      : sessionId = j['session_id'] as String? ?? '',
-        leaseId = j['lease_id'] as String? ?? '',
-        assignmentId = j['assignment_id'] as String? ?? '',
-        agentId = j['agent_id'] as String? ?? '',
-        fencingToken = (j['fencing_token'] as num?)?.toInt() ?? 0,
-        acquiredAt = j['acquired_at'] as String? ?? '',
-        renewedAt = j['renewed_at'] as String? ?? '',
-        expiresAt = j['expires_at'] as String? ?? '';
-}
 
 class CoordinationEvent {
   final String eventId;
@@ -1165,44 +1079,6 @@ class RecurringJob {
   }
 }
 
-/// A handoff transferring work from one assignment to a successor. A successor
-/// cannot take the turn until it acknowledges the exact record.
-class CoordinationHandoff {
-  final String id;
-  final String goalId;
-  final String sessionId;
-  final String sourceAssignmentId;
-  final String targetAssignmentId;
-  final String contextMode;
-  final String objective;
-  final String definitionOfDone;
-  final String scope;
-  final String completedSummary;
-  final String nextAction;
-  final List<String> blockers;
-  final List<String> risks;
-  final String contentHash;
-  final String createdAt;
-
-  CoordinationHandoff.fromJson(Map<String, dynamic> j)
-      : id = j['id'] as String? ?? '',
-        goalId = j['goal_id'] as String? ?? '',
-        sessionId = j['session_id'] as String? ?? '',
-        sourceAssignmentId = j['source_assignment_id'] as String? ?? '',
-        targetAssignmentId = j['target_assignment_id'] as String? ?? '',
-        contextMode = j['context_mode'] as String? ?? '',
-        objective = j['objective'] as String? ?? '',
-        definitionOfDone = j['definition_of_done'] as String? ?? '',
-        scope = j['scope'] as String? ?? '',
-        completedSummary = j['completed_summary'] as String? ?? '',
-        nextAction = j['next_action'] as String? ?? '',
-        blockers =
-            ((j['blockers'] as List?) ?? const []).whereType<String>().toList(),
-        risks =
-            ((j['risks'] as List?) ?? const []).whereType<String>().toList(),
-        contentHash = j['content_hash'] as String? ?? '',
-        createdAt = j['created_at'] as String? ?? '';
-}
 
 /// Global notifier bumped whenever model profiles are added, updated, or deleted
 /// so open session views, composers, and settings can refresh their pickers live.

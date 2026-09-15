@@ -54,3 +54,10 @@ android/.gradle/
 
 # Local release artifacts
 dist/
+
+# Release APKs — deliverables, not source.
+*.apk
+
+# Release APKs are deliverables, and .snippet/ is this tool's own runtime
+# state — neither belongs in the repo.
+.snippet/

@@ -34,8 +34,6 @@ class AgentsSidebarPanel extends StatefulWidget {
 class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   List<CoordinationAgent> agents = const [];
 
-  /// session id → agent id, for the sessions that currently have a holder.
-  Map<String, String> activeBySession = const {};
   String? error;
   bool loading = true;
 
@@ -61,22 +59,12 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       });
     }
     try {
-      // Both in one pass so the active/idle split is internally consistent.
-      final results = await Future.wait([
-        widget.client.coordinationAgents(),
-        widget.client.coordinationActiveLeases(),
-      ]);
+      final all = await widget.client.coordinationAgents();
       if (!mounted) return;
-      final leases = results[1] as List<CoordinationLease>;
       setState(() {
         // Mission Control is excluded: it has its own pinned chat, so it is not
         // one of the workers this panel lists.
-        agents = (results[0] as List<CoordinationAgent>)
-            .where((a) => !a.isMissionControl)
-            .toList();
-        activeBySession = {
-          for (final l in leases) l.sessionId: l.agentId,
-        };
+        agents = all.where((a) => !a.isMissionControl).toList();
         error = null;
       });
     } catch (e) {
@@ -85,12 +73,6 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       if (mounted) setState(() => loading = false);
     }
   }
-
-  /// Sessions this agent currently holds. An agent can hold more than one.
-  List<String> _sessionsFor(String agentId) => activeBySession.entries
-      .where((e) => e.value == agentId)
-      .map((e) => e.key)
-      .toList(growable: false);
 
   /// Open the "describe an agent" popover, anchored under its button.
   ///
@@ -220,14 +202,6 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       );
     }
 
-    // Active first: the only rows that need attention.
-    final active = <(CoordinationAgent, List<String>)>[];
-    final idle = <(CoordinationAgent, List<String>)>[];
-    for (final a in agents) {
-      final sessions = _sessionsFor(a.id);
-      (sessions.isEmpty ? idle : active).add((a, sessions));
-    }
-
     return Container(
       color: AppColors.bg,
       child: Column(
@@ -290,29 +264,13 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 18),
                     children: [
-                      if (active.isNotEmpty) ...[
-                        _GroupLabel('Active now', active.length, accent: true),
-                        for (final (a, sessions) in active)
-                          _AgentSidebarRow(
-                            agent: a,
-                            sessions: sessions,
-                            onTap: widget.onOpenAgent == null
-                                ? null
-                                : () => widget.onOpenAgent!(a),
-                          ),
-                      ],
-                      if (idle.isNotEmpty) ...[
-                        if (active.isNotEmpty) const SizedBox(height: 14),
-                        _GroupLabel('Idle', idle.length),
-                        for (final (a, _) in idle)
-                          _AgentSidebarRow(
-                            agent: a,
-                            sessions: const [],
-                            onTap: widget.onOpenAgent == null
-                                ? null
-                                : () => widget.onOpenAgent!(a),
-                          ),
-                      ],
+                      for (final a in agents)
+                        _AgentSidebarRow(
+                          agent: a,
+                          onTap: widget.onOpenAgent == null
+                              ? null
+                              : () => widget.onOpenAgent!(a),
+                        ),
                     ],
                   ),
           ),
@@ -334,44 +292,15 @@ class _EmptyTeam extends StatelessWidget {
       );
 }
 
-class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.label, this.count, {this.accent = false});
-
-  final String label;
-  final int count;
-  final bool accent;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        // Desktop: list inset 8 + kNavPadH 12 = content x20, the same x the
-        // shared ShellSectionHeader and every sibling panel's rows land on.
-        // It was 8 total (x16), which is what read as inset differently from
-        // the rest of the rail. Mobile keeps its existing 16 unchanged.
-        padding: EdgeInsets.fromLTRB(
-            kMobile ? 8 : kNavPadH, 6, kMobile ? 8 : kNavPadH, 6),
-        child: Row(children: [
-          Text(label.toUpperCase(),
-              style: sans(kMobile ? 12 : 10.5,
-                  weight: W.title,
-                  color: accent ? AppColors.accent : AppColors.fg4,
-                  spacing: 0.6)),
-          const SizedBox(width: 6),
-          Text('$count',
-              style: sans(kMobile ? 12 : 10.5, color: AppColors.fg4)),
-        ]),
-      );
-}
 
 /// One agent row: avatar, name, and either the sessions it holds or its role.
 class _AgentSidebarRow extends StatelessWidget {
   const _AgentSidebarRow({
     required this.agent,
-    required this.sessions,
     this.onTap,
   });
 
   final CoordinationAgent agent;
-  final List<String> sessions;
   final VoidCallback? onTap;
 
   @override
@@ -379,7 +308,6 @@ class _AgentSidebarRow extends StatelessWidget {
     final name =
         agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
     final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
-    final isActive = sessions.isNotEmpty;
 
     return Material(
       color: Colors.transparent,
@@ -395,13 +323,11 @@ class _AgentSidebarRow extends StatelessWidget {
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             CircleAvatar(
               radius: 13,
-              backgroundColor:
-                  isActive ? AppColors.accentBg : AppColors.surface2,
-              foregroundColor: isActive ? AppColors.accent : AppColors.fg3,
+              backgroundColor: AppColors.surface2,
+              foregroundColor: AppColors.fg3,
               child: Text(initial,
                   style: sans(kMobile ? 13 : 11.5,
-                      weight: W.title,
-                      color: isActive ? AppColors.accent : AppColors.fg3)),
+                      weight: W.title, color: AppColors.fg3)),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -419,12 +345,11 @@ class _AgentSidebarRow extends StatelessWidget {
                           weight: W.body, color: AppColors.fg1)),
                   const SizedBox(height: 2),
                   Text(
-                    isActive ? _sessionSummary(sessions) : agent.role,
+                    agent.role,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: sans(kMobile ? M.meta : 11.5,
-                        color: isActive ? AppColors.ok : AppColors.fg4,
-                        height: 1.35),
+                        color: AppColors.fg4, height: 1.35),
                   ),
                 ],
               ),
@@ -435,18 +360,4 @@ class _AgentSidebarRow extends StatelessWidget {
     );
   }
 
-  /// `snippet-service/…` — the tail of the session id is the readable part,
-  /// since ids are workspace-relative paths.
-  static String _sessionSummary(List<String> sessions) {
-    if (sessions.length == 1) return _shortSession(sessions.first);
-    return '${sessions.length} sessions';
-  }
-
-  static String _shortSession(String id) {
-    final parts = id.split('/').where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return id;
-    if (parts.length == 1) return parts.first;
-    // Keep the folder plus the file, dropping the middle of a long path.
-    return '${parts.first}/…/${parts.last}';
-  }
 }

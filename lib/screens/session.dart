@@ -663,32 +663,6 @@ class _SessionScreenState extends State<SessionScreen>
         ),
       );
     }
-    if (kind == 'sent') {
-      // A direct message the user just sent. Rendering it here is what makes
-      // the send visible at all: the message lives in the agent's own thread,
-      // so without a row the composer cleared and nothing appeared to happen.
-      final agent = e['agent']?.toString() ?? '';
-      final id = e['agent_id']?.toString() ?? '';
-      return KeyedSubtree(
-        key: ValueKey('agent-sent-$index-$id'),
-        child: GestureDetector(
-          onTap: id.isEmpty
-              ? null
-              : () => openAgentThread(
-                    context,
-                    client: widget.client,
-                    agentId: id,
-                    agentName: agent.isEmpty ? id : agent,
-                  ),
-          child: AgentEventRow(
-            icon: 'send',
-            label: 'Sent to ${agent.isEmpty ? id : agent}',
-            detail: 'Open the conversation to see the reply',
-            accent: true,
-          ),
-        ),
-      );
-    }
     final from = e['from']?.toString() ?? '';
     return KeyedSubtree(
       key: ValueKey('agent-message-$index-${e['thread']}'),
@@ -1649,19 +1623,9 @@ class _SessionScreenState extends State<SessionScreen>
         // the session's point of view: nothing here records what was asked.
         originSession: widget.sessionId,
       );
-      // Show it HERE. The message lives in the agent's own thread, not this
-      // transcript, so without a row of its own a send looks like it did
-      // nothing at all — which is exactly how it read before.
-      if (mounted) {
-        setState(() {
-          _agentEvents.add({
-            'event': 'sent',
-            'agent_id': agentId,
-            'agent': name,
-          });
-          _transcriptDirty = true;
-        });
-      }
+      // No optimistic row here: the daemon records the sent message as an
+      // `agent_message` event in THIS session, which now renders in the
+      // transcript. A local row on top of that would show the same send twice.
       _toast('Sent to $name');
     } catch (e) {
       // Put the text back: a failed send must not cost the user what they wrote.
@@ -3546,7 +3510,7 @@ class _SessionScreenState extends State<SessionScreen>
     final picked = await pickAgentId(
       context,
       widget.client,
-      title: 'Dispatch to',
+      title: 'Send to',
       // An agent already on this session is not offered again: it is reached by
       // messaging the session itself, so listing it twice would be ambiguous.
       exclude: _sessionAgentIds,
@@ -3562,7 +3526,7 @@ class _SessionScreenState extends State<SessionScreen>
     // Pin it to the session so the composer shows WHO can be reached without
     // walking the directory again next time.
     _pinSessionAgent(picked.id);
-    _toast('Dispatching to ${_recipientAgentName}');
+    _toast('Sending to ${_recipientAgentName}');
   }
 
   void _clearRecipient() {
@@ -3787,12 +3751,12 @@ class _SessionScreenState extends State<SessionScreen>
                                   Builder(
                                     builder: (ctx) => _recipientAgentId == null
                                         ? _composerChip(
-                                            icon: 'users',
-                                            label: 'Dispatch',
+                                            icon: 'send',
+                                            label: 'Send to',
                                             onTap: () => _pickRecipient(ctx),
                                           )
                                         : _composerChip(
-                                            icon: 'users',
+                                            icon: 'send',
                                             label: _recipientAgentName ??
                                                 _recipientAgentId!,
                                             selected: true,
@@ -4136,6 +4100,20 @@ class _SessionScreenState extends State<SessionScreen>
               Padding(
                   padding: const EdgeInsets.only(top: 4, bottom: 4),
                   child: Bubble(mine: false, text: reply)));
+        // A direct message between this session and an agent. The service records
+        // BOTH directions so the exchange reads as one conversation: what this
+        // session sent out, and what came back. Rendering only the reply would
+        // leave it appearing from nowhere, and rendering neither — which is what
+        // happened here — made a dispatch look like it was never stored at all.
+        case 'agent_message':
+          endTools(key);
+          addEvent(
+              key,
+              _AgentMessageCard(
+                agentId: _s(e['agent_id']),
+                body: _s(e['body']),
+                outbound: e['outbound'] == true,
+              ));
         case 'model_error':
           endTools(key);
           addEvent(key, NoteLine(_s(e['message']), error: true));
@@ -4414,22 +4392,20 @@ class _SessionScreenState extends State<SessionScreen>
     );
   }
 
-  /// The task board. ONE destination: it carries the tasks, the agents on
-  /// them, and the handoffs between them, so the old coordination hub — with
-  /// its separate Active/Handoffs sections — is gone.
-  /// Put an agent to work in THIS session, with an optional inference profile.
+  /// Message an agent from THIS session.
   ///
-  /// The daemon mints the goal, assignment, and lease, so this only has to
-  /// describe the work — the client never invents server-owned state.
+  /// The message carries this session as its origin, so the agent knows which
+  /// session to reply in and which session to request dispatch on. Nothing here
+  /// creates work: dispatching belongs to Mission Control.
   Future<void> _giveWork() async {
-    final dispatched = await showAgentWorkSheet(
+    final sent = await showAgentWorkSheet(
       context,
       client: widget.client,
       sessionId: widget.sessionId,
       workspaceLabel: _state?.workspace,
     );
-    if (dispatched && mounted) {
-      _toast('Dispatched — the agent will report on the task board');
+    if (sent && mounted) {
+      _toast('Sent — the agent replies in this session');
     }
   }
 
@@ -5488,6 +5464,71 @@ class _DirectMessageCard extends StatelessWidget {
   }
 }
 
+/// Transcript card for a direct message between this session and an agent.
+///
+/// Both directions render, so the exchange reads as one conversation: what this
+/// session sent out, and what came back. `outbound` picks the wording — the
+/// service records the flag, so the card never has to guess from the text.
+class _AgentMessageCard extends StatelessWidget {
+  const _AgentMessageCard({
+    required this.agentId,
+    required this.body,
+    required this.outbound,
+  });
+
+  final String agentId;
+  final String body;
+  final bool outbound;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                  color: AppColors.accent, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(
+                        outbound
+                            ? 'Sent to $agentId'
+                            : 'Reply from $agentId',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13.5, color: AppColors.fg1)),
+                  ),
+                  Text(outbound ? 'sent' : 'reply',
+                      style: sans(12, color: AppColors.fg4)),
+                ]),
+                if (body.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(body.trim(),
+                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Transcript card for an assignment handed to this session.
 ///
 /// The line a worker actually needs: what the work is, and how it knows it is
@@ -6459,9 +6500,9 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             onTap: widget.onTasks),
       if (widget.onGiveWork != null)
         _row(
-            icon: 'users',
-            label: 'Give an agent work',
-            detail: 'Dispatch a task to an agent with an inference profile',
+            icon: 'send',
+            label: 'Message an agent',
+            detail: 'Send a message to an agent from this session',
             onTap: widget.onGiveWork),
       _row(
           icon: 'scheduled',

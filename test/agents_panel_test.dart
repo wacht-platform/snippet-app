@@ -33,8 +33,6 @@ class _FakeAgentsClient extends DaemonClient {
         }),
       ];
 
-  @override
-  Future<List<CoordinationLease>> coordinationActiveLeases() async => const [];
 }
 
 void main() {
@@ -106,14 +104,11 @@ void main() {
     await asDesktop(() async {
       await pumpPanel(tester);
 
-      // Canonical content x is list inset 8 + kNavPadH 12 = 20. This panel's
-      // group labels and rows were both at 16 (8 + its own 8), which is what
-      // read as inset differently from the rest of the rail.
+      // Canonical content x is list inset 8 + kNavPadH 12 = 20. Rows used to sit
+      // at 16 (8 + this panel's own 8), which is what read as inset differently
+      // from the rest of the rail. The active/idle grouping is gone — a lease is
+      // never acquired, so every row is idle — leaving one flat list.
       const expected = kSidebarContentInset + kNavPadH;
-
-      final group = tester.getTopLeft(find.text('IDLE')).dx;
-      expect(group, closeTo(expected, 0.5),
-          reason: 'group labels must share the header/row content x');
 
       final avatar = tester.getTopLeft(find.byType(CircleAvatar)).dx;
       expect(avatar, closeTo(expected, 0.5),

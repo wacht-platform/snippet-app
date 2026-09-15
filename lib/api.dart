@@ -821,65 +821,6 @@ class DaemonClient {
         jsonDecode(r.body) as Map<String, dynamic>);
   }
 
-  /// POST /coordination/assignments — offer work to a specialized agent.
-  Future<CoordinationAssignment> createCoordinationAssignment({
-    required String id,
-    required String goalId,
-    required String sessionId,
-    required String agentId,
-    required String scope,
-    required String definitionOfDone,
-  }) async {
-    final r = await http.post(
-      _uri('/coordination/assignments'),
-      headers: _json,
-      body: jsonEncode({
-        'id': id,
-        'goal_id': goalId,
-        'session_id': sessionId,
-        'agent_id': agentId,
-        'scope': scope,
-        'definition_of_done': definitionOfDone,
-      }),
-    );
-    if (r.statusCode != 201) throw _err('create coordination assignment', r);
-    return CoordinationAssignment.fromJson(
-        jsonDecode(r.body) as Map<String, dynamic>);
-  }
-
-  /// POST /coordination/dispatch — give an agent work in a session.
-  ///
-  /// One call, because the server mints the ids a client cannot safely invent:
-  /// the goal, the assignment id, and the turn lease. Pass [profile] to run THIS
-  /// dispatch on a specific inference profile; omit it to leave the session's own.
-  Future<CoordinationAssignment> dispatchAgentWork({
-    required String sessionId,
-    String? agentId,
-    required String scope,
-    required String definitionOfDone,
-    String? profile,
-    String? goalId,
-  }) async {
-    final payload = <String, dynamic>{
-      'session_id': sessionId,
-      'scope': scope,
-      'definition_of_done': definitionOfDone,
-    };
-    if (agentId != null && agentId.isNotEmpty) payload['agent_id'] = agentId;
-    if (profile != null && profile.isNotEmpty) payload['profile'] = profile;
-    if (goalId != null && goalId.isNotEmpty) payload['goal_id'] = goalId;
-    final r = await http.post(
-      _uri('/coordination/dispatch'),
-      headers: _json,
-      body: jsonEncode(payload),
-    );
-    if (r.statusCode != 202 && r.statusCode != 200) {
-      throw _err('dispatch agent work', r);
-    }
-    return CoordinationAssignment.fromJson(
-        jsonDecode(r.body) as Map<String, dynamic>);
-  }
-
   /// POST /coordination/direct/messages — send a direct message to an agent.
   ///
   /// A conversation, not a command: it never creates a task or authorises a
@@ -984,123 +925,6 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('mark thread read', r);
   }
 
-  /// POST /coordination/sessions/{sessionId}/lease — acquire a fenced turn lease.
-  Future<CoordinationLease> acquireCoordinationLease({
-    required String sessionId,
-    required String leaseId,
-    required String assignmentId,
-    required String agentId,
-    required String expiresAt,
-  }) async {
-    final r = await http.post(
-      _uri('/coordination/sessions/${Uri.encodeComponent(sessionId)}/lease'),
-      headers: _json,
-      body: jsonEncode({
-        'lease_id': leaseId,
-        'assignment_id': assignmentId,
-        'agent_id': agentId,
-        'expires_at': expiresAt,
-      }),
-    );
-    if (r.statusCode != 201) throw _err('acquire coordination lease', r);
-    return CoordinationLease.fromJson(
-        jsonDecode(r.body) as Map<String, dynamic>);
-  }
-
-  /// DELETE /coordination/sessions/{sessionId}/lease/{leaseId}.
-  Future<void> releaseCoordinationLease({
-    required String sessionId,
-    required String leaseId,
-  }) async {
-    final uri = _uri(
-      '/coordination/sessions/${Uri.encodeComponent(sessionId)}/lease/${Uri.encodeComponent(leaseId)}',
-    );
-    final r = await http.delete(uri);
-    if (r.statusCode != 204) throw _err('release coordination lease', r);
-  }
-
-  /// POST /coordination/sessions/{sessionId}/lease/{leaseId}/renew.
-  Future<CoordinationLease> renewCoordinationLease({
-    required String sessionId,
-    required String leaseId,
-    required int fencingToken,
-    required String expiresAt,
-  }) async {
-    final r = await http.post(
-      _uri(
-          '/coordination/sessions/${Uri.encodeComponent(sessionId)}/lease/${Uri.encodeComponent(leaseId)}/renew'),
-      headers: _json,
-      body:
-          jsonEncode({'fencing_token': fencingToken, 'expires_at': expiresAt}),
-    );
-    if (r.statusCode != 200) throw _err('renew coordination lease', r);
-    return CoordinationLease.fromJson(
-        jsonDecode(r.body) as Map<String, dynamic>);
-  }
-
-  /// GET /coordination/handoffs — unacknowledged handoffs awaiting a successor.
-  Future<List<CoordinationHandoff>> coordinationHandoffs() async {
-    final r = await http.get(_uri('/coordination/handoffs'));
-    if (r.statusCode != 200) throw _err('list coordination handoffs', r);
-    final list = jsonDecode(r.body) as List;
-    return list
-        .map((e) => CoordinationHandoff.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// POST /coordination/handoffs/{handoffId}/acknowledge.
-  Future<void> acknowledgeCoordinationHandoff(String handoffId) async {
-    final r = await http.post(
-      _uri(
-          '/coordination/handoffs/${Uri.encodeComponent(handoffId)}/acknowledge'),
-      headers: _json,
-    );
-    if (r.statusCode != 204) throw _err('acknowledge coordination handoff', r);
-  }
-
-  /// GET /coordination/leases — sessions that currently have a turn holder, i.e.
-  /// which agent is active where.
-  Future<List<CoordinationLease>> coordinationActiveLeases() async {
-    final r = await http.get(_uri('/coordination/leases'));
-    if (r.statusCode != 200) throw _err('list coordination leases', r);
-    final list = jsonDecode(r.body) as List;
-    return list
-        .map((e) => CoordinationLease.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// GET /coordination/assignments — outstanding and past work, optionally
-  /// narrowed to one agent or one session.
-  Future<List<CoordinationAssignment>> coordinationAssignments({
-    String? agentId,
-    String? sessionId,
-    int limit = 200,
-  }) async {
-    final r = await http.get(_uri('/coordination/assignments', {
-      'limit': '$limit',
-      if (agentId != null && agentId.isNotEmpty) 'agent_id': agentId,
-      if (sessionId != null && sessionId.isNotEmpty) 'session_id': sessionId,
-    }));
-    if (r.statusCode != 200) throw _err('list coordination assignments', r);
-    final list = jsonDecode(r.body) as List;
-    return list
-        .map((e) => CoordinationAssignment.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// GET /coordination/sessions/{id}/agents — which agents are (and were) in a
-  /// session, active holder first, then history.
-  Future<List<CoordinationSessionAgent>> coordinationSessionAgents(
-      String sessionId) async {
-    final r = await http.get(_uri(
-        '/coordination/sessions/${Uri.encodeComponent(sessionId)}/agents'));
-    if (r.statusCode != 200) throw _err('list session agents', r);
-    final list = jsonDecode(r.body) as List;
-    return list
-        .map(
-            (e) => CoordinationSessionAgent.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
 
   /// GET /coordination/threads/{threadId}/events — cursor-paged board events.
   Future<List<CoordinationEvent>> coordinationEvents(
@@ -1171,8 +995,13 @@ class DaemonClient {
   }
 
   /// POST /coordination/tasks.
+  ///
+  /// [sessionId] is the session that should do the work. It is REQUIRED by the
+  /// daemon: a task with no target can never be dispatched, so it would sit on
+  /// the board forever instead of running.
   Future<TaskItem> createTask({
     required String title,
+    required String sessionId,
     String description = '',
     int priority = 0,
   }) async {
@@ -1182,6 +1011,7 @@ class DaemonClient {
       body: jsonEncode({
         'title': title,
         'description': description,
+        'session_id': sessionId,
         'priority': priority,
       }),
     );

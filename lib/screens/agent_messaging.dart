@@ -6,21 +6,15 @@ import '../panel.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
-/// Pick one agent from the directory.
-///
-/// Returns null when dismissed. Shared by the composer's recipient picker and
-/// the "give work" sheet so both offer the same list, in the same order, with
-/// the same description.
-///
 /// Pick one agent from the directory, as an anchored DROPDOWN.
 ///
 /// Returns null when dismissed. Shared by the composer's recipient picker and
-/// the "give work" sheet so both offer the same list, in the same order.
+/// the message sheet so both offer the same list, in the same order.
 ///
 /// Mission Control is NOT offered. It is the coordinator, reached by opening its
 /// own session, so listing it as a recipient elsewhere would be a second path to
 /// the same place — and would let a message meant for a worker land on the
-/// dispatcher. Agents reach Mission Control through their own tools, not here.
+/// coordinator. Agents reach Mission Control through their own tools, not here.
 Future<CoordinationAgent?> pickAgentId(
   BuildContext context,
   DaemonClient client, {
@@ -41,7 +35,7 @@ Future<CoordinationAgent?> pickAgentId(
           !exclude.contains(a.id) &&
           // Mission Control is reached through its own chat, not picked here.
           // Offering it would let a message aimed at a worker land on the
-          // dispatcher.
+          // coordinator.
           !a.isMissionControl)
       .toList();
   if (!context.mounted) return null;
@@ -78,12 +72,12 @@ Future<CoordinationAgent?> pickAgentId(
   return null;
 }
 
-/// Give one agent work in one session, in a single step.
+/// Message one agent from one session.
 ///
-/// The sheet collects only what a human can decide — who, what, and how the
-/// agent knows it is done — plus an optional inference profile for THIS
-/// dispatch. The daemon mints the goal, assignment id, and turn lease, so the
-/// client never invents server-owned state.
+/// The sheet collects only what a human can decide — who, and what to say. It
+/// sends a DIRECT MESSAGE carrying this session as its origin, so the agent
+/// knows which session to reply in and which session to request dispatch on.
+/// Nothing here creates work: dispatching belongs to Mission Control.
 class AgentWorkSheet extends StatefulWidget {
   const AgentWorkSheet({
     super.key,
@@ -109,13 +103,10 @@ class AgentWorkSheet extends StatefulWidget {
 }
 
 class _AgentWorkSheetState extends State<AgentWorkSheet> {
-  final _scope = TextEditingController();
-  final _done = TextEditingController();
+  final _message = TextEditingController();
 
-  List<InferenceProfile> _profiles = const [];
   String? _agentId;
   String? _agentName;
-  String? _profile;
   bool _loading = true;
   bool _sending = false;
   String? _error;
@@ -129,24 +120,15 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
 
   @override
   void dispose() {
-    _scope.dispose();
-    _done.dispose();
+    _message.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     try {
-      // Profiles come from the same config the model picker reads, so the sheet
-      // offers exactly the profiles the daemon knows about.
-      final results = await Future.wait([
-        widget.client.coordinationAgents(),
-        widget.client.getConfig(),
-      ]);
-      final agents = results[0] as List<CoordinationAgent>;
-      final cfg = results[1] as ServerConfig;
+      final agents = await widget.client.coordinationAgents();
       if (!mounted) return;
       setState(() {
-        _profiles = cfg.profiles;
         _loading = false;
         // Resolve a display name for a pre-selected agent; leave the choice
         // open otherwise.
@@ -181,10 +163,9 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
       setState(() => _error = 'Choose an agent');
       return;
     }
-    final scope = _scope.text.trim();
-    final done = _done.text.trim();
-    if (scope.isEmpty || done.isEmpty) {
-      setState(() => _error = 'Scope and definition of done are required');
+    final message = _message.text.trim();
+    if (message.isEmpty) {
+      setState(() => _error = 'Write a message');
       return;
     }
     setState(() {
@@ -192,19 +173,20 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
       _error = null;
     });
     try {
-      await widget.client.dispatchAgentWork(
-        sessionId: widget.sessionId,
-        agentId: agentId,
-        scope: scope,
-        definitionOfDone: done,
-        profile: _profile,
+      await widget.client.sendAgentMessage(
+        toAgentId: agentId,
+        body: message,
+        // Ask FROM this session. The agent then knows which session to reply in
+        // AND which session to request dispatch on — the whole reason this is a
+        // message rather than a dispatch.
+        originSession: widget.sessionId,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      // Keep the sheet and its input: a failed dispatch must not cost the
-      // user what they just typed.
+      // Keep the sheet and its input: a failed send must not cost the user what
+      // they just typed.
       setState(() {
         _sending = false;
         _error = '$e';
@@ -263,54 +245,12 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
         ),
         const SizedBox(height: 14),
         AppField(
-          label: 'scope',
-          controller: _scope,
+          label: 'message',
+          controller: _message,
           hint: 'What should this agent do?',
-          minLines: 2,
-          maxLines: 5,
+          minLines: 3,
+          maxLines: 7,
           enabled: !_sending,
-        ),
-        const SizedBox(height: 14),
-        AppField(
-          label: 'definition of done',
-          controller: _done,
-          hint: 'How will it know the work is finished?',
-          minLines: 2,
-          maxLines: 5,
-          enabled: !_sending,
-        ),
-        const SizedBox(height: 14),
-        Text('inference profile', style: mono(10, color: AppColors.fg4)),
-        const SizedBox(height: 4),
-        Material(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.sm),
-          child: Builder(
-            builder: (ctx) => InkWell(
-              onTap: _sending ? null : () => _chooseProfile(ctx),
-              borderRadius: BorderRadius.circular(R.sm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-              child: Row(children: [
-                AppIcon('sparkles', size: 15, color: AppColors.fg3),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(_profile ?? "session's own profile",
-                      style: sans(13,
-                          color: _profile == null
-                              ? AppColors.fg4
-                              : AppColors.fg1)),
-                ),
-                AppIcon('chevron-down', size: 13, color: AppColors.fg4),
-              ]),
-            ),
-          ),
-        ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Applies to this dispatch only; the session keeps its own model.',
-          style: sans(11, color: AppColors.fg4),
         ),
         if (_error != null) ...[
           const SizedBox(height: 12),
@@ -328,7 +268,7 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Btn(_sending ? 'Dispatching…' : 'Dispatch',
+            child: Btn(_sending ? 'Sending…' : 'Send',
                 full: true,
                 disabled: _sending,
                 onTap: _submit),
@@ -337,47 +277,13 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
       ],
     );
   }
-
-  Future<void> _chooseProfile(BuildContext anchor) async {
-    final picked = await showAppMenu<String>(
-      context,
-      anchor: anchor,
-      minWidth: 260,
-      maxWidth: 340,
-      items: [
-        appMenuHeading<String>('Inference profile'),
-        // Clearing the choice is a real option: it means "use whatever the
-        // session already runs on", not "no model".
-        appMenuRow<String>(
-          value: '',
-          icon: 'sparkles',
-          label: "Session's own profile",
-          description: 'Use the model this session already runs on',
-          selected: _profile == null,
-        ),
-        for (final p in _profiles)
-          appMenuRow<String>(
-            value: p.name,
-            icon: 'sparkles',
-            label: p.name,
-            // Only a usable profile can actually run the dispatch.
-            description: p.usable
-                ? '${p.provider} · ${p.model}'
-                : '${p.provider} · ${p.model} — unusable',
-            selected: _profile == p.name,
-          ),
-      ],
-    );
-    if (picked == null || !mounted) return;
-    setState(() => _profile = picked.isEmpty ? null : picked);
-  }
 }
 
 /// A direct conversation with one agent.
 ///
 /// This is conversation, not work control: it shows what was said and lets the
-/// user reply. Turning a message into a task happens through the "give work"
-/// flow, so a chat can never silently authorise a workspace change.
+/// user reply. A message never authorises a workspace change, so a chat cannot
+/// silently start work.
 class AgentThreadScreen extends StatefulWidget {
   const AgentThreadScreen({
     super.key,
@@ -645,8 +551,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   }
 }
 
-/// Open the "give work" sheet for a session, reporting whether anything was
-/// dispatched so the caller can refresh a roster or board.
+/// Open the message sheet for a session, reporting whether anything was sent so
+/// the caller can refresh a roster or board.
 Future<bool> showAgentWorkSheet(
   BuildContext context, {
   required DaemonClient client,
@@ -656,7 +562,7 @@ Future<bool> showAgentWorkSheet(
 }) async {
   final done = await showAppSheet<bool>(
     context,
-    title: 'Give an agent work',
+    title: 'Message an agent',
     child: AgentWorkSheet(
       client: client,
       sessionId: sessionId,
