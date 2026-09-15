@@ -405,6 +405,15 @@ class M {
 /// why it stuck to the sides of the shell.
 const double kComposerGutter = 16;
 
+/// Reading measure for long-form prose — roughly 75 characters at the 16px body
+/// size (measured: 7.29px average advance, so 547px ≈ 75ch).
+///
+/// The transcript column is 820px, which is ~112 characters per line: past the
+/// 60–75ch range where the eye reliably finds the next line. Prose is capped to
+/// this width; code blocks are NOT — they already scroll horizontally inside
+/// their own box, so a narrower measure costs them nothing.
+const double kProseMeasure = 547;
+
 // ---------------------------------------------------------------------------
 // Typography — Geist for UI, JetBrains Mono for code.
 //
