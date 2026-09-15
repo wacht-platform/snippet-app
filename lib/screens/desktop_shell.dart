@@ -5891,12 +5891,23 @@ class _SidebarState extends State<_Sidebar> {
               // title, and its glyph rendered as a dark blob rather than a
               // control. The same actions live on long-press.
               //
+              // Who is working in this session, inline. Rendered only when an
+              // agent is actually dispatched here, so an ordinary chat keeps the
+              // row's original spacing. Tinted by run state, like the desktop
+              // sidebar, so an agent merely assigned reads differently from one
+              // mid-turn.
+              if (s.displayAgentId != null &&
+                  s.displayAgentId!.trim().isNotEmpty) ...[
+                const SizedBox(width: 8),
+                _AgentBadge(
+                  agentId: s.displayAgentId!,
+                  working: sessionIsActive(s.status),
+                ),
+              ],
               // The gap is REQUIRED, not cosmetic: the title is `Expanded`, so a
               // long one fills the full width and butts straight against the
               // time — the two run together with no separation.
               if (!renaming) ...[
-                // Who is working in this session, inline. Empty renders nothing,
-                // so the 10px gap below is the row's original spacing.
                 const SizedBox(width: 10),
                 Text(relativeTime(s.lastActive),
                     style: sans(M.meta, color: AppColors.fg4)),
