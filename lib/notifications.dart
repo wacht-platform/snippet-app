@@ -387,6 +387,32 @@ Future<String?> setNotificationsEnabled(bool on) async {
   return startWatching();
 }
 
+/// Whether the Android watcher service is currently running.
+///
+/// The shell consults this to decide what back means at the app root: with the
+/// watcher up, backing out should background the app (keeping the watcher) the
+/// way `WithForegroundTask` used to, rather than finishing it.
+Future<bool> watcherServiceRunning() async {
+  if (!kMobile) return false;
+  try {
+    return await FlutterForegroundTask.isRunningService;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Send the app to the background without finishing it, so a running watcher
+/// service survives. Used for back at the root while watching.
+///
+/// `FlutterForegroundTask.minimizeApp()` returns `void` (it fires a platform
+/// channel message), so there is nothing to await.
+void minimizeApp() {
+  if (!kMobile) return;
+  try {
+    FlutterForegroundTask.minimizeApp();
+  } catch (_) {}
+}
+
 /// Start the watcher (idempotent). Returns an error string or null.
 Future<String?> startWatching() async {
   if (kMobile) {

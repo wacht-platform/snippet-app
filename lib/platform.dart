@@ -21,7 +21,14 @@ bool get kDesktopNotify =>
 bool get kCanRecord => kMobile || kMacOS;
 
 /// True wherever we can deliver session notifications at all.
-bool get kCanNotify => kMobile || kDesktopNotify;
+///
+/// MOBILE ONLY. The desktop shell has no notification surface: there is no bell
+/// in the window chrome and no inbox, so the only control was the Settings >
+/// Alerts toggle. Removing just that toggle would strand anyone who had already
+/// enabled watching — with the setting on and no way to turn it off — so the
+/// delivery gate is narrowed too. Hiding both together is what keeps the UI and
+/// the machinery from disagreeing.
+bool get kCanNotify => kMobile;
 
 /// macOS specifically — the window draws full-size content, so the traffic-light
 /// controls overlay the top-left; the shell insets its top to clear them.
@@ -32,8 +39,36 @@ bool get kMacOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 /// sites guard on this to fall back instead of throwing MissingPluginException.
 bool get kWindows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 
-/// Height to reserve at the top for the macOS window controls.
+/// Height reserved for the macOS traffic lights when the sidebar has to clear
+/// the native window chrome (narrow layout, drawer).
+///
+/// This is AppKit's own titlebar height: the lights are positioned natively and
+/// are NOT moved by the app.
 const double kMacTitlebar = 28.0;
+
+/// Height of the app's painted title bar.
+///
+/// Deliberately taller than [kMacTitlebar]. At 28px the bar crushed the tabs
+/// against the window edge; the reference measures its title bar at 40px with
+/// 32px tabs sitting on the bar's bottom edge. The extra height is painted by
+/// Flutter, and `MainFlutterWindow` nudges the traffic lights down so they stay
+/// centred in the taller band.
+const double kTitleBarHeight = 40.0;
+
+/// Tab height inside [kTitleBarHeight]. Bottom-aligned, so the active tab
+/// merges into the navigation band beneath it.
+const double kTitleTabHeight = 32.0;
+
+/// Horizontal space reserved at the left of the title bar, before the tab
+/// strip.
+///
+/// Measured: the reference's tab strip begins at x128, with a 128px block to
+/// its left. For us that block holds the native traffic lights (which AppKit
+/// places at the window's left) plus the same breathing room — so the tabs land
+/// on the same axis as the reference rather than 44px to its left, which is what
+/// read as the bar being "compressed".
+const double kTrafficLightReserve = 128.0;
+
 const _windowStateChannel = MethodChannel('snippet/window_state');
 
 /// Whether macOS is in native full-screen mode. Other platforms never need a

@@ -37,7 +37,7 @@ class TaskDetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(t.title as String,
-                style: sans(18, weight: FontWeight.w600, color: AppColors.fg1)),
+                style: sans(18, weight: FontWeight.w500, color: AppColors.fg1)),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,

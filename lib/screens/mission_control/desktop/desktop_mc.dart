@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 
 import '../../../theme.dart';
 import '../../../widgets.dart';
+import '../../../panel.dart';
+import '../coordination_agent_directory.dart';
+import '../task_board_screen.dart';
 import '../mission_control_screen.dart' show ChangeNotifierProvider;
 import '../mission_control_state.dart';
 import '../widgets/mission_control_header.dart';
@@ -135,6 +138,39 @@ class _LeftRail extends StatelessWidget {
         children: [
           const SectionLabel('Active tasks'),
           const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Btn('Agents',
+                    small: true,
+                    icon: 'users',
+                    full: true,
+                    onTap: () => presentScreen(
+                          context,
+                          style: PanelStyle.drawer,
+                          builder: (_, close) =>
+                              CoordinationAgentDirectory(client: state.client),
+                        )),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Btn('Tasks',
+                    small: true,
+                    icon: 'layers',
+                    full: true,
+                    onTap: () => presentScreen(
+                          context,
+                          style: PanelStyle.drawer,
+                          builder: (_, close) => TaskBoardScreen(
+                            client: state.client,
+                          ),
+                        )),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const SectionLabel('Active tasks'),
+          const SizedBox(height: 8),
           if (state.activeTasks.isEmpty)
             _emptyHint('No active tasks')
           else
@@ -155,7 +191,7 @@ class _LeftRail extends StatelessWidget {
 
   Widget _emptyHint(String text) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Text(text, style: sans(12, color: AppColors.fg4)),
+        child: Text(text, style: sans(12, color: AppColors.fg3)),
       );
 }
 
@@ -394,7 +430,7 @@ class _SessionInspector extends StatelessWidget {
             (session.title as String).isEmpty
                 ? session.folder as String
                 : session.title as String,
-            style: sans(15, weight: FontWeight.w600, color: AppColors.fg1),
+            style: sans(16, weight: FontWeight.w500, color: AppColors.fg1),
           ),
           const SizedBox(height: 4),
           Text(session.folder as String, style: mono(11, color: AppColors.fg3)),

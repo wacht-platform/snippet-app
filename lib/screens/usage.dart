@@ -6,11 +6,22 @@ import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'shell_nav.dart';
 
 class UsageScreen extends StatefulWidget {
   final DaemonClient client;
   final bool embedded;
-  const UsageScreen({super.key, required this.client, this.embedded = false});
+
+  /// Host-supplied back action for [embedded] use. This screen draws its OWN
+  /// `NavBackRow`, so exactly one header exists per level.
+  final VoidCallback? onBack;
+
+  const UsageScreen({
+    super.key,
+    required this.client,
+    this.embedded = false,
+    this.onBack,
+  });
 
   @override
   State<UsageScreen> createState() => _UsageScreenState();
@@ -58,7 +69,7 @@ class _UsageScreenState extends State<UsageScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text('${snap.error}',
                     textAlign: TextAlign.center,
-                    style: mono(10.5, color: AppColors.fg4)),
+                    style: mono(10, color: AppColors.fg3)),
               ),
               const SizedBox(height: 10),
               Btn('Retry', small: true, onTap: _refresh),
@@ -69,7 +80,7 @@ class _UsageScreenState extends State<UsageScreen> {
         if (summary.providers.isEmpty) {
           return Center(
               child: Text('No provider usage has been reported yet.',
-                  style: sans(12.5, color: AppColors.fg3)));
+                  style: sans(12, color: AppColors.fg3)));
         }
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
@@ -79,7 +90,18 @@ class _UsageScreenState extends State<UsageScreen> {
         );
       },
     );
-    if (widget.embedded) return body;
+    if (widget.embedded) {
+      // No back action → desktop dialog pane, where the host's section chip strip
+      // is the navigation. Drawing a row anyway duplicates it.
+      if (widget.onBack == null) return body;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          NavBackRow(title: 'Usage', onBack: widget.onBack!),
+          Expanded(child: body),
+        ],
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.surface1,
       body: Column(children: [
@@ -103,11 +125,11 @@ class _ProviderCard extends StatelessWidget {
         Row(children: [
           Expanded(
             child: Text(provider.provider,
-                style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
+                style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)),
           ),
           Text(
               '${provider.sessions} session${provider.sessions == 1 ? '' : 's'}',
-              style: mono(10.5, color: AppColors.fg4)),
+              style: mono(10, color: AppColors.fg3)),
         ]),
         if (provider.profile != null || provider.model.isNotEmpty) ...[
           const SizedBox(height: 3),
@@ -127,8 +149,39 @@ class _ProviderCard extends StatelessWidget {
         ],
         if (provider.rateLimits.isEmpty) ...[
           const SizedBox(height: 12),
-          Text('No reported rate-limit usage yet.',
-              style: sans(11.5, color: AppColors.fg4)),
+          // THREE states, worded distinctly — a single generic "no usage yet"
+          // said the wrong thing in two of them:
+          //   true  → provider publishes limits, we just haven't seen one yet
+          //   false → provider never publishes them; "yet" would promise a
+          //           number the API cannot produce
+          //   null  → daemon predates the flag; assert nothing either way
+          Row(children: [
+            AppIcon(
+                switch (provider.rateLimitsSupported) {
+                  true => 'clock',
+                  false => 'alert-circle',
+                  null => 'sparkles',
+                },
+                size: 12,
+                color: AppColors.fg4),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                  switch (provider.rateLimitsSupported) {
+                    true =>
+                      'No rate-limit report yet — this provider publishes them, none seen so far.',
+                    // Not "doesn't publish rate limits": xAI does send
+                    // x-ratelimit-* headers, but they are flat API caps with no
+                    // window or reset — not the subscription quota shown here.
+                    // Claiming it publishes nothing would be false, and showing
+                    // those numbers would invent an unrelated figure.
+                    false =>
+                      'Subscription limits aren’t exposed by this provider’s API.',
+                    null => 'No reported rate-limit usage.',
+                  },
+                  style: sans(11, height: 1.35, color: AppColors.fg3)),
+            ),
+          ]),
         ] else ...[
           const SizedBox(height: 12),
           for (final rate in provider.rateLimits) ...[
@@ -150,7 +203,7 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: sans(10.5, color: AppColors.fg4)),
+          Text(label, style: sans(10, color: AppColors.fg3)),
           const SizedBox(height: 2),
           Text(value, style: mono(12, color: AppColors.fg2)),
         ],
@@ -163,24 +216,37 @@ class _RateRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reset = rateResetLabel(rate.resetsAt);
+    // The window rolled over since this snapshot was taken. Do NOT draw the bar
+    // or the percentage: both would state the PREVIOUS window's usage as if it
+    // were current (99% used / 1% left on a window that has already reset).
+    if (rate.isExpired) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(rateWindowLabel(rate.windowMinutes),
+            style: sans(11, color: AppColors.fg3)),
+        const SizedBox(height: 4),
+        Text('rolled over · awaiting the next report',
+            style: mono(10, color: AppColors.fg3)),
+      ]);
+    }
+
     final remaining = rate.leftPercent;
     final color = remaining < 20
         ? AppColors.danger
         : remaining < 50
             ? AppColors.run
             : AppColors.ok;
-    final reset = rateResetLabel(rate.resetsAt);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text(rateWindowLabel(rate.windowMinutes),
-            style: sans(11.5, color: AppColors.fg2)),
-        Text('${remaining.round()}% left', style: mono(10.5, color: color)),
+            style: sans(11, color: AppColors.fg2)),
+        Text('${remaining.round()}% left', style: mono(10, color: color)),
       ]),
       const SizedBox(height: 5),
       Progress(pct: remaining, color: color, height: 6),
       if (reset != null) ...[
         const SizedBox(height: 4),
-        Text(reset, style: mono(10, color: AppColors.fg4)),
+        Text(reset, style: mono(10, color: AppColors.fg3)),
       ],
     ]);
   }

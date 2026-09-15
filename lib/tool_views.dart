@@ -13,8 +13,8 @@ import 'widgets.dart';
 List<Map> _mapItems(dynamic value) =>
     value is List ? value.whereType<Map>().toList() : const <Map>[];
 
-/// Per-tool rendering: a glyph + one-line summary for the inline ToolLine, and a
-// rich, tool-specific body for the detail drawer (never raw JSON unless unknown).
+/// Per-tool rendering: a glyph + one-line summary for the inline tool row, and
+// a rich, tool-specific body for the detail drawer (never raw JSON unless unknown).
 
 /// Lucide-ish glyph name for a tool (resolved via [iconFor]).
 String toolIcon(String tool) => switch (tool) {
@@ -47,7 +47,11 @@ String toolArgSummary(String tool, dynamic args) {
   String s(String k) => args[k]?.toString() ?? '';
   String first(String v) => v.split('\n').first.trim();
   final v = switch (tool) {
-    'bash' => 'shell command',
+    // The command itself, not a placeholder. Showing "shell command" for every
+    // bash call made the transcript unreadable: `cargo test`, `rm -rf build` and
+    // `git push` all rendered identically, so a person watching the agent work
+    // could not tell what it was doing without expanding every row.
+    'bash' => s('command'),
     'search_content' || 'web_search' => s('query'),
     'search_files' => s('pattern'),
     'web_read' => s('url'),
@@ -244,7 +248,7 @@ Widget toolDetailView(BuildContext context,
   rows.addAll(_toolBody(context, tool, a, d, status));
 
   if (rows.isEmpty) {
-    rows.add(Text('No details.', style: sans(12.5, color: AppColors.fg3)));
+    rows.add(Text('No details.', style: sans(12, color: AppColors.fg3)));
   }
   return _wrap(rows);
 }
@@ -375,7 +379,7 @@ List<Widget> _bashView(Map? a, Map? d) {
   final stderr =
       _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
   if (cmd.isEmpty && stdout.isEmpty && stderr.isEmpty) {
-    return [Text('no output', style: mono(11.5, color: AppColors.fg4))];
+    return [Text('no output', style: mono(11, color: AppColors.fg3))];
   }
   return [_ShellPanel(command: cmd, stdout: stdout, stderr: stderr)];
 }
@@ -481,7 +485,7 @@ List<Widget> _codeMapView(Map? a, Map? d) {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           child: Text(s.toString(),
-              style: mono(11.5, height: 1.4, color: AppColors.fg2)),
+              style: mono(11, height: 1.4, color: AppColors.fg2)),
         ),
     ]));
   }
@@ -514,12 +518,12 @@ List<Widget> _webReadView(Map? a, Map? d) {
   final title = d?['title']?.toString() ?? '';
   if (title.isNotEmpty) {
     out.add(Text(title,
-        style: sans(14.5, weight: FontWeight.w600, color: AppColors.fg1)));
+        style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)));
     out.add(const SizedBox(height: 4));
   }
   if (d?['published_date'] != null) {
     out.add(
-        Text('${d?['published_date']}', style: mono(10, color: AppColors.fg4)));
+        Text('${d?['published_date']}', style: mono(10, color: AppColors.fg3)));
   }
   final text = d?['text']?.toString();
   if (text != null && text.isNotEmpty) {
@@ -536,7 +540,7 @@ List<Widget> _titleView(Map? a, Map? d) {
   }
   return [
     Text(title,
-        style: sans(14.5, weight: FontWeight.w600, color: AppColors.fg1)),
+        style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)),
   ];
 }
 
@@ -546,7 +550,7 @@ List<Widget> _memoryView(String tool, Map? a, Map? d) {
   final content = (d?['content'] ?? a?['content'])?.toString() ?? '';
   if (id.isNotEmpty) {
     out.add(Text(id,
-        style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)));
+        style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)));
   }
   if (content.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -565,7 +569,7 @@ List<Widget> _skillView(String tool, Map? a, Map? d) {
   final out = <Widget>[];
   if (name.isNotEmpty) {
     out.add(Text(name,
-        style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)));
+        style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)));
   }
   if (text.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -583,7 +587,7 @@ List<Widget> _monitorView(Map? a, Map? d) {
   final filter = (a?['filter'] ?? d?['filter'])?.toString() ?? '';
   final out = <Widget>[
     Text(action,
-        style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+        style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
   ];
   if (path.isNotEmpty) {
     out.add(const SizedBox(height: 4));
@@ -591,7 +595,7 @@ List<Widget> _monitorView(Map? a, Map? d) {
   }
   if (filter.isNotEmpty) {
     out.add(const SizedBox(height: 4));
-    out.add(Text(filter, style: mono(11.5, color: AppColors.fg3)));
+    out.add(Text(filter, style: mono(11, color: AppColors.fg3)));
   }
   return out;
 }
@@ -602,7 +606,7 @@ List<Widget> _presentView(Map? a, Map? d) {
   return [
     if (path.isNotEmpty)
       Text(path,
-          style: sans(13.5, weight: FontWeight.w600, color: AppColors.fg1)),
+          style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
     if (caption.isNotEmpty) ...[
       const SizedBox(height: 4),
       Text(caption, style: sans(13, color: AppColors.fg3)),
@@ -670,7 +674,7 @@ Widget _statusChip(bool ok, String label) => Container(
             child: Text(label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: mono(10.5,
+                style: mono(10,
                     weight: FontWeight.w500,
                     color: ok ? AppColors.ok : AppColors.danger))),
       ]),
@@ -682,7 +686,7 @@ Widget _done(String label) => Padding(
     );
 
 Widget _empty(String label) =>
-    Text(label, style: sans(12.5, color: AppColors.fg3));
+    Text(label, style: sans(12, color: AppColors.fg3));
 
 class _Card extends StatelessWidget {
   final List<Widget> children;
@@ -770,7 +774,7 @@ class _MatchRow extends StatelessWidget {
 }
 
 Widget _highlightedLine(String text, String query) {
-  final base = mono(11.5, height: 1.45, color: AppColors.fg2);
+  final base = mono(11, height: 1.45, color: AppColors.fg2);
   final q = query.trim();
   if (q.isEmpty) return Text(text, style: base);
   final lower = text.toLowerCase();
@@ -786,8 +790,8 @@ Widget _highlightedLine(String text, String query) {
     if (at > i) spans.add(TextSpan(text: text.substring(i, at)));
     spans.add(TextSpan(
       text: text.substring(at, at + needle.length),
-      style: mono(11.5,
-              height: 1.45, color: AppColors.accent, weight: FontWeight.w600)
+      style: mono(11,
+              height: 1.45, color: AppColors.accent, weight: FontWeight.w500)
           .copyWith(backgroundColor: AppColors.accentBg),
     ));
     i = at + needle.length;
@@ -813,15 +817,15 @@ class _SymbolRow extends StatelessWidget {
           decoration: BoxDecoration(
               color: AppColors.accentBg,
               borderRadius: BorderRadius.circular(4)),
-          child: Text(kind, style: mono(9.5, color: AppColors.accent)),
+          child: Text(kind, style: mono(10, color: AppColors.accent)),
         ),
         const SizedBox(width: 8),
         Expanded(
             child: Text(signature,
-                style: mono(11.5, height: 1.4, color: AppColors.fg1))),
+                style: mono(11, height: 1.4, color: AppColors.fg1))),
         if (line != null) ...[
           const SizedBox(width: 6),
-          Text(':$line', style: mono(10.5, color: AppColors.fg4)),
+          Text(':$line', style: mono(10, color: AppColors.fg3)),
         ],
       ]),
     );
@@ -853,13 +857,13 @@ class _ResultCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style:
-                  sans(13.5, weight: FontWeight.w600, color: AppColors.accent)),
+                  sans(13, weight: FontWeight.w500, color: AppColors.accent)),
         if (url.isNotEmpty) ...[
           if (title.isNotEmpty) const SizedBox(height: 2),
           Text(url,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: mono(11, color: AppColors.fg4)),
+              style: mono(11, color: AppColors.fg3)),
         ],
         if (snippetText.isNotEmpty) ...[
           const SizedBox(height: 4),
@@ -867,7 +871,7 @@ class _ResultCard extends StatelessWidget {
         ],
         if (dateText.isNotEmpty) ...[
           const SizedBox(height: 4),
-          Text(dateText, style: mono(10, color: AppColors.fg4)),
+          Text(dateText, style: mono(10, color: AppColors.fg3)),
         ],
       ]),
     );
@@ -890,7 +894,7 @@ class _ErrorBox extends StatelessWidget {
         const SizedBox(width: 9),
         Expanded(
             child: SelectableText(message,
-                style: mono(11.5, height: 1.45, color: AppColors.danger))),
+                style: mono(11, height: 1.45, color: AppColors.danger))),
       ]),
     );
   }
@@ -970,7 +974,7 @@ class _ShellPanel extends StatelessWidget {
                 _shellScroll(TextSpan(children: [
                   TextSpan(
                       text: '\$ ',
-                      style: mono(11.5, height: 1.45, color: AppColors.accent)),
+                      style: mono(11, height: 1.45, color: AppColors.accent)),
                   highlightedCodeSpan(command, language: 'bash'),
                 ])),
               if (command.isNotEmpty &&
@@ -983,7 +987,7 @@ class _ShellPanel extends StatelessWidget {
               if (stderr.isNotEmpty)
                 _shellScroll(TextSpan(
                   text: stderr,
-                  style: mono(11.5, height: 1.45, color: AppColors.danger),
+                  style: mono(11, height: 1.45, color: AppColors.danger),
                 )),
             ],
           ),
@@ -1030,7 +1034,7 @@ class _CodeBox extends StatelessWidget {
     final color = addTint ? AppColors.ok : AppColors.fg2;
     final style = useSans
         ? sans(12, height: 1.4, color: color)
-        : mono(11.5, height: 1.4, color: color);
+        : mono(11, height: 1.4, color: color);
     return Stack(
       children: [
         Padding(
@@ -1199,10 +1203,10 @@ class _DiffBlock extends StatelessWidget {
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
             width: 12,
-            child: Text(sign, style: mono(11.5, height: 1.45, color: fg))),
+            child: Text(sign, style: mono(11, height: 1.45, color: fg))),
         Expanded(
             child: Text(l.text.isEmpty ? ' ' : l.text,
-                style: mono(11.5, height: 1.45, color: fg))),
+                style: mono(11, height: 1.45, color: fg))),
       ]),
     );
   }

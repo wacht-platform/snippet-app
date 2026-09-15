@@ -123,6 +123,26 @@ class DaemonClient {
     );
   }
 
+  /// Daemon-wide interactive shells: NOT tied to any session.
+  ///
+  /// A shell belongs to the machine, so switching or closing a session must not
+  /// kill it. `/attach` cannot serve this — it requires a live session — so the
+  /// daemon exposes the same `wire: term` frames over `/shells`.
+  WebSocketChannel attachShells() {
+    final base = Uri.parse(baseUrl);
+    final wsScheme = base.scheme == 'https' ? 'wss' : 'ws';
+    final uri = base.replace(
+      scheme: wsScheme,
+      path: '/shells',
+      queryParameters: {'token': token},
+    );
+    return ws_io.IOWebSocketChannel.connect(
+      uri,
+      connectTimeout: const Duration(seconds: 10),
+      pingInterval: const Duration(seconds: 20),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> notificationReplay({int since = 0}) async {
     final r =
         await http.get(_uri('/notifications/replay', {'since': '$since'}));
@@ -725,6 +745,383 @@ class DaemonClient {
     final r = await http.post(_uri('/mission-control/sessions/$id/archive'),
         headers: _json);
     if (r.statusCode != 200) throw _err('archive mission control session', r);
+  }
+
+  // ---- Coordination agents ----
+
+  /// GET /agents — list specialized agent identities.
+  Future<List<CoordinationAgent>> coordinationAgents() async {
+    final r = await http.get(_uri('/agents'));
+    if (r.statusCode != 200) throw _err('list coordination agents', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => CoordinationAgent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /agents/{id}/board — this agent's coordination memory, newest first.
+  ///
+  /// Optional [workspace] scopes to one folder, [contains] searches the
+  /// summaries, and [kind] narrows to dispatched/reported/noted.
+  Future<List<BoardEntry>> agentBoard(
+    String agentId, {
+    String? workspace,
+    String? contains,
+    String? kind,
+    int limit = 50,
+  }) async {
+    final query = <String, String>{'limit': '$limit'};
+    if (workspace != null && workspace.isNotEmpty) query['workspace'] = workspace;
+    if (contains != null && contains.isNotEmpty) query['contains'] = contains;
+    if (kind != null && kind.isNotEmpty) query['kind'] = kind;
+    final r = await http.get(
+        _uri('/agents/${Uri.encodeComponent(agentId)}/board', query));
+    if (r.statusCode != 200) throw _err('load agent board', r);
+    final entries = (jsonDecode(r.body) as Map<String, dynamic>)['entries'];
+    return ((entries as List?) ?? const [])
+        .map((e) => BoardEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /agents/build — ask the runtime to research and build an agent from one prompt.
+  Future<void> buildCoordinationAgent(String prompt) async {
+    final r = await http.post(
+      _uri('/agents/build'),
+      headers: _json,
+      body: jsonEncode({'prompt': prompt}),
+    );
+    if (r.statusCode != 202) throw _err('build coordination agent', r);
+  }
+
+  /// POST /agents — direct registration for trusted/system callers.
+  Future<CoordinationAgent> createCoordinationAgent({
+    required String id,
+    required String displayName,
+    required String handle,
+    String kind = 'worker',
+    String status = 'active',
+    String role = 'implementer',
+    List<String> capabilities = const [],
+  }) async {
+    final r = await http.post(
+      _uri('/agents'),
+      headers: _json,
+      body: jsonEncode({
+        'id': id,
+        'display_name': displayName,
+        'handle': handle,
+        'kind': kind,
+        'status': status,
+        'role': role,
+        'capabilities': capabilities,
+      }),
+    );
+    if (r.statusCode != 201) throw _err('create coordination agent', r);
+    return CoordinationAgent.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/direct/messages — send a direct message to an agent.
+  ///
+  /// A conversation, not a command: it never creates a task or authorises a
+  /// workspace change. The daemon accepts it durably and wakes the recipient, so
+  /// [idempotencyKey] makes a retry safe.
+  ///
+  /// Pass [originSession] when the message is asked FROM a session. It is
+  /// recorded on the event, and the recipient's reply is routed back to that
+  /// session — which is where the human is reading and where the exchange is
+  /// kept.
+  Future<CoordinationEvent> sendAgentMessage({
+    required String toAgentId,
+    required String body,
+    String fromKind = 'human',
+    String fromId = 'local',
+    String? idempotencyKey,
+    String? originSession,
+  }) async {
+    final payload = <String, dynamic>{
+      'from_kind': fromKind,
+      'from_id': fromId,
+      'to_kind': 'agent',
+      'to_id': toAgentId,
+      'body': body,
+    };
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+      payload['idempotency_key'] = idempotencyKey;
+    }
+    if (originSession != null && originSession.isNotEmpty) {
+      payload['origin_session'] = originSession;
+    }
+    final r = await http.post(
+      _uri('/coordination/direct/messages'),
+      headers: _json,
+      body: jsonEncode(payload),
+    );
+    if (r.statusCode != 202 && r.statusCode != 200) {
+      throw _err('send agent message', r);
+    }
+    return CoordinationEvent.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /coordination/direct/messages — one page of a direct conversation.
+  ///
+  /// The thread is derived from the pair server-side, so a client never needs to
+  /// know or remember a thread id.
+  Future<List<CoordinationEvent>> agentThread({
+    required String peerId,
+    String actorKind = 'human',
+    String actorId = 'local',
+    int afterSequence = 0,
+    int limit = 100,
+  }) async {
+    final r = await http.get(_uri('/coordination/direct/messages', {
+      'actor_kind': actorKind,
+      'actor_id': actorId,
+      'peer_kind': peerId == 'local' ? 'human' : 'agent',
+      'peer_id': peerId,
+      'after_sequence': '$afterSequence',
+      'limit': '$limit',
+    }));
+    if (r.statusCode != 200) throw _err('read agent thread', r);
+    final events = (jsonDecode(r.body) as Map<String, dynamic>)['events'];
+    return ((events as List?) ?? const [])
+        .map((e) => CoordinationEvent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /coordination/direct/threads — conversations with unread counts.
+  Future<List<DirectThreadSummary>> directThreads({
+    String actorKind = 'human',
+    String actorId = 'local',
+  }) async {
+    final r = await http.get(_uri('/coordination/direct/threads', {
+      'actor_kind': actorKind,
+      'actor_id': actorId,
+    }));
+    if (r.statusCode != 200) throw _err('list direct threads', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => DirectThreadSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/direct/read — mark a conversation read.
+  Future<void> markAgentThreadRead({
+    required String peerId,
+    String actorKind = 'human',
+    String actorId = 'local',
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/direct/read'),
+      headers: _json,
+      body: jsonEncode({
+        'actor_kind': actorKind,
+        'actor_id': actorId,
+        'peer_kind': peerId == 'local' ? 'human' : 'agent',
+        'peer_id': peerId,
+      }),
+    );
+    if (r.statusCode != 200) throw _err('mark thread read', r);
+  }
+
+
+  /// GET /coordination/threads/{threadId}/events — cursor-paged board events.
+  Future<List<CoordinationEvent>> coordinationEvents(
+    String threadId, {
+    int afterSequence = 0,
+    int limit = 100,
+  }) async {
+    final r = await http.get(_uri(
+      '/coordination/threads/${Uri.encodeComponent(threadId)}/events',
+      {'after_sequence': '$afterSequence', 'limit': '$limit'},
+    ));
+    if (r.statusCode != 200) throw _err('list coordination events', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => CoordinationEvent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/threads/{threadId}/messages — append a board message.
+  Future<CoordinationEvent> postCoordinationMessage(
+    String threadId, {
+    required String actorKind,
+    required String actorId,
+    required String body,
+    String? idempotencyKey,
+  }) async {
+    final payload = <String, dynamic>{
+      'actor_kind': actorKind,
+      'actor_id': actorId,
+      'body': body,
+    };
+    if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
+      payload['idempotency_key'] = idempotencyKey;
+    }
+    final r = await http.post(
+      _uri('/coordination/threads/${Uri.encodeComponent(threadId)}/messages'),
+      headers: _json,
+      body: jsonEncode(payload),
+    );
+    if (r.statusCode != 200) throw _err('post coordination message', r);
+    return CoordinationEvent.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /coordination/tasks/{id} — one task.
+  Future<TaskItem> getTask(String id) async {
+    final r =
+        await http.get(_uri('/coordination/tasks/${Uri.encodeComponent(id)}'));
+    if (r.statusCode != 200) throw _err('get task', r);
+    return TaskItem.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /coordination/tasks — the board, ordered by priority then age.
+  Future<List<TaskItem>> tasks({
+    String? status,
+    String? agentId,
+    int limit = 200,
+  }) async {
+    final query = <String, String>{'limit': '$limit'};
+    if (status != null && status.isNotEmpty) query['status'] = status;
+    if (agentId != null && agentId.isNotEmpty) query['agent_id'] = agentId;
+    final r = await http.get(_uri('/coordination/tasks', query));
+    if (r.statusCode != 200) throw _err('list tasks', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/tasks.
+  ///
+  /// [sessionId] is the session that should do the work. It is REQUIRED by the
+  /// daemon: a task with no target can never be dispatched, so it would sit on
+  /// the board forever instead of running.
+  Future<TaskItem> createTask({
+    required String title,
+    required String sessionId,
+    String description = '',
+    int priority = 0,
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/tasks'),
+      headers: _json,
+      body: jsonEncode({
+        'title': title,
+        'description': description,
+        'session_id': sessionId,
+        'priority': priority,
+      }),
+    );
+    if (r.statusCode != 201) throw _err('create task', r);
+    return TaskItem.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// PATCH /coordination/tasks/{id} — only the fields supplied are changed.
+  Future<TaskItem> updateTask(
+    String id, {
+    String? title,
+    String? description,
+    int? priority,
+  }) async {
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (description != null) body['description'] = description;
+    if (priority != null) body['priority'] = priority;
+    final r = await http.patch(
+      _uri('/coordination/tasks/${Uri.encodeComponent(id)}'),
+      headers: _json,
+      body: jsonEncode(body),
+    );
+    if (r.statusCode != 200) throw _err('update task', r);
+    return TaskItem.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/tasks/{id}/status — move between board columns.
+  Future<TaskItem> setTaskStatus(String id, TaskStatus status) async {
+    final r = await http.post(
+      _uri('/coordination/tasks/${Uri.encodeComponent(id)}/status'),
+      headers: _json,
+      body: jsonEncode({'status': status.wire}),
+    );
+    if (r.statusCode != 200) throw _err('set task status', r);
+    return TaskItem.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /coordination/tasks/{id}/links — edges in BOTH directions, plus the
+  /// blockers resolved from the reverse edge.
+  Future<TaskLinks> taskLinks(String id) async {
+    final r = await http
+        .get(_uri('/coordination/tasks/${Uri.encodeComponent(id)}/links'));
+    if (r.statusCode != 200) throw _err('task links', r);
+    return TaskLinks.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /coordination/tasks/{id}/links — `blocks` by default.
+  Future<void> linkTasks(
+    String fromId,
+    String toId, {
+    TaskLinkKind kind = TaskLinkKind.blocks,
+  }) async {
+    final r = await http.post(
+      _uri('/coordination/tasks/${Uri.encodeComponent(fromId)}/links'),
+      headers: _json,
+      body: jsonEncode({'to_task_id': toId, 'kind': kind.wire}),
+    );
+    if (r.statusCode != 201) throw _err('link tasks', r);
+  }
+
+  Future<void> unlinkTasks(String a, String b) async {
+    final r = await http.delete(_uri(
+        '/coordination/tasks/${Uri.encodeComponent(a)}/links/${Uri.encodeComponent(b)}'));
+    if (r.statusCode != 204) throw _err('unlink tasks', r);
+  }
+
+  /// GET /coordination/tasks/{id}/agents — the roster, active members first.
+  Future<List<TaskAgent>> taskAgents(String id) async {
+    final r = await http
+        .get(_uri('/coordination/tasks/${Uri.encodeComponent(id)}/agents'));
+    if (r.statusCode != 200) throw _err('task agents', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => TaskAgent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /coordination/tasks/{id}/agents — also joins the task's message room.
+  Future<void> addTaskAgent(String id, String agentId,
+      {String role = ''}) async {
+    final r = await http.post(
+      _uri('/coordination/tasks/${Uri.encodeComponent(id)}/agents'),
+      headers: _json,
+      body: jsonEncode({'agent_id': agentId, 'role': role}),
+    );
+    if (r.statusCode != 204) throw _err('add task agent', r);
+  }
+
+  Future<void> removeTaskAgent(String id, String agentId) async {
+    final r = await http.delete(_uri(
+        '/coordination/tasks/${Uri.encodeComponent(id)}/agents/${Uri.encodeComponent(agentId)}'));
+    if (r.statusCode != 204) throw _err('remove task agent', r);
+  }
+
+  /// Opens the live coordination event stream. Events are also persisted and can
+  /// be replayed with [coordinationEvents] after reconnect.
+  WebSocketChannel attachCoordinationEvents() {
+    final base = Uri.parse(baseUrl);
+    final wsScheme = base.scheme == 'https' ? 'wss' : 'ws';
+    final uri = base.replace(
+      scheme: wsScheme,
+      path: '/coordination/events',
+      queryParameters: {'token': token},
+    );
+    return ws_io.IOWebSocketChannel.connect(
+      uri,
+      connectTimeout: const Duration(seconds: 10),
+      pingInterval: const Duration(seconds: 45),
+    );
   }
 
   // ---- Recurring jobs ----

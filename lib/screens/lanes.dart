@@ -126,7 +126,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
         : failed
             ? AppColors.danger
             : cancelled
-                ? AppColors.fg4
+                ? AppColors.fg3
                 : AppColors.ok;
     final status = lane.running
         ? 'running · ${_elapsed(lane.startedAt)}'
@@ -169,7 +169,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      sans(14, weight: FontWeight.w600, color: AppColors.fg1),
+                      sans(14, weight: FontWeight.w500, color: AppColors.fg1),
                 ),
               ),
               const SizedBox(width: 10),
@@ -191,7 +191,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
               const SizedBox(height: 10),
               Row(children: [
                 Text(_expanded ? 'Hide details' : 'View details',
-                    style: mono(10.5, color: AppColors.accent)),
+                    style: mono(10, color: AppColors.accent)),
                 const SizedBox(width: 5),
                 AppIcon(_expanded ? 'chevron-up' : 'chevron-down',
                     size: 13, color: AppColors.accent),
@@ -216,8 +216,11 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label,
               style: mono(10,
-                  weight: FontWeight.w600,
-                  color: danger ? AppColors.danger : AppColors.fg4)),
+                  weight: FontWeight.w500,
+                  // Rendered as HANDOFF / RESULT / ERROR — upper case, so it
+                  // needs positive tracking.
+                  spacing: 0.5,
+                  color: danger ? AppColors.danger : AppColors.fg3)),
           const SizedBox(height: 6),
           MarkdownBody(
             data: value,
@@ -281,7 +284,12 @@ class _ActivityHistory extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('ACTIVITY HISTORY',
-              style: mono(10, weight: FontWeight.w600, color: AppColors.fg4)),
+              // Upper case needs POSITIVE tracking — what `mono()` gained
+              // `spacing` for. A label is content, so `fg3` not `fg4`.
+              style: mono(10,
+                  weight: FontWeight.w500,
+                  spacing: 0.5,
+                  color: AppColors.fg3)),
           const SizedBox(height: 7),
           for (final entry in entries.reversed.take(24))
             Padding(
@@ -300,7 +308,7 @@ class _ActivityHistory extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(entry.text,
-                      style: mono(10.5, height: 1.35, color: AppColors.fg3)),
+                      style: mono(10, height: 1.35, color: AppColors.fg3)),
                 ),
               ]),
             ),

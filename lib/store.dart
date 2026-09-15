@@ -11,12 +11,34 @@ class OpenTabDescriptor {
   final String title;
   final String? profile;
 
+  /// Set for a diff tab: the changed file and which diff to show.
+  final String? diffPath;
+  final bool diffStaged;
+  final bool diffUntracked;
+
+  /// Which pane the tab was in, which inner session tab group owns it, and —
+  /// for a terminal tab — which pty it showed.
+  ///
+  /// A pane is a property of the tab, so it has to survive a restart; otherwise
+  /// reopening the app would collapse every split back into the left pane.
+  final String? pane;
+  final String? groupSessionKey;
+  final String? termSessionKey;
+  final String? termId;
+
   const OpenTabDescriptor({
     required this.instanceUrl,
     this.sessionId,
     this.filePath,
     required this.title,
     this.profile,
+    this.diffPath,
+    this.diffStaged = false,
+    this.diffUntracked = false,
+    this.pane,
+    this.groupSessionKey,
+    this.termSessionKey,
+    this.termId,
   });
 
   factory OpenTabDescriptor.fromJson(Map<String, dynamic> j) =>
@@ -26,6 +48,13 @@ class OpenTabDescriptor {
         filePath: j['file_path'] as String?,
         title: j['title'] as String? ?? '',
         profile: j['profile'] as String?,
+        diffPath: j['diff_path'] as String?,
+        diffStaged: j['diff_staged'] as bool? ?? false,
+        diffUntracked: j['diff_untracked'] as bool? ?? false,
+        pane: j['pane'] as String?,
+        groupSessionKey: j['group_session_key'] as String?,
+        termSessionKey: j['term_session_key'] as String?,
+        termId: j['term_id'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -34,9 +63,18 @@ class OpenTabDescriptor {
         if (filePath != null) 'file_path': filePath,
         'title': title,
         if (profile != null) 'profile': profile,
+        if (diffPath != null) 'diff_path': diffPath,
+        if (diffStaged) 'diff_staged': true,
+        if (diffUntracked) 'diff_untracked': true,
+        if (pane != null) 'pane': pane,
+        if (groupSessionKey != null) 'group_session_key': groupSessionKey,
+        if (termSessionKey != null) 'term_session_key': termSessionKey,
+        if (termId != null) 'term_id': termId,
       };
 
   bool get isFile => filePath != null;
+  bool get isDiff => diffPath != null;
+  bool get isTerminal => termId != null;
 }
 
 class OpenTabsState {
