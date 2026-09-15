@@ -1572,7 +1572,14 @@ class Bubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              agent,
+              // Cap the reading measure. The column is 820px — about 112
+              // characters a line at the 16px body size — past the 60-75ch
+              // range where the eye reliably finds the next line. Code blocks
+              // are unaffected: they scroll horizontally in their own box.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: kProseMeasure),
+                child: agent,
+              ),
               if (selectable && shown.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),

@@ -313,21 +313,23 @@ class _VaultScreenState extends State<VaultScreen> {
   /// The add affordance, as a full-height row at the app's touch minimum.
   Widget _addRow() {
     const pad = EdgeInsets.symmetric(horizontal: 14);
-    return Material(
-      color: AppColors.surface2,
-      borderRadius: BorderRadius.circular(R.md),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: _add,
-        child: SizedBox(
-          height: kMobile ? M.minTarget : 44,
-          child: Padding(
-            padding: pad,
-            child: Row(children: [
-              AppIcon('plus', size: 16, color: AppColors.accent),
-              const SizedBox(width: 12),
-              Text('Add secret', style: sans(13, color: AppColors.fg1)),
-            ]),
+    return Pressable(
+      child: Material(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _add,
+          child: SizedBox(
+            height: kMobile ? M.minTarget : 44,
+            child: Padding(
+              padding: pad,
+              child: Row(children: [
+                AppIcon('plus', size: 16, color: AppColors.accent),
+                const SizedBox(width: 12),
+                Text('Add secret', style: sans(13, color: AppColors.fg1)),
+              ]),
+            ),
           ),
         ),
       ),

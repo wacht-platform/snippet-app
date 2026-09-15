@@ -5974,19 +5974,21 @@ class _SidebarState extends State<_Sidebar> {
   Widget _sessionActionTile(String icon, String label,
       {required VoidCallback onTap, bool danger = false}) {
     final color = danger ? AppColors.danger : AppColors.fg1;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(R.sm),
-      child: InkWell(
+    return Pressable(
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 13),
-          child: Row(children: [
-            AppIcon(icon, size: 16, color: color),
-            const SizedBox(width: 12),
-            Text(label, style: sans(13, color: color)),
-          ]),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.sm),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 13),
+            child: Row(children: [
+              AppIcon(icon, size: 16, color: color),
+              const SizedBox(width: 12),
+              Text(label, style: sans(13, color: color)),
+            ]),
+          ),
         ),
       ),
     );
@@ -6494,21 +6496,23 @@ class _MachineListState extends State<_MachineList> {
   }
 
   Widget _addRow() {
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        widget.onAdd();
-      },
-      child: Padding(
-        padding:
-            EdgeInsets.fromLTRB(14, kMobile ? 11 : 8, 14, kMobile ? 11 : 8),
-        child: Row(children: [
-          AppIcon('plus', size: 15, color: AppColors.accent),
-          const SizedBox(width: 10),
-          Text('Add machine',
-              style: sans(kMobile ? 14 : 12,
-                  weight: W.label, color: AppColors.accent)),
-        ]),
+    return Pressable(
+      child: InkWell(
+        onTap: () {
+          Navigator.pop(context);
+          widget.onAdd();
+        },
+        child: Padding(
+          padding:
+              EdgeInsets.fromLTRB(14, kMobile ? 11 : 8, 14, kMobile ? 11 : 8),
+          child: Row(children: [
+            AppIcon('plus', size: 15, color: AppColors.accent),
+            const SizedBox(width: 10),
+            Text('Add machine',
+                style: sans(kMobile ? 14 : 12,
+                    weight: W.label, color: AppColors.accent)),
+          ]),
+        ),
       ),
     );
   }
