@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/theme.dart';
 import 'package:snippet/widgets.dart';
+import 'golden.dart';
 
 /// Renders the shared widget set to a PNG, and pins the behaviour of the two
 /// shared-layer rules that are easiest to regress.
@@ -233,10 +234,7 @@ void main() {
     // A fixed pump, NOT pumpAndSettle: StatusDot pulses forever, so the tree
     // never goes quiet and pumpAndSettle would time out.
     await tester.pump(const Duration(milliseconds: 120));
-    await expectLater(
-      find.byType(MaterialApp),
-      matchesGoldenFile('goldens/widget_gallery_$density.png'),
-    );
+    await expectGolden(tester, find.byType(MaterialApp), 'goldens/widget_gallery_$density.png');
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

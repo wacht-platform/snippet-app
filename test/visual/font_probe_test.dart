@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/theme.dart';
+import 'golden.dart';
 
 /// Proves the test bootstrap actually applies real fonts to the app's own
 /// helpers. The control line (bare `TextStyle`) must stay as blocks — if the
@@ -35,7 +36,6 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 50));
-    await expectLater(
-        find.byType(MaterialApp), matchesGoldenFile('goldens/font_probe.png'));
+    await expectGolden(tester, find.byType(MaterialApp), 'goldens/font_probe.png');
   });
 }

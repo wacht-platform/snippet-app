@@ -10,6 +10,7 @@ import 'package:snippet/screens/usage.dart';
 import 'package:snippet/screens/vault.dart';
 import 'package:snippet/theme.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'golden.dart';
 
 /// The secondary screens as they actually render, with real content.
 ///
@@ -132,8 +133,7 @@ void main() {
 
         await tester.pumpWidget(_app(LanesScreen(liveLanes: () => lanes)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/lanes_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/lanes_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -157,8 +157,7 @@ void main() {
 
         await tester.pumpWidget(_app(VaultScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/vault_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/vault_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -214,8 +213,7 @@ void main() {
         await tester.pumpWidget(
             _app(ProcessesScreen(client: client, sessionId: 's1')));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/processes_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/processes_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -244,8 +242,7 @@ void main() {
 
         await tester.pumpWidget(_app(RecurringScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/recurring_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/recurring_$density.png');
         // `RecurringScreen` watches `client.events()`. The fake throws, which the
         // screen catches and answers by scheduling a 3s reconnect timer. That
         // timer must not outlive the test, so unmount the tree — `dispose`
@@ -312,8 +309,7 @@ void main() {
 
         await tester.pumpWidget(_app(UsageScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/usage_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/usage_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

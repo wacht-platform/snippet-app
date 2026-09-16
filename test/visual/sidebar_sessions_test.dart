@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/screens/shell_nav.dart';
 import 'package:snippet/theme.dart';
 import 'package:snippet/widgets.dart';
+import 'golden.dart';
 
 /// The sidebar session list as it actually renders.
 ///
@@ -27,8 +28,7 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 120));
-    await expectLater(find.byType(MaterialApp),
-        matchesGoldenFile('goldens/sidebar_sessions.png'));
+    await expectGolden(tester, find.byType(MaterialApp), 'goldens/sidebar_sessions.png');
   });
 }
 

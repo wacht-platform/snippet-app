@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/theme.dart';
+import 'golden.dart';
 
 /// Accent candidates for the dark UI, rendered so a hue can be compared rather
 /// than imagined. Surfaces, ink and status hues are held fixed; only the accent
@@ -92,8 +93,7 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 50));
-    await expectLater(find.byType(MaterialApp),
-        matchesGoldenFile('goldens/accent_candidates.png'));
+    await expectGolden(tester, find.byType(MaterialApp), 'goldens/accent_candidates.png');
   });
 }
 

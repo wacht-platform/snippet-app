@@ -11,6 +11,8 @@ import 'package:snippet/screens/mission_control/mission_control_screen.dart';
 import 'package:snippet/theme.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'golden.dart';
+
 /// The remaining screens as they actually render, with real content.
 ///
 /// Same approach as `secondary_screens_test.dart`: drive the REAL screen
@@ -163,8 +165,7 @@ void main() {
 
         await tester.pumpWidget(_app(MissionControlScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/mission_control_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/mission_control_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {
@@ -193,8 +194,7 @@ void main() {
         await tester.pumpWidget(_app(Scaffold(
             body: CoordinationAgentDirectory(client: client, embedded: true))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/agent_directory_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/agent_directory_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {
@@ -227,8 +227,7 @@ void main() {
 
         await tester.pumpWidget(_app(InferenceProfilesScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/inference_profiles_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/inference_profiles_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {
@@ -279,8 +278,7 @@ class Greeting extends StatelessWidget {
           name: 'greeting.dart',
         )));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/editor_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/editor_$density.png');
         // `re_editor` starts a cursor blink while focused, then — on Android
         // only — schedules a bare `Future.delayed(100ms)` inside `startBlink`.
         // `stopBlink` cancels the periodic timer but NOT that delayed future,
@@ -355,8 +353,7 @@ class Greeting extends StatelessWidget {
         await tester.pumpWidget(_app(
             Scaffold(body: GitScreen(client: client, sessionId: 's1', embedded: true))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/git_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/git_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {

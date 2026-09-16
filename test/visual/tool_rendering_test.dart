@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/theme.dart';
 import 'package:snippet/transcript.dart';
 import 'package:snippet/widgets.dart';
+import 'golden.dart';
 
 /// The tool-call rendering as it actually appears in the transcript.
 ///
@@ -68,8 +69,7 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 150));
-    await expectLater(find.byType(MaterialApp),
-        matchesGoldenFile('goldens/tool_rendering.png'));
+    await expectGolden(tester, find.byType(MaterialApp), 'goldens/tool_rendering.png');
   });
 }
 

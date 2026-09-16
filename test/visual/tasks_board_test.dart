@@ -5,6 +5,7 @@ import 'package:snippet/api.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/mission_control/task_board_screen.dart';
 import 'package:snippet/theme.dart';
+import 'golden.dart';
 
 /// The Tasks board as it actually renders, with real rows.
 ///
@@ -73,8 +74,7 @@ void main() {
         // Fixed pump, not pumpAndSettle: the board runs a periodic refresh
         // timer, so the tree never goes fully quiet.
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/tasks_board_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/tasks_board_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

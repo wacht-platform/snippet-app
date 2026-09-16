@@ -14,6 +14,7 @@ import 'package:snippet/screens/session.dart' show TerminalInfo;
 import 'package:snippet/screens/terminals_sidebar_panel.dart';
 import 'package:snippet/theme.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'golden.dart';
 
 /// The remaining screens as they actually render, with real content.
 ///
@@ -160,8 +161,7 @@ void main() {
         await tester.pumpWidget(_app(Scaffold(
             body: FileExplorer(client: client, start: '/home/snippet'))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/files_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/files_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -191,8 +191,7 @@ void main() {
           onOpenFolder: (_) async {},
         ))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/new_session_picker_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/new_session_picker_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -223,8 +222,7 @@ void main() {
         await tester.pumpWidget(_app(Scaffold(
             body: TaskDetailScreen(client: client, taskId: 't1'))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/task_detail_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/task_detail_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -243,8 +241,7 @@ void main() {
             body: CoordinationAgentDetail(
                 agent: agent, client: _FakeDaemon(), embedded: true))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/agent_detail_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/agent_detail_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -269,8 +266,7 @@ void main() {
             height: 700,
             child: AgentsSidebarPanel(client: client))))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/agents_panel_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/agents_panel_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -304,8 +300,7 @@ void main() {
               onOpenFile: (_, __) {},
             ))))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/file_tree_panel_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/file_tree_panel_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -363,8 +358,7 @@ void main() {
               sessionId: 's1',
             ))))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/git_diff_panel_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/git_diff_panel_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -393,8 +387,7 @@ void main() {
               onCloseTerminal: (_) {},
             ))))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/terminals_panel_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/terminals_panel_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;

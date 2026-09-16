@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/theme.dart';
 import 'package:snippet/transcript.dart';
 import 'package:snippet/widgets.dart';
+import 'golden.dart';
 
 /// The chat transcript as it composes on screen.
 ///
@@ -111,8 +112,7 @@ void main() {
         ));
         // Fixed pump: the fixture has a spinner-free tree, but keep the habit.
         await tester.pump(const Duration(milliseconds: 120));
-        await expectLater(find.byType(MaterialApp),
-            matchesGoldenFile('goldens/transcript_$density.png'));
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/transcript_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
