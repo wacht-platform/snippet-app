@@ -136,7 +136,10 @@ class _LeftRail extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
         children: [
-          const SectionLabel('Active tasks'),
+          // These buttons open OTHER surfaces (the agent directory, the task
+          // board) — they are not active tasks. The label above them both said
+          // the wrong thing and repeated the section below it verbatim.
+          const SectionLabel('Browse'),
           const SizedBox(height: 8),
           Row(
             children: [

@@ -31,6 +31,21 @@ class _FakeDaemon extends DaemonClient {
   @override
   Future<String> mcOpen({String? profile}) async => 'mission-control';
 
+  // Mission Control's own data calls. `mcTasks`/`mcSessions` take `bool?`, and
+  // `fromJson` tolerates an empty map (every field defaults), so an empty
+  // overview is a valid overview.
+  @override
+  Future<MissionControlOverview> mcOverview() async =>
+      MissionControlOverview.fromJson(const {});
+
+  @override
+  Future<List<MissionControlTask>> mcTasks({bool? archived}) async =>
+      const [];
+
+  @override
+  Future<List<ManagedSession>> mcSessions({bool? archived}) async =>
+      const [];
+
   @override
   Future<List<CoordinationAgent>> coordinationAgents() async =>
       agents.map(CoordinationAgent.fromJson).toList();
@@ -166,6 +181,29 @@ void main() {
         await tester.pumpWidget(_app(MissionControlScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
         await expectGolden(tester, find.byType(MaterialApp), 'goldens/mission_control_$density.png');
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    // --- Mission Control at a DESKTOP width. `MissionControlScreen` picks its
+    // variant by width (>= 720), and the test above renders at 430 — so the
+    // wide branch, `DesktopMissionControl`, was never seen.
+    testWidgets('mission control, wide ($density)', (tester) async {
+      debugDefaultTargetPlatformOverride = platform;
+      try {
+        tester.view.devicePixelRatio = 2.0;
+        tester.view.physicalSize = const Size(1440, 900) * 2.0;
+        addTearDown(tester.view.reset);
+
+        final client = _FakeDaemon()..agents = [];
+
+        await tester.pumpWidget(_app(MissionControlScreen(client: client)));
+        await tester.pump(const Duration(milliseconds: 120));
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/mission_control_wide_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {
