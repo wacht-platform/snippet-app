@@ -4619,6 +4619,8 @@ class _SidebarState extends State<_Sidebar> {
   // sidebar is presentational, so opening the drawer doesn't refetch.
   String _filterQuery = '';
   final _machineKey = GlobalKey(); // anchors the desktop machine popover
+  final GlobalKey<_SettingsPanelState> _mobileSettingsKey =
+      GlobalKey<_SettingsPanelState>();
   bool _selecting = false;
   final Set<String> _selected = {};
 
@@ -4935,6 +4937,7 @@ class _SidebarState extends State<_Sidebar> {
           return _mobileUnavailable('Add a machine to configure it.');
         }
         return _SettingsPanel(
+          key: _mobileSettingsKey,
           client: client,
           instances: widget.instances,
           active: widget.active,
@@ -6592,6 +6595,7 @@ class _SettingsPanel extends StatefulWidget {
   final ValueChanged<_SettingsPage?>? onSection;
 
   const _SettingsPanel({
+    super.key,
     required this.client,
     required this.instances,
     required this.active,
