@@ -2005,7 +2005,7 @@ class _AppFieldState extends State<AppField> {
               decoration: InputDecoration(
                 isCollapsed: true,
                 contentPadding:
-                    EdgeInsets.symmetric(vertical: kMobile ? 12 : 8),
+                    EdgeInsets.symmetric(vertical: kMobile ? 8 : 8),
                 border: InputBorder.none,
                 hintText: widget.hint,
                 hintStyle: widget.mono

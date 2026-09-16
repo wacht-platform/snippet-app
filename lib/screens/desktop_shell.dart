@@ -5422,18 +5422,15 @@ class _SidebarState extends State<_Sidebar> {
         ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
       final recentPreview = recent.take(3).toList();
       final recentIds = recentPreview.map((s) => s.id).toSet();
+      final activity = [...active, ...recentPreview];
       final grouped = <String, List<SessionInfo>>{};
       for (final s in recent.where((s) => !recentIds.contains(s.id))) {
         grouped.putIfAbsent(s.folder, () => <SessionInfo>[]).add(s);
       }
       final mobileChildren = <Widget>[];
-      if (active.isNotEmpty) {
-        mobileChildren.add(_mobileListHeader('Active now', active.length));
-        mobileChildren.addAll(active.map(_sessionCard));
-      }
-      if (recentPreview.isNotEmpty) {
-        mobileChildren.add(_mobileListHeader('Recently active', recentPreview.length));
-        mobileChildren.addAll(recentPreview.map(_sessionCard));
+      if (activity.isNotEmpty) {
+        mobileChildren.add(_mobileListHeader('Recent activity', activity.length));
+        mobileChildren.addAll(activity.map(_sessionCard));
       }
       for (final entry in grouped.entries) {
         mobileChildren.add(_folderHeader(entry.key,
