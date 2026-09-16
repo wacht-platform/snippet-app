@@ -169,14 +169,16 @@ class _VaultScreenState extends State<VaultScreen> {
               widget.embedded ? 0 : (kMobile ? M.gutter : 16),
               28),
         children: [
-          Text(
-            'Use these as \$NAME in shell commands. Values stay on the daemon and are never shown again.',
-            style:
-                sans(kMobile ? M.meta : 12, height: 1.45, color: AppColors.fg3),
-          ),
-          const SizedBox(height: 16),
-          _inlineLabel('Secrets'),
-          const SizedBox(height: 8),
+          if (!(widget.embedded && kMobile)) ...[
+            Text(
+              'Use these as \$NAME in shell commands. Values stay on the daemon and are never shown again.',
+              style: sans(kMobile ? M.meta : 12,
+                  height: 1.45, color: AppColors.fg3),
+            ),
+            const SizedBox(height: 16),
+            _inlineLabel('Secrets'),
+            const SizedBox(height: 8),
+          ],
           if (kMobile)
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
