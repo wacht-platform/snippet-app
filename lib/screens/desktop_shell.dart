@@ -6819,12 +6819,12 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   Widget _mobileSettingsHome() {
     Widget section(String label, Widget child, {Widget? trailing}) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 28),
+        padding: const EdgeInsets.only(bottom: 22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 6),
               child: Row(children: [
                 Expanded(
                   child: Text(label.toUpperCase(),
@@ -7177,9 +7177,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         // the phone's now, so the insets match too.
         padding: EdgeInsets.fromLTRB(
             kMobile && widget.embedded ? 0 : 14,
-            kMobile ? 8 : 9,
+            kMobile ? 4 : 9,
             kMobile && widget.embedded ? 0 : 4,
-            kMobile ? 8 : 9),
+            kMobile ? 4 : 9),
         child: Row(children: [
           // A machine is a SERVER, not a CPU. The old `cpu` glyph described a
           // chip inside the machine, which read as the wrong object entirely.
@@ -7232,7 +7232,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       // each, and a 0 desktop inset put the bell flush against the card edge.
       padding: EdgeInsets.symmetric(
           horizontal: kMobile && widget.embedded ? 0 : 14,
-          vertical: kMobile ? 8 : 9),
+          vertical: kMobile ? 4 : 9),
       child: Row(children: [
         // A bell for a notification setting. `zap` (a lightning bolt) named
         // nothing about alerts.
