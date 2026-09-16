@@ -80,6 +80,21 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
       delegate = (await widget.client.getConfig()).delegate;
     } catch (_) {}
     if (!mounted) return;
+    if (kMobile && widget.embedded) {
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => InferenceProfileEditor(
+            client: widget.client,
+            existing: p,
+            delegateName: delegate,
+            onClose: () => Navigator.pop(context),
+            onSaved: () => Navigator.pop(context, true),
+          ),
+        ),
+      );
+      if (saved == true && mounted) _refresh();
+      return;
+    }
     setState(() {
       _inEditor = true;
       _editProfile = p;
