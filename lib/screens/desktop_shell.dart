@@ -5155,9 +5155,9 @@ class _SidebarState extends State<_Sidebar> {
         // Divider separates "where you are" from "what you can do".
         Container(width: 1, height: 20, color: AppColors.border),
         const SizedBox(width: 2),
-        _mobileBarAction('search', 'Search chats',
+        _mobileBarAction('search', 'Search',
             onTap: hasClient ? _toggleMobileSearch : null),
-        _mobileBarAction('plus', 'New chat',
+        _mobileBarAction('plus', 'New',
             onTap: hasClient ? widget.onNewSession : null),
         const SizedBox(width: 4),
       ],
@@ -5235,11 +5235,22 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
           onTap: enabled ? () => widget.onMobileHome(h) : null,
           child: SizedBox(
-            width: 52,
+            width: 72,
             height: _kMobileBarHeight,
             child: Center(
-              child: AppIcon(h.icon,
-                  size: 21, color: active ? AppColors.fg1 : AppColors.fg4),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppIcon(h.icon,
+                      size: 23, color: active ? AppColors.fg1 : AppColors.fg3),
+                  const SizedBox(height: 2),
+                  Text(h.label,
+                      style: caps(10,
+                          color: active ? AppColors.fg1 : AppColors.fg3,
+                          spacing: 0.35)),
+                ],
+              ),
             ),
           ),
         ),
@@ -5256,12 +5267,23 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
           onTap: onTap,
           child: SizedBox(
-            width: 52,
+            width: 72,
             height: _kMobileBarHeight,
             child: Center(
-              child: AppIcon(icon,
-                  size: 21,
-                  color: onTap == null ? AppColors.fg4 : AppColors.fg2),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppIcon(icon,
+                      size: 23,
+                      color: onTap == null ? AppColors.fg4 : AppColors.fg2),
+                  const SizedBox(height: 2),
+                  Text(tooltip,
+                      style: caps(10,
+                          color: onTap == null ? AppColors.fg4 : AppColors.fg2,
+                          spacing: 0.35)),
+                ],
+              ),
             ),
           ),
         ),
@@ -5874,10 +5896,6 @@ class _SidebarState extends State<_Sidebar> {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
     final selected = s.id == widget.selectedSessionId;
-    final folder = s.folder.trim();
-    final context = folder.isEmpty
-        ? 'Local conversation'
-        : folder.split('/').where((part) => part.isNotEmpty).last;
     return Material(
       color: selected || checked ? AppColors.surface2 : Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
@@ -5905,7 +5923,7 @@ class _SidebarState extends State<_Sidebar> {
                 }
               },
         child: SizedBox(
-          height: M.rowHeight + 12,
+          height: M.rowHeight,
           child: Padding(
             padding: EdgeInsets.only(left: M.rowPadH, right: 6),
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -5923,24 +5941,12 @@ class _SidebarState extends State<_Sidebar> {
               Expanded(
                 child: renaming
                     ? _inlineRenameField(s, compact: false)
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            s.title.isEmpty ? '(untitled)' : s.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(M.rowTitle,
-                                color: selected ? AppColors.fg1 : AppColors.fg2),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(context,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: mono(M.meta,
-                                  color: AppColors.fg3, tabular: false)),
-                        ],
+                    : Text(
+                        s.title.isEmpty ? '(untitled)' : s.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(M.rowTitle,
+                            color: selected ? AppColors.fg1 : AppColors.fg2),
                       ),
               ),
               // No per-row overflow button. At this row height it crowded the
