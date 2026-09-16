@@ -6612,7 +6612,14 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   bool _notif = false;
   bool _notifBusy = false;
   _SettingsPage _page = _SettingsPage.general;
-  final Set<String> _openMobileSettings = {'machine', 'configuration'};
+  final Set<String> _openMobileSettings = {
+    'machine',
+    'alerts',
+    'profiles',
+    'usage',
+    'vault',
+    'scheduled',
+  };
 
   /// Phone drill-down, read from the shell. Desktop uses `_page` + the chip
   /// strip instead, so this is only consulted when `kMobile && embedded`.
@@ -6802,45 +6809,42 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   Widget _mobileSettingsHome() {
     Widget section(String key, String label, Widget child) {
       final open = _openMobileSettings.contains(key);
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Material(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.md),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              InkWell(
-                onTap: () => setState(() {
-                  if (open) {
-                    _openMobileSettings.remove(key);
-                  } else {
-                    _openMobileSettings.add(key);
-                  }
-                }),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  child: Row(children: [
-                    Expanded(child: Text(label, style: sans(M.rowTitle, weight: W.label, color: AppColors.fg1))),
-                    AppIcon(open ? 'chevron-down' : 'chevron-right', size: 18, color: AppColors.fg3),
-                  ]),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() {
+              if (open) {
+                _openMobileSettings.remove(key);
+              } else {
+                _openMobileSettings.add(key);
+              }
+            }),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(2, 14, 2, 12),
+              child: Row(children: [
+                Expanded(
+                  child: Text(label,
+                      style: display(M.sectionTitle, color: AppColors.fg1)),
                 ),
-              ),
-              if (open) ...[
-                Divider(height: 1, color: AppColors.border),
-                child,
-              ],
-            ],
+                AppIcon(open ? 'chevron-down' : 'chevron-right',
+                    size: 18, color: AppColors.fg3),
+              ]),
+            ),
           ),
-        ),
+          if (open) ...[
+            child,
+            const SizedBox(height: 8),
+          ],
+        ],
       );
     }
 
-    final configRows = [
-      for (final (page, icon, label) in _nav)
-        if (page != _SettingsPage.general) _mobileIndexRow(page, icon, label),
-    ];
+    Widget inlineScreen(Widget child) => SizedBox(
+          height: 360,
+          child: child,
+        );
+
     return ListView(
       padding: EdgeInsets.fromLTRB(M.gutter, 14, M.gutter, 28),
       children: [
@@ -6849,9 +6853,19 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           child: Text('Settings', style: display(M.pageTitle, color: AppColors.fg1)),
         ),
         section('machine', 'Workspace', _settingsCard(_machineRows())),
-        if (kCanNotify)
-          section('alerts', 'Notifications', _settingsCard([_notifTile()])),
-        section('configuration', 'Agent configuration', _settingsCard(configRows)),
+        if (kCanNotify) section('alerts', 'Notifications', _settingsCard([_notifTile()])),
+        section('profiles', 'Inference profiles', inlineScreen(
+          InferenceProfilesScreen(client: widget.client, embedded: true),
+        )),
+        section('usage', 'Usage', inlineScreen(
+          UsageScreen(client: widget.client, embedded: true),
+        )),
+        section('vault', 'Vault', inlineScreen(
+          VaultScreen(client: widget.client, embedded: true),
+        )),
+        section('scheduled', 'Scheduled jobs', inlineScreen(
+          RecurringScreen(client: widget.client, listOnly: true, embedded: true),
+        )),
       ],
     );
   }
