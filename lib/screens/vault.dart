@@ -27,10 +27,10 @@ class VaultScreen extends StatefulWidget {
     this.onBack,
   });
   @override
-  State<VaultScreen> createState() => _VaultScreenState();
+  State<VaultScreen> createState() => VaultScreenState();
 }
 
-class _VaultScreenState extends State<VaultScreen> {
+class VaultScreenState extends State<VaultScreen> {
   List<String>? _names;
   bool _loading = true;
   String? _error;
@@ -71,6 +71,8 @@ class _VaultScreenState extends State<VaultScreen> {
   ///
   /// MOBILE keeps the sheet: a form inline in a phone list fights the scroll
   /// and the keyboard, and `showAppSheet` already handles the insets.
+  Future<void> add() => _add();
+
   Future<void> _add() async {
     if (_adding) return;
     if (!kMobile) {
@@ -209,7 +211,7 @@ class _VaultScreenState extends State<VaultScreen> {
             ]),
           // The add row hides while the form is open: two ways to do the same
           // thing at once is what makes a form feel unanchored.
-          if (!_adding) ...[
+          if (!_adding && !(widget.embedded && kMobile)) ...[
             const SizedBox(height: 12),
             _addRow(),
           ],
