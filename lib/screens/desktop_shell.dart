@@ -5393,20 +5393,40 @@ class _SidebarState extends State<_Sidebar> {
     // desktop density aid; on a touch screen it obscures the one thing people
     // came here to do: open the recent conversation.
     if (kMobile) {
-      list.sort((a, b) => b.lastActive.compareTo(a.lastActive));
-      // A query that matches nothing must say so — an empty list would read as a
-      // load failure once the head and Mission Control have stepped aside.
-      if (list.isEmpty && _filterQuery.trim().isNotEmpty) {
-        return _mobileSearchEmpty();
+      final active = list.where((s) => sessionIsActive(s.status)).toList()
+        ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      final activeIds = active.map((s) => s.id).toSet();
+      final recent = list.where((s) => !activeIds.contains(s.id)).toList()
+        ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      final recentPreview = recent.take(3).toList();
+      final recentIds = recentPreview.map((s) => s.id).toSet();
+      final grouped = <String, List<SessionInfo>>{};
+      for (final s in recent.where((s) => !recentIds.contains(s.id))) {
+        grouped.putIfAbsent(s.folder, () => <SessionInfo>[]).add(s);
+      }
+      final mobileChildren = <Widget>[];
+      if (active.isNotEmpty) {
+        mobileChildren.add(_mobileListHeader('Active now', active.length));
+        mobileChildren.addAll(active.map(_sessionCard));
+      }
+      if (recentPreview.isNotEmpty) {
+        mobileChildren.add(_mobileListHeader('Recently active', recentPreview.length));
+        mobileChildren.addAll(recentPreview.map(_sessionCard));
+      }
+      for (final entry in grouped.entries) {
+        mobileChildren.add(_folderHeader(entry.key,
+            first: mobileChildren.isEmpty, count: entry.value.length));
+        if (!_collapsed.contains(entry.key)) {
+          mobileChildren.addAll(entry.value.map(_sessionCard));
+        }
       }
       return RefreshIndicator(
         color: AppColors.accent,
         backgroundColor: AppColors.surface3,
         onRefresh: () async => widget.onRefreshSessions(),
-        child: ListView.builder(
+        child: ListView(
           padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
-          itemCount: list.length,
-          itemBuilder: (_, i) => _sessionCard(list[i]),
+          children: mobileChildren,
         ),
       );
     }
@@ -5583,6 +5603,19 @@ class _SidebarState extends State<_Sidebar> {
             ),
     );
   }
+
+  Widget _mobileListHeader(String label, int count) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(label, style: display(M.sectionTitle, color: AppColors.fg1)),
+            const SizedBox(width: 8),
+            Text('$count', style: mono(M.meta, color: AppColors.fg3)),
+          ],
+        ),
+      );
 
   Widget _folderHeader(String folder, {required bool first, int count = 0}) {
     final name =
