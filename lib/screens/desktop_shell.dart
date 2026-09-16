@@ -6799,47 +6799,38 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   /// screen of content. Models / Usage / Vault / Scheduled each own a real
   /// surface, so those earn a row.
   Widget _mobileSettingsHome() {
-    Widget section(String key, String label, Widget child) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(2, 18, 2, 8),
-            child: Text(label,
-                style: display(M.sectionTitle, color: AppColors.fg1)),
-          ),
-          child,
-          const SizedBox(height: 8),
-        ],
+    Widget section(String label, Widget child) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              Expanded(child: Text(label.toUpperCase(), style: caps(11, color: AppColors.fg3))),
+              Container(width: 48, height: 1, color: AppColors.border2),
+            ]),
+            const SizedBox(height: 10),
+            child,
+          ],
+        ),
       );
     }
 
-    Widget inlineScreen(Widget child) => SizedBox(
-          height: 360,
-          child: child,
-        );
+    Widget inlineScreen(Widget child) => SizedBox(height: 360, child: child);
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(M.gutter, 14, M.gutter, 28),
+      padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 18),
-          child: Text('Settings', style: display(M.pageTitle, color: AppColors.fg1)),
-        ),
-        section('machine', 'Workspace', _settingsCard(_machineRows())),
-        if (kCanNotify) section('alerts', 'Notifications', _settingsCard([_notifTile()])),
-        section('profiles', 'Inference profiles', inlineScreen(
-          InferenceProfilesScreen(client: widget.client, embedded: true),
-        )),
-        section('usage', 'Usage', inlineScreen(
-          UsageScreen(client: widget.client, embedded: true),
-        )),
-        section('vault', 'Vault', inlineScreen(
-          VaultScreen(client: widget.client, embedded: true),
-        )),
-        section('scheduled', 'Scheduled jobs', inlineScreen(
-          RecurringScreen(client: widget.client, listOnly: true, embedded: true),
-        )),
+        Text('Settings', style: display(28, color: AppColors.fg1)),
+        const SizedBox(height: 6),
+        Text('Workspace, models, and automation', style: sans(13, color: AppColors.fg3)),
+        const SizedBox(height: 28),
+        section('Workspace', _machineRows().isEmpty ? const SizedBox.shrink() : Column(children: _machineRows())),
+        if (kCanNotify) section('Notifications', _notifTile()),
+        section('Inference profiles', inlineScreen(InferenceProfilesScreen(client: widget.client, embedded: true))),
+        section('Usage', inlineScreen(UsageScreen(client: widget.client, embedded: true))),
+        section('Vault', inlineScreen(VaultScreen(client: widget.client, embedded: true))),
+        section('Scheduled jobs', inlineScreen(RecurringScreen(client: widget.client, listOnly: true, embedded: true))),
       ],
     );
   }
