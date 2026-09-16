@@ -6802,6 +6802,11 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return ListView(
       padding: EdgeInsets.fromLTRB(M.gutter, 14, M.gutter, 28),
       children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 16),
+          child: Text('Settings',
+              style: display(M.pageTitle, color: AppColors.fg1)),
+        ),
         _inlineLabel('Machine'),
         const SizedBox(height: 8),
         _settingsCard(_machineRows()),

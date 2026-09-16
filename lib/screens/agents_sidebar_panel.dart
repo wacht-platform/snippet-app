@@ -202,6 +202,31 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       );
     }
 
+    final active = agents.where((a) => a.available).toList();
+    final paused = agents.where((a) => !a.available).toList();
+    Widget group(String label, List<CoordinationAgent> members) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(M.gutter, 18, M.gutter, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(label, style: display(M.sectionTitle, color: AppColors.fg1)),
+                  const SizedBox(width: 8),
+                  Text('${members.length}', style: mono(M.meta, color: AppColors.fg3)),
+                ],
+              ),
+            ),
+            for (final a in members)
+              _AgentSidebarRow(
+                agent: a,
+                onTap: widget.onOpenAgent == null ? null : () => widget.onOpenAgent!(a),
+              ),
+          ],
+        );
+
     return Container(
       color: AppColors.bg,
       child: Column(
@@ -262,15 +287,10 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             child: agents.isEmpty
                 ? _EmptyTeam()
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 18),
+                    padding: EdgeInsets.fromLTRB(kMobile ? 0 : 8, 0, kMobile ? 0 : 8, 18),
                     children: [
-                      for (final a in agents)
-                        _AgentSidebarRow(
-                          agent: a,
-                          onTap: widget.onOpenAgent == null
-                              ? null
-                              : () => widget.onOpenAgent!(a),
-                        ),
+                      if (active.isNotEmpty) group('Available now', active),
+                      if (paused.isNotEmpty) group('Paused', paused),
                     ],
                   ),
           ),
