@@ -197,6 +197,28 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       );
     }
     if (error != null && agents.isEmpty) {
+      if (kMobile) {
+        return Material(
+          color: AppColors.bg,
+          child: SafeArea(
+            bottom: false,
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
+              children: [
+                Text('Agents', style: display(28, color: AppColors.fg1)),
+                const SizedBox(height: 16),
+                Text('Could not load agents',
+                    style: sans(13, color: AppColors.fg2)),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Btn('Retry', small: true, onTap: refresh),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
       return Container(
         color: AppColors.bg,
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
@@ -212,72 +234,114 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
 
     final active = agents.where((a) => a.available).toList();
     final paused = agents.where((a) => !a.available).toList();
-    Widget group(String label, List<CoordinationAgent> members) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(M.gutter, 18, M.gutter, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(label, style: display(M.sectionTitle, color: AppColors.fg1)),
-                  const SizedBox(width: 8),
-                  Text('${members.length}', style: mono(M.meta, color: AppColors.fg3)),
-                ],
+    Widget group(String label, List<CoordinationAgent> members,
+            {Widget? trailing}) =>
+        Padding(
+          padding: EdgeInsets.only(bottom: kMobile ? 18 : 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: kMobile
+                    ? const EdgeInsets.only(bottom: 4)
+                    : EdgeInsets.fromLTRB(M.gutter, 18, M.gutter, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: kMobile
+                          ? Text(label.toUpperCase(),
+                              style: caps(11, color: AppColors.fg3))
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(label,
+                                    style: display(M.sectionTitle,
+                                        color: AppColors.fg1)),
+                                const SizedBox(width: 8),
+                                Text('${members.length}',
+                                    style: mono(M.meta, color: AppColors.fg3)),
+                              ],
+                            ),
+                    ),
+                    if (trailing != null) trailing,
+                  ],
+                ),
               ),
-            ),
-            for (final a in members)
-              _AgentSidebarRow(
-                agent: a,
-                onTap: widget.onOpenAgent == null ? null : () => widget.onOpenAgent!(a),
-              ),
-          ],
+              for (final a in members)
+                _AgentSidebarRow(
+                  agent: a,
+                  onTap: widget.onOpenAgent == null
+                      ? null
+                      : () => widget.onOpenAgent!(a),
+                ),
+            ],
+          ),
         );
+
+    final createBtn = Builder(
+      builder: (ctx) => kMobile
+          ? IconBtn('plus',
+              size: 32,
+              iconSize: 16,
+              tooltip: 'Create agent',
+              onTap: busy ? null : () => _openCreateAgent(ctx))
+          : ShellSectionAction(
+              icon: 'plus',
+              tooltip: 'Create agent',
+              onTap: busy ? null : () => _openCreateAgent(ctx),
+            ),
+    );
+
+    if (kMobile) {
+      return Material(
+        color: AppColors.bg,
+        child: SafeArea(
+          bottom: false,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
+            children: [
+              Text('Agents', style: display(28, color: AppColors.fg1)),
+              const SizedBox(height: 16),
+              if (agents.isEmpty) ...[
+                group('Team', const [], trailing: createBtn),
+                _EmptyTeam(),
+              ] else ...[
+                if (active.isNotEmpty)
+                  group('Team', active, trailing: createBtn),
+                if (paused.isNotEmpty)
+                  group('Paused', paused,
+                      trailing: active.isEmpty ? createBtn : null),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       color: AppColors.bg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // The SAME section header every sibling panel uses.
-          //
-          // This panel drew its own 15px title while Terminals, Git Diff and the
-          // file tree all render the shared `ShellSectionHeader` (12px uppercase),
-          // which is why the agents panel read as heavier than the rest of the
-          // rail. The count is gone from here deliberately: the two group
-          // headings below already carry "Active now N" / "Idle N", so it was
-          // saying the same thing twice.
-          if (!kMobile)
-            ShellSectionHeader(
-              label: 'Agents',
-              actions: [
-                // `Builder` so the popover anchors to THIS button — the context's
-                // render object is the button's box (same mechanism the file
-                // tree's actions use).
-                Builder(
-                  builder: (ctx) => ShellSectionAction(
-                    icon: 'plus',
-                    tooltip: 'Create agent',
-                    onTap: busy ? null : () => _openCreateAgent(ctx),
-                  ),
-                ),
-                ShellSectionAction(
-                  icon: 'refresh',
-                  tooltip: 'Refresh',
-                  onTap: busy ? null : refresh,
-                ),
-              ],
-            )
-          else
-            const SizedBox.shrink(),
+          ShellSectionHeader(
+            label: 'Agents',
+            actions: [
+              createBtn,
+              ShellSectionAction(
+                icon: 'refresh',
+                tooltip: 'Refresh',
+                onTap: busy ? null : refresh,
+              ),
+            ],
+          ),
           Expanded(
             child: agents.isEmpty
                 ? _EmptyTeam()
                 : ListView(
-                    padding: EdgeInsets.fromLTRB(kMobile ? 0 : 8, 0, kMobile ? 0 : 8, 18),
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 18),
                     children: [
-                      if (active.isNotEmpty) group('Agents', agents),
+                      if (active.isNotEmpty) group('Agents', active),
                       if (paused.isNotEmpty) group('Paused', paused),
                     ],
                   ),
@@ -291,7 +355,7 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
 class _EmptyTeam extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+        padding: EdgeInsets.fromLTRB(kMobile ? 0 : 20, kMobile ? 8 : 24, kMobile ? 0 : 20, 20),
         child: Text(
           'No agents yet.\n\nBuild one and it appears here, along with the '
           'sessions it is working in.',
@@ -327,7 +391,7 @@ class _AgentSidebarRow extends StatelessWidget {
           // avatar lines up under the header's own inset instead of sitting
           // 4px left of it. Mobile unchanged.
           padding: EdgeInsets.symmetric(
-              horizontal: kMobile ? 8 : kNavPadH, vertical: 7),
+              horizontal: kMobile ? 0 : kNavPadH, vertical: kMobile ? 6 : 7),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             CircleAvatar(
               radius: 13,
@@ -357,7 +421,7 @@ class _AgentSidebarRow extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: sans(kMobile ? M.meta : 11,
-                        color: AppColors.fg4, height: 1.35),
+                        color: AppColors.fg3, height: 1.35),
                   ),
                 ],
               ),

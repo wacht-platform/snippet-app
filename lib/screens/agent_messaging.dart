@@ -293,6 +293,7 @@ class AgentThreadScreen extends StatefulWidget {
     required this.agentName,
     this.subtitle,
     this.onClose,
+    this.embedded = false,
   });
 
   final DaemonClient client;
@@ -304,6 +305,9 @@ class AgentThreadScreen extends StatefulWidget {
   final String? subtitle;
 
   final VoidCallback? onClose;
+
+  /// Nested under a host that already draws `NavBackRow`.
+  final bool embedded;
 
   @override
   State<AgentThreadScreen> createState() => _AgentThreadScreenState();
@@ -388,15 +392,18 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     // Containers — no Material ancestor — while a TextField and the icon buttons
     // here require one. Without this the screen threw "No Material widget found"
     // and rendered blank.
+    final hideChrome = widget.embedded && kMobile;
     return Material(
       color: AppColors.bg,
       child: SafeArea(
-        top: true,
+        top: !hideChrome,
         bottom: true,
         child: Column(
         children: [
-          _header(),
-          Divider(height: 1, color: AppColors.border),
+          if (!hideChrome) ...[
+            _header(),
+            Divider(height: 1, color: AppColors.border),
+          ],
           Expanded(child: _body()),
           Divider(height: 1, color: AppColors.border),
           _composer(),

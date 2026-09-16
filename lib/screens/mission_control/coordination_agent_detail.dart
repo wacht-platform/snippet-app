@@ -45,6 +45,7 @@ class CoordinationAgentDetail extends StatelessWidget {
           : agent.displayName.trim(),
       subtitle: _subtitle(agent),
       onClose: onClose,
+      embedded: embedded,
     );
   }
 
