@@ -6848,9 +6848,10 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           padding: const EdgeInsets.only(left: 2, bottom: 18),
           child: Text('Settings', style: display(M.pageTitle, color: AppColors.fg1)),
         ),
-        section('machine', 'Machine', _settingsCard(_machineRows())),
-        if (kCanNotify) section('alerts', 'Alerts', _settingsCard([_notifTile()])),
-        section('configuration', 'Configuration', _settingsCard(configRows)),
+        section('machine', 'Workspace', _settingsCard(_machineRows())),
+        if (kCanNotify)
+          section('alerts', 'Notifications', _settingsCard([_notifTile()])),
+        section('configuration', 'Agent configuration', _settingsCard(configRows)),
       ],
     );
   }
