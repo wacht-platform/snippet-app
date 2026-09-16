@@ -372,17 +372,15 @@ class M {
   static const minTarget = 44.0;
   static const appBarHeight = 56.0;
 
-  /// Phone reading body stays at 16px for physical legibility; chrome follows
-  /// desktop's 20/16/13/11 hierarchy and the same Geist/Inter family split.
-  static const pageTitle = 20.0;
-  static const sectionTitle = 16.0;
+  /// Editorial hierarchy: page titles create a clear entry point, while section
+  /// titles and row labels step down without collapsing into the same visual size.
+  static const pageTitle = 24.0;
+  static const sectionTitle = 18.0;
 
-  /// 14, not 13: at 13px a phone row title sat uncomfortably close to the 11px
-  /// meta beside it, so the hierarchy read as "two smalls" rather than
-  /// "title + detail". These two move as a pair — widening only the title would
-  /// have grown the gap between them in the same row.
-  static const rowTitle = 14.0;
-  static const body = 16.0;
+  /// Reading text is intentionally larger than compact metadata. The 15px row
+  /// title keeps navigation scannable without competing with conversation prose.
+  static const rowTitle = 15.0;
+  static const body = 17.0;
   static const meta = 12.0;
   static const monoMeta = 10.0;
 

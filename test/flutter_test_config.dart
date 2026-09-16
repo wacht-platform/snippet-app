@@ -34,7 +34,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 const String _geist =
     '/home/snippet/.bun/install/cache/next@16.2.6@@@1/dist/compiled/@vercel/og/Geist-Regular.ttf';
 const String _sansFallback =
-    '/home/snippet/.pub-cache/hosted/pub.dev/google_fonts-8.2.1/example/google_fonts/Lato-Regular.ttf';
+    '/home/snippet/.pub-cache/hosted/pub.dev/google_fonts-8.1.0/example/google_fonts/Lato-Regular.ttf';
 const String _mono =
     '/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf';
 

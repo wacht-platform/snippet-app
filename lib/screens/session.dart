@@ -5118,7 +5118,7 @@ class _QueuedBubble extends StatelessWidget {
                   children: [
                     if (text.isNotEmpty)
                       Text(text,
-                          style: sans(16, height: 1.5, color: AppColors.fg1)),
+                          style: sans(M.body, height: 1.5, color: AppColors.fg1)),
                     if (images + files + audio > 0) ...[
                       if (text.isNotEmpty) const SizedBox(height: 6),
                       AttachmentPill(
