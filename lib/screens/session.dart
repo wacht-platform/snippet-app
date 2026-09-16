@@ -3747,27 +3747,6 @@ class _SessionScreenState extends State<SessionScreen>
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Row(children: [
-                                  // Dispatch leads the group: it is the most
-                                  // consequential control here — it decides
-                                  // WHERE what you type is going. Anchored to
-                                  // itself so the menu opens under the chip.
-                                  Builder(
-                                    builder: (ctx) => _recipientAgentId == null
-                                        ? _composerChip(
-                                            icon: 'send',
-                                            label: 'Send to',
-                                            onTap: () => _pickRecipient(ctx),
-                                          )
-                                        : _composerChip(
-                                            icon: 'send',
-                                            label: _recipientAgentName ??
-                                                _recipientAgentId!,
-                                            selected: true,
-                                            onTap: () => _pickRecipient(ctx),
-                                            onClear: _clearRecipient,
-                                          ),
-                                  ),
-                                  const SizedBox(width: 6),
                                   // Approval mode lives here instead of the tool
                                   // band, so the setting sits next to what it
                                   // governs.
