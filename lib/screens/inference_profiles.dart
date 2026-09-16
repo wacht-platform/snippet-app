@@ -300,29 +300,18 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                 ],
               ),
             ),
-            _overflowMenu(p),
+            _deleteProfileButton(p),
           ]),
         ),
       ),
     );
   }
 
-  Widget _overflowMenu(InferenceProfile p) => PopupMenuButton<String>(
-        tooltip: '',
-        color: AppColors.surface1,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        menuPadding: const EdgeInsets.symmetric(vertical: 6),
-        shape: appMenuShape,
-        icon: AppIcon('more-vertical', size: 16, color: AppColors.fg3),
-        onSelected: (v) {
-          if (v == 'delete') {
-            _run(() => widget.client.deleteProfile(p.name), 'delete');
-          }
-        },
-        itemBuilder: (_) => [
-          appMenuItem(value: 'delete', label: 'Delete profile', danger: true),
-        ],
+  Widget _deleteProfileButton(InferenceProfile p) => IconBtn(
+        'trash',
+        size: 36,
+        iconSize: 16,
+        tooltip: 'Delete profile',
+        onTap: () => _run(() => widget.client.deleteProfile(p.name), 'delete'),
       );
 }
