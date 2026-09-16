@@ -162,6 +162,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
     final pid = p['pid'] ?? 0;
     final running = p['running'] == true;
     final status = p['status'] as String?;
+    final failed = !running && status != null && status != '0';
     final statusLabel = running
         ? 'running'
         : switch (status) {
@@ -170,6 +171,17 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             final c? when c.isNotEmpty => 'exited ($c)',
             _ => 'exited',
           };
+    // A finished process previously wore one grey dot and one grey label
+    // whatever the outcome, so `exited (101)` looked exactly like `exited (ok)`
+    // — the same "failure is invisible" defect the tool rows had. Colour now
+    // summarises the outcome: green live, danger for non-zero/killed, grey for
+    // a clean exit.
+    final dotColor = running
+        ? AppColors.ok
+        : failed
+            ? AppColors.danger
+            : AppColors.fg4;
+    final labelColor = failed ? AppColors.danger : AppColors.fg3;
     final open = _openLogId == id;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -185,7 +197,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
               height: 7,
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: running ? AppColors.ok : AppColors.fg4)),
+                  color: dotColor)),
           const SizedBox(width: 9),
           Expanded(
               child: Text(cmd,
@@ -208,7 +220,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
         Row(children: [
           Text('pid $pid', style: mono(10, color: AppColors.fg3)),
           const SizedBox(width: 12),
-          Text(statusLabel, style: mono(10, color: AppColors.fg3)),
+          Text(statusLabel, style: mono(10, color: labelColor)),
           const Spacer(),
           GestureDetector(
               onTap: () => _toggleLog(id),
