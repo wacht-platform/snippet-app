@@ -4751,37 +4751,22 @@ class _SidebarState extends State<_Sidebar> {
           // replay the transition, and `_SettingsPanel` keeps its state across
           // them.
           Expanded(
-            child: AnimatedSwitcher(
-              duration: Motion.base,
-              reverseDuration: Motion.fast,
-              switchInCurve: Motion.enter,
-              switchOutCurve: Motion.exit,
-              // The default layout is `Stack(alignment: center)`, which hands
-              // each child LOOSE constraints — an empty state would then centre
-              // itself in the corner rather than fill the body. `StackFit.expand`
-              // keeps every child pane-sized while they cross-fade.
-              layoutBuilder: (current, previous) => Stack(
-                fit: StackFit.expand,
-                children: [...previous, if (current != null) current],
-              ),
-              transitionBuilder: (child, anim) {
-                // Enter from the side you travelled from, so going back
-                // retraces the motion you arrived with instead of repeating it.
-                final dx = _forward ? 0.06 : -0.06;
-                return FadeTransition(
-                  opacity: anim,
-                  child: SlideTransition(
-                    position:
-                        Tween<Offset>(begin: Offset(dx, 0), end: Offset.zero)
-                            .animate(anim),
-                    child: child,
-                  ),
-                );
-              },
-              child: KeyedSubtree(
-                key: ValueKey(_sideKey),
-                child: _mobileHomeBody(hasClient),
-              ),
+            child: IndexedStack(
+              index: widget.mobileHome.index,
+              children: [
+                KeyedSubtree(
+                  key: const ValueKey('mobile-chats'),
+                  child: _mobileHomeBody(hasClient, _MobileHome.chats),
+                ),
+                KeyedSubtree(
+                  key: const ValueKey('mobile-agents'),
+                  child: _mobileHomeBody(hasClient, _MobileHome.agents),
+                ),
+                KeyedSubtree(
+                  key: const ValueKey('mobile-settings'),
+                  child: _mobileHomeBody(hasClient, _MobileHome.settings),
+                ),
+              ],
             ),
           ),
           // The bar names the app's TOP LEVEL, so it hides inside a nested
@@ -4882,8 +4867,9 @@ class _SidebarState extends State<_Sidebar> {
   /// Each destination gets the whole surface below the bar. Chats keeps a head
   /// for its title and context controls; Agents and Settings own their own
   /// headers, so they render directly.
-  Widget _mobileHomeBody(bool hasClient) {
-    switch (widget.mobileHome) {
+  Widget _mobileHomeBody(bool hasClient, [_MobileHome? home]) {
+    final destination = home ?? widget.mobileHome;
+    switch (destination) {
       case _MobileHome.chats:
         // The header STAYS while searching. It names the machine whose chats are
         // being filtered — hiding it exactly when you are narrowing a machine's
