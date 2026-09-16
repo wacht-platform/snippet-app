@@ -410,7 +410,9 @@ class _RecurringScreenState extends State<RecurringScreen> {
           shrinkWrap: widget.embedded,
           // 16 on BOTH paths; see vault.dart. Keeps every nested screen's
           // content on the same left axis as its NavBackRow.
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: widget.embedded
+              ? EdgeInsets.zero
+              : const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             if (jobs.isEmpty)
               Padding(

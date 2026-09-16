@@ -6827,8 +6827,14 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         const SizedBox(height: 28),
         section('Workspace', _machineRows().isEmpty ? const SizedBox.shrink() : Column(children: _machineRows())),
         if (kCanNotify) section('Notifications', _notifTile()),
-        section('Inference profiles', inlineScreen(InferenceProfilesScreen(client: widget.client, embedded: true))),
-        section('Usage', inlineScreen(UsageScreen(client: widget.client, embedded: true))),
+        section('Models & usage', Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            inlineScreen(InferenceProfilesScreen(client: widget.client, embedded: true)),
+            const SizedBox(height: 20),
+            inlineScreen(UsageScreen(client: widget.client, embedded: true)),
+          ],
+        )),
         section('Vault', inlineScreen(VaultScreen(client: widget.client, embedded: true))),
         section('Scheduled jobs', inlineScreen(RecurringScreen(client: widget.client, listOnly: true, embedded: true))),
       ],

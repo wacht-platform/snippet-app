@@ -85,7 +85,11 @@ class _UsageScreenState extends State<UsageScreen> {
         return ListView.separated(
           physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
           shrinkWrap: widget.embedded,
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+              widget.embedded ? 0 : 16,
+              widget.embedded ? 0 : 14,
+              widget.embedded ? 0 : 16,
+              24),
           itemCount: summary.providers.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (_, i) => _ProviderCard(provider: summary.providers[i]),

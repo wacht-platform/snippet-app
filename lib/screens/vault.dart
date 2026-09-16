@@ -163,8 +163,11 @@ class _VaultScreenState extends State<VaultScreen> {
       final list = ListView(
         physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
         shrinkWrap: widget.embedded,
-        padding: EdgeInsets.fromLTRB(
-            kMobile ? M.gutter : 16, 14, kMobile ? M.gutter : 16, 28),
+                  padding: EdgeInsets.fromLTRB(
+              widget.embedded ? 0 : (kMobile ? M.gutter : 16),
+              14,
+              widget.embedded ? 0 : (kMobile ? M.gutter : 16),
+              28),
         children: [
           Text(
             'Use these as \$NAME in shell commands. Values stay on the daemon and are never shown again.',

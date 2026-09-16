@@ -158,6 +158,11 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
         final list = ListView(
           physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
           shrinkWrap: widget.embedded,
+          padding: EdgeInsets.fromLTRB(
+              widget.embedded ? 0 : 16,
+              widget.embedded ? 0 : 14,
+              widget.embedded ? 0 : 16,
+              widget.embedded ? 0 : 20),
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
