@@ -6819,7 +6819,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   Widget _mobileSettingsHome() {
     Widget section(String label, Widget child, {Widget? trailing}) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 22),
+        padding: const EdgeInsets.only(bottom: 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -7232,7 +7232,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       // each, and a 0 desktop inset put the bell flush against the card edge.
       padding: EdgeInsets.symmetric(
           horizontal: kMobile && widget.embedded ? 0 : 14,
-          vertical: kMobile ? 4 : 9),
+          vertical: kMobile ? 2 : 9),
       child: Row(children: [
         // A bell for a notification setting. `zap` (a lightning bolt) named
         // nothing about alerts.

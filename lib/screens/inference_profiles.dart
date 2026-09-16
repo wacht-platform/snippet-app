@@ -268,7 +268,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
         borderRadius: BorderRadius.circular(widget.embedded ? R.sm : R.md),
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-              0, widget.embedded ? 10 : 12, 0, widget.embedded ? 10 : 12),
+              0, widget.embedded ? 6 : 12, 0, widget.embedded ? 6 : 12),
           child: Row(children: [
             AppIcon('cpu',
                 size: widget.embedded ? 16 : 16,
@@ -299,13 +299,13 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                       const WarnChip(),
                     ],
                   ]),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text('${p.provider} · ${p.model}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: mono(11, color: AppColors.fg4)),
                   if (match != null && match.totalTokens > 0) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                         '${fmtSi(match.totalTokens)} tok · ${match.sessions} session${match.sessions == 1 ? '' : 's'}',
                         style: mono(11, color: AppColors.fg3)),
@@ -322,7 +322,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
 
   Widget _deleteProfileButton(InferenceProfile p) => IconBtn(
         'trash',
-        size: 36,
+        size: 32,
         iconSize: 16,
         tooltip: 'Delete profile',
         onTap: () => _run(() => widget.client.deleteProfile(p.name), 'delete'),
