@@ -6611,6 +6611,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   late final List<Instance> _instances = [...widget.instances];
   bool _notif = false;
   bool _notifBusy = false;
+  late Future<void> _mobileSettingsReady;
+
   _SettingsPage _page = _SettingsPage.general;
 
   /// Phone drill-down, read from the shell. Desktop uses `_page` + the chip
@@ -6642,9 +6644,19 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   @override
   void initState() {
     super.initState();
+    _mobileSettingsReady = _loadMobileSettings();
     notificationsEnabled().then((v) {
       if (mounted) setState(() => _notif = v);
     });
+  }
+
+  Future<void> _loadMobileSettings() async {
+    await Future.wait<void>([
+      widget.client.getConfig(),
+      widget.client.getUsage(),
+      widget.client.vaultList(),
+      widget.client.recurringJobs(),
+    ]);
   }
 
   Future<void> _toggleNotif(bool v) async {
@@ -6713,7 +6725,21 @@ class _SettingsPanelState extends State<_SettingsPanel> {
             child: KeyedSubtree(
               key: ValueKey(_mobileSection?.name ?? 'home'),
               child: _mobileSection == null
-                  ? _mobileSettingsHome()
+                  ? FutureBuilder<void>(
+                      future: _mobileSettingsReady,
+                      builder: (context, snap) {
+                        if (snap.connectionState != ConnectionState.done) {
+                          return const AppLoading(label: 'Loading settings');
+                        }
+                        if (snap.hasError) {
+                          return Center(
+                            child: Text('Unable to load settings',
+                                style: sans(13, color: AppColors.fg2)),
+                          );
+                        }
+                        return _mobileSettingsHome();
+                      },
+                    )
                   : _mobileSectionPage(),
             ),
           ),
