@@ -62,43 +62,28 @@ class _CreateAgentFormState extends State<CreateAgentForm> {
   }
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Describe the agent in plain language. It will research the role, create its identity, and propose the tools it needs.',
-              style: sans(13, color: AppColors.fg3, height: 1.45),
-            ),
-            const SizedBox(height: 18),
-            AppField(
-              controller: _prompt,
-              label: 'What should this agent become?',
-              hint:
-                  'Create a Rust security reviewer that researches current dependency auditing practices and can inspect repositories without modifying them.',
-              minLines: 5,
-              maxLines: 8,
-              autofocus: true,
-            ),
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppField(
+            controller: _prompt,
+            hint: 'A security reviewer that inspects repos without changing them.',
+            minLines: 4,
+            maxLines: 6,
+            autofocus: true,
+          ),
+          if (_error != null) ...[
             const SizedBox(height: 10),
-            Text(
-              'The agent chooses its name, personality, capabilities, and initial tool proposals from this brief.',
-              style: sans(12, color: AppColors.fg3, height: 1.4),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 14),
-              Text(_error!, style: sans(12, color: AppColors.danger)),
-            ],
-            const SizedBox(height: 20),
-            Btn(
-              _busy ? 'Starting build…' : 'Build agent',
-              full: true,
-              disabled: _busy,
-              icon: 'sparkles',
-              onTap: _submit,
-            ),
+            Text(_error!, style: sans(12, color: AppColors.danger)),
           ],
-        ),
+          const SizedBox(height: 14),
+          Btn(
+            _busy ? 'Starting build…' : 'Build agent',
+            full: true,
+            disabled: _busy,
+            icon: 'sparkles',
+            onTap: _submit,
+          ),
+        ],
       );
 }

@@ -2257,32 +2257,28 @@ class _TextPromptSheetState extends State<_TextPromptSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AppField(
-                controller: _controller,
-                hint: widget.hint,
-                autofocus: true,
-                minLines: widget.minLines,
-                maxLines: widget.maxLines,
-                onSubmitted: (_) => _done()),
-            const SizedBox(height: 10),
-            Row(children: [
-              const Spacer(),
-              Btn('Cancel',
-                  variant: BtnVariant.ghost,
-                  small: true,
-                  onTap: () => Navigator.pop(context)),
-              const SizedBox(width: 6),
-              Btn(widget.saveLabel, small: true, onTap: _done),
-            ]),
+    return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppField(
+              controller: _controller,
+              hint: widget.hint,
+              autofocus: true,
+              minLines: widget.minLines,
+              maxLines: widget.maxLines,
+              onSubmitted: (_) => _done()),
+          const SizedBox(height: 10),
+          Row(children: [
+            const Spacer(),
+            Btn('Cancel',
+                variant: BtnVariant.ghost,
+                small: true,
+                onTap: () => Navigator.pop(context)),
+            const SizedBox(width: 6),
+            Btn(widget.saveLabel, small: true, onTap: _done),
           ]),
-    );
+        ]);
   }
 }
 
@@ -2348,53 +2344,64 @@ Future<T?> showAppSheet<T>(BuildContext context,
   return showModalBottomSheet<T>(
     context: context,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.62),
+    barrierColor: Colors.black.withValues(alpha: 0.5),
     isScrollControlled: true,
+    useSafeArea: false,
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
-      // Never taller than the caller asked, and never taller than the space
-      // above the keyboard.
-      final available = (media.size.height - media.viewInsets.bottom) * 0.88;
+      final keyboard = media.viewInsets.bottom;
+      // Lift the whole sheet above the keyboard. Padding the *inside* of a
+      // pinned-to-bottom sheet just grew a blank band under the field while
+      // the keyboard still covered the inputs.
+      final aboveKeyboard = media.size.height - keyboard;
+      final available = aboveKeyboard * 0.92;
       final limit = available < maxHeight ? available : maxHeight;
-      return BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: Container(
-          decoration: BoxDecoration(
+      return Padding(
+        padding: EdgeInsets.only(bottom: keyboard),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Material(
             color: AppColors.surface1,
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-          ),
-          constraints: BoxConstraints(maxHeight: limit),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const SizedBox(height: 10),
-            Center(
-                child: Container(
-                    width: 32,
-                    height: 3,
-                    decoration: BoxDecoration(
-                        color: AppColors.border2,
-                        borderRadius: BorderRadius.circular(99)))),
-            Padding(
-              padding: EdgeInsets.fromLTRB(M.gutter, 10, 8, 10),
-              child: Row(children: [
-                Expanded(
-                    child: Text(title,
-                        style: sans(M.sectionTitle,
-                            weight: W.label, color: AppColors.fg1))),
-                IconBtn('x',
-                    size: 32,
-                    iconSize: 16,
-                    onTap: () => Navigator.pop(sheetContext)),
+            clipBehavior: Clip.antiAlias,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: limit),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const SizedBox(height: 8),
+                Center(
+                    child: Container(
+                        width: 28,
+                        height: 3,
+                        decoration: BoxDecoration(
+                            color: AppColors.border2,
+                            borderRadius: BorderRadius.circular(99)))),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
+                  child: Row(children: [
+                    Expanded(
+                        child: Text(title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(16,
+                                weight: W.label, color: AppColors.fg1))),
+                    IconBtn('x',
+                        size: 32,
+                        iconSize: 16,
+                        tooltip: 'Close',
+                        onTap: () => Navigator.pop(sheetContext)),
+                  ]),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                        20, 0, 20, 16 + media.padding.bottom),
+                    child: child,
+                  ),
+                ),
               ]),
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 14),
-                child: child,
-              ),
-            ),
-            SizedBox(height: media.padding.bottom + media.viewInsets.bottom),
-          ]),
+          ),
         ),
       );
     },
