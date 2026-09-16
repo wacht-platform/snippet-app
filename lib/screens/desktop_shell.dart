@@ -6612,14 +6612,6 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   bool _notif = false;
   bool _notifBusy = false;
   _SettingsPage _page = _SettingsPage.general;
-  final Set<String> _openMobileSettings = {
-    'machine',
-    'alerts',
-    'profiles',
-    'usage',
-    'vault',
-    'scheduled',
-  };
 
   /// Phone drill-down, read from the shell. Desktop uses `_page` + the chip
   /// strip instead, so this is only consulted when `kMobile && embedded`.
@@ -6808,34 +6800,16 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   /// surface, so those earn a row.
   Widget _mobileSettingsHome() {
     Widget section(String key, String label, Widget child) {
-      final open = _openMobileSettings.contains(key);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          InkWell(
-            onTap: () => setState(() {
-              if (open) {
-                _openMobileSettings.remove(key);
-              } else {
-                _openMobileSettings.add(key);
-              }
-            }),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(2, 14, 2, 12),
-              child: Row(children: [
-                Expanded(
-                  child: Text(label,
-                      style: display(M.sectionTitle, color: AppColors.fg1)),
-                ),
-                AppIcon(open ? 'chevron-down' : 'chevron-right',
-                    size: 18, color: AppColors.fg3),
-              ]),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(2, 18, 2, 8),
+            child: Text(label,
+                style: display(M.sectionTitle, color: AppColors.fg1)),
           ),
-          if (open) ...[
-            child,
-            const SizedBox(height: 8),
-          ],
+          child,
+          const SizedBox(height: 8),
         ],
       );
     }

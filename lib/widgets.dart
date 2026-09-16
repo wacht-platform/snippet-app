@@ -15,6 +15,51 @@ import 'theme.dart';
 OverlayEntry? _activeToast;
 Timer? _toastTimer;
 
+/// Full-surface loading state for mobile screens. A quiet brand mark avoids the
+/// generic circular progress indicator and keeps partial content hidden.
+class AppLoading extends StatefulWidget {
+  const AppLoading({super.key, this.label = 'Loading'});
+  final String label;
+
+  @override
+  State<AppLoading> createState() => _AppLoadingState();
+}
+
+class _AppLoadingState extends State<AppLoading>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 0.35, end: 1).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('snippet',
+                style: display(20, weight: W.strong, color: AppColors.fg1)),
+            const SizedBox(height: 8),
+            Text(widget.label, style: sans(12, color: AppColors.fg3)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
 ShapeBorder get appMenuShape => RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(R.md),
       side: BorderSide(color: AppColors.border),

@@ -187,7 +187,9 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       return Container(
         color: AppColors.bg,
         alignment: Alignment.center,
-        child: SizedBox(
+        child: kMobile
+            ? const AppLoading(label: 'Loading agents')
+            : SizedBox(
             width: 20,
             height: 20,
             child: CircularProgressIndicator(
