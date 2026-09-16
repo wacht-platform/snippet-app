@@ -170,38 +170,34 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
               widget.embedded ? 0 : 16,
               widget.embedded ? 0 : 20),
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title only when NOT embedded: embedded draws it in the
-                      // shared NavBackRow above, so repeating it here is the
-                      // duplication this screen already had.
-                      if (!widget.embedded) ...[
+            if (!widget.embedded) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text('Inference profiles',
                             style: sans(18,
                                 weight: FontWeight.w500, color: AppColors.fg1)),
                         const SizedBox(height: 3),
-                      ],
-                      if (!widget.embedded)
                         Text(
                             'Choose the profile used for new sessions and delegated work.',
                             style: sans(12, color: AppColors.fg3)),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                IconBtn('plus',
-                    size: 36,
-                    iconSize: 17,
-                    tooltip: 'Add profile',
-                    onTap: () => _edit(null)),
-              ],
-            ),
-            SizedBox(height: widget.embedded ? 12 : 16),
+                  const SizedBox(width: 12),
+                  IconBtn('plus',
+                      size: 36,
+                      iconSize: 17,
+                      tooltip: 'Add profile',
+                      onTap: () => _edit(null)),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
             if (profiles.isEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),

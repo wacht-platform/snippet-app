@@ -165,9 +165,9 @@ class _VaultScreenState extends State<VaultScreen> {
         shrinkWrap: widget.embedded,
                   padding: EdgeInsets.fromLTRB(
               widget.embedded ? 0 : (kMobile ? M.gutter : 16),
-              14,
+              widget.embedded ? 0 : 14,
               widget.embedded ? 0 : (kMobile ? M.gutter : 16),
-              28),
+              widget.embedded ? 0 : 28),
         children: [
           if (!(widget.embedded && kMobile)) ...[
             Text(

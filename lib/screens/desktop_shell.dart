@@ -23,6 +23,7 @@ import 'editor.dart';
 import 'files.dart';
 import 'git.dart';
 import 'inference_profiles.dart';
+import 'inference_profile_editor.dart';
 import 'processes.dart';
 import 'usage.dart';
 import 'vault.dart';
@@ -6815,14 +6816,22 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   /// screen of content. Models / Usage / Vault / Scheduled each own a real
   /// surface, so those earn a row.
   Widget _mobileSettingsHome() {
-    Widget section(String label, Widget child) {
+    Widget section(String label, Widget child, {Widget? trailing}) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.only(bottom: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(label.toUpperCase(), style: caps(11, color: AppColors.fg3)),
-            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(children: [
+                Expanded(
+                  child: Text(label.toUpperCase(),
+                      style: caps(11, color: AppColors.fg3)),
+                ),
+                if (trailing != null) trailing,
+              ]),
+            ),
             child,
           ],
         ),
@@ -6835,14 +6844,30 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
       children: [
         Text('Settings', style: display(28, color: AppColors.fg1)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text('Workspace, models, and automation', style: sans(13, color: AppColors.fg3)),
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
         section('Workspace', _machineRows().isEmpty ? const SizedBox.shrink() : Column(children: _machineRows())),
         if (kCanNotify) section('Notifications', _notifTile()),
         section(
             'Models & usage',
-            InferenceProfilesScreen(client: widget.client, embedded: true)),
+            InferenceProfilesScreen(client: widget.client, embedded: true),
+            trailing: IconBtn('plus',
+                size: 36,
+                iconSize: 17,
+                tooltip: 'Add profile',
+                onTap: () {
+                  Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => InferenceProfileEditor(
+                        client: widget.client,
+                        onClose: () => Navigator.pop(context),
+                        onSaved: () => Navigator.pop(context, true),
+                      ),
+                    ),
+                  );
+                }),
+        ),
         section('Vault', inlineScreen(VaultScreen(client: widget.client, embedded: true))),
         section('Scheduled jobs', inlineScreen(RecurringScreen(client: widget.client, listOnly: true, embedded: true))),
       ],
