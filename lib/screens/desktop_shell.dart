@@ -6840,14 +6840,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         const SizedBox(height: 28),
         section('Workspace', _machineRows().isEmpty ? const SizedBox.shrink() : Column(children: _machineRows())),
         if (kCanNotify) section('Notifications', _notifTile()),
-        section('Models & usage', Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            inlineScreen(InferenceProfilesScreen(client: widget.client, embedded: true)),
-            const SizedBox(height: 20),
-            inlineScreen(UsageScreen(client: widget.client, embedded: true)),
-          ],
-        )),
+        section(
+            'Models & usage',
+            InferenceProfilesScreen(client: widget.client, embedded: true)),
         section('Vault', inlineScreen(VaultScreen(client: widget.client, embedded: true))),
         section('Scheduled jobs', inlineScreen(RecurringScreen(client: widget.client, listOnly: true, embedded: true))),
       ],
@@ -7145,7 +7140,11 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         // card's own gutter. The old desktop value (10) was written when this
         // was a bare sidebar panel row; it is the same row in the same card as
         // the phone's now, so the insets match too.
-        padding: EdgeInsets.fromLTRB(14, kMobile ? 12 : 9, 4, kMobile ? 12 : 9),
+        padding: EdgeInsets.fromLTRB(
+            kMobile && widget.embedded ? 0 : 14,
+            kMobile ? 12 : 9,
+            kMobile && widget.embedded ? 0 : 4,
+            kMobile ? 12 : 9),
         child: Row(children: [
           // A machine is a SERVER, not a CPU. The old `cpu` glyph described a
           // chip inside the machine, which read as the wrong object entirely.
@@ -7196,7 +7195,9 @@ class _SettingsPanelState extends State<_SettingsPanel> {
     return Padding(
       // Non-zero on BOTH platforms: this tile lives inside a `_settingsCard` on
       // each, and a 0 desktop inset put the bell flush against the card edge.
-      padding: EdgeInsets.symmetric(horizontal: 14, vertical: kMobile ? 12 : 9),
+      padding: EdgeInsets.symmetric(
+          horizontal: kMobile && widget.embedded ? 0 : 14,
+          vertical: kMobile ? 12 : 9),
       child: Row(children: [
         // A bell for a notification setting. `zap` (a lightning bolt) named
         // nothing about alerts.

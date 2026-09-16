@@ -290,7 +290,8 @@ class _VaultScreenState extends State<VaultScreen> {
     return SizedBox(
       height: kMobile ? M.rowHeight : 48,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: EdgeInsets.symmetric(
+            horizontal: widget.embedded && kMobile ? 0 : 14),
         child: Row(children: [
           // Tinted tile, matching the settings index rows.
           Container(
@@ -326,7 +327,8 @@ class _VaultScreenState extends State<VaultScreen> {
 
   /// The add affordance, as a full-height row at the app's touch minimum.
   Widget _addRow() {
-    const pad = EdgeInsets.symmetric(horizontal: 14);
+    final pad = EdgeInsets.symmetric(
+        horizontal: widget.embedded && kMobile ? 0 : 14);
     return Pressable(
       child: Material(
         color: AppColors.surface2,

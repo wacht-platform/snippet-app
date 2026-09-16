@@ -34,6 +34,7 @@ class InferenceProfilesScreen extends StatefulWidget {
 
 class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
   late Future<ServerConfig> _future;
+  late Future<UsageSummary> _usage;
   bool _inEditor = false;
   InferenceProfile? _editProfile;
   String? _delegate;
@@ -43,6 +44,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
     super.initState();
     modelsRevision.addListener(_onModelsChanged);
     _future = widget.client.getConfig();
+    _usage = widget.client.getUsage();
   }
 
   void _onModelsChanged() {
@@ -143,18 +145,22 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
         ],
       );
     }
-    final body = FutureBuilder<ServerConfig>(
-      future: _future,
+    final body = FutureBuilder<List<Object?>>(
+      future: Future.wait<Object?>([_future, _usage]),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return Center(
-              child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.fg3)));
+          return widget.embedded
+              ? const SizedBox.shrink()
+              : Center(
+                  child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.fg3)));
         }
-        final profiles = snap.data?.profiles ?? const [];
+        final cfg = snap.data?[0] as ServerConfig?;
+        final usage = snap.data?[1] as UsageSummary?;
+        final profiles = cfg?.profiles ?? const [];
         final list = ListView(
           physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
           shrinkWrap: widget.embedded,
@@ -180,10 +186,10 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                                 weight: FontWeight.w500, color: AppColors.fg1)),
                         const SizedBox(height: 3),
                       ],
-                      Text(
-                          'Choose the profile used for new sessions and delegated work.',
-                          style: sans(widget.embedded ? 12 : 12,
-                              color: AppColors.fg3)),
+                      if (!widget.embedded)
+                        Text(
+                            'Choose the profile used for new sessions and delegated work.',
+                            style: sans(12, color: AppColors.fg3)),
                     ],
                   ),
                 ),
@@ -208,7 +214,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
               Column(
                 children: [
                   for (var i = 0; i < profiles.length; i++) ...[
-                    _profileCard(profiles[i], snap.data?.delegate),
+                    _profileCard(profiles[i], cfg?.delegate, usage),
                     if (i < profiles.length - 1)
                       Divider(height: 1, color: AppColors.border),
                   ],
@@ -247,25 +253,31 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
     );
   }
 
-  Widget _profileCard(InferenceProfile p, String? delegate) {
+  Widget _profileCard(
+      InferenceProfile p, String? delegate, UsageSummary? usage) {
     final isDelegate =
         delegate != null && delegate.isNotEmpty && delegate == p.name;
+    UsageProvider? match;
+    for (final u in usage?.providers ?? const <UsageProvider>[]) {
+      if (u.profile == p.name ||
+          (u.provider == p.provider && u.model == p.model)) {
+        match = u;
+        break;
+      }
+    }
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _edit(p),
         borderRadius: BorderRadius.circular(widget.embedded ? R.sm : R.md),
         child: Padding(
-          // Horizontal inset 0: the LIST already insets by 16, so this padding
-          // stacked on top of it and put row icons ~10px right of the title and
-          // the nav chevron above them. Rows, title and header share one axis.
           padding: EdgeInsets.fromLTRB(
-              0, widget.embedded ? 8 : 12, 6, widget.embedded ? 8 : 12),
+              0, widget.embedded ? 10 : 12, 0, widget.embedded ? 10 : 12),
           child: Row(children: [
             AppIcon('cpu',
-                size: widget.embedded ? 14 : 16,
+                size: widget.embedded ? 16 : 16,
                 color: p.active ? AppColors.accent : AppColors.fg3),
-            SizedBox(width: widget.embedded ? 10 : 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,7 +287,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                       child: Text(p.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(widget.embedded ? 12 : 14,
+                          style: sans(widget.embedded ? 14 : 14,
                               weight: FontWeight.w500, color: AppColors.fg1)),
                     ),
                     if (p.active) ...[
@@ -291,12 +303,17 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                       const WarnChip(),
                     ],
                   ]),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Text('${p.provider} · ${p.model}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(widget.embedded ? 10 : 11,
-                          color: AppColors.fg4)),
+                      style: mono(11, color: AppColors.fg4)),
+                  if (match != null && match.totalTokens > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                        '${fmtSi(match.totalTokens)} tok · ${match.sessions} session${match.sessions == 1 ? '' : 's'}',
+                        style: mono(11, color: AppColors.fg3)),
+                  ],
                 ],
               ),
             ),
