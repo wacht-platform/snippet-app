@@ -415,8 +415,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           10,
           widget.embedded ? 16 : 16,
           widget.embedded ? 12 : 12 + MediaQuery.of(context).padding.bottom),
-      decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.border))),
+      decoration: const BoxDecoration(),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [

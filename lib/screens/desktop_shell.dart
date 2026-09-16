@@ -6831,10 +6831,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(children: [
-              Expanded(child: Text(label.toUpperCase(), style: caps(11, color: AppColors.fg3))),
-              Container(width: 48, height: 1, color: AppColors.border2),
-            ]),
+            Text(label.toUpperCase(), style: caps(11, color: AppColors.fg3)),
             const SizedBox(height: 10),
             child,
           ],

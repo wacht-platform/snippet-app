@@ -45,14 +45,14 @@ class _AppLoadingState extends State<AppLoading>
         opacity: Tween<double>(begin: 0.35, end: 1).animate(
           CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('snippet',
-                style: display(20, weight: W.strong, color: AppColors.fg1)),
-            const SizedBox(height: 8),
-            Text(widget.label, style: sans(12, color: AppColors.fg3)),
-          ],
+        child: Semantics(
+          label: widget.label,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+              CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+            ),
+            child: AppIcon('sparkles', size: 28, color: AppColors.fg1),
+          ),
         ),
       ),
     );
