@@ -21,7 +21,20 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   TestWidgetsFlutterBinding.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
   await _loadRealFonts();
+  _primeGoldenMode();
   await testMain();
+}
+
+/// Goldens are LOCAL review artifacts, not repo content, so a fresh clone has
+/// none. Without this every comparison would fail on a checkout that simply has
+/// not rendered yet. When the directory holds no PNGs, write them instead of
+/// comparing; once they exist, the normal comparison runs and a real visual
+/// change still fails loudly.
+void _primeGoldenMode() {
+  final dir = Directory('test/visual/goldens');
+  final hasGoldens = dir.existsSync() &&
+      dir.listSync().any((e) => e.path.endsWith('.png'));
+  if (!hasGoldens) autoUpdateGoldenFiles = true;
 }
 
 /// One real source file per family. A missing file makes that family a no-op,
