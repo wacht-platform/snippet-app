@@ -5841,6 +5841,10 @@ class _SidebarState extends State<_Sidebar> {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
     final selected = s.id == widget.selectedSessionId;
+    final folder = s.folder.trim();
+    final context = folder.isEmpty
+        ? 'Local conversation'
+        : folder.split('/').where((part) => part.isNotEmpty).last;
     return Material(
       color: selected || checked ? AppColors.surface2 : Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
@@ -5868,10 +5872,10 @@ class _SidebarState extends State<_Sidebar> {
                 }
               },
         child: SizedBox(
-          height: M.rowHeight,
+          height: M.rowHeight + 12,
           child: Padding(
             padding: EdgeInsets.only(left: M.rowPadH, right: 6),
-            child: Row(children: [
+            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               if (_selecting) ...[
                 AppIcon(checked ? 'check' : 'plus',
                     size: 16,
@@ -5886,12 +5890,24 @@ class _SidebarState extends State<_Sidebar> {
               Expanded(
                 child: renaming
                     ? _inlineRenameField(s, compact: false)
-                    : Text(
-                        s.title.isEmpty ? '(untitled)' : s.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(M.rowTitle,
-                            color: selected ? AppColors.fg1 : AppColors.fg2),
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            s.title.isEmpty ? '(untitled)' : s.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(M.rowTitle,
+                                color: selected ? AppColors.fg1 : AppColors.fg2),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(context,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: mono(M.meta,
+                                  color: AppColors.fg3, tabular: false)),
+                        ],
                       ),
               ),
               // No per-row overflow button. At this row height it crowded the
