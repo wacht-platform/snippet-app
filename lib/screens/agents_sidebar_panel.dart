@@ -270,27 +270,7 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
               ],
             )
           else
-            Padding(
-              padding: EdgeInsets.fromLTRB(M.gutter, 12, M.gutter - 6, 8),
-              child: Row(children: [
-                Text('Agents',
-                    style: sans(M.sectionTitle,
-                        weight: W.label, color: AppColors.fg1)),
-                const Spacer(),
-                Builder(
-                  builder: (ctx) => IconBtn('plus',
-                      size: M.minTarget,
-                      iconSize: 18,
-                      tooltip: 'Create agent',
-                      onTap: busy ? null : () => _openCreateAgent(ctx)),
-                ),
-                IconBtn('refresh',
-                    size: M.minTarget,
-                    iconSize: 18,
-                    tooltip: 'Refresh',
-                    onTap: busy ? null : refresh),
-              ]),
-            ),
+            const SizedBox.shrink(),
           Expanded(
             child: agents.isEmpty
                 ? _EmptyTeam()
