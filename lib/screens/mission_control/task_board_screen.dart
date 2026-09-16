@@ -216,11 +216,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
         child: Column(children: [
           SnAppBar(
             title: 'Tasks',
-            // The doc's page title is 20px; SnAppBar defaults to 17. Its WEIGHT
-            // stays at the app's `display()` 500 rather than the doc's 600 —
-            // forcing 600 would mean either changing SnAppBar for every screen
-            // or bypassing the shared helper, and both reach outside this page.
-            titleSize: 20,
+            titleSize: M.pageTitle,
             background: AppColors.bg,
             bordered: false,
             actions: [
@@ -499,24 +495,19 @@ class _TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        // The doc's row gap is 8; between 26px rows a hair more reads as a list
-        // rather than a stack of cards.
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: 2),
         child: Material(
-          // The doc puts CARDS on the chrome rung, and separation comes from
-          // that step rather than a hairline — this row had the fill right and
-          // the border was never there.
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.card),
+          color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(R.card),
+            borderRadius: BorderRadius.circular(R.sm),
             child: Container(
-              // The doc's row metric: 26px tall, radius 8, `5px 12px`. Phone
-              // keeps its own touch height — 26 is a desktop measurement and
-              // sits well under the 44px minimum target.
               height: kMobile ? M.rowHeight : kNavRowHeight,
               padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(R.sm),
+              ),
               child: Row(children: [
                 // Priority is a mark, not a badge: at 0 (the default) it draws
                 // nothing, so an ordinary task stays quiet and a raised one
