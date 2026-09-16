@@ -161,6 +161,8 @@ class _VaultScreenState extends State<VaultScreen> {
     } else {
       final names = _names ?? const [];
       final list = ListView(
+        physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
+        shrinkWrap: widget.embedded,
         padding: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 16, 14, kMobile ? M.gutter : 16, 28),
         children: [
@@ -172,25 +174,34 @@ class _VaultScreenState extends State<VaultScreen> {
           const SizedBox(height: 16),
           _inlineLabel('Secrets'),
           const SizedBox(height: 8),
-          _card([
-            if (names.isEmpty)
-              _emptyRow()
-            else ...[
-              for (final n in names) _secretRow(n),
-            ],
-            // Desktop: the form is a ROW IN THE SAME CARD, so it reads as part
-            // of the list rather than a surface floating over it.
-            if (_adding)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-                child: _AddSecretForm(
-                  client: widget.client,
-                  inline: true,
-                  onSaved: _afterAdded,
-                  onCancel: () => setState(() => _adding = false),
+          if (kMobile)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (names.isEmpty) _emptyRow() else ...[for (final n in names) _secretRow(n)],
+                if (_adding)
+                  _AddSecretForm(
+                    client: widget.client,
+                    inline: true,
+                    onSaved: _afterAdded,
+                    onCancel: () => setState(() => _adding = false),
+                  ),
+              ],
+            )
+          else
+            _card([
+              if (names.isEmpty) _emptyRow() else ...[for (final n in names) _secretRow(n)],
+              if (_adding)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  child: _AddSecretForm(
+                    client: widget.client,
+                    inline: true,
+                    onSaved: _afterAdded,
+                    onCancel: () => setState(() => _adding = false),
+                  ),
                 ),
-              ),
-          ]),
+            ]),
           // The add row hides while the form is open: two ways to do the same
           // thing at once is what makes a form feel unanchored.
           if (!_adding) ...[

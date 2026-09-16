@@ -83,6 +83,8 @@ class _UsageScreenState extends State<UsageScreen> {
                   style: sans(12, color: AppColors.fg3)));
         }
         return ListView.separated(
+          physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
+          shrinkWrap: widget.embedded,
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
           itemCount: summary.providers.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),

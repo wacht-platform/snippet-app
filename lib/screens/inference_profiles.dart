@@ -156,7 +156,8 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
         }
         final profiles = snap.data?.profiles ?? const [];
         final list = ListView(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
+          shrinkWrap: widget.embedded,
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,8 +183,11 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Btn('Add profile',
-                    icon: 'plus', small: true, onTap: () => _edit(null)),
+                IconBtn('plus',
+                    size: 36,
+                    iconSize: 17,
+                    tooltip: 'Add profile',
+                    onTap: () => _edit(null)),
               ],
             ),
             SizedBox(height: widget.embedded ? 12 : 16),

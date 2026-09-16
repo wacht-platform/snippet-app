@@ -6816,7 +6816,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       );
     }
 
-    Widget inlineScreen(Widget child) => SizedBox(height: 360, child: child);
+    Widget inlineScreen(Widget child) => child;
 
     return ListView(
       padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
