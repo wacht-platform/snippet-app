@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../panel.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -580,6 +581,19 @@ void openAgentThread(
   required String agentId,
   required String agentName,
 }) {
+  if (kMobile) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AgentThreadScreen(
+          client: client,
+          agentId: agentId,
+          agentName: agentName,
+          onClose: () => Navigator.pop(context),
+        ),
+      ),
+    );
+    return;
+  }
   presentScreen(
     context,
     style: PanelStyle.drawer,
