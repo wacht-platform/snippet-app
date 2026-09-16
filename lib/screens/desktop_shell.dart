@@ -4786,7 +4786,8 @@ class _SidebarState extends State<_Sidebar> {
           // screen. Leaving it up would give that screen a second exit that
           // skips the level you are in — and make the bar look like part of the
           // sub-screen rather than the shell.
-          if (!_mobileDrilledDown) _mobileBar(hasClient),
+          if (widget.mobileHome == _MobileHome.chats && !_mobileDrilledDown)
+                  _mobileBar(hasClient),
         ],
         if (!kMobile) ...[
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
