@@ -6824,14 +6824,16 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(children: [
-                Expanded(
-                  child: Text(label.toUpperCase(),
-                      style: caps(11, color: AppColors.fg3)),
-                ),
-                if (trailing != null) trailing,
-              ]),
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(label.toUpperCase(),
+                        style: caps(11, color: AppColors.fg3)),
+                  ),
+                  if (trailing != null) trailing,
+                ],
+              ),
             ),
             child,
           ],
@@ -6845,17 +6847,15 @@ class _SettingsPanelState extends State<_SettingsPanel> {
       padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
       children: [
         Text('Settings', style: display(28, color: AppColors.fg1)),
-        const SizedBox(height: 4),
-        Text('Workspace, models, and automation', style: sans(13, color: AppColors.fg3)),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         section('Workspace', _machineRows().isEmpty ? const SizedBox.shrink() : Column(children: _machineRows())),
         if (kCanNotify) section('Notifications', _notifTile()),
         section(
             'Models & usage',
             InferenceProfilesScreen(client: widget.client, embedded: true),
             trailing: IconBtn('plus',
-                size: 36,
-                iconSize: 17,
+                size: 32,
+                iconSize: 16,
                 tooltip: 'Add profile',
                 onTap: () {
                   Navigator.of(context).push<bool>(
@@ -6874,8 +6874,8 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           inlineScreen(VaultScreen(
               key: _vaultKey, client: widget.client, embedded: true)),
           trailing: IconBtn('plus',
-              size: 36,
-              iconSize: 17,
+              size: 32,
+              iconSize: 16,
               tooltip: 'Add secret',
               onTap: () => _vaultKey.currentState?.add()),
         ),
