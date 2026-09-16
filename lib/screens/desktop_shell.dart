@@ -6612,6 +6612,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   bool _notif = false;
   bool _notifBusy = false;
   _SettingsPage _page = _SettingsPage.general;
+  final Set<String> _openMobileSettings = {'machine', 'configuration'};
 
   /// Phone drill-down, read from the shell. Desktop uses `_page` + the chip
   /// strip instead, so this is only consulted when `kMobile && embedded`.
@@ -6799,31 +6800,57 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   /// screen of content. Models / Usage / Vault / Scheduled each own a real
   /// surface, so those earn a row.
   Widget _mobileSettingsHome() {
+    Widget section(String key, String label, Widget child) {
+      final open = _openMobileSettings.contains(key);
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Material(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.md),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                onTap: () => setState(() {
+                  if (open) {
+                    _openMobileSettings.remove(key);
+                  } else {
+                    _openMobileSettings.add(key);
+                  }
+                }),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(children: [
+                    Expanded(child: Text(label, style: sans(M.rowTitle, weight: W.label, color: AppColors.fg1))),
+                    AppIcon(open ? 'chevron-down' : 'chevron-right', size: 18, color: AppColors.fg3),
+                  ]),
+                ),
+              ),
+              if (open) ...[
+                Divider(height: 1, color: AppColors.border),
+                child,
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final configRows = [
+      for (final (page, icon, label) in _nav)
+        if (page != _SettingsPage.general) _mobileIndexRow(page, icon, label),
+    ];
     return ListView(
       padding: EdgeInsets.fromLTRB(M.gutter, 14, M.gutter, 28),
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 16),
-          child: Text('Settings',
-              style: display(M.pageTitle, color: AppColors.fg1)),
+          padding: const EdgeInsets.only(left: 2, bottom: 18),
+          child: Text('Settings', style: display(M.pageTitle, color: AppColors.fg1)),
         ),
-        _inlineLabel('Machine'),
-        const SizedBox(height: 8),
-        _settingsCard(_machineRows()),
-        if (kCanNotify) ...[
-          const SizedBox(height: 22),
-          _inlineLabel('Alerts'),
-          const SizedBox(height: 8),
-          _settingsCard([_notifTile()]),
-        ],
-        const SizedBox(height: 22),
-        _inlineLabel('Configuration'),
-        const SizedBox(height: 8),
-        _settingsCard([
-          for (final (page, icon, label) in _nav)
-            if (page != _SettingsPage.general)
-              _mobileIndexRow(page, icon, label),
-        ]),
+        section('machine', 'Machine', _settingsCard(_machineRows())),
+        if (kCanNotify) section('alerts', 'Alerts', _settingsCard([_notifTile()])),
+        section('configuration', 'Configuration', _settingsCard(configRows)),
       ],
     );
   }

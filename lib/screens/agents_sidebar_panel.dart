@@ -99,7 +99,13 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       top = origin.dy
           .clamp(12.0, (screen.height - 320).clamp(12.0, double.infinity));
     }
-    final submitted = await showGeneralDialog<bool>(
+    final submitted = kMobile
+        ? await showAppSheet<bool>(
+            context,
+            title: 'Create agent',
+            child: CreateAgentForm(client: widget.client),
+          )
+        : await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'create agent',
@@ -289,7 +295,7 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                 : ListView(
                     padding: EdgeInsets.fromLTRB(kMobile ? 0 : 8, 0, kMobile ? 0 : 8, 18),
                     children: [
-                      if (active.isNotEmpty) group('Available now', active),
+                      if (active.isNotEmpty) group('Agents', agents),
                       if (paused.isNotEmpty) group('Paused', paused),
                     ],
                   ),
