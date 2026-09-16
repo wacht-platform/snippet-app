@@ -24,6 +24,12 @@ class DaemonClient {
 
   ServerConfig? _configCache;
   Future<ServerConfig>? _configInFlight;
+  UsageSummary? _usageCache;
+  Future<UsageSummary>? _usageInFlight;
+  List<String>? _vaultCache;
+  Future<List<String>>? _vaultInFlight;
+  List<RecurringJob>? _recurringCache;
+  Future<List<RecurringJob>>? _recurringInFlight;
   int _configGeneration = 0;
 
   DaemonClient(this.baseUrl, this.token);
@@ -173,9 +179,19 @@ class DaemonClient {
   // ---- model configuration (shared with the TUI's config.toml) ----
 
   Future<UsageSummary> getUsage() async {
-    final r = await http.get(_uri('/usage'));
-    if (r.statusCode != 200) throw _err('load usage', r);
-    return UsageSummary.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+    if (_usageCache != null) return _usageCache!;
+    if (_usageInFlight != null) return _usageInFlight!;
+    final pending = () async {
+      final r = await http.get(_uri('/usage'));
+      if (r.statusCode != 200) throw _err('load usage', r);
+      final value = UsageSummary.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+      _usageCache = value;
+      return value;
+    }();
+    _usageInFlight = pending;
+    try { return await pending; } finally {
+      if (identical(_usageInFlight, pending)) _usageInFlight = null;
+    }
   }
 
   Future<ServerConfig> getConfig({bool force = false}) async {
@@ -271,11 +287,19 @@ class DaemonClient {
 
   /// Vault: names only ever come back; values only ever go up.
   Future<List<String>> vaultList() async {
-    final r = await http.get(_uri('/vault'));
-    if (r.statusCode != 200) throw _err('vault', r);
-    return ((jsonDecode(r.body) as Map<String, dynamic>)['names'] as List? ??
-            const [])
-        .cast<String>();
+    if (_vaultCache != null) return [..._vaultCache!];
+    if (_vaultInFlight != null) return _vaultInFlight!;
+    final pending = () async {
+      final r = await http.get(_uri('/vault'));
+      if (r.statusCode != 200) throw _err('vault', r);
+      final value = ((jsonDecode(r.body) as Map<String, dynamic>)['names'] as List? ?? const []).cast<String>();
+      _vaultCache = value;
+      return [...value];
+    }();
+    _vaultInFlight = pending;
+    try { return await pending; } finally {
+      if (identical(_vaultInFlight, pending)) _vaultInFlight = null;
+    }
   }
 
   Future<void> vaultSet(String name, String value) async {
@@ -1128,12 +1152,21 @@ class DaemonClient {
 
   /// GET /recurring — list scheduled pokes for Mission Control and sessions.
   Future<List<RecurringJob>> recurringJobs() async {
-    final r = await http.get(_uri('/recurring'));
-    if (r.statusCode != 200) throw _err('list recurring jobs', r);
-    final list = jsonDecode(r.body) as List;
-    return list
-        .map((e) => RecurringJob.fromJson(e as Map<String, dynamic>))
-        .toList();
+    if (_recurringCache != null) return [..._recurringCache!];
+    if (_recurringInFlight != null) return _recurringInFlight!;
+    final pending = () async {
+      final r = await http.get(_uri('/recurring'));
+      if (r.statusCode != 200) throw _err('list recurring jobs', r);
+      final list = (jsonDecode(r.body) as List)
+          .map((e) => RecurringJob.fromJson(e as Map<String, dynamic>))
+          .toList();
+      _recurringCache = list;
+      return [...list];
+    }();
+    _recurringInFlight = pending;
+    try { return await pending; } finally {
+      if (identical(_recurringInFlight, pending)) _recurringInFlight = null;
+    }
   }
 
   /// POST /recurring — schedule a poke. [schedule] is `every 5m|1h|1d` or `daily HH:MM`.
