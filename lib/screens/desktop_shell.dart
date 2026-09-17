@@ -5677,7 +5677,11 @@ class _SidebarState extends State<_Sidebar> {
           onTap: toggle,
           child: SizedBox(
             width: double.infinity,
-            child: Row(children: [
+            child: Padding(
+              padding: EdgeInsets.only(top: first ? 0 : 14),
+              child: Row(
+                mainAxisSize: MainAxisSize.max,
+                children: [
               AppIcon(chevron, size: 14, color: AppColors.fg4),
               const SizedBox(width: 4),
               AppIcon('folder', size: 13, color: AppColors.fg4),
@@ -5696,7 +5700,9 @@ class _SidebarState extends State<_Sidebar> {
               const SizedBox(width: 8),
               if (collapsed && count > 0)
                 Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
-            ]),
+            ],
+              ),
+            ),
           ),
         ),
       );
