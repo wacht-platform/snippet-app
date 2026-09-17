@@ -110,7 +110,7 @@ void main() {
       // never acquired, so every row is idle — leaving one flat list.
       const expected = kSidebarContentInset + kNavPadH;
 
-      final avatar = tester.getTopLeft(find.byType(CircleAvatar)).dx;
+      final avatar = tester.getTopLeft(find.byType(AgentStateIcon)).dx;
       expect(avatar, closeTo(expected, 0.5),
           reason: 'row content must share the same x as the header above it');
     });
@@ -146,4 +146,58 @@ void main() {
       expect(refreshBox, plusBox);
     });
   });
+
+  testWidgets('agents show nested assigned folders without @ tags or roles',
+      (tester) async {
+    await asDesktop(() async {
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final assignedClient = _CustomAgentsClient([
+        CoordinationAgent.fromJson({
+          'id': 'a1',
+          'display_name': 'Builder',
+          'handle': 'builder',
+          'role': 'developer',
+          'status': 'active',
+          'assigned_sessions': [
+            {
+              'id': 's1',
+              'title': 'feature/auth',
+              'conversation': 'feature/auth',
+              'last_active': nowSec - 120,
+            },
+          ],
+        }),
+      ]);
+
+      tester.view.physicalSize = const Size(360, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AgentsSidebarPanel(client: assignedClient),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Shows agent name and nested folder title
+      expect(find.text('Builder'), findsOneWidget);
+      expect(find.text('feature/auth'), findsOneWidget);
+
+      // Shows relative time for the assignment
+      expect(find.text('2m'), findsWidgets);
+
+      // Does NOT show @handle or role
+      expect(find.text('@builder'), findsNothing);
+      expect(find.text('developer'), findsNothing);
+    });
+  });
+}
+
+class _CustomAgentsClient extends DaemonClient {
+  final List<CoordinationAgent> _agents;
+  _CustomAgentsClient(this._agents)
+      : super('https://daemon.invalid', 'test-token');
+
+  @override
+  Future<List<CoordinationAgent>> coordinationAgents() async => _agents;
 }

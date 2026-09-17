@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
@@ -320,37 +323,52 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   bool _loading = true;
   bool _sending = false;
   String? _error;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted && !_sending) {
+        _load(silent: true);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool silent = false}) async {
+    if (!silent && _events.isEmpty) {
+      setState(() => _loading = true);
+    }
     try {
       final events = await widget.client.agentThread(peerId: widget.agentId);
       if (!mounted) return;
+      final hadNew = events.length > _events.length;
       setState(() {
         _events = events;
         _loading = false;
+        _error = null;
       });
-      // Opening a conversation is what marks it read.
       unawaitedMarkRead();
-      _jumpToBottom();
+      if (hadNew) {
+        _jumpToBottom(animated: silent);
+      }
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = '$e';
-        _loading = false;
-      });
+      if (!silent) {
+        setState(() {
+          _error = '$e';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -358,10 +376,18 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     widget.client.markAgentThreadRead(peerId: widget.agentId).catchError((_) {});
   }
 
-  void _jumpToBottom() {
+  void _jumpToBottom({bool animated = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        if (animated) {
+          _scroll.animateTo(
+            _scroll.position.maxScrollExtent,
+            duration: Motion.fast,
+            curve: Motion.enter,
+          );
+        } else {
+          _scroll.jumpTo(_scroll.position.maxScrollExtent);
+        }
       }
     });
   }
@@ -378,7 +404,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       if (!mounted) return;
       _input.clear();
       setState(() => _sending = false);
-      await _load();
+      await _load(silent: true);
+      _jumpToBottom(animated: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
@@ -388,26 +415,24 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Wrapped in Material because `presentScreen`'s non-rounded frames are plain
+    // Wrapped in Material because presentScreen's non-rounded frames are plain
     // Containers — no Material ancestor — while a TextField and the icon buttons
-    // here require one. Without this the screen threw "No Material widget found"
-    // and rendered blank.
+    // here require one.
     final hideChrome = widget.embedded && kMobile;
     return Material(
-      color: AppColors.bg,
+      color: readingBg,
       child: SafeArea(
         top: !hideChrome,
-        bottom: true,
+        bottom: false,
         child: Column(
-        children: [
-          if (!hideChrome) ...[
-            _header(),
-            Divider(height: 1, color: AppColors.border),
+          children: [
+            if (!hideChrome) ...[
+              _header(),
+              Divider(height: 1, color: AppColors.border),
+            ],
+            Expanded(child: _body()),
+            _composer(),
           ],
-          Expanded(child: _body()),
-          Divider(height: 1, color: AppColors.border),
-          _composer(),
-        ],
         ),
       ),
     );
@@ -415,145 +440,304 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   Widget _header() {
     final subtitle = widget.subtitle?.trim() ?? '';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
-      child: Row(children: [
-        AppIcon('message', size: 15, color: AppColors.accent),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(widget.agentName,
+    final canGoBack = widget.onClose != null || Navigator.of(context).canPop();
+    return Container(
+      height: M.appBarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      color: AppColors.bg,
+      child: Row(
+        children: [
+          if (canGoBack)
+            IconBtn(
+              'chevron-left',
+              size: M.minTarget,
+              iconSize: 20,
+              tooltip: 'Back',
+              onTap: () {
+                if (widget.onClose != null) {
+                  widget.onClose!();
+                } else {
+                  Navigator.of(context).maybePop();
+                }
+              },
+            ),
+          SizedBox(width: canGoBack ? 4 : 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.agentName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(14, weight: W.title, color: AppColors.fg1)),
-              const SizedBox(height: 2),
-              Text(
-                  subtitle.isEmpty
-                      ? 'direct message · conversation only'
-                      : '$subtitle · conversation only',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(10, color: AppColors.fg3)),
-            ],
+                  style:
+                      sans(M.sectionTitle, weight: W.label, color: AppColors.fg1),
+                ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(M.monoMeta, color: AppColors.fg3),
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
-        if (widget.onClose != null)
-          IconBtn('x',
-              size: 28,
-              iconSize: 14,
+          IconBtn(
+            'refresh',
+            size: M.minTarget,
+            iconSize: 18,
+            tooltip: 'Refresh',
+            onTap: () => _load(silent: false),
+          ),
+          if (!kMobile && widget.onClose != null) ...[
+            const SizedBox(width: 4),
+            IconBtn(
+              'x',
+              size: M.minTarget,
+              iconSize: 16,
               tooltip: 'Close',
-              onTap: widget.onClose!),
-      ]),
+              onTap: widget.onClose!,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _body() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
     }
     if (_error != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(_error!, style: sans(12, color: AppColors.danger)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppIcon('alert-circle', size: 24, color: AppColors.danger),
+              const SizedBox(height: 10),
+              Text(_error!,
+                  textAlign: TextAlign.center,
+                  style: sans(13, color: AppColors.danger)),
+              const SizedBox(height: 14),
+              Btn('Retry', small: true, onTap: () => _load(silent: false)),
+            ],
+          ),
         ),
       );
     }
     if (_events.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('No messages yet. Say something to start.',
-              style: sans(12, color: AppColors.fg3)),
+      return RefreshIndicator(
+        color: AppColors.accent,
+        onRefresh: () => _load(silent: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: Center(
+                child: EmptyState(
+                  icon: 'message',
+                  title: 'Chat with ${widget.agentName}',
+                  body: 'Send a message to discuss tasks or coordinate work directly.',
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
-    return ListView.builder(
-      controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      itemCount: _events.length,
-      itemBuilder: (_, i) => _bubble(_events[i]),
+    return RefreshIndicator(
+      color: AppColors.accent,
+      onRefresh: () => _load(silent: true),
+      child: ListView.builder(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        itemCount: _events.length,
+        itemBuilder: (_, i) => _bubble(_events[i]),
+      ),
     );
   }
 
   Widget _bubble(CoordinationEvent e) {
     // The local human is the only `human` actor, so everything else is the peer.
     final mine = e.actorKind == 'human';
+    if (mine) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Bubble(mine: true, text: e.body),
+      );
+    }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
-        crossAxisAlignment:
-            mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 3),
-            child: Text(mine ? 'you' : '${e.actorKind}:${e.actorId}',
-                style: mono(10, color: AppColors.fg3)),
-          ),
-          Container(
-            constraints: const BoxConstraints(maxWidth: 520),
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-            decoration: BoxDecoration(
-              color: mine ? AppColors.accentBg : AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.sm),
-              border: Border.all(
-                  color: mine ? AppColors.accentLine : AppColors.border),
+            padding: const EdgeInsets.only(left: 4, bottom: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIcon('users', size: 12, color: AppColors.accent),
+                const SizedBox(width: 5),
+                Text(
+                  widget.agentName,
+                  style: sans(11, weight: W.label, color: AppColors.accent),
+                ),
+              ],
             ),
-            child: Text(e.body,
-                // 1.35 rather than 1.4: a long reply is a wall of text either
-                // way, and the tighter leading keeps it from dominating the
-                // screen without making it hard to read.
-                style: sans(13, height: 1.35, color: AppColors.fg1)),
           ),
+          Bubble(mine: false, text: e.body),
         ],
       ),
     );
   }
 
   Widget _composer() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _input,
-              minLines: 1,
-              maxLines: 4,
-              cursorColor: AppColors.fg1,
-              onSubmitted: (_) => _send(),
-              style: sans(13, color: AppColors.fg1),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'Message ${widget.agentName}',
-                hintStyle: sans(13, color: AppColors.fg4),
-                filled: true,
-                fillColor: AppColors.surface2,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(R.sm),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(R.sm),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(R.sm),
-                  borderSide: BorderSide(color: AppColors.accentLine),
+    final mq = MediaQuery.of(context);
+    final keyboard = mq.viewInsets.bottom;
+    return AnimatedPadding(
+      duration: Motion.fast,
+      curve: Motion.enter,
+      padding: EdgeInsets.only(bottom: keyboard),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(
+          kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
+          8,
+          kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
+          10 + (keyboard > 0 ? 8 : mq.padding.bottom),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.bg,
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: AppColors.border),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.enter): () {
+                    if (!kMobile) _send();
+                  },
+                  const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+                    _send();
+                  },
+                  const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
+                    _send();
+                  },
+                },
+                child: TextField(
+                  controller: _input,
+                  minLines: 2,
+                  maxLines: 8,
+                  cursorColor: AppColors.fg1,
+                  onSubmitted: (_) {
+                    if (!kMobile) _send();
+                  },
+                  style: sans(kMobile ? M.body : 16,
+                      height: 1.45, color: AppColors.fg1),
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    contentPadding: const EdgeInsets.fromLTRB(2, 2, 8, 10),
+                    border: InputBorder.none,
+                    hintText: 'Message ${widget.agentName}…',
+                    hintStyle: sans(kMobile ? M.body : 16,
+                        height: 1.45, color: AppColors.fg4),
+                  ),
                 ),
               ),
-            ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      borderRadius: BorderRadius.circular(R.sm),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AppIcon('users', size: 12, color: AppColors.fg3),
+                        const SizedBox(width: 5),
+                        Text(widget.agentName,
+                            style: mono(11, color: AppColors.fg2)),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _input,
+                    builder: (_, val, __) {
+                      final canSend = val.text.trim().isNotEmpty && !_sending;
+                      return _SendBtn(
+                        enabled: canSend,
+                        sending: _sending,
+                        onTap: canSend ? _send : null,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Btn('Send',
-              small: true,
-              icon: 'send',
-              disabled: _sending,
-              onTap: _send),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SendBtn extends StatelessWidget {
+  final bool enabled;
+  final bool sending;
+  final VoidCallback? onTap;
+  const _SendBtn({required this.enabled, this.sending = false, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = kMobile ? M.minTarget : 28.0;
+    return Material(
+      color: enabled ? AppColors.fg1 : AppColors.surface2,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Center(
+            child: sending
+                ? SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.8,
+                      color: AppColors.bg,
+                    ),
+                  )
+                : AppIcon('arrow-up',
+                    size: 15,
+                    color: enabled ? AppColors.bg : AppColors.fg4),
+          ),
+        ),
       ),
     );
   }
