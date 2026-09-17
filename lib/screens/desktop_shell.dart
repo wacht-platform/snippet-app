@@ -5417,8 +5417,6 @@ class _SidebarState extends State<_Sidebar> {
       final recent = list.where((s) => s.lastActive >= cutoff).toList()
         ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
       final recentIds = recent.take(15).map((s) => s.id).toSet();
-      final older = list.where((s) => !recentIds.contains(s.id)).toList()
-        ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
       final mobileChildren = <Widget>[];
       if (recentIds.isNotEmpty) {
         mobileChildren.add(_mobileListHeader('Recent chats', recentIds.length));
