@@ -20,12 +20,20 @@ class AgentsSidebarPanel extends StatefulWidget {
     super.key,
     required this.client,
     this.onOpenAgent,
+    this.onOpenSession,
+    this.trailingHeader,
   });
 
   final DaemonClient client;
 
   /// Called when a row is tapped. The host decides where detail goes.
   final void Function(CoordinationAgent agent)? onOpenAgent;
+
+  /// Open an assigned session when tapped.
+  final void Function(String sessionId, String title)? onOpenSession;
+
+  /// Rendered in the top mobile header on the right (e.g. machine avatar switcher).
+  final Widget? trailingHeader;
 
   @override
   State<AgentsSidebarPanel> createState() => _AgentsSidebarPanelState();
@@ -249,32 +257,36 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     });
 
     if (kMobile) {
-      return Material(
-        color: AppColors.bg,
-        child: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            color: AppColors.accent,
-            backgroundColor: AppColors.surface2,
-            onRefresh: refresh,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
-              children: [
-                _agentListHeader(ordered.length),
-                if (ordered.isEmpty) ...[
-                  _EmptyTeam(),
-                ] else ...[
-                  for (final agent in ordered)
-                    _AgentSidebarRow(
-                      agent: agent,
-                      onTap: widget.onOpenAgent == null
-                          ? null
-                          : () => widget.onOpenAgent!(agent),
-                    ),
-                ],
+      return RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: AppColors.surface3,
+        onRefresh: refresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
+          children: [
+            if (ordered.isEmpty) ...[
+              _EmptyTeam(),
+            ] else ...[
+              for (final agent in ordered) ...[
+                _AgentSidebarRow(
+                  agent: agent,
+                  onTap: widget.onOpenAgent == null
+                      ? null
+                      : () => widget.onOpenAgent!(agent),
+                ),
+                for (final s in agent.assignedSessions)
+                  _AgentAssignedRow(
+                    session: s,
+                    onTap: widget.onOpenSession == null
+                        ? (widget.onOpenAgent == null
+                            ? null
+                            : () => widget.onOpenAgent!(agent))
+                        : () => widget.onOpenSession!(s.id, s.title),
+                  ),
+                const SizedBox(height: 4),
               ],
-            ),
-          ),
+            ],
+          ],
         ),
       );
     }
@@ -301,13 +313,23 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 18),
                     children: [
-                      for (final agent in ordered)
+                      for (final agent in ordered) ...[
                         _AgentSidebarRow(
                           agent: agent,
                           onTap: widget.onOpenAgent == null
                               ? null
                               : () => widget.onOpenAgent!(agent),
                         ),
+                        for (final s in agent.assignedSessions)
+                          _AgentAssignedRow(
+                            session: s,
+                            onTap: widget.onOpenSession == null
+                                ? (widget.onOpenAgent == null
+                                    ? null
+                                    : () => widget.onOpenAgent!(agent))
+                                : () => widget.onOpenSession!(s.id, s.title),
+                          ),
+                      ],
                     ],
                   ),
           ),
@@ -322,13 +344,14 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text('Agents', style: display(M.sectionTitle, color: AppColors.fg1)),
+            Text('Agents',
+                style: display(M.sectionTitle, color: AppColors.fg1)),
             const SizedBox(width: 8),
             Text('$count', style: mono(M.meta, color: AppColors.fg3)),
             const Spacer(),
             IconBtn('plus',
-                size: 32,
-                iconSize: 16,
+                size: 28,
+                iconSize: 15,
                 tooltip: 'Create agent',
                 onTap: busy ? null : () => _openCreateAgent(context)),
           ],
@@ -348,8 +371,29 @@ class _EmptyTeam extends StatelessWidget {
       );
 }
 
+/// State icon for agents, visually distinct from the session chat bubble.
+class AgentStateIcon extends StatelessWidget {
+  final bool active;
+  final double size;
+  const AgentStateIcon({super.key, this.active = false, this.size = 17});
 
-/// One agent row: avatar, name, and either the sessions it holds or its role.
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: AppIcon(
+          'users',
+          size: size - 1,
+          color: active ? AppColors.accent : AppColors.fg3,
+        ),
+      ),
+    );
+  }
+}
+
+/// One agent row: agent icon, name, and time of last assignment on the right.
 class _AgentSidebarRow extends StatelessWidget {
   const _AgentSidebarRow({
     required this.agent,
@@ -363,6 +407,11 @@ class _AgentSidebarRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final name =
         agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
+    final hasAssigned = agent.assignedSessions.isNotEmpty;
+    final lastActive = agent.assignedSessions.fold<int>(
+      0,
+      (latest, s) => s.lastActive > latest ? s.lastActive : latest,
+    );
 
     return Material(
       color: Colors.transparent,
@@ -373,40 +422,98 @@ class _AgentSidebarRow extends StatelessWidget {
         child: SizedBox(
           height: M.rowHeight,
           child: Padding(
-            padding: EdgeInsets.only(left: M.rowPadH, right: 6),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              SessionStateIcon(
-                  status: agent.available ? 'running' : 'idle', size: 17),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(M.rowTitle, color: AppColors.fg2),
+            padding: EdgeInsets.only(
+              left: kMobile ? M.rowPadH : kNavPadH,
+              right: 6,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                AgentStateIcon(
+                  active: agent.available && hasAssigned,
+                  size: 17,
                 ),
-              ),
-              if (agent.assignedSessions.isNotEmpty) ...[
                 const SizedBox(width: 10),
-                Flexible(
+                Expanded(
                   child: Text(
-                    agent.assignedSessions
-                        .map((session) => session.title.trim().isEmpty
-                            ? session.conversation
-                            : session.title)
-                        .join(' · '),
+                    name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                    style: sans(M.meta, color: AppColors.fg3),
+                    style: sans(M.rowTitle, weight: W.body, color: AppColors.fg1),
                   ),
                 ),
+                if (hasAssigned && lastActive > 0) ...[
+                  const SizedBox(width: 10),
+                  Text(
+                    relativeTime(lastActive),
+                    style: sans(M.meta, tabular: true, color: AppColors.fg3),
+                  ),
+                ],
               ],
-            ]),
+            ),
           ),
         ),
       ),
     );
   }
+}
 
+/// Nested row for a folder/session an agent is assigned to.
+class _AgentAssignedRow extends StatelessWidget {
+  const _AgentAssignedRow({
+    required this.session,
+    this.onTap,
+  });
+
+  final AgentAssignedSession session;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = session.title.trim().isNotEmpty
+        ? session.title.trim()
+        : (session.conversation.trim().isNotEmpty
+            ? session.conversation.trim()
+            : 'Session');
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(R.sm),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.sm),
+        onTap: onTap,
+        child: SizedBox(
+          height: kMobile ? 38.0 : 28.0,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: (kMobile ? M.rowPadH : kNavPadH) + 20,
+              right: 6,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                AppIcon('folder', size: 14, color: AppColors.fg3),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(kMobile ? 13.5 : 12, color: AppColors.fg2),
+                  ),
+                ),
+                if (session.lastActive > 0) ...[
+                  const SizedBox(width: 10),
+                  Text(
+                    relativeTime(session.lastActive),
+                    style: sans(M.meta, tabular: true, color: AppColors.fg3),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
