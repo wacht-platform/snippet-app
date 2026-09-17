@@ -5163,19 +5163,23 @@ class _SidebarState extends State<_Sidebar> {
       AppIcon('search', size: 16, color: AppColors.fg3),
       const SizedBox(width: 9),
       Expanded(
-        child: TextField(
-          controller: _searchCtl,
-          focusNode: _searchFocus,
-          autofocus: true,
-          cursorColor: AppColors.accent,
-          textInputAction: TextInputAction.search,
-          onChanged: (v) => setState(() => _filterQuery = v),
-          style: sans(13, color: AppColors.fg1),
-          decoration: InputDecoration(
-            isCollapsed: true,
-            border: InputBorder.none,
-            hintText: 'Search chats',
-            hintStyle: sans(13, color: AppColors.fg4),
+        child: SizedBox(
+          height: 36,
+          child: TextField(
+            controller: _searchCtl,
+            focusNode: _searchFocus,
+            autofocus: true,
+            cursorColor: AppColors.accent,
+            textInputAction: TextInputAction.search,
+            onChanged: (v) => setState(() => _filterQuery = v),
+            style: sans(15, color: AppColors.fg1),
+            decoration: InputDecoration(
+              isCollapsed: true,
+              contentPadding: EdgeInsets.zero,
+              border: InputBorder.none,
+              hintText: 'Search chats',
+              hintStyle: sans(13, color: AppColors.fg4),
+            ),
           ),
         ),
       ),
@@ -6853,10 +6857,10 @@ class _SettingsPanelState extends State<_SettingsPanel> {
         section(
             'Models & usage',
             InferenceProfilesScreen(client: widget.client, embedded: true),
-            trailing: IconBtn('plus',
-                size: 32,
-                iconSize: 16,
-                tooltip: 'Add profile',
+            trailing: Btn('Add',
+                small: true,
+                variant: BtnVariant.ghost,
+                icon: 'plus',
                 onTap: () {
                   Navigator.of(context).push<bool>(
                     MaterialPageRoute(
@@ -6873,10 +6877,10 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           'Vault',
           inlineScreen(VaultScreen(
               key: _vaultKey, client: widget.client, embedded: true)),
-          trailing: IconBtn('plus',
-              size: 32,
-              iconSize: 16,
-              tooltip: 'Add secret',
+          trailing: Btn('Add',
+              small: true,
+              variant: BtnVariant.ghost,
+              icon: 'plus',
               onTap: () => _vaultKey.currentState?.add()),
         ),
         section('Scheduled jobs', inlineScreen(RecurringScreen(client: widget.client, listOnly: true, embedded: true))),
