@@ -5163,23 +5163,19 @@ class _SidebarState extends State<_Sidebar> {
       AppIcon('search', size: 16, color: AppColors.fg3),
       const SizedBox(width: 9),
       Expanded(
-        child: SizedBox(
-          height: 36,
-          child: TextField(
-            controller: _searchCtl,
-            focusNode: _searchFocus,
-            autofocus: true,
-            cursorColor: AppColors.accent,
-            textInputAction: TextInputAction.search,
-            onChanged: (v) => setState(() => _filterQuery = v),
-            style: sans(15, color: AppColors.fg1),
-            decoration: InputDecoration(
-              isCollapsed: true,
-              contentPadding: EdgeInsets.zero,
-              border: InputBorder.none,
-              hintText: 'Search chats',
-              hintStyle: sans(13, color: AppColors.fg4),
-            ),
+        child: TextField(
+          controller: _searchCtl,
+          focusNode: _searchFocus,
+          autofocus: true,
+          cursorColor: AppColors.accent,
+          textInputAction: TextInputAction.search,
+          onChanged: (v) => setState(() => _filterQuery = v),
+          style: sans(15, color: AppColors.fg1),
+          decoration: InputDecoration(
+            isCollapsed: true,
+            border: InputBorder.none,
+            hintText: 'Search chats',
+            hintStyle: sans(15, color: AppColors.fg4),
           ),
         ),
       ),
