@@ -232,88 +232,44 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       );
     }
 
-    final active = agents.where((a) => a.available).toList();
-    final paused = agents.where((a) => !a.available).toList();
-    Widget group(String label, List<CoordinationAgent> members,
-            {Widget? trailing}) =>
-        Padding(
-          padding: EdgeInsets.only(bottom: kMobile ? 18 : 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: kMobile
-                    ? const EdgeInsets.only(bottom: 4)
-                    : EdgeInsets.fromLTRB(M.gutter, 18, M.gutter, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: kMobile
-                          ? Text(label.toUpperCase(),
-                              style: caps(11, color: AppColors.fg3))
-                          : Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(label,
-                                    style: display(M.sectionTitle,
-                                        color: AppColors.fg1)),
-                                const SizedBox(width: 8),
-                                Text('${members.length}',
-                                    style: mono(M.meta, color: AppColors.fg3)),
-                              ],
-                            ),
-                    ),
-                    if (trailing != null) trailing,
-                  ],
-                ),
-              ),
-              for (final a in members)
-                _AgentSidebarRow(
-                  agent: a,
-                  onTap: widget.onOpenAgent == null
-                      ? null
-                      : () => widget.onOpenAgent!(a),
-                ),
-            ],
-          ),
-        );
-
     final createBtn = Builder(
-      builder: (ctx) => kMobile
-          ? IconBtn('plus',
-              size: 32,
-              iconSize: 16,
-              tooltip: 'Create agent',
-              onTap: busy ? null : () => _openCreateAgent(ctx))
-          : ShellSectionAction(
-              icon: 'plus',
-              tooltip: 'Create agent',
-              onTap: busy ? null : () => _openCreateAgent(ctx),
-            ),
+      builder: (ctx) => ShellSectionAction(
+        icon: 'plus',
+        tooltip: 'Create agent',
+        onTap: busy ? null : () => _openCreateAgent(ctx),
+      ),
     );
+    final ordered = [...agents]..sort((a, b) {
+      if (a.available != b.available) return a.available ? -1 : 1;
+      return a.displayName.compareTo(b.displayName);
+    });
 
     if (kMobile) {
       return Material(
         color: AppColors.bg,
         child: SafeArea(
           bottom: false,
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
-            children: [
-              Text('Agents', style: display(28, color: AppColors.fg1)),
-              const SizedBox(height: 16),
-              if (agents.isEmpty) ...[
-                group('Team', const [], trailing: createBtn),
-                _EmptyTeam(),
-              ] else ...[
-                if (active.isNotEmpty)
-                  group('Team', active, trailing: createBtn),
-                if (paused.isNotEmpty)
-                  group('Paused', paused,
-                      trailing: active.isEmpty ? createBtn : null),
+          child: RefreshIndicator(
+            color: AppColors.accent,
+            backgroundColor: AppColors.surface2,
+            onRefresh: refresh,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
+              children: [
+                _agentListHeader(ordered.length),
+                if (ordered.isEmpty) ...[
+                  _EmptyTeam(),
+                ] else ...[
+                  for (final agent in ordered)
+                    _AgentSidebarRow(
+                      agent: agent,
+                      onTap: widget.onOpenAgent == null
+                          ? null
+                          : () => widget.onOpenAgent!(agent),
+                    ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       );
@@ -336,13 +292,18 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             ],
           ),
           Expanded(
-            child: agents.isEmpty
+            child: ordered.isEmpty
                 ? _EmptyTeam()
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 18),
                     children: [
-                      if (active.isNotEmpty) group('Agents', active),
-                      if (paused.isNotEmpty) group('Paused', paused),
+                      for (final agent in ordered)
+                        _AgentSidebarRow(
+                          agent: agent,
+                          onTap: widget.onOpenAgent == null
+                              ? null
+                              : () => widget.onOpenAgent!(agent),
+                        ),
                     ],
                   ),
           ),
@@ -350,6 +311,25 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       ),
     );
   }
+
+  Widget _agentListHeader(int count) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text('Agents', style: display(M.sectionTitle, color: AppColors.fg1)),
+            const SizedBox(width: 8),
+            Text('$count', style: mono(M.meta, color: AppColors.fg3)),
+            const Spacer(),
+            IconBtn('plus',
+                size: 32,
+                iconSize: 16,
+                tooltip: 'Create agent',
+                onTap: busy ? null : () => _openCreateAgent(context)),
+          ],
+        ),
+      );
 }
 
 class _EmptyTeam extends StatelessWidget {
