@@ -77,9 +77,10 @@ class _CreateAgentFormState extends State<CreateAgentForm> {
             Text(_error!, style: sans(12, color: AppColors.danger)),
           ],
           const SizedBox(height: 14),
-          Btn(
-            _busy ? 'Starting build…' : 'Build agent',
-            full: true,
+                      Btn(
+              _busy ? 'Starting build…' : 'Build agent',
+              small: true,
+              full: true,
             disabled: _busy,
             icon: 'sparkles',
             onTap: _submit,

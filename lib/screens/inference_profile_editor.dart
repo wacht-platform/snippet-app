@@ -411,10 +411,10 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     );
     final footer = Container(
       padding: EdgeInsets.fromLTRB(
-          widget.embedded ? 16 : 16,
-          10,
-          widget.embedded ? 16 : 16,
-          widget.embedded ? 12 : 12 + MediaQuery.of(context).padding.bottom),
+          16,
+          6,
+          16,
+          widget.embedded ? 8 : 8 + MediaQuery.of(context).padding.bottom),
       decoration: const BoxDecoration(),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
