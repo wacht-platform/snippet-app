@@ -5427,8 +5427,22 @@ class _SidebarState extends State<_Sidebar> {
             .map(_sessionCard));
       }
       if (older.isNotEmpty) {
-        mobileChildren.add(_mobileListHeader('Other chats', older.length));
-        mobileChildren.addAll(older.map(_sessionCard));
+        final grouped = <String, List<SessionInfo>>{};
+        final order = <String>[];
+        for (final session in older) {
+          grouped.putIfAbsent(session.folder, () {
+            order.add(session.folder);
+            return <SessionInfo>[];
+          }).add(session);
+        }
+        for (final folder in order) {
+          final sessions = grouped[folder]!;
+          mobileChildren.add(_folderHeader(folder,
+              first: mobileChildren.isEmpty, count: sessions.length));
+          if (!_collapsed.contains(folder)) {
+            mobileChildren.addAll(sessions.map(_sessionCard));
+          }
+        }
       }
       if (mobileChildren.isEmpty) {
         mobileChildren.add(Padding(
