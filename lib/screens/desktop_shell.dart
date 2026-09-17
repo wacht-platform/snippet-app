@@ -5426,21 +5426,32 @@ class _SidebarState extends State<_Sidebar> {
             .where((s) => recentIds.contains(s.id))
             .map(_sessionCard));
       }
-      if (older.isNotEmpty) {
+      if (list.isNotEmpty) {
         final grouped = <String, List<SessionInfo>>{};
         final order = <String>[];
-        for (final session in older) {
+        final allSorted = [...list]
+          ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
+        for (final session in allSorted) {
           grouped.putIfAbsent(session.folder, () {
             order.add(session.folder);
             return <SessionInfo>[];
           }).add(session);
         }
+        if (recentIds.isNotEmpty) {
+          mobileChildren.add(const SizedBox(height: 8));
+        }
         for (final folder in order) {
           final sessions = grouped[folder]!;
           mobileChildren.add(_folderHeader(folder,
-              first: mobileChildren.isEmpty, count: sessions.length));
+              first: false, count: sessions.length));
           if (!_collapsed.contains(folder)) {
             mobileChildren.addAll(sessions.map(_sessionCard));
+          }
+          if (folder != order.last) {
+            mobileChildren.add(Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Divider(height: 1, color: AppColors.border),
+            ));
           }
         }
       }
