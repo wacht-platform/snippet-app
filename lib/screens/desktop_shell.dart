@@ -56,8 +56,8 @@ enum _Pane { left, right }
 /// Which top-level place the phone home is showing. The floating action bar
 /// switches this; desktop keeps its sidebar rail instead, so this is phone-only.
 enum _MobileHome {
-  chats('Chats', 'chat-thread'),
   agents('Agents', 'users'),
+  chats('Chats', 'chat-thread'),
   settings('Settings', 'settings');
 
   const _MobileHome(this.label, this.icon);
@@ -2160,6 +2160,7 @@ class _DesktopShellState extends State<DesktopShell>
           : AgentsSidebarPanel(
               client: client,
               onOpenAgent: _openRightAgent,
+              onOpenSession: (id, title) => _openSession(id, title, null),
             );
     } else if (_effectiveSection == ShellSection.git) {
       final client = _client;
@@ -2821,15 +2822,15 @@ class _DesktopShellState extends State<DesktopShell>
       );
     }
 
-    // On a non-Chats destination, back returns to Chats rather than leaving the
-    // app — otherwise Settings/Agents would be a dead end whose only exit is the
+    // On a non-Agents destination, back returns to Agents rather than leaving the
+    // app — otherwise Settings/Chats would be a dead end whose only exit is the
     // bar, and back would exit the app from a screen the user just navigated to.
-    if (_mobileHome != _MobileHome.chats) {
+    if (_mobileHome != _MobileHome.agents) {
       return PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
           if (didPop) return;
-          setState(() => _mobileHome = _MobileHome.chats);
+          setState(() => _mobileHome = _MobileHome.agents);
         },
         child: shell,
       );
@@ -4755,18 +4756,11 @@ class _SidebarState extends State<_Sidebar> {
             child: IndexedStack(
               index: widget.mobileHome.index,
               children: [
-                KeyedSubtree(
-                  key: const ValueKey('mobile-chats'),
-                  child: _mobileHomeBody(hasClient, _MobileHome.chats),
-                ),
-                KeyedSubtree(
-                  key: const ValueKey('mobile-agents'),
-                  child: _mobileHomeBody(hasClient, _MobileHome.agents),
-                ),
-                KeyedSubtree(
-                  key: const ValueKey('mobile-settings'),
-                  child: _mobileHomeBody(hasClient, _MobileHome.settings),
-                ),
+                for (final h in _MobileHome.values)
+                  KeyedSubtree(
+                    key: ValueKey('mobile-${h.name}'),
+                    child: _mobileHomeBody(hasClient, h),
+                  ),
               ],
             ),
           ),
@@ -4900,21 +4894,26 @@ class _SidebarState extends State<_Sidebar> {
         // phone screen, so the back affordance cannot drift between them.
         final agent = widget.agent;
         if (agent != null) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              NavBackRow(
-                  title: agent.displayName, onBack: () => widget.onAgent(null)),
-              Expanded(
-                child: CoordinationAgentDetail(
-                    agent: agent, client: client, embedded: true),
-              ),
-            ],
+          return CoordinationAgentDetail(
+            agent: agent,
+            client: client,
+            embedded: false,
+            onClose: () => widget.onAgent(null),
           );
         }
-        return AgentsSidebarPanel(
-          client: client,
-          onOpenAgent: (a) => widget.onAgent(a),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _mobileAgentsHeader(hasClient),
+            Expanded(
+              child: AgentsSidebarPanel(
+                client: client,
+                onOpenAgent: (a) => widget.onAgent(a),
+                onOpenSession: (id, title) =>
+                    widget.onOpenSession(id, title, null),
+              ),
+            ),
+          ],
         );
 
       case _MobileHome.settings:
@@ -4933,7 +4932,7 @@ class _SidebarState extends State<_Sidebar> {
           // told which section is open and reports changes back up.
           section: widget.settingsSection,
           onSection: widget.onSettingsSection,
-          onClose: () => widget.onMobileHome(_MobileHome.chats),
+          onClose: () => widget.onMobileHome(_MobileHome.agents),
           embedded: true,
         );
     }
@@ -4996,6 +4995,18 @@ class _SidebarState extends State<_Sidebar> {
               active: mcActive,
               tooltip: 'Mission Control',
               onTap: widget.onOpenMissionControl),
+        _machineAvatarButton(),
+      ]),
+    );
+  }
+
+  Widget _mobileAgentsHeader(bool hasClient) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter - 4, 2),
+      child: Row(children: [
+        Text('Agents',
+            style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
+        const Spacer(),
         _machineAvatarButton(),
       ]),
     );
@@ -5091,14 +5102,8 @@ class _SidebarState extends State<_Sidebar> {
         switchOutCurve: Motion.exit,
         child: searching
             ? _mobileBarPill(radius, key: 'search', child: _mobileSearchRow())
-            // `Align` sizes itself to the parent but hands the child LOOSE
-            // constraints, which is what lets the pill hug its content and sit
-            // centred while the row still fills the width around it.
-            : Align(
-                alignment: Alignment.center,
-                child: _mobileBarPill(radius,
-                    key: 'bar', child: _mobileBarRow(hasClient)),
-              ),
+            : _mobileBarPill(radius,
+                key: 'bar', child: _mobileBarRow(hasClient)),
       ),
     );
   }
@@ -5136,19 +5141,24 @@ class _SidebarState extends State<_Sidebar> {
 
   Widget _mobileBarRow(bool hasClient) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         const SizedBox(width: 4),
         for (final h in _MobileHome.values)
-          _mobileBarDest(h, widget.mobileHome == h, hasClient),
-        const SizedBox(width: 4),
+          Expanded(
+            child: _mobileBarDest(h, widget.mobileHome == h, true),
+          ),
+        const SizedBox(width: 2),
         // Divider separates "where you are" from "what you can do".
         Container(width: 1, height: 20, color: AppColors.border),
         const SizedBox(width: 2),
-        _mobileBarAction('search', 'Search',
-            onTap: hasClient ? _toggleMobileSearch : null),
-        _mobileBarAction('plus', 'New',
-            onTap: hasClient ? widget.onNewSession : null),
+        Expanded(
+          child: _mobileBarAction('search', 'Search',
+              onTap: hasClient ? _toggleMobileSearch : null),
+        ),
+        Expanded(
+          child: _mobileBarAction('plus', 'New',
+              onTap: hasClient ? widget.onNewSession : null),
+        ),
         const SizedBox(width: 4),
       ],
     );
@@ -5225,7 +5235,6 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
           onTap: enabled ? () => widget.onMobileHome(h) : null,
           child: SizedBox(
-            width: 72,
             height: _kMobileBarHeight,
             child: Center(
               child: Column(
@@ -5257,7 +5266,6 @@ class _SidebarState extends State<_Sidebar> {
           borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
           onTap: onTap,
           child: SizedBox(
-            width: 72,
             height: _kMobileBarHeight,
             child: Center(
               child: Column(
@@ -5405,37 +5413,26 @@ class _SidebarState extends State<_Sidebar> {
     // desktop density aid; on a touch screen it obscures the one thing people
     // came here to do: open the recent conversation.
     if (kMobile) {
-      final active = list.where((s) => sessionIsActive(s.status)).toList()
+      final cutoff = DateTime.now().millisecondsSinceEpoch ~/ 1000 - 12 * 60 * 60;
+      final recent = list.where((s) => s.lastActive >= cutoff).toList()
         ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
-      final activeIds = active.map((s) => s.id).toSet();
-      final recent = list.where((s) => !activeIds.contains(s.id)).toList()
-        ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
-      final recentPreview = recent.take(3).toList();
-      final recentIds = recentPreview.map((s) => s.id).toSet();
-      final activity = [...active, ...recentPreview];
-      final grouped = <String, List<SessionInfo>>{};
-      for (final s in recent.where((s) => !recentIds.contains(s.id))) {
-        grouped.putIfAbsent(s.folder, () => <SessionInfo>[]).add(s);
-      }
-      final mobileChildren = <Widget>[];
-      if (activity.isNotEmpty) {
-        mobileChildren.add(_mobileListHeader('Recent activity', activity.length));
-        mobileChildren.addAll(activity.map(_sessionCard));
-      }
-      for (final entry in grouped.entries) {
-        mobileChildren.add(_folderHeader(entry.key,
-            first: mobileChildren.isEmpty, count: entry.value.length));
-        if (!_collapsed.contains(entry.key)) {
-          mobileChildren.addAll(entry.value.map(_sessionCard));
-        }
-      }
+      final visible = recent.take(5).toList();
       return RefreshIndicator(
         color: AppColors.accent,
         backgroundColor: AppColors.surface3,
         onRefresh: () async => widget.onRefreshSessions(),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
-          children: mobileChildren,
+          children: [
+            ...visible.map(_sessionCard),
+            if (visible.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('No sessions active in the last 12 hours.',
+                    textAlign: TextAlign.center,
+                    style: sans(12, color: AppColors.fg3)),
+              ),
+          ],
         ),
       );
     }

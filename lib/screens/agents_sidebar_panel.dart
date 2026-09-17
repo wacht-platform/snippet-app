@@ -247,7 +247,30 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         onTap: busy ? null : () => _openCreateAgent(ctx),
       ),
     );
-    final ordered = [...agents]..sort((a, b) {
+    final cutoff = DateTime.now().millisecondsSinceEpoch ~/ 1000 - 12 * 60 * 60;
+    final filteredAgents = [
+      for (final agent in agents)
+        CoordinationAgent.fromJson({
+          'id': agent.id,
+          'display_name': agent.displayName,
+          'handle': agent.handle,
+          'kind': agent.kind,
+          'status': agent.status,
+          'role': agent.role,
+          'capabilities': agent.capabilities,
+          'assigned_sessions': agent.assignedSessions
+              .where((session) => session.lastActive >= cutoff)
+              .take(5)
+              .map((session) => {
+                    'id': session.id,
+                    'title': session.title,
+                    'conversation': session.conversation,
+                    'last_active': session.lastActive,
+                  })
+              .toList(),
+        }),
+    ];
+    final ordered = [...filteredAgents]..sort((a, b) {
       final aLast = a.assignedSessions.fold<int>(0,
           (latest, session) => session.lastActive > latest ? session.lastActive : latest);
       final bLast = b.assignedSessions.fold<int>(0,
