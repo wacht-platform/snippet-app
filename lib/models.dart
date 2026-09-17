@@ -845,17 +845,20 @@ class AgentAssignedSession {
   final String id;
   final String title;
   final String conversation;
+  final int lastActive;
 
   const AgentAssignedSession({
     required this.id,
     required this.title,
     required this.conversation,
+    required this.lastActive,
   });
 
   AgentAssignedSession.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         title = j['title'] as String? ?? '',
-        conversation = j['conversation'] as String? ?? '';
+        conversation = j['conversation'] as String? ?? '',
+        lastActive = (j['last_active'] as num?)?.toInt() ?? 0;
 }
 
 /// A specialized worker identity in the SQLite coordination directory.

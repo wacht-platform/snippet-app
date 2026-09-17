@@ -240,7 +240,11 @@ class _AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       ),
     );
     final ordered = [...agents]..sort((a, b) {
-      if (a.available != b.available) return a.available ? -1 : 1;
+      final aLast = a.assignedSessions.fold<int>(0,
+          (latest, session) => session.lastActive > latest ? session.lastActive : latest);
+      final bLast = b.assignedSessions.fold<int>(0,
+          (latest, session) => session.lastActive > latest ? session.lastActive : latest);
+      if (aLast != bLast) return bLast.compareTo(aLast);
       return a.displayName.compareTo(b.displayName);
     });
 
@@ -384,9 +388,18 @@ class _AgentSidebarRow extends StatelessWidget {
               ),
               if (agent.assignedSessions.isNotEmpty) ...[
                 const SizedBox(width: 10),
-                Text(
-                  '${agent.assignedSessions.length} ${agent.assignedSessions.length == 1 ? 'session' : 'sessions'}',
-                  style: sans(M.meta, tabular: true, color: AppColors.fg3),
+                Flexible(
+                  child: Text(
+                    agent.assignedSessions
+                        .map((session) => session.title.trim().isEmpty
+                            ? session.conversation
+                            : session.title)
+                        .join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: sans(M.meta, color: AppColors.fg3),
+                  ),
                 ),
               ],
             ]),
