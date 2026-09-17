@@ -359,56 +359,38 @@ class _AgentSidebarRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final name =
         agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
-    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
 
     return Material(
       color: Colors.transparent,
+      borderRadius: BorderRadius.circular(R.sm),
       child: InkWell(
+        borderRadius: BorderRadius.circular(R.sm),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(R.md),
-        child: Padding(
-          // Same alignment as _GroupLabel: x20 on desktop (list 8 + 12), so the
-          // avatar lines up under the header's own inset instead of sitting
-          // 4px left of it. Mobile unchanged.
-          padding: EdgeInsets.symmetric(
-              horizontal: kMobile ? 0 : kNavPadH, vertical: kMobile ? 6 : 7),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            CircleAvatar(
-              radius: 13,
-              backgroundColor: AppColors.surface2,
-              foregroundColor: AppColors.fg3,
-              child: Text(initial,
-                  style: sans(kMobile ? 13 : 11,
-                      weight: W.title, color: AppColors.fg3)),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      // W.body (400), matching the canonical `ShellNavRow` —
-                      // which is `selected ? W.label : W.body`. At W.label every
-                      // agent name rendered heavier than every session row
-                      // beside it, which is most of why this panel read "bold".
-                      style: sans(kMobile ? M.rowTitle : 13,
-                          weight: W.body, color: AppColors.fg1)),
-                  const SizedBox(height: 2),
-                  Text(
-                    agent.assignedSessions.isEmpty
-                        ? agent.role
-                        : '${agent.role} · ${agent.assignedSessions.length} ${agent.assignedSessions.length == 1 ? 'session' : 'sessions'}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? M.meta : 11,
-                        color: AppColors.fg3, height: 1.35),
-                  ),
-                ],
+        child: SizedBox(
+          height: M.rowHeight,
+          child: Padding(
+            padding: EdgeInsets.only(left: M.rowPadH, right: 6),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              SessionStateIcon(
+                  status: agent.available ? 'running' : 'idle', size: 17),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(M.rowTitle, color: AppColors.fg2),
+                ),
               ),
-            ),
-          ]),
+              if (agent.assignedSessions.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                Text(
+                  '${agent.assignedSessions.length} ${agent.assignedSessions.length == 1 ? 'session' : 'sessions'}',
+                  style: sans(M.meta, tabular: true, color: AppColors.fg3),
+                ),
+              ],
+            ]),
+          ),
         ),
       ),
     );
