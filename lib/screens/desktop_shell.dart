@@ -5689,14 +5689,9 @@ class _SidebarState extends State<_Sidebar> {
                     style: sans(12, weight: W.label, color: AppColors.fg3)),
               ),
               const SizedBox(width: 8),
+              const SizedBox(width: 28),
               Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: FractionallySizedBox(
-                    widthFactor: 0.5,
-                    child: Container(height: 1, color: AppColors.border),
-                  ),
-                ),
+                child: Container(height: 1, color: AppColors.border),
               ),
               const SizedBox(width: 8),
               if (collapsed && count > 0)
