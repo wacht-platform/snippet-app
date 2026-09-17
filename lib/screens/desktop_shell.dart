@@ -5446,10 +5446,8 @@ class _SidebarState extends State<_Sidebar> {
             mobileChildren.addAll(sessions.map(_sessionCard));
           }
           if (folder != order.last) {
-            mobileChildren.add(Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Divider(height: 1, color: AppColors.border),
-            ));
+            // Workspace separation belongs to the folder header: the rule starts
+            // after the folder label instead of floating above the next group.
           }
         }
       }
@@ -5684,12 +5682,15 @@ class _SidebarState extends State<_Sidebar> {
               const SizedBox(width: 4),
               AppIcon('folder', size: 13, color: AppColors.fg4),
               const SizedBox(width: 8),
-              Expanded(
+              Flexible(
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(12, weight: W.label, color: AppColors.fg3)),
               ),
+              const SizedBox(width: 8),
+              Expanded(child: Container(height: 1, color: AppColors.border)),
+              const SizedBox(width: 8),
               // A collapsed group still tells you how much is inside it.
               if (collapsed && count > 0)
                 Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
