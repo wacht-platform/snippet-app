@@ -417,7 +417,9 @@ class _AgentSidebarRow extends StatelessWidget {
                           weight: W.body, color: AppColors.fg1)),
                   const SizedBox(height: 2),
                   Text(
-                    agent.role,
+                    agent.assignedSessions.isEmpty
+                        ? agent.role
+                        : '${agent.role} · ${agent.assignedSessions.length} ${agent.assignedSessions.length == 1 ? 'session' : 'sessions'}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: sans(kMobile ? M.meta : 11,

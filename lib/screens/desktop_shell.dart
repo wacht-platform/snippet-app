@@ -343,7 +343,7 @@ class _DesktopShellState extends State<DesktopShell>
   /// Owned by the SHELL, not the sidebar: `_mobileShell`'s back handler must see
   /// it, or pressing back from Settings would exit the app instead of returning
   /// to Chats. Desktop navigates with the sidebar rail, so this is phone-only.
-  _MobileHome _mobileHome = _MobileHome.chats;
+  _MobileHome _mobileHome = _MobileHome.agents;
 
   /// Phone drill-down: which settings section is open, and which agent's detail.
   ///
