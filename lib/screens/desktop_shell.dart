@@ -5675,8 +5675,8 @@ class _SidebarState extends State<_Sidebar> {
         color: Colors.transparent,
         child: InkWell(
           onTap: toggle,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 8),
+          child: SizedBox(
+            width: double.infinity,
             child: Row(children: [
               AppIcon(chevron, size: 14, color: AppColors.fg4),
               const SizedBox(width: 4),
@@ -5689,9 +5689,16 @@ class _SidebarState extends State<_Sidebar> {
                     style: sans(12, weight: W.label, color: AppColors.fg3)),
               ),
               const SizedBox(width: 8),
-              Expanded(child: Container(height: 1, color: AppColors.border)),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: 0.5,
+                    child: Container(height: 1, color: AppColors.border),
+                  ),
+                ),
+              ),
               const SizedBox(width: 8),
-              // A collapsed group still tells you how much is inside it.
               if (collapsed && count > 0)
                 Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
             ]),
