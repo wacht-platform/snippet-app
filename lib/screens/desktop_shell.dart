@@ -5416,23 +5416,35 @@ class _SidebarState extends State<_Sidebar> {
       final cutoff = DateTime.now().millisecondsSinceEpoch ~/ 1000 - 12 * 60 * 60;
       final recent = list.where((s) => s.lastActive >= cutoff).toList()
         ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
-      final visible = recent.take(5).toList();
+      final recentIds = recent.take(15).map((s) => s.id).toSet();
+      final older = list.where((s) => !recentIds.contains(s.id)).toList()
+        ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      final mobileChildren = <Widget>[];
+      if (recentIds.isNotEmpty) {
+        mobileChildren.add(_mobileListHeader('Recent chats', recentIds.length));
+        mobileChildren.addAll(recent
+            .where((s) => recentIds.contains(s.id))
+            .map(_sessionCard));
+      }
+      if (older.isNotEmpty) {
+        mobileChildren.add(_mobileListHeader('Other chats', older.length));
+        mobileChildren.addAll(older.map(_sessionCard));
+      }
+      if (mobileChildren.isEmpty) {
+        mobileChildren.add(Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text('No chats yet.',
+              textAlign: TextAlign.center,
+              style: sans(12, color: AppColors.fg3)),
+        ));
+      }
       return RefreshIndicator(
         color: AppColors.accent,
         backgroundColor: AppColors.surface3,
         onRefresh: () async => widget.onRefreshSessions(),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
-          children: [
-            ...visible.map(_sessionCard),
-            if (visible.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text('No sessions active in the last 12 hours.',
-                    textAlign: TextAlign.center,
-                    style: sans(12, color: AppColors.fg3)),
-              ),
-          ],
+          children: mobileChildren,
         ),
       );
     }
