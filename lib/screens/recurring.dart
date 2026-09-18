@@ -51,13 +51,26 @@ class RecurringScreen extends StatefulWidget {
   State<RecurringScreen> createState() => _RecurringScreenState();
 }
 
-class _RecurringScreenState extends State<RecurringScreen> {
+class _RecurringScreenState extends State<RecurringScreen>
+    with AutomaticKeepAliveClientMixin {
   late Future<List<RecurringJob>> _future;
   List<SessionInfo>? _sessions;
   StreamSubscription<dynamic>? _eventsSub;
   Timer? _refreshDebounce;
   Timer? _eventsReconnect;
   bool _closed = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void didUpdateWidget(covariant RecurringScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.client != widget.client ||
+        oldWidget.sessionId != widget.sessionId) {
+      _future = widget.client.recurringJobs();
+    }
+  }
 
   @override
   void dispose() {
@@ -375,17 +388,20 @@ class _RecurringScreenState extends State<RecurringScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     Theme.of(context); // Rebuild on theme change
     final body = FutureBuilder<List<RecurringJob>>(
       future: _future,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return Center(
-              child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.fg3)));
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return widget.embedded
+              ? const SizedBox.shrink()
+              : Center(
+                  child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.fg3)));
         }
         if (snap.hasError) {
           return Padding(

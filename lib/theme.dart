@@ -602,6 +602,11 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedMessageMultiple02;
     case 'users':
       return HugeIcons.strokeRoundedUserGroup;
+    case 'agent':
+    case 'bot':
+      return HugeIcons.strokeRoundedBot;
+    case 'brain':
+      return HugeIcons.strokeRoundedAiBrain01;
     case 'archive':
       return HugeIcons.strokeRoundedArchive01;
     case 'plus':

@@ -315,10 +315,6 @@ class VaultScreenState extends State<VaultScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: mono(kMobile ? 13 : 12, color: AppColors.fg1)),
           ),
-          // A masked placeholder, not the value — the value never leaves the
-          // daemon, so there is nothing here to reveal.
-          Text('••••••', style: mono(11, color: AppColors.fg4)),
-          const SizedBox(width: 4),
           IconBtn('trash',
               size: kMobile ? M.minTarget : 34,
               iconSize: kMobile ? 16 : 15,

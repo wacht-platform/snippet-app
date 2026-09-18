@@ -14,7 +14,7 @@ enum ShellSection {
   terminal('Terminal', 'terminal'),
   git('Git Diff', 'git-branch'),
   files('File Tree', 'file'),
-  agents('Agents', 'users');
+  agents('Agents', 'agent');
 
   const ShellSection(this.label, this.icon);
   final String label;

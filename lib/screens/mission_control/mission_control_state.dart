@@ -135,6 +135,27 @@ bool isMissionControlListRow(SessionInfo session) {
   return isMissionControlTab(sessionId: session.id, title: session.title);
 }
 
+/// Whether a session id names an agent inbox rather than a project session.
+bool isInboxSession(String? id) {
+  if (id == null || id.isEmpty) return false;
+  final normalized = id.replaceAll(r'\', '/').trim();
+  if (normalized.startsWith('inbox-') || normalized.startsWith('inbox/')) {
+    return true;
+  }
+  final lastSlash = normalized.lastIndexOf('/');
+  if (lastSlash >= 0 && lastSlash + 1 < normalized.length) {
+    final name = normalized.substring(lastSlash + 1);
+    if (name.startsWith('inbox-')) return true;
+  }
+  return false;
+}
+
+/// Whether a session row represents an agent inbox.
+bool isInboxSessionRow(SessionInfo session) {
+  return isInboxSession(session.id) ||
+      session.folder.trim().toLowerCase() == 'inbox';
+}
+
 /// `/attach` may deliver text as a String or as UTF-8 bytes.
 String decodeAttachPayload(dynamic raw) {
   return switch (raw) {

@@ -457,7 +457,9 @@ class _FileExplorerState extends State<FileExplorer> {
                     compact: true,
                     onBack: _selecting
                         ? _exitSelect
-                        : (widget.onClose ?? () => Navigator.pop(context)),
+                        : (listing?.parent != null && listing?.path != _root
+                            ? () => _go(listing!.parent!)
+                            : (widget.onClose ?? () => Navigator.pop(context))),
                     actions: _selecting
                         ? [
                             IconBtn('trash',
@@ -470,11 +472,19 @@ class _FileExplorerState extends State<FileExplorer> {
                             IconBtn('x', tooltip: 'Cancel', onTap: _exitSelect),
                           ]
                         : [
+                            if (listing != null && widget.onNewChat != null)
+                              IconBtn('plus',
+                                  tooltip: 'New chat here',
+                                  onTap: () => widget.onNewChat!(listing.path)),
                             if (listing != null)
                               IconBtn('more-vertical',
                                   tooltip: 'Folder actions',
                                   onTap: () =>
                                       _showFolderActions(listing.path)),
+                            if (widget.onClose != null && listing?.path != _root)
+                              IconBtn('x',
+                                  tooltip: 'Close',
+                                  onTap: widget.onClose),
                           ],
                   ),
                   if (!_selecting && listing != null)

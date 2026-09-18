@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/io.dart' as ws_io;
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -19,6 +19,24 @@ class DownloadCancelled implements Exception {
 /// param on every request (matching the daemon's auth) and the session id (a
 /// path with a `/`) is URL-encoded automatically by [Uri].
 class DaemonClient {
+  @visibleForTesting
+  static WebSocketChannel Function(Uri uri,
+      {Duration? connectTimeout, Duration? pingInterval})? wsConnector;
+
+  static WebSocketChannel _connectWs(Uri uri,
+      {Duration? connectTimeout, Duration? pingInterval}) {
+    final connector = wsConnector;
+    if (connector != null) {
+      return connector(uri,
+          connectTimeout: connectTimeout, pingInterval: pingInterval);
+    }
+    return ws_io.IOWebSocketChannel.connect(
+      uri,
+      connectTimeout: connectTimeout,
+      pingInterval: pingInterval,
+    );
+  }
+
   final String baseUrl; // e.g. https://abc.trycloudflare.com
   final String token;
 
@@ -122,7 +140,7 @@ class DaemonClient {
       path: '/attach',
       queryParameters: {'session': sessionId, 'token': token},
     );
-    return ws_io.IOWebSocketChannel.connect(
+    return _connectWs(
       uri,
       connectTimeout: const Duration(seconds: 10),
       pingInterval: const Duration(seconds: 20),
@@ -142,7 +160,7 @@ class DaemonClient {
       path: '/shells',
       queryParameters: {'token': token},
     );
-    return ws_io.IOWebSocketChannel.connect(
+    return _connectWs(
       uri,
       connectTimeout: const Duration(seconds: 10),
       pingInterval: const Duration(seconds: 20),
@@ -169,7 +187,7 @@ class DaemonClient {
       path: '/events',
       queryParameters: {'token': token},
     );
-    return ws_io.IOWebSocketChannel.connect(
+    return _connectWs(
       uri,
       connectTimeout: const Duration(seconds: 10),
       pingInterval: const Duration(seconds: 45),
@@ -1141,7 +1159,7 @@ class DaemonClient {
       path: '/coordination/events',
       queryParameters: {'token': token},
     );
-    return ws_io.IOWebSocketChannel.connect(
+    return _connectWs(
       uri,
       connectTimeout: const Duration(seconds: 10),
       pingInterval: const Duration(seconds: 45),

@@ -1931,6 +1931,7 @@ class SnAppBar extends StatelessWidget {
           IconBtn('chevron-left',
               size: kMobile ? 42 : 38,
               iconSize: kMobile ? 27 : 22,
+              tooltip: 'Back',
               onTap: onBack)
         else
           const SizedBox(width: 8),

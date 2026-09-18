@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,24 +20,40 @@ import 'add_instance.dart';
 import 'editor.dart';
 import 'files.dart';
 import 'git.dart';
-import 'inference_profiles.dart';
-import 'inference_profile_editor.dart';
-import 'processes.dart';
-import 'usage.dart';
-import 'vault.dart';
-import 'recurring.dart';
-import 'agents_sidebar_panel.dart';
-import 'terminals_sidebar_panel.dart';
-import 'mission_control/coordination_agent_detail.dart';
-import 'mission_control/task_board_screen.dart';
-import 'git_diff_sidebar_panel.dart';
-import 'file_tree_sidebar_panel.dart';
+import 'inbound_share_picker.dart';
+import 'mission_control.dart';
+import 'mobile_shell.dart';
 import 'new_session_picker.dart';
 import 'session.dart';
-import 'session_panels.dart';
+import 'settings_panel.dart';
+import 'shell_card_tab_strip.dart';
+import 'shell_main_pane.dart';
+import 'shell_models.dart';
 import 'shell_nav.dart';
+import 'shell_pane_view.dart';
 import 'shell_rail.dart';
-import 'mission_control.dart';
+import 'shell_rail_tools.dart';
+import 'shell_shortcuts.dart';
+import 'shell_sidebar_host.dart';
+import 'shell_split_view.dart';
+import 'shell_welcome.dart';
+import 'shell_window_bar.dart';
+
+export 'inbound_share_picker.dart';
+export 'mobile_shell.dart';
+export 'settings_panel.dart';
+export 'shell_card_tab_strip.dart';
+export 'shell_components.dart';
+export 'shell_main_pane.dart';
+export 'shell_models.dart';
+export 'shell_pane_view.dart';
+export 'shell_rail_tools.dart';
+export 'shell_shortcuts.dart';
+export 'shell_sidebar_host.dart';
+export 'shell_split_view.dart';
+export 'shell_welcome.dart';
+export 'shell_window_bar.dart';
+export 'sidebar.dart';
 
 
 class DesktopShell extends StatefulWidget {
@@ -48,229 +62,13 @@ class DesktopShell extends StatefulWidget {
   State<DesktopShell> createState() => _DesktopShellState();
 }
 
-/// Which pane a tab lives in. Both panes are tab containers, so this is a
-/// property OF a tab, not of the shell — dragging a tab across the divider is
-/// what moves it.
-enum _Pane { left, right }
-
-/// Which top-level place the phone home is showing. The floating action bar
-/// switches this; desktop keeps its sidebar rail instead, so this is phone-only.
-enum _MobileHome {
-  agents('Agents', 'users'),
-  chats('Chats', 'chat-thread'),
-  settings('Settings', 'settings');
-
-  const _MobileHome(this.label, this.icon);
-  final String label;
-  final String icon;
-}
-
-/// Floating action bar geometry. Kept local: it is the only floating surface in
-/// the app, so it has not earned a shared token — but the radius is deliberately
-/// larger than `R.card` so it reads as a float rather than another card.
-const double _kMobileBarHeight = 58;
-const double _kMobileBarRadius = 18;
-
-/// One open tab in the shell — a live chat session, an opened file, a single git
-/// change, or a terminal, on a given instance.
-///
-/// Terminals are tabs like anything else, because the nested space is a tab
-/// container: opening a second terminal gives you a second tab, not a second
-/// app-wide pane.
-class _ShellTab {
-  final DaemonClient client;
-  final String instanceUrl;
-  final String? sessionId;
-  final String? filePath;
-  String title;
-  String? profile;
-  SharedInbound? inboundShare;
-
-  /// Which pane this tab is shown in. Mutable: this is what a drag changes.
-  _Pane pane;
-
-  /// The locked conversation root of the inner tab group this item belongs to.
-  /// A group shows exactly one session root; its files, diffs and terminals sit
-  /// alongside it in the full-width strip. Null is only valid for a session
-  /// root itself, or for a legacy item that will be adopted by the active root.
-  String? groupSessionKey;
-
-  /// Set only for a diff tab: the changed file plus the view it should show.
-  /// A staged-only file reads the index diff; an untracked one shows as an add.
-  final String? diffPath;
-  final bool diffStaged;
-  final bool diffUntracked;
-
-  /// Set only for a terminal tab.
-  ///
-  /// [termSessionKey] is the shell key of the session that owns the pty when the
-  /// shell is SESSION-scoped. It is NULL for a daemon-wide shell, which belongs
-  /// to the machine rather than a conversation — those render from
-  /// `ShellsController` over `/shells`.
-  final String? termId;
-  final String? termSessionKey;
-
-  _ShellTab.session({
-    required this.client,
-    required this.instanceUrl,
-    required this.sessionId,
-    required this.title,
-    this.profile,
-    this.inboundShare,
-    this.pane = _Pane.left,
-    this.groupSessionKey,
-  })  : filePath = null,
-        diffPath = null,
-        diffStaged = false,
-        diffUntracked = false,
-        termId = null,
-        termSessionKey = null;
-  _ShellTab.file({
-    required this.client,
-    required this.instanceUrl,
-    required this.filePath,
-    required this.title,
-    this.pane = _Pane.left,
-    this.groupSessionKey,
-  })  : sessionId = null,
-        profile = null,
-        diffPath = null,
-        diffStaged = false,
-        diffUntracked = false,
-        termId = null,
-        termSessionKey = null;
-  _ShellTab.diff({
-    required this.client,
-    required this.instanceUrl,
-    required this.sessionId,
-    required this.diffPath,
-    required this.title,
-    required this.diffStaged,
-    required this.diffUntracked,
-    this.pane = _Pane.left,
-    this.groupSessionKey,
-  })  : filePath = null,
-        profile = null,
-        termId = null,
-        termSessionKey = null;
-  _ShellTab.terminal({
-    required this.client,
-    required this.instanceUrl,
-    required this.termId,
-    required this.title,
-    this.termSessionKey,
-    this.pane = _Pane.left,
-    this.groupSessionKey,
-  })  : sessionId = null,
-        filePath = null,
-        profile = null,
-        diffPath = null,
-        diffStaged = false,
-        diffUntracked = false;
-
-  bool get isFile => filePath != null;
-  bool get isDiff => diffPath != null;
-  bool get isTerminal => termId != null;
-  bool get isMissionControl =>
-      !isFile &&
-      !isDiff &&
-      !isTerminal &&
-      isMissionControlTab(sessionId: sessionId, title: title);
-  String get key => isTerminal
-      ? '$instanceUrl|term|${termSessionKey ?? 'global'}|$termId'
-      : isDiff
-          ? '$instanceUrl|diff|$diffPath|$diffStaged'
-          : isFile
-              ? '$instanceUrl|file|$filePath'
-              : isMissionControl
-                  ? '$instanceUrl|mission-control'
-                  : '$instanceUrl|$sessionId';
-}
-
-/// Icon for a tab, by kind. One helper so the four call sites that render a
-/// tab (top bar, desktop strip, split header, tab menu) cannot drift.
-String _tabIconKind(_ShellTab t) => t.isMissionControl
-    ? 'layers'
-    : t.isTerminal
-        ? 'terminal'
-        : t.isDiff
-            ? 'git-branch'
-            : t.isFile
-                ? 'file'
-                : 'chat-thread';
-
-class _MacSessionStatus {
-  final HarnessState? state;
-  final bool running;
-  const _MacSessionStatus(this.state, this.running);
-}
-
-class _MacSessionControls {
-  final VoidCallback stop;
-  final void Function(String action, [String? extra]) performAction;
-  const _MacSessionControls(this.stop, this.performAction);
-}
-
-/// Session readouts that render in the secondary pane.
-///
-/// These were drawers. A drawer covers the transcript, but Lanes / Checkpoints
-/// are exactly the things you check WHILE reading a session — so they belong
-/// beside it, and tapping the same band button again closes the pane.
-///
-/// Usage is deliberately NOT here. It is a per-provider, account-wide view, so
-/// it lives in Settings → Usage rather than being reachable from a single
-/// conversation.
-enum _RightPanel {
-  none('', ''),
-  lanes('Lanes', 'layers'),
-  tasks('Tasks', 'layers'),
-  recurring('Scheduled', 'scheduled'),
-  checkpoints('Checkpoints', 'history');
-
-  const _RightPanel(this.label, this.icon);
-  final String label;
-  final String icon;
-}
-
-/// One tab in the secondary pane's readout strip.
-///
-/// Readouts are a LIST, not a single selection. Lanes, Checkpoints, Usage and a
-/// named agent are independent things you may want open at the same time;
-/// keeping one meant closing one to open another, which is why they are tabs
-/// here rather than one exclusive mode.
-class _RightTab {
-  _RightTab.panel(this.panel)
-      : agent = null,
-        pane = _Pane.right;
-  _RightTab.agent(CoordinationAgent this.agent)
-      : panel = _RightPanel.none,
-        pane = _Pane.right;
-
-  final _RightPanel panel;
-  final CoordinationAgent? agent;
-
-  /// Which pane holds this readout.
-  ///
-  /// Mutable, and the reason a readout is a TAB rather than a read-only panel:
-  /// anything in a pane's strip can be dragged to the other pane. Without this
-  /// the secondary pane had nothing draggable at all when it held a readout,
-  /// so right-to-left drags simply never started.
-  _Pane pane;
-
-  bool get isAgent => agent != null;
-
-  /// Stable identity, so re-opening a panel focuses its tab instead of adding
-  /// a duplicate.
-  String get key => isAgent ? 'agent|${agent!.id}' : 'panel|${panel.name}';
-
-  String get label {
-    final a = agent;
-    if (a == null) return panel.label;
-    return a.displayName.trim().isEmpty ? a.id : a.displayName;
-  }
-
-  String get icon => isAgent ? 'users' : panel.icon;
-}
+typedef _Pane = ShellPane;
+typedef _MobileHome = MobileHome;
+typedef _ShellTab = ShellTab;
+typedef _MacSessionStatus = MacSessionStatus;
+typedef _MacSessionControls = MacSessionControls;
+typedef _RightPanel = RightPanel;
+typedef _RightTab = RightTab;
 
 class _DesktopShellState extends State<DesktopShell>
     with WidgetsBindingObserver {
@@ -361,6 +159,50 @@ class _DesktopShellState extends State<DesktopShell>
   bool get _mobileDrilledDown =>
       _mobileSettingsSection != null || _mobileAgent != null;
 
+  final List<_MobileRoute> _mobileRouteHistory = [
+    const _MobileRoute(home: MobileHome.agents),
+  ];
+
+  void _pushMobileRoute(_MobileRoute route) {
+    if (!kMobile) return;
+    if (_mobileRouteHistory.isNotEmpty && _mobileRouteHistory.last == route) {
+      return;
+    }
+    final isTopLevel =
+        !route.inSession && route.agent == null && route.settingsSection == null;
+    if (isTopLevel) {
+      final existingIndex = _mobileRouteHistory.lastIndexOf(route);
+      if (existingIndex >= 0) {
+        _mobileRouteHistory.removeRange(
+            existingIndex + 1, _mobileRouteHistory.length);
+        return;
+      }
+    }
+    _mobileRouteHistory.add(route);
+  }
+
+  bool _handleMobileBack() {
+    if (!kMobile) return false;
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (_mobileRouteHistory.length <= 1) {
+      return false;
+    }
+    setState(() {
+      _mobileRouteHistory.removeLast();
+      final prev = _mobileRouteHistory.last;
+      _mobileHome = prev.home;
+      _mobileAgent = prev.agent;
+      _mobileSettingsSection = prev.settingsSection;
+      _mobileChatsOpen = !prev.inSession;
+      if (prev.inSession &&
+          prev.sessionTabIndex != null &&
+          prev.sessionTabIndex! < _tabs.length) {
+        _activeIndex = prev.sessionTabIndex!;
+      }
+    });
+    return true;
+  }
+
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
@@ -399,29 +241,10 @@ class _DesktopShellState extends State<DesktopShell>
   /// coordination failure can never take the session list down with it.
   bool _sidebarGit = false;
 
+
   /// Secondary-pane width, dragged by its handle. Width-driven rather than a
   /// flex ratio because a flex ratio cannot be dragged and has no natural size.
   double _paneWidth = kPaneDefaultWidth;
-
-  /// Whether the pointer is over the 6px resize zone. The visible separator is
-  /// always present as a 0.5px hairline and brightens on hover.
-  bool _paneHandleHover = false;
-
-  /// The pane a tab is currently being dragged OVER, if any.
-  ///
-  /// Drop targets gave no feedback: `_dropOn` accepted a drag silently, so
-  /// dragging a chip across the divider looked like nothing was happening and
-  /// there was no way to tell a valid drop from a miss. Highlighted by
-  /// [_dropOn]; cleared on leave and on drop.
-  _Pane? _dragOverPane;
-
-  /// True while ANY tab is being dragged.
-  ///
-  /// The secondary pane only renders when it already holds something, so from
-  /// the default state there was no right-hand drop target to drag INTO — the
-  /// feature was unreachable until you had opened that pane some other way.
-  /// A drag now materialises an empty right pane to receive it.
-  bool _dragActive = false;
 
   /// Which contextual sidebar the rail is showing. Purely a shell concern: the
   /// conversation you're reading stays put while this changes.
@@ -576,142 +399,22 @@ class _DesktopShellState extends State<DesktopShell>
   ShellSection get _effectiveSection =>
       _hiddenSections.contains(_section) ? ShellSection.sessions : _section;
 
-  List<Widget> _railTools() {
-    final tab = _activeTab;
-    final mc = tab?.isMissionControl ?? false;
-    final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
-    final goalRunning = s?.goal?.ongoing ?? false;
-    final lanes = s?.lanes.where((l) => l.running).length ?? 0;
-
-    // Mission Control keeps its own cluster, inline. It is not a workspace
-    // session: it orchestrates, so the authoring trio above (goal, lanes,
-    // checkpoints) is meaningless here, and what it DOES have is put out in the
-    // open. A "⋯" that hides one-tap actions behind a menu was friction, and it
-    // made MC the only session whose controls were not visible.
-    //
-    // Deliberately NOT here: Agents (the device-wide directory is a shell-level
-    // surface, and who is working where is already on the session rows as inline
-    // avatars) and Approval (MC runs its own turn; the mode belongs to a session
-    // whose composer it governs).
-    if (mc) {
-      final enabled = tab != null;
-      return [
-        // A PANE readout rather than a pushed screen — the board can stay open
-        // beside the conversation, like Lanes and Checkpoints do for an
-        // ordinary session, and the button shows when it is.
-        _railTool('layers',
-            tooltip: 'Tasks',
-            active: _rightPanelActive(_RightPanel.tasks),
-            onTap: enabled ? () => _toggleRightPanel(_RightPanel.tasks) : null),
-        _railTool('minimize',
-            tooltip: 'Compact history',
-            onTap: enabled ? () => _dispatchSessionAction('compact') : null),
-        // A pane readout like Tasks — same treatment in every conversation.
-        _railTool('scheduled',
-            tooltip: 'Scheduled',
-            active: _rightPanelActive(_RightPanel.recurring),
-            onTap: enabled
-                ? () => _toggleRightPanel(_RightPanel.recurring)
-                : null),
-      ];
-    }
-
-    return [
-      Builder(
-        builder: (ctx) => _railTool('goal',
-            tooltip: goalRunning ? 'Cancel goal' : 'Set goal',
-            active: goalRunning,
-            onTap: tab == null
-                ? null
-                : (goalRunning
-                    ? () => _dispatchSessionAction('goal')
-                    : () => _openGoalPopover(ctx))),
-      ),
-      _railTool('layers',
-          tooltip: 'Lanes',
-          active: _rightPanelActive(_RightPanel.lanes),
-          badge: lanes > 0 ? '$lanes' : null,
-          onTap:
-              tab == null ? null : () => _toggleRightPanel(_RightPanel.lanes)),
-      _railTool('history',
-          tooltip: 'Checkpoints',
-          active: _rightPanelActive(_RightPanel.checkpoints),
-          onTap: tab == null
-              ? null
-              : () => _toggleRightPanel(_RightPanel.checkpoints)),
-      // Scheduled is a property of THIS conversation — the jobs it re-runs — so
-      // it belongs in every session's cluster, not only Mission Control's. It
-      // opens a pane readout rather than the drawer it used to be, so it can
-      // stay beside the chat it governs.
-      _railTool('scheduled',
-          tooltip: 'Scheduled',
-          active: _rightPanelActive(_RightPanel.recurring),
-          onTap: tab == null
-              ? null
-              : () => _toggleRightPanel(_RightPanel.recurring)),
-    ];
-  }
-
-  /// One button in the band's right cluster.
-  ///
-  /// Delegates to the SHARED `RailIcon`, the same widget the section strip over
-  /// the sidebar uses. This used to be its own `IconBtn` at a different size and
-  /// colour ramp, which is why the two clusters read as two design languages on
-  /// one row.
-  Widget _railTool(
-    String icon, {
-    required String tooltip,
-    required VoidCallback? onTap,
-    bool active = false,
-    String? badge,
-  }) =>
-      RailIcon(
-        icon: icon,
-        tooltip: tooltip,
-        active: active,
-        badge: badge,
-        onTap: onTap,
+  List<Widget> _railTools() => buildShellRailTools(
+        activeTab: _activeTab,
+        macSessionStatus: _activeTab == null
+            ? null
+            : _macSessionStatuses[_activeTab!.key],
+        isRightPanelActive: _rightPanelActive,
+        onToggleRightPanel: _toggleRightPanel,
+        onSessionAction: _dispatchSessionAction,
+        onOpenGoalPopover: _openGoalPopover,
       );
 
-  /// Anchored goal field, under its button in the band.
-  Future<void> _openGoalPopover(BuildContext btnCtx) async {
-    final box = btnCtx.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final origin = box.localToGlobal(Offset.zero);
-    const width = 320.0;
-    final screen = MediaQuery.sizeOf(context).width;
-    final left =
-        (origin.dx + box.size.width - width).clamp(8.0, screen - width - 8);
-    await showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'goal',
-      barrierColor: Colors.transparent,
-      transitionDuration: Motion.press,
-      pageBuilder: (_, __, ___) => Stack(children: [
-        Positioned(
-          left: left,
-          top: origin.dy + box.size.height + 6,
-          width: width,
-          child: Material(
-            color: AppColors.surface3,
-            borderRadius: BorderRadius.circular(R.md),
-            elevation: 12,
-            shadowColor: Colors.black87,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: _GoalPopover(
-                onSet: (text) {
-                  Navigator.pop(context);
-                  _dispatchSessionAction('goal', text);
-                },
-              ),
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
+  Future<void> _openGoalPopover(BuildContext btnCtx) => showGoalPopover(
+        context: context,
+        anchorContext: btnCtx,
+        onSetGoal: (text) => _dispatchSessionAction('goal', text),
+      );
 
   @override
   void initState() {
@@ -733,8 +436,9 @@ class _DesktopShellState extends State<DesktopShell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (!kMobile)
+    if (!kMobile) {
       HardwareKeyboard.instance.removeHandler(_handleGlobalShortcuts);
+    }
     _sessionsTicker?.cancel();
     _stopEventsWatch();
     _persistTabsDebounce?.cancel();
@@ -773,83 +477,21 @@ class _DesktopShellState extends State<DesktopShell>
     });
   }
 
-  bool _mod(LogicalKeyboardKey left, LogicalKeyboardKey right) {
-    final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    return keys.contains(left) || keys.contains(right);
-  }
-
-  bool get _metaDown =>
-      _mod(LogicalKeyboardKey.metaLeft, LogicalKeyboardKey.metaRight);
-  bool get _ctrlDown =>
-      _mod(LogicalKeyboardKey.controlLeft, LogicalKeyboardKey.controlRight);
-  bool get _altDown =>
-      _mod(LogicalKeyboardKey.altLeft, LogicalKeyboardKey.altRight);
-  bool get _shiftDown =>
-      _mod(LogicalKeyboardKey.shiftLeft, LogicalKeyboardKey.shiftRight);
-  bool get _cmdOrCtrl => _metaDown || _ctrlDown;
-
-  /// Tab / window chords must not depend on Focus staying on the shell.
-  /// Clicking a tab, a message, or the composer steals focus and used to
-  /// kill Ctrl+Tab and Cmd+W after the first use.
-  bool _handleGlobalShortcuts(KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
-    if (!_cmdOrCtrl) return false;
-    final key = event.logicalKey;
-
-    if (key == LogicalKeyboardKey.keyW && !_shiftDown && !_altDown) {
+  late final _shortcutsHandler = ShellShortcutsHandler(
+    onCloseActiveTab: () {
       if (_activeIndex >= 0) _closeTab(_activeIndex);
-      return true;
-    }
-    if (key == LogicalKeyboardKey.keyT && !_shiftDown && !_altDown) {
-      _newSessionFlow();
-      return true;
-    }
-    if ((key == LogicalKeyboardKey.tab || key == LogicalKeyboardKey.pageDown) &&
-        _ctrlDown &&
-        !_altDown &&
-        !_metaDown) {
-      _activateRelativeTab(_shiftDown ? -1 : 1);
-      return true;
-    }
-    if (key == LogicalKeyboardKey.pageUp &&
-        _ctrlDown &&
-        !_altDown &&
-        !_metaDown) {
-      _activateRelativeTab(-1);
-      return true;
-    }
-    if ((key == LogicalKeyboardKey.arrowLeft ||
-            key == LogicalKeyboardKey.arrowRight) &&
-        _altDown) {
-      _activateRelativeTab(key == LogicalKeyboardKey.arrowLeft ? -1 : 1);
-      return true;
-    }
-    if (key == LogicalKeyboardKey.keyF && _shiftDown && !_altDown) {
-      _openActiveFiles();
-      return true;
-    }
-    if (key == LogicalKeyboardKey.keyG && _shiftDown && !_altDown) {
-      _openMacGit();
-      return true;
-    }
-    if (key == LogicalKeyboardKey.period && !_shiftDown && !_altDown) {
-      _macSessionControls[_activeTab?.key]?.stop();
-      return true;
-    }
-    if (key == LogicalKeyboardKey.slash && !_shiftDown && !_altDown) {
-      _showDesktopShortcuts();
-      return true;
-    }
-    for (var i = 0; i < 9; i++) {
-      if (key.keyId == LogicalKeyboardKey.digit1.keyId + i &&
-          !_shiftDown &&
-          !_altDown) {
-        _activateTab(i);
-        return true;
-      }
-    }
-    return false;
-  }
+    },
+    onNewSession: _newSessionFlow,
+    onActivateRelativeTab: _activateRelativeTab,
+    onOpenActiveFiles: _openActiveFiles,
+    onOpenMacGit: _openMacGit,
+    onStopRunningTask: () => _macSessionControls[_activeTab?.key]?.stop(),
+    onShowShortcuts: _showDesktopShortcuts,
+    onActivateTab: _activateTab,
+  );
+
+  bool _handleGlobalShortcuts(KeyEvent event) =>
+      _shortcutsHandler.handleKeyEvent(event);
 
   /// Drop every per-tab bookkeeping entry for a tab that is going away.
   ///
@@ -1061,8 +703,9 @@ class _DesktopShellState extends State<DesktopShell>
       _eventsChannel = ch;
       _eventsSub = ch.stream.listen(
         (msg) {
-          if (generation != _eventsGeneration || !identical(ch, _eventsChannel))
+          if (generation != _eventsGeneration || !identical(ch, _eventsChannel)) {
             return;
+          }
           final event = DeviceEvent.decode(msg);
           if (event == null) return;
           final kind = event.kind;
@@ -1171,16 +814,6 @@ class _DesktopShellState extends State<DesktopShell>
     return null;
   }
 
-  String? _macBranchLabel() {
-    final branch = _macGit?.branch.trim();
-    return branch == null || branch.isEmpty ? null : branch;
-  }
-
-  String _macChangeLabel() {
-    final git = _macGit;
-    if (git == null || git.clean || git.files.isEmpty) return '';
-    return '${git.files.length} change${git.files.length == 1 ? '' : 's'}';
-  }
 
   // Bring the active tab's chip into view in the strip.
   void _scrollStripToActive() {
@@ -1401,7 +1034,18 @@ class _DesktopShellState extends State<DesktopShell>
         .indexWhere((t) => t.isMissionControl && t.instanceUrl == inst.url);
     if (i >= 0) {
       _activateTab(i);
-      if (kMobile) setState(() => _mobileChatsOpen = false);
+      if (kMobile) {
+        setState(() {
+          _mobileChatsOpen = false;
+          _pushMobileRoute(_MobileRoute(
+            home: _mobileHome,
+            agent: _mobileAgent,
+            settingsSection: _mobileSettingsSection,
+            inSession: true,
+            sessionTabIndex: i,
+          ));
+        });
+      }
     }
   }
 
@@ -1455,59 +1099,14 @@ class _DesktopShellState extends State<DesktopShell>
   void _tabMenu(int i) {
     if (i < 0 || i >= _tabs.length) return;
     final t = _tabs[i];
-    showModalBottomSheet(
+    showTabContextMenu(
       context: context,
-      backgroundColor: AppColors.surface1,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
-            child: Row(children: [
-              AppIcon(t.isFile ? 'file' : 'terminal',
-                  size: 15, color: AppColors.fg3),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(t.title.isEmpty ? '(untitled)' : t.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(14, color: AppColors.fg1)),
-              ),
-            ]),
-          ),
-          Divider(height: 1, color: AppColors.border),
-          if (!t.isMissionControl)
-            _tabMenuItem(ctx, 'x', 'Close tab', () => _closeTab(i)),
-          if (_tabs.any((tab) => !tab.isMissionControl))
-            _tabMenuItem(
-                ctx, 'copy', 'Close other tabs', () => _closeOthers(i)),
-          if (_tabs.any((tab) => !tab.isMissionControl))
-            _tabMenuItem(ctx, 'trash', 'Close all tabs', _closeAllTabs,
-                danger: true),
-        ]),
-      ),
-    );
-  }
-
-  Widget _tabMenuItem(
-      BuildContext ctx, String icon, String label, VoidCallback onTap,
-      {bool danger = false}) {
-    final color = danger ? AppColors.danger : AppColors.fg1;
-    return InkWell(
-      onTap: () {
-        Navigator.of(ctx).pop();
-        onTap();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        child: Row(children: [
-          AppIcon(icon, size: 16, color: color),
-          const SizedBox(width: 12),
-          Text(label, style: sans(13, color: color)),
-        ]),
-      ),
+      tab: t,
+      index: i,
+      hasNonMissionControlTabs: _tabs.any((tab) => !tab.isMissionControl),
+      onCloseTab: () => _closeTab(i),
+      onCloseOthers: () => _closeOthers(i),
+      onCloseAll: _closeAllTabs,
     );
   }
 
@@ -1605,37 +1204,7 @@ class _DesktopShellState extends State<DesktopShell>
   void _openActiveFiles() =>
       _macSessionControls[_activeTab?.key]?.performAction('files');
 
-  void _showDesktopShortcuts() {
-    showAppSheet(
-      context,
-      title: 'Keyboard shortcuts',
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        _shortcutRow('⌘/Ctrl T', 'New session'),
-        _shortcutRow('⌘/Ctrl W', 'Close active tab'),
-        _shortcutRow('⌘/Ctrl 1–9', 'Switch to tab'),
-        _shortcutRow('⌘ ⌥ ← / → · Ctrl Tab · Ctrl PageUp/PageDown',
-            'Previous / next tab'),
-        _shortcutRow('⌘/Ctrl ⇧ F', 'Browse files'),
-        _shortcutRow('⌘/Ctrl ⇧ G', 'Open Git'),
-        _shortcutRow('⌘/Ctrl .', 'Stop active run'),
-        _shortcutRow('⌘/Ctrl Enter', 'Send message'),
-      ]),
-    );
-  }
-
-  Widget _shortcutRow(String keys, String label) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        child: Row(children: [
-          Expanded(child: Text(label, style: sans(13, color: AppColors.fg1))),
-          Text(keys, style: mono(11, color: AppColors.fg3)),
-        ]),
-      );
-
-  Widget _desktopShortcuts(Widget child) {
-    // Chords are handled globally in _handleGlobalShortcuts so they keep
-    // working after a tab click or composer focus steal.
-    return child;
-  }
+  void _showDesktopShortcuts() => showDesktopShortcutsDialog(context);
 
   void _onNotif(Map<String, dynamic> m) async {
     if (!mounted) return;
@@ -1721,8 +1290,10 @@ class _DesktopShellState extends State<DesktopShell>
       if (!identical(c, _client)) return;
       // Mission Control stays pinned at the top of the list; leftover titled
       // chats that alias it are still collapsed so it isn't listed twice.
+      // Agent inboxes are mailboxes, never human chat sessions.
       s.removeWhere((row) =>
-          isMissionControlListRow(row) && !isDedicatedMcSession(row.id));
+          (isMissionControlListRow(row) && !isDedicatedMcSession(row.id)) ||
+          isInboxSessionRow(row));
       s.sort((a, b) {
         final am = isDedicatedMcSession(a.id);
         final bm = isDedicatedMcSession(b.id);
@@ -1752,8 +1323,7 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
 
-  // Start a chat by picking a folder. One screen for both platforms: it renders
-  // as a centered modal on desktop and full screen on a phone (see presentScreen).
+  // Start a chat by picking a folder using NewSessionPicker on both desktop and mobile.
   Future<void> _newSessionFlow() async {
     final c = _client;
     final active = _active;
@@ -1839,7 +1409,16 @@ class _DesktopShellState extends State<DesktopShell>
       final root = _tabs[_activeIndex];
       _groupRootKey[root.pane] = root.key;
       _activeKey[root.pane] = root.key;
-      if (kMobile) _mobileChatsOpen = false;
+      if (kMobile) {
+        _mobileChatsOpen = false;
+        _pushMobileRoute(_MobileRoute(
+          home: _mobileHome,
+          agent: _mobileAgent,
+          settingsSection: _mobileSettingsSection,
+          inSession: true,
+          sessionTabIndex: _activeIndex,
+        ));
+      }
     });
     _persistTabs();
     _syncPage();
@@ -1906,68 +1485,11 @@ class _DesktopShellState extends State<DesktopShell>
         if (!t.isMissionControl) t.sessionId,
     };
     final rest = cached.where((s) => !openIds.contains(s.id)).toList();
-    final picked = await showAppSheet<String>(
-      context,
-      title: 'Send to',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final t in open)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: AppIcon(_tabIconKind(t),
-                  size: 18,
-                  color: t.isMissionControl ? AppColors.accent : AppColors.fg3),
-              title: Text(
-                  t.isMissionControl
-                      ? 'Mission Control'
-                      : (t.title.trim().isEmpty ? '(untitled)' : t.title),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(16,
-                      weight: t.isMissionControl
-                          ? FontWeight.w500
-                          : FontWeight.w400,
-                      color: AppColors.fg1)),
-              subtitle: Text(
-                  t.isMissionControl
-                      ? (_active?.label ?? 'this machine')
-                      : 'Open tab',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg3)),
-              onTap: () => Navigator.pop(context,
-                  t.isMissionControl ? 'mission-control' : t.sessionId),
-            ),
-          if (open.isEmpty)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: AppIcon('layers', size: 18, color: AppColors.accent),
-              title: Text('Mission Control',
-                  style: sans(16, weight: W.label, color: AppColors.fg1)),
-              subtitle: Text(_active?.label ?? 'this machine',
-                  style: sans(12, color: AppColors.fg3)),
-              onTap: () => Navigator.pop(context, 'mission-control'),
-            ),
-          for (final s in rest)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: AppIcon('terminal', size: 18, color: AppColors.fg3),
-              title: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(16, color: AppColors.fg1)),
-              subtitle: Text(
-                  s.displayAgentId == null || s.displayAgentId!.trim().isEmpty
-                      ? (s.folder.trim().isEmpty ? 'session' : s.folder)
-                      : '${s.folder.trim().isEmpty ? 'session' : s.folder} · ${s.displayAgentId}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg3)),
-              onTap: () => Navigator.pop(context, s.id),
-            ),
-        ],
-      ),
+    final picked = await showInboundSharePicker(
+      context: context,
+      openTabs: open,
+      restSessions: rest,
+      machineLabel: _active?.label ?? 'this machine',
     );
     if (!mounted || picked == null || picked.isEmpty) return;
     if (picked == 'mission-control') {
@@ -2124,111 +1646,49 @@ class _DesktopShellState extends State<DesktopShell>
     _syncPage();
   }
 
-  Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) {
-    final tab = _activeTab;
-    Widget panel;
-    // The rail switches which panel occupies the sidebar. Git stays a mode of
-    // the sessions panel — you inspect a session's diff, not the agent list.
-    if (_effectiveSection == ShellSection.terminal) {
-      // DAEMON-WIDE shells, not the session's. A shell belongs to the machine, so
-      // this panel is the same list whichever session is open — and it is the
-      // only place a shell is created or destroyed.
-      final shells = _shells.shells;
-      panel = TerminalsSidebarPanel(
-        workspacePath: _activeWorkspaceFolder() ?? '',
-        terminals: [
-          for (final s in shells)
-            TerminalInfo(
-              id: s.id,
-              title: s.title,
-              alive: s.alive,
-              live: s.live,
-            ),
-        ],
-        focus: shells.indexWhere((s) => s.id == _shells.focusId),
+  Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) =>
+      ShellSidebarHost(
+        effectiveSection: _effectiveSection,
+        shells: _shells.shells,
+        focusShellId: _shells.focusId,
+        activeWorkspaceFolder: _activeWorkspaceFolder(),
+        client: _client,
+        activeInstance: _active,
+        activeTab: _activeTab,
+        sidebarGit: _sidebarGit,
+        onCloseGit: () => setState(() => _sidebarGit = false),
         onNewTerminal: _newGlobalShell,
         onOpenTerminal: (idx) {
-          if (idx < 0 || idx >= shells.length) return;
-          _focusGlobalShell(shells[idx].id);
+          final s = _shells.shells;
+          if (idx >= 0 && idx < s.length) _focusGlobalShell(s[idx].id);
         },
         onCloseTerminal: _closeGlobalShell,
-      );
-    } else if (_effectiveSection == ShellSection.agents) {
-      final client = _client;
-      panel = client == null
-          ? _sidebarUnavailable('Add a machine to see its agents.')
-          : AgentsSidebarPanel(
-              client: client,
-              onOpenAgent: _openRightAgent,
-              onOpenSession: (id, title) => _openSession(id, title, null),
-            );
-    } else if (_effectiveSection == ShellSection.git) {
-      final client = _client;
-      panel = client == null
-          ? _sidebarUnavailable('Add a machine to see Git diff.')
-          : GitDiffSidebarPanel(
-              client: client,
-              workspacePath: _activeWorkspaceFolder() ?? '',
-              sessionId: _activeTab?.sessionId,
-              // Open the change as a tab in the main pane, so a diff reads in
-              // the same tab system as a chat or a file.
-              onOpenDiff: (f) => _openDiffTab(
-                client,
-                _active?.url ?? '',
-                _activeTab?.sessionId ?? '',
-                f,
-              ),
-            );
-    } else if (_effectiveSection == ShellSection.files) {
-      final client = _client;
-      panel = client == null
-          ? _sidebarUnavailable('Add a machine to browse its files.')
-          : FileTreeSidebarPanel(
-              client: client,
-              workspacePath: _activeWorkspaceFolder() ?? '',
-              onOpenFile: (path, name) =>
-                  _openFileTab(client, _active?.url ?? '', path, name),
-            );
-    } else if (_sidebarGit && tab != null && !tab.isFile) {
-      final path = tab.filePath;
-      final slash = path?.lastIndexOf('/') ?? -1;
-      final folder =
-          path != null && slash > 0 ? path.substring(0, slash) : null;
-      panel = Container(
-        color: AppColors.surface1,
-        child: GitScreen(
-          client: tab.client,
-          sessionId: tab.sessionId ?? '',
-          folder: folder,
-          embedded: true,
-          onClose: () => setState(() => _sidebarGit = false),
-        ),
-      );
-    } else {
-      panel = _Sidebar(
+        onOpenRightAgent: _openRightAgent,
+        onOpenSession: (id, title, profile) => _openSession(id, title, profile),
+        onOpenDiff: (f) {
+          final c = _client;
+          if (c != null) {
+            _openDiffTab(c, _active?.url ?? '', _activeTab?.sessionId ?? '', f);
+          }
+        },
+        onOpenFile: (path, name) {
+          final c = _client;
+          if (c != null) {
+            _openFileTab(c, _active?.url ?? '', path, name);
+          }
+        },
         topInset: topInset,
+        onAfterPick: onAfterPick,
         instances: _instances,
-        active: _active,
-        client: _client,
         selectedSessionId: _sessionId,
         sessions: _sessions,
         sessionsLoading: _sessionsLoading,
         sessionsError: _sessionsError,
         onRefreshSessions: _loadSessions,
         onSessionAction: _dispatchSessionAction,
-        onNewSession: () {
-          _newSessionFlow();
-          onAfterPick?.call();
-        },
+        onNewSession: _newSessionFlow,
         onSelectInstance: _selectInstance,
-        onOpenMissionControl: () {
-          _openMissionControlTab();
-          onAfterPick?.call();
-        },
-        onOpenSession: (id, title, profile) {
-          _openSession(id, title, profile);
-          onAfterPick?.call();
-        },
+        onOpenMissionControl: _openMissionControlTab,
         onAddInstance: _addInstanceFlow,
         onRenameInstance: _renameInstance,
         onRemoveInstance: _removeInstance,
@@ -2238,26 +1698,37 @@ class _DesktopShellState extends State<DesktopShell>
         mobileHome: _mobileHome,
         onMobileHome: (h) => setState(() {
           _mobileHome = h;
-          // Switching destinations abandons any drill-down, or the new
-          // destination would open showing the previous one's nested screen.
           _mobileSettingsSection = null;
           _mobileAgent = null;
+          _pushMobileRoute(_MobileRoute(home: h));
         }),
-        settingsSection: _mobileSettingsSection,
-        onSettingsSection: (s) => setState(() => _mobileSettingsSection = s),
-        agent: _mobileAgent,
-        onAgent: (a) => setState(() => _mobileAgent = a),
-      );
-    }
-
-    return panel;
-  }
-
-  Widget _sidebarUnavailable(String message) => Container(
-        color: AppColors.bg,
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-        child:
-            Text(message, style: sans(12, color: AppColors.fg3, height: 1.5)),
+        mobileSettingsSection: _mobileSettingsSection,
+        onSettingsSection: (s) {
+          if (s == null) {
+            _handleMobileBack();
+          } else {
+            setState(() {
+              _mobileSettingsSection = s;
+              _pushMobileRoute(_MobileRoute(
+                  home: _MobileHome.settings, settingsSection: s));
+            });
+          }
+        },
+        mobileAgent: _mobileAgent,
+        onMobileAgent: (a) {
+          if (a == null) {
+            _handleMobileBack();
+          } else {
+            setState(() {
+              _mobileAgent = a;
+              _pushMobileRoute(
+                  _MobileRoute(home: _MobileHome.agents, agent: a));
+            });
+          }
+        },
+        onSettingsClose: () {
+          _handleMobileBack();
+        },
       );
 
   void _onSessionDeleted(String id) {
@@ -2274,286 +1745,49 @@ class _DesktopShellState extends State<DesktopShell>
     if (_drawerOpen) _scaffoldKey.currentState?.closeDrawer();
   }
 
-  Widget _macNavigationBar() {
-    final tab = _activeTab;
-    final controls = tab == null ? null : _macSessionControls[tab.key];
-    final running = _macSessionStatuses[tab?.key]?.running ?? false;
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(children: [
-        Expanded(child: _tabList()),
-        if (tab != null && tab.isFile) ...[
-          IconBtn('download',
-              size: 26,
-              iconSize: 12,
-              tooltip: 'Download',
-              onTap: _downloadActiveFile),
-          IconBtn('edit',
-              size: 26, iconSize: 12, tooltip: 'Edit', onTap: _editActiveFile),
-        ] else if (controls != null) ...[
-          if (running)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: IconBtn('stop',
-                  size: 26,
-                  iconSize: 12,
-                  tooltip: 'Stop running task',
-                  onTap: controls.stop),
-            ),
-        ],
-        IconBtn('plus',
-            size: 26,
-            iconSize: 13,
-            tooltip: 'New session',
-            onTap: _newSessionFlow),
-        const SizedBox(width: 8),
-      ]),
-    );
-  }
-
-  Widget _macWindowBar() {
-    // `fullSizeContentView` does not expose the native titlebar inset through
-    // MediaQuery, so that value is false even while traffic lights are visible.
-    // Ask AppKit instead; reserve their full hit area until native fullscreen
-    // confirms that macOS has removed them.
-    return FutureBuilder<bool>(
-      future: macOSIsFullscreen(),
-      builder: (context, snapshot) =>
-          _macWindowBarContent(hasWindowControls: snapshot.data != true),
-    );
-  }
-
-  Widget _macWindowBarContent({required bool hasWindowControls}) {
-    return SizedBox(
-      // Taller than AppKit's own band. At 28px this crushed the tabs; the
-      // reference runs a 40px bar with 32px tabs on its bottom edge, and the
-      // native traffic lights are nudged down to stay centred.
-      height: kTitleBarHeight,
-      child: ColoredBox(
-        // The window/title bar sits on the floor surface (#0D0D0D) while the
-        // body below is the lighter chrome (#171717) — that step is what makes
-        // the active tab read as connected to the strip.
-        color: AppColors.floor,
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: hasWindowControls ? kTrafficLightReserve : 16,
-            right: 20,
-          ),
-          child: Row(
-            // Children fill the bar's full height: the tab strip then sits on
-            // the bottom edge and merges into the band below it (the browser
-            // silhouette), while the utility controls centre in the same band.
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Back/Forward navigation arrows
-                    IconBtn(
-                      'chevron-left',
-                      size: 24,
-                      iconSize: 16,
-                      tooltip: 'Back',
-                      onTap: _canNavigateBack ? _navigateBack : null,
-                    ),
-                    IconBtn(
-                      'chevron-right',
-                      size: 24,
-                      iconSize: 16,
-                      tooltip: 'Forward',
-                      onTap: _canNavigateForward ? _navigateForward : null,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Main workspace tabs: the conversations and Mission Control.
-              //
-              // Auxiliary content — terminals, previewed files, diffs — is docked
-              // in a PANE and listed by that pane's own strip, so the two strips
-              // never show the same tab. Naming what you are working on is the
-              // window bar's job.
-              Expanded(
-                child: Center(child: _mainTabsRow()),
-              ),
-              const SizedBox(width: 8),
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Right-side utilities: settings and the active machine
-                    // avatar. Checkpoints remain in a session's Actions/History.
-                    IconBtn(
-                      'settings',
-                      size: 24,
-                      iconSize: 16,
-                      tooltip: 'Settings',
-                      onTap: _openShellSettings,
-                    ),
-                    const SizedBox(width: 6),
-                    _topMachineSwitcher(),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _macWindowBar() => MacWindowBar(
+        canNavigateBack: _canNavigateBack,
+        canNavigateForward: _canNavigateForward,
+        onNavigateBack: _navigateBack,
+        onNavigateForward: _navigateForward,
+        tabsRow: _mainTabsRow(),
+        onOpenSettings: _openShellSettings,
+        machineSwitcher: _topMachineSwitcher(),
+      );
 
   final _topMachineKey = GlobalKey();
 
-  Widget _topMachineSwitcher() {
-    final a = _active;
-    final ok = a == null ? null : _health[a.url];
-    final initial = a == null || a.label.trim().isEmpty
-        ? '+'
-        : a.label.trim().characters.first.toUpperCase();
-    return Tooltip(
-      message: a == null ? 'Add machine' : 'Switch machine',
-      child: Material(
-        key: _topMachineKey,
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          onTap: _instances.isEmpty ? _addInstanceFlow : _openTopMachines,
-          customBorder: const CircleBorder(),
-          child: SizedBox(
-            // Fits inside the 28px title bar with margin to spare.
-            width: 26,
-            height: 26,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Center(
-                  child: Container(
-                    width: 22,
-                    height: 22,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.border2),
-                    ),
-                    child: Text(
-                      initial,
-                      style: sans(10, weight: W.title, color: AppColors.fg1),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: ok == true ? AppColors.ok : AppColors.fg4,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.bg, width: 1.5),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _topMachineSwitcher() => TopMachineSwitcher(
+        active: _active,
+        isHealthy: _active == null ? null : _health[_active!.url],
+        hasInstances: _instances.isNotEmpty,
+        onAdd: _addInstanceFlow,
+        onOpenList: _openTopMachines,
+        anchorKey: _topMachineKey,
+      );
 
   Future<void> _openTopMachines() async {
     _refreshHealth();
-    final content = _MachineList(
-      instances: _instances,
-      active: _active,
-      health: _health,
-      onSelect: _selectInstance,
-      onAdd: _addInstanceFlow,
-      onManage: _manageMachine,
-    );
-    final box = _topMachineKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final origin = box.localToGlobal(Offset.zero);
-    await showGeneralDialog(
+    await showTopMachinesPopover(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: 'machines',
-      barrierColor: Colors.transparent,
-      transitionDuration: Motion.press,
-      pageBuilder: (_, __, ___) => Stack(children: [
-        Positioned(
-          right:
-              (MediaQuery.of(context).size.width - origin.dx - box.size.width)
-                  .clamp(10.0, 500.0),
-          top: origin.dy + box.size.height + 4,
-          width: 260,
-          child: Material(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
-            elevation: 12,
-            shadowColor: Colors.black87,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: content,
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
-
-  void _manageMachine(Instance i) {
-    showAppSheet(
-      context,
-      title: i.label,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            leading: AppIcon('edit', size: 16, color: AppColors.fg2),
-            title: Text('Rename', style: sans(14, color: AppColors.fg1)),
-            onTap: () async {
-              Navigator.pop(context);
-              final name = await promptText(context,
-                  title: 'Rename machine',
-                  initial: i.label,
-                  hint: 'Machine name',
-                  saveLabel: 'Rename');
-              if (name != null && name.isNotEmpty) {
-                _renameInstance(i, name);
-              }
-            },
-          ),
-          ListTile(
-            leading: AppIcon('trash', size: 16, color: AppColors.danger),
-            title: Text('Remove', style: sans(14, color: AppColors.danger)),
-            onTap: () async {
-              Navigator.pop(context);
-              final ok = await confirmAction(
-                context,
-                title: 'Remove machine?',
-                body:
-                    '${i.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
-                confirmLabel: 'Remove',
-              );
-              if (ok) _removeInstance(i);
-            },
-          ),
-        ],
+      anchorKey: _topMachineKey,
+      content: _MachineList(
+        instances: _instances,
+        active: _active,
+        health: _health,
+        onSelect: _selectInstance,
+        onAdd: _addInstanceFlow,
+        onManage: _manageMachine,
       ),
     );
   }
+
+  void _manageMachine(Instance i) => showManageMachineSheet(
+        context: context,
+        instance: i,
+        onRename: _renameInstance,
+        onRemove: _removeInstance,
+      );
 
   bool get _canNavigateBack => _activeIndex > 0;
   bool get _canNavigateForward =>
@@ -2567,28 +1801,6 @@ class _DesktopShellState extends State<DesktopShell>
     if (_canNavigateForward) _activateTab(_activeIndex + 1);
   }
 
-  /// Top-level workspace tab chip in the window bar.
-  /// The chip that follows the pointer while a tab is being dragged into the
-  /// secondary pane.
-  Widget _tabDragFeedback(_ShellTab t) => Material(
-        color: Colors.transparent,
-        child: Container(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: AppColors.surface3,
-            borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(color: AppColors.border2),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(_tabIconKind(t), size: 13, color: AppColors.accent),
-            const SizedBox(width: 7),
-            Text(t.title.isEmpty ? '(untitled)' : t.title,
-                style: sans(12, color: AppColors.fg1)),
-          ]),
-        ),
-      );
-
   /// Activate a MAIN workspace tab by identity.
   ///
   /// Identity, not index: the window bar lists `_mainTabs`, so the chip's
@@ -2598,96 +1810,21 @@ class _DesktopShellState extends State<DesktopShell>
     if (i >= 0) _activateTab(i);
   }
 
-  /// A MAIN workspace tab chip in the window bar.
-  ///
-  /// Separate from `_paneTabChip` on purpose: this strip lists the
-  /// conversations and Mission Control — what the window bar names — while a
-  /// pane strip lists the auxiliary content docked beside it. One chip is never
-  /// rendered by both.
-  Widget _topWorkspaceTab(_ShellTab t) {
-    final isActive = t == _activeTab;
-    final title = t.title.isEmpty ? '(untitled)' : t.title;
-    // Same key map the narrow strip uses; the two strips are mutually
-    // exclusive (the window bar is wide-macOS only), so they cannot collide.
-    final key = _chipKeys.putIfAbsent(t.key, () => GlobalKey());
-
-    return GestureDetector(
-      onTap: () => _activateTabAt(t),
-      child: Container(
-        key: key,
-        // Bottom-aligned in the taller bar: the active tab is filled with the
-        // band colour below and shows only rounded top corners, so it merges
-        // into the navigation band the way a browser tab merges into a page.
-        height: kTitleTabHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.bg : Colors.transparent,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Tinted by run state so the window bar reads status at a glance,
-            // not just which tab is focused.
-            SessionStateIcon(
-              status: _statusForTab(t),
-              icon: _tabIconKind(t),
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 160),
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(14,
-                    weight: isActive ? W.label : W.body,
-                    color: isActive ? AppColors.fg1 : AppColors.fg3),
-              ),
-            ),
-            if (_canCloseTopTab(t)) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                // force: the pane-strip rule refuses to close a session root,
-                // but a window-bar tab IS a top-level workspace and must close.
-                onTap: () => _closeTabAt(t, force: true),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: AppIcon('x', size: 13, color: AppColors.fg4),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   /// The main workspace tab strip: the chips plus the new-session button.
   ///
   /// Hosted by the window bar on macOS, and by a row above the panes on a plain
   /// desktop that has no window bar of its own — so both show the same strip
   /// instead of one silently lacking tabs.
-  Widget _mainTabsRow() => ListView(
+  Widget _mainTabsRow() => MainTabsStrip(
         controller: _stripController,
-        scrollDirection: Axis.horizontal,
-        // Horizontal padding only; the host bar owns the vertical alignment.
-        padding: const EdgeInsets.only(right: 4),
-        children: [
-          for (final t in _mainTabs) ...[
-            _topWorkspaceTab(t),
-            const SizedBox(width: 4),
-          ],
-          Center(
-            child: IconBtn('plus',
-                size: 24,
-                iconSize: 16,
-                tooltip: 'New session',
-                onTap: _newSessionFlow),
-          ),
-        ],
+        tabs: _mainTabs,
+        activeTab: _activeTab,
+        statusForTab: _statusForTab,
+        canCloseTab: _canCloseTopTab,
+        onActivateTab: _activateTabAt,
+        onCloseTab: (t) => _closeTabAt(t, force: true),
+        onNewSession: _newSessionFlow,
+        chipKeyFor: (key) => _chipKeys.putIfAbsent(key, () => GlobalKey()),
       );
 
   Future<void> _downloadActiveFile() async {
@@ -2730,125 +1867,70 @@ class _DesktopShellState extends State<DesktopShell>
   void _showMobileChats() {
     if (!kMobile) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    // Reset the destination too. A session can be opened from Agents, so without
-    // this, backing out of it returned you to Agents — leaving the bar showing
-    // "Chats" while the body showed Agents, and stranding the list.
-    setState(() {
-      _mobileHome = _MobileHome.chats;
-      _mobileChatsOpen = true;
-    });
+    if (!_handleMobileBack()) {
+      setState(() {
+        _mobileChatsOpen = true;
+      });
+    }
   }
 
   Widget _mobileShell() {
     final tab = _activeTab;
-    // Chats is ALSO the visible surface whenever no session is active. Without
-    // the `tab == null` arm, closing the last tab (or deleting the open session
-    // from elsewhere) would leave the panel parked off-screen with no session
-    // behind it: a blank screen with nothing owning back.
-    final chatsVisible = _mobileChatsOpen || tab == null;
-    final shell = Scaffold(
-      // ALWAYS `bg`, never the reading surface. This Scaffold's own background
-      // is visible only in the status-bar inset strip, because the session below
-      // is `Positioned.fill` inside a `SafeArea` and paints its own `readingBg`
-      // over everything else. Painting it `readingBg` therefore left a canvas
-      // band ABOVE the session header while the header itself is `bg` chrome —
-      // three tones, darkest-lightest-darkest, reading as a stray strip.
-      //
-      // `bg` makes the strip continuous with the header, and matches Chats,
-      // where the panel behind the status bar is `bg` too.
-      backgroundColor: AppColors.bg,
-      body: Stack(children: [
-        // The session sits UNDERNEATH and stays fully drawn. The Chats panel
-        // slides over it and reveals it again on the way out, so there is no
-        // fade-through or blank frame during the transition.
-        if (tab != null)
-          Positioned.fill(
-            child: IgnorePointer(
-              ignoring: chatsVisible,
-              child: SafeArea(
-                bottom: false,
-                child: _tabBody(tab, primary: true),
-              ),
-            ),
-          ),
-        // Chats is the LEFT panel (the chevron beside it points left, and it is
-        // the sidebar). The actions panel is the RIGHT one; the two must come
-        // from opposite edges or they read as the same surface.
-        Positioned.fill(
-          child: IgnorePointer(
-            ignoring: !chatsVisible,
-            child: AnimatedSlide(
-              duration: Motion.base,
-              curve: Motion.enter,
-              offset: chatsVisible ? Offset.zero : const Offset(-1, 0),
-              child: Material(
-                color: AppColors.bg,
-                child: SafeArea(
-                  child: _sidebar(
-                    topInset: false,
-                    onAfterPick: () => setState(() => _mobileChatsOpen = false),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ]),
-    );
-
-    // Back has exactly ONE owner per state. Every PopScope on a route receives
-    // the callback, so registering two would run both on a single press — one
-    // would close the terminal and the other would jump to Chats.
-    //
-    // Session open → the SESSION owns back (see SessionScreen): its ladder
-    // closes the actions drawer, then the terminal overlay, then returns here.
-    // It passes `mobileActive` so its guard is absent whenever Chats is showing.
-    if (!chatsVisible) return shell;
-
-    // Drilled into a nested screen → back pops ONE level, not the whole
-    // destination. Without this, backing out of a settings section landed you on
-    // Chats and lost the destination you were in.
-    if (_mobileDrilledDown) {
-      return PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
+    return MobileShell(
+      activeTabBody: tab != null ? _tabBody(tab, primary: true) : null,
+      sidebar: _sidebar(
+        topInset: false,
+        onAfterPick: () {
+          if (_tabs.isNotEmpty) {
+            setState(() {
+              _mobileChatsOpen = false;
+              _pushMobileRoute(_MobileRoute(
+                home: _mobileHome,
+                agent: _mobileAgent,
+                settingsSection: _mobileSettingsSection,
+                inSession: true,
+                sessionTabIndex: _activeIndex,
+              ));
+            });
+          }
+        },
+      ),
+      hasActiveTab: tab != null,
+      chatsOpen: _mobileChatsOpen,
+      drilledDown: _mobileDrilledDown,
+      mobileHome: _mobileHome,
+      canPopRoute: _mobileRouteHistory.length > 1,
+      onPopRoute: () {
+        _handleMobileBack();
+      },
+      onClearDrillDown: () {
+        _handleMobileBack();
+      },
+      onMobileHome: (home) {
+        setState(() {
+          _mobileHome = home;
+          _mobileSettingsSection = null;
+          _mobileAgent = null;
+          _pushMobileRoute(_MobileRoute(home: home));
+        });
+      },
+      onCloseChats: () {
+        if (_tabs.isNotEmpty) {
           setState(() {
-            _mobileSettingsSection = null;
-            _mobileAgent = null;
+            _mobileChatsOpen = false;
+            _pushMobileRoute(_MobileRoute(
+              home: _mobileHome,
+              agent: _mobileAgent,
+              settingsSection: _mobileSettingsSection,
+              inSession: true,
+              sessionTabIndex: _activeIndex,
+            ));
           });
-        },
-        child: shell,
-      );
-    }
-
-    // On a non-Agents destination, back returns to Agents rather than leaving the
-    // app — otherwise Settings/Chats would be a dead end whose only exit is the
-    // bar, and back would exit the app from a screen the user just navigated to.
-    if (_mobileHome != _MobileHome.agents) {
-      return PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
-          setState(() => _mobileHome = _MobileHome.agents);
-        },
-        child: shell,
-      );
-    }
-
-    // Chats on screen → the shell IS the app root. Background the app so a
-    // running watcher service keeps working, rather than finishing the activity.
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        if (await watcherServiceRunning()) {
-          minimizeApp();
-        } else {
-          SystemNavigator.pop();
         }
       },
-      child: shell,
+      onOpenChats: () {
+        _handleMobileBack();
+      },
     );
   }
 
@@ -2867,7 +1949,7 @@ class _DesktopShellState extends State<DesktopShell>
       );
     }
     if (kMobile) return _mobileShell();
-    return _desktopShortcuts(LayoutBuilder(builder: (context, c) {
+    return LayoutBuilder(builder: (context, c) {
       // Narrow window → keep the native shell but collapse the sidebar to a drawer.
       if (c.maxWidth < kShellCompact) {
         // Full-width drawer on phones; a capped one on a shrunk desktop window.
@@ -2952,79 +2034,9 @@ class _DesktopShellState extends State<DesktopShell>
           ]),
         ),
       );
-    }));
+    });
   }
 
-  /// Both desktop panes share the same canvas. Their separation is a foreground
-  /// hairline: the left pane owns the sidebar/content boundary for its full
-  /// height, while [_paneResizeHandle] owns the continuous split divider.
-  ///
-  /// Only the OUTER top corners take a radius — the left pane's top-left and the
-  /// right pane's top-right. The inner corners stay square so the two panes meet
-  /// flush at the divider instead of showing two rounded notches, and
-  /// [roundRight] is false for the left pane whenever a right pane is open.
-  Widget _paneSurface(
-    _Pane pane, {
-    required Widget child,
-    bool roundRight = false,
-  }) {
-    // While a tab is dragged over this pane, outline the whole surface. The
-    // strip alone is a small target to read, and the drop accepts anywhere in
-    // the pane, so the highlight has to cover the region that will actually
-    // take the tab.
-    final droppable = _dragOverPane == pane;
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.canvas,
-        borderRadius: BorderRadius.only(
-          topLeft: pane == _Pane.left
-              ? const Radius.circular(R.sheetTop)
-              : Radius.zero,
-          topRight:
-              roundRight ? const Radius.circular(R.sheetTop) : Radius.zero,
-        ),
-      ),
-      // Requires the decoration above: Flutter asserts on a non-default
-      // clipBehavior without one.
-      clipBehavior: Clip.antiAlias,
-      child: Stack(fit: StackFit.expand, children: [
-        child,
-        if (droppable)
-          // IgnorePointer so the highlight cannot swallow the drop it is
-          // advertising; foreground so it paints over the pane's content.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                      color: AppColors.accent, width: kPaneActiveStroke),
-                  borderRadius: BorderRadius.only(
-                    topLeft: pane == _Pane.left
-                        ? const Radius.circular(R.sheetTop)
-                        : Radius.zero,
-                    topRight: roundRight
-                        ? const Radius.circular(R.sheetTop)
-                        : Radius.zero,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (pane == _Pane.left)
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              child: Container(
-                width: kPaneHairline,
-                color: kPaneSeamColor,
-              ),
-            ),
-          ),
-      ]),
-    );
-  }
 
   /// Body for one tab.
   ///
@@ -3293,377 +2305,66 @@ class _DesktopShellState extends State<DesktopShell>
     if (i >= 0) _closeTab(i, force: force);
   }
 
-  /// Sidebar + the two pane containers. Both are tab containers; which tabs they
-  /// hold is a property of each tab (`_ShellTab.pane`), so a drop is all it
-  /// takes to move one across.
-  Widget _bodyRow({required bool topInset}) {
-    final rightTabs = _tabsIn(_Pane.right);
-    final leftTabs = _tabsIn(_Pane.left);
-    // An explicit collapse wins over content, or the collapse control would
-    // appear to do nothing while a terminal is docked.
-    //
-    // `_dragActive` overrides BOTH the collapse and the emptiness: the pane only
-    // renders when it already holds something, so from the default state there
-    // was no right-hand drop target to drag INTO and the feature was unreachable
-    // without opening that pane some other way first. A drag materialises an
-    // empty one to receive it; releasing outside returns to hidden, because this
-    // is transient and never touches `_rightCollapsed`.
-    final showRight = _dragActive ||
-        (!_rightCollapsed &&
-            (rightTabs.isNotEmpty ||
-                _rightTabs.any((r) => r.pane == _Pane.right)));
-    // Collapsing the LEFT pane is only meaningful while it holds aux content —
-    // it is also the conversation surface, which there must always be a way
-    // back to.
-    final showLeft = !(_leftCollapsed && leftTabs.isNotEmpty);
-    return Expanded(
-      child: Row(children: [
-        SizedBox(
-          width: kSidebarWidth,
-          child: _sidebar(topInset: topInset),
-        ),
-        if (showLeft)
-          Expanded(
-            child: _dropOn(
-              _Pane.left,
-              // The left pane's top-RIGHT is only an outer corner when no right
-              // pane is open; otherwise it meets the divider flush and square.
-              _paneView(_Pane.left, roundRight: !showRight),
-            ),
-          )
-        else
-          Expanded(child: _collapsedPaneStub(_Pane.left)),
-        if (showRight) ...[
-          _paneResizeHandle(joinBaseline: showLeft),
-          SizedBox(
-            width: _paneWidth.clamp(kPaneMinWidth, double.infinity),
-            child:
-                _dropOn(_Pane.right, _paneView(_Pane.right, roundRight: true)),
-          ),
-        ],
-      ]),
-    );
-  }
-
-  /// A collapsed pane leaves a thin re-open affordance rather than vanishing —
-  /// otherwise there is no way back to the terminals docked inside it.
-  Widget _collapsedPaneStub(_Pane p) => Center(
-        child: IconBtn('chevron-right',
-            size: 28,
-            iconSize: 14,
-            tooltip: 'Show pane',
-            onTap: () => setState(() {
-                  if (p == _Pane.left) {
-                    _leftCollapsed = false;
-                  } else {
-                    _rightCollapsed = false;
-                  }
-                })),
-      );
-
-  /// A pane is a drop target for a tab dragged out of any strip.
-  ///
-  /// Reports hover through `_dragOverPane` so the pane can show it will accept
-  /// the tab. Without that, a drag across the divider had no feedback at all —
-  /// there was no way to tell a valid drop from a miss.
-  /// A pane is a drop target for ANY pane tab — a docked `_ShellTab` or a
-  /// session readout.
-  ///
-  /// The payload is `Object` precisely because those are two different classes.
-  /// Readouts used to be non-draggable, so a pane holding one (Usage, Lanes, an
-  /// agent) had NOTHING to start a drag from — which is why right-to-left drags
-  /// never happened at all.
-  Widget _dropOn(_Pane p, Widget child) => DragTarget<Object>(
-        onWillAcceptWithDetails: (d) => _dragOriginOf(d.data) != p,
-        onAcceptWithDetails: (d) {
-          setState(() => _dragOverPane = null);
-          final data = d.data;
-          if (data is _ShellTab) {
-            _moveTo(p, data);
-          } else if (data is _RightTab) {
-            _moveReadout(p, data);
+  Widget _bodyRow({required bool topInset}) => ShellSplitView(
+        sidebar: _sidebar(topInset: topInset),
+        paneWidth: _paneWidth,
+        leftCollapsed: _leftCollapsed,
+        rightCollapsed: _rightCollapsed,
+        leftTabs: _tabsIn(_Pane.left),
+        rightTabs: _tabsIn(_Pane.right),
+        readouts: _rightTabs,
+        activeKey: _activeKey,
+        focusedPane: _focusedPane,
+        statusForTab: _statusForTab,
+        canCloseTab: (t) => _canCloseTab(t) || t.isTerminal,
+        tabBodyBuilder: (t, primary) => _tabBody(t, primary: primary),
+        readoutBodyBuilder: (r) {
+          final tab = _activeTab;
+          final controls = tab == null ? null : _macSessionControls[tab.key];
+          final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
+          return _rightTabBody(r, s, controls);
+        },
+        fallbackBuilder: _paneFallback,
+        onPaneResize: (delta) => setState(() {
+          final max = MediaQuery.sizeOf(context).width * 0.72;
+          _paneWidth = (_paneWidth - delta).clamp(kPaneMinWidth, max);
+        }),
+        onExpandPane: (p) => setState(() {
+          if (p == _Pane.left) {
+            _leftCollapsed = false;
+          } else {
+            _rightCollapsed = false;
+          }
+        }),
+        onMoveTab: _moveTo,
+        onMoveReadout: _moveReadout,
+        onActivateTab: _activateIn,
+        onActivateReadout: (p, r) => setState(() => _activeKey[p] = r.key),
+        onDismissTab: (p, t) {
+          if (t.isTerminal) {
+            _hideTabView(p, t);
+          } else {
+            _closePaneTab(t);
           }
         },
-        onLeave: (_) {
-          if (_dragOverPane == p) setState(() => _dragOverPane = null);
-        },
-        onMove: (d) {
-          if (_dragOriginOf(d.data) != p && _dragOverPane != p) {
-            setState(() => _dragOverPane = p);
-          }
-        },
-        builder: (_, __, ___) => child,
+        onCloseReadout: (r) => _closeRightTab(r.key),
       );
 
-  /// Which pane a dragged payload currently lives in, or null if it is neither
-  /// kind of pane tab.
-  _Pane? _dragOriginOf(Object? data) {
-    if (data is _ShellTab) return data.pane;
-    if (data is _RightTab) return data.pane;
-    return null;
-  }
-
-  /// Move a readout to another pane — the readout twin of `_moveTo`.
   void _moveReadout(_Pane p, _RightTab r) {
     if (r.pane == p) return;
     setState(() {
       final from = r.pane;
       r.pane = p;
       _rightCollapsed = false;
-      // Release the selection in the pane it LEFT, or that pane keeps pointing
-      // at a tab it no longer holds and renders blank.
       if (_activeKey[from] == r.key) _activeKey.remove(from);
       _activeKey[p] = r.key;
     });
   }
 
-  /// One pane.
-  ///
-  /// Its strip lists ONLY auxiliary tabs (terminals, previewed files, diffs) —
-  /// the main workspace tabs live in the window bar. When no aux tab is selected
-  /// the pane falls back to [fallback]: the conversation in the left pane, the
-  /// readout in the right.
-  /// One pane: its own tab strip, then its content.
-  ///
-  /// Content STACKS every tab docked here with only the active one laid out.
-  /// That is a correctness requirement, not an optimisation: a `SessionScreen`
-  /// owns its ptys, so unmounting one on a tab switch would kill its terminals.
-  /// The same applies to a terminal tab, whose `TerminalHost` lives in the
-  /// session that owns it.
-  Widget _paneView(_Pane p, {bool roundRight = false}) {
-    final list = _tabsIn(p);
-    // Readouts are pane-aware: a readout can be dragged between panes like any
-    // other tab, so filter by WHERE it currently lives rather than assuming the
-    // secondary pane.
-    final readouts = [
-      for (final r in _rightTabs)
-        if (r.pane == p) r
-    ];
-    final key = _activeKey[p];
-
-    final selectedTab = list.where((t) => t.key == key).firstOrNull;
-    _RightTab? selectedReadout;
-    for (final r in readouts) {
-      if (r.key == key) selectedReadout = r;
-    }
-    // No valid selection: prefer a DOCKED tab, matching the previous behaviour
-    // where readouts showed only when the pane held no docked tabs. Without this
-    // guard a readout would jump in front of the tabs the user was working with.
-    final shownTab = selectedTab ??
-        (selectedReadout == null && list.isNotEmpty ? list.first : null);
-    final shownReadout = selectedReadout ??
-        (shownTab == null && readouts.isNotEmpty ? readouts.first : null);
-
-    final tab = _activeTab;
-    final controls = tab == null ? null : _macSessionControls[tab.key];
-    final s = tab == null ? null : _macSessionStatuses[tab.key]?.state;
-
-    Widget content;
-    if (list.isEmpty && readouts.isEmpty) {
-      content = _paneFallback(p);
-    } else {
-      content = Stack(children: [
-        // EVERY docked tab stays mounted, selected or not. That is a
-        // correctness requirement, not an optimisation: a `SessionScreen` owns
-        // its ptys, so unmounting one on a tab switch would kill its terminals.
-        for (final t in list)
-          Offstage(
-            offstage: t != shownTab,
-            child: _tabBody(
-              t,
-              // `primary` gates file drops and inbound shares. Several sessions
-              // can be mounted at once, so exactly one may claim them: the
-              // active tab, in the focused pane.
-              primary: t == shownTab && _focusedPane == p,
-            ),
-          ),
-        if (shownReadout != null) _rightTabBody(shownReadout, s, controls),
-      ]);
-    }
-
-    return _paneSurface(
-      p,
-      roundRight: roundRight,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // The strip renders whenever this pane hosts ANY tab, and lists both
-          // kinds, so there is always a way to reach a readout that a dropped
-          // tab would otherwise have covered.
-          if (list.isNotEmpty || readouts.isNotEmpty)
-            _paneStrip(p, list, readouts, key),
-          Expanded(child: content),
-        ],
-      ),
-    );
-  }
-
-  /// What a pane shows when it holds nothing at all.
   Widget _paneFallback(_Pane p) {
     if (p == _Pane.right) return _emptyPaneHint();
     return _client == null ? _welcome() : _recentPlaceholder();
   }
-
-  /// Joined pane-tab construction: tabs meet directly on one shared
-  /// near-background baseline, with the active tab marked by a solid white top
-  /// edge. A session root stays a capped, locked first tab; supporting tabs are
-  /// larger bounded frames with their close action inside the tab itself.
-  ///
-  /// Lists BOTH kinds of tab in ONE strip: docked `_ShellTab`s first, then
-  /// session readouts. They previously had separate strips in separate views, so
-  /// dropping a tab into a pane that held a readout hid that readout completely.
-  Widget _paneStrip(
-    _Pane p,
-    List<_ShellTab> list,
-    List<_RightTab> readouts,
-    String? activeKey,
-  ) {
-    final count = list.length + readouts.length;
-    return Container(
-      height: kPaneHeaderHeight,
-      color: AppColors.canvas,
-      child: Stack(fit: StackFit.expand, children: [
-        LayoutBuilder(builder: (context, c) {
-          final w = kPaneTabWidth(c.maxWidth, count);
-          return ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.zero,
-            itemCount: count,
-            separatorBuilder: (_, __) => const SizedBox.shrink(),
-            itemBuilder: (_, i) {
-              if (i < list.length) {
-                final t = list[i];
-                return _paneTabChip(p, t, t.key == activeKey, w);
-              }
-              final r = readouts[i - list.length];
-              return _readoutChip(p, r, r.key == activeKey, w);
-            },
-          );
-        }),
-        // Foreground baseline: the ListView paints over the container's own
-        // decoration, so the strip rule must be laid on top of the tabs.
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Container(height: kPaneHairline, color: kPaneSeamColor),
-          ),
-        ),
-      ]),
-    );
-  }
-
-  /// One readout tab (Lanes / Checkpoints / Usage / an agent) in a pane strip.
-  ///
-  /// A `_ShellTab` chip's twin: same geometry, same selected stroke, same close
-  /// position — a readout is a tab like any other, so it must not read as a
-  /// different control class sitting in the same strip.
-  Widget _readoutChip(_Pane p, _RightTab r, bool active, double width) {
-    final chip = GestureDetector(
-      onTap: () => setState(() => _activeKey[p] = r.key),
-      child: SizedBox(
-        width: width,
-        child: Container(
-          height: kPaneTabHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.canvas,
-            border: Border(
-              right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-              top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-            ),
-          ),
-          foregroundDecoration: !active
-              ? null
-              : BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                        color: AppColors.fg1, width: kPaneActiveStroke),
-                  ),
-                ),
-          child: Row(children: [
-            AppIcon(r.icon,
-                size: 14, color: active ? AppColors.fg1 : AppColors.fg3),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                r.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(kPaneTabText,
-                    weight: active ? W.label : W.body,
-                    color: active ? AppColors.fg1 : AppColors.fg3),
-              ),
-            ),
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: () => _closeRightTab(r.key),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.all(3),
-                child: AppIcon('x', size: 11, color: AppColors.fg4),
-              ),
-            ),
-          ]),
-        ),
-      ),
-    );
-
-    // A readout drags between panes exactly like a docked tab. Without this the
-    // secondary pane had NOTHING draggable whenever it held a readout, so a
-    // right-to-left drag could never even start.
-    void started() => setState(() => _dragActive = true);
-    void ended(DraggableDetails _) {
-      if (_dragActive || _dragOverPane != null) {
-        setState(() {
-          _dragActive = false;
-          _dragOverPane = null;
-        });
-      }
-    }
-
-    if (kMobile) {
-      return LongPressDraggable<_RightTab>(
-        data: r,
-        dragAnchorStrategy: pointerDragAnchorStrategy,
-        feedback: _readoutDragFeedback(r),
-        childWhenDragging: Opacity(opacity: 0.4, child: chip),
-        onDragStarted: started,
-        onDragEnd: ended,
-        child: chip,
-      );
-    }
-    return Draggable<_RightTab>(
-      data: r,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      feedback: _readoutDragFeedback(r),
-      childWhenDragging: Opacity(opacity: 0.4, child: chip),
-      onDragStarted: started,
-      onDragEnd: ended,
-      child: chip,
-    );
-  }
-
-  /// Drag ghost for a readout chip, matching `_tabDragFeedback`'s shape so the
-  /// two kinds of dragged tab look like the same thing in flight.
-  Widget _readoutDragFeedback(_RightTab r) => Material(
-        color: Colors.transparent,
-        child: Container(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: AppColors.surface3,
-            borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(color: AppColors.border2),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(r.icon, size: 13, color: AppColors.accent),
-            const SizedBox(width: 7),
-            Text(r.label, style: sans(12, color: AppColors.fg1)),
-          ]),
-        ),
-      );
 
   /// The sidebar is the only shell creator. Its controller listener adds the
   /// acknowledged shell to the active inner group exactly once.
@@ -3788,308 +2489,39 @@ class _DesktopShellState extends State<DesktopShell>
     _persistTabs();
   }
 
-  Widget _paneTabChip(_Pane p, _ShellTab t, bool active, double width) {
-    final canDismiss = _canCloseTab(t) || t.isTerminal;
-    void dismiss() {
-      // Closing a terminal tab only hides this pane view. Its pty remains alive
-      // and traceable from the Terminals panel; file/diff tabs close normally.
-      if (t.isTerminal) {
-        _hideTabView(p, t);
-      } else {
-        _closePaneTab(t);
-      }
-    }
-
-    final chip = GestureDetector(
-      onTap: () => _activateIn(p, t),
-      child: SizedBox(
-        width: width,
-        child: Container(
-          height: kPaneTabHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          // Every tab carries the SAME hairline top border, so selection cannot
-          // move anything. The active tab's heavier stroke is a
-          // `foregroundDecoration`: it paints above the child and takes no part
-          // in layout. A thicker `Border` would inset only the active tab and
-          // jog its label by the width difference on every tab switch.
-          decoration: BoxDecoration(
-            color: AppColors.canvas,
-            border: Border(
-              right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-              top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-            ),
-          ),
-          foregroundDecoration: !active
-              ? null
-              : BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                        color: AppColors.fg1, width: kPaneActiveStroke),
-                  ),
-                ),
-          child: Row(children: [
-            SessionStateIcon(
-              status: _statusForTab(t),
-              icon: _tabIconKind(t),
-              size: 14,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                t.title.isEmpty ? '(untitled)' : t.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(kPaneTabText,
-                    weight: active ? W.label : W.body,
-                    color: active ? AppColors.fg1 : AppColors.fg3),
-              ),
-            ),
-            if (canDismiss) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: dismiss,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(3),
-                  child: AppIcon('x', size: 11, color: AppColors.fg4),
-                ),
-              ),
-            ],
-          ]),
-        ),
-      ),
-    );
-
-    // Dragging a chip to the other pane moves the tab.
-    //
-    // Desktop starts the drag IMMEDIATELY; a long-press is a touch affordance,
-    // and requiring one with a mouse made this look unimplemented. Mobile keeps
-    // the long-press, because there a plain drag belongs to the horizontal
-    // strip's own scroll gesture.
-    //
-    // `onDragEnd` clears the highlight: a drag released outside every target
-    // fires no drop callback, so without this the pane stayed outlined until the
-    // next rebuild. It also ends the drag state that materialises an empty
-    // right pane (see `_dragActive`).
-    void started() => setState(() => _dragActive = true);
-
-    void ended(DraggableDetails _) {
-      if (_dragActive || _dragOverPane != null) {
-        setState(() {
-          _dragActive = false;
-          _dragOverPane = null;
-        });
-      }
-    }
-
-    if (kMobile) {
-      return LongPressDraggable<_ShellTab>(
-        data: t,
-        dragAnchorStrategy: pointerDragAnchorStrategy,
-        feedback: _tabDragFeedback(t),
-        childWhenDragging: Opacity(opacity: 0.4, child: chip),
-        onDragStarted: started,
-        onDragEnd: ended,
-        child: chip,
-      );
-    }
-    return Draggable<_ShellTab>(
-      data: t,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      feedback: _tabDragFeedback(t),
-      childWhenDragging: Opacity(opacity: 0.4, child: chip),
-      onDragStarted: started,
-      onDragEnd: ended,
-      child: chip,
-    );
-  }
-
-  /// A pane that holds nothing to show. Centred, so it reads as the pane's own
-  /// placeholder rather than a stray line of text pinned to its top-left corner.
-  Widget _emptyPaneHint() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('Drag a tab here, or open a terminal from the sidebar.',
-              textAlign: TextAlign.center,
-              style: sans(12, color: AppColors.fg3)),
-        ),
-      );
-
-  /// The single shared divider between the two panes. It is one line, not a
-  /// per-pane edge, which is what keeps the boundary continuous when both panes
-  /// are open — and the wider hit zone makes that same line the resize target.
-  /// When [joinBaseline] is set, a horizontal segment also crosses the handle at
-  /// the pane strips' baseline height. Without it the left and right strips each
-  /// end at their own edge and the boundary reads as two separate borders.
-  Widget _paneResizeHandle({bool joinBaseline = false}) => MouseRegion(
-        cursor: SystemMouseCursors.resizeColumn,
-        onEnter: (_) => setState(() => _paneHandleHover = true),
-        onExit: (_) => setState(() => _paneHandleHover = false),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragUpdate: (d) {
-            setState(() {
-              // Dragging left GROWS the right pane, hence the negation.
-              final max = MediaQuery.sizeOf(context).width * 0.72;
-              _paneWidth = (_paneWidth - d.delta.dx).clamp(kPaneMinWidth, max);
-            });
-          },
-          child: SizedBox(
-            width: kPaneSplitHandleWidth,
-            child: Stack(children: [
-              Center(
-                child: SizedBox(
-                  width: kPaneHairline,
-                  height: double.infinity,
-                  child: ColoredBox(
-                    color:
-                        _paneHandleHover ? kPaneSeamHoverColor : kPaneSeamColor,
-                  ),
-                ),
-              ),
-              // Carry the strips' baseline across the handle, so the two pane
-              // tab rows read as one boundary rather than two separate edges.
-              if (joinBaseline)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: kPaneHeaderHeight - kPaneHairline,
-                  child: IgnorePointer(
-                    child: Container(
-                      height: kPaneHairline,
-                      color: kPaneSeamColor,
-                    ),
-                  ),
-                ),
-              // …and carry the strips' top edge across too: without this the two
-              // panes are each bounded on top but leave a gap between them.
-              if (joinBaseline)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  child: IgnorePointer(
-                    child: Container(
-                      height: kPaneHairline,
-                      color: kPaneSeamColor,
-                    ),
-                  ),
-                ),
-            ]),
-          ),
-        ),
-      );
+  Widget _emptyPaneHint() => const EmptyPaneHint();
 
   Widget _rightTabBody(
     _RightTab t,
     HarnessState? s,
     _MacSessionControls? controls,
-  ) {
-    final agent = t.agent;
-    if (agent != null) {
-      return CoordinationAgentDetail(
-          agent: agent, client: _client, embedded: true);
-    }
-    return switch (t.panel) {
-      _RightPanel.lanes => SessionLanesPanel(lanes: s?.lanes ?? const []),
-      // The board as a PANE readout, not a pushed screen: Mission Control is a
-      // work surface, so its board belongs beside the conversation where it can
-      // stay open while you talk to the agent, exactly like Lanes and
-      // Checkpoints do for an ordinary session.
-      _RightPanel.tasks => _client == null
-          ? _emptyPaneHint()
-          : TaskBoardScreen(client: _client!, embedded: true),
-      // A PANE readout, not the pushed drawer it used to be: Scheduled belongs
-      // beside the conversation like Lanes and Checkpoints, not over it. The
-      // active session is passed through so a job created here targets the chat
-      // you are looking at — the drawer carried the same context.
-      _RightPanel.recurring => _client == null
-          ? _emptyPaneHint()
-          : RecurringScreen(
-              client: _client!,
-              embedded: true,
-              sessionId: _activeTab?.sessionId,
-              workspace: s?.workspace,
-            ),
-      _RightPanel.checkpoints => SessionCheckpointsPanel(
-          checkpoints: s?.checkpoints.reversed.toList() ?? const [],
-          // Route the action back through the session, so rewinding from the
-          // pane behaves exactly as rewinding from the session's own drawer.
-          onRewind: (c) => controls?.performAction('rewind', c.id),
-          onFork: (c) => controls?.performAction('fork', c.id),
-        ),
-      _RightPanel.none => const SizedBox.shrink(),
-    };
-  }
+  ) =>
+      RightTabBody(
+        tab: t,
+        state: s,
+        controls: controls,
+        client: _client,
+        activeSessionId: _activeTab?.sessionId,
+      );
 
-  Widget _mainPane({VoidCallback? onMenu}) {
-    final client = _client;
-    if (client == null) {
-      return _withMenu(onMenu, _welcome());
-    }
-    if (_tabs.isEmpty) {
-      return _withMenu(onMenu, _recentPlaceholder());
-    }
-    return Column(children: [
-      // Narrow desktop keeps its local strip because the sidebar is a drawer.
-      if (!kMacOS) _tabStrip(onMenu),
-      Expanded(
-        // Pane-scoped MediaQuery so window-width sizing (chat bubbles) fits the pane.
-        child: LayoutBuilder(builder: (ctx, c) {
-          final mq = MediaQuery.of(ctx);
-          return MediaQuery(
-            data: mq.copyWith(size: Size(c.maxWidth, c.maxHeight)),
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                // Disconnect the old session's TextField as soon as a horizontal
-                // page swipe starts. Waiting for onPageChanged leaves the old
-                // field as the platform text-input client during the gesture.
-                if (notification is ScrollStartNotification &&
-                    notification.metrics.axis == Axis.horizontal) {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                }
-                return false;
-              },
-              child: PageView.builder(
-                controller: _pageController,
-                physics: kMobile ? null : const NeverScrollableScrollPhysics(),
-                itemCount: _tabs.length,
-                onPageChanged: (i) {
-                  // PageView keeps each session mounted. Remove focus from the
-                  // old composer before changing the active page so the platform
-                  // text-input client cannot remain attached to the previous
-                  // session after a swipe.
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  setState(() => _activeIndex = i);
-                  _persistTabs();
-                  _scrollStripToActive();
-                  _refreshMacGit();
-                },
-                itemBuilder: (_, i) {
-                  final t = _tabs[i];
-                  return _KeepAlive(
-                    key: ValueKey(t.key),
-                    keep: t.isMissionControl || i == _activeIndex,
-                    // Same body builder as the split panes, so a terminal
-                    // or a diff renders identically whether it is in a pane or
-                    // the narrow single-column layout.
-                    child: _tabBody(t, primary: i == _activeIndex),
-                  );
-                },
-              ),
-            ),
-          );
-        }),
-      ),
-    ]);
-  }
+  Widget _mainPane({VoidCallback? onMenu}) => MainPaneView(
+        client: _client,
+        tabs: _tabs,
+        activeIndex: _activeIndex,
+        pageController: _pageController,
+        onPageChanged: (i) {
+          setState(() => _activeIndex = i);
+          _persistTabs();
+          _scrollStripToActive();
+          _refreshMacGit();
+        },
+        tabBodyBuilder: (t, primary) => _tabBody(t, primary: primary),
+        welcomeView: _welcome(),
+        recentPlaceholder: _recentPlaceholder(),
+        tabStrip: _tabStrip(onMenu),
+        onMenu: onMenu,
+      );
 
-  /// Open the active session's terminal from the terminal sidebar panel.
-  void _openActiveShell() {
-    final key = _activeTab?.key;
-    if (key == null) return;
-    _macSessionControls[key]?.performAction('shell');
-  }
 
   /// Settings, opened from the shell's status line. The sidebar has its own
   /// opener for the machine popover; this one exists so the status bar does not
@@ -4110,61 +2542,22 @@ class _DesktopShellState extends State<DesktopShell>
             ));
   }
 
-  /// The tab strip:
-  /// - Individual rounded tab cards (220px wide) that scroll horizontally
-  /// - Plus button immediately after the tabs
-  /// - On the far right: Split pane toggle [|] and Close pane [✕]
-  Widget _tabList() {
-    return SingleChildScrollView(
-      controller: _stripController,
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < _tabs.length; i++) _tabChip(i),
-          const SizedBox(width: 4),
-          IconBtn(
-            'plus',
-            size: 28,
-            iconSize: 14,
-            tooltip: 'New tab',
-            onTap: _newSessionFlow,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tabStrip(VoidCallback? onMenu) {
-    final compact = kMobile ? M.tabStripHeight : 42.0;
-    return Container(
-      // No bottom border: the band's surface (#171717) against the darker panes
-      // below is the separation, as everywhere else in this design language.
-      height: compact,
-      color: AppColors.bg,
-      child: Row(children: [
-        if (onMenu != null)
-          IconBtn('sidebar',
-              size: kMobile ? M.tabActionSize : 36,
-              iconSize: kMobile ? M.tabIconSize : 16,
-              tooltip: 'Sidebar',
-              onTap: onMenu),
-        Expanded(child: _tabList()),
-        if (!kMobile && _activeTab?.isFile == true) ...[
-          IconBtn('download',
-              size: 32,
-              iconSize: 14,
-              tooltip: 'Download',
-              onTap: _downloadActiveFile),
-          IconBtn('edit',
-              size: 32, iconSize: 14, tooltip: 'Edit', onTap: _editActiveFile),
-        ],
-        // No split toggle: the secondary pane appears when a tab is dragged
-        // out of the strip, not from a mode button.
-      ]),
-    );
-  }
+  Widget _tabStrip(VoidCallback? onMenu) => CardTabStrip(
+        controller: _stripController,
+        tabs: _tabs,
+        activeIndex: _activeIndex,
+        onMenu: onMenu,
+        subtitleForTab: _tabSubtitle,
+        canCloseTab: _canCloseTab,
+        onActivateTab: _activateTab,
+        onTabMenu: _tabMenu,
+        onCloseTab: _closeTab,
+        onNewTab: _newSessionFlow,
+        isFileActive: _activeTab?.isFile == true,
+        onDownloadFile: _downloadActiveFile,
+        onEditFile: _editActiveFile,
+        chipKeyFor: (key) => _chipKeys.putIfAbsent(key, () => GlobalKey()),
+      );
 
   /// The second line of a desktop tab. File tabs show their folder; the
   /// Mission Control pin reads as orchestration; sessions show the workspace.
@@ -4179,3215 +2572,46 @@ class _DesktopShellState extends State<DesktopShell>
     return _macRepositoryLabel();
   }
 
-  /// One tab. Sized as an individual rounded card:
-  /// - Bounded width (180–240px, never stretched across the whole screen)
-  /// - Dark card background `#1C1C22` when active, with subtle `#2E2E36` border
-  /// - Two lines of text: bold title on top, muted subtitle/category below
-  /// - Close ✕ button on right
-  Widget _tabChip(int i) {
-    final t = _tabs[i];
-    final active = i == _activeIndex;
-    final desktop = !kMobile;
-    final title = t.title.isEmpty ? '(untitled)' : t.title;
-    final key = _chipKeys.putIfAbsent(t.key, () => GlobalKey());
-
-    if (!desktop) {
-      return GestureDetector(
-        onTap: () => _activateTab(i),
-        onLongPress: () => _tabMenu(i),
-        child: AnimatedContainer(
-          duration: Motion.quick,
-          curve: Motion.enter,
-          key: key,
-          margin: const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
-          padding: const EdgeInsets.only(left: 12, right: 6),
-          decoration: BoxDecoration(
-            color: active ? AppColors.surface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(R.sm),
-            border: Border.all(
-              color: active ? AppColors.border : Colors.transparent,
-            ),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(
-              _tabIconKind(t),
-              size: 12,
-              color: active ? AppColors.accent : AppColors.fg4,
-            ),
-            const SizedBox(width: 7),
-            Flexible(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    sans(12, color: active ? AppColors.fg1 : AppColors.fg3),
-              ),
-            ),
-            if (_canCloseTab(t)) ...[
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => _closeTab(i),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: AppIcon('x', size: 10, color: AppColors.fg4),
-                ),
-              ),
-            ],
-          ]),
-        ),
+  Widget _recentPlaceholder() => ShellRecentPlaceholder(
+        sessions: _sessions,
+        sessionsLoading: _sessionsLoading,
+        onOpenSession: _openSession,
       );
-    }
 
-    // Desktop card tab: bounded width, distinct card surface, 2-line label
-    return GestureDetector(
-      onTap: () => _activateTab(i),
-      onLongPress: () => _tabMenu(i),
-      child: AnimatedContainer(
-        duration: Motion.press,
-        curve: Motion.enter,
-        key: key,
-        width: 220,
-        margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: active ? AppColors.surface2 : Colors.transparent,
-          borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(
-            color: active ? AppColors.border2 : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          children: [
-            AppIcon(
-              _tabIconKind(t),
-              size: 14,
-              color: active ? AppColors.accent : AppColors.fg4,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(
-                      11,
-                      weight: active ? W.label : W.body,
-                      color: active ? AppColors.fg1 : AppColors.fg3,
-                    ),
-                  ),
-                  Text(
-                    _tabSubtitle(t),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(10, color: AppColors.fg3),
-                  ),
-                ],
-              ),
-            ),
-            if (_canCloseTab(t)) ...[
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => _closeTab(i),
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  width: 18,
-                  height: 18,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(R.xs),
-                  ),
-                  child: AppIcon('x',
-                      size: 10, color: active ? AppColors.fg3 : AppColors.fg4),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  // No session selected → recent sessions + a New chat button (instead of a bare
-  // "nothing selected" message).
-  Widget _recentPlaceholder() {
-    final sessions = (_sessions ?? const <SessionInfo>[]).take(8).toList();
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: ConstrainedBox(
-          // Clamp the block so recent sessions stay a bounded, centered preview
-          // with breathing room top/bottom instead of filling a small viewport;
-          // the list scrolls within when there are more than fit.
-          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 520),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            children: [
-              Text('Recent sessions', style: display(24)),
-              const SizedBox(height: 6),
-              Text(
-                  'Pick up where you left off, or start a new chat from Browse.',
-                  style: sans(12, height: 1.4, color: AppColors.fg3)),
-              const SizedBox(height: 18),
-              if (_sessionsLoading && _sessions == null)
-                Center(
-                    child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: AppColors.fg3))))
-              else if (sessions.isEmpty)
-                Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text('No sessions yet.',
-                        style: sans(12, color: AppColors.fg3)))
-              else
-                ...sessions.map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: AppCard(
-                        onTap: () => _openSession(s.id, s.title, s.profile),
-                        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                        child: Row(children: [
-                          Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(s.title.isEmpty ? '(untitled)' : s.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: sans(13, color: AppColors.fg1)),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                      lastPathSegment(s.folder,
-                                          ifEmpty: s.folder),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: mono(10, color: AppColors.fg3)),
-                                ]),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(relativeTime(s.lastActive),
-                              style: mono(10, color: AppColors.fg3)),
-                        ]),
-                      ),
-                    )),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // When collapsed, overlay a sidebar-toggle on the welcome/empty states.
-  Widget _withMenu(VoidCallback? onMenu, Widget child) {
-    if (onMenu == null) return child;
-    return Stack(children: [
-      child,
-      Positioned(
-          top: 6,
-          left: 6,
-          child: IconBtn('sidebar',
-              size: kMobile ? 44 : 38,
-              iconSize: kMobile ? 25 : 19,
-              tooltip: 'Sidebar',
-              onTap: onMenu)),
-    ]);
-  }
-
-  Widget _welcome() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(R.card),
-                        border: Border.all(color: AppColors.border)),
-                    child: AppIcon('server', size: 24, color: AppColors.fg3),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text('No instance connected',
-                    textAlign: TextAlign.center,
-                    style: sans(16, color: AppColors.fg1)),
-                const SizedBox(height: 8),
-                Text.rich(
-                  TextSpan(
-                      style: sans(12, height: 1.5, color: AppColors.fg3),
-                      children: [
-                        const TextSpan(text: 'Run '),
-                        TextSpan(
-                            text: 'snippet serve',
-                            style: mono(12, color: AppColors.fg2)),
-                        const TextSpan(
-                            text:
-                                ' on a machine, then paste the connection string it prints.'),
-                      ]),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 22),
-                Center(
-                    child: PillBtn('Add machine',
-                        icon: 'plus', onTap: _addInstanceFlow)),
-              ]),
-        ),
-      ),
-    );
-  }
+  Widget _welcome() => ShellWelcomeView(onAddInstance: _addInstanceFlow);
 }
 
-class _GoalPopover extends StatefulWidget {
-  final void Function(String text) onSet;
-  const _GoalPopover({required this.onSet});
+typedef _MachineList = MachineList;
+typedef _SettingsPanel = SettingsPanel;
+typedef _SettingsPage = SettingsPage;
 
-  @override
-  State<_GoalPopover> createState() => _GoalPopoverState();
-}
-
-class _GoalPopoverState extends State<_GoalPopover> {
-  final _ctl = TextEditingController();
-
-  @override
-  void dispose() {
-    _ctl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final t = _ctl.text.trim();
-    if (t.isEmpty) return;
-    widget.onSet(t);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Set goal',
-            style: sans(12, weight: W.label, color: AppColors.fg1)),
-        const SizedBox(height: 8),
-        AppField(
-          controller: _ctl,
-          hint: 'What should the agent work toward?',
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          onSubmitted: (_) => _submit(),
-        ),
-        const SizedBox(height: 8),
-        Row(children: [
-          const Spacer(),
-          Btn('Cancel',
-              variant: BtnVariant.ghost,
-              small: true,
-              onTap: () => Navigator.pop(context)),
-          const SizedBox(width: 6),
-          Btn('Set goal', small: true, onTap: _submit),
-        ]),
-      ],
-    );
-  }
-}
-
-/// Keeps a swiped-away tab mounted so its WebSocket attach and scroll position
-/// survive switching between tabs.
-class _KeepAlive extends StatefulWidget {
-  final Widget child;
-  final bool keep;
-  const _KeepAlive({super.key, required this.child, this.keep = true});
-  @override
-  State<_KeepAlive> createState() => _KeepAliveState();
-}
-
-class _KeepAliveState extends State<_KeepAlive>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => widget.keep;
-  @override
-  void didUpdateWidget(covariant _KeepAlive oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.keep != widget.keep) updateKeepAlive();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    super.build(context);
-    return widget.child;
-  }
-}
-
-/// Quiet empty state used inside the sectioned sidebar.
-class _SidebarEmpty extends StatelessWidget {
-  const _SidebarEmpty(this.message);
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-        child: Text(message,
-            textAlign: TextAlign.center,
-            style: sans(12, color: AppColors.fg3, height: 1.45)),
-      );
-}
-
-class _Sidebar extends StatefulWidget {
-  final List<Instance> instances;
-  final Instance? active;
-  final DaemonClient? client;
-  final String? selectedSessionId;
-  final List<SessionInfo>? sessions;
-  final bool sessionsLoading;
-  final String? sessionsError;
-  final VoidCallback onRefreshSessions;
-  final VoidCallback onNewSession;
-  final void Function(Instance) onSelectInstance;
-  final VoidCallback onOpenMissionControl;
-  final void Function(String id, String title, String? profile) onOpenSession;
-  final VoidCallback onAddInstance;
-  final void Function(Instance, String) onRenameInstance;
-  final void Function(Instance) onRemoveInstance;
-  final void Function(String id) onSessionDeleted;
-  final Map<String, bool> health;
-  final VoidCallback onRefreshHealth;
-  final bool topInset;
-  final void Function(String action)? onSessionAction;
-
-  /// Phone home destination + its setter. Owned by the shell so that back can
-  /// return to Chats; passed down because the phone home IS this widget.
-  final _MobileHome mobileHome;
-  final ValueChanged<_MobileHome> onMobileHome;
-
-  /// Phone drill-down state + setters. Also shell-owned, for the same reason:
-  /// the back handler and the bar's visibility both live up there.
-  final _SettingsPage? settingsSection;
-  final ValueChanged<_SettingsPage?> onSettingsSection;
+class _MobileRoute {
+  final MobileHome home;
   final CoordinationAgent? agent;
-  final ValueChanged<CoordinationAgent?> onAgent;
+  final SettingsPage? settingsSection;
+  final bool inSession;
+  final int? sessionTabIndex;
 
-  const _Sidebar({
-    required this.instances,
-    required this.active,
-    required this.client,
-    required this.selectedSessionId,
-    required this.sessions,
-    required this.sessionsLoading,
-    this.sessionsError,
-    required this.onRefreshSessions,
-    required this.onNewSession,
-    required this.onSelectInstance,
-    required this.onOpenMissionControl,
-    required this.onOpenSession,
-    required this.onAddInstance,
-    required this.onRenameInstance,
-    required this.onRemoveInstance,
-    required this.onSessionDeleted,
-    required this.health,
-    required this.onRefreshHealth,
-    required this.topInset,
-    this.onSessionAction,
-    required this.mobileHome,
-    required this.onMobileHome,
-    required this.settingsSection,
-    required this.onSettingsSection,
-    required this.agent,
-    required this.onAgent,
+  const _MobileRoute({
+    required this.home,
+    this.agent,
+    this.settingsSection,
+    this.inSession = false,
+    this.sessionTabIndex,
   });
-  @override
-  State<_Sidebar> createState() => _SidebarState();
-}
-
-class _SidebarState extends State<_Sidebar> {
-  // The session list now lives in the shell (passed via widget.sessions); the
-  // sidebar is presentational, so opening the drawer doesn't refetch.
-  String _filterQuery = '';
-  final _machineKey = GlobalKey(); // anchors the desktop machine popover
-  final GlobalKey<_SettingsPanelState> _mobileSettingsKey =
-      GlobalKey<_SettingsPanelState>();
-  bool _selecting = false;
-  final Set<String> _selected = {};
-
-  /// Phone search. The bar's search action flips this and the pill expands into a
-  /// full-width field, so searching never costs permanent vertical space.
-  bool _mobileSearchOpen = false;
-  final TextEditingController _searchCtl = TextEditingController();
-  final FocusNode _searchFocus = FocusNode();
-
-  /// True while a nested phone screen is open, in which case the bar hides.
-  ///
-  /// Read from the widget rather than re-deriving it here: the state is
-  /// shell-owned (the back handler needs it too), and the bar is rendered from
-  /// THIS state, so this is the only place both are in scope.
-  bool get _mobileDrilledDown =>
-      widget.settingsSection != null || widget.agent != null;
-
-  /// Identity of the phone screen the home is showing, so the switcher animates
-  /// a real CHANGE of screen rather than every ordinary rebuild.
-  ///
-  /// The settings SECTION is deliberately left out of this key. Keying on it
-  /// would rebuild `_SettingsPanel`, re-running its `initState` notification
-  /// fetch and flickering the switch; a section change should instead cross-fade
-  /// the panel's own body, which `_SettingsPanelState` does.
-  String get _sideKey => widget.agent != null
-      ? 'agent|${widget.agent!.id}'
-      : widget.mobileHome.name;
-
-  /// True when the last navigation moved FORWARD through the shell — a later
-  /// destination, or into a nested screen — rather than back out of one.
-  ///
-  /// Sets the slide's direction, so going back retraces the motion you arrived
-  /// with instead of repeating it. Captured in `didUpdateWidget` because the
-  /// previous value is already gone by the time `build` runs.
-  bool _forward = true;
 
   @override
-  void didUpdateWidget(covariant _Sidebar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.mobileHome != widget.mobileHome) {
-      _forward = widget.mobileHome.index > oldWidget.mobileHome.index;
-    } else if (oldWidget.agent == null && widget.agent != null) {
-      _forward = true;
-    } else if (oldWidget.agent != null && widget.agent == null) {
-      _forward = false;
-    }
-  }
-
-  /// Folder groups the user has collapsed. Keyed by folder path; a group is
-  /// expanded by default, so a fresh session list is fully visible.
-  final Set<String> _collapsed = {};
-
-  /// Collapse key for the whole CHATS section — distinct from any folder path.
-  static const String _chatsKey = '__chats__';
-  String? _renamingId;
-  String? _hoveredId;
-  final TextEditingController _renameCtl = TextEditingController();
-  final FocusNode _renameFocus = FocusNode();
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _MobileRoute &&
+          runtimeType == other.runtimeType &&
+          home == other.home &&
+          agent?.id == other.agent?.id &&
+          settingsSection == other.settingsSection &&
+          inSession == other.inSession &&
+          sessionTabIndex == other.sessionTabIndex;
 
   @override
-  void dispose() {
-    _renameCtl.dispose();
-    _renameFocus.dispose();
-    _searchCtl.dispose();
-    _searchFocus.dispose();
-    super.dispose();
-  }
-
-  void _openMc() {
-    if (widget.client == null) return;
-    widget.onOpenMissionControl();
-  }
-
-  List<SessionInfo>? get _sessions => widget.sessions;
-  bool get _loading => widget.sessionsLoading;
-
-  /// Empty state for a phone search that matched nothing.
-  ///
-  /// Needed now that the head and the pinned row step aside during search: an
-  /// empty list would otherwise read as a load failure rather than "no matches".
-  Widget _mobileSearchEmpty() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIcon('search', size: 20, color: AppColors.fg4),
-              const SizedBox(height: 10),
-              Text('No chats match “${_filterQuery.trim()}”',
-                  textAlign: TextAlign.center,
-                  style: sans(12, color: AppColors.fg3)),
-            ],
-          ),
-        ),
-      );
-
-  void _openSettings() {
-    final c = widget.client;
-    if (c == null) return;
-    presentScreen(context,
-        maxWidth: 780,
-        maxHeight: 640,
-        builder: (_, close) => _SettingsPanel(
-              client: c,
-              instances: widget.instances,
-              active: widget.active,
-              onRemove: widget.onRemoveInstance,
-              onClose: close,
-            ));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final hasClient = widget.client != null;
-    return Container(
-      color: AppColors.bg, // shell surface — darker than the chat canvas
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (widget.topInset && kMacOS) SizedBox(height: kMacTitlebar + 6),
-        if (kMobile) ...[
-          // The bar is a SIBLING of the content, not an overlay: the content
-          // gets the remaining height, so nothing hides behind the bar and no
-          // scroll-padding hack is needed. It still reads as floating (inset,
-          // rounded, raised).
-          // Animate a real change of DESTINATION or drill-down. Keyed on the
-          // screen's identity rather than the whole widget, so an ordinary
-          // rebuild — a session arriving, a health dot updating — does not
-          // replay the transition, and `_SettingsPanel` keeps its state across
-          // them.
-          Expanded(
-            child: IndexedStack(
-              index: widget.mobileHome.index,
-              children: [
-                for (final h in _MobileHome.values)
-                  KeyedSubtree(
-                    key: ValueKey('mobile-${h.name}'),
-                    child: _mobileHomeBody(hasClient, h),
-                  ),
-              ],
-            ),
-          ),
-          // The bar names the app's TOP LEVEL, so it hides inside a nested
-          // screen. Leaving it up would give that screen a second exit that
-          // skips the level you are in — and make the bar look like part of the
-          // sub-screen rather than the shell.
-          if (!_mobileDrilledDown) _mobileBar(hasClient),
-        ],
-        if (!kMobile) ...[
-          if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
-              child: Row(children: [
-                Text('${_selected.length} selected',
-                    style: sans(11, color: AppColors.fg3)),
-                const Spacer(),
-                _selectAllToggle(),
-                IconBtn('x',
-                    size: 28,
-                    iconSize: 15,
-                    tooltip: 'Cancel',
-                    onTap: _exitSelect),
-                IconBtn('trash',
-                    size: 28,
-                    iconSize: 14,
-                    tooltip: 'Delete selected',
-                    onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
-              ]),
-            ),
-          // Sectioned, collapsible sidebar — the reference's left column.
-          Expanded(child: _sectionedSidebar()),
-        ],
-      ]),
-    );
-  }
-
-  /// Grok-style "Browse" card at the top of the mobile drawer.
-  Widget _browseCard() {
-    return Material(
-      color: AppColors.surface2,
-      borderRadius: BorderRadius.circular(R.card),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.card),
-        onTap: widget.client != null ? widget.onNewSession : null,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surface3,
-                borderRadius: BorderRadius.circular(R.sm),
-              ),
-              child: AppIcon('folder', size: 16, color: AppColors.fg2),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Browse',
-                        style: sans(14, weight: W.label, color: AppColors.fg1)),
-                    const SizedBox(height: 1),
-                    Text('files · new chat',
-                        style: sans(11, color: AppColors.fg3)),
-                  ]),
-            ),
-            AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  /// Full-surface placeholder for a phone destination with no machine.
-  ///
-  /// Local to the sidebar rather than reusing the shell's `_sidebarUnavailable`:
-  /// that one is a `_DesktopShellState` method and is not in scope here.
-  Widget _mobileUnavailable(String message) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(message,
-              textAlign: TextAlign.center,
-              style: sans(12, color: AppColors.fg3, height: 1.5)),
-        ),
-      );
-
-  /// The phone home body for the destination the bar currently selects.
-  ///
-  /// Each destination gets the whole surface below the bar. Chats keeps a head
-  /// for its title and context controls; Agents and Settings own their own
-  /// headers, so they render directly.
-  Widget _mobileHomeBody(bool hasClient, [_MobileHome? home]) {
-    final destination = home ?? widget.mobileHome;
-    switch (destination) {
-      case _MobileHome.chats:
-        // The header STAYS while searching. It names the machine whose chats are
-        // being filtered — hiding it exactly when you are narrowing a machine's
-        // chats took away the context you were filtering against.
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _mobileChatsHeader(hasClient),
-            Expanded(
-              child: !hasClient
-                  ? Center(
-                      child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Text('Add a machine to begin.',
-                              textAlign: TextAlign.center,
-                              style: sans(12, color: AppColors.fg3))))
-                  : _sessionList(),
-            ),
-          ],
-        );
-
-      case _MobileHome.agents:
-        final client = widget.client;
-        if (client == null) {
-          return _mobileUnavailable('Add a machine to see its agents.');
-        }
-        // Drilled into one agent: same shared header as every other nested
-        // phone screen, so the back affordance cannot drift between them.
-        final agent = widget.agent;
-        if (agent != null) {
-          return CoordinationAgentDetail(
-            agent: agent,
-            client: client,
-            embedded: false,
-            onClose: () => widget.onAgent(null),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _mobileAgentsHeader(hasClient),
-            Expanded(
-              child: AgentsSidebarPanel(
-                client: client,
-                onOpenAgent: (a) => widget.onAgent(a),
-                onOpenSession: (id, title) =>
-                    widget.onOpenSession(id, title, null),
-              ),
-            ),
-          ],
-        );
-
-      case _MobileHome.settings:
-        final client = widget.client;
-        if (client == null) {
-          return _mobileUnavailable('Add a machine to configure it.');
-        }
-        return _SettingsPanel(
-          key: _mobileSettingsKey,
-          client: client,
-          instances: widget.instances,
-          active: widget.active,
-          onRemove: widget.onRemoveInstance,
-          // Drill-down lives on the SHELL (see `_mobileSettingsSection`), so the
-          // back handler and the bar's visibility can both read it. The panel is
-          // told which section is open and reports changes back up.
-          section: widget.settingsSection,
-          onSection: widget.onSettingsSection,
-          onClose: () => widget.onMobileHome(_MobileHome.agents),
-          embedded: true,
-        );
-    }
-  }
-
-  /// The Chats head: machine context plus the two quick actions.
-  ///
-  /// Deliberately NOT a page title — the bar already names the destination, so
-  /// repeating "Chats" here spent a line on something the user just tapped. The
-  /// state filter moved into the machine sheet, which is what let the old
-  /// three-band stack collapse into one row.
-  /// The Chats head: machine identity, and nothing else.
-  ///
-  /// Search moved into the bottom bar (it expands there), and `plus` already
-  /// The Chats header: the destination name on the left, small icon buttons on
-  /// the right for the two controls that are context rather than destinations.
-  ///
-  /// ONE row, above the list. The machine switcher and Mission Control are not
-  /// nav-bar destinations (that bar is icon-only and names top-level places), so
-  /// they sit here beside the title rather than in a separate strip below the
-  /// list. The row stays visible while searching, so the machine you are
-  /// narrowing stays named.
-  Widget _mobileChatsHeader(bool hasClient) {
-    if (_selecting) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(M.gutter, 8, M.gutter - 4, 8),
-        child: Row(children: [
-          Text('${_selected.length} selected',
-              style:
-                  sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
-          const Spacer(),
-          _selectAllToggle(),
-          IconBtn('x',
-              size: M.minTarget,
-              iconSize: 18,
-              tooltip: 'Cancel',
-              onTap: _exitSelect),
-          IconBtn('trash',
-              size: M.minTarget,
-              iconSize: 17,
-              tooltip: 'Delete selected',
-              onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
-        ]),
-      );
-    }
-    final mc = (_sessions ?? const <SessionInfo>[])
-        .where((s) => isDedicatedMcSession(s.id))
-        .toList();
-    final mcActive = mc.isNotEmpty && mc.first.id == widget.selectedSessionId;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter - 4, 2),
-      child: Row(children: [
-        Text('Chats',
-            style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
-        const Spacer(),
-        if (hasClient && mc.isNotEmpty)
-          IconBtn('layers',
-              size: M.minTarget,
-              iconSize: 19,
-              active: mcActive,
-              tooltip: 'Mission Control',
-              onTap: widget.onOpenMissionControl),
-        _machineAvatarButton(),
-      ]),
-    );
-  }
-
-  Widget _mobileAgentsHeader(bool hasClient) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter - 4, 2),
-      child: Row(children: [
-        Text('Agents',
-            style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
-        const Spacer(),
-        _machineAvatarButton(),
-      ]),
-    );
-  }
-
-  /// Machine switcher, as a small round button: the machine's initial plus a
-  /// reachability dot, matching the desktop window bar's avatar so the two read
-  /// as the same control.
-  Widget _machineAvatarButton() {
-    final a = widget.active;
-    final ok = a == null ? null : widget.health[a.url];
-    final initial = a == null || a.label.trim().isEmpty
-        ? '+'
-        : a.label.trim().characters.first.toUpperCase();
-    return Tooltip(
-      message: a == null ? 'Add machine' : 'Switch machine',
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap:
-              widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
-          child: SizedBox(
-            width: M.minTarget,
-            height: M.minTarget,
-            child: Center(
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 30,
-                    height: 30,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.border2),
-                    ),
-                    child: Text(initial,
-                        style: sans(13, weight: W.title, color: AppColors.fg1)),
-                  ),
-                  Positioned(
-                    right: -1,
-                    bottom: -1,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: ok == true ? AppColors.ok : AppColors.fg4,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.bg, width: 1.5),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// The floating action bar: destinations left, quick actions right.
-  ///
-  /// Destinations are the phone's translation of the desktop sidebar rail — on
-  /// a phone those five panels had NO entry point at all, which is the real
-  /// reason this exists (the reclaimed vertical space is a side effect).
-  ///
-  /// Rendered as a sibling of the body by the caller, never an overlay, so it
-  /// cannot hide the last row of a list.
-  /// The floating action bar.
-  ///
-  /// Deliberately COMPACT: icon-only destinations in a pill that hugs its
-  /// content and centres, rather than a full-width strip. The bar is an
-  /// affordance you reach occasionally, so it should not reserve a third of the
-  /// screen's width for three glyphs.
-  ///
-  /// Tapping search expands the SAME pill into a full-width field — the control
-  /// grows in place instead of a second search surface appearing.
-  ///
-  /// Rendered as a sibling of the body by the caller, never an overlay, so it
-  /// cannot hide the last row of a list.
-  Widget _mobileBar(bool hasClient) {
-    final radius = BorderRadius.circular(_kMobileBarRadius);
-    final searching = _mobileSearchOpen && hasClient;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter, 8),
-      child: AnimatedSwitcher(
-        duration: Motion.fast,
-        switchInCurve: Motion.enter,
-        switchOutCurve: Motion.exit,
-        child: searching
-            ? _mobileBarPill(radius, key: 'search', child: _mobileSearchRow())
-            : _mobileBarPill(radius,
-                key: 'bar', child: _mobileBarRow(hasClient)),
-      ),
-    );
-  }
-
-  Widget _mobileBarPill(BorderRadius radius,
-      {required String key, required Widget child}) {
-    return Container(
-      key: ValueKey(key),
-      height: _kMobileBarHeight,
-      // Shadow on the OUTER container; fill, border and rounded clip on the
-      // inner Material. An InkWell paints its ripple onto the nearest Material
-      // ancestor — with none local it splashes onto the Scaffold and bleeds
-      // outside the pill's corners.
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x59000000),
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Material(
-        color: AppColors.surface1,
-        shape: RoundedRectangleBorder(
-          borderRadius: radius,
-          side: BorderSide(color: AppColors.border2),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: child,
-      ),
-    );
-  }
-
-  Widget _mobileBarRow(bool hasClient) {
-    return Row(
-      children: [
-        const SizedBox(width: 4),
-        for (final h in _MobileHome.values)
-          Expanded(
-            child: _mobileBarDest(h, widget.mobileHome == h, true),
-          ),
-        const SizedBox(width: 2),
-        // Divider separates "where you are" from "what you can do".
-        Container(width: 1, height: 20, color: AppColors.border),
-        const SizedBox(width: 2),
-        Expanded(
-          child: _mobileBarAction('search', 'Search',
-              onTap: hasClient ? _toggleMobileSearch : null),
-        ),
-        Expanded(
-          child: _mobileBarAction('plus', 'New',
-              onTap: hasClient ? widget.onNewSession : null),
-        ),
-        const SizedBox(width: 4),
-      ],
-    );
-  }
-
-  /// The expanded search field. Occupies the whole pill, so the destinations and
-  /// the create action yield to it rather than competing with it.
-  Widget _mobileSearchRow() {
-    return Row(children: [
-      const SizedBox(width: 12),
-      AppIcon('search', size: 16, color: AppColors.fg3),
-      const SizedBox(width: 9),
-      Expanded(
-        child: TextField(
-          controller: _searchCtl,
-          focusNode: _searchFocus,
-          autofocus: true,
-          cursorColor: AppColors.accent,
-          textInputAction: TextInputAction.search,
-          onChanged: (v) => setState(() => _filterQuery = v),
-          style: sans(15, color: AppColors.fg1),
-          decoration: InputDecoration(
-            isCollapsed: true,
-            border: InputBorder.none,
-            hintText: 'Search chats',
-            hintStyle: sans(15, color: AppColors.fg4),
-          ),
-        ),
-      ),
-      if (_filterQuery.isNotEmpty)
-        IconBtn('x', size: 32, iconSize: 14, tooltip: 'Clear', onTap: () {
-          _searchCtl.clear();
-          setState(() => _filterQuery = '');
-        }),
-      IconBtn('arrow-down',
-          size: 36,
-          iconSize: 16,
-          tooltip: 'Close search',
-          onTap: _toggleMobileSearch),
-      const SizedBox(width: 4),
-    ]);
-  }
-
-  void _toggleMobileSearch() {
-    final open = !_mobileSearchOpen;
-    FocusManager.instance.primaryFocus?.unfocus();
-    // Search only ever matches CONVERSATIONS, so opening it from Agents or
-    // Settings would expand the field over a body with no chat list to filter.
-    // The destination follows the search, the way tapping a result implies a
-    // list: land on Chats first, then open the field.
-    if (open) widget.onMobileHome(_MobileHome.chats);
-    setState(() {
-      _mobileSearchOpen = open;
-      if (!open) {
-        // Leaving search CLEARS the query: a filter that stays applied while its
-        // field is hidden leaves the list silently missing rows.
-        _searchCtl.clear();
-        _filterQuery = '';
-      }
-    });
-    if (open) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _searchFocus.requestFocus();
-      });
-    }
-  }
-
-  Widget _mobileBarDest(_MobileHome h, bool active, bool enabled) {
-    return Tooltip(
-      message: h.label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
-          onTap: enabled ? () => widget.onMobileHome(h) : null,
-          child: SizedBox(
-            height: _kMobileBarHeight,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon(h.icon,
-                      size: 23, color: active ? AppColors.fg1 : AppColors.fg3),
-                  const SizedBox(height: 2),
-                  Text(h.label,
-                      style: caps(10,
-                          color: active ? AppColors.fg1 : AppColors.fg3,
-                          spacing: 0.35)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _mobileBarAction(String icon, String tooltip, {VoidCallback? onTap}) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(_kMobileBarRadius - 4),
-          onTap: onTap,
-          child: SizedBox(
-            height: _kMobileBarHeight,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon(icon,
-                      size: 23,
-                      color: onTap == null ? AppColors.fg4 : AppColors.fg2),
-                  const SizedBox(height: 2),
-                  Text(tooltip,
-                      style: caps(10,
-                          color: onTap == null ? AppColors.fg4 : AppColors.fg2,
-                          spacing: 0.35)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Phone metrics come from the shared M table so the two densities cannot
-  // drift; desktop values stay local because they are already tokenised.
-  double get _navText => kMobile ? M.rowTitle : 13;
-  double get _navIcon => kMobile ? 18 : 16;
-  double get _navPadV => kMobile ? 12 : 8;
-  double get _rowTitle => kMobile ? M.rowTitle : 12.5;
-  double get _rowTime => kMobile ? M.meta : 10;
-
-  Widget _navRow(String icon, String label,
-      {String? sub, VoidCallback? onTap, bool active = false}) {
-    // Desktop: flat rounded rows matching the thread list (no sub line).
-    if (!kMobile) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(6, 0, 6, 1),
-        child: Material(
-          color: active ? AppColors.accentBg : Colors.transparent,
-          borderRadius: BorderRadius.circular(R.sm),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(R.sm),
-            onTap: onTap,
-            child: Opacity(
-              opacity: onTap == null ? 0.45 : 1,
-              child: Container(
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Row(children: [
-                  AppIcon(icon, size: 15, color: AppColors.fg3),
-                  const SizedBox(width: 10),
-                  Text(label, style: sans(12, color: AppColors.fg1)),
-                ]),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    return Material(
-      color: active ? AppColors.accentBg : Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Opacity(
-          opacity: onTap == null ? 0.45 : 1,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(14, _navPadV, 14, _navPadV),
-            child: Row(children: [
-              AppIcon(icon, size: _navIcon, color: AppColors.fg2),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label, style: sans(_navText, color: AppColors.fg1)),
-                      if (sub != null)
-                        Text(sub, style: sans(12, color: AppColors.fg3)),
-                    ]),
-              ),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Free-text match against a session's title and folder. An empty query
-  /// matches everything, so the text filter is inert until the user types.
-  bool _matchesQuery(SessionInfo s) {
-    final q = _filterQuery.trim().toLowerCase();
-    if (q.isEmpty) return true;
-    return s.title.toLowerCase().contains(q) ||
-        s.folder.toLowerCase().contains(q);
-  }
-
-  Widget _sessionList() {
-    if (_loading && _sessions == null) {
-      return Center(
-          child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.fg3)));
-    }
-    final all = _sessions ?? const <SessionInfo>[];
-    if (all.isEmpty) {
-      // Offline ≠ empty: a failed fetch gets an explicit error + retry.
-      if (widget.sessionsError != null) {
-        return ListView(
-            padding: EdgeInsets.fromLTRB(
-                kMobile ? M.gutter : 8, 2, kMobile ? M.gutter : 8, 32),
-            children: [
-              Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    AppIcon('wifi-off', size: 20, color: AppColors.fg4),
-                    const SizedBox(height: 10),
-                    Text(widget.sessionsError!,
-                        textAlign: TextAlign.center,
-                        style: sans(12, color: AppColors.fg3)),
-                    const SizedBox(height: 12),
-                    TextButton(
-                        onPressed: widget.onRefreshSessions,
-                        child: Text('Retry',
-                            style: sans(12, color: AppColors.accent))),
-                  ])),
-            ]);
-      }
-      return ListView(
-          padding: EdgeInsets.fromLTRB(
-              kMobile ? M.gutter : 8, 2, kMobile ? M.gutter : 8, 32),
-          children: [
-            Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text('No chats yet.',
-                    textAlign: TextAlign.center,
-                    style: sans(12, color: AppColors.fg3))),
-          ]);
-    }
-    final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
-    final list = all
-        .where((s) => !isDedicatedMcSession(s.id) && _matchesQuery(s))
-        .toList();
-    // Phone chats are one flat, chronological surface. Folder nesting is a
-    // desktop density aid; on a touch screen it obscures the one thing people
-    // came here to do: open the recent conversation.
-    if (kMobile) {
-      final cutoff = DateTime.now().millisecondsSinceEpoch ~/ 1000 - 12 * 60 * 60;
-      final recent = list.where((s) => s.lastActive >= cutoff).toList()
-        ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
-      final recentIds = recent.take(15).map((s) => s.id).toSet();
-      final mobileChildren = <Widget>[];
-      if (recentIds.isNotEmpty) {
-        mobileChildren.add(_mobileListHeader('Recent chats', recentIds.length));
-        mobileChildren.addAll(recent
-            .where((s) => recentIds.contains(s.id))
-            .map(_sessionCard));
-      }
-      if (list.isNotEmpty) {
-        final grouped = <String, List<SessionInfo>>{};
-        final order = <String>[];
-        final allSorted = [...list]
-          ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
-        for (final session in allSorted) {
-          grouped.putIfAbsent(session.folder, () {
-            order.add(session.folder);
-            return <SessionInfo>[];
-          }).add(session);
-        }
-        if (recentIds.isNotEmpty) {
-          mobileChildren.add(const SizedBox(height: 8));
-        }
-        for (final folder in order) {
-          final sessions = grouped[folder]!;
-          mobileChildren.add(_folderHeader(folder,
-              first: false, count: sessions.length));
-          if (!_collapsed.contains(folder)) {
-            mobileChildren.addAll(sessions.map(_sessionCard));
-          }
-          if (folder != order.last) {
-            // Workspace separation belongs to the folder header: the rule starts
-            // after the folder label instead of floating above the next group.
-          }
-        }
-      }
-      if (mobileChildren.isEmpty) {
-        mobileChildren.add(Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text('No chats yet.',
-              textAlign: TextAlign.center,
-              style: sans(12, color: AppColors.fg3)),
-        ));
-      }
-      return RefreshIndicator(
-        color: AppColors.accent,
-        backgroundColor: AppColors.surface3,
-        onRefresh: () async => widget.onRefreshSessions(),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
-          children: mobileChildren,
-        ),
-      );
-    }
-    final children = <Widget>[];
-    if (mc.isNotEmpty) {
-      children.add(_missionControlPin(mc.first));
-    }
-    final newest = <String, int>{};
-    for (final s in list) {
-      final t = newest[s.folder];
-      if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
-    }
-    list.sort((a, b) {
-      final fa = newest[a.folder] ?? 0;
-      final fb = newest[b.folder] ?? 0;
-      if (fa != fb) return fb.compareTo(fa);
-      final byFolder = a.folder.compareTo(b.folder);
-      if (byFolder != 0) return byFolder;
-      return b.lastActive.compareTo(a.lastActive);
-    });
-    final groups = <String, List<SessionInfo>>{};
-    final order = <String>[];
-    for (final s in list) {
-      final bucket = groups.putIfAbsent(s.folder, () {
-        order.add(s.folder);
-        return <SessionInfo>[];
-      });
-      bucket.add(s);
-    }
-    var firstFolder = true;
-    for (final key in order) {
-      final sessions = groups[key]!;
-      children.add(_folderHeader(key,
-          first: firstFolder && mc.isEmpty, count: sessions.length));
-      firstFolder = false;
-      // A collapsed group keeps its header (with its count) but hides its rows.
-      if (_collapsed.contains(key)) continue;
-      for (var i = 0; i < sessions.length; i++) {
-        if (kMobile) {
-          children.add(Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: _sessionCard(sessions[i])));
-        } else {
-          children.add(
-              _desktopTreeRow(sessions[i], last: i == sessions.length - 1));
-        }
-      }
-    }
-    if (list.isEmpty && mc.isEmpty) {
-      children.add(Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text('Nothing here.',
-              textAlign: TextAlign.center,
-              style: sans(12, color: AppColors.fg3))));
-    }
-    final listView = ListView(
-        padding: EdgeInsets.fromLTRB(
-            kMobile ? M.gutter : 14, 2, kMobile ? M.gutter : 14, 32),
-        children: children);
-    // Phones: the natural refresh gesture. Desktop keeps the header button.
-    if (!kMobile) return listView;
-    return RefreshIndicator(
-      color: AppColors.accent,
-      backgroundColor: AppColors.surface2,
-      onRefresh: () async => widget.onRefreshSessions(),
-      child: listView,
-    );
-  }
-
-  /// Desktop sidebar as stacked, collapsible sections — the reference's left
-  /// column: an UPPERCASE section header with an action cluster, then nested
-  /// collapsible folder groups, then compact rows.
-  ///
-  /// Separate from `_sessionList()` because mobile keeps its card list; only the
-  /// wide layout uses this density.
-  Widget _sectionedSidebar() {
-    final hasClient = widget.client != null;
-    final all = _sessions ?? const <SessionInfo>[];
-    final list = all
-        .where((s) => !isDedicatedMcSession(s.id) && _matchesQuery(s))
-        .toList();
-
-    // Newest folder first, then newest session within it.
-    final newest = <String, int>{};
-    for (final s in list) {
-      final t = newest[s.folder];
-      if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
-    }
-    list.sort((a, b) {
-      final fa = newest[a.folder] ?? 0;
-      final fb = newest[b.folder] ?? 0;
-      if (fa != fb) return fb.compareTo(fa);
-      final byFolder = a.folder.compareTo(b.folder);
-      if (byFolder != 0) return byFolder;
-      return b.lastActive.compareTo(a.lastActive);
-    });
-
-    final groups = <String, List<SessionInfo>>{};
-    final order = <String>[];
-    for (final s in list) {
-      groups.putIfAbsent(s.folder, () {
-        order.add(s.folder);
-        return <SessionInfo>[];
-      }).add(s);
-    }
-
-    final chatsOpen = !_collapsed.contains(_chatsKey);
-    return ListView(
-      // Top inset keeps the first section header clear of the navigation band,
-      // matching the reference's 8px section padding.
-      padding: const EdgeInsets.only(top: 8, bottom: 16),
-      children: [
-        ShellSectionHeader(
-          label: 'Chats',
-          onToggle: () => setState(() => _toggleCollapsed(_chatsKey)),
-          actions: [
-            ShellSectionAction(
-              icon: 'plus',
-              tooltip: 'New chat',
-              onTap: hasClient ? widget.onNewSession : null,
-            ),
-          ],
-        ),
-        if (!chatsOpen)
-          const SizedBox.shrink()
-        else if (!hasClient)
-          const _SidebarEmpty('Add a machine to begin.')
-        else if (list.isEmpty)
-          // Distinguish "no conversations" from "none match the search": saying
-          // "No chats yet" over a searched list reads as data loss.
-          _SidebarEmpty(_filterQuery.trim().isNotEmpty
-              ? 'No chats match the search.'
-              : 'No chats yet.')
-        else
-          // Flat list of conversations directly under CHATS (no folder nesting)
-          for (final s in list) _sidebarSessionRow(s),
-      ],
-    );
-  }
-
-  void _toggleCollapsed(String key) {
-    if (_collapsed.contains(key)) {
-      _collapsed.remove(key);
-    } else {
-      _collapsed.add(key);
-    }
-  }
-
-  /// One chat row. The folder is already conveyed by its group header, so the
-  /// row stays a single line; the trailing dot carries run/needs-input state.
-  Widget _sidebarSessionRow(SessionInfo s) {
-    final selected = s.id == widget.selectedSessionId;
-    return ShellNavRow(
-      id: s.id,
-      label: s.title.trim().isEmpty ? '(untitled)' : s.title,
-      icon: 'chat-thread',
-      tone: ShellTone.chat,
-      selected: selected,
-      onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
-      // The icon now carries run state, so the trailing dot would be a second
-      // indicator for one fact. Colour is the state channel — see
-      // `sessionStateColor`: amber busy, accent needs-you, neutral idle.
-      leading: SessionStateIcon(status: s.status, size: kNavIcon),
-      // Who is working here, inline. Same treatment as the phone card: an agent
-      // working in this chat is shown on the row itself, so "which session is an
-      // agent working in" is answerable from the list without opening anything.
-      // `working` tints it by run state, so a chat an agent merely owns reads
-      // differently from one it is mid-turn in.
-      trailing: s.displayAgentId == null || s.displayAgentId!.trim().isEmpty
-          ? null
-          : _AgentBadge(
-              agentId: s.displayAgentId!,
-              working: sessionIsActive(s.status),
-            ),
-    );
-  }
-
-  Widget _mobileListHeader(String label, int count) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(label, style: display(M.sectionTitle, color: AppColors.fg1)),
-            const SizedBox(width: 8),
-            Text('$count', style: mono(M.meta, color: AppColors.fg3)),
-          ],
-        ),
-      );
-
-  Widget _folderHeader(String folder, {required bool first, int count = 0}) {
-    final name =
-        folder.isEmpty ? 'No folder' : lastPathSegment(folder, ifEmpty: folder);
-    final collapsed = _collapsed.contains(folder);
-    // Collapsing is a local view preference, not state worth persisting — a
-    // fresh session list should show everything.
-    void toggle() => setState(() {
-          if (collapsed) {
-            _collapsed.remove(folder);
-          } else {
-            _collapsed.add(folder);
-          }
-        });
-    final chevron = collapsed ? 'chevron-right' : 'chevron-down';
-    if (kMobile) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: toggle,
-          child: SizedBox(
-            width: double.infinity,
-            child: Padding(
-              padding: EdgeInsets.only(top: first ? 0 : 14),
-              child: Row(
-                mainAxisSize: MainAxisSize.max,
-                children: [
-              AppIcon(chevron, size: 14, color: AppColors.fg4),
-              const SizedBox(width: 4),
-              AppIcon('folder', size: 13, color: AppColors.fg4),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12, weight: W.label, color: AppColors.fg3)),
-              ),
-              const SizedBox(width: 8),
-              const SizedBox(width: 28),
-              Expanded(
-                child: Container(height: 1, color: AppColors.border),
-              ),
-              const SizedBox(width: 8),
-              if (collapsed && count > 0)
-                Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
-            ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: toggle,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(4, first ? 10 : 16, 6, 4),
-          child: Row(children: [
-            AppIcon(chevron, size: 13, color: AppColors.fg4),
-            const SizedBox(width: 3),
-            AppIcon('folder', size: 13, color: AppColors.fg4),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.left,
-                  style: sans(11, weight: W.title, color: AppColors.fg3)),
-            ),
-            if (collapsed && count > 0)
-              Text('$count', style: sans(10, tabular: true, color: AppColors.fg3)),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
-    return _sessionRow(s);
-  }
-
-  Widget _missionControlPin(SessionInfo s) {
-    final selected = s.id == widget.selectedSessionId;
-    final waiting = s.status == 'waiting_for_input';
-    final running = s.status == 'running';
-    void open() => widget.onOpenSession(s.id, 'Mission Control', s.profile);
-    final status = running || waiting
-        ? Container(
-            width: kMobile ? 8 : 6,
-            height: kMobile ? 8 : 6,
-            decoration: BoxDecoration(
-              color: waiting ? AppColors.accent : AppColors.run,
-              shape: BoxShape.circle,
-            ),
-          )
-        : null;
-    if (kMobile) {
-      return Material(
-        color: selected ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: open,
-          child: Container(
-            height: M.rowHeight,
-            padding: EdgeInsets.symmetric(horizontal: M.rowPadH),
-            child: Row(children: [
-              AppIcon('layers',
-                  size: 16, color: selected ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text('Mission Control',
-                    style: sans(M.rowTitle,
-                        weight: W.label,
-                        color: selected ? AppColors.fg1 : AppColors.fg2)),
-              ),
-              if (status != null) status,
-            ]),
-          ),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
-      child: Material(
-        // Surface step, matching the mobile branch above AND every other
-        // selection in the shell. This one used `accentBg`, so the same pinned
-        // row changed colour with the window width and read as an alert on
-        // desktop — accent is reserved for state (running / needs-attention).
-        color: selected ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: open,
-          child: Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(children: [
-              AppIcon('layers',
-                  size: 14,
-                  color: selected ? AppColors.fg1 : AppColors.fg3),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Mission Control',
-                    style: sans(12,
-                        weight: W.label,
-                        color: selected ? AppColors.fg1 : AppColors.fg2)),
-              ),
-              if (status != null) status,
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Desktop: flat native thread row — no card chrome, rounded hover, a status
-  // dot only when it means something (needs input / running).
-  Widget _sessionRow(SessionInfo s) {
-    final selected = s.id == widget.selectedSessionId;
-    final waiting = s.status == 'waiting_for_input';
-    final checked = _selected.contains(s.id);
-    final renaming = _renamingId == s.id;
-    final hovered = !kMobile && _hoveredId == s.id;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hoveredId = s.id),
-      onExit: (_) {
-        if (_hoveredId == s.id) setState(() => _hoveredId = null);
-      },
-      child: Material(
-        color: selected || checked ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: renaming
-              ? null
-              : () {
-                  if (_selecting) {
-                    _toggleSelected(s.id);
-                  } else {
-                    widget.onOpenSession(s.id, s.title, s.profile);
-                  }
-                },
-          onLongPress: renaming
-              ? null
-              : () {
-                  if (_selecting) {
-                    _toggleSelected(s.id);
-                  } else {
-                    _enterSelect(seed: s.id);
-                  }
-                },
-          onSecondaryTapDown: (renaming || !kMobile)
-              ? null
-              : (details) =>
-                  _sessionActions(s, position: details.globalPosition),
-          child: Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(children: [
-              if (_selecting) ...[
-                AppIcon(checked ? 'check' : 'plus',
-                    size: 13,
-                    color: checked ? AppColors.accent : AppColors.fg4),
-                const SizedBox(width: 6),
-              ] else ...[
-                // Always present, so titles share one left edge; the colour is
-                // what carries state.
-                SessionStateIcon(status: s.status, size: 14),
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                  child: renaming
-                      ? _inlineRenameField(s, compact: true)
-                      : Text(s.title.isEmpty ? '(untitled)' : s.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12,
-                              color:
-                                  selected ? AppColors.fg1 : AppColors.fg2))),
-              if (!renaming) ...[
-                if (hovered && !_selecting && !isDedicatedMcSession(s.id)) ...[
-                  const SizedBox(width: 4),
-                  Tooltip(
-                    message: 'Rename',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(R.xs),
-                      onTap: () => _beginRename(s),
-                      child: Padding(
-                        padding: const EdgeInsets.all(3),
-                        child: AppIcon('edit', size: 12, color: AppColors.fg3),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Tooltip(
-                    message: 'Delete',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(R.xs),
-                      onTap: () => _confirmDeleteSessions([s]),
-                      child: Padding(
-                        padding: const EdgeInsets.all(3),
-                        child:
-                            AppIcon('trash', size: 12, color: AppColors.danger),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(width: 8),
-                  Text(relativeTime(s.lastActive),
-                      // A timestamp is content, not a placeholder.
-                      style: mono(10,
-                          color: waiting ? AppColors.accent : AppColors.fg3)),
-                ],
-              ],
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-
-  Widget _sessionCard(SessionInfo s) {
-    final checked = _selected.contains(s.id);
-    final renaming = _renamingId == s.id;
-    final selected = s.id == widget.selectedSessionId;
-    return Material(
-      color: selected || checked ? AppColors.surface2 : Colors.transparent,
-      borderRadius: BorderRadius.circular(R.sm),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
-        onTap: renaming
-            ? null
-            : () {
-                if (_selecting) {
-                  _toggleSelected(s.id);
-                } else {
-                  widget.onOpenSession(s.id, s.title, s.profile);
-                }
-              },
-        // Long-press opens this chat's actions rather than jumping straight into
-        // selection: the common intent is to rename or delete ONE chat, and bulk
-        // selection stays reachable from that same sheet.
-        onLongPress: renaming
-            ? null
-            : () {
-                if (_selecting) {
-                  _toggleSelected(s.id);
-                } else {
-                  _sessionActions(s);
-                }
-              },
-        child: SizedBox(
-          height: M.rowHeight,
-          child: Padding(
-            padding: EdgeInsets.only(left: M.rowPadH, right: 6),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              if (_selecting) ...[
-                AppIcon(checked ? 'check' : 'plus',
-                    size: 16,
-                    color: checked ? AppColors.accent : AppColors.fg4),
-                const SizedBox(width: 10),
-              ] else ...[
-                // The conversation glyph, tinted by run state (and pulsing while
-                // working). Always present so every row's title aligns.
-                SessionStateIcon(status: s.status, size: 17),
-                const SizedBox(width: 10),
-              ],
-              Expanded(
-                child: renaming
-                    ? _inlineRenameField(s, compact: false)
-                    : Text(
-                        s.title.isEmpty ? '(untitled)' : s.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(M.rowTitle,
-                            color: selected ? AppColors.fg1 : AppColors.fg2),
-                      ),
-              ),
-              // No per-row overflow button. At this row height it crowded the
-              // title, and its glyph rendered as a dark blob rather than a
-              // control. The same actions live on long-press.
-              //
-              // Who is working in this session, inline. Rendered only when an
-              // agent is actually dispatched here, so an ordinary chat keeps the
-              // row's original spacing. Tinted by run state, like the desktop
-              // sidebar, so an agent merely assigned reads differently from one
-              // mid-turn.
-              if (s.displayAgentId != null &&
-                  s.displayAgentId!.trim().isNotEmpty) ...[
-                const SizedBox(width: 8),
-                _AgentBadge(
-                  agentId: s.displayAgentId!,
-                  working: sessionIsActive(s.status),
-                ),
-              ],
-              // The gap is REQUIRED, not cosmetic: the title is `Expanded`, so a
-              // long one fills the full width and butts straight against the
-              // time — the two run together with no separation.
-              if (!renaming) ...[
-                const SizedBox(width: 10),
-                Text(relativeTime(s.lastActive),
-                    style: sans(M.meta, tabular: true, color: AppColors.fg3)),
-              ],
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Long-press / right-click a session → rename or delete.
-  Future<void> _sessionActions(SessionInfo s, {Offset? position}) async {
-    if (isDedicatedMcSession(s.id)) return;
-    if (!kMobile) {
-      final overlay =
-          Overlay.of(context).context.findRenderObject() as RenderBox;
-      final point = position ?? overlay.size.center(Offset.zero);
-      final selected = await showAppMenu<String>(
-        context,
-        point: point,
-        items: [
-          appMenuItem(value: 'rename', icon: 'edit', label: 'Rename'),
-          appMenuItem(
-              value: 'delete', icon: 'trash', label: 'Delete', danger: true),
-        ],
-      );
-      if (selected == 'rename') {
-        _beginRename(s);
-      } else if (selected == 'delete') {
-        await _confirmDeleteSessions([s]);
-      }
-      return;
-    }
-    showAppSheet(context,
-        title: s.title.isEmpty ? '(untitled)' : s.title,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sessionActionTile('check-check', 'Select', onTap: () {
-              Navigator.pop(context);
-              _enterSelect(seed: s.id);
-            }),
-            _sessionActionTile('edit', 'Rename', onTap: () {
-              Navigator.pop(context);
-              _beginRename(s);
-            }),
-            _sessionActionTile('trash', 'Delete', danger: true, onTap: () {
-              Navigator.pop(context);
-              _confirmDeleteSessions([s]);
-            }),
-          ],
-        ));
-  }
-
-  Widget _sessionActionTile(String icon, String label,
-      {required VoidCallback onTap, bool danger = false}) {
-    final color = danger ? AppColors.danger : AppColors.fg1;
-    return Pressable(
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 13),
-            child: Row(children: [
-              AppIcon(icon, size: 16, color: color),
-              const SizedBox(width: 12),
-              Text(label, style: sans(13, color: color)),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _enterSelect({String? seed}) {
-    if (seed != null && isDedicatedMcSession(seed)) return;
-    setState(() {
-      _selecting = true;
-      _renamingId = null;
-      if (seed != null) _selected.add(seed);
-    });
-  }
-
-  void _exitSelect() {
-    setState(() {
-      _selecting = false;
-      _selected.clear();
-    });
-  }
-
-  void _toggleSelected(String id) {
-    if (isDedicatedMcSession(id)) return;
-    setState(() {
-      if (!_selected.add(id)) _selected.remove(id);
-    });
-  }
-
-  /// Rows the current filter is showing — the exact set "Select all" acts on.
-  ///
-  /// Mirrors [_sessionList]'s predicate deliberately: selecting rows the user
-  /// cannot see (a filtered-out chat) would let a bulk delete remove something
-  /// that was never on screen.
-  List<SessionInfo> get _visibleSessions => [
-        for (final s in _sessions ?? const <SessionInfo>[])
-          if (!isDedicatedMcSession(s.id) && _matchesQuery(s)) s,
-      ];
-
-  bool get _allVisibleSelected {
-    final ids = _visibleSessions.map((s) => s.id).toList();
-    return ids.isNotEmpty && ids.every(_selected.contains);
-  }
-
-  void _toggleSelectAllVisible() {
-    final ids = _visibleSessions.map((s) => s.id).toList();
-    if (ids.isEmpty) return;
-    setState(() {
-      if (ids.every(_selected.contains)) {
-        for (final id in ids) {
-          _selected.remove(id);
-        }
-      } else {
-        _selected.addAll(ids);
-      }
-      // An emptied selection must not leave the bar up reading "0 selected".
-      if (_selected.isEmpty) _selecting = false;
-    });
-  }
-
-  /// "Select all" / "Unselect all" as a text toggle, not an icon: nothing in the
-  /// icon set means "all" unambiguously, and the label also states which way the
-  /// next tap goes.
-  Widget _selectAllToggle() {
-    final all = _allVisibleSelected;
-    return InkWell(
-      borderRadius: BorderRadius.circular(R.sm),
-      onTap: _toggleSelectAllVisible,
-      child: SizedBox(
-        height: kMobile ? M.minTarget : 26,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(all ? 'Unselect all' : 'Select all',
-                style: sans(kMobile ? M.rowTitle : 11,
-                    weight: W.label, color: AppColors.fg3)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _beginRename(SessionInfo s) {
-    if (isDedicatedMcSession(s.id)) return;
-    _renameCtl.text = s.title;
-    _renameCtl.selection =
-        TextSelection(baseOffset: 0, extentOffset: _renameCtl.text.length);
-    setState(() {
-      _selecting = false;
-      _selected.clear();
-      _renamingId = s.id;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _renameFocus.requestFocus();
-    });
-  }
-
-  Widget _inlineRenameField(SessionInfo s, {required bool compact}) {
-    return TextField(
-      controller: _renameCtl,
-      focusNode: _renameFocus,
-      autofocus: true,
-      maxLines: 1,
-      style: sans(compact ? 12 : 16, color: AppColors.fg1),
-      cursorColor: AppColors.fg1,
-      decoration: const InputDecoration(
-        isCollapsed: true,
-        border: InputBorder.none,
-        hintText: 'Session title',
-      ),
-      onSubmitted: (_) => _commitRename(s),
-      onTapOutside: (_) => _commitRename(s),
-    );
-  }
-
-  Future<void> _commitRename(SessionInfo s) async {
-    if (_renamingId != s.id) return;
-    final c = widget.client;
-    final title = _renameCtl.text.trim();
-    setState(() => _renamingId = null);
-    if (c == null || title.isEmpty || title == s.title) return;
-    try {
-      await c.renameSession(s.id, title);
-      widget.onRefreshSessions();
-    } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
-    }
-  }
-
-  Future<void> _confirmDeleteSelected() async {
-    final ids = _selected.toList();
-    final sessions = (widget.sessions ?? const <SessionInfo>[])
-        .where((s) => ids.contains(s.id))
-        .toList();
-    if (sessions.isEmpty) return;
-    await _confirmDeleteSessions(sessions);
-  }
-
-  Future<void> _confirmDeleteSessions(List<SessionInfo> sessions) async {
-    final c = widget.client;
-    if (c == null || sessions.isEmpty) return;
-    final n = sessions.length;
-    final first = sessions.first.title.isEmpty
-        ? '(untitled session)'
-        : sessions.first.title;
-    final body = n == 1
-        ? '$first\n\nPermanently removes the conversation. The folder and its files are untouched.'
-        : 'Delete $n conversations? Folders and files are untouched.';
-    final ok = await confirmAction(
-      context,
-      title: n == 1 ? 'Delete session?' : 'Delete $n sessions?',
-      body: body,
-      confirmLabel: n == 1 ? 'Delete' : 'Delete $n',
-    );
-    if (!ok) return;
-    try {
-      for (final s in sessions) {
-        await c.deleteSession(s.id);
-        widget.onSessionDeleted(s.id);
-      }
-      if (mounted) _exitSelect();
-      widget.onRefreshSessions();
-    } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
-    }
-  }
-
-  // ---- machines ----
-
-  /// The sidebar header IS the machine switcher: active machine label in
-  /// display type with a live dot + chevron, host underneath, refresh trailing.
-  /// Edge-to-edge tap target; hover raise comes from the global theme.
-  Widget _machineHeader() {
-    final a = widget.active;
-    final ok = a == null ? null : widget.health[a.url];
-    final hasClient = widget.client != null;
-    // Mobile: Grok-style profile row with avatar circle + name + host + chevron.
-    if (kMobile) {
-      return Material(
-        key: _machineKey,
-        color: Colors.transparent,
-        child: InkWell(
-          onTap:
-              widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(children: [
-              // Avatar circle — first letter of the machine name.
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.border, width: 1),
-                ),
-                alignment: Alignment.center,
-                child: a == null
-                    ? AppIcon('plus', size: 18, color: AppColors.fg2)
-                    : Text(
-                        (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
-                        style: sans(18, weight: W.label, color: AppColors.fg1),
-                      ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: a == null
-                    ? Text('Add machine', style: sans(16, color: AppColors.fg1))
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(a.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(16,
-                                  weight: W.label, color: AppColors.fg1)),
-                          const SizedBox(height: 2),
-                          Row(children: [
-                            Container(
-                                width: 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                    color: ok == true
-                                        ? AppColors.ok
-                                        : AppColors.fg4,
-                                    shape: BoxShape.circle)),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(hostOf(a.url),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: mono(11, color: AppColors.fg3)),
-                            ),
-                          ]),
-                        ],
-                      ),
-              ),
-              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-            ]),
-          ),
-        ),
-      );
-    }
-    // Desktop: original compact header.
-    return Material(
-      key: _machineKey,
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-          child: Row(children: [
-            Expanded(
-              child: a == null
-                  ? Row(children: [
-                      AppIcon('plus', size: 18, color: AppColors.fg1),
-                      const SizedBox(width: 9),
-                      Text('Add machine', style: display(18)),
-                    ])
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Flexible(
-                              child: Text(a.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: display(18))),
-                          const SizedBox(width: 8),
-                          Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                  color:
-                                      ok == true ? AppColors.ok : AppColors.fg4,
-                                  shape: BoxShape.circle)),
-                          const SizedBox(width: 6),
-                          AppIcon('chevron-down',
-                              size: 16, color: AppColors.fg3),
-                        ]),
-                        const SizedBox(height: 2),
-                        Text(hostOf(a.url),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: mono(11, color: AppColors.fg3)),
-                      ],
-                    ),
-            ),
-            const SizedBox(width: 6),
-            IconBtn('refresh',
-                size: 30,
-                iconSize: 15,
-                tooltip: 'Refresh',
-                onTap:
-                    hasClient && !_loading ? widget.onRefreshSessions : null),
-            IconBtn('settings',
-                size: 30,
-                iconSize: 15,
-                tooltip: 'Settings',
-                onTap: hasClient ? _openSettings : null),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  /// Machine list: bottom sheet on phones, a popover anchored to the block on
-  /// desktop. Same rows + "Add machine" footer either way.
-  Future<void> _openMachines() async {
-    widget.onRefreshHealth();
-    final content = _MachineList(
-      instances: widget.instances,
-      active: widget.active,
-      health: widget.health,
-      onSelect: widget.onSelectInstance,
-      onAdd: widget.onAddInstance,
-      onManage: _machineActions,
-    );
-    if (kMobile) {
-      await showAppSheet(
-        context,
-        title: 'Machines',
-        child: content,
-      );
-      return;
-    }
-    final box = _machineKey.currentContext!.findRenderObject() as RenderBox;
-    final origin = box.localToGlobal(Offset.zero);
-    await showGeneralDialog(
-      context: context,
-      barrierDismissible: true, // click-away and Esc dismiss
-      barrierLabel: 'machines',
-      barrierColor: Colors.transparent,
-      transitionDuration: Motion.press,
-      pageBuilder: (_, __, ___) => Stack(children: [
-        // Inset from the edge-to-edge header so it reads as a popover.
-        Positioned(
-          left: origin.dx + 10,
-          top: origin.dy + box.size.height + 4,
-          width: box.size.width - 20,
-          child: Material(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
-            elevation: 12,
-            shadowColor: Colors.black87,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border2),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 420),
-                child: SingleChildScrollView(child: content),
-              ),
-            ),
-          ),
-        ),
-      ]),
-      transitionBuilder: (_, anim, __, child) {
-        final curved =
-            CurvedAnimation(parent: anim, curve: Motion.enter);
-        return BackdropFilter(
-          filter: ImageFilter.blur(
-              sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
-          child: FadeTransition(opacity: curved, child: child),
-        );
-      },
-    );
-  }
-
-  // Overflow / long-press on a machine row → rename or remove (existing flows).
-  void _machineActions(Instance i) {
-    showAppSheet(context,
-        title: i.label,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sessionActionTile('edit', 'Rename', onTap: () {
-              Navigator.pop(context);
-              _renameMachine(i);
-            }),
-            _sessionActionTile('trash', 'Remove', danger: true, onTap: () {
-              Navigator.pop(context);
-              _confirmRemoveMachine(i);
-            }),
-          ],
-        ));
-  }
-
-  Future<void> _renameMachine(Instance i) async {
-    final name = await promptText(context,
-        title: 'Rename machine',
-        initial: i.label,
-        hint: 'Machine name',
-        saveLabel: 'Rename');
-    if (name == null || name.isEmpty) return;
-    widget.onRenameInstance(i, name);
-  }
-
-  Future<void> _confirmRemoveMachine(Instance i) async {
-    final ok = await confirmAction(
-      context,
-      title: 'Remove machine?',
-      body:
-          '${i.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
-      confirmLabel: 'Remove',
-    );
-    if (ok) widget.onRemoveInstance(i);
-  }
-}
-
-/// Rows for the machine popover/sheet: live dot (re-pinged on open), label,
-/// host, trailing overflow. Pops itself before invoking any callback.
-class _MachineList extends StatefulWidget {
-  final List<Instance> instances;
-  final Instance? active;
-  final Map<String, bool> health;
-  final void Function(Instance) onSelect;
-  final VoidCallback onAdd;
-  final void Function(Instance) onManage;
-  const _MachineList({
-    required this.instances,
-    required this.active,
-    required this.health,
-    required this.onSelect,
-    required this.onAdd,
-    required this.onManage,
-  });
-  @override
-  State<_MachineList> createState() => _MachineListState();
-}
-
-class _MachineListState extends State<_MachineList> {
-  late final Map<String, bool> _h = {...widget.health};
-
-  @override
-  void initState() {
-    super.initState();
-    for (final i in widget.instances) {
-      DaemonClient(i.url, i.token).health().then((ok) {
-        if (mounted && _h[i.url] != ok) setState(() => _h[i.url] = ok);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ...widget.instances.map(_row),
-          Divider(height: 13, thickness: 1, color: AppColors.border),
-          _addRow(),
-        ]);
-  }
-
-  Widget _row(Instance i) {
-    final selected = i.url == widget.active?.url;
-    final ok = _h[i.url];
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        widget.onSelect(i);
-      },
-      onLongPress: () {
-        Navigator.pop(context);
-        widget.onManage(i);
-      },
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(14, kMobile ? 9 : 6, 4, kMobile ? 9 : 6),
-        child: Row(children: [
-          Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                  color: ok == true ? AppColors.ok : AppColors.fg4,
-                  shape: BoxShape.circle)),
-          const SizedBox(width: 10),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(i.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(kMobile ? 14 : 12, color: AppColors.fg1)),
-              const SizedBox(height: 1),
-              Text(hostOf(i.url),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(kMobile ? 11 : 10, color: AppColors.fg3)),
-            ]),
-          ),
-          if (selected) AppIcon('check', size: 14, color: AppColors.accent),
-          IconBtn('more-vertical', size: 30, iconSize: 15, tooltip: 'Manage',
-              onTap: () {
-            Navigator.pop(context);
-            widget.onManage(i);
-          }),
-        ]),
-      ),
-    );
-  }
-
-  Widget _addRow() {
-    return Pressable(
-      child: InkWell(
-        onTap: () {
-          Navigator.pop(context);
-          widget.onAdd();
-        },
-        child: Padding(
-          padding:
-              EdgeInsets.fromLTRB(14, kMobile ? 11 : 8, 14, kMobile ? 11 : 8),
-          child: Row(children: [
-            AppIcon('plus', size: 15, color: AppColors.accent),
-            const SizedBox(width: 10),
-            Text('Add machine',
-                style: sans(kMobile ? 14 : 12,
-                    weight: W.label, color: AppColors.accent)),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-/// Settings dialog: Zed-style sidebar + content pane. Models / vault /
-/// scheduled swap in-place so they never stack a second dialog.
-class _SettingsPanel extends StatefulWidget {
-  final DaemonClient client;
-  final List<Instance> instances;
-  final Instance? active;
-  final void Function(Instance) onRemove;
-  final VoidCallback onClose;
-
-  /// True when hosted INSIDE the phone home under the floating bar, rather than
-  /// presented as its own dialog/drawer.
-  final bool embedded;
-
-  /// Phone drill-down. Null shows the section list; a value shows that section.
-  ///
-  /// Owned by the SHELL, not by this widget: the back handler and the bar's
-  /// visibility both need to read it, and neither can see inside here.
-  final _SettingsPage? section;
-  final ValueChanged<_SettingsPage?>? onSection;
-
-  const _SettingsPanel({
-    super.key,
-    required this.client,
-    required this.instances,
-    required this.active,
-    required this.onRemove,
-    required this.onClose,
-    this.embedded = false,
-    this.section,
-    this.onSection,
-  });
-  @override
-  State<_SettingsPanel> createState() => _SettingsPanelState();
-}
-
-enum _SettingsPage { general, models, usage, vault, scheduled }
-
-class _SettingsPanelState extends State<_SettingsPanel> {
-  late final List<Instance> _instances = [...widget.instances];
-  bool _notif = false;
-  bool _notifBusy = false;
-  late Future<void> _mobileSettingsReady;
-  final GlobalKey<VaultScreenState> _vaultKey = GlobalKey<VaultScreenState>();
-
-  _SettingsPage _page = _SettingsPage.general;
-
-  /// Phone drill-down, read from the shell. Desktop uses `_page` + the chip
-  /// strip instead, so this is only consulted when `kMobile && embedded`.
-  _SettingsPage? get _mobileSection => widget.section;
-
-  /// True when the last move through Settings went deeper, rather than back out
-  /// of a section. Sets the slide direction between sections the same way the
-  /// shell does between destinations. Captured from the PREVIOUS widget in
-  /// `didUpdateWidget`, because that value is gone by the time `build` runs.
-  bool _sectionForward = true;
-
-  @override
-  void didUpdateWidget(covariant _SettingsPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final before = oldWidget.section?.index ?? -1;
-    final after = widget.section?.index ?? -1;
-    if (before != after) _sectionForward = after > before;
-  }
-
-  static const _nav = [
-    (_SettingsPage.general, 'server', 'General'),
-    (_SettingsPage.models, 'ai-chip', 'Inference profiles'),
-    (_SettingsPage.usage, 'analytics', 'Usage'),
-    (_SettingsPage.vault, 'lock-key', 'Vault'),
-    (_SettingsPage.scheduled, 'repeat', 'Scheduled'),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _mobileSettingsReady = _loadMobileSettings();
-    notificationsEnabled().then((v) {
-      if (mounted) setState(() => _notif = v);
-    });
-  }
-
-  Future<void> _loadMobileSettings() async {
-    await Future.wait<void>([
-      widget.client.getConfig(),
-      widget.client.getUsage(),
-      widget.client.vaultList(),
-      widget.client.recurringJobs(),
-    ]);
-  }
-
-  Future<void> _toggleNotif(bool v) async {
-    setState(() => _notifBusy = true);
-    final err = await setNotificationsEnabled(v);
-    if (!mounted) return;
-    setState(() {
-      _notifBusy = false;
-      _notif = err == null ? v : _notif;
-    });
-    if (err != null) toast(context, err);
-  }
-
-  Future<void> _confirmRemove(Instance inst) async {
-    final ok = await confirmAction(
-      context,
-      title: 'Remove instance?',
-      body:
-          '${inst.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
-      confirmLabel: 'Remove',
-    );
-    if (!ok) return;
-    widget.onRemove(inst);
-    setState(() => _instances.removeWhere((e) => e.url == inst.url));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    // Phone + embedded in the home: open INLINE, not behind a drill-down.
-    final drill = kMobile && widget.embedded;
-    if (drill) {
-      return Material(
-        // Same surface as the other phone destinations (chats, agents). This was
-        // `surface1`, one step lighter, which made Settings read as a different
-        // app the moment you tapped into it.
-        color: AppColors.bg,
-        child: SafeArea(
-          bottom: false,
-          child: AnimatedSwitcher(
-            duration: Motion.base,
-            reverseDuration: Motion.fast,
-            switchInCurve: Motion.enter,
-            switchOutCurve: Motion.exit,
-            // `StackFit.expand`, not the default centered `Stack`: these are
-            // full-body screens, and loose constraints would let each one
-            // shrink-wrap into the middle of the transition.
-            layoutBuilder: (current, previous) => Stack(
-              fit: StackFit.expand,
-              children: [...previous, if (current != null) current],
-            ),
-            transitionBuilder: (child, anim) {
-              final dx = _sectionForward ? 0.06 : -0.06;
-              return FadeTransition(
-                opacity: anim,
-                child: SlideTransition(
-                  position:
-                      Tween<Offset>(begin: Offset(dx, 0), end: Offset.zero)
-                          .animate(anim),
-                  child: child,
-                ),
-              );
-            },
-            // Keyed so entering a section and leaving it are two different
-            // children — the switcher only animates a genuine change of screen.
-            child: KeyedSubtree(
-              key: ValueKey(_mobileSection?.name ?? 'home'),
-              child: _mobileSection == null
-                  ? FutureBuilder<void>(
-                      future: _mobileSettingsReady,
-                      builder: (context, snap) {
-                        if (snap.connectionState != ConnectionState.done) {
-                          return const AppLoading(label: 'Loading settings');
-                        }
-                        if (snap.hasError) {
-                          return Center(
-                            child: Text('Unable to load settings',
-                                style: sans(13, color: AppColors.fg2)),
-                          );
-                        }
-                        return _mobileSettingsHome();
-                      },
-                    )
-                  : _mobileSectionPage(),
-            ),
-          ),
-        ),
-      );
-    }
-    return Scaffold(
-      backgroundColor: AppColors.surface1,
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          // Embedded in the phone home, the bar already names this destination,
-          // so the title block is pure repetition — the section picker becomes
-          // the first line. Presented as a panel, it keeps its own title and
-          // close affordance.
-          if (!widget.embedded) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
-              child: Row(children: [
-                // Title only. The subtitle ("Configure this workspace and its
-                // inference profiles.") restated what the panel already is —
-                // it is titled Settings and every section is visible in the
-                // rail beside it, so the line spent height saying nothing new.
-                Expanded(
-                  child: Text('Settings',
-                      style: sans(14, weight: W.label, color: AppColors.fg1)),
-                ),
-                IconBtn('x',
-                    size: 26,
-                    iconSize: 13,
-                    tooltip: 'Close',
-                    onTap: widget.onClose),
-              ]),
-            ),
-            Divider(height: 1, color: AppColors.border),
-          ],
-          Expanded(
-            child: LayoutBuilder(builder: (context, c) {
-              // WIDE: a vertical rail, the shape every desktop settings window
-              // uses. The chip strip was a phone pattern stretched across a
-              // 640px dialog — five pills floating in a row with nothing
-              // anchoring them, leaving the whole left edge empty.
-              //
-              // NARROW: keep the chips. The panel is presented full-screen when
-              // the window is small, and a 196px rail would eat most of it.
-              if (c.maxWidth >= 560) {
-                return Row(children: [
-                  SizedBox(
-                    width: 196,
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
-                      children: [
-                        for (final (page, icon, label) in _nav)
-                          _settingsNavRow(page, icon, label),
-                      ],
-                    ),
-                  ),
-                  Container(width: 1, color: AppColors.border),
-                  Expanded(child: _pageBody()),
-                ]);
-              }
-              return Column(children: [
-                SizedBox(height: 44, child: _navChips()),
-                Divider(height: 1, color: AppColors.border),
-                Expanded(child: _pageBody()),
-              ]);
-            }),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  /// Phone settings HOME.
-  ///
-  /// Redesigned onto the current language: every group is a `surface2` card with
-  /// hairline separators between its rows, rather than machines and alerts
-  /// floating bare above a lone card of index rows. That mixture was the visual
-  /// inconsistency — half the screen was cards, half was loose rows.
-  ///
-  /// The light sections stay INLINE and only the heavy ones nest: "General"
-  /// holds two things, so hiding it behind a chevron spent a tap to reveal one
-  /// screen of content. Models / Usage / Vault / Scheduled each own a real
-  /// surface, so those earn a row.
-  Widget _mobileSettingsHome() {
-    Widget section(String label, Widget child, {Widget? trailing}) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(label.toUpperCase(),
-                        style: caps(11, color: AppColors.fg3)),
-                  ),
-                  if (trailing != null) trailing,
-                ],
-              ),
-            ),
-            child,
-          ],
-        ),
-      );
-    }
-
-    Widget inlineScreen(Widget child) => child;
-
-    return ListView(
-      padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
-      children: [
-        Text('Settings', style: display(28, color: AppColors.fg1)),
-        const SizedBox(height: 16),
-        section('Workspace', _machineRows().isEmpty ? const SizedBox.shrink() : Column(children: _machineRows())),
-        if (kCanNotify) section('Notifications', _notifTile()),
-        section(
-            'Models & usage',
-            InferenceProfilesScreen(client: widget.client, embedded: true),
-            trailing: Btn('Add',
-                small: true,
-                variant: BtnVariant.ghost,
-                icon: 'plus',
-                onTap: () {
-                  Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => InferenceProfileEditor(
-                        client: widget.client,
-                        onClose: () => Navigator.pop(context),
-                        onSaved: () => Navigator.pop(context, true),
-                      ),
-                    ),
-                  );
-                }),
-        ),
-        section(
-          'Vault',
-          inlineScreen(VaultScreen(
-              key: _vaultKey, client: widget.client, embedded: true)),
-          trailing: Btn('Add',
-              small: true,
-              variant: BtnVariant.ghost,
-              icon: 'plus',
-              onTap: () => _vaultKey.currentState?.add()),
-        ),
-        section('Scheduled jobs', inlineScreen(RecurringScreen(client: widget.client, listOnly: true, embedded: true))),
-      ],
-    );
-  }
-
-  /// One grouped card. Related rows share a surface and a radius, and hairlines
-  /// separate them — the design language's "surface step, not borders" applied
-  /// to a list. Supplying the separators here keeps every group identical,
-  /// which is what stops the screen reverting to mixed loose rows and cards.
-  Widget _settingsCard(List<Widget> children) => Material(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              children[i],
-              if (i < children.length - 1)
-                Divider(height: 1, thickness: 1, color: AppColors.border),
-            ],
-          ],
-        ),
-      );
-
-  /// Section label, shared so the inline and nested settings cannot diverge.
-  Widget _inlineLabel(String t) => Padding(
-        padding: const EdgeInsets.only(left: 2),
-        child: Text(t.toUpperCase(),
-            style: caps(kMobile ? 11 : 10, color: AppColors.fg3)),
-      );
-
-  /// Machine rows WITHOUT separators — `_settingsCard` supplies those.
-  List<Widget> _machineRows() => [
-        if (_instances.isEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-            child: Text('No saved connections.',
-                style: sans(M.meta, color: AppColors.fg3)),
-          )
-        else
-          for (final i in _instances) _instanceRow(i),
-      ];
-
-  /// A navigation row inside a card. Deliberately NOT its own Material: it used
-  /// to be a card, which inside a card read as a box in a box.
-  ///
-  /// One line, title only. The summary under it described what each section is
-  /// for, but this card sits under a "Configuration" heading that already says
-  /// as much — and at phone widths the longest ("Secrets the agent can use")
-  /// ellipsized, so a row of truncated descriptions read as broken rather than
-  /// informative. The label alone is unambiguous here.
-  Widget _mobileIndexRow(_SettingsPage page, String icon, String label) {
-    return InkWell(
-      onTap: () => widget.onSection?.call(page),
-      child: Container(
-        // A full 52px target, matching every other phone list row. At the old
-        // 60px the row was tall for a two-line stack; with one line it only read
-        // as an oversized gap.
-        height: M.rowHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Row(children: [
-          AppIcon(icon, size: 20, color: AppColors.fg2),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(M.rowTitle, color: AppColors.fg1)),
-          ),
-          AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-        ]),
-      ),
-    );
-  }
-
-  /// One-line description of what a settings section is FOR.
-  ///
-  /// Phrased as what you go there to do, not as a noun list — "Providers and
-  /// models" restated the label; "Pick the model each session runs on" tells you
-  /// why you'd tap it.
-  ///
-  /// Kept under ~25 chars so they fit the rail on ONE line. Longer strings
-  /// ellipsized, and a row of truncated descriptions reads as broken rather than
-  /// concise — which defeats the reason the rail carries them at all.
-  String _sectionSummary(_SettingsPage p) => switch (p) {
-        _SettingsPage.general => 'Machine and alerts',
-        _SettingsPage.models => 'Model for new chats',
-        _SettingsPage.usage => 'Token spend and limits',
-        _SettingsPage.vault => 'Secrets the agent can use',
-        _SettingsPage.scheduled => 'Jobs that re-run on time',
-      };
-
-  /// One phone settings section.
-  ///
-  /// The HOST does not draw a header here — each section screen owns its own
-  /// `NavBackRow`. That is deliberate: models nests a second level (the model
-  /// editor), and if the host drew the outer header the editor level would stack
-  /// a second one under it. One header per level, always.
-  Widget _mobileSectionPage() {
-    final section = _mobileSection!;
-    void back() => widget.onSection?.call(null);
-    return switch (section) {
-      _SettingsPage.general => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            NavBackRow(title: 'General', onBack: back),
-            // showTitle: false — the NavBackRow above already names it.
-            Expanded(child: _generalPage(showTitle: false)),
-          ],
-        ),
-      _SettingsPage.models => InferenceProfilesScreen(
-          client: widget.client,
-          embedded: true,
-          onBack: back,
-        ),
-      _SettingsPage.usage => UsageScreen(
-          client: widget.client,
-          embedded: true,
-          onBack: back,
-        ),
-      _SettingsPage.vault => VaultScreen(
-          client: widget.client,
-          embedded: true,
-          onBack: back,
-        ),
-      _SettingsPage.scheduled => RecurringScreen(
-          client: widget.client,
-          listOnly: true,
-          embedded: true,
-          onBack: back,
-        ),
-    };
-  }
-
-  /// One row in the desktop settings rail.
-  ///
-  /// Selection is NEUTRAL (`surface2` fill, `fg1` icon and label), matching the
-  /// sidebar and the phone index rows. It previously used `accentBg` with an
-  /// accent icon and label — but accent means STATE in this design language
-  /// (running / needs-you), not "you are here". A blue rail row read as an
-  /// alert rather than a location.
-  ///
-  /// Carries the section description as a second line, which is what makes the
-  /// rail worth 196px: the labels alone would not be.
-  Widget _settingsNavRow(_SettingsPage page, String icon, String label) {
-    final selected = _page == page;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Material(
-        color: selected ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: () => setState(() => _page = page),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(children: [
-              AppIcon(icon,
-                  size: 16, color: selected ? AppColors.fg1 : AppColors.fg3),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13,
-                            weight: selected ? W.label : W.body,
-                            color: selected ? AppColors.fg1 : AppColors.fg2)),
-                    const SizedBox(height: 2),
-                    Text(_sectionSummary(page),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg3)),
-                  ],
-                ),
-              ),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navChips() {
-    return ListView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      children: [
-        for (final (page, icon, label) in _nav)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Material(
-              // Neutral selection here too — see `_settingsNavRow`.
-              color: _page == page ? AppColors.surface3 : Colors.transparent,
-              borderRadius: BorderRadius.circular(R.sm),
-              child: InkWell(
-                onTap: () => setState(() => _page = page),
-                borderRadius: BorderRadius.circular(R.sm),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  child: Row(children: [
-                    AppIcon(icon,
-                        size: 13,
-                        color: _page == page ? AppColors.fg1 : AppColors.fg3),
-                    const SizedBox(width: 5),
-                    Text(label,
-                        style: sans(11,
-                            weight: _page == page ? W.label : W.body,
-                            color:
-                                _page == page ? AppColors.fg1 : AppColors.fg2)),
-                  ]),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _pageBody() {
-    return switch (_page) {
-      // Title and blurb suppressed: the desktop rail already shows both, so
-      // repeating them here duplicates two lines above the first card.
-      _SettingsPage.general => _generalPage(showTitle: false, showBlurb: false),
-      _SettingsPage.models =>
-        InferenceProfilesScreen(client: widget.client, embedded: true),
-      _SettingsPage.usage => UsageScreen(client: widget.client, embedded: true),
-      _SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
-      _SettingsPage.scheduled =>
-        RecurringScreen(client: widget.client, listOnly: true, embedded: true),
-    };
-  }
-
-  /// The General section's content.
-  ///
-  /// [showTitle] and [showBlurb] are false wherever the host already names this
-  /// section — the phone drill-down draws a `NavBackRow("General")`, and the
-  /// desktop rail shows the section name AND its description. Repeating either
-  /// here is the same duplication the model editor had with its stacked rows.
-  ///
-  /// Groups are CARDS on both platforms, and the vertical rhythm is one scale:
-  /// 18 between groups, 8 between a section label and its card. The old values
-  /// (14 / 16 / 6) were three different numbers for the same two relationships,
-  /// which is what made the spacing read as uneven.
-  Widget _generalPage({bool showTitle = true, bool showBlurb = true}) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      children: [
-        if (showTitle) ...[
-          Text('General',
-              style: sans(14, weight: W.label, color: AppColors.fg1)),
-          const SizedBox(height: 3),
-        ],
-        if (showBlurb) ...[
-          Text('Manage the machine this app connects to and its alerts.',
-              style: sans(11, color: AppColors.fg3)),
-          const SizedBox(height: 18),
-        ],
-        _inlineLabel('Machines'),
-        const SizedBox(height: 8),
-        _settingsCard(
-          _instances.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    child: Text('No saved connections.',
-                        style: sans(M.meta, color: AppColors.fg3)),
-                  ),
-                ]
-              : [for (final i in _instances) _instanceRow(i)],
-        ),
-        if (kCanNotify) ...[
-          const SizedBox(height: 18),
-          _inlineLabel('Alerts'),
-          const SizedBox(height: 8),
-          _settingsCard([_notifTile()]),
-        ],
-      ],
-    );
-  }
-
-  Widget _instanceRow(Instance i) {
-    final isActive = i.url == widget.active?.url;
-    return Material(
-      color: Colors.transparent,
-      child: Padding(
-        // Both platforms now render this row INSIDE a card, so both need the
-        // card's own gutter. The old desktop value (10) was written when this
-        // was a bare sidebar panel row; it is the same row in the same card as
-        // the phone's now, so the insets match too.
-        padding: EdgeInsets.fromLTRB(
-            kMobile && widget.embedded ? 0 : 14,
-            kMobile ? 4 : 9,
-            kMobile && widget.embedded ? 0 : 4,
-            kMobile ? 4 : 9),
-        child: Row(children: [
-          // A machine is a SERVER, not a CPU. The old `cpu` glyph described a
-          // chip inside the machine, which read as the wrong object entirely.
-          AppIcon('server',
-              size: kMobile ? 18 : 14,
-              color: isActive ? AppColors.accent : AppColors.fg3),
-          const SizedBox(width: 10),
-          Expanded(
-            // Name and hostname share ONE baseline. Stacked, the hostname was a
-            // second line that doubled the row height to say something short;
-            // side by side the pair reads as "this machine, at this address".
-            child: Row(children: [
-              Flexible(
-                child: Text(i.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? 13 : 12,
-                        weight: W.label, color: AppColors.fg1)),
-              ),
-              const SizedBox(width: 8),
-              // Both are variable-length, so they share the space equally and
-              // ellipsize independently — neither is guaranteed to survive.
-              Flexible(
-                child: Text(hostOf(i.url),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(kMobile ? 11 : 10, color: AppColors.fg3)),
-              ),
-            ]),
-          ),
-          if (isActive)
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: Text('active',
-                  style: sans(kMobile ? 12 : 10, color: AppColors.accent)),
-            ),
-          IconBtn('trash',
-              size: kMobile ? M.minTarget : 26,
-              iconSize: kMobile ? 17 : 13,
-              tooltip: 'Remove',
-              onTap: () => _confirmRemove(i)),
-        ]),
-      ),
-    );
-  }
-
-  Widget _notifTile() {
-    return Padding(
-      // Non-zero on BOTH platforms: this tile lives inside a `_settingsCard` on
-      // each, and a 0 desktop inset put the bell flush against the card edge.
-      padding: EdgeInsets.symmetric(
-          horizontal: kMobile && widget.embedded ? 0 : 14,
-          vertical: kMobile ? 2 : 9),
-      child: Row(children: [
-        // A bell for a notification setting. `zap` (a lightning bolt) named
-        // nothing about alerts.
-        AppIcon('bell', size: kMobile ? 18 : 14, color: AppColors.fg3),
-        const SizedBox(width: 10),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // No "Alerts" title here: every call site already prints an ALERTS
-            // section label directly above, so the row was repeating it.
-            Text('Notify when a session needs input',
-                style: sans(kMobile ? M.rowTitle : 12, color: AppColors.fg1)),
-          ]),
-        ),
-        _notifBusy
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg3))
-            : AppSwitch(on: _notif, onChanged: _toggleNotif),
-      ]),
-    );
-  }
-}
-
-/// Small green pulsing dot indicating a running session.
-class _PulsingDot extends StatefulWidget {
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200));
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (reduceMotion(context)) {
-      if (_ctrl.isAnimating) _ctrl.stop();
-      _ctrl.value = 1;
-    } else if (!_ctrl.isAnimating) {
-      _ctrl.repeat(reverse: true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _ctrl.drive(Tween(begin: 0.4, end: 1.0)),
-      child: Container(
-        width: 7,
-        height: 7,
-        decoration: const BoxDecoration(
-          color: Color(0xFF34D399), // emerald-400
-          shape: BoxShape.circle,
-        ),
-      ),
-    );
-  }
-}
-
-
-/// The agent working in a session, as a small inline badge.
-///
-/// Inline and compact on purpose: it answers "who is in here" on the row, so it
-/// needs no screen of its own, and it renders only when an agent is actually
-/// bound — an ordinary chat stays visually quiet.
-///
-/// [working] is the difference between the two facts worth telling apart: an
-/// agent ASSIGNED to a chat is quiet accent, while one actually mid-turn takes
-/// the run colour. Without it every bound session looked equally busy, which is
-/// the opposite of what the badge is for.
-class _AgentBadge extends StatelessWidget {
-  const _AgentBadge({required this.agentId, this.working = false});
-
-  final String agentId;
-  final bool working;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = working ? AppColors.run : AppColors.accent;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: working ? AppColors.runBg : AppColors.accentBg,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        AppIcon('users', size: 11, color: fg),
-        const SizedBox(width: 4),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 96),
-          child: Text(
-            agentId,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: sans(10, weight: W.label, color: fg),
-          ),
-        ),
-      ]),
-    );
-  }
+  int get hashCode =>
+      Object.hash(home, agent?.id, settingsSection, inSession, sessionTabIndex);
 }

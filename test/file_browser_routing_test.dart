@@ -19,17 +19,28 @@ class _FakeFilesClient extends DaemonClient {
   _FakeFilesClient() : super('https://daemon.invalid', 'test-token');
 
   @override
-  Future<FsListing> fs(String? path) async => FsListing.fromJson({
-        'path': path ?? '/root',
-        'parent': null,
+  Future<FsListing> fs(String? path) async {
+    if (path == '/root/lib') {
+      return FsListing.fromJson({
+        'path': '/root/lib',
+        'parent': '/root',
         'entries': [
-          {'name': 'clip.mp4', 'path': '/root/clip.mp4', 'is_dir': false},
-          {'name': 'song.mp3', 'path': '/root/song.mp3', 'is_dir': false},
-          {'name': 'notes.pdf', 'path': '/root/notes.pdf', 'is_dir': false},
-          {'name': 'notes.txt', 'path': '/root/notes.txt', 'is_dir': false},
-          {'name': 'lib', 'path': '/root/lib', 'is_dir': true},
+          {'name': 'main.dart', 'path': '/root/lib/main.dart', 'is_dir': false},
         ],
       });
+    }
+    return FsListing.fromJson({
+      'path': path ?? '/root',
+      'parent': null,
+      'entries': [
+        {'name': 'clip.mp4', 'path': '/root/clip.mp4', 'is_dir': false},
+        {'name': 'song.mp3', 'path': '/root/song.mp3', 'is_dir': false},
+        {'name': 'notes.pdf', 'path': '/root/notes.pdf', 'is_dir': false},
+        {'name': 'notes.txt', 'path': '/root/notes.txt', 'is_dir': false},
+        {'name': 'lib', 'path': '/root/lib', 'is_dir': true},
+      ],
+    });
+  }
 
   @override
   Future<FileContent> readFile(String path) async => FileContent.fromJson({
@@ -193,4 +204,59 @@ void main() {
       expect(find.byType(FileViewer), findsNothing);
     });
   });
+
+  testWidgets('mobile standalone FileExplorer provides New chat here action and climbs back cleanly',
+      (tester) async {
+    await asPlatform(TargetPlatform.android, () async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      String? newChatFolder;
+      var closed = false;
+
+      await tester.pumpWidget(MaterialApp(
+        home: FileExplorer(
+          client: _FakeFilesClient(),
+          title: 'Files',
+          start: '/root',
+          onClose: () => closed = true,
+          onNewChat: (folder) => newChatFolder = folder,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // 1. Mobile app bar shows 'New chat here' quick action when onNewChat is set
+      expect(find.byTooltip('New chat here'), findsOneWidget);
+      await tester.tap(find.byTooltip('New chat here'));
+      await tester.pumpAndSettle();
+      expect(newChatFolder, equals('/root'));
+
+      // 2. Navigate into subfolder 'lib'
+      await tester.tap(find.text('lib'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('main.dart'), findsOneWidget);
+      expect(find.text('/root/lib'), findsOneWidget);
+
+      // In subfolder, 'New chat here' action targets '/root/lib'
+      await tester.tap(find.byTooltip('New chat here'));
+      await tester.pumpAndSettle();
+      expect(newChatFolder, equals('/root/lib'));
+
+      // 3. Tapping back in SnAppBar climbs to parent folder (/root)
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('/root'), findsOneWidget);
+      expect(find.text('notes.txt'), findsOneWidget);
+      expect(closed, isFalse);
+
+      // 4. Tapping back at root calls onClose without opening any session
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(closed, isTrue);
+    });
+  });
 }
+

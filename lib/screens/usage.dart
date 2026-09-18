@@ -56,7 +56,7 @@ class _UsageScreenState extends State<UsageScreen> {
     final body = FutureBuilder<UsageSummary>(
       future: _future,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return const Center(child: CircularProgressIndicator(strokeWidth: 2));
         }
         if (snap.hasError) {

@@ -32,26 +32,40 @@ class InferenceProfilesScreen extends StatefulWidget {
       _InferenceProfilesScreenState();
 }
 
-class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
+class _InferenceProfilesScreenState extends State<InferenceProfilesScreen>
+    with AutomaticKeepAliveClientMixin {
   late Future<ServerConfig> _future;
-  late Future<UsageSummary> _usage;
   bool _inEditor = false;
   InferenceProfile? _editProfile;
   String? _delegate;
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   void initState() {
     super.initState();
     modelsRevision.addListener(_onModelsChanged);
-    _future = widget.client.getConfig();
-    _usage = widget.client.getUsage();
+    _load();
+  }
+
+  void _load({bool force = false}) {
+    _future = widget.client.getConfig(force: force);
   }
 
   void _onModelsChanged() {
     if (!mounted || _inEditor) return;
     setState(() {
-      _future = widget.client.getConfig(force: true);
+      _load(force: true);
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant InferenceProfilesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.client != widget.client) {
+      _load();
+    }
   }
 
   @override
@@ -63,7 +77,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
   void _refresh() {
     if (!mounted) return;
     setState(() {
-      _future = widget.client.getConfig();
+      _load();
     });
   }
 
@@ -115,6 +129,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     Theme.of(context); // Rebuild on theme change
     if (_inEditor) {
       final editor = InferenceProfileEditor(
@@ -145,10 +160,10 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
         ],
       );
     }
-    final body = FutureBuilder<List<Object?>>(
-      future: Future.wait<Object?>([_future, _usage]),
+    final body = FutureBuilder<ServerConfig>(
+      future: _future,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return widget.embedded
               ? const SizedBox.shrink()
               : Center(
@@ -158,8 +173,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: AppColors.fg3)));
         }
-        final cfg = snap.data?[0] as ServerConfig?;
-        final usage = snap.data?[1] as UsageSummary?;
+        final cfg = snap.data;
         final profiles = cfg?.profiles ?? const [];
         final list = ListView(
           physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
@@ -210,7 +224,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
               Column(
                 children: [
                   for (var i = 0; i < profiles.length; i++) ...[
-                    _profileCard(profiles[i], cfg?.delegate, usage),
+                    _profileCard(profiles[i], cfg?.delegate),
                     if (i < profiles.length - 1)
                       Divider(height: 1, color: AppColors.border),
                   ],
@@ -249,18 +263,9 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
     );
   }
 
-  Widget _profileCard(
-      InferenceProfile p, String? delegate, UsageSummary? usage) {
+  Widget _profileCard(InferenceProfile p, String? delegate) {
     final isDelegate =
         delegate != null && delegate.isNotEmpty && delegate == p.name;
-    UsageProvider? match;
-    for (final u in usage?.providers ?? const <UsageProvider>[]) {
-      if (u.profile == p.name ||
-          (u.provider == p.provider && u.model == p.model)) {
-        match = u;
-        break;
-      }
-    }
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -270,8 +275,8 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
           padding: EdgeInsets.fromLTRB(
               0, widget.embedded ? 6 : 12, 0, widget.embedded ? 6 : 12),
           child: Row(children: [
-            AppIcon('cpu',
-                size: widget.embedded ? 16 : 16,
+            AppIcon('ai-chip',
+                size: widget.embedded ? 18 : 20,
                 color: p.active ? AppColors.accent : AppColors.fg3),
             const SizedBox(width: 12),
             Expanded(
@@ -304,12 +309,6 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: mono(11, color: AppColors.fg4)),
-                  if (match != null && match.totalTokens > 0) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                        '${fmtSi(match.totalTokens)} tok · ${match.sessions} session${match.sessions == 1 ? '' : 's'}',
-                        style: mono(11, color: AppColors.fg3)),
-                  ],
                 ],
               ),
             ),

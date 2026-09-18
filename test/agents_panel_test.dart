@@ -191,6 +191,139 @@ void main() {
       expect(find.text('developer'), findsNothing);
     });
   });
+
+  testWidgets('tapping chevron collapses and expands nested sessions in tree view',
+      (tester) async {
+    await asDesktop(() async {
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final assignedClient = _CustomAgentsClient([
+        CoordinationAgent.fromJson({
+          'id': 'a1',
+          'display_name': 'Builder',
+          'handle': 'builder',
+          'role': 'developer',
+          'status': 'active',
+          'assigned_sessions': [
+            {
+              'id': 's1',
+              'title': 'feature/auth',
+              'conversation': 'feature/auth',
+              'last_active': nowSec - 120,
+            },
+          ],
+        }),
+      ]);
+
+      tester.view.physicalSize = const Size(360, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AgentsSidebarPanel(client: assignedClient),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('feature/auth'), findsOneWidget);
+      expect(find.text('1'), findsNothing);
+
+      // Tap chevron to collapse
+      await tester.tap(find.byWidgetPredicate(
+          (w) => w is AppIcon && w.name == 'chevron-down'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('feature/auth'), findsNothing);
+      expect(find.text('1'), findsOneWidget);
+
+      // Tap chevron to expand again
+      await tester.tap(find.byWidgetPredicate(
+          (w) => w is AppIcon && w.name == 'chevron-right'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('feature/auth'), findsOneWidget);
+      expect(find.text('1'), findsNothing);
+    });
+  });
+
+  testWidgets('tapping agent name opens agent conversation even if agent has sessions',
+      (tester) async {
+    CoordinationAgent? openedAgent;
+    final assignedClient = _CustomAgentsClient([
+        CoordinationAgent.fromJson({
+          'id': 'a1',
+          'display_name': 'Builder',
+          'handle': 'builder',
+          'role': 'developer',
+          'status': 'active',
+          'assigned_sessions': [
+            {
+              'id': 's1',
+              'title': 'feature/auth',
+              'conversation': 'feature/auth',
+              'last_active': 1000,
+            },
+          ],
+        }),
+      ]);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AgentsSidebarPanel(
+            client: assignedClient,
+            onOpenAgent: (a) => openedAgent = a,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Builder'), findsOneWidget);
+      await tester.tap(find.text('Builder'));
+      await tester.pumpAndSettle();
+
+      expect(openedAgent, isNotNull);
+      expect(openedAgent?.id, 'a1');
+    });
+
+  testWidgets('agent inbox sessions are not shown under assigned sessions',
+      (tester) async {
+    final assignedClient = _CustomAgentsClient([
+      CoordinationAgent.fromJson({
+        'id': 'a1',
+        'display_name': 'Builder',
+        'handle': 'builder',
+        'role': 'developer',
+        'status': 'active',
+        'assigned_sessions': [
+          {
+            'id': 'inbox-a1',
+            'title': 'Agent Inbox',
+            'conversation': 'default',
+            'last_active': 2000,
+          },
+          {
+            'id': 's1',
+            'title': 'feature/auth',
+            'conversation': 'feature/auth',
+            'last_active': 1000,
+          },
+        ],
+      }),
+    ]);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: AgentsSidebarPanel(
+          client: assignedClient,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Builder'), findsOneWidget);
+    expect(find.text('feature/auth'), findsOneWidget);
+    expect(find.text('Agent Inbox'), findsNothing);
+    expect(find.text('inbox-a1'), findsNothing);
+  });
 }
 
 class _CustomAgentsClient extends DaemonClient {

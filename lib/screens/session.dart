@@ -2253,6 +2253,7 @@ class _SessionScreenState extends State<SessionScreen>
     _input.removeListener(_interceptBigPaste);
     _inputFocus.unfocus();
     _reconnectTimer?.cancel();
+    _bannerTimer?.cancel();
     _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
@@ -2593,27 +2594,7 @@ class _SessionScreenState extends State<SessionScreen>
         ]),
       ),
     );
-    final guardedScaffold =
-        kMobile && widget.onMenu != null && widget.mobileActive
-            ? PopScope(
-                canPop: false,
-                onPopInvokedWithResult: (didPop, _) {
-                  if (didPop) return;
-                  // One authority, innermost first: an open actions drawer
-                  // closes, then the terminal overlay, then the session yields
-                  // back to the Chats list. Only Chats may exit the app.
-                  final scaf = _scaffoldKey.currentState;
-                  if (scaf != null && scaf.isEndDrawerOpen) {
-                    scaf.closeEndDrawer();
-                  } else if (_termOpen && _terms.isNotEmpty) {
-                    setState(() => _termOpen = false);
-                  } else {
-                    widget.onMenu?.call();
-                  }
-                },
-                child: scaffold,
-              )
-            : scaffold;
+    final guardedScaffold = scaffold;
     return kMacOS
         ? DropTarget(
             enable: widget.acceptDrops,
