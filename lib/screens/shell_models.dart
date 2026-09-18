@@ -229,5 +229,5 @@ class RightTab {
     return a.displayName.trim().isEmpty ? a.id : a.displayName;
   }
 
-  String get icon => isAgent ? 'users' : panel.icon;
+  String get icon => isAgent ? 'agent' : panel.icon;
 }

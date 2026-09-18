@@ -146,7 +146,7 @@ class _LeftRail extends StatelessWidget {
               Expanded(
                 child: Btn('Agents',
                     small: true,
-                    icon: 'users',
+                    icon: 'agent',
                     full: true,
                     onTap: () => presentScreen(
                           context,

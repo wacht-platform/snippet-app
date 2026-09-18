@@ -626,6 +626,10 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     final isSearching = effectiveQuery.isNotEmpty;
     final collapsed = isSearching ? false : _collapsed.contains(agent.id);
     final hasSessions = count > 0;
+    final lastActive = agent.assignedSessions.fold<int>(
+      0,
+      (latest, s) => s.lastActive > latest ? s.lastActive : latest,
+    );
     void toggle() {
       if (hasSessions) {
         setState(() {
@@ -653,7 +657,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         borderRadius: BorderRadius.circular(R.sm),
         onTap: openAgent,
         child: SizedBox(
-          height: 28,
+          height: 26,
           child: Padding(
             padding: EdgeInsets.fromLTRB(hasSessions ? 4 : kNavPadH, 0, 6, 0),
             child: Row(
@@ -675,23 +679,30 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                 ],
                 AgentStateIcon(
                   active: agent.available && hasSessions,
-                  size: 14,
+                  size: 13,
                 ),
-                const SizedBox(width: 7),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.left,
-                    style: sans(13, weight: W.body, color: AppColors.fg1),
+                    style: sans(12, weight: W.body, color: AppColors.fg1),
                   ),
                 ),
-                if (collapsed && count > 0)
+                if (collapsed && count > 0) ...[
                   InkWell(
                     onTap: toggle,
                     child: Text('$count',
                         style: sans(10, tabular: true, color: AppColors.fg3)),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                if (lastActive > 0)
+                  Text(
+                    relativeTime(lastActive),
+                    style: sans(10, tabular: true, color: AppColors.fg3),
                   ),
               ],
             ),
@@ -725,19 +736,19 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
           }
         },
         child: Container(
-          height: 28,
-          padding: const EdgeInsets.fromLTRB(kNavPadH + 12, 0, 6, 0),
+          height: 24,
+          padding: const EdgeInsets.fromLTRB(26, 0, 6, 0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              AppIcon(icon, size: 13, color: AppColors.fg3),
-              const SizedBox(width: 8),
+              AppIcon(icon, size: 12, color: AppColors.fg3),
+              const SizedBox(width: 7),
               Expanded(
                 child: Text(
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg2),
+                  style: sans(11.5, color: AppColors.fg2),
                 ),
               ),
               if (s.lastActive > 0)

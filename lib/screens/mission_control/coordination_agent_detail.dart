@@ -43,20 +43,9 @@ class CoordinationAgentDetail extends StatelessWidget {
       agentName: agent.displayName.trim().isEmpty
           ? agent.id
           : agent.displayName.trim(),
-      subtitle: _subtitle(agent),
       onClose: onClose,
       embedded: embedded,
     );
-  }
-
-  /// `@handle · role · status`, skipping any part the daemon did not report.
-  static String _subtitle(CoordinationAgent a) {
-    final parts = <String>[
-      if (a.handle.trim().isNotEmpty) '@${a.handle.trim()}',
-      if (a.role.trim().isNotEmpty) a.role.trim(),
-      if (a.status.trim().isNotEmpty) a.status.trim(),
-    ];
-    return parts.join(' · ');
   }
 }
 

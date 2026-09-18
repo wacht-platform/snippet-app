@@ -1335,8 +1335,8 @@ class _DesktopShellState extends State<DesktopShell>
       // horizontal room is what buys legibility (deep paths and long folder
       // names), while extra height only stretched a list that rarely fills it —
       // leaving a tall empty box around short content.
-      maxWidth: 800,
-      maxHeight: 560,
+      maxWidth: 440,
+      maxHeight: 500,
       builder: (_, close) => NewSessionPicker(
         client: c,
         machineLabel: active?.label ?? '',
@@ -2531,8 +2531,8 @@ class _DesktopShellState extends State<DesktopShell>
     if (c == null) return;
     final inst = _active;
     presentScreen(context,
-        maxWidth: 780,
-        maxHeight: 640,
+        maxWidth: 700,
+        maxHeight: 500,
         builder: (_, close) => _SettingsPanel(
               client: c,
               instances: _instances,

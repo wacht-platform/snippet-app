@@ -129,7 +129,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                   child: Row(children: [
-                    AppIcon('users', size: 16, color: AppColors.fg3),
+                    AppIcon('agent', size: 16, color: AppColors.fg3),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(

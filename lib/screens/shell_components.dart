@@ -165,7 +165,7 @@ class AgentBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        AppIcon('users', size: 11, color: fg),
+        AppIcon('agent', size: 11, color: fg),
         const SizedBox(width: 4),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 96),

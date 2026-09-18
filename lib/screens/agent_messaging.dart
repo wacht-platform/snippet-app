@@ -1,9 +1,17 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 
 import '../api.dart';
+import '../desktop_pick.dart';
 import '../models.dart';
 import '../panel.dart';
 import '../platform.dart';
@@ -62,7 +70,7 @@ Future<CoordinationAgent?> pickAgentId(
       for (final a in candidates)
         appMenuRow<String>(
           value: a.id,
-          icon: 'users',
+          icon: 'agent',
           label: a.displayName.trim().isEmpty ? a.id : a.displayName,
           description: '${a.handle} · ${a.role} · ${a.status}',
           selected: a.id == currentAgentId,
@@ -232,7 +240,7 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
               child: Row(children: [
-                AppIcon('users', size: 15, color: AppColors.fg3),
+                AppIcon('agent', size: 15, color: AppColors.fg3),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(_agentName ?? 'Choose an agent',
@@ -317,6 +325,9 @@ class AgentThreadScreen extends StatefulWidget {
 }
 
 class _AgentThreadScreenState extends State<AgentThreadScreen> {
+  static const _maxAttachments = 10;
+  static const _maxRecordingDuration = Duration(minutes: 3);
+
   final _input = TextEditingController();
   final _scroll = ScrollController();
   List<CoordinationEvent> _events = const [];
@@ -324,6 +335,25 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   bool _sending = false;
   String? _error;
   Timer? _pollTimer;
+
+  final List<_AgentAttachment> _attachments = [];
+  int _attachmentGeneration = 0;
+
+  final AudioRecorder _recorder = AudioRecorder();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  StreamSubscription<Amplitude>? _amplitudeSub;
+  StreamSubscription<PlayerState>? _playerStateSub;
+  StreamSubscription<Duration>? _positionSub;
+  Timer? _recordingTimer;
+
+  bool _isRecording = false;
+  String? _recordingPath;
+  Uint8List? _recordingBytes;
+  Duration _recordingElapsed = Duration.zero;
+  Duration _playbackPosition = Duration.zero;
+  bool _isPlayingRecording = false;
+  final List<double> _waveform = [];
 
   @override
   void initState() {
@@ -334,11 +364,37 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         _load(silent: true);
       }
     });
+    _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
+      if (!mounted) return;
+      setState(() => _isPlayingRecording = state == PlayerState.playing);
+    });
+    _positionSub = _audioPlayer.onPositionChanged.listen((position) {
+      if (!mounted) return;
+      setState(() => _playbackPosition = position);
+    });
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _amplitudeSub?.cancel();
+    _recordingTimer?.cancel();
+    _playerStateSub?.cancel();
+    _positionSub?.cancel();
+    if (_isRecording) {
+      unawaited(_recorder.cancel());
+    }
+    if (kCanRecord) {
+      unawaited(_recorder.dispose());
+    }
+    unawaited(_audioPlayer.dispose());
+    final pendingPath = _recordingPath;
+    if (pendingPath != null) {
+      try {
+        final f = File(pendingPath);
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+    }
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -392,9 +448,417 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     });
   }
 
+  Future<void> _onMicTap() async {
+    if (_isRecording) {
+      await _stopRecording();
+    } else {
+      await _startRecording();
+    }
+  }
+
+  Future<void> _startRecording() async {
+    if (!kCanRecord) return;
+    if (mounted) {
+      setState(() {
+        _isRecording = true;
+        _recordingElapsed = Duration.zero;
+        _waveform
+          ..clear()
+          ..add(0.08);
+      });
+    }
+    final granted = kMobile
+        ? (await Permission.microphone.request()).isGranted
+        : await _recorder.hasPermission();
+    if (!granted) {
+      if (mounted) setState(() => _isRecording = false);
+      if (mounted) {
+        toast(
+          context,
+          kMobile
+              ? 'Microphone permission is required.'
+              : 'Microphone permission is required by macOS.',
+          danger: true,
+        );
+        if (kMobile) {
+          final status = await Permission.microphone.status;
+          if (status.isPermanentlyDenied) await openAppSettings();
+        }
+      }
+      return;
+    }
+    try {
+      if (_recordingPath != null || _recordingBytes != null) {
+        await _discardRecording();
+      }
+      final tempDir = await getTemporaryDirectory();
+      final path =
+          '${tempDir.path}/snippet-agent-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 96000,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+      if (!await _recorder.isRecording()) {
+        if (mounted) setState(() => _isRecording = false);
+        if (mounted) toast(context, 'Could not start recording.', danger: true);
+        return;
+      }
+      _amplitudeSub?.cancel();
+      _amplitudeSub = _recorder
+          .onAmplitudeChanged(const Duration(milliseconds: 120))
+          .listen((a) {
+        final level = ((a.current + 60) / 60).clamp(0.04, 1.0).toDouble();
+        if (!mounted) return;
+        setState(() {
+          _waveform.add(level);
+          if (_waveform.length > 180) _waveform.removeAt(0);
+        });
+      });
+      _recordingTimer?.cancel();
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        final next = _recordingElapsed + const Duration(seconds: 1);
+        if (next >= _maxRecordingDuration) {
+          setState(() => _recordingElapsed = _maxRecordingDuration);
+          unawaited(_stopRecording());
+          toast(context, 'Recording stopped at the 3-minute limit.');
+        } else {
+          setState(() => _recordingElapsed = next);
+        }
+      });
+      if (mounted) setState(() => _recordingPath = path);
+    } catch (e) {
+      if (mounted) setState(() => _isRecording = false);
+      if (mounted) toast(context, 'Could not start recording: $e', danger: true);
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    if (!_isRecording) return;
+    if (mounted) setState(() => _isRecording = false);
+    _amplitudeSub?.cancel();
+    _amplitudeSub = null;
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    try {
+      final stoppedPath = await _recorder.stop();
+      final path = stoppedPath ?? _recordingPath;
+      if (path == null) {
+        if (mounted) toast(context, 'No recording was captured.');
+        return;
+      }
+      final bytes = await _waitForRecordingFile(path);
+      if (bytes == null || bytes.isEmpty) {
+        await _discardRecording();
+        if (mounted) toast(context, 'The recording was empty.');
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _recordingPath = path;
+          _recordingBytes = bytes;
+        });
+      } else {
+        _recordingPath = path;
+        _recordingBytes = bytes;
+      }
+    } catch (e) {
+      if (mounted) toast(context, 'Could not finish recording: $e', danger: true);
+    }
+  }
+
+  Future<Uint8List?> _waitForRecordingFile(String path) async {
+    final file = File(path);
+    const attempts = 40;
+    for (var i = 0; i < attempts; i++) {
+      try {
+        if (await file.exists()) {
+          final bytes = await file.readAsBytes();
+          if (bytes.isNotEmpty) return bytes;
+        }
+      } catch (_) {}
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    return null;
+  }
+
+  Future<void> _discardRecording() async {
+    final path = _recordingPath;
+    _amplitudeSub?.cancel();
+    _amplitudeSub = null;
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    try {
+      await _audioPlayer.stop();
+    } catch (_) {}
+    if (path != null) {
+      try {
+        final file = File(path);
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _recordingPath = null;
+        _recordingBytes = null;
+        _recordingElapsed = Duration.zero;
+        _playbackPosition = Duration.zero;
+        _waveform.clear();
+        _isPlayingRecording = false;
+      });
+    }
+  }
+
+  Future<bool> _confirmRecording() async {
+    final path = _recordingPath;
+    final bytes = _recordingBytes;
+    if (path == null && bytes == null) return false;
+    try {
+      if (bytes == null || bytes.isEmpty) {
+        await _discardRecording();
+        if (mounted) toast(context, 'The recording was empty.');
+        return false;
+      }
+      await _ingest([
+        (
+          name: 'voice-${DateTime.now().microsecondsSinceEpoch}.m4a',
+          localPath: null,
+          readBytes: () async => bytes,
+        )
+      ]);
+      await _audioPlayer.stop();
+      if (path != null) {
+        try {
+          final file = File(path);
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+      }
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _recordingPath = null;
+          _recordingBytes = null;
+          _recordingElapsed = Duration.zero;
+          _waveform.clear();
+          _playbackPosition = Duration.zero;
+          _isPlayingRecording = false;
+        });
+      }
+      return true;
+    } catch (e) {
+      if (mounted) toast(context, 'Could not attach recording: $e', danger: true);
+      return false;
+    }
+  }
+
+  Future<void> _toggleRecordingPlayback() async {
+    final path = _recordingPath;
+    if (path == null || _isRecording) return;
+    try {
+      if (_isPlayingRecording) {
+        await _audioPlayer.pause();
+      } else if (_audioPlayer.state == PlayerState.paused) {
+        await _audioPlayer.resume();
+      } else {
+        await _audioPlayer.play(DeviceFileSource(path));
+      }
+    } catch (e) {
+      if (mounted) toast(context, 'Could not play preview: $e', danger: true);
+    }
+  }
+
+  String _audioTime(Duration d) {
+    final seconds = d.inSeconds.clamp(0, 5999);
+    final minutes = seconds ~/ 60;
+    final remainder = seconds % 60;
+    return '$minutes:${remainder.toString().padLeft(2, '0')}';
+  }
+
+  bool _isImageName(String n) {
+    final l = n.toLowerCase();
+    return const [
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.webp',
+      '.bmp',
+      '.heic',
+      '.heif'
+    ].any(l.endsWith);
+  }
+
+  Future<void> _onAttachTap() async {
+    if (!kMobile) {
+      await _pickFiles();
+      return;
+    }
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface1,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Row(
+            children: [
+              _attachOption('camera', 'Camera', 'camera'),
+              const SizedBox(width: 10),
+              _attachOption('image', 'Photos', 'photos'),
+              const SizedBox(width: 10),
+              _attachOption('file', 'Files', 'files'),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice == 'camera') {
+      await _pickCamera();
+    } else if (choice == 'photos') {
+      await _pickPhotos();
+    } else if (choice == 'files') {
+      await _pickFiles();
+    }
+  }
+
+  Widget _attachOption(String icon, String label, String value) {
+    return Expanded(
+      child: Material(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.md),
+          onTap: () => Navigator.pop(context, value),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppIcon(icon, size: 22, color: AppColors.fg2),
+                const SizedBox(height: 8),
+                Text(label, style: sans(12, color: AppColors.fg1)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickPhotos() async {
+    final xs = await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 2200);
+    if (xs.isEmpty) return;
+    await _ingest(xs
+        .map((x) => (name: x.name, localPath: x.path, readBytes: x.readAsBytes))
+        .toList());
+  }
+
+  Future<void> _pickCamera() async {
+    final x = await ImagePicker().pickImage(
+        source: ImageSource.camera, imageQuality: 85, maxWidth: 2200);
+    if (x == null) return;
+    await _ingest([(name: x.name, localPath: x.path, readBytes: x.readAsBytes)]);
+  }
+
+  Future<void> _pickFiles() async {
+    List<PickedLocalFile> files;
+    try {
+      files = await pickLocalFiles();
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+      return;
+    }
+    if (files.isEmpty) return;
+    await _ingest(files
+        .map((f) => (
+              name: f.name,
+              localPath: f.path,
+              readBytes: f.readAsBytes,
+            ))
+        .toList());
+  }
+
+  Future<void> _ingest(
+      List<
+              ({
+                String name,
+                String? localPath,
+                Future<Uint8List> Function() readBytes
+              })>
+          picked) async {
+    final remaining = _maxAttachments - _attachments.length;
+    if (remaining <= 0) {
+      toast(context, 'Max $_maxAttachments attachments reached.');
+      return;
+    }
+    var items = picked;
+    if (items.length > remaining) {
+      items = items.take(remaining).toList();
+      toast(context, 'Added $remaining (max $_maxAttachments).');
+    }
+    final entries = items
+        .map((p) => _AgentAttachment(
+              name: p.name,
+              isImage: _isImageName(p.name),
+              isAudio: isAudioAttachmentPath(p.name),
+              localPath: p.localPath,
+            ))
+        .toList();
+    if (entries.isEmpty) return;
+    setState(() => _attachments.addAll(entries));
+    final generation = _attachmentGeneration;
+    for (var i = 0; i < entries.length; i++) {
+      final p = items[i];
+      final a = entries[i];
+      try {
+        final bytes = await p.readBytes();
+        final path = await widget.client.uploadFile(bytes, name: p.name);
+        if (!mounted || generation != _attachmentGeneration) return;
+        setState(() {
+          a.remotePath = path;
+          a.uploading = false;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _attachments.remove(a));
+        toast(context, 'Upload failed: ${p.name}', danger: true);
+      }
+    }
+  }
+
   Future<void> _send() async {
-    final body = _input.text.trim();
-    if (body.isEmpty || _sending) return;
+    if (_sending) return;
+    if (_isRecording) {
+      await _stopRecording();
+    }
+    if (_recordingPath != null) {
+      final ok = await _confirmRecording();
+      if (!ok) return;
+    }
+    if (_attachments.any((a) => a.uploading)) {
+      if (!mounted) return;
+      toast(context, 'Please wait for attachments to upload');
+      return;
+    }
+    final ready = _attachments.where((a) => a.remotePath != null).toList();
+    final markers = ready
+        .map((a) => a.isImage
+            ? '[attached image — call read_image on this exact path to view it: ${a.remotePath}]'
+            : '[attached file — read it at this exact path: ${a.remotePath}]')
+        .toList();
+    var body = _input.text.trim();
+    if (markers.isNotEmpty) {
+      body = body.isEmpty ? markers.join('\n\n') : '$body\n\n${markers.join('\n\n')}';
+    }
+    if (body.isEmpty) return;
     setState(() => _sending = true);
     try {
       await widget.client.sendAgentMessage(
@@ -403,6 +867,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       );
       if (!mounted) return;
       _input.clear();
+      _attachmentGeneration++;
+      _attachments.clear();
+      _discardRecording();
       setState(() => _sending = false);
       await _load(silent: true);
       _jumpToBottom(animated: true);
@@ -418,7 +885,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     // Wrapped in Material because presentScreen's non-rounded frames are plain
     // Containers — no Material ancestor — while a TextField and the icon buttons
     // here require one.
-    final hideChrome = widget.embedded && kMobile;
+    final hideChrome = widget.embedded;
     return Material(
       color: readingBg,
       child: SafeArea(
@@ -474,7 +941,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                   style:
                       sans(M.sectionTitle, weight: W.label, color: AppColors.fg1),
                 ),
-                if (subtitle.isNotEmpty) ...[
+                if (!kMobile && subtitle.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
@@ -590,7 +1057,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AppIcon('users', size: 12, color: AppColors.accent),
+                AppIcon('agent', size: 12, color: AppColors.accent),
                 const SizedBox(width: 5),
                 Text(
                   widget.agentName,
@@ -603,6 +1070,140 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         ],
       ),
     );
+  }
+
+  Widget _recordingPanel() {
+    final reviewing = !_isRecording && _recordingPath != null;
+    final position = reviewing ? _playbackPosition : _recordingElapsed;
+    final samples = List<double>.of(_waveform);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+      ),
+      child: Row(children: [
+        InkWell(
+          onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
+          borderRadius: BorderRadius.circular(99),
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Center(
+              child: AppIcon(
+                _isRecording
+                    ? 'stop'
+                    : (_isPlayingRecording ? 'pause' : 'play'),
+                size: 16,
+                color: _isRecording ? AppColors.accent : AppColors.fg1,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(_audioTime(position),
+            style: mono(11,
+                color: _isRecording ? AppColors.accent : AppColors.fg3)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SizedBox(
+            height: 22,
+            child: CustomPaint(painter: _WaveformPainter(samples)),
+          ),
+        ),
+        if (reviewing) ...[
+          IconBtn('x',
+              size: 28,
+              iconSize: 14,
+              tooltip: 'Discard',
+              onTap: _discardRecording),
+          IconBtn('check',
+              size: 28,
+              iconSize: 14,
+              tooltip: 'Use recording',
+              onTap: () => unawaited(_confirmRecording())),
+        ],
+      ]),
+    );
+  }
+
+  Widget _attachmentBar() {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _attachments.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (_, i) => _attachmentTile(_attachments[i]),
+      ),
+    );
+  }
+
+  Widget _attachmentTile(_AgentAttachment a) {
+    final thumb = a.isImage && a.localPath != null;
+    final isAudio = a.isAudio;
+    final body = thumb
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(R.sm),
+            child: Image.file(File(a.localPath!),
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+                cacheWidth: 72,
+                cacheHeight: 72),
+          )
+        : Container(
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: isAudio ? AppColors.accentBg : AppColors.surface2,
+              borderRadius: BorderRadius.circular(R.sm),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon(isAudio ? 'mic' : (a.isImage ? 'image' : 'file'),
+                  size: 12, color: isAudio ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 5),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 100),
+                child: Text(a.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(10,
+                        color: isAudio ? AppColors.accent : AppColors.fg2)),
+              ),
+            ]),
+          );
+    return Stack(children: [
+      body,
+      if (a.uploading)
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(R.sm)),
+            alignment: Alignment.center,
+            child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppColors.fg2)),
+          ),
+        ),
+      Positioned(
+        top: 3,
+        right: 3,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => setState(() => _attachments.remove(a)),
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: const BoxDecoration(
+                color: Colors.black87, shape: BoxShape.circle),
+            child: AppIcon('x', size: 8, color: Colors.white),
+          ),
+        ),
+      ),
+    ]);
   }
 
   Widget _composer() {
@@ -630,6 +1231,14 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_isRecording || _recordingPath != null) ...[
+                _recordingPanel(),
+                const SizedBox(height: 8),
+              ],
+              if (_attachments.isNotEmpty) ...[
+                _attachmentBar(),
+                const SizedBox(height: 6),
+              ],
               CallbackShortcuts(
                 bindings: {
                   const SingleActivator(LogicalKeyboardKey.enter): () {
@@ -665,6 +1274,19 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(R.sm),
+                    child: InkWell(
+                      onTap: _onAttachTap,
+                      borderRadius: BorderRadius.circular(R.sm),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: AppIcon('plus', size: 18, color: AppColors.fg3),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -676,7 +1298,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        AppIcon('users', size: 12, color: AppColors.fg3),
+                        AppIcon('agent', size: 12, color: AppColors.fg3),
                         const SizedBox(width: 5),
                         Text(widget.agentName,
                             style: mono(11, color: AppColors.fg2)),
@@ -684,10 +1306,33 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                     ),
                   ),
                   const Spacer(),
+                  if (kCanRecord) ...[
+                    Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(R.sm),
+                      child: InkWell(
+                        onTap: _onMicTap,
+                        borderRadius: BorderRadius.circular(R.sm),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: AppIcon(
+                            _isRecording ? 'mic-off' : 'mic',
+                            size: 18,
+                            color: _isRecording ? AppColors.danger : AppColors.fg3,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _input,
                     builder: (_, val, __) {
-                      final canSend = val.text.trim().isNotEmpty && !_sending;
+                      final canSend = (val.text.trim().isNotEmpty ||
+                              _attachments.isNotEmpty ||
+                              _isRecording ||
+                              _recordingPath != null) &&
+                          !_sending;
                       return _SendBtn(
                         enabled: canSend,
                         sending: _sending,
@@ -797,4 +1442,57 @@ void openAgentThread(
       onClose: close,
     ),
   );
+}
+
+class _AgentAttachment {
+  final String name;
+  final bool isImage;
+  final bool isAudio;
+  final String? localPath;
+  String? remotePath;
+  bool uploading;
+  _AgentAttachment({
+    required this.name,
+    required this.isImage,
+    required this.isAudio,
+    this.localPath,
+  }) : uploading = true;
+}
+
+class _WaveformPainter extends CustomPainter {
+  final List<double> samples;
+  const _WaveformPainter(this.samples);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.accent
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    if (samples.isEmpty) {
+      canvas.drawLine(
+        Offset(0, size.height / 2),
+        Offset(size.width, size.height / 2),
+        paint..color = AppColors.fg4,
+      );
+      return;
+    }
+    final waveformWidth = math.min(size.width, samples.length * 4.0);
+    for (var i = 0; i < samples.length; i++) {
+      final amplitude = samples[i].clamp(0.04, 1.0).toDouble();
+      final half =
+          (size.height * 0.45 * amplitude).clamp(2.0, size.height * 0.45);
+      final x = i * 4.0 + 2.0;
+      if (x > waveformWidth) break;
+      canvas.drawLine(
+        Offset(x, size.height / 2 - half),
+        Offset(x, size.height / 2 + half),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveformPainter oldDelegate) =>
+      oldDelegate.samples != samples;
 }

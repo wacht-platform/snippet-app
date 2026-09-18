@@ -87,7 +87,7 @@ class MissionControlHeader extends StatelessWidget {
           ),
         ),
         IconBtn(
-          'users',
+          'agent',
           size: 40,
           iconSize: 18,
           tooltip: 'Agents',

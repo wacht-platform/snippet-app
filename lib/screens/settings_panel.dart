@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../notifications.dart';
+import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'add_instance.dart';
 import 'inference_profile_editor.dart';
 import 'inference_profiles.dart';
 import 'recurring.dart';
@@ -320,22 +322,20 @@ class SettingsPanelState extends State<SettingsPanel> {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          // Embedded in the phone home, the bar already names this destination,
-          // so the title block is pure repetition — the section picker becomes
-          // the first line. Presented as a panel, it keeps its own title and
-          // close affordance.
           if (!widget.embedded) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
+            Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                border: Border(bottom: BorderSide(color: AppColors.border)),
+              ),
               child: Row(children: [
-                // Title only. The subtitle ("Configure this workspace and its
-                // inference profiles.") restated what the panel already is —
-                // it is titled Settings and every section is visible in the
-                // rail beside it, so the line spent height saying nothing new.
-                Expanded(
-                  child: Text('Settings',
-                      style: sans(14, weight: W.label, color: AppColors.fg1)),
-                ),
+                AppIcon('settings', size: 15, color: AppColors.fg3),
+                const SizedBox(width: 8),
+                Text('Settings',
+                    style: sans(13, weight: W.label, color: AppColors.fg1)),
+                const Spacer(),
                 IconBtn('x',
                     size: 26,
                     iconSize: 13,
@@ -343,23 +343,16 @@ class SettingsPanelState extends State<SettingsPanel> {
                     onTap: widget.onClose),
               ]),
             ),
-            Divider(height: 1, color: AppColors.border),
           ],
           Expanded(
             child: LayoutBuilder(builder: (context, c) {
-              // WIDE: a vertical rail, the shape every desktop settings window
-              // uses. The chip strip was a phone pattern stretched across a
-              // 640px dialog — five pills floating in a row with nothing
-              // anchoring them, leaving the whole left edge empty.
-              //
-              // NARROW: keep the chips. The panel is presented full-screen when
-              // the window is small, and a 196px rail would eat most of it.
               if (c.maxWidth >= 560) {
                 return Row(children: [
-                  SizedBox(
-                    width: 196,
+                  Container(
+                    width: 190,
+                    color: AppColors.surface1,
                     child: ListView(
-                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
                       children: [
                         for (final (page, icon, label) in _nav)
                           _settingsNavRow(page, icon, label),
@@ -367,7 +360,12 @@ class SettingsPanelState extends State<SettingsPanel> {
                     ),
                   ),
                   Container(width: 1, color: AppColors.border),
-                  Expanded(child: _pageBody()),
+                  Expanded(
+                    child: Container(
+                      color: AppColors.bg,
+                      child: _pageBody(),
+                    ),
+                  ),
                 ]);
               }
               return Column(children: [
@@ -474,15 +472,6 @@ class SettingsPanelState extends State<SettingsPanel> {
       );
 
 
-  /// One-line description of what a settings section is FOR.
-  String _sectionSummary(SettingsPage p) => switch (p) {
-        SettingsPage.general => 'Machine and alerts',
-        SettingsPage.models => 'Model for new chats',
-        SettingsPage.usage => 'Token spend and limits',
-        SettingsPage.vault => 'Secrets the agent can use',
-        SettingsPage.scheduled => 'Jobs that re-run on time',
-      };
-
   /// One phone settings section.
   Widget _mobileSectionPage() {
     final section = _mobileSection!;
@@ -530,31 +519,30 @@ class SettingsPanelState extends State<SettingsPanel> {
         child: InkWell(
           borderRadius: BorderRadius.circular(R.sm),
           onTap: () => setState(() => _page = page),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(children: [
               AppIcon(icon,
-                  size: 16, color: selected ? AppColors.fg1 : AppColors.fg3),
-              const SizedBox(width: 10),
+                  size: 14, color: selected ? AppColors.fg1 : AppColors.fg3),
+              const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13,
-                            weight: selected ? W.label : W.body,
-                            color: selected ? AppColors.fg1 : AppColors.fg2)),
-                    const SizedBox(height: 2),
-                    Text(_sectionSummary(page),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg3)),
-                  ],
-                ),
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12.5,
+                        weight: selected ? W.label : W.body,
+                        color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
+              if (selected)
+                Container(
+                  width: 3,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                ),
             ]),
           ),
         ),
@@ -598,54 +586,201 @@ class SettingsPanelState extends State<SettingsPanel> {
     );
   }
 
+  Widget _paneHeader(String title, String subtitle, {Widget? action}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title, style: sans(15, weight: W.title, color: AppColors.fg1)),
+                const SizedBox(height: 3),
+                Text(subtitle, style: sans(11.5, color: AppColors.fg3)),
+              ],
+            ),
+          ),
+          if (action != null) action,
+        ],
+      ),
+    );
+  }
+
   Widget _pageBody() {
     return switch (_page) {
-      SettingsPage.general => _generalPage(showTitle: false, showBlurb: false),
-      SettingsPage.models =>
-        InferenceProfilesScreen(client: widget.client, embedded: true),
-      SettingsPage.usage => UsageScreen(client: widget.client, embedded: true),
-      SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
-      SettingsPage.scheduled =>
-        RecurringScreen(client: widget.client, listOnly: true, embedded: true),
+      SettingsPage.general => _generalPage(showTitle: !kMobile, showBlurb: !kMobile),
+      SettingsPage.models => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!kMobile) ...[
+              _paneHeader('Inference profiles', 'Model and provider configurations for new sessions.'),
+              Divider(height: 1, color: AppColors.border),
+            ],
+            Expanded(child: InferenceProfilesScreen(client: widget.client, embedded: true)),
+          ],
+        ),
+      SettingsPage.usage => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!kMobile) ...[
+              _paneHeader('Usage & Tokens', 'Token consumption, context window stats, and limits.'),
+              Divider(height: 1, color: AppColors.border),
+            ],
+            Expanded(child: UsageScreen(client: widget.client, embedded: true)),
+          ],
+        ),
+      SettingsPage.vault => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!kMobile) ...[
+              _paneHeader('Vault & Secrets', 'Encrypted API keys and secrets accessible by agents.'),
+              Divider(height: 1, color: AppColors.border),
+            ],
+            Expanded(child: VaultScreen(client: widget.client, embedded: true)),
+          ],
+        ),
+      SettingsPage.scheduled => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!kMobile) ...[
+              _paneHeader('Scheduled Jobs', 'Recurring tasks and automated runs.'),
+              Divider(height: 1, color: AppColors.border),
+            ],
+            Expanded(child: RecurringScreen(client: widget.client, listOnly: true, embedded: true)),
+          ],
+        ),
     };
   }
 
   /// The General section's content.
   Widget _generalPage({bool showTitle = true, bool showBlurb = true}) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (showTitle) ...[
-          Text('General',
-              style: sans(14, weight: W.label, color: AppColors.fg1)),
-          const SizedBox(height: 3),
+          _paneHeader('General', 'Manage the connected daemon machine, saved instances, and notifications.'),
+          Divider(height: 1, color: AppColors.border),
         ],
-        if (showBlurb) ...[
-          Text('Manage the machine this app connects to and its alerts.',
-              style: sans(11, color: AppColors.fg3)),
-          const SizedBox(height: 18),
-        ],
-        _inlineLabel('Machines'),
-        const SizedBox(height: 8),
-        _settingsCard(
-          _instances.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    child: Text('No saved connections.',
-                        style: sans(M.meta, color: AppColors.fg3)),
-                  ),
-                ]
-              : [for (final i in _instances) _instanceRow(i)],
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              kMobile && widget.embedded ? M.gutter : 20,
+              16,
+              kMobile && widget.embedded ? M.gutter : 20,
+              24,
+            ),
+            children: [
+              _inlineLabel('Active Machine'),
+              const SizedBox(height: 8),
+              _activeMachineCard(),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(child: _inlineLabel('Saved Connections (${_instances.length})')),
+                  Btn('Add machine',
+                      icon: 'plus',
+                      small: true,
+                      variant: BtnVariant.ghost,
+                      onTap: () async {
+                        final inst = await showModal<Instance>(
+                          context,
+                          const AddInstanceScreen(),
+                        );
+                        if (inst != null && mounted) {
+                          setState(() {
+                            if (!_instances.any((e) => e.url == inst.url)) {
+                              _instances.add(inst);
+                            }
+                          });
+                        }
+                      }),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _settingsCard(
+                _instances.isEmpty
+                    ? [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 14),
+                          child: Text('No saved connections.',
+                              style: sans(12, color: AppColors.fg3)),
+                        ),
+                      ]
+                    : [for (final i in _instances) _instanceRow(i)],
+              ),
+              if (kCanNotify) ...[
+                const SizedBox(height: 20),
+                _inlineLabel('Alerts & Notifications'),
+                const SizedBox(height: 8),
+                _settingsCard([_notifTile()]),
+              ],
+            ],
+          ),
         ),
-        if (kCanNotify) ...[
-          const SizedBox(height: 18),
-          _inlineLabel('Alerts'),
-          const SizedBox(height: 8),
-          _settingsCard([_notifTile()]),
-        ],
       ],
+    );
+  }
+
+  Widget _activeMachineCard() {
+    final active = widget.active;
+    final label = active != null && active.label.isNotEmpty ? active.label : 'Default Machine';
+    final url = active?.url ?? widget.client.baseUrl;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.surface3,
+              borderRadius: BorderRadius.circular(R.sm),
+            ),
+            child: Center(
+              child: AppIcon('server', size: 16, color: AppColors.accent),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(label,
+                        style: sans(13, weight: W.label, color: AppColors.fg1)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('connected',
+                          style: sans(10, weight: W.label, color: AppColors.accent)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(url,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(11, color: AppColors.fg3)),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -702,16 +837,22 @@ class SettingsPanelState extends State<SettingsPanel> {
     return Padding(
       padding: EdgeInsets.symmetric(
           horizontal: kMobile && widget.embedded ? 0 : 14,
-          vertical: kMobile ? 2 : 9),
+          vertical: kMobile ? 2 : 10),
       child: Row(children: [
-        AppIcon('bell', size: kMobile ? 18 : 14, color: AppColors.fg3),
+        AppIcon('bell', size: kMobile ? 18 : 15, color: AppColors.fg3),
         const SizedBox(width: 10),
         Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Notify when a session needs input',
-                style: sans(kMobile ? M.rowTitle : 12, color: AppColors.fg1)),
-          ]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Session notifications',
+                  style: sans(kMobile ? M.rowTitle : 12.5,
+                      weight: W.label, color: AppColors.fg1)),
+              const SizedBox(height: 1),
+              Text('Notify when a session completes or requires input',
+                  style: sans(11, color: AppColors.fg3)),
+            ],
+          ),
         ),
         _notifBusy
             ? SizedBox(
