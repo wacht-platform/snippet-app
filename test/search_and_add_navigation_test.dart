@@ -148,7 +148,7 @@ void main() {
       // Close bottom search
       await tester.tap(find.byTooltip('Close search'));
       await tester.pumpAndSettle();
-      expect(find.text('Feature Setup'), findsNWidgets(2));
+      expect(find.text('Feature Setup'), findsOneWidget);
 
       // 2. Switch to Agents Screen:
       await tester.tap(find.text('Agents').first);
@@ -224,7 +224,7 @@ void main() {
   });
 
   testWidgets(
-      'mobile sessions list shows up to 10 recent sessions within 12 hours and handles empty state and search',
+      'mobile sessions list shows sessions chronologically with trailing folder name and handles empty state and search',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
@@ -286,15 +286,15 @@ void main() {
       await tester.pumpWidget(buildWidget(allSessions));
       await tester.pumpAndSettle();
 
-      // Recent header and project folder header are present (no count next to Recent):
-      expect(find.text('Recent'), findsOneWidget);
+      // Recent header is removed; folder name is on trailing session card; no duplicates
+      expect(find.text('Recent'), findsNothing);
       expect(find.text('10'), findsNothing);
-      expect(find.text('project'), findsOneWidget);
+      expect(find.text('project'), findsWidgets);
 
-      // Top recent items are visible:
-      expect(find.text('Session Title 0'), findsWidgets);
-      expect(find.text('Session Title 1'), findsWidgets);
-      expect(find.text('Session Title 2'), findsWidgets);
+      // Top recent items are visible once each:
+      expect(find.text('Session Title 0'), findsOneWidget);
+      expect(find.text('Session Title 1'), findsOneWidget);
+      expect(find.text('Session Title 2'), findsOneWidget);
 
       // Now search for an older session: search searches across all matching chats
       await tester.tap(find.byTooltip('Search'));

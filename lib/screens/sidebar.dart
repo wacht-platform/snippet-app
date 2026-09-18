@@ -938,47 +938,13 @@ class SidebarState extends State<Sidebar> {
             !isInboxSessionRow(s) &&
             _matchesQuery(s))
         .toList();
-    // Phone chats are one flat, chronological surface. Folder nesting is a
-    // desktop density aid; on a touch screen it obscures the one thing people
-    // came here to do: open the recent conversation.
+    // Phone chats are one flat, chronological surface.
     if (kMobile) {
-      final cutoff =
-          DateTime.now().millisecondsSinceEpoch ~/ 1000 - 12 * 60 * 60;
-      final recent = list.where((s) => s.lastActive >= cutoff).toList()
+      final allSorted = [...list]
         ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
-      final recentIds = recent.take(10).map((s) => s.id).toSet();
       final mobileChildren = <Widget>[];
-      if (recentIds.isNotEmpty) {
-        mobileChildren
-            .add(_mobileListHeader('Recent', first: true));
-        mobileChildren.addAll(recent
-            .where((s) => recentIds.contains(s.id))
-            .map(_sessionCard));
-      }
-      if (list.isNotEmpty) {
-        final grouped = <String, List<SessionInfo>>{};
-        final order = <String>[];
-        final allSorted = [...list]
-          ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
-        for (final session in allSorted) {
-          grouped.putIfAbsent(session.folder, () {
-            order.add(session.folder);
-            return <SessionInfo>[];
-          }).add(session);
-        }
-        if (recentIds.isNotEmpty) {
-          mobileChildren.add(const SizedBox(height: 8));
-        }
-        for (final folder in order) {
-          final sessions = grouped[folder]!;
-          mobileChildren.add(_folderHeader(folder,
-              first: mobileChildren.isEmpty, count: sessions.length));
-          final showSessions =
-              _filterQuery.trim().isNotEmpty || !_collapsed.contains(folder);
-          if (showSessions) {
-            mobileChildren.addAll(sessions.map(_sessionCard));
-          }
-        }
+      for (final session in allSorted) {
+        mobileChildren.add(_sessionCard(session));
       }
       if (mobileChildren.isEmpty) {
         mobileChildren.add(Padding(
@@ -1234,22 +1200,6 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-
-  Widget _mobileListHeader(String label, {int? count, bool first = false}) =>
-      Padding(
-        padding: EdgeInsets.fromLTRB(0, first ? 6 : 18, 0, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Text(label, style: display(M.sectionTitle, color: AppColors.fg1)),
-            if (count != null) ...[
-              const SizedBox(width: 8),
-              Text('$count', style: mono(M.meta, color: AppColors.fg3)),
-            ],
-          ],
-        ),
-      );
 
   Widget _folderHeader(String folder, {required bool first, int count = 0}) {
     final name =
@@ -1535,6 +1485,11 @@ class SidebarState extends State<Sidebar> {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
     final selected = !kMobile && s.id == widget.selectedSessionId;
+    final folderName = s.folder.trim().isEmpty
+        ? ''
+        : lastPathSegment(s.folder, ifEmpty: s.folder);
+    final trailingText =
+        folderName.isNotEmpty ? folderName : relativeTime(s.lastActive);
     return Material(
       color: selected || checked ? AppColors.surface2 : Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
@@ -1564,7 +1519,7 @@ class SidebarState extends State<Sidebar> {
         child: SizedBox(
           height: M.rowHeight,
           child: Padding(
-            padding: const EdgeInsets.only(left: 18, right: 0),
+            padding: EdgeInsets.zero,
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               if (_selecting) ...[
                 AppIcon(checked ? 'check' : 'plus',
@@ -1573,7 +1528,7 @@ class SidebarState extends State<Sidebar> {
                 const SizedBox(width: 8),
               ] else ...[
                 // The conversation glyph, tinted by run state (and pulsing while
-                // working). Always present so every row's title aligns with the folder above.
+                // working).
                 SessionStateIcon(status: s.status, size: 16),
                 const SizedBox(width: 8),
               ],
@@ -1607,11 +1562,16 @@ class SidebarState extends State<Sidebar> {
               ],
               // The gap is REQUIRED, not cosmetic: the title is `Expanded`, so a
               // long one fills the full width and butts straight against the
-              // time — the two run together with no separation.
-              if (!renaming) ...[
+              // folder — the two run together with no separation.
+              if (!renaming && trailingText.isNotEmpty) ...[
                 const SizedBox(width: 10),
-                Text(relativeTime(s.lastActive),
-                    style: sans(M.meta, tabular: true, color: AppColors.fg3)),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 130),
+                  child: Text(trailingText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(M.meta, color: AppColors.fg3)),
+                ),
               ],
             ]),
           ),
