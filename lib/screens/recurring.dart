@@ -36,6 +36,7 @@ class RecurringScreen extends StatefulWidget {
   /// Host-supplied back action for [embedded] use. This screen draws its OWN
   /// `NavBackRow`, so exactly one header exists per level.
   final VoidCallback? onBack;
+  final ValueChanged<bool>? onAddingChanged;
 
   const RecurringScreen({
     super.key,
@@ -46,6 +47,7 @@ class RecurringScreen extends StatefulWidget {
     this.listOnly = false,
     this.embedded = false,
     this.onBack,
+    this.onAddingChanged,
   });
   @override
   State<RecurringScreen> createState() => RecurringScreenState();
@@ -61,6 +63,7 @@ class RecurringScreenState extends State<RecurringScreen>
   bool _closed = false;
 
   bool _adding = false;
+  bool get isAdding => _adding;
   bool _submitting = false;
   final _titleCtrl = TextEditingController();
   final _promptCtrl = TextEditingController();
@@ -163,6 +166,7 @@ class RecurringScreenState extends State<RecurringScreen>
         _submitting = false;
         _adding = true;
       });
+      widget.onAddingChanged?.call(true);
       return;
     }
     final title = TextEditingController();
@@ -461,6 +465,7 @@ class RecurringScreenState extends State<RecurringScreen>
           _adding = false;
           _submitting = false;
         });
+        widget.onAddingChanged?.call(false);
         _refresh();
       }
     } catch (e) {
@@ -516,7 +521,10 @@ class RecurringScreenState extends State<RecurringScreen>
                   size: 24,
                   iconSize: 13,
                   tooltip: 'Cancel',
-                  onTap: () => setState(() => _adding = false)),
+                  onTap: () {
+                    setState(() => _adding = false);
+                    widget.onAddingChanged?.call(false);
+                  }),
             ],
           ),
           const SizedBox(height: 4),
@@ -622,7 +630,10 @@ class RecurringScreenState extends State<RecurringScreen>
               Btn('Cancel',
                   small: true,
                   variant: BtnVariant.ghost,
-                  onTap: () => setState(() => _adding = false)),
+                  onTap: () {
+                    setState(() => _adding = false);
+                    widget.onAddingChanged?.call(false);
+                  }),
               const SizedBox(width: 8),
               Btn('Save job',
                   small: true,

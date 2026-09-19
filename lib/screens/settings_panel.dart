@@ -201,6 +201,16 @@ class SettingsPanelState extends State<SettingsPanel> {
   bool _addMachineBusy = false;
   String? _addMachineError;
 
+  bool _modelsEditing = false;
+  bool _vaultAdding = false;
+  bool _recurringAdding = false;
+
+  bool get _isNested => switch (_page) {
+        SettingsPage.general => _addingMachine,
+        SettingsPage.models => _modelsEditing,
+        _ => false,
+      };
+
   String? _renamingUrl;
   final TextEditingController _renameController = TextEditingController();
 
@@ -442,25 +452,26 @@ class SettingsPanelState extends State<SettingsPanel> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Content Pane Header
-                        Container(
-                          height: 48,
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  _pageTitle(_page),
-                                  style: sans(14,
-                                      weight: W.title,
-                                      color: AppColors.fg1),
+                        if (!_isNested)
+                          Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _pageTitle(_page),
+                                    style: sans(14,
+                                        weight: W.title,
+                                        color: AppColors.fg1),
+                                  ),
                                 ),
-                              ),
-                              if (_pageAction(_page) != null)
-                                _pageAction(_page)!,
-                            ],
+                                if (_pageAction(_page) != null)
+                                  _pageAction(_page)!,
+                              ],
+                            ),
                           ),
-                        ),
                         // Active Page Content
                         Expanded(child: _pageBody()),
                       ],
@@ -536,10 +547,11 @@ class SettingsPanelState extends State<SettingsPanel> {
         section(
             'Inference profile',
             InferenceProfilesScreen(client: widget.client, embedded: true),
-            trailing: Btn('Add',
-                small: true,
-                variant: BtnVariant.ghost,
-                icon: 'plus',
+            trailing: IconBtn(
+                'plus',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Add profile',
                 onTap: () {
                   Navigator.of(context).push<bool>(
                     MaterialPageRoute(
@@ -556,10 +568,11 @@ class SettingsPanelState extends State<SettingsPanel> {
           'Vault',
           inlineScreen(VaultScreen(
               key: _vaultKey, client: widget.client, embedded: true)),
-          trailing: Btn('Add',
-              small: true,
-              variant: BtnVariant.ghost,
-              icon: 'plus',
+          trailing: IconBtn(
+              'plus',
+              size: 28,
+              iconSize: 15,
+              tooltip: 'Add secret',
               onTap: () => _vaultKey.currentState?.add()),
         ),
         section('Scheduled jobs', inlineScreen(RecurringScreen(client: widget.client, listOnly: true, embedded: true))),
@@ -713,22 +726,40 @@ class SettingsPanelState extends State<SettingsPanel> {
   Widget? _pageAction(SettingsPage page) => switch (page) {
         SettingsPage.general => _addingMachine
             ? null
-            : Btn('Add machine',
-                icon: 'plus',
-                small: true,
-                onTap: _addMachine),
-        SettingsPage.models => Btn('Add profile',
-            icon: 'plus',
-            small: true,
-            onTap: () => _modelsKey.currentState?.addProfile()),
-        SettingsPage.vault => Btn('Add secret',
-            icon: 'plus',
-            small: true,
-            onTap: () => _vaultKey.currentState?.add()),
-        SettingsPage.scheduled => Btn('Add job',
-            icon: 'plus',
-            small: true,
-            onTap: () => _recurringKey.currentState?.add()),
+            : IconBtn(
+                'plus',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Add machine',
+                onTap: _addMachine,
+              ),
+        SettingsPage.models => _modelsEditing
+            ? null
+            : IconBtn(
+                'plus',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Add profile',
+                onTap: () => _modelsKey.currentState?.addProfile(),
+              ),
+        SettingsPage.vault => _vaultAdding
+            ? null
+            : IconBtn(
+                'plus',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Add secret',
+                onTap: () => _vaultKey.currentState?.add(),
+              ),
+        SettingsPage.scheduled => _recurringAdding
+            ? null
+            : IconBtn(
+                'plus',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Add job',
+                onTap: () => _recurringKey.currentState?.add(),
+              ),
         _ => null,
       };
 
@@ -745,6 +776,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           onTap: () => setState(() {
             _page = page;
             _addingMachine = false;
+            _modelsEditing = false;
             _renamingUrl = null;
           }),
           child: Container(
@@ -813,6 +845,8 @@ class SettingsPanelState extends State<SettingsPanel> {
           key: _modelsKey,
           client: widget.client,
           embedded: true,
+          onEditingChanged: (editing) =>
+              setState(() => _modelsEditing = editing),
         ),
       SettingsPage.usage => UsageScreen(
           client: widget.client,
@@ -822,11 +856,15 @@ class SettingsPanelState extends State<SettingsPanel> {
           key: _vaultKey,
           client: widget.client,
           embedded: true,
+          onAddingChanged: (adding) =>
+              setState(() => _vaultAdding = adding),
         ),
       SettingsPage.scheduled => RecurringScreen(
           key: _recurringKey,
           client: widget.client,
           embedded: true,
+          onAddingChanged: (adding) =>
+              setState(() => _recurringAdding = adding),
         ),
     };
   }
@@ -849,10 +887,10 @@ class SettingsPanelState extends State<SettingsPanel> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Btn('Add machine',
-                    icon: 'plus',
-                    small: true,
-                    variant: BtnVariant.ghost,
+                IconBtn('plus',
+                    size: 28,
+                    iconSize: 15,
+                    tooltip: 'Add machine',
                     onTap: _addMachine),
               ],
             ),

@@ -18,6 +18,7 @@ class VaultScreen extends StatefulWidget {
   /// Host-supplied back action for [embedded] use. This screen draws its OWN
   /// `NavBackRow`, so exactly one header exists per level.
   final VoidCallback? onBack;
+  final ValueChanged<bool>? onAddingChanged;
 
   const VaultScreen({
     super.key,
@@ -25,6 +26,7 @@ class VaultScreen extends StatefulWidget {
     this.onClose,
     this.embedded = false,
     this.onBack,
+    this.onAddingChanged,
   });
   @override
   State<VaultScreen> createState() => VaultScreenState();
@@ -37,6 +39,8 @@ class VaultScreenState extends State<VaultScreen> {
 
   /// Desktop only: the inline add form is open in the list.
   bool _adding = false;
+
+  bool get isAdding => _adding;
 
   @override
   void initState() {
@@ -77,6 +81,7 @@ class VaultScreenState extends State<VaultScreen> {
     if (_adding) return;
     if (!kMobile) {
       setState(() => _adding = true);
+      widget.onAddingChanged?.call(true);
       return;
     }
     final name = await showAppSheet<String>(
@@ -103,6 +108,7 @@ class VaultScreenState extends State<VaultScreen> {
       _names!.sort();
       _adding = false;
     });
+    widget.onAddingChanged?.call(false);
   }
 
   Future<void> _remove(String name) async {
@@ -193,7 +199,10 @@ class VaultScreenState extends State<VaultScreen> {
                     client: widget.client,
                     inline: true,
                     onSaved: _afterAdded,
-                    onCancel: () => setState(() => _adding = false),
+                    onCancel: () {
+                      setState(() => _adding = false);
+                      widget.onAddingChanged?.call(false);
+                    },
                   ),
               ],
             )
@@ -218,7 +227,10 @@ class VaultScreenState extends State<VaultScreen> {
                       client: widget.client,
                       inline: true,
                       onSaved: _afterAdded,
-                      onCancel: () => setState(() => _adding = false),
+                      onCancel: () {
+                        setState(() => _adding = false);
+                        widget.onAddingChanged?.call(false);
+                      },
                     ),
                   ),
               ],

@@ -19,6 +19,7 @@ class InferenceProfilesScreen extends StatefulWidget {
   /// `NavBackRow`, so exactly one header exists per level — the host drawing it
   /// instead is what produced two stacked back rows in the model editor.
   final VoidCallback? onBack;
+  final ValueChanged<bool>? onEditingChanged;
 
   const InferenceProfilesScreen({
     super.key,
@@ -26,6 +27,7 @@ class InferenceProfilesScreen extends StatefulWidget {
     this.onClose,
     this.embedded = false,
     this.onBack,
+    this.onEditingChanged,
   });
   @override
   State<InferenceProfilesScreen> createState() =>
@@ -119,6 +121,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       _editProfile = p;
       _delegate = delegate;
     });
+    widget.onEditingChanged?.call(true);
   }
 
   void _closeEditor({bool saved = false}) {
@@ -127,6 +130,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       _inEditor = false;
       _editProfile = null;
     });
+    widget.onEditingChanged?.call(false);
     if (saved) _refresh();
   }
 
@@ -155,9 +159,12 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NavBackRow(
-            title: _editProfile == null ? 'Add profile' : 'Edit profile',
-            onBack: _closeEditor,
+          Padding(
+            padding: EdgeInsets.fromLTRB(widget.embedded ? 18 : 4, 6, 24, 6),
+            child: NavBackRow(
+              title: _editProfile == null ? 'Add profile' : 'Edit profile',
+              onBack: _closeEditor,
+            ),
           ),
           Expanded(child: editor),
         ],
