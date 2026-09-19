@@ -887,7 +887,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     // here require one.
     final hideChrome = widget.embedded;
     return Material(
-      color: hideChrome ? Colors.transparent : readingBg,
+      color: readingBg,
       child: SafeArea(
         top: !hideChrome,
         bottom: false,

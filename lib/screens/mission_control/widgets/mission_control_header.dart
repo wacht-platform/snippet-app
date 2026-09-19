@@ -5,7 +5,6 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../../platform.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../../../panel.dart';
@@ -44,7 +43,7 @@ class MissionControlHeader extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(_compact ? 12 : 16, 10, 8, 10),
       decoration: BoxDecoration(
-        color: (kMacOS || kWindows) ? Colors.transparent : readingBg,
+        color: readingBg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [

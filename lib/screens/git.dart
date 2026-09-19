@@ -657,11 +657,11 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
     ]);
     if (widget.embedded) {
       return ColoredBox(
-          color: (kMacOS || kWindows) ? Colors.transparent : readingBg,
+          color: readingBg,
           child: body);
     }
     return Scaffold(
-      backgroundColor: (kMacOS || kWindows) ? Colors.transparent : readingBg,
+      backgroundColor: readingBg,
       body: SafeArea(bottom: false, child: body),
     );
   }

@@ -5,7 +5,6 @@ library;
 
 import 'package:flutter/material.dart';
 
-import '../../../platform.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../../../panel.dart';
@@ -71,7 +70,7 @@ class _DesktopMissionControlState extends State<DesktopMissionControl> {
   Widget build(BuildContext context) {
     final state = ChangeNotifierProvider.of<MissionControlState>(context);
     return Scaffold(
-      backgroundColor: (kMacOS || kWindows) ? Colors.transparent : readingBg,
+      backgroundColor: readingBg,
       body: SafeArea(
         child: Column(
           children: [

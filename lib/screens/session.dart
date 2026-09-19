@@ -2526,7 +2526,7 @@ class _SessionScreenState extends State<SessionScreen>
       endDrawer: useDrawer ? _actionsDrawer(s) : null,
       // Tap-only: the default edge drag competes with transcript gestures.
       endDrawerEnableOpenDragGesture: false,
-      backgroundColor: (kMacOS || kWindows) ? Colors.transparent : readingBg,
+      backgroundColor: readingBg,
       resizeToAvoidBottomInset: false,
       body: SafeArea(
         bottom: false,
@@ -3034,7 +3034,7 @@ class _SessionScreenState extends State<SessionScreen>
       height: mac ? 42 : 50,
       padding: EdgeInsets.symmetric(horizontal: mac ? 16 : 8),
       decoration: BoxDecoration(
-        color: mac ? Colors.transparent : readingBg,
+        color: mac ? AppColors.surface1 : readingBg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [

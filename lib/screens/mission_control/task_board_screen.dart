@@ -181,7 +181,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
     // canvas pane and the standalone route is a bg scaffold, and the two must
     // still read the same.
     final list = ColoredBox(
-      color: widget.embedded ? Colors.transparent : readingBg,
+      color: readingBg,
       child: _content(),
     );
 
@@ -190,7 +190,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
       // filter on. A slim chrome band keeps the control reachable — otherwise
       // embedding would silently drop the page's only filter affordance.
       return ColoredBox(
-        color: AppColors.windowBg,
+        color: AppColors.bg,
         child: Column(children: [
           Align(
             alignment: Alignment.centerRight,

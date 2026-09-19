@@ -3,7 +3,6 @@ import 'package:re_editor/re_editor.dart';
 
 import '../api.dart';
 import '../highlight.dart';
-import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -188,7 +187,7 @@ class _EditorScreenState extends State<EditorScreen> {
         if (!didPop) _maybePop();
       },
       child: Scaffold(
-        backgroundColor: (kMacOS || kWindows) ? Colors.transparent : readingBg,
+        backgroundColor: readingBg,
         body: SafeArea(
           bottom: false,
           child: Column(children: [

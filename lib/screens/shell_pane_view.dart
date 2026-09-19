@@ -260,7 +260,7 @@ class ReadoutChip extends StatelessWidget {
           height: kPaneTabHeight,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: active ? AppColors.windowBg : Colors.transparent,
+            color: active ? readingBg : Colors.transparent,
             border: Border(
               right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
               top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
@@ -362,7 +362,7 @@ class PaneTabChip extends StatelessWidget {
           height: kPaneTabHeight,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: active ? AppColors.windowBg : Colors.transparent,
+            color: active ? readingBg : Colors.transparent,
             border: Border(
               right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
               top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
@@ -468,7 +468,7 @@ class PaneStrip extends StatelessWidget {
     final count = tabs.length + readouts.length;
     return Container(
       height: kPaneHeaderHeight,
-      color: Colors.transparent,
+      color: readingBg,
       child: Stack(fit: StackFit.expand, children: [
         LayoutBuilder(builder: (context, c) {
           final w = kPaneTabWidth(c.maxWidth, count);
