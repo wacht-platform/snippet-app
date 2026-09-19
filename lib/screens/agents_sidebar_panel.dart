@@ -269,8 +269,6 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             child: ListView(
               padding: EdgeInsets.fromLTRB(M.gutter, 24, M.gutter, 32),
               children: [
-                Text('Agents', style: display(28, color: AppColors.fg1)),
-                const SizedBox(height: 16),
                 Text('Could not load agents',
                     style: sans(13, color: AppColors.fg2)),
                 const SizedBox(height: 10),
@@ -322,18 +320,30 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
 
     if (kMobile) {
       final mobileChildren = <Widget>[];
-      var first = true;
       for (final agent in ordered) {
         final sessions = _sessionsForAgent(agent, q);
-        mobileChildren.add(
-            _agentHeader(agent, first: first, count: sessions.length));
-        first = false;
         final showSessions = q.isNotEmpty || !_collapsed.contains(agent.id);
-        if (showSessions) {
-          for (final s in sessions) {
-            mobileChildren.add(_sessionCard(agent, s));
-          }
-        }
+        mobileChildren.add(Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _agentHeader(agent, count: sessions.length),
+              if (showSessions && sessions.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Material(
+                  key: ValueKey('agent-sessions-${agent.id}'),
+                  color: AppColors.surface1,
+                  borderRadius: BorderRadius.circular(R.md),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(children: [
+                    for (final s in sessions) _sessionCard(agent, s),
+                  ]),
+                ),
+              ],
+            ],
+          ),
+        ));
       }
 
       return RefreshIndicator(
@@ -341,7 +351,8 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         backgroundColor: AppColors.surface3,
         onRefresh: refresh,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 28),
           children: [
             ...mobileChildren,
             if (ordered.isEmpty && mobileChildren.isEmpty)
@@ -463,8 +474,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   }
 
 
-  /// Mobile agent header row styled exactly like the folder header on the sessions page.
-  Widget _agentHeader(CoordinationAgent agent, {required bool first, int count = 0}) {
+  Widget _agentHeader(CoordinationAgent agent, {int count = 0}) {
     final name =
         agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
     final isSearching = effectiveQuery.isNotEmpty;
@@ -490,82 +500,83 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     }
     final chevron = collapsed ? 'chevron-right' : 'chevron-down';
 
-    return Padding(
-      padding: EdgeInsets.only(top: first ? 2 : 16),
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        children: [
-          Expanded(
-            flex: 7,
-            child: Row(
-              mainAxisSize: MainAxisSize.max,
-              children: [
-                if (hasSessions) ...[
-                  Material(
-                    color: Colors.transparent,
-                    child: InkResponse(
-                      onTap: toggle,
-                      radius: 18,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 6, 6, 6),
-                        child: AppIcon(chevron, size: 14, color: AppColors.fg4),
-                      ),
-                    ),
+    final activity = agent.available ? 'Available' : 'Unavailable';
+    final metadata = [
+      if (agent.role.trim().isNotEmpty) agent.role.trim(),
+      activity,
+    ].join(' · ');
+
+    return Row(children: [
+      Expanded(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(R.sm),
+            onTap: openAgent,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(R.sm),
                   ),
-                ] else
-                  const SizedBox(width: 20),
+                  child: Text(name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+                      style: sans(16, weight: W.label, color: AppColors.fg2)),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(R.xs),
-                      onTap: openAgent,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Text(
-                          name,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(15, weight: W.label, color: AppColors.fg1),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: hasSessions ? toggle : openAgent,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(height: 1, color: AppColors.border),
-                      ),
-                      if (collapsed && count > 0) ...[
-                        const SizedBox(width: 8),
-                        Text('$count',
-                            style: sans(11, tabular: true, color: AppColors.fg3)),
-                      ],
+                          style: sans(16, weight: W.label, color: AppColors.fg1)),
+                      const SizedBox(height: 4),
+                      Text(metadata,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(M.meta, color: AppColors.fg3)),
                     ],
                   ),
                 ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+      if (hasSessions)
+        Tooltip(
+          message: '${collapsed ? 'Expand' : 'Collapse'} sessions for $name',
+          child: Semantics(
+            button: true,
+            label: '$count assigned sessions',
+            expanded: !collapsed,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(R.sm),
+              onTap: isSearching ? null : toggle,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                    minWidth: M.minTarget, minHeight: M.minTarget),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const SizedBox(width: 8),
+                  Text('$count',
+                      style: sans(M.meta, tabular: true, color: AppColors.fg3)),
+                  const SizedBox(width: 6),
+                  AppIcon(chevron, size: 14, color: AppColors.fg3),
+                  const SizedBox(width: 8),
+                ]),
               ),
             ),
           ),
-        ],
-      ),
-    );
+        ),
+    ]);
   }
 
-  /// Mobile session card matching `_sessionCard` in desktop_shell.dart.
   Widget _sessionCard(CoordinationAgent agent, AgentAssignedSession s) {
     final title = s.title.trim().isNotEmpty
         ? s.title.trim()
@@ -591,7 +602,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         child: SizedBox(
           height: M.rowHeight,
           child: Padding(
-            padding: const EdgeInsets.only(left: 18, right: 0),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
