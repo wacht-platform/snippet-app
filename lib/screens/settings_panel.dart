@@ -183,6 +183,8 @@ class SettingsPanelState extends State<SettingsPanel> {
   bool _notifBusy = false;
   late Future<void> _mobileSettingsReady;
   final GlobalKey<VaultScreenState> _vaultKey = GlobalKey<VaultScreenState>();
+  final GlobalKey<InferenceProfilesScreenState> _modelsKey =
+      GlobalKey<InferenceProfilesScreenState>();
 
   SettingsPage _page = SettingsPage.general;
 
@@ -207,9 +209,9 @@ class SettingsPanelState extends State<SettingsPanel> {
   static const _nav = [
     (SettingsPage.general, 'server', 'General'),
     (SettingsPage.models, 'ai-chip', 'Inference profiles'),
-    (SettingsPage.usage, 'analytics', 'Usage'),
-    (SettingsPage.vault, 'lock-key', 'Vault'),
-    (SettingsPage.scheduled, 'repeat', 'Scheduled'),
+    (SettingsPage.usage, 'analytics', 'Usage & Tokens'),
+    (SettingsPage.vault, 'lock-key', 'Vault & Secrets'),
+    (SettingsPage.scheduled, 'repeat', 'Scheduled Jobs'),
   ];
 
   @override
@@ -318,20 +320,164 @@ class SettingsPanelState extends State<SettingsPanel> {
       );
     }
     return Scaffold(
-      backgroundColor: AppColors.surface1,
+      backgroundColor: AppColors.bg,
       body: SafeArea(
         bottom: false,
-        child: Column(children: [
-          if (!widget.embedded) ...[
+        child: LayoutBuilder(builder: (context, c) {
+          if (c.maxWidth >= 560) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left Column (Sidebar Rail)
+                Container(
+                  width: 215,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface1,
+                    border: Border(
+                      right: BorderSide(
+                          color: AppColors.border.withValues(alpha: 0.7)),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Sidebar Header
+                      Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                                color: AppColors.border.withValues(alpha: 0.6)),
+                          ),
+                        ),
+                        child: Row(children: [
+                          AppIcon('settings',
+                              size: 16, color: AppColors.accent),
+                          const SizedBox(width: 10),
+                          Text('Settings',
+                              style: sans(14,
+                                  weight: W.title, color: AppColors.fg1)),
+                        ]),
+                      ),
+                      // Nav Items
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 10),
+                          children: [
+                            for (final (page, icon, label) in _nav)
+                              _settingsNavRow(page, icon, label),
+                          ],
+                        ),
+                      ),
+                      // Machine Status in Sidebar Footer
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: BorderSide(
+                                color: AppColors.border.withValues(alpha: 0.6)),
+                          ),
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: AppColors.ok,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.active?.label.isNotEmpty == true
+                                  ? widget.active!.label
+                                  : 'Connected',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(11, color: AppColors.fg3),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ],
+                  ),
+                ),
+                // Right Column (Content Pane)
+                Expanded(
+                  child: Container(
+                    color: AppColors.bg,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Content Pane Header (matches sidebar 52px height)
+                        Container(
+                          height: 52,
+                          padding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                  color:
+                                      AppColors.border.withValues(alpha: 0.6)),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _pageTitle(_page),
+                                      style: sans(14.5,
+                                          weight: W.title,
+                                          color: AppColors.fg1),
+                                    ),
+                                    const SizedBox(height: 1),
+                                    Text(
+                                      _pageSubtitle(_page),
+                                      style: sans(11, color: AppColors.fg3),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (_pageAction(_page) != null) ...[
+                                _pageAction(_page)!,
+                                const SizedBox(width: 10),
+                              ],
+                              IconBtn('x',
+                                  size: 28,
+                                  iconSize: 15,
+                                  tooltip: 'Close settings',
+                                  onTap: widget.onClose),
+                            ],
+                          ),
+                        ),
+                        // Active Page Content
+                        Expanded(child: _pageBody()),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+          // Narrow viewport fallback:
+          return Column(children: [
             Container(
-              height: 44,
+              height: 46,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
                 color: AppColors.surface1,
                 border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
               child: Row(children: [
-                AppIcon('settings', size: 15, color: AppColors.fg3),
+                AppIcon('settings', size: 15, color: AppColors.accent),
                 const SizedBox(width: 8),
                 Text('Settings',
                     style: sans(13, weight: W.label, color: AppColors.fg1)),
@@ -343,39 +489,11 @@ class SettingsPanelState extends State<SettingsPanel> {
                     onTap: widget.onClose),
               ]),
             ),
-          ],
-          Expanded(
-            child: LayoutBuilder(builder: (context, c) {
-              if (c.maxWidth >= 560) {
-                return Row(children: [
-                  Container(
-                    width: 190,
-                    color: AppColors.surface1,
-                    child: ListView(
-                      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-                      children: [
-                        for (final (page, icon, label) in _nav)
-                          _settingsNavRow(page, icon, label),
-                      ],
-                    ),
-                  ),
-                  Container(width: 1, color: AppColors.border),
-                  Expanded(
-                    child: Container(
-                      color: AppColors.bg,
-                      child: _pageBody(),
-                    ),
-                  ),
-                ]);
-              }
-              return Column(children: [
-                SizedBox(height: 44, child: _navChips()),
-                Divider(height: 1, color: AppColors.border),
-                Expanded(child: _pageBody()),
-              ]);
-            }),
-          ),
-        ]),
+            SizedBox(height: 44, child: _navChips()),
+            Divider(height: 1, color: AppColors.border),
+            Expanded(child: _pageBody()),
+          ]);
+        }),
       ),
     );
   }
@@ -449,8 +567,11 @@ class SettingsPanelState extends State<SettingsPanel> {
   /// One grouped card. Related rows share a surface and a radius, and hairlines
   /// separate them.
   Widget _settingsCard(List<Widget> children) => Material(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
+        color: kMobile ? AppColors.surface2 : AppColors.surface1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(R.md),
+          side: BorderSide(color: AppColors.border),
+        ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -458,7 +579,10 @@ class SettingsPanelState extends State<SettingsPanel> {
             for (var i = 0; i < children.length; i++) ...[
               children[i],
               if (i < children.length - 1)
-                Divider(height: 1, thickness: 1, color: AppColors.border),
+                Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: AppColors.border.withValues(alpha: 0.6)),
             ],
           ],
         ),
@@ -481,7 +605,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             NavBackRow(title: 'General', onBack: back),
-            Expanded(child: _generalPage(showTitle: false)),
+            Expanded(child: _generalPage()),
           ],
         ),
       SettingsPage.models => InferenceProfilesScreen(
@@ -508,11 +632,62 @@ class SettingsPanelState extends State<SettingsPanel> {
     };
   }
 
+  Future<void> _addMachine() async {
+    final inst = await showModal<Instance>(
+      context,
+      const AddInstanceScreen(),
+    );
+    if (inst != null && mounted) {
+      setState(() {
+        if (!_instances.any((e) => e.url == inst.url)) {
+          _instances.add(inst);
+        }
+      });
+    }
+  }
+
+  String _pageTitle(SettingsPage page) => switch (page) {
+        SettingsPage.general => 'General',
+        SettingsPage.models => 'Inference Profiles',
+        SettingsPage.usage => 'Usage & Tokens',
+        SettingsPage.vault => 'Vault & Secrets',
+        SettingsPage.scheduled => 'Scheduled Jobs',
+      };
+
+  String _pageSubtitle(SettingsPage page) => switch (page) {
+        SettingsPage.general =>
+          'Manage the connected daemon machine, saved instances, and notifications.',
+        SettingsPage.models =>
+          'Model and provider configurations for new sessions and delegated work.',
+        SettingsPage.usage =>
+          'Token consumption, context window stats, and limits by provider.',
+        SettingsPage.vault =>
+          'Encrypted API keys and secrets accessible by agents.',
+        SettingsPage.scheduled =>
+          'Recurring background tasks and automated routines.',
+      };
+
+  Widget? _pageAction(SettingsPage page) => switch (page) {
+        SettingsPage.general => Btn('Add machine',
+            icon: 'plus',
+            small: true,
+            onTap: _addMachine),
+        SettingsPage.models => Btn('Add profile',
+            icon: 'plus',
+            small: true,
+            onTap: () => _modelsKey.currentState?.addProfile()),
+        SettingsPage.vault => Btn('Add secret',
+            icon: 'plus',
+            small: true,
+            onTap: () => _vaultKey.currentState?.add()),
+        _ => null,
+      };
+
   /// One row in the desktop settings rail.
   Widget _settingsNavRow(SettingsPage page, String icon, String label) {
     final selected = _page == page;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.only(bottom: 3),
       child: Material(
         color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),
@@ -520,29 +695,21 @@ class SettingsPanelState extends State<SettingsPanel> {
           borderRadius: BorderRadius.circular(R.sm),
           onTap: () => setState(() => _page = page),
           child: Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(children: [
               AppIcon(icon,
-                  size: 14, color: selected ? AppColors.fg1 : AppColors.fg3),
-              const SizedBox(width: 8),
+                  size: 15,
+                  color: selected ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(12.5,
+                    style: sans(13,
                         weight: selected ? W.label : W.body,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
-              if (selected)
-                Container(
-                  width: 3,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(1.5),
-                  ),
-                ),
             ]),
           ),
         ),
@@ -586,141 +753,75 @@ class SettingsPanelState extends State<SettingsPanel> {
     );
   }
 
-  Widget _paneHeader(String title, String subtitle, {Widget? action}) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(title, style: sans(15, weight: W.title, color: AppColors.fg1)),
-                const SizedBox(height: 3),
-                Text(subtitle, style: sans(11.5, color: AppColors.fg3)),
-              ],
-            ),
-          ),
-          if (action != null) action,
-        ],
-      ),
-    );
-  }
-
   Widget _pageBody() {
     return switch (_page) {
-      SettingsPage.general => _generalPage(showTitle: !kMobile, showBlurb: !kMobile),
-      SettingsPage.models => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!kMobile) ...[
-              _paneHeader('Inference profiles', 'Model and provider configurations for new sessions.'),
-              Divider(height: 1, color: AppColors.border),
-            ],
-            Expanded(child: InferenceProfilesScreen(client: widget.client, embedded: true)),
-          ],
+      SettingsPage.general => _generalPage(),
+      SettingsPage.models => InferenceProfilesScreen(
+          key: _modelsKey,
+          client: widget.client,
+          embedded: true,
         ),
-      SettingsPage.usage => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!kMobile) ...[
-              _paneHeader('Usage & Tokens', 'Token consumption, context window stats, and limits.'),
-              Divider(height: 1, color: AppColors.border),
-            ],
-            Expanded(child: UsageScreen(client: widget.client, embedded: true)),
-          ],
+      SettingsPage.usage => UsageScreen(
+          client: widget.client,
+          embedded: true,
         ),
-      SettingsPage.vault => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!kMobile) ...[
-              _paneHeader('Vault & Secrets', 'Encrypted API keys and secrets accessible by agents.'),
-              Divider(height: 1, color: AppColors.border),
-            ],
-            Expanded(child: VaultScreen(client: widget.client, embedded: true)),
-          ],
+      SettingsPage.vault => VaultScreen(
+          key: _vaultKey,
+          client: widget.client,
+          embedded: true,
         ),
-      SettingsPage.scheduled => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!kMobile) ...[
-              _paneHeader('Scheduled Jobs', 'Recurring tasks and automated runs.'),
-              Divider(height: 1, color: AppColors.border),
-            ],
-            Expanded(child: RecurringScreen(client: widget.client, listOnly: true, embedded: true)),
-          ],
+      SettingsPage.scheduled => RecurringScreen(
+          client: widget.client,
+          listOnly: true,
+          embedded: true,
         ),
     };
   }
 
   /// The General section's content.
-  Widget _generalPage({bool showTitle = true, bool showBlurb = true}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _generalPage() {
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        kMobile && widget.embedded ? M.gutter : 24,
+        kMobile && widget.embedded ? 16 : 20,
+        kMobile && widget.embedded ? M.gutter : 24,
+        28,
+      ),
       children: [
-        if (showTitle) ...[
-          _paneHeader('General', 'Manage the connected daemon machine, saved instances, and notifications.'),
-          Divider(height: 1, color: AppColors.border),
-        ],
-        Expanded(
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(
-              kMobile && widget.embedded ? M.gutter : 20,
-              16,
-              kMobile && widget.embedded ? M.gutter : 20,
-              24,
-            ),
-            children: [
-              _inlineLabel('Active Machine'),
-              const SizedBox(height: 8),
-              _activeMachineCard(),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: _inlineLabel('Saved Connections (${_instances.length})')),
-                  Btn('Add machine',
-                      icon: 'plus',
-                      small: true,
-                      variant: BtnVariant.ghost,
-                      onTap: () async {
-                        final inst = await showModal<Instance>(
-                          context,
-                          const AddInstanceScreen(),
-                        );
-                        if (inst != null && mounted) {
-                          setState(() {
-                            if (!_instances.any((e) => e.url == inst.url)) {
-                              _instances.add(inst);
-                            }
-                          });
-                        }
-                      }),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _settingsCard(
-                _instances.isEmpty
-                    ? [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 14),
-                          child: Text('No saved connections.',
-                              style: sans(12, color: AppColors.fg3)),
-                        ),
-                      ]
-                    : [for (final i in _instances) _instanceRow(i)],
-              ),
-              if (kCanNotify) ...[
-                const SizedBox(height: 20),
-                _inlineLabel('Alerts & Notifications'),
-                const SizedBox(height: 8),
-                _settingsCard([_notifTile()]),
-              ],
-            ],
-          ),
+        _inlineLabel('Active Machine'),
+        const SizedBox(height: 8),
+        _activeMachineCard(),
+        const SizedBox(height: 22),
+        Row(
+          children: [
+            Expanded(
+                child: _inlineLabel('Saved Connections (${_instances.length})')),
+            Btn('Add machine',
+                icon: 'plus',
+                small: true,
+                variant: BtnVariant.ghost,
+                onTap: _addMachine),
+          ],
         ),
+        const SizedBox(height: 8),
+        _settingsCard(
+          _instances.isEmpty
+              ? [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 14),
+                    child: Text('No saved connections.',
+                        style: sans(12, color: AppColors.fg3)),
+                  ),
+                ]
+              : [for (final i in _instances) _instanceRow(i)],
+        ),
+        if (kCanNotify) ...[
+          const SizedBox(height: 22),
+          _inlineLabel('Alerts & Notifications'),
+          const SizedBox(height: 8),
+          _settingsCard([_notifTile()]),
+        ],
       ],
     );
   }
@@ -730,26 +831,27 @@ class SettingsPanelState extends State<SettingsPanel> {
     final label = active != null && active.label.isNotEmpty ? active.label : 'Default Machine';
     final url = active?.url ?? widget.client.baseUrl;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: kMobile ? AppColors.surface2 : AppColors.surface1,
         borderRadius: BorderRadius.circular(R.md),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: AppColors.surface3,
+              color: AppColors.surface2,
               borderRadius: BorderRadius.circular(R.sm),
+              border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
             ),
             child: Center(
-              child: AppIcon('server', size: 16, color: AppColors.accent),
+              child: AppIcon('server', size: 18, color: AppColors.accent),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -758,10 +860,10 @@ class SettingsPanelState extends State<SettingsPanel> {
                 Row(
                   children: [
                     Text(label,
-                        style: sans(13, weight: W.label, color: AppColors.fg1)),
+                        style: sans(13.5, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppColors.accentBg,
                         borderRadius: BorderRadius.circular(4),
@@ -788,47 +890,78 @@ class SettingsPanelState extends State<SettingsPanel> {
     final isActive = i.url == widget.active?.url;
     return Material(
       color: Colors.transparent,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-            kMobile && widget.embedded ? 0 : 14,
-            kMobile ? 4 : 9,
-            kMobile && widget.embedded ? 0 : 4,
-            kMobile ? 4 : 9),
-        child: Row(children: [
-          AppIcon('server',
-              size: kMobile ? 18 : 14,
-              color: isActive ? AppColors.accent : AppColors.fg3),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Row(children: [
-              Flexible(
-                child: Text(i.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? 13 : 12,
-                        weight: W.label, color: AppColors.fg1)),
+      child: InkWell(
+        onTap: () {
+          showManageMachineSheet(
+            context: context,
+            instance: i,
+            onRename: (inst, newName) {
+              setState(() {
+                final idx = _instances.indexWhere((e) => e.url == inst.url);
+                if (idx >= 0) {
+                  _instances[idx] =
+                      Instance(url: inst.url, token: inst.token, name: newName);
+                }
+              });
+            },
+            onRemove: _confirmRemove,
+          );
+        },
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              kMobile && widget.embedded ? 0 : 14,
+              kMobile ? 4 : 10,
+              kMobile && widget.embedded ? 0 : 8,
+              kMobile ? 4 : 10),
+          child: Row(children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: isActive ? AppColors.ok : AppColors.fg4,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(hostOf(i.url),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(kMobile ? 11 : 10, color: AppColors.fg3)),
-              ),
-            ]),
-          ),
-          if (isActive)
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: Text('active',
-                  style: sans(kMobile ? 12 : 10, color: AppColors.accent)),
             ),
-          IconBtn('trash',
-              size: kMobile ? M.minTarget : 26,
-              iconSize: kMobile ? 17 : 13,
-              tooltip: 'Remove',
-              onTap: () => _confirmRemove(i)),
-        ]),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Row(children: [
+                Flexible(
+                  child: Text(i.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(kMobile ? 13 : 13,
+                          weight: W.label, color: AppColors.fg1)),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(hostOf(i.url),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(kMobile ? 11 : 11, color: AppColors.fg3)),
+                ),
+              ]),
+            ),
+            if (isActive)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentBg,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text('active',
+                      style: sans(10, weight: W.label, color: AppColors.accent)),
+                ),
+              ),
+            IconBtn('trash',
+                size: kMobile ? M.minTarget : 28,
+                iconSize: kMobile ? 17 : 14,
+                tooltip: 'Remove',
+                onTap: () => _confirmRemove(i)),
+          ]),
+        ),
       ),
     );
   }
@@ -837,20 +970,20 @@ class SettingsPanelState extends State<SettingsPanel> {
     return Padding(
       padding: EdgeInsets.symmetric(
           horizontal: kMobile && widget.embedded ? 0 : 14,
-          vertical: kMobile ? 2 : 10),
+          vertical: kMobile ? 2 : 12),
       child: Row(children: [
-        AppIcon('bell', size: kMobile ? 18 : 15, color: AppColors.fg3),
-        const SizedBox(width: 10),
+        AppIcon('bell', size: kMobile ? 18 : 16, color: AppColors.fg3),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Session notifications',
-                  style: sans(kMobile ? M.rowTitle : 12.5,
+                  style: sans(kMobile ? M.rowTitle : 13,
                       weight: W.label, color: AppColors.fg1)),
-              const SizedBox(height: 1),
+              const SizedBox(height: 2),
               Text('Notify when a session completes or requires input',
-                  style: sans(11, color: AppColors.fg3)),
+                  style: sans(11.5, color: AppColors.fg3)),
             ],
           ),
         ),

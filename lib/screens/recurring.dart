@@ -422,13 +422,13 @@ class _RecurringScreenState extends State<RecurringScreen>
               }).toList()
             : allJobs;
         final list = ListView(
-          physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
-          shrinkWrap: widget.embedded,
-          // 16 on BOTH paths; see vault.dart. Keeps every nested screen's
-          // content on the same left axis as its NavBackRow.
-          padding: widget.embedded
+          physics: (widget.embedded && kMobile)
+              ? const NeverScrollableScrollPhysics()
+              : null,
+          shrinkWrap: (widget.embedded && kMobile),
+          padding: (widget.embedded && kMobile)
               ? EdgeInsets.zero
-              : const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              : const EdgeInsets.fromLTRB(24, 20, 24, 28),
           children: [
             if (jobs.isEmpty)
               Padding(

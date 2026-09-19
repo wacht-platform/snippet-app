@@ -29,15 +29,18 @@ class InferenceProfilesScreen extends StatefulWidget {
   });
   @override
   State<InferenceProfilesScreen> createState() =>
-      _InferenceProfilesScreenState();
+      InferenceProfilesScreenState();
 }
 
-class _InferenceProfilesScreenState extends State<InferenceProfilesScreen>
+class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     with AutomaticKeepAliveClientMixin {
   late Future<ServerConfig> _future;
   bool _inEditor = false;
   InferenceProfile? _editProfile;
   String? _delegate;
+
+  void addProfile() => _edit(null);
+  bool get inEditor => _inEditor;
 
   @override
   bool get wantKeepAlive => true;
@@ -176,13 +179,15 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         final cfg = snap.data;
         final profiles = cfg?.profiles ?? const [];
         final list = ListView(
-          physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
-          shrinkWrap: widget.embedded,
+          physics: (widget.embedded && kMobile)
+              ? const NeverScrollableScrollPhysics()
+              : null,
+          shrinkWrap: (widget.embedded && kMobile),
           padding: EdgeInsets.fromLTRB(
-              widget.embedded ? 0 : 16,
-              widget.embedded ? 0 : 14,
-              widget.embedded ? 0 : 16,
-              widget.embedded ? 0 : 20),
+              (widget.embedded && kMobile) ? 0 : 24,
+              (widget.embedded && kMobile) ? 0 : 20,
+              (widget.embedded && kMobile) ? 0 : 24,
+              28),
           children: [
             if (!widget.embedded) ...[
               Row(
@@ -213,14 +218,37 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen>
               const SizedBox(height: 16),
             ],
             if (profiles.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
-                child: Text(
-                    'No inference profile configured. Add one with an API key before starting a session.',
-                    style: sans(widget.embedded ? 12 : 13,
-                        height: 1.4, color: AppColors.fg3)),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  borderRadius: BorderRadius.circular(R.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppIcon('ai-chip', size: 30, color: AppColors.fg4),
+                    const SizedBox(height: 12),
+                    Text('No inference profiles configured',
+                        style: sans(14, weight: W.label, color: AppColors.fg1)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Add an API key or local model provider to start sessions.',
+                      textAlign: TextAlign.center,
+                      style: sans(12, color: AppColors.fg3),
+                    ),
+                    const SizedBox(height: 16),
+                    Btn('Add profile',
+                        icon: 'plus',
+                        small: true,
+                        onTap: () => _edit(null)),
+                  ],
+                ),
               )
-            else
+            else if (kMobile && widget.embedded)
               Column(
                 children: [
                   for (var i = 0; i < profiles.length; i++) ...[
@@ -229,6 +257,26 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                       Divider(height: 1, color: AppColors.border),
                   ],
                 ],
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  borderRadius: BorderRadius.circular(R.md),
+                  border: Border.all(color: AppColors.border),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (var i = 0; i < profiles.length; i++) ...[
+                      _profileCard(profiles[i], cfg?.delegate),
+                      if (i < profiles.length - 1)
+                        Divider(
+                            height: 1,
+                            color: AppColors.border.withValues(alpha: 0.6)),
+                    ],
+                  ],
+                ),
               ),
           ],
         );
@@ -266,17 +314,19 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   Widget _profileCard(InferenceProfile p, String? delegate) {
     final isDelegate =
         delegate != null && delegate.isNotEmpty && delegate == p.name;
+    final compact = kMobile && widget.embedded;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _edit(p),
-        borderRadius: BorderRadius.circular(widget.embedded ? R.sm : R.md),
+        borderRadius: BorderRadius.circular(compact ? R.sm : R.md),
         child: Padding(
-          padding: EdgeInsets.fromLTRB(
-              0, widget.embedded ? 6 : 12, 0, widget.embedded ? 6 : 12),
+          padding: EdgeInsets.symmetric(
+              horizontal: compact ? 0 : 16,
+              vertical: compact ? 6 : 14),
           child: Row(children: [
             AppIcon('ai-chip',
-                size: widget.embedded ? 18 : 20,
+                size: compact ? 18 : 20,
                 color: p.active ? AppColors.accent : AppColors.fg3),
             const SizedBox(width: 12),
             Expanded(
@@ -288,7 +338,7 @@ class _InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                       child: Text(p.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(widget.embedded ? 14 : 14,
+                          style: sans(compact ? 14 : 14,
                               weight: FontWeight.w500, color: AppColors.fg1)),
                     ),
                     if (p.active) ...[

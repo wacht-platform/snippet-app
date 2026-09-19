@@ -2531,8 +2531,8 @@ class _DesktopShellState extends State<DesktopShell>
     if (c == null) return;
     final inst = _active;
     presentScreen(context,
-        maxWidth: 700,
-        maxHeight: 500,
+        maxWidth: 860,
+        maxHeight: 600,
         builder: (_, close) => _SettingsPanel(
               client: c,
               instances: _instances,

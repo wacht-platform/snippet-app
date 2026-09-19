@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
@@ -83,13 +84,15 @@ class _UsageScreenState extends State<UsageScreen> {
                   style: sans(12, color: AppColors.fg3)));
         }
         return ListView.separated(
-          physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
-          shrinkWrap: widget.embedded,
+          physics: (widget.embedded && kMobile)
+              ? const NeverScrollableScrollPhysics()
+              : null,
+          shrinkWrap: (widget.embedded && kMobile),
           padding: EdgeInsets.fromLTRB(
-              widget.embedded ? 0 : 16,
-              widget.embedded ? 0 : 14,
-              widget.embedded ? 0 : 16,
-              24),
+              (widget.embedded && kMobile) ? 0 : 24,
+              (widget.embedded && kMobile) ? 0 : 20,
+              (widget.embedded && kMobile) ? 0 : 24,
+              28),
           itemCount: summary.providers.length,
           separatorBuilder: (_, __) => const SizedBox(height: 10),
           itemBuilder: (_, i) => _ProviderCard(provider: summary.providers[i]),

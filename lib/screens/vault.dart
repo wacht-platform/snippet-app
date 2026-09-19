@@ -163,13 +163,15 @@ class VaultScreenState extends State<VaultScreen> {
     } else {
       final names = _names ?? const [];
       final list = ListView(
-        physics: widget.embedded ? const NeverScrollableScrollPhysics() : null,
-        shrinkWrap: widget.embedded,
-                  padding: EdgeInsets.fromLTRB(
-              widget.embedded ? 0 : (kMobile ? M.gutter : 16),
-              widget.embedded ? 0 : 14,
-              widget.embedded ? 0 : (kMobile ? M.gutter : 16),
-              widget.embedded ? 0 : 28),
+        physics: (widget.embedded && kMobile)
+            ? const NeverScrollableScrollPhysics()
+            : null,
+        shrinkWrap: (widget.embedded && kMobile),
+        padding: EdgeInsets.fromLTRB(
+            (widget.embedded && kMobile) ? 0 : (kMobile ? M.gutter : 24),
+            (widget.embedded && kMobile) ? 0 : 20,
+            (widget.embedded && kMobile) ? 0 : (kMobile ? M.gutter : 24),
+            28),
         children: [
           if (!(widget.embedded && kMobile)) ...[
             Text(
