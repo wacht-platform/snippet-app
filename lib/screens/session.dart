@@ -226,6 +226,7 @@ class _SessionScreenState extends State<SessionScreen>
   /// Owns the mobile end-drawer so the actions panel can close it directly.
   /// `Navigator.pop` does NOT close a drawer, so the closer must be this key.
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _composerCardKey = GlobalKey();
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   StreamSubscription<Amplitude>? _amplitudeSub;
@@ -3579,27 +3580,43 @@ class _SessionScreenState extends State<SessionScreen>
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(R.sm),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(8, 0, onClear == null ? 8 : 0, 0),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(icon,
-                  size: 13, color: selected ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 6),
-              Text(label,
-                  style: sans(11,
-                      weight: W.label,
-                      color: selected ? AppColors.accent : AppColors.fg2)),
-              if (onClear != null)
-                IconBtn('x',
-                    size: 22,
-                    iconSize: 12,
-                    tooltip: 'Clear',
-                    onTap: onClear)
-              else ...[
-                const SizedBox(width: 5),
-                AppIcon('chevron-down', size: 12, color: AppColors.fg4),
+          child: Container(
+            height: 28,
+            padding: EdgeInsets.fromLTRB(9, 0, onClear == null ? 8 : 4, 0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(R.sm),
+              border: Border.all(
+                color: selected
+                    ? AppColors.accent.withValues(alpha: 0.25)
+                    : AppColors.border,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                AppIcon(icon,
+                    size: 13.5,
+                    color: selected ? AppColors.accent : AppColors.fg3),
+                const SizedBox(width: 6),
+                Text(label,
+                    style: sans(12,
+                        weight: selected ? W.label : W.body,
+                        color: selected ? AppColors.accent : AppColors.fg2)),
+                if (onClear != null)
+                  IconBtn('x',
+                      size: 22,
+                      iconSize: 12,
+                      tooltip: 'Clear',
+                      onTap: onClear)
+                else ...[
+                  const SizedBox(width: 5),
+                  AppIcon('chevron-down',
+                      size: 12,
+                      color: selected ? AppColors.accent : AppColors.fg4),
+                ],
               ],
-            ]),
+            ),
           ),
         ),
       );
@@ -3616,6 +3633,7 @@ class _SessionScreenState extends State<SessionScreen>
       exclude: _sessionAgentIds,
       currentAgentId: current,
       anchor: anchor,
+      verticalAnchor: _composerCardKey.currentContext,
     );
     if (picked == null || !mounted) return;
     setState(() {
@@ -3626,7 +3644,7 @@ class _SessionScreenState extends State<SessionScreen>
     // Pin it to the session so the composer shows WHO can be reached without
     // walking the directory again next time.
     _pinSessionAgent(picked.id);
-    _toast('Sending to ${_recipientAgentName}');
+    _toast('Sending to $_recipientAgentName');
   }
 
   void _clearRecipient() {
@@ -3691,6 +3709,7 @@ class _SessionScreenState extends State<SessionScreen>
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor ?? context,
+      verticalAnchor: _composerCardKey.currentContext,
       minWidth: 260,
       maxWidth: 320,
       items: [
@@ -3737,6 +3756,7 @@ class _SessionScreenState extends State<SessionScreen>
               if (_attachments.isNotEmpty) _attachmentBar(),
               if (_isRecording || _recordingPath != null) _recordingPanel(),
               Container(
+                key: _composerCardKey,
                 decoration: BoxDecoration(
                   // Uses the shell `bg` — the SAME surface as the sidebar — so the
                   // composer reads as part of the chrome rather than a separate
@@ -3847,19 +3867,21 @@ class _SessionScreenState extends State<SessionScreen>
                             Expanded(
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
-                                child: Row(children: [
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
                                   // Sending to an agent remains a composer action: it
                                   // changes the destination of this message without
                                   // adding another control to the session list.
                                   Builder(
                                     builder: (ctx) => _recipientAgentId == null
                                         ? _composerChip(
-                                            icon: 'send',
+                                            icon: 'agent',
                                             label: 'Send to',
                                             onTap: () => _pickRecipient(ctx),
                                           )
                                         : _composerChip(
-                                            icon: 'send',
+                                            icon: 'agent',
                                             label: _recipientAgentName ??
                                                 _recipientAgentId!,
                                             selected: true,
@@ -4455,8 +4477,9 @@ class _SessionScreenState extends State<SessionScreen>
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor ?? context,
+      verticalAnchor: _composerCardKey.currentContext,
       minWidth: 260,
-      maxWidth: 340,
+      maxWidth: 360,
       items: [
         appMenuHeading<String>('Inference profile'),
         for (final p in cfg.profiles)

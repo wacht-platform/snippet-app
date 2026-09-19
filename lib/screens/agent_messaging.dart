@@ -34,6 +34,7 @@ Future<CoordinationAgent?> pickAgentId(
   Set<String> exclude = const {},
   String? currentAgentId,
   BuildContext? anchor,
+  BuildContext? verticalAnchor,
 }) async {
   List<CoordinationAgent> agents;
   try {
@@ -63,8 +64,9 @@ Future<CoordinationAgent?> pickAgentId(
   final picked = await showAppMenu<String>(
     context,
     anchor: anchor ?? context,
+    verticalAnchor: verticalAnchor,
     minWidth: 260,
-    maxWidth: 340,
+    maxWidth: 360,
     items: [
       appMenuHeading<String>(title),
       for (final a in candidates)

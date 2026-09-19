@@ -106,7 +106,7 @@ PopupMenuItem<T> appMenuRow<T>({
   String? description,
   String? trailing,
   bool selected = false,
-  double height = 54,
+  double height = 56,
 }) {
   return PopupMenuItem<T>(
     value: value,
@@ -115,7 +115,7 @@ PopupMenuItem<T> appMenuRow<T>({
     // large outer padding would double up and inset the fill too far.
     padding: const EdgeInsets.symmetric(horizontal: 4),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),
@@ -124,17 +124,17 @@ PopupMenuItem<T> appMenuRow<T>({
         // Icon in a tinted tile. A bare 15px glyph floating beside two lines of
         // text had no visual anchor, which is most of why these menus read flat.
         Container(
-          width: 26,
-          height: 26,
+          width: 28,
+          height: 28,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected ? AppColors.accentBg : AppColors.surface3,
-            borderRadius: BorderRadius.circular(R.xs),
+            borderRadius: BorderRadius.circular(R.sm),
           ),
           child: AppIcon(icon,
-              size: 14, color: selected ? AppColors.accent : AppColors.fg3),
+              size: 14.5, color: selected ? AppColors.accent : AppColors.fg3),
         ),
-        const SizedBox(width: 11),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,11 +144,13 @@ PopupMenuItem<T> appMenuRow<T>({
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(13, weight: W.label, color: AppColors.fg1)),
-              if (description != null)
+              if (description != null) ...[
+                const SizedBox(height: 2.5),
                 Text(description,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(11, color: AppColors.fg3)),
+                    style: sans(11.5, color: AppColors.fg3)),
+              ],
             ],
           ),
         ),
@@ -173,7 +175,7 @@ PopupMenuItem<T> appMenuRow<T>({
 PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
       enabled: false,
       height: 34,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
       // Upper case -> `caps()`, and a group heading is a label, not a
       // disabled control, so `fg3` rather than the `fg4` placeholder rung.
       child: Text(label.toUpperCase(),
@@ -195,6 +197,11 @@ Future<T?> showAppMenu<T>(
 
   /// The control this menu belongs to; the desktop popover anchors to it.
   BuildContext? anchor,
+
+  /// Optional vertical reference box (e.g. the composer card container).
+  /// When provided, the menu positions its top/bottom edge relative to this
+  /// box instead of the anchor control, avoiding covering the input area.
+  BuildContext? verticalAnchor,
 
   /// Explicit screen point (long-press / right-click). Wins over [anchor].
   Offset? point,
@@ -286,33 +293,25 @@ Future<T?> showAppMenu<T>(
       position = const RelativeRect.fromLTRB(16, 80, 16, 80);
     } else {
       final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      // Right-aligning means the popover's right edge tracks the anchor's, so
-      // its left is measured back from that edge instead of from the anchor's
-      // left. Clamped either way, so it cannot leave the window.
+      final vertBox = verticalAnchor?.findRenderObject() as RenderBox?;
+      final vertOrigin = vertBox != null
+          ? vertBox.localToGlobal(Offset.zero, ancestor: overlay)
+          : origin;
+      final topY = below
+          ? (vertOrigin.dy + (vertBox?.size.height ?? box.size.height) + 6)
+          : (vertOrigin.dy - 6);
       final alignRight = origin.dx + box.size.width;
       final left = alignEnd
           ? (alignRight - minWidth)
               .clamp(12.0, overlay.size.width - minWidth - 12)
           : origin.dx.clamp(12.0, overlay.size.width - minWidth - 12);
-      if (below) {
-        // Anchored under a control at the TOP of the window (the shell menu),
-        // where an upward menu would be clipped offscreen.
-        position = RelativeRect.fromLTRB(
-          left,
-          origin.dy + box.size.height + 4,
-          overlay.size.width - left - minWidth,
-          0,
-        );
-      } else {
-        // Above the control: the composer chips sit at the bottom of the window,
-        // so a menu opening downward would be clipped.
-        position = RelativeRect.fromLTRB(
-          left,
-          origin.dy - 8,
-          overlay.size.width - left - minWidth,
-          overlay.size.height - origin.dy + 8,
-        );
-      }
+
+      position = RelativeRect.fromLTRB(
+        alignEnd ? overlay.size.width : left,
+        topY,
+        alignEnd ? (overlay.size.width - alignRight) : overlay.size.width,
+        below ? overlay.size.height : 0,
+      );
     }
   } else {
     position = const RelativeRect.fromLTRB(16, 80, 16, 80);
