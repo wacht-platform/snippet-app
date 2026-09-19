@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -161,6 +162,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
     final pid = p['pid'] ?? 0;
     final running = p['running'] == true;
     final status = p['status'] as String?;
+    final failed = !running && status != null && status != '0';
     final statusLabel = running
         ? 'running'
         : switch (status) {
@@ -169,6 +171,17 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             final c? when c.isNotEmpty => 'exited ($c)',
             _ => 'exited',
           };
+    // A finished process previously wore one grey dot and one grey label
+    // whatever the outcome, so `exited (101)` looked exactly like `exited (ok)`
+    // — the same "failure is invisible" defect the tool rows had. Colour now
+    // summarises the outcome: green live, danger for non-zero/killed, grey for
+    // a clean exit.
+    final dotColor = running
+        ? AppColors.ok
+        : failed
+            ? AppColors.danger
+            : AppColors.fg4;
+    final labelColor = failed ? AppColors.danger : AppColors.fg3;
     final open = _openLogId == id;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -184,7 +197,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
               height: 7,
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: running ? AppColors.ok : AppColors.fg4)),
+                  color: dotColor)),
           const SizedBox(width: 9),
           Expanded(
               child: Text(cmd,
@@ -195,7 +208,9 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             TextButton(
                 onPressed: () => _kill(id),
                 style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 0),
+                    // 'Stop' is a destructive action on a live process; 22px was
+                    // well under the 44pt floor on a phone.
+                    minimumSize: Size(0, kMobile ? M.minTarget : 0),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4)),
@@ -203,15 +218,16 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
         ]),
         const SizedBox(height: 4),
         Row(children: [
-          Text('pid $pid', style: mono(10.5, color: AppColors.fg4)),
+          Text('pid $pid', style: mono(10, color: AppColors.fg3)),
           const SizedBox(width: 12),
-          Text(statusLabel, style: mono(10.5, color: AppColors.fg4)),
+          Text(statusLabel, style: mono(10, color: labelColor)),
           const Spacer(),
           GestureDetector(
               onTap: () => _toggleLog(id),
               behavior: HitTestBehavior.opaque,
               child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  // A 24px target; the text itself is only ~16px.
+                  padding: EdgeInsets.all(kMobile ? 14 : 4),
                   child: Text(open ? 'hide log' : 'log',
                       style: mono(11,
                           color: open ? AppColors.accent : AppColors.fg3)))),
@@ -235,7 +251,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                             strokeWidth: 2, color: AppColors.fg3)))
                 : SingleChildScrollView(
                     child: Text(_log.trim().isEmpty ? '(empty)' : _log,
-                        style: mono(10.5, height: 1.4, color: AppColors.fg2))),
+                        style: mono(10, height: 1.4, color: AppColors.fg2))),
           ),
         ],
       ]),

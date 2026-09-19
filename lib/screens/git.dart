@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -114,7 +115,7 @@ class _GitScreenState extends State<GitScreen> {
     Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => _DiffView(
+          builder: (_) => GitFileDiffView(
             client: widget.client,
             sessionId: _repo,
             file: f.path,
@@ -179,7 +180,7 @@ class _GitScreenState extends State<GitScreen> {
                     : 'Source Control',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(12, weight: FontWeight.w600, color: AppColors.fg1),
+                style: sans(12, weight: FontWeight.w500, color: AppColors.fg1),
               ),
             ),
             IconBtn('refresh',
@@ -295,8 +296,8 @@ class _GitScreenState extends State<GitScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(st.branch.isEmpty ? '(no branch)' : st.branch,
-                      style: sans(15.5,
-                          weight: FontWeight.w600, color: AppColors.fg1)),
+                      style: sans(16,
+                          weight: FontWeight.w500, color: AppColors.fg1)),
                   if (hasUp)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
@@ -306,7 +307,7 @@ class _GitScreenState extends State<GitScreen> {
                           if (st.ahead > 0) '↑${st.ahead}',
                           if (st.behind > 0) '↓${st.behind}',
                         ].join('  '),
-                        style: mono(11.5, color: AppColors.fg3),
+                        style: mono(11, color: AppColors.fg3),
                       ),
                     ),
                 ],
@@ -347,16 +348,25 @@ class _GitScreenState extends State<GitScreen> {
         child: Row(children: [
           Expanded(
               child: Text(title,
-                  style: sans(11.5,
-                      weight: FontWeight.w600,
+                  // The title carries a live count ("Staged (3)").
+                  style: sans(11,
+                      weight: FontWeight.w500,
+                      tabular: true,
                       color: AppColors.fg3,
                       spacing: 0.3))),
           if (trailing != null)
             GestureDetector(
               onTap: _busy ? null : onTrailing,
-              child: Text(trailing,
-                  style: sans(11.5,
-                      weight: FontWeight.w500, color: AppColors.accent)),
+              // "Stage all" / "Unstage all" was bare ~15px text in a
+              // GestureDetector — no target at all. HitTestBehavior.opaque plus
+              // a real min height makes the whole area tappable.
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                constraints: BoxConstraints(minHeight: kMobile ? M.minTarget : 0),
+                alignment: Alignment.centerRight,
+                child: Text(trailing,
+                    style: sans(11,
+                        weight: FontWeight.w500, color: AppColors.accent))),
             ),
         ]),
       );
@@ -373,13 +383,13 @@ class _GitScreenState extends State<GitScreen> {
           SizedBox(
               width: 16,
               child: Text(code,
-                  style: mono(13, weight: FontWeight.w700, color: c))),
+                  style: mono(13, weight: FontWeight.w500, color: c))),
           const SizedBox(width: 8),
           Expanded(
               child: Text(f.path,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: mono(12.5, color: AppColors.fg1))),
+                  style: mono(12, color: AppColors.fg1))),
           IconBtn(staged ? 'rotate' : 'plus',
               size: 34,
               iconSize: 16,
@@ -466,7 +476,7 @@ class _BranchPickerState extends State<_BranchPicker> {
         const SizedBox(height: 10),
         if (local.isNotEmpty) ...[
           Text('Local',
-              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+              style: sans(11, weight: FontWeight.w500, color: AppColors.fg3)),
           const SizedBox(height: 6),
           ...local.map((b) => _row(
                 name: b,
@@ -479,7 +489,7 @@ class _BranchPickerState extends State<_BranchPicker> {
         ],
         if (remotes.isNotEmpty) ...[
           Text('Remote',
-              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+              style: sans(11, weight: FontWeight.w500, color: AppColors.fg3)),
           const SizedBox(height: 6),
           ...remotes.map((b) => _row(
                 name: b,
@@ -536,32 +546,40 @@ class _BranchPickerState extends State<_BranchPicker> {
             Text('current', style: sans(11, color: AppColors.accent))
           else if (remote)
             Text(_localNameForRemote(name),
-                style: sans(11, color: AppColors.fg4)),
+                style: sans(11, color: AppColors.fg3)),
         ]),
       ),
     );
   }
 }
 
-/// Read-only unified-diff viewer with +/- line tints. Reused later by the editor.
-class _DiffView extends StatefulWidget {
+/// Read-only unified-diff viewer with +/- line tints.
+///
+/// Public so a single change can open as a shell tab: the git sidebar panel
+/// inspects a diff beside the chat, and that is the same widget the full Git
+/// screen pushes. [embedded] drops the app bar when a shell tab already
+/// provides chrome.
+class GitFileDiffView extends StatefulWidget {
   final DaemonClient client;
   final String sessionId;
   final String file;
   final bool staged;
   final bool untracked;
-  const _DiffView({
+  final bool embedded;
+  const GitFileDiffView({
+    super.key,
     required this.client,
     required this.sessionId,
     required this.file,
     required this.staged,
     required this.untracked,
+    this.embedded = false,
   });
   @override
-  State<_DiffView> createState() => _DiffViewState();
+  State<GitFileDiffView> createState() => _GitFileDiffViewState();
 }
 
-class _DiffViewState extends State<_DiffView> {
+class _GitFileDiffViewState extends State<GitFileDiffView> {
   String? _patch;
   String? _error;
   bool _loading = true;
@@ -598,69 +616,86 @@ class _DiffViewState extends State<_DiffView> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final name = widget.file.split('/').last;
+    final bar = SnAppBar(
+      title: name,
+      subtitle: widget.file,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        if (_patch != null && _patch!.isNotEmpty)
+          IconBtn('clipboard', tooltip: 'Copy', onTap: () {
+            Clipboard.setData(ClipboardData(text: _patch!));
+            toast(context, 'Diff copied');
+          }),
+      ],
+    );
+    final body = Column(children: [
+      // A shell tab already supplies chrome, so only the pushed route draws
+      // the app bar. Without this the diff would show two title bars.
+      if (!widget.embedded) bar,
+      if (_loading)
+        Expanded(
+            child: Center(
+                child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.fg3))))
+      else if (_error != null)
+        Expanded(
+            child: EmptyState(
+                icon: 'alert-triangle', title: 'Diff failed', body: _error!))
+      else if ((_patch ?? '').trim().isEmpty)
+        Expanded(
+            child: EmptyState(
+                icon: 'file',
+                title: widget.untracked ? 'Untracked file' : 'No diff',
+                body: widget.untracked
+                    ? 'New file — stage it to include it in the next commit.'
+                    : 'No changes to show for this view.'))
+      else
+        Expanded(child: _diffBody(_patch!)),
+    ]);
+    if (widget.embedded) {
+      return ColoredBox(color: readingBg, child: body);
+    }
     return Scaffold(
       backgroundColor: readingBg,
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          SnAppBar(
-            title: name,
-            subtitle: widget.file,
-            onBack: () => Navigator.pop(context),
-            actions: [
-              if (_patch != null && _patch!.isNotEmpty)
-                IconBtn('clipboard', tooltip: 'Copy', onTap: () {
-                  Clipboard.setData(ClipboardData(text: _patch!));
-                  toast(context, 'Diff copied');
-                }),
-            ],
-          ),
-          if (_loading)
-            Expanded(
-                child: Center(
-                    child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3))))
-          else if (_error != null)
-            Expanded(
-                child: EmptyState(
-                    icon: 'alert-triangle',
-                    title: 'Diff failed',
-                    body: _error!))
-          else if ((_patch ?? '').trim().isEmpty)
-            Expanded(
-                child: EmptyState(
-                    icon: 'file',
-                    title: widget.untracked ? 'Untracked file' : 'No diff',
-                    body: widget.untracked
-                        ? 'New file — stage it to include it in the next commit.'
-                        : 'No changes to show for this view.'))
-          else
-            Expanded(child: _diffBody(_patch!)),
-        ]),
-      ),
+      body: SafeArea(bottom: false, child: body),
     );
   }
 
   Widget _diffBody(String patch) {
     final lines = patch.split('\n');
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        // IntrinsicWidth bounds the horizontal scroll to the widest line so each
-        // line's `width: double.infinity` background resolves (no infinite-width crash).
-        child: IntrinsicWidth(
-          child: SelectionArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: lines.map(_diffLine).toList(),
+    return LayoutBuilder(builder: (context, c) {
+      // The horizontal extent has to be the widest line, so each line's
+      // `width: double.infinity` background has something finite to resolve
+      // against. `IntrinsicWidth` alone does that, but it also SHRINK-WRAPS: a
+      // diff whose longest line is narrower than the pane renders as a narrow
+      // column instead of filling it. Flooring the width at the pane's own width
+      // makes the rows span the pane, while a line wider than the pane still
+      // scrolls horizontally.
+      //
+      // The floor must sit OUTSIDE `IntrinsicWidth`: its `tighten` clamps the
+      // intrinsic width into the incoming range, so a minimum applied inside
+      // would be clamped back down to the intrinsic width and do nothing.
+      final paneWidth = c.maxWidth.isFinite ? c.maxWidth : 0.0;
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: paneWidth),
+            child: IntrinsicWidth(
+              child: SelectionArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: lines.map(_diffLine).toList(),
+                ),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   Widget _diffLine(String line) {
@@ -678,7 +713,7 @@ class _DiffViewState extends State<_DiffView> {
         line.startsWith('index ') ||
         line.startsWith('+++') ||
         line.startsWith('---')) {
-      fg = AppColors.fg4;
+      fg = AppColors.fg3;
     }
     return Container(
       width: double.infinity,

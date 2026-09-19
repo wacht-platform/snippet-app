@@ -45,8 +45,35 @@ class _LanesScreenState extends State<LanesScreen> {
     Theme.of(context);
     final lanes = widget.liveLanes();
     final running = lanes.where((lane) => lane.running).toList();
-    final finished = lanes.where((lane) => !lane.running).toList();
-    final failed = lanes.where((lane) => lane.status == 'failed').length;
+    // Group by OUTCOME, not by "still running or not". Folding every finished
+    // lane into one bucket labelled "Completed" filed failed and cancelled lanes
+    // under a header that claimed they succeeded.
+    final failed = lanes.where((lane) => lane.status == 'failed').toList();
+    final cancelled =
+        lanes.where((lane) => lane.status == 'cancelled').toList();
+    final completed = lanes
+        .where((lane) =>
+            !lane.running &&
+            lane.status != 'failed' &&
+            lane.status != 'cancelled')
+        .toList();
+
+    final groups = <Widget>[];
+    void section(String label, List<LaneInfo> items) {
+      if (items.isEmpty) return;
+      if (groups.isNotEmpty) groups.add(const SizedBox(height: 12));
+      groups.add(SectionLabel(label));
+      groups.add(const SizedBox(height: 8));
+      for (final lane in items) {
+        groups.add(LaneDetailCard(lane: lane));
+        groups.add(const SizedBox(height: 8));
+      }
+    }
+
+    section('In progress', running);
+    section('Failed', failed);
+    section('Completed', completed);
+    section('Cancelled', cancelled);
 
     return Scaffold(
       body: SafeArea(
@@ -56,7 +83,7 @@ class _LanesScreenState extends State<LanesScreen> {
             title: 'Delegated lanes',
             titleSize: 14,
             compact: true,
-            subtitle: _subtitle(lanes, running.length, failed),
+            subtitle: _subtitle(lanes, running.length, failed.length),
             onBack: widget.onClose ?? () => Navigator.pop(context),
           ),
           Expanded(
@@ -67,25 +94,7 @@ class _LanesScreenState extends State<LanesScreen> {
                     body: 'Parallel agent work will appear here when started.')
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
-                    children: [
-                      if (running.isNotEmpty) ...[
-                        const SectionLabel('In progress'),
-                        const SizedBox(height: 8),
-                        for (final lane in running) ...[
-                          LaneDetailCard(lane: lane),
-                          const SizedBox(height: 8),
-                        ],
-                      ],
-                      if (finished.isNotEmpty) ...[
-                        if (running.isNotEmpty) const SizedBox(height: 12),
-                        const SectionLabel('Completed'),
-                        const SizedBox(height: 8),
-                        for (final lane in finished) ...[
-                          LaneDetailCard(lane: lane),
-                          const SizedBox(height: 8),
-                        ],
-                      ],
-                    ],
+                    children: groups,
                   ),
           ),
         ]),
@@ -126,7 +135,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
         : failed
             ? AppColors.danger
             : cancelled
-                ? AppColors.fg4
+                ? AppColors.fg3
                 : AppColors.ok;
     final status = lane.running
         ? 'running · ${_elapsed(lane.startedAt)}'
@@ -137,6 +146,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                 : 'completed';
     final activity = lane.activity?.trim();
     final summary = lane.summary?.trim();
+    final error = lane.error?.trim();
 
     return Container(
       decoration: BoxDecoration(
@@ -169,7 +179,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      sans(14, weight: FontWeight.w600, color: AppColors.fg1),
+                      sans(14, weight: FontWeight.w500, color: AppColors.fg1),
                 ),
               ),
               const SizedBox(width: 10),
@@ -187,11 +197,31 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
               const SizedBox(height: 9),
               MarkdownPreview(data: summary, maxLines: 2),
             ],
+            // A failed lane's reason is the single most useful thing on the
+            // card, and it was reachable only by expanding "View details" —
+            // while a successful lane showed its summary inline. Surface it.
+            if (failed && error != null && error.isNotEmpty && !_expanded) ...[
+              const SizedBox(height: 9),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: AppIcon('alert-triangle',
+                      size: 12, color: AppColors.danger),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(error,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12, height: 1.4, color: AppColors.danger)),
+                ),
+              ]),
+            ],
             if (hasDetails) ...[
               const SizedBox(height: 10),
               Row(children: [
                 Text(_expanded ? 'Hide details' : 'View details',
-                    style: mono(10.5, color: AppColors.accent)),
+                    style: mono(10, color: AppColors.accent)),
                 const SizedBox(width: 5),
                 AppIcon(_expanded ? 'chevron-up' : 'chevron-down',
                     size: 13, color: AppColors.accent),
@@ -216,8 +246,11 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label,
               style: mono(10,
-                  weight: FontWeight.w600,
-                  color: danger ? AppColors.danger : AppColors.fg4)),
+                  weight: FontWeight.w500,
+                  // Rendered as HANDOFF / RESULT / ERROR — upper case, so it
+                  // needs positive tracking.
+                  spacing: 0.5,
+                  color: danger ? AppColors.danger : AppColors.fg3)),
           const SizedBox(height: 6),
           MarkdownBody(
             data: value,
@@ -281,7 +314,12 @@ class _ActivityHistory extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('ACTIVITY HISTORY',
-              style: mono(10, weight: FontWeight.w600, color: AppColors.fg4)),
+              // Upper case needs POSITIVE tracking — what `mono()` gained
+              // `spacing` for. A label is content, so `fg3` not `fg4`.
+              style: mono(10,
+                  weight: FontWeight.w500,
+                  spacing: 0.5,
+                  color: AppColors.fg3)),
           const SizedBox(height: 7),
           for (final entry in entries.reversed.take(24))
             Padding(
@@ -300,7 +338,7 @@ class _ActivityHistory extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(entry.text,
-                      style: mono(10.5, height: 1.35, color: AppColors.fg3)),
+                      style: mono(10, height: 1.35, color: AppColors.fg3)),
                 ),
               ]),
             ),

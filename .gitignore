@@ -54,3 +54,18 @@ android/.gradle/
 
 # Local release artifacts
 dist/
+
+# Release APKs — deliverables, not source.
+*.apk
+
+# Release APKs are deliverables, and .snippet/ is this tool's own runtime
+# state — neither belongs in the repo.
+.snippet/
+
+# Golden-test diff artifacts (regenerated on every mismatch; never commit).
+test/visual/failures/
+
+# Golden PNGs are LOCAL review artifacts, not repo content: 3.3MB of images that
+# churn on every restyle. `test/flutter_test_config.dart` writes them on a first
+# run when the directory is empty, then comparisons run normally.
+test/visual/goldens/

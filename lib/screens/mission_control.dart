@@ -6,4 +6,9 @@ library;
 export 'mission_control/mission_control_screen.dart'
     show MissionControlScreen, openMissionControl;
 export 'mission_control/mission_control_state.dart'
-    show isDedicatedMcSession, isMissionControlListRow, isMissionControlTab;
+    show
+        isDedicatedMcSession,
+        isInboxSession,
+        isInboxSessionRow,
+        isMissionControlListRow,
+        isMissionControlTab;

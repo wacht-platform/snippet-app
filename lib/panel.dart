@@ -25,7 +25,7 @@ Future<T?> presentScreen<T>(
     barrierDismissible: dismissible,
     barrierLabel: 'panel',
     barrierColor: Colors.black.withValues(alpha: 0.58),
-    transitionDuration: const Duration(milliseconds: 180),
+    transitionDuration: Motion.fast,
     pageBuilder: (ctx, _, __) {
       void close() => Navigator.of(ctx).pop();
       // Host the screen directly; sub-pushes (file viewer, diff) go to the root
@@ -57,7 +57,7 @@ Future<T?> presentScreen<T>(
       });
     },
     transitionBuilder: (ctx, anim, _, child) {
-      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+      final curved = CurvedAnimation(parent: anim, curve: Motion.enter);
       final transition = (style == PanelStyle.dialog)
           ? FadeTransition(
               opacity: curved,
@@ -100,7 +100,7 @@ Future<T?> showModal<T>(
     barrierDismissible: true,
     barrierLabel: 'modal',
     barrierColor: Colors.black.withValues(alpha: 0.58),
-    transitionDuration: const Duration(milliseconds: 160),
+    transitionDuration: Motion.fast,
     pageBuilder: (ctx, _, __) => Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -111,7 +111,7 @@ Future<T?> showModal<T>(
       ),
     ),
     transitionBuilder: (ctx, anim, _, child) {
-      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+      final curved = CurvedAnimation(parent: anim, curve: Motion.enter);
       return BackdropFilter(
         filter: ImageFilter.blur(
             sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),

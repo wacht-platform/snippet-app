@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'files.dart';
 import 'mission_control.dart';
+import 'shell_nav.dart';
 
 /// Recurring goals — list, create, pause, and delete jobs that SetGoal a
 /// session. The daemon detects `~/.snippet/recurring/<id>.json`. If that
@@ -31,6 +32,11 @@ class RecurringScreen extends StatefulWidget {
 
   /// When true, skip the app bar and fill the parent (settings dialog pane).
   final bool embedded;
+
+  /// Host-supplied back action for [embedded] use. This screen draws its OWN
+  /// `NavBackRow`, so exactly one header exists per level.
+  final VoidCallback? onBack;
+
   const RecurringScreen({
     super.key,
     required this.client,
@@ -39,18 +45,32 @@ class RecurringScreen extends StatefulWidget {
     this.workspace,
     this.listOnly = false,
     this.embedded = false,
+    this.onBack,
   });
   @override
   State<RecurringScreen> createState() => _RecurringScreenState();
 }
 
-class _RecurringScreenState extends State<RecurringScreen> {
+class _RecurringScreenState extends State<RecurringScreen>
+    with AutomaticKeepAliveClientMixin {
   late Future<List<RecurringJob>> _future;
   List<SessionInfo>? _sessions;
   StreamSubscription<dynamic>? _eventsSub;
   Timer? _refreshDebounce;
   Timer? _eventsReconnect;
   bool _closed = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void didUpdateWidget(covariant RecurringScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.client != widget.client ||
+        oldWidget.sessionId != widget.sessionId) {
+      _future = widget.client.recurringJobs();
+    }
+  }
 
   @override
   void dispose() {
@@ -161,7 +181,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   children: [
                     Text('Schedule a goal or message',
                         style: sans(14,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+                            weight: FontWeight.w500, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     Text(
                       'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',
@@ -352,33 +372,36 @@ class _RecurringScreenState extends State<RecurringScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: EdgeInsets.symmetric(
+            horizontal: 10, vertical: kMobile ? 14 : 6),
         decoration: BoxDecoration(
-          color: on
-              ? AppColors.accent.withValues(alpha: 0.16)
-              : AppColors.surface2,
+          // Selection = a NEUTRAL surface step, accent reserved for state.
+          color: on ? AppColors.surface3 : AppColors.surface2,
           borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(color: on ? AppColors.accent : AppColors.border),
+          border: Border.all(color: on ? AppColors.border2 : AppColors.border),
         ),
         child: Text(label,
-            style: sans(12, color: on ? AppColors.accent : AppColors.fg2)),
+            style: sans(12, color: on ? AppColors.fg1 : AppColors.fg2)),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     Theme.of(context); // Rebuild on theme change
     final body = FutureBuilder<List<RecurringJob>>(
       future: _future,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return Center(
-              child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.fg3)));
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return widget.embedded
+              ? const SizedBox.shrink()
+              : Center(
+                  child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: AppColors.fg3)));
         }
         if (snap.hasError) {
           return Padding(
@@ -399,8 +422,13 @@ class _RecurringScreenState extends State<RecurringScreen> {
               }).toList()
             : allJobs;
         final list = ListView(
-          padding: EdgeInsets.fromLTRB(
-              widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
+          physics: (widget.embedded && kMobile)
+              ? const NeverScrollableScrollPhysics()
+              : null,
+          shrinkWrap: (widget.embedded && kMobile),
+          padding: (widget.embedded && kMobile)
+              ? EdgeInsets.zero
+              : const EdgeInsets.fromLTRB(24, 20, 24, 28),
           children: [
             if (jobs.isEmpty)
               Padding(
@@ -417,8 +445,10 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   onTap: _add,
                   borderRadius: BorderRadius.circular(R.md),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    // ~39px at 10; the primary action of the screen needs the
+                    // 44pt floor on a phone.
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 8, vertical: kMobile ? 14 : 10),
                     child: Row(children: [
                       AppIcon('plus', size: 16, color: AppColors.fg3),
                       const SizedBox(width: 12),
@@ -436,19 +466,37 @@ class _RecurringScreenState extends State<RecurringScreen> {
                 constraints: const BoxConstraints(maxWidth: 680), child: list));
       },
     );
-    if (widget.embedded) return body;
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          SnAppBar(
-              title: 'Scheduled',
-              titleSize: 14,
-              compact: true,
-              onBack: widget.onClose ?? () => Navigator.pop(context)),
-          Expanded(child: body),
-        ]),
-      ),
+    // Three cases, and the header differs for each:
+    //   not embedded        → owned Scaffold + SnAppBar
+    //   embedded + onBack   → OWNED NavBackRow (phone drill-down)
+    //   embedded, no onBack → NO header (desktop dialog pane; the host's section
+    //                         chip strip is the navigation)
+    // Drawing a row regardless is what stacked two back rows in the editor.
+    if (!widget.embedded) {
+      return Scaffold(
+        body: SafeArea(
+          bottom: false,
+          child: Column(children: [
+            SnAppBar(
+                title: 'Scheduled',
+                titleSize: 14,
+                compact: true,
+                onBack: widget.onClose ?? () => Navigator.pop(context)),
+            Expanded(child: body),
+          ]),
+        ),
+      );
+    }
+    // Embedded with a back action → phone drill-down, so THIS level owns the
+    // header. Embedded without one → the desktop dialog pane, where the host's
+    // section chip strip is the navigation and a back row would duplicate it.
+    if (widget.onBack == null) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        NavBackRow(title: 'Scheduled', onBack: widget.onBack!),
+        Expanded(child: body),
+      ],
     );
   }
 
@@ -515,7 +563,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
             Text(job.title.isEmpty ? job.id : job.title,
                 style: sans(14, color: paused ? AppColors.fg3 : AppColors.fg1)),
             const SizedBox(height: 2),
-            Text(sub, style: sans(12, color: AppColors.fg4)),
+            Text(sub, style: sans(12, tabular: true, color: AppColors.fg3)),
             if (job.lastError != null && job.lastError!.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(job.lastError!,
