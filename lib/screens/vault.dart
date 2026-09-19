@@ -169,11 +169,11 @@ class VaultScreenState extends State<VaultScreen> {
         shrinkWrap: (widget.embedded && kMobile),
         padding: EdgeInsets.fromLTRB(
             (widget.embedded && kMobile) ? 0 : (kMobile ? M.gutter : 24),
-            (widget.embedded && kMobile) ? 0 : (widget.embedded ? 8 : 20),
+            (widget.embedded && kMobile) ? 0 : (widget.embedded ? 4 : 20),
             (widget.embedded && kMobile) ? 0 : (kMobile ? M.gutter : 24),
             28),
         children: [
-          if (!(widget.embedded && kMobile)) ...[
+          if (!widget.embedded && !kMobile) ...[
             Text(
               'Use these as \$NAME in shell commands. Values stay on the daemon and are never shown again.',
               style: sans(kMobile ? M.meta : 12,
@@ -225,7 +225,7 @@ class VaultScreenState extends State<VaultScreen> {
             ),
           // The add row hides while the form is open: two ways to do the same
           // thing at once is what makes a form feel unanchored.
-          if (!_adding && !(widget.embedded && kMobile)) ...[
+          if (!_adding && !widget.embedded && !kMobile) ...[
             const SizedBox(height: 12),
             _addRow(),
           ],

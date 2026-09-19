@@ -369,7 +369,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                     children: [
                       // Sidebar Header
                       Container(
-                        height: 44,
+                        height: 48,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           border: Border(
@@ -377,14 +377,17 @@ class SettingsPanelState extends State<SettingsPanel> {
                                 color: AppColors.border.withValues(alpha: 0.5)),
                           ),
                         ),
-                        child: Row(children: [
-                          AppIcon('settings',
-                              size: 15, color: AppColors.accent),
-                          const SizedBox(width: 9),
-                          Text('Settings',
-                              style: sans(13.5,
-                                  weight: W.title, color: AppColors.fg1)),
-                        ]),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            AppIcon('settings',
+                                size: 15, color: AppColors.accent),
+                            const SizedBox(width: 9),
+                            Text('Settings',
+                                style: sans(13.5,
+                                    weight: W.title, color: AppColors.fg1)),
+                          ],
+                        ),
                       ),
                       // Nav Items
                       Expanded(
@@ -440,9 +443,10 @@ class SettingsPanelState extends State<SettingsPanel> {
                       children: [
                         // Content Pane Header
                         Container(
-                          height: 44,
-                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
                                 child: Text(
@@ -834,24 +838,25 @@ class SettingsPanelState extends State<SettingsPanel> {
     return ListView(
       padding: EdgeInsets.fromLTRB(
         compact ? M.gutter : 24,
-        compact ? 16 : 8,
+        compact ? 16 : 4,
         compact ? M.gutter : 24,
         28,
       ),
       children: [
-        Row(
-          children: [
-            Expanded(
-                child: _inlineLabel('Saved Connections (${_instances.length})')),
-            if (compact)
-              Btn('Add machine',
-                  icon: 'plus',
-                  small: true,
-                  variant: BtnVariant.ghost,
-                  onTap: _addMachine),
-          ],
-        ),
-        const SizedBox(height: 10),
+        if (compact)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Btn('Add machine',
+                    icon: 'plus',
+                    small: true,
+                    variant: BtnVariant.ghost,
+                    onTap: _addMachine),
+              ],
+            ),
+          ),
         if (_instances.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 36),
@@ -890,9 +895,9 @@ class SettingsPanelState extends State<SettingsPanel> {
             ],
           ),
         if (kCanNotify) ...[
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
           _inlineLabel('Alerts & Notifications'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _notifRow(),
         ],
       ],
@@ -1014,7 +1019,7 @@ class SettingsPanelState extends State<SettingsPanel> {
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: 0,
-          vertical: compact ? 4 : 10,
+          vertical: compact ? 4 : 6,
         ),
         child: Row(
           children: [

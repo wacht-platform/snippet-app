@@ -677,7 +677,7 @@ class RecurringScreenState extends State<RecurringScreen>
           shrinkWrap: (widget.embedded && kMobile),
           padding: (widget.embedded && kMobile)
               ? EdgeInsets.zero
-              : const EdgeInsets.fromLTRB(24, 20, 24, 28),
+              : EdgeInsets.fromLTRB(24, widget.embedded ? 4 : 20, 24, 28),
           children: [
             if (_adding) _inlineAddCard(),
             if (jobs.isEmpty && !_adding)
@@ -687,7 +687,7 @@ class RecurringScreenState extends State<RecurringScreen>
                     style: sans(13, color: AppColors.fg3)),
               ),
             ...jobs.map(_jobRow),
-            if (_canAdd && !_adding) ...[
+            if (_canAdd && !_adding && !widget.embedded) ...[
               const SizedBox(height: 4),
               Material(
                 color: Colors.transparent,

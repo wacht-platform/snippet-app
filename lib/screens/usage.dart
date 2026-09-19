@@ -90,7 +90,7 @@ class _UsageScreenState extends State<UsageScreen> {
           shrinkWrap: (widget.embedded && kMobile),
           padding: EdgeInsets.fromLTRB(
               (widget.embedded && kMobile) ? 0 : 24,
-              (widget.embedded && kMobile) ? 0 : 20,
+              (widget.embedded && kMobile) ? 0 : (widget.embedded ? 4 : 20),
               (widget.embedded && kMobile) ? 0 : 24,
               28),
           itemCount: summary.providers.length,
