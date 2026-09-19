@@ -482,9 +482,8 @@ const double kPaneTabHeight = kPaneHeaderHeight;
 const double kPaneHairline = 0.2;
 const double kPaneActiveStroke = 2.0;
 
-/// Hit width of the pane split handle. The visible line is one hairline at the
-/// centre; this is only the grab zone around it.
-const double kPaneSplitHandleWidth = 6;
+/// Width of the visible pane split divider line.
+const double kPaneSplitHandleWidth = 1.0;
 
 /// Passive pane/tab seam. Low-alpha white over the canvas: clearly present as a
 /// boundary, but still a step below the chrome's own borders.

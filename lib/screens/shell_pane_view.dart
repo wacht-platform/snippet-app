@@ -149,51 +149,35 @@ class _PaneResizeHandleState extends State<PaneResizeHandle> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeColumn,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragUpdate: (d) => widget.onResize(d.delta.dx),
-        child: SizedBox(
-          width: kPaneSplitHandleWidth,
-          child: Stack(children: [
-            Center(
-              child: SizedBox(
-                width: kPaneHairline,
-                height: double.infinity,
-                child: ColoredBox(
-                  color: _hover ? kPaneSeamHoverColor : kPaneSeamColor,
-                ),
+    return SizedBox(
+      width: kPaneSplitHandleWidth,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          // Razor-thin visible divider line
+          Positioned.fill(
+            child: ColoredBox(
+              color: _hover ? kPaneSeamHoverColor : AppColors.border,
+            ),
+          ),
+          // Expanded invisible hit target for effortless grab & hover
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: -4,
+            right: -4,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeColumn,
+              onEnter: (_) => setState(() => _hover = true),
+              onExit: (_) => setState(() => _hover = false),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragUpdate: (d) => widget.onResize(d.delta.dx),
               ),
             ),
-            if (widget.joinBaseline)
-              Positioned(
-                left: 0,
-                right: 0,
-                top: kPaneHeaderHeight - kPaneHairline,
-                child: IgnorePointer(
-                  child: Container(
-                    height: kPaneHairline,
-                    color: kPaneSeamColor,
-                  ),
-                ),
-              ),
-            if (widget.joinBaseline)
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: IgnorePointer(
-                  child: Container(
-                    height: kPaneHairline,
-                    color: kPaneSeamColor,
-                  ),
-                ),
-              ),
-          ]),
-        ),
+          ),
+        ],
       ),
     );
   }

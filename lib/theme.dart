@@ -256,7 +256,7 @@ class AppColors {
   /// Translucent window background for desktop vibrancy (macOS) and Acrylic/Mica (Windows).
   /// Blends subtly with the native frosted desktop backdrop without losing contrast.
   static Color get windowBg =>
-      (kMacOS || kWindows) ? currentTheme.bg.withValues(alpha: 0.22) : currentTheme.bg;
+      (kMacOS || kWindows) ? currentTheme.bg.withValues(alpha: 0.70) : currentTheme.bg;
 
   /// Translucent frosted glass surface for modals, dialogs, drawers, bottom sheets,
   /// and floating action bars across desktop and mobile.
@@ -300,11 +300,11 @@ class AppColors {
 }
 
 /// Reading/content surfaces (chat, editor, file viewer, diff).
-/// On desktop, a smoked pure black tint (82% opacity) preserves the deep, rich
-/// shade of black and text contrast without turning grey, while letting the
-/// native desktop vibrancy subtly diffuse through.
+/// Translucent deep dark on desktop so vibrancy shines through with a sleek
+/// smoked-glass feel, closely harmonized with the sidebar to reduce contrast
+/// and make the interface smooth and cohesive.
 Color get readingBg => (kMacOS || kWindows)
-    ? const Color(0xFF000000).withValues(alpha: 0.82)
+    ? currentTheme.canvas.withValues(alpha: 0.74)
     : AppColors.canvas;
 
 // ---------------------------------------------------------------------------
