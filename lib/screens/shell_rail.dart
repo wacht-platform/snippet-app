@@ -68,7 +68,7 @@ class ShellRail extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: 40,
-      color: AppColors.bg,
+      color: AppColors.windowBg,
       padding: const EdgeInsets.only(right: 16),
       child: Row(
         children: [

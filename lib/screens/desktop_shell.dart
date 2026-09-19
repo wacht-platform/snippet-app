@@ -1973,7 +1973,7 @@ class _DesktopShellState extends State<DesktopShell>
             drawerEdgeDragWidth: kMobile ? 20 : 24,
             drawer: Drawer(
               width: drawerW,
-              backgroundColor: AppColors.bg,
+              backgroundColor: AppColors.windowBg,
               shape: const RoundedRectangleBorder(),
               child: SafeArea(
                   child: _sidebar(
@@ -2000,7 +2000,7 @@ class _DesktopShellState extends State<DesktopShell>
         return Scaffold(
           // The window paints the chrome surface; the reading pane inside it is
           // the darker canvas.
-          backgroundColor: AppColors.bg,
+          backgroundColor: AppColors.windowBg,
           body: SafeArea(
             child: Column(children: [
               _macWindowBar(),
@@ -2019,7 +2019,7 @@ class _DesktopShellState extends State<DesktopShell>
       }
 
       return Scaffold(
-        backgroundColor: AppColors.bg,
+        backgroundColor: AppColors.windowBg,
         body: SafeArea(
           child: Column(children: [
             // The navigation band is a shell-level row: full window width,

@@ -69,7 +69,7 @@ class TopWorkspaceTabChip extends StatelessWidget {
         height: kTitleTabHeight,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.bg : Colors.transparent,
+          color: isActive ? AppColors.windowBg : Colors.transparent,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
         ),
         child: Row(

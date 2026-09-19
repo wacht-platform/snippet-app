@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import 'models.dart';
@@ -45,10 +47,15 @@ Future<void> showCommandPalette(
       ),
       transitionBuilder: (ctx, anim, _, child) {
         final c = CurvedAnimation(parent: anim, curve: Motion.enter);
-        return FadeTransition(
-            opacity: c,
-            child: ScaleTransition(
-                scale: Tween(begin: 0.98, end: 1.0).animate(c), child: child));
+        return BackdropFilter(
+          filter: ImageFilter.blur(
+              sigmaX: 20 * c.value, sigmaY: 20 * c.value),
+          child: FadeTransition(
+              opacity: c,
+              child: ScaleTransition(
+                  scale: Tween(begin: 0.98, end: 1.0).animate(c),
+                  child: child)),
+        );
       },
     );
   }
@@ -70,15 +77,20 @@ Future<void> showCommandPalette(
   );
 }
 
-Widget _frame(Widget child) => Material(
-      color: AppColors.surface1,
+Widget _frame(Widget child) => ClipRRect(
       borderRadius: BorderRadius.circular(R.card),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: AppColors.border2)),
-        child: child,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Material(
+          color: AppColors.glassSurface,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(R.card),
+              border: Border.all(color: AppColors.glassBorder),
+            ),
+            child: child,
+          ),
+        ),
       ),
     );
 

@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'platform.dart';
+
 // ---------------------------------------------------------------------------
 // Theme presets — each one defines every color the app uses. Ported from the
 // TUI's 13 presets (src/tui/theme.rs) plus mobile-specific surface/diff slots.
@@ -250,6 +252,18 @@ class AppColors {
   static Color get surface1 => currentTheme.surface1;
   static Color get surface2 => currentTheme.surface2;
   static Color get surface3 => currentTheme.surface3;
+
+  /// Translucent window background for desktop vibrancy (macOS) and Acrylic/Mica (Windows).
+  /// Blends subtly with the native frosted desktop backdrop without losing contrast.
+  static Color get windowBg =>
+      (kMacOS || kWindows) ? currentTheme.bg.withValues(alpha: 0.86) : currentTheme.bg;
+
+  /// Translucent frosted glass surface for modals, dialogs, drawers, bottom sheets,
+  /// and floating action bars across desktop and mobile.
+  static Color get glassSurface => currentTheme.surface1.withValues(alpha: 0.85);
+
+  /// Subtle translucent border for glassy surfaces.
+  static Color get glassBorder => currentTheme.border2.withValues(alpha: 0.6);
 
   // Foreground
   static Color get fg1 => currentTheme.fg1;
@@ -515,8 +529,10 @@ ThemeData buildAppTheme() {
     ),
   );
   return base.copyWith(
-    scaffoldBackgroundColor: c.bg,
-    canvasColor: c.bg,
+    scaffoldBackgroundColor:
+        (kMacOS || kWindows) ? c.bg.withValues(alpha: 0.86) : c.bg,
+    canvasColor:
+        (kMacOS || kWindows) ? c.bg.withValues(alpha: 0.86) : c.bg,
     dividerColor: c.border,
     textSelectionTheme: TextSelectionThemeData(
       selectionColor: _withAlpha(c.accent, 0.35),

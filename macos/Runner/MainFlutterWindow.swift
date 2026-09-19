@@ -17,6 +17,18 @@ class MainFlutterWindow: NSWindow {
     // narrow-desktop drawer layout stays reachable between 800 and 900 —
     // pinning the floor at 900 would make that path dead code on macOS.
     self.minSize = NSSize(width: 800, height: 600)
+    // Enable translucent glassy vibrancy background behind the window
+    self.isOpaque = false
+    self.backgroundColor = .clear
+
+    let visualEffectView = NSVisualEffectView()
+    visualEffectView.blendingMode = .behindWindow
+    visualEffectView.state = .active
+    visualEffectView.material = .underWindowBackground
+    visualEffectView.autoresizingMask = [.width, .height]
+    visualEffectView.frame = flutterViewController.view.bounds
+    flutterViewController.view.addSubview(visualEffectView, positioned: .below, relativeTo: nil)
+
     // Use the native traffic lights, but let Flutter paint a cohesive title
     // surface beneath them instead of leaving a separate blank title strip.
     self.title = "snippet"

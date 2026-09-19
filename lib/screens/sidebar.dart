@@ -220,7 +220,7 @@ class SidebarState extends State<Sidebar> {
     Theme.of(context); // Rebuild on theme change
     final hasClient = widget.client != null;
     return Container(
-      color: AppColors.bg, // shell surface — darker than the chat canvas
+      color: !kMobile ? AppColors.windowBg : AppColors.bg, // shell surface — darker than the chat canvas
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (widget.topInset && kMacOS) SizedBox(height: kMacTitlebar + 6),
         if (kMobile) ...[
@@ -676,14 +676,20 @@ class SidebarState extends State<Sidebar> {
           ),
         ],
       ),
-      child: Material(
-        color: AppColors.surface1,
-        shape: RoundedRectangleBorder(
-          borderRadius: radius,
-          side: BorderSide(color: AppColors.border2),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Material(
+            color: AppColors.surface1.withValues(alpha: 0.82),
+            shape: RoundedRectangleBorder(
+              borderRadius: radius,
+              side: BorderSide(color: AppColors.glassBorder),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: child,
+          ),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: child,
       ),
     );
   }
@@ -1848,20 +1854,25 @@ class SidebarState extends State<Sidebar> {
           left: origin.dx + 10,
           top: origin.dy + box.size.height + 4,
           width: box.size.width - 20,
-          child: Material(
-            color: AppColors.surface1,
+          child: ClipRRect(
             borderRadius: BorderRadius.circular(R.md),
-            elevation: 12,
-            shadowColor: Colors.black87,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border2),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 420),
-                child: SingleChildScrollView(child: content),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Material(
+                color: AppColors.glassSurface,
+                elevation: 12,
+                shadowColor: Colors.black87,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(R.md),
+                    border: Border.all(color: AppColors.glassBorder),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 420),
+                    child: SingleChildScrollView(child: content),
+                  ),
+                ),
               ),
             ),
           ),
@@ -1872,7 +1883,7 @@ class SidebarState extends State<Sidebar> {
             CurvedAnimation(parent: anim, curve: Motion.enter);
         return BackdropFilter(
           filter: ImageFilter.blur(
-              sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
+              sigmaX: 20.0 * curved.value, sigmaY: 20.0 * curved.value),
           child: FadeTransition(opacity: curved, child: child),
         );
       },
