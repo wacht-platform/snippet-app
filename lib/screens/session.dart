@@ -249,6 +249,8 @@ class _SessionScreenState extends State<SessionScreen>
   final List<QueuedInput> _optimisticQueued = [];
   // Queue IDs hidden after a local cancel/steer until the daemon confirms them.
   final Set<String> _queueHidden = {};
+  bool _editingQueue = false;
+  int? _hoveredQueuedIndex;
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
   final List<String> _pending = [];
@@ -2163,8 +2165,24 @@ class _SessionScreenState extends State<SessionScreen>
   void _cancelQueuedAt(int visible) {
     if (visible < 0 || visible >= _heldQueue.length) return;
     final item = _heldQueue[visible];
-    setState(() => _hideQueuedAt(visible));
+    setState(() {
+      _hideQueuedAt(visible);
+      if (_heldQueue.length <= 1) {
+        _editingQueue = false;
+        _hoveredQueuedIndex = null;
+      }
+    });
     _send({'kind': 'unqueue', 'value': item.id, 'nonce': _nextNonce()});
+  }
+
+  void _editQueuedAt(int visible) {
+    if (visible < 0 || visible >= _heldQueue.length) return;
+    final item = _heldQueue[visible];
+    final cleanText = _queuedText(item.text);
+    _input.text = cleanText;
+    _input.selection = TextSelection.collapsed(offset: cleanText.length);
+    _cancelQueuedAt(visible);
+    _inputFocus.requestFocus();
   }
 
   void _steerAllQueued() {
@@ -2182,7 +2200,11 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _cancelAllQueued() {
-    setState(() => _queueHidden.addAll(_heldQueue.map((item) => item.id)));
+    setState(() {
+      _queueHidden.addAll(_heldQueue.map((item) => item.id));
+      _editingQueue = false;
+      _hoveredQueuedIndex = null;
+    });
     _send({'kind': 'drop_queued'});
   }
 
@@ -2195,9 +2217,181 @@ class _SessionScreenState extends State<SessionScreen>
       _queueHidden.add(item.id);
       _optimisticQueued.removeWhere((queued) => queued.id == item.id);
       _trackPending(item.text, nonce);
+      if (_heldQueue.length <= 1) {
+        _editingQueue = false;
+        _hoveredQueuedIndex = null;
+      }
     });
     _send({'kind': 'steer_queued', 'value': item.id, 'nonce': nonce});
     _armAckWatchdog();
+  }
+
+  Widget _queuedCard() {
+    final queue = _heldQueue;
+    if (queue.isEmpty) return const SizedBox.shrink();
+
+    final count = queue.length;
+    final title = '$count  Queued messages';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: (kMacOS || kWindows) ? AppColors.glassSurface : AppColors.surface1,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: (kMacOS || kWindows) ? AppColors.glassBorder : AppColors.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: sans(13, weight: W.label, color: AppColors.fg2),
+              ),
+              const Spacer(),
+              if (_editingQueue && queue.length > 1) ...[
+                GestureDetector(
+                  onTap: _steerAllQueued,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Text('Send all',
+                        style: sans(12,
+                            weight: W.label, color: AppColors.accent)),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _cancelAllQueued,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Text('Cancel all',
+                        style: sans(12, color: AppColors.fg3)),
+                  ),
+                ),
+              ],
+              GestureDetector(
+                onTap: () => setState(() => _editingQueue = !_editingQueue),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _editingQueue
+                        ? AppColors.surface3
+                        : AppColors.surface2,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _editingQueue ? 'Done' : 'Edit',
+                    style: sans(12, weight: W.label, color: AppColors.fg2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (var qi = 0; qi < queue.length; qi++) ...[
+            if (qi > 0) const SizedBox(height: 6),
+            _queuedItemRow(qi, queue[qi]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _queuedItemRow(int qi, QueuedInput item) {
+    final isHovered = _hoveredQueuedIndex == qi;
+    final showActions = _editingQueue || isHovered;
+    final text = _queuedText(item.text);
+    final counts = _queuedAttachCounts(item.text);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hoveredQueuedIndex = qi),
+      onExit: (_) => setState(() {
+        if (_hoveredQueuedIndex == qi) _hoveredQueuedIndex = null;
+      }),
+      child: AnimatedContainer(
+        duration: Motion.fast,
+        curve: Motion.enter,
+        padding: EdgeInsets.symmetric(
+          horizontal: showActions ? 10 : 2,
+          vertical: showActions ? 6 : 4,
+        ),
+        decoration: BoxDecoration(
+          color: showActions
+              ? AppColors.surface2.withValues(alpha: 0.6)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    text.isEmpty ? '(attachment)' : text,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, color: AppColors.fg1),
+                  ),
+                  if (counts.$1 + counts.$2 + counts.$3 > 0) ...[
+                    const SizedBox(height: 4),
+                    AttachmentPill(
+                      audio: counts.$1,
+                      images: counts.$2,
+                      files: counts.$3,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (showActions) ...[
+              IconBtn(
+                'trash',
+                size: 26,
+                iconSize: 14,
+                tooltip: 'Delete',
+                onTap: () => _cancelQueuedAt(qi),
+              ),
+              const SizedBox(width: 2),
+              IconBtn(
+                'edit',
+                size: 26,
+                iconSize: 14,
+                tooltip: 'Edit',
+                onTap: () => _editQueuedAt(qi),
+              ),
+              const SizedBox(width: 2),
+              IconBtn(
+                'arrow-up',
+                size: 26,
+                iconSize: 14,
+                tooltip: 'Send now',
+                onTap: () => _steerQueuedAt(qi),
+              ),
+            ] else ...[
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: AppColors.fg4,
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   // Clean text for a held/pending message (markers stripped). Attachments
@@ -2398,48 +2592,6 @@ class _SessionScreenState extends State<SessionScreen>
                                                         mine: true,
                                                         text: _pending[pi],
                                                         selectable: false))),
-                                          if (_heldQueue.isNotEmpty) ...[
-                                            const SizedBox(height: 8),
-                                            _QueuedSection(
-                                              count: _heldQueue.length,
-                                              showBulkActions: !kMobile ||
-                                                  _heldQueue.length > 1,
-                                              onSendAll: _steerAllQueued,
-                                              onCancelAll: _cancelAllQueued,
-                                              children: [
-                                                for (var qi = 0;
-                                                    qi < _heldQueue.length;
-                                                    qi++)
-                                                  KeyedSubtree(
-                                                    key: ValueKey(
-                                                        'queued-$qi-${_heldQueue[qi].id}'),
-                                                    child: _QueuedBubble(
-                                                      text: _queuedText(
-                                                          _heldQueue[qi].text),
-                                                      audio:
-                                                          _queuedAttachCounts(
-                                                                  _heldQueue[qi]
-                                                                      .text)
-                                                              .$1,
-                                                      images:
-                                                          _queuedAttachCounts(
-                                                                  _heldQueue[qi]
-                                                                      .text)
-                                                              .$2,
-                                                      files:
-                                                          _queuedAttachCounts(
-                                                                  _heldQueue[qi]
-                                                                      .text)
-                                                              .$3,
-                                                      onCancel: () =>
-                                                          _cancelQueuedAt(qi),
-                                                      onSteer: () =>
-                                                          _steerQueuedAt(qi),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ],
                                           _LiveStreamRow(
                                             key: const ValueKey(
                                                 'live-stream-row'),
@@ -3612,8 +3764,9 @@ class _SessionScreenState extends State<SessionScreen>
             10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
         child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_heldQueue.isNotEmpty) _queuedCard(),
               if (_attachments.isNotEmpty) _attachmentBar(),
               if (_isRecording || _recordingPath != null) _recordingPanel(),
               Container(
@@ -5056,170 +5209,6 @@ class TerminalHost {
       if (t.id == id) return t;
     }
     return null;
-  }
-}
-
-class _QueuedBubble extends StatelessWidget {
-  final String text;
-  final int audio, images, files;
-  final VoidCallback onCancel;
-  final VoidCallback? onSteer;
-  const _QueuedBubble({
-    required this.text,
-    required this.audio,
-    required this.images,
-    required this.files,
-    required this.onCancel,
-    this.onSteer,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.card),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (text.isNotEmpty)
-                      Text(text,
-                          style: sans(M.body, height: 1.5, color: AppColors.fg1)),
-                    if (images + files + audio > 0) ...[
-                      if (text.isNotEmpty) const SizedBox(height: 6),
-                      AttachmentPill(
-                          audio: audio, images: images, files: files),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(right: 2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Queued',
-                        style:
-                            sans(kMobile ? 11 : 10, color: AppColors.fg3)),
-                    const SizedBox(width: 10),
-                    if (onSteer != null) ...[
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: onSteer,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 3),
-                          child: Text('Send now',
-                              style: sans(kMobile ? 12 : 10,
-                                  weight: W.label, color: AppColors.accent)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onCancel,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                        child: Text('Cancel',
-                            style: sans(kMobile ? 12 : 10,
-                                color: AppColors.fg4)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QueuedSection extends StatelessWidget {
-  final int count;
-  final bool showBulkActions;
-  final VoidCallback onSendAll;
-  final VoidCallback onCancelAll;
-  final List<Widget> children;
-  const _QueuedSection({
-    required this.count,
-    required this.showBulkActions,
-    required this.onSendAll,
-    required this.onCancelAll,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final showBulk = showBulkActions && count > 1;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
-            child: Row(children: [
-              Text('QUEUED ($count)',
-                  style: sans(10,
-                      weight: W.label, spacing: 0.6, color: AppColors.fg4)),
-              const Spacer(),
-              if (showBulk) ...[
-                Material(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.xs),
-                  child: InkWell(
-                    onTap: onSendAll,
-                    borderRadius: BorderRadius.circular(R.xs),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      child: Text('Send all',
-                          style: sans(10,
-                              weight: W.label, color: AppColors.accent)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(R.xs),
-                  child: InkWell(
-                    onTap: onCancelAll,
-                    borderRadius: BorderRadius.circular(R.xs),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 3),
-                      child: Text('Cancel all',
-                          style: sans(10, color: AppColors.fg3)),
-                    ),
-                  ),
-                ),
-              ],
-            ]),
-          ),
-          ...children,
-        ],
-      ),
-    );
   }
 }
 
