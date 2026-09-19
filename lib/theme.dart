@@ -256,11 +256,11 @@ class AppColors {
   /// Translucent window background for desktop vibrancy (macOS) and Acrylic/Mica (Windows).
   /// Blends subtly with the native frosted desktop backdrop without losing contrast.
   static Color get windowBg =>
-      (kMacOS || kWindows) ? currentTheme.bg.withValues(alpha: 0.86) : currentTheme.bg;
+      (kMacOS || kWindows) ? currentTheme.bg.withValues(alpha: 0.65) : currentTheme.bg;
 
   /// Translucent frosted glass surface for modals, dialogs, drawers, bottom sheets,
   /// and floating action bars across desktop and mobile.
-  static Color get glassSurface => currentTheme.surface1.withValues(alpha: 0.85);
+  static Color get glassSurface => currentTheme.surface1.withValues(alpha: 0.80);
 
   /// Subtle translucent border for glassy surfaces.
   static Color get glassBorder => currentTheme.border2.withValues(alpha: 0.6);
@@ -299,10 +299,12 @@ class AppColors {
   static Color get diffGutter => currentTheme.diffGutter;
 }
 
-/// Reading/content surfaces (chat, editor, file viewer, diff). Always the dark
-/// `canvas`, so the content the user is actually reading recedes and the grey
-/// chrome around it carries the structure.
-Color get readingBg => AppColors.canvas;
+/// Reading/content surfaces (chat, editor, file viewer, diff).
+/// Translucent on desktop so vibrancy shines through the entire app canvas,
+/// while maintaining deep contrast for text.
+Color get readingBg => (kMacOS || kWindows)
+    ? currentTheme.canvas.withValues(alpha: 0.72)
+    : currentTheme.canvas;
 
 // ---------------------------------------------------------------------------
 // Radius — small and precise. Large radii read consumer/toy; a developer tool
@@ -530,9 +532,9 @@ ThemeData buildAppTheme() {
   );
   return base.copyWith(
     scaffoldBackgroundColor:
-        (kMacOS || kWindows) ? c.bg.withValues(alpha: 0.86) : c.bg,
+        (kMacOS || kWindows) ? c.bg.withValues(alpha: 0.65) : c.bg,
     canvasColor:
-        (kMacOS || kWindows) ? c.bg.withValues(alpha: 0.86) : c.bg,
+        (kMacOS || kWindows) ? c.bg.withValues(alpha: 0.65) : c.bg,
     dividerColor: c.border,
     textSelectionTheme: TextSelectionThemeData(
       selectionColor: _withAlpha(c.accent, 0.35),

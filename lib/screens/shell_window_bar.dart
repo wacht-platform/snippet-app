@@ -277,7 +277,7 @@ class MacWindowBar extends StatelessWidget {
         return SizedBox(
           height: kTitleBarHeight,
           child: ColoredBox(
-            color: AppColors.floor,
+            color: AppColors.windowBg,
             child: Padding(
               padding: EdgeInsets.only(
                 left: hasWindowControls ? kTrafficLightReserve : 16,

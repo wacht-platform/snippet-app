@@ -2882,7 +2882,7 @@ class _SessionScreenState extends State<SessionScreen>
       height: mac ? 42 : 50,
       padding: EdgeInsets.symmetric(horizontal: mac ? 16 : 8),
       decoration: BoxDecoration(
-        color: mac ? AppColors.surface1 : readingBg,
+        color: mac ? AppColors.windowBg : readingBg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [

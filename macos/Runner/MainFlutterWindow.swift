@@ -18,13 +18,14 @@ class MainFlutterWindow: NSWindow {
     // pinning the floor at 900 would make that path dead code on macOS.
     self.minSize = NSSize(width: 800, height: 600)
     // Enable translucent glassy vibrancy background behind the window
+    flutterViewController.backgroundColor = .clear
     self.isOpaque = false
     self.backgroundColor = .clear
 
     let visualEffectView = NSVisualEffectView()
     visualEffectView.blendingMode = .behindWindow
     visualEffectView.state = .active
-    visualEffectView.material = .underWindowBackground
+    visualEffectView.material = .sidebar
     visualEffectView.autoresizingMask = [.width, .height]
     visualEffectView.frame = flutterViewController.view.bounds
     flutterViewController.view.addSubview(visualEffectView, positioned: .below, relativeTo: nil)
@@ -58,6 +59,12 @@ class MainFlutterWindow: NSWindow {
     }
 
     super.awakeFromNib()
+
+    // Ensure transparency persists after nib unpacking
+    self.isOpaque = false
+    self.backgroundColor = .clear
+    flutterViewController.backgroundColor = .clear
+    self.invalidateShadow()
 
     // AppKit sizes the native titlebar for a ~28pt band and centres the traffic
     // lights in it. The app paints a taller bar, so the lights would sit high

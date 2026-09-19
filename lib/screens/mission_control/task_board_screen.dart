@@ -181,7 +181,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
     // canvas pane and the standalone route is a bg scaffold, and the two must
     // still read the same.
     final list = ColoredBox(
-      color: AppColors.canvas,
+      color: readingBg,
       child: _content(),
     );
 
