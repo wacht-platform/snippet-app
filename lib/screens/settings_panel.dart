@@ -193,6 +193,8 @@ class SettingsPanelState extends State<SettingsPanel> {
   final GlobalKey<VaultScreenState> _vaultKey = GlobalKey<VaultScreenState>();
   final GlobalKey<InferenceProfilesScreenState> _modelsKey =
       GlobalKey<InferenceProfilesScreenState>();
+  final GlobalKey<RecurringScreenState> _recurringKey =
+      GlobalKey<RecurringScreenState>();
 
   bool _addingMachine = false;
   final TextEditingController _addMachinePaste = TextEditingController();
@@ -367,20 +369,20 @@ class SettingsPanelState extends State<SettingsPanel> {
                     children: [
                       // Sidebar Header
                       Container(
-                        height: 52,
+                        height: 44,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           border: Border(
                             bottom: BorderSide(
-                                color: AppColors.border.withValues(alpha: 0.6)),
+                                color: AppColors.border.withValues(alpha: 0.5)),
                           ),
                         ),
                         child: Row(children: [
                           AppIcon('settings',
-                              size: 16, color: AppColors.accent),
-                          const SizedBox(width: 10),
+                              size: 15, color: AppColors.accent),
+                          const SizedBox(width: 9),
                           Text('Settings',
-                              style: sans(14,
+                              style: sans(13.5,
                                   weight: W.title, color: AppColors.fg1)),
                         ]),
                       ),
@@ -388,7 +390,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 10),
+                              horizontal: 8, vertical: 8),
                           children: [
                             for (final (page, icon, label) in _nav)
                               _settingsNavRow(page, icon, label),
@@ -436,49 +438,22 @@ class SettingsPanelState extends State<SettingsPanel> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Content Pane Header (matches sidebar 52px height)
+                        // Content Pane Header
                         Container(
-                          height: 52,
-                          padding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(
-                                  color:
-                                      AppColors.border.withValues(alpha: 0.6)),
-                            ),
-                          ),
+                          height: 44,
+                          padding: const EdgeInsets.fromLTRB(24, 0, 20, 0),
                           child: Row(
                             children: [
                               Expanded(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _pageTitle(_page),
-                                      style: sans(14.5,
-                                          weight: W.title,
-                                          color: AppColors.fg1),
-                                    ),
-                                    const SizedBox(height: 1),
-                                    Text(
-                                      _pageSubtitle(_page),
-                                      style: sans(11, color: AppColors.fg3),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
+                                child: Text(
+                                  _pageTitle(_page),
+                                  style: sans(14,
+                                      weight: W.title,
+                                      color: AppColors.fg1),
                                 ),
                               ),
-                              if (_pageAction(_page) != null) ...[
+                              if (_pageAction(_page) != null)
                                 _pageAction(_page)!,
-                                const SizedBox(width: 10),
-                              ],
-                              IconBtn('x',
-                                  size: 28,
-                                  iconSize: 15,
-                                  tooltip: 'Close settings',
-                                  onTap: widget.onClose),
                             ],
                           ),
                         ),
@@ -731,19 +706,6 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.scheduled => 'Scheduled Jobs',
       };
 
-  String _pageSubtitle(SettingsPage page) => switch (page) {
-        SettingsPage.general =>
-          'Manage the connected daemon machine, saved instances, and notifications.',
-        SettingsPage.models =>
-          'Model and provider configurations for new sessions and delegated work.',
-        SettingsPage.usage =>
-          'Token consumption, context window stats, and limits by provider.',
-        SettingsPage.vault =>
-          'Encrypted API keys and secrets accessible by agents.',
-        SettingsPage.scheduled =>
-          'Recurring background tasks and automated routines.',
-      };
-
   Widget? _pageAction(SettingsPage page) => switch (page) {
         SettingsPage.general => _addingMachine
             ? null
@@ -759,6 +721,10 @@ class SettingsPanelState extends State<SettingsPanel> {
             icon: 'plus',
             small: true,
             onTap: () => _vaultKey.currentState?.add()),
+        SettingsPage.scheduled => Btn('Add job',
+            icon: 'plus',
+            small: true,
+            onTap: () => _recurringKey.currentState?.add()),
         _ => null,
       };
 
@@ -766,7 +732,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   Widget _settingsNavRow(SettingsPage page, String icon, String label) {
     final selected = _page == page;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
+      padding: const EdgeInsets.only(bottom: 2),
       child: Material(
         color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),
@@ -778,18 +744,18 @@ class SettingsPanelState extends State<SettingsPanel> {
             _renamingUrl = null;
           }),
           child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(children: [
               AppIcon(icon,
-                  size: 15,
+                  size: 13.5,
                   color: selected ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(13,
+                    style: sans(12.5,
                         weight: selected ? W.label : W.body,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
@@ -854,8 +820,8 @@ class SettingsPanelState extends State<SettingsPanel> {
           embedded: true,
         ),
       SettingsPage.scheduled => RecurringScreen(
+          key: _recurringKey,
           client: widget.client,
-          listOnly: true,
           embedded: true,
         ),
     };
@@ -868,7 +834,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     return ListView(
       padding: EdgeInsets.fromLTRB(
         compact ? M.gutter : 24,
-        compact ? 16 : 20,
+        compact ? 16 : 8,
         compact ? M.gutter : 24,
         28,
       ),
@@ -877,11 +843,12 @@ class SettingsPanelState extends State<SettingsPanel> {
           children: [
             Expanded(
                 child: _inlineLabel('Saved Connections (${_instances.length})')),
-            Btn('Add machine',
-                icon: 'plus',
-                small: true,
-                variant: BtnVariant.ghost,
-                onTap: _addMachine),
+            if (compact)
+              Btn('Add machine',
+                  icon: 'plus',
+                  small: true,
+                  variant: BtnVariant.ghost,
+                  onTap: _addMachine),
           ],
         ),
         const SizedBox(height: 10),

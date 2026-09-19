@@ -14,7 +14,42 @@ void showTabContextMenu({
   required VoidCallback onCloseTab,
   required VoidCallback onCloseOthers,
   required VoidCallback onCloseAll,
+  Offset? position,
 }) {
+  if (!kMobile) {
+    showAppMenu<String>(
+      context,
+      point: position ?? const Offset(200, 44),
+      below: true,
+      items: [
+        if (!tab.isMissionControl)
+          appMenuItem(
+            value: 'close',
+            icon: 'x',
+            label: 'Close tab',
+          ),
+        if (hasNonMissionControlTabs)
+          appMenuItem(
+            value: 'close_others',
+            icon: 'copy',
+            label: 'Close other tabs',
+          ),
+        if (hasNonMissionControlTabs)
+          appMenuItem(
+            value: 'close_all',
+            icon: 'trash',
+            label: 'Close all tabs',
+            danger: true,
+          ),
+      ],
+    ).then((choice) {
+      if (choice == 'close') onCloseTab();
+      if (choice == 'close_others') onCloseOthers();
+      if (choice == 'close_all') onCloseAll();
+    });
+    return;
+  }
+
   Widget tabMenuItem(
     BuildContext ctx,
     String icon,
@@ -155,6 +190,7 @@ class CardTabChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
+      onSecondaryTap: onLongPress,
       child: AnimatedContainer(
         duration: Motion.press,
         curve: Motion.enter,

@@ -48,10 +48,10 @@ class RecurringScreen extends StatefulWidget {
     this.onBack,
   });
   @override
-  State<RecurringScreen> createState() => _RecurringScreenState();
+  State<RecurringScreen> createState() => RecurringScreenState();
 }
 
-class _RecurringScreenState extends State<RecurringScreen>
+class RecurringScreenState extends State<RecurringScreen>
     with AutomaticKeepAliveClientMixin {
   late Future<List<RecurringJob>> _future;
   List<SessionInfo>? _sessions;
@@ -59,6 +59,16 @@ class _RecurringScreenState extends State<RecurringScreen>
   Timer? _refreshDebounce;
   Timer? _eventsReconnect;
   bool _closed = false;
+
+  bool _adding = false;
+  bool _submitting = false;
+  final _titleCtrl = TextEditingController();
+  final _promptCtrl = TextEditingController();
+  final _planCtrl = TextEditingController();
+  final _dailyCtrl = TextEditingController(text: '09:00');
+  final _customEveryCtrl = TextEditingController();
+  String _mode = 'preset';
+  String _schedule = 'every 1h';
 
   @override
   bool get wantKeepAlive => true;
@@ -78,6 +88,11 @@ class _RecurringScreenState extends State<RecurringScreen>
     _refreshDebounce?.cancel();
     _eventsReconnect?.cancel();
     _eventsSub?.cancel();
+    _titleCtrl.dispose();
+    _promptCtrl.dispose();
+    _planCtrl.dispose();
+    _dailyCtrl.dispose();
+    _customEveryCtrl.dispose();
     super.dispose();
   }
 
@@ -132,8 +147,24 @@ class _RecurringScreenState extends State<RecurringScreen>
     if (mounted) setState(() => _future = widget.client.recurringJobs());
   }
 
+  void add() => _add();
+
   Future<void> _add() async {
     if (!_canAdd) return;
+    if (!kMobile) {
+      setState(() {
+        _titleCtrl.clear();
+        _promptCtrl.clear();
+        _planCtrl.clear();
+        _dailyCtrl.text = '09:00';
+        _customEveryCtrl.clear();
+        _mode = 'preset';
+        _schedule = 'every 1h';
+        _submitting = false;
+        _adding = true;
+      });
+      return;
+    }
     final title = TextEditingController();
     final prompt = TextEditingController();
     final plan = TextEditingController();
@@ -386,6 +417,224 @@ class _RecurringScreenState extends State<RecurringScreen>
     );
   }
 
+  Future<void> _saveInline() async {
+    if (_submitting) return;
+    final t = _titleCtrl.text.trim();
+    final p = _promptCtrl.text.trim();
+    final planPath = _planCtrl.text.trim();
+    final sched = switch (_mode) {
+      'daily' => 'daily ${_dailyCtrl.text.trim()}',
+      'onceAt' => 'at ${_dailyCtrl.text.trim()}',
+      'onceIn' => 'in ${_customEveryCtrl.text.trim()}',
+      'custom' => _customSchedule(_customEveryCtrl.text),
+      _ => _schedule,
+    };
+    if (t.isEmpty) {
+      if (mounted) toast(context, 'Title is required', danger: true);
+      return;
+    }
+    if (p.isEmpty && planPath.isEmpty) {
+      if (mounted) {
+        toast(context, 'Goal or plan file is required', danger: true);
+      }
+      return;
+    }
+    if (sched == null) {
+      if (mounted) {
+        toast(context, 'Interval must be at least 5 minutes (e.g. 5m, 2h)',
+            danger: true);
+      }
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await widget.client.createRecurring(
+        title: t,
+        sessionId: _boundSessionId,
+        prompt: p,
+        planPath: planPath.isEmpty ? null : planPath,
+        schedule: sched,
+        goal: true,
+      );
+      if (mounted) {
+        setState(() {
+          _adding = false;
+          _submitting = false;
+        });
+        _refresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        toast(context, '$e', danger: true);
+      }
+    }
+  }
+
+  Future<void> _pickPlanInline() async {
+    final start = (widget.workspace?.trim().isNotEmpty == true)
+        ? widget.workspace
+        : null;
+    final picked = await presentScreen<String>(
+      context,
+      builder: (_, close) => FileExplorer(
+        client: widget.client,
+        title: 'Plan file',
+        start: start,
+        onClose: close,
+        onPickFile: (path) {},
+      ),
+    );
+    if (picked != null && picked.trim().isNotEmpty && mounted) {
+      setState(() {
+        _planCtrl.text = picked.trim();
+      });
+    }
+  }
+
+  Widget _inlineAddCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Schedule a goal or message',
+                  style: sans(13, weight: W.label, color: AppColors.fg1),
+                ),
+              ),
+              IconBtn('x',
+                  size: 24,
+                  iconSize: 13,
+                  tooltip: 'Cancel',
+                  onTap: () => setState(() => _adding = false)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes.',
+            style: sans(11.5, color: AppColors.fg3),
+          ),
+          const SizedBox(height: 12),
+          AppField(
+            label: 'Title',
+            controller: _titleCtrl,
+            hint: 'Nightly review',
+          ),
+          const SizedBox(height: 10),
+          Text('Schedule', style: sans(11.5, color: AppColors.fg3)),
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final s in const [
+              'every 5m',
+              'every 15m',
+              'every 1h',
+              'every 1d',
+            ])
+              _chip(s, _mode == 'preset' && _schedule == s, () {
+                setState(() {
+                  _mode = 'preset';
+                  _schedule = s;
+                });
+              }),
+            _chip('custom', _mode == 'custom', () {
+              setState(() => _mode = 'custom');
+            }),
+            _chip('daily', _mode == 'daily', () {
+              setState(() => _mode = 'daily');
+            }),
+            _chip('once at', _mode == 'onceAt', () {
+              setState(() => _mode = 'onceAt');
+            }),
+            _chip('once in', _mode == 'onceIn', () {
+              setState(() => _mode = 'onceIn');
+            }),
+          ]),
+          if (_mode == 'custom') ...[
+            const SizedBox(height: 8),
+            AppField(
+              label: 'Every (min 5m)',
+              controller: _customEveryCtrl,
+              mono: true,
+              hint: '5m  ·  90m  ·  2h  ·  300s',
+            ),
+          ],
+          if (_mode == 'daily') ...[
+            const SizedBox(height: 8),
+            AppField(
+              label: 'Time (HH:MM)',
+              controller: _dailyCtrl,
+              mono: true,
+              hint: '09:00',
+            ),
+          ],
+          if (_mode == 'onceAt') ...[
+            const SizedBox(height: 8),
+            AppField(
+              label: 'Time today/tomorrow (HH:MM)',
+              controller: _dailyCtrl,
+              mono: true,
+              hint: '14:30',
+            ),
+          ],
+          if (_mode == 'onceIn') ...[
+            const SizedBox(height: 8),
+            AppField(
+              label: 'From now (e.g. 30m, 2h)',
+              controller: _customEveryCtrl,
+              mono: true,
+              hint: '30m',
+            ),
+          ],
+          const SizedBox(height: 10),
+          AppField(
+            label: 'Goal',
+            controller: _promptCtrl,
+            hint: 'The piece of work to complete',
+            minLines: 2,
+            maxLines: 5,
+          ),
+          const SizedBox(height: 10),
+          AppField(
+            label: 'Plan file (optional)',
+            controller: _planCtrl,
+            mono: true,
+            hint: 'notes/plan.md — pick or type a path',
+            rightSlot: IconBtn('folder',
+                size: 28,
+                iconSize: 14,
+                tooltip: 'Pick file',
+                onTap: _pickPlanInline),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Btn('Cancel',
+                  small: true,
+                  variant: BtnVariant.ghost,
+                  onTap: () => setState(() => _adding = false)),
+              const SizedBox(width: 8),
+              Btn('Save job',
+                  small: true,
+                  disabled: _submitting,
+                  onTap: _saveInline),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -430,14 +679,15 @@ class _RecurringScreenState extends State<RecurringScreen>
               ? EdgeInsets.zero
               : const EdgeInsets.fromLTRB(24, 20, 24, 28),
           children: [
-            if (jobs.isEmpty)
+            if (_adding) _inlineAddCard(),
+            if (jobs.isEmpty && !_adding)
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
                 child: Text('No scheduled jobs yet.',
                     style: sans(13, color: AppColors.fg3)),
               ),
             ...jobs.map(_jobRow),
-            if (_canAdd) ...[
+            if (_canAdd && !_adding) ...[
               const SizedBox(height: 4),
               Material(
                 color: Colors.transparent,

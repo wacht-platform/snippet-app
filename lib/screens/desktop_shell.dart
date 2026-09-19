@@ -1099,6 +1099,12 @@ class _DesktopShellState extends State<DesktopShell>
   void _tabMenu(int i) {
     if (i < 0 || i >= _tabs.length) return;
     final t = _tabs[i];
+    Offset? anchor;
+    final key = _chipKeys[t.key];
+    final box = key?.currentContext?.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize) {
+      anchor = box.localToGlobal(Offset(box.size.width / 2, box.size.height));
+    }
     showTabContextMenu(
       context: context,
       tab: t,
@@ -1107,6 +1113,7 @@ class _DesktopShellState extends State<DesktopShell>
       onCloseTab: () => _closeTab(i),
       onCloseOthers: () => _closeOthers(i),
       onCloseAll: _closeAllTabs,
+      position: anchor,
     );
   }
 

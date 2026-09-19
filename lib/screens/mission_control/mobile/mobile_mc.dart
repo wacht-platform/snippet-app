@@ -6,6 +6,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../panel.dart';
+import '../../../platform.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../mission_control_screen.dart' show ChangeNotifierProvider;
@@ -49,6 +51,15 @@ class MobileMissionControl extends StatelessWidget {
     MissionControlState state,
     task,
   ) async {
+    if (!kMobile) {
+      await presentScreen<void>(
+        context,
+        style: PanelStyle.drawer,
+        builder: (_, close) => TaskDetailSheet(task: task, state: state),
+      );
+      state.refresh(silent: true);
+      return;
+    }
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -58,9 +69,7 @@ class MobileMissionControl extends StatelessWidget {
       ),
       builder: (sheetCtx) => TaskDetailSheet(task: task, state: state),
     );
-    if (state.hasListeners) {
-      state.refresh(silent: true);
-    }
+    state.refresh(silent: true);
   }
 
   Future<void> _openQuestionReply(
@@ -69,60 +78,72 @@ class MobileMissionControl extends StatelessWidget {
     QuestionItem q,
   ) async {
     final controller = TextEditingController();
-    final reply = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.bg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetCtx) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            20,
-            16,
-            16 + MediaQuery.of(sheetCtx).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SectionLabel('Agent is asking'),
-              const SizedBox(height: 8),
-              Text(q.question, style: sans(14, color: AppColors.fg1)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                autofocus: true,
-                maxLines: 4,
-                minLines: 2,
-                decoration: const InputDecoration(
-                  hintText: 'Type your reply…',
-                  border: OutlineInputBorder(),
+    Widget buildBody(BuildContext ctx) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SectionLabel('Agent is asking'),
+            const SizedBox(height: 8),
+            Text(q.question, style: sans(14, color: AppColors.fg1)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 4,
+              minLines: 2,
+              decoration: const InputDecoration(
+                hintText: 'Type your reply…',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Spacer(),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => Navigator.pop(sheetCtx),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () =>
-                        Navigator.pop(sheetCtx, controller.text.trim()),
-                    child: const Text('Send'),
-                  ),
-                ],
-              ),
-            ],
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, controller.text.trim()),
+                  child: const Text('Send'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    final String? reply;
+    if (!kMobile) {
+      reply = await showAppSheet<String>(
+        context,
+        title: 'Reply to agent',
+        maxWidth: 480,
+        child: Builder(builder: buildBody),
+      );
+    } else {
+      reply = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppColors.bg,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (sheetCtx) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
           ),
-        );
-      },
-    );
+          child: buildBody(sheetCtx),
+        ),
+      );
+    }
     if (reply != null && reply.isNotEmpty) {
       await state.sendMessage(reply);
     }
@@ -133,13 +154,21 @@ class MobileMissionControl extends StatelessWidget {
 Future<void> showNotificationInbox(
   BuildContext context,
   MissionControlState state,
-) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.bg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => NotificationInbox(state: state),
+) {
+  if (!kMobile) {
+    return presentScreen<void>(
+      context,
+      style: PanelStyle.drawer,
+      builder: (_, close) => NotificationInbox(state: state),
     );
+  }
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: AppColors.bg,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) => NotificationInbox(state: state),
+  );
+}
