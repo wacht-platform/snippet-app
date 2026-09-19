@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../panel.dart';
 import '../platform.dart';
+import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
@@ -148,6 +150,9 @@ class SettingsPanel extends StatefulWidget {
   final List<Instance> instances;
   final Instance? active;
   final void Function(Instance) onRemove;
+  final void Function(Instance, String)? onRename;
+  final void Function(Instance)? onSelect;
+  final void Function(Instance)? onAdd;
   final VoidCallback onClose;
 
   /// True when hosted INSIDE the phone home under the floating bar, rather than
@@ -167,6 +172,9 @@ class SettingsPanel extends StatefulWidget {
     required this.instances,
     required this.active,
     required this.onRemove,
+    this.onRename,
+    this.onSelect,
+    this.onAdd,
     required this.onClose,
     this.embedded = false,
     this.section,
@@ -185,6 +193,14 @@ class SettingsPanelState extends State<SettingsPanel> {
   final GlobalKey<VaultScreenState> _vaultKey = GlobalKey<VaultScreenState>();
   final GlobalKey<InferenceProfilesScreenState> _modelsKey =
       GlobalKey<InferenceProfilesScreenState>();
+
+  bool _addingMachine = false;
+  final TextEditingController _addMachinePaste = TextEditingController();
+  bool _addMachineBusy = false;
+  String? _addMachineError;
+
+  String? _renamingUrl;
+  final TextEditingController _renameController = TextEditingController();
 
   SettingsPage _page = SettingsPage.general;
 
@@ -217,10 +233,18 @@ class SettingsPanelState extends State<SettingsPanel> {
   @override
   void initState() {
     super.initState();
+    _addMachinePaste.addListener(() => setState(() {}));
     _mobileSettingsReady = _loadMobileSettings();
     notificationsEnabled().then((v) {
       if (mounted) setState(() => _notif = v);
     });
+  }
+
+  @override
+  void dispose() {
+    _addMachinePaste.dispose();
+    _renameController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMobileSettings() async {
@@ -529,7 +553,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     return ListView(
       padding: EdgeInsets.fromLTRB(M.gutter, 12, M.gutter, 32),
       children: [
-        if (kCanNotify) section('Notifications', _notifTile()),
+        if (kCanNotify) section('Notifications', _notifRow()),
         section(
             'Inference profile',
             InferenceProfilesScreen(client: widget.client, embedded: true),
@@ -564,29 +588,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     );
   }
 
-  /// One grouped card. Related rows share a surface and a radius, and hairlines
-  /// separate them.
-  Widget _settingsCard(List<Widget> children) => Material(
-        color: kMobile ? AppColors.surface2 : AppColors.surface1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
-          side: BorderSide(color: AppColors.border),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              children[i],
-              if (i < children.length - 1)
-                Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: AppColors.border.withValues(alpha: 0.6)),
-            ],
-          ],
-        ),
-      );
+
 
   /// Section label, shared so the inline and nested settings cannot diverge.
   Widget _inlineLabel(String t) => Padding(
@@ -632,18 +634,93 @@ class SettingsPanelState extends State<SettingsPanel> {
     };
   }
 
-  Future<void> _addMachine() async {
-    final inst = await showModal<Instance>(
-      context,
-      const AddInstanceScreen(),
-    );
-    if (inst != null && mounted) {
-      setState(() {
-        if (!_instances.any((e) => e.url == inst.url)) {
-          _instances.add(inst);
+  void _addMachine() {
+    if (kMobile && widget.embedded) {
+      showModal<Instance>(
+        context,
+        const AddInstanceScreen(),
+      ).then((inst) {
+        if (inst != null && mounted) {
+          setState(() {
+            _instances.removeWhere((e) => e.url == inst.url);
+            _instances.add(inst);
+          });
+          InstanceStore().save(_instances);
+          widget.onAdd?.call(inst);
         }
       });
+      return;
     }
+    setState(() {
+      _addingMachine = true;
+      _addMachineError = null;
+      _addMachinePaste.clear();
+    });
+  }
+
+  Future<void> _submitAddMachine() async {
+    final raw = _addMachinePaste.text.trim();
+    if (raw.isEmpty || _addMachineBusy) return;
+    setState(() {
+      _addMachineBusy = true;
+      _addMachineError = null;
+    });
+    try {
+      final parsed = parseConnection(raw);
+      if (parsed == null) {
+        throw 'Invalid connection string. Run "snippet daemon link" on the remote machine.';
+      }
+      final (url, token) = parsed;
+      final cfg = await DaemonClient(url, token).getConfig();
+      final name = cfg.hostname.isNotEmpty ? cfg.hostname : hostOf(url);
+      final inst = Instance(name: name, url: url, token: token);
+      if (!mounted) return;
+      setState(() {
+        _addMachineBusy = false;
+        _instances.removeWhere((e) => e.url == inst.url);
+        _instances.add(inst);
+        _addingMachine = false;
+        _addMachinePaste.clear();
+      });
+      await InstanceStore().save(_instances);
+      widget.onAdd?.call(inst);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _addMachineBusy = false;
+          _addMachineError = 'Connection failed: $e';
+        });
+      }
+    }
+  }
+
+  void _startRename(Instance i) {
+    setState(() {
+      _renamingUrl = i.url;
+      _renameController.text = i.label;
+    });
+  }
+
+  Future<void> _commitRename(Instance inst) async {
+    final newName = _renameController.text.trim();
+    if (newName.isEmpty) {
+      setState(() => _renamingUrl = null);
+      return;
+    }
+    setState(() {
+      final idx = _instances.indexWhere((e) => e.url == inst.url);
+      if (idx >= 0) {
+        _instances[idx] =
+            Instance(name: newName, url: inst.url, token: inst.token);
+      }
+      _renamingUrl = null;
+    });
+    await InstanceStore().save(_instances);
+    widget.onRename?.call(inst, newName);
+  }
+
+  void _selectInstance(Instance i) {
+    widget.onSelect?.call(i);
   }
 
   String _pageTitle(SettingsPage page) => switch (page) {
@@ -668,10 +745,12 @@ class SettingsPanelState extends State<SettingsPanel> {
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
-        SettingsPage.general => Btn('Add machine',
-            icon: 'plus',
-            small: true,
-            onTap: _addMachine),
+        SettingsPage.general => _addingMachine
+            ? null
+            : Btn('Add machine',
+                icon: 'plus',
+                small: true,
+                onTap: _addMachine),
         SettingsPage.models => Btn('Add profile',
             icon: 'plus',
             small: true,
@@ -693,7 +772,11 @@ class SettingsPanelState extends State<SettingsPanel> {
         borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           borderRadius: BorderRadius.circular(R.sm),
-          onTap: () => setState(() => _page = page),
+          onTap: () => setState(() {
+            _page = page;
+            _addingMachine = false;
+            _renamingUrl = null;
+          }),
           child: Container(
             height: 36,
             padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -780,18 +863,16 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   /// The General section's content.
   Widget _generalPage() {
+    if (_addingMachine) return _addMachinePane();
+    final compact = kMobile && widget.embedded;
     return ListView(
       padding: EdgeInsets.fromLTRB(
-        kMobile && widget.embedded ? M.gutter : 24,
-        kMobile && widget.embedded ? 16 : 20,
-        kMobile && widget.embedded ? M.gutter : 24,
+        compact ? M.gutter : 24,
+        compact ? 16 : 20,
+        compact ? M.gutter : 24,
         28,
       ),
       children: [
-        _inlineLabel('Active Machine'),
-        const SizedBox(height: 8),
-        _activeMachineCard(),
-        const SizedBox(height: 22),
         Row(
           children: [
             Expanded(
@@ -803,117 +884,173 @@ class SettingsPanelState extends State<SettingsPanel> {
                 onTap: _addMachine),
           ],
         ),
-        const SizedBox(height: 8),
-        _settingsCard(
-          _instances.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 14),
-                    child: Text('No saved connections.',
-                        style: sans(12, color: AppColors.fg3)),
+        const SizedBox(height: 10),
+        if (_instances.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 36),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppIcon('server', size: 28, color: AppColors.fg4),
+                  const SizedBox(height: 10),
+                  Text('No saved connections',
+                      style: sans(13, weight: W.label, color: AppColors.fg2)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Connect to a remote machine running the snippet daemon.',
+                    style: sans(11.5, color: AppColors.fg3),
                   ),
-                ]
-              : [for (final i in _instances) _instanceRow(i)],
-        ),
+                  const SizedBox(height: 14),
+                  Btn('Connect machine',
+                      icon: 'plus',
+                      small: true,
+                      onTap: _addMachine),
+                ],
+              ),
+            ),
+          )
+        else
+          Column(
+            children: [
+              for (var i = 0; i < _instances.length; i++) ...[
+                _instanceRow(_instances[i]),
+                if (i < _instances.length - 1)
+                  Divider(
+                      height: 1,
+                      color: AppColors.border.withValues(alpha: 0.4)),
+              ],
+            ],
+          ),
         if (kCanNotify) ...[
-          const SizedBox(height: 22),
+          const SizedBox(height: 28),
           _inlineLabel('Alerts & Notifications'),
-          const SizedBox(height: 8),
-          _settingsCard([_notifTile()]),
+          const SizedBox(height: 10),
+          _notifRow(),
         ],
       ],
     );
   }
 
-  Widget _activeMachineCard() {
-    final active = widget.active;
-    final label = active != null && active.label.isNotEmpty ? active.label : 'Default Machine';
-    final url = active?.url ?? widget.client.baseUrl;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kMobile ? AppColors.surface2 : AppColors.surface1,
-        borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.sm),
-              border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-            ),
-            child: Center(
-              child: AppIcon('server', size: 18, color: AppColors.accent),
-            ),
+  Widget _addMachinePane() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+      children: [
+        Row(
+          children: [
+            IconBtn('arrow-left', size: 30, iconSize: 16, tooltip: 'Back',
+                onTap: () => setState(() {
+                      _addingMachine = false;
+                      _addMachineError = null;
+                    })),
+            const SizedBox(width: 8),
+            Text('Connect a machine',
+                style: sans(16, weight: W.label, color: AppColors.fg1)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 38),
+          child: Text(
+            'Control a remote machine running the snippet daemon.',
+            style: sans(12, color: AppColors.fg3),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Text(label,
-                        style: sans(13.5, weight: W.label, color: AppColors.fg1)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentBg,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text('connected',
-                          style: sans(10, weight: W.label, color: AppColors.accent)),
-                    ),
-                  ],
+        ),
+        const SizedBox(height: 24),
+        Text('1. Run on your remote machine',
+            style: sans(12, weight: W.label, color: AppColors.fg2)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(R.sm),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: SelectableText(
+                  'snippet daemon link',
+                  style: mono(12.5, color: AppColors.accent),
                 ),
-                const SizedBox(height: 3),
-                Text(url,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(11, color: AppColors.fg3)),
-              ],
+              ),
+              IconBtn('copy', size: 26, iconSize: 13, tooltip: 'Copy command',
+                  onTap: () {
+                Clipboard.setData(
+                    const ClipboardData(text: 'snippet daemon link'));
+                toast(context, 'Copied');
+              }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text('2. Paste connection string or URL',
+            style: sans(12, weight: W.label, color: AppColors.fg2)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _addMachinePaste,
+          autofocus: true,
+          style: mono(12, color: AppColors.fg1),
+          decoration: InputDecoration(
+            hintText: 'https://host:port?token=... or {"url":..., "token":...}',
+            hintStyle: mono(11.5, color: AppColors.fg4),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            filled: true,
+            fillColor: AppColors.surface1,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(R.sm),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(R.sm),
+              borderSide: BorderSide(color: AppColors.accent),
             ),
           ),
+          onSubmitted: (_) => _submitAddMachine(),
+        ),
+        if (_addMachineError != null) ...[
+          const SizedBox(height: 10),
+          Text(_addMachineError!,
+              style: sans(12, color: AppColors.danger)),
         ],
-      ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Btn('Cancel',
+                variant: BtnVariant.ghost,
+                small: true,
+                onTap: () => setState(() {
+                      _addingMachine = false;
+                      _addMachineError = null;
+                    })),
+            const SizedBox(width: 8),
+            Btn(_addMachineBusy ? 'Connecting…' : 'Connect machine',
+                small: true,
+                disabled: _addMachineBusy ||
+                    _addMachinePaste.text.trim().isEmpty,
+                onTap: _submitAddMachine),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _instanceRow(Instance i) {
     final isActive = i.url == widget.active?.url;
+    final isRenaming = _renamingUrl == i.url;
+    final compact = kMobile && widget.embedded;
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          showManageMachineSheet(
-            context: context,
-            instance: i,
-            onRename: (inst, newName) {
-              setState(() {
-                final idx = _instances.indexWhere((e) => e.url == inst.url);
-                if (idx >= 0) {
-                  _instances[idx] =
-                      Instance(url: inst.url, token: inst.token, name: newName);
-                }
-              });
-            },
-            onRemove: _confirmRemove,
-          );
-        },
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-              kMobile && widget.embedded ? 0 : 14,
-              kMobile ? 4 : 10,
-              kMobile && widget.embedded ? 0 : 8,
-              kMobile ? 4 : 10),
-          child: Row(children: [
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 0 : 8,
+          vertical: compact ? 4 : 10,
+        ),
+        child: Row(
+          children: [
             Container(
               width: 7,
               height: 7,
@@ -923,63 +1060,121 @@ class SettingsPanelState extends State<SettingsPanel> {
               ),
             ),
             const SizedBox(width: 10),
-            Expanded(
-              child: Row(children: [
-                Flexible(
-                  child: Text(i.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(kMobile ? 13 : 13,
-                          weight: W.label, color: AppColors.fg1)),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(hostOf(i.url),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(kMobile ? 11 : 11, color: AppColors.fg3)),
-                ),
-              ]),
-            ),
-            if (isActive)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentBg,
-                    borderRadius: BorderRadius.circular(4),
+            if (isRenaming) ...[
+              Expanded(
+                child: SizedBox(
+                  height: 30,
+                  child: TextField(
+                    controller: _renameController,
+                    autofocus: true,
+                    style: sans(13, color: AppColors.fg1),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 6),
+                      filled: true,
+                      fillColor: AppColors.surface2,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(R.xs),
+                        borderSide: BorderSide(color: AppColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(R.xs),
+                        borderSide: BorderSide(color: AppColors.accent),
+                      ),
+                    ),
+                    onSubmitted: (_) => _commitRename(i),
                   ),
-                  child: Text('active',
-                      style: sans(10, weight: W.label, color: AppColors.accent)),
                 ),
               ),
-            IconBtn('trash',
-                size: kMobile ? M.minTarget : 28,
-                iconSize: kMobile ? 17 : 14,
-                tooltip: 'Remove',
-                onTap: () => _confirmRemove(i)),
-          ]),
+              const SizedBox(width: 6),
+              IconBtn('check',
+                  size: 26,
+                  iconSize: 13,
+                  tooltip: 'Save name',
+                  onTap: () => _commitRename(i)),
+              IconBtn('x',
+                  size: 26,
+                  iconSize: 13,
+                  tooltip: 'Cancel',
+                  onTap: () => setState(() => _renamingUrl = null)),
+            ] else ...[
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(i.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(compact ? 13 : 13.5,
+                              weight: W.label, color: AppColors.fg1)),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(hostOf(i.url),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: mono(compact ? 11 : 11,
+                              color: AppColors.fg3)),
+                    ),
+                  ],
+                ),
+              ),
+              if (isActive)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentBg,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text('active',
+                        style: sans(10,
+                            weight: W.label, color: AppColors.accent)),
+                  ),
+                )
+              else if (widget.onSelect != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Btn('Connect',
+                      small: true,
+                      variant: BtnVariant.ghost,
+                      onTap: () => _selectInstance(i)),
+                ),
+              IconBtn('edit',
+                  size: compact ? M.minTarget : 28,
+                  iconSize: compact ? 16 : 13,
+                  tooltip: 'Rename machine',
+                  onTap: () => _startRename(i)),
+              IconBtn('trash',
+                  size: compact ? M.minTarget : 28,
+                  iconSize: compact ? 17 : 13,
+                  tooltip: 'Remove machine',
+                  onTap: () => _confirmRemove(i)),
+            ],
+          ],
         ),
       ),
     );
   }
 
-  Widget _notifTile() {
+  Widget _notifRow() {
+    final compact = kMobile && widget.embedded;
     return Padding(
       padding: EdgeInsets.symmetric(
-          horizontal: kMobile && widget.embedded ? 0 : 14,
-          vertical: kMobile ? 2 : 12),
+          horizontal: compact ? 0 : 8,
+          vertical: compact ? 2 : 8),
       child: Row(children: [
-        AppIcon('bell', size: kMobile ? 18 : 16, color: AppColors.fg3),
+        AppIcon('bell', size: 16, color: AppColors.fg3),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Session notifications',
-                  style: sans(kMobile ? M.rowTitle : 13,
+                  style: sans(compact ? M.rowTitle : 13,
                       weight: W.label, color: AppColors.fg1)),
               const SizedBox(height: 2),
               Text('Notify when a session completes or requires input',
@@ -987,13 +1182,14 @@ class SettingsPanelState extends State<SettingsPanel> {
             ],
           ),
         ),
-        _notifBusy
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg3))
-            : AppSwitch(on: _notif, onChanged: _toggleNotif),
+        if (_notifBusy)
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        else
+          AppSwitch(on: _notif, onChanged: _toggleNotif),
       ]),
     );
   }

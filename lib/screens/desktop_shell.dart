@@ -2538,6 +2538,9 @@ class _DesktopShellState extends State<DesktopShell>
               instances: _instances,
               active: inst,
               onRemove: _removeInstance,
+              onRename: _renameInstance,
+              onSelect: _selectInstance,
+              onAdd: _onInstanceAdded,
               onClose: close,
             ));
   }

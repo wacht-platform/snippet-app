@@ -198,19 +198,31 @@ class VaultScreenState extends State<VaultScreen> {
               ],
             )
           else
-            _card([
-              if (names.isEmpty) _emptyRow() else ...[for (final n in names) _secretRow(n)],
-              if (_adding)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-                  child: _AddSecretForm(
-                    client: widget.client,
-                    inline: true,
-                    onSaved: _afterAdded,
-                    onCancel: () => setState(() => _adding = false),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (names.isEmpty)
+                  _emptyRow()
+                else
+                  for (var i = 0; i < names.length; i++) ...[
+                    _secretRow(names[i]),
+                    if (i < names.length - 1)
+                      Divider(
+                          height: 1,
+                          color: AppColors.border.withValues(alpha: 0.4)),
+                  ],
+                if (_adding)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: _AddSecretForm(
+                      client: widget.client,
+                      inline: true,
+                      onSaved: _afterAdded,
+                      onCancel: () => setState(() => _adding = false),
+                    ),
                   ),
-                ),
-            ]),
+              ],
+            ),
           // The add row hides while the form is open: two ways to do the same
           // thing at once is what makes a form feel unanchored.
           if (!_adding && !(widget.embedded && kMobile)) ...[
@@ -257,23 +269,6 @@ class VaultScreenState extends State<VaultScreen> {
             style: caps(kMobile ? 11 : 10, color: AppColors.fg3)),
       );
 
-  /// Grouped surface with hairline separators — the same treatment as every
-  /// other list in Settings. The rows here used to float bare on the page.
-  Widget _card(List<Widget> children) => Material(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < children.length; i++) ...[
-              children[i],
-              if (i < children.length - 1)
-                Divider(height: 1, thickness: 1, color: AppColors.border),
-            ],
-          ],
-        ),
-      );
 
   Widget _emptyRow() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),

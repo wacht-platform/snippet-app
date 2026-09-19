@@ -218,65 +218,42 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
               const SizedBox(height: 16),
             ],
             if (profiles.isEmpty)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surface1,
-                  borderRadius: BorderRadius.circular(R.md),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AppIcon('ai-chip', size: 30, color: AppColors.fg4),
-                    const SizedBox(height: 12),
-                    Text('No inference profiles configured',
-                        style: sans(14, weight: W.label, color: AppColors.fg1)),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Add an API key or local model provider to start sessions.',
-                      textAlign: TextAlign.center,
-                      style: sans(12, color: AppColors.fg3),
-                    ),
-                    const SizedBox(height: 16),
-                    Btn('Add profile',
-                        icon: 'plus',
-                        small: true,
-                        onTap: () => _edit(null)),
-                  ],
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AppIcon('ai-chip', size: 30, color: AppColors.fg4),
+                      const SizedBox(height: 12),
+                      Text('No inference profiles configured',
+                          style: sans(14, weight: W.label, color: AppColors.fg1)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Add an API key or local model provider to start sessions.',
+                        textAlign: TextAlign.center,
+                        style: sans(12, color: AppColors.fg3),
+                      ),
+                      const SizedBox(height: 16),
+                      Btn('Add profile',
+                          icon: 'plus',
+                          small: true,
+                          onTap: () => _edit(null)),
+                    ],
+                  ),
                 ),
               )
-            else if (kMobile && widget.embedded)
+            else
               Column(
                 children: [
                   for (var i = 0; i < profiles.length; i++) ...[
                     _profileCard(profiles[i], cfg?.delegate),
                     if (i < profiles.length - 1)
-                      Divider(height: 1, color: AppColors.border),
+                      Divider(
+                          height: 1,
+                          color: AppColors.border.withValues(alpha: 0.4)),
                   ],
                 ],
-              )
-            else
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface1,
-                  borderRadius: BorderRadius.circular(R.md),
-                  border: Border.all(color: AppColors.border),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    for (var i = 0; i < profiles.length; i++) ...[
-                      _profileCard(profiles[i], cfg?.delegate),
-                      if (i < profiles.length - 1)
-                        Divider(
-                            height: 1,
-                            color: AppColors.border.withValues(alpha: 0.6)),
-                    ],
-                  ],
-                ),
               ),
           ],
         );
@@ -322,8 +299,8 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         borderRadius: BorderRadius.circular(compact ? R.sm : R.md),
         child: Padding(
           padding: EdgeInsets.symmetric(
-              horizontal: compact ? 0 : 16,
-              vertical: compact ? 6 : 14),
+              horizontal: compact ? 0 : 8,
+              vertical: compact ? 6 : 11),
           child: Row(children: [
             AppIcon('ai-chip',
                 size: compact ? 18 : 20,
@@ -338,31 +315,53 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                       child: Text(p.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(compact ? 14 : 14,
+                          style: sans(compact ? 13.5 : 13.5,
                               weight: FontWeight.w500, color: AppColors.fg1)),
                     ),
                     if (p.active) ...[
-                      const SizedBox(width: 6),
-                      Text('active', style: sans(10, color: AppColors.accent)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentBg,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('active',
+                            style: sans(10,
+                                weight: W.label, color: AppColors.accent)),
+                      ),
                     ],
                     if (isDelegate) ...[
                       const SizedBox(width: 6),
-                      Text('delegate', style: sans(10, color: AppColors.run)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('delegate',
+                            style: sans(10,
+                                weight: W.label, color: AppColors.fg2)),
+                      ),
                     ],
                     if (!p.usable) ...[
                       const SizedBox(width: 6),
                       const WarnChip(),
                     ],
                   ]),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Text('${p.provider} · ${p.model}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(11, color: AppColors.fg4)),
+                      style: mono(11.5, color: AppColors.fg3)),
                 ],
               ),
             ),
             _deleteProfileButton(p),
+            const SizedBox(width: 4),
+            AppIcon('chevron-right', size: 14, color: AppColors.fg4),
           ]),
         ),
       ),

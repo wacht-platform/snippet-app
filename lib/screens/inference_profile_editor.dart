@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -82,6 +83,11 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   /// (effort tiers on Anthropic, reasoning yes/no on OpenRouter, context size).
   String? _modelHint;
 
+  bool _showModelBrowser = false;
+  bool _loadingModels = false;
+  List<CatalogModel>? _catalogModels;
+  final TextEditingController _modelSearch = TextEditingController();
+
   bool get _isEdit => widget.existing != null;
   bool get _isChatgpt => _provider == 'chatgpt';
   bool get _isXai => _provider == 'xai';
@@ -109,6 +115,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     // The Save button's enabled state depends on this field; without a listener
     // typing never rebuilt, leaving Save stuck disabled on desktop.
     _model.addListener(() => setState(() {}));
+    _modelSearch.addListener(() => setState(() {}));
   }
 
   @override
@@ -118,6 +125,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     _model.dispose();
     _ctx.dispose();
     _key.dispose();
+    _modelSearch.dispose();
     super.dispose();
   }
 
@@ -144,7 +152,18 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   }
 
   Future<void> _browseModels() async {
-    setState(() => _error = null);
+    if (_showModelBrowser) {
+      setState(() => _showModelBrowser = false);
+      return;
+    }
+    if (_catalogModels != null && _catalogModels!.isNotEmpty) {
+      setState(() => _showModelBrowser = true);
+      return;
+    }
+    setState(() {
+      _loadingModels = true;
+      _error = null;
+    });
     final List<CatalogModel> models;
     try {
       models = await widget.client.providerModels(
@@ -154,13 +173,26 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
         apiKey: _key.text.trim(),
       );
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted) {
+        setState(() {
+          _loadingModels = false;
+          _error = '$e';
+        });
+      }
       return;
     }
     if (!mounted) return;
+    setState(() => _loadingModels = false);
     if (models.isEmpty) {
       setState(() => _error =
           'The provider returned no models (this provider may not have a catalog).');
+      return;
+    }
+    if (!kMobile || widget.embedded) {
+      setState(() {
+        _catalogModels = models;
+        _showModelBrowser = true;
+      });
       return;
     }
     final picked = await showModalBottomSheet<CatalogModel>(
@@ -173,6 +205,134 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       builder: (ctx) => _ModelPickerSheet(models: models),
     );
     if (picked != null) _applyPick(picked);
+  }
+
+  Widget _inlineModelBrowser() {
+    final q = _modelSearch.text.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? _catalogModels!
+        : _catalogModels!
+            .where((m) =>
+                m.id.toLowerCase().contains(q) ||
+                (m.displayName?.toLowerCase().contains(q) ?? false))
+            .toList();
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      constraints: const BoxConstraints(maxHeight: 220),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.sm),
+        border: Border.all(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+            child: Row(
+              children: [
+                AppIcon('search', size: 14, color: AppColors.fg3),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _modelSearch,
+                    autofocus: true,
+                    style: sans(12, color: AppColors.fg1),
+                    decoration: InputDecoration(
+                      hintText: 'Search ${_catalogModels!.length} models…',
+                      hintStyle: sans(12, color: AppColors.fg4),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                Text('${filtered.length}',
+                    style: mono(11, color: AppColors.fg4)),
+                const SizedBox(width: 4),
+                IconBtn('x',
+                    size: 22,
+                    iconSize: 12,
+                    tooltip: 'Close catalog',
+                    onTap: () => setState(() => _showModelBrowser = false)),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+          Flexible(
+            child: filtered.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
+                      child: Text('No matching models',
+                          style: sans(11.5, color: AppColors.fg3)),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    shrinkWrap: true,
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        color: AppColors.border.withValues(alpha: 0.25)),
+                    itemBuilder: (ctx, i) {
+                      final m = filtered[i];
+                      final isSelected = m.id == _model.text.trim();
+                      return InkWell(
+                        onTap: () {
+                          _applyPick(m);
+                          setState(() => _showModelBrowser = false);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(m.id,
+                                        style: mono(12,
+                                            weight: isSelected
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
+                                            color: isSelected
+                                                ? AppColors.accent
+                                                : AppColors.fg1)),
+                                    if (m.displayName != null &&
+                                        m.displayName!.isNotEmpty &&
+                                        m.displayName != m.id) ...[
+                                      const SizedBox(height: 1),
+                                      Text(m.displayName!,
+                                          style: sans(10.5,
+                                              color: AppColors.fg3)),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (m.contextWindow != null &&
+                                  m.contextWindow! > 0)
+                                Text(_fmtCtx(m.contextWindow!),
+                                    style: mono(10, color: AppColors.fg4)),
+                              if (isSelected) ...[
+                                const SizedBox(width: 8),
+                                AppIcon('check',
+                                    size: 14, color: AppColors.accent),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _dismiss({bool saved = false}) {
@@ -258,6 +418,9 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
               onSelect: (val) => setState(() {
                 _provider = val;
                 _images = _defaultImages(val);
+                _catalogModels = null;
+                _showModelBrowser = false;
+                _modelSearch.clear();
               }),
             ),
           const SizedBox(height: 16),
@@ -284,9 +447,25 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                     mono: true,
                     hint: _isChatgpt ? 'gpt-5.1-codex' : 'claude-sonnet-4.5')),
             const SizedBox(width: 8),
-            IconBtn('list',
-                size: 44, iconSize: 18, onTap: _busy ? null : _browseModels),
+            if (_loadingModels)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8, right: 8),
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else
+              IconBtn(_showModelBrowser ? 'x' : 'list',
+                  size: 44,
+                  iconSize: 18,
+                  tooltip: _showModelBrowser ? 'Hide catalog' : 'Browse models',
+                  onTap: _busy ? null : _browseModels),
           ]),
+          if (_showModelBrowser && _catalogModels != null) ...[
+            _inlineModelBrowser(),
+          ],
           if (_modelHint != null) ...[
             const SizedBox(height: 6),
             Text(_modelHint!,
