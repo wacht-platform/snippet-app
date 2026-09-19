@@ -441,7 +441,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                         // Content Pane Header
                         Container(
                           height: 44,
-                          padding: const EdgeInsets.fromLTRB(24, 0, 20, 0),
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
                           child: Row(
                             children: [
                               Expanded(
@@ -1013,7 +1013,7 @@ class SettingsPanelState extends State<SettingsPanel> {
       color: Colors.transparent,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: compact ? 0 : 8,
+          horizontal: 0,
           vertical: compact ? 4 : 10,
         ),
         child: Row(

@@ -169,7 +169,7 @@ class VaultScreenState extends State<VaultScreen> {
         shrinkWrap: (widget.embedded && kMobile),
         padding: EdgeInsets.fromLTRB(
             (widget.embedded && kMobile) ? 0 : (kMobile ? M.gutter : 24),
-            (widget.embedded && kMobile) ? 0 : 20,
+            (widget.embedded && kMobile) ? 0 : (widget.embedded ? 8 : 20),
             (widget.embedded && kMobile) ? 0 : (kMobile ? M.gutter : 24),
             28),
         children: [
@@ -271,7 +271,8 @@ class VaultScreenState extends State<VaultScreen> {
 
 
   Widget _emptyRow() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        padding: EdgeInsets.symmetric(
+            horizontal: widget.embedded ? 0 : 14, vertical: 16),
         child: Row(children: [
           AppIcon('lock-key', size: 16, color: AppColors.fg4),
           const SizedBox(width: 12),
@@ -289,10 +290,10 @@ class VaultScreenState extends State<VaultScreen> {
   /// tooltip nor a label.
   Widget _secretRow(String name) {
     return SizedBox(
-      height: kMobile ? M.rowHeight : 48,
+      height: kMobile ? M.rowHeight : 44,
       child: Padding(
         padding: EdgeInsets.symmetric(
-            horizontal: widget.embedded && kMobile ? 0 : 14),
+            horizontal: widget.embedded ? 0 : 14),
         child: Row(children: [
           // Tinted tile, matching the settings index rows.
           Container(
@@ -313,8 +314,8 @@ class VaultScreenState extends State<VaultScreen> {
                 style: mono(kMobile ? 13 : 12, color: AppColors.fg1)),
           ),
           IconBtn('trash',
-              size: kMobile ? M.minTarget : 34,
-              iconSize: kMobile ? 16 : 15,
+              size: kMobile ? M.minTarget : 32,
+              iconSize: kMobile ? 16 : 14,
               tooltip: 'Remove $name',
               onTap: () => _remove(name)),
         ]),
@@ -322,28 +323,22 @@ class VaultScreenState extends State<VaultScreen> {
     );
   }
 
-  /// The add affordance, as a full-height row at the app's touch minimum.
+  /// The add affordance, matching recurring.dart add job row.
   Widget _addRow() {
-    final pad = EdgeInsets.symmetric(
-        horizontal: widget.embedded && kMobile ? 0 : 14);
-    return Pressable(
-      child: Material(
-        color: AppColors.surface2,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _add,
         borderRadius: BorderRadius.circular(R.md),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: _add,
-          child: SizedBox(
-            height: kMobile ? M.minTarget : 44,
-            child: Padding(
-              padding: pad,
-              child: Row(children: [
-                AppIcon('plus', size: 16, color: AppColors.accent),
-                const SizedBox(width: 12),
-                Text('Add secret', style: sans(13, color: AppColors.fg1)),
-              ]),
-            ),
-          ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+              horizontal: widget.embedded ? 2 : 14,
+              vertical: kMobile ? 14 : 10),
+          child: Row(children: [
+            AppIcon('plus', size: 16, color: AppColors.fg3),
+            const SizedBox(width: 12),
+            Text('Add secret', style: sans(14, color: AppColors.fg2)),
+          ]),
         ),
       ),
     );

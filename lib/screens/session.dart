@@ -2315,19 +2315,8 @@ class _SessionScreenState extends State<SessionScreen>
       onExit: (_) => setState(() {
         if (_hoveredQueuedIndex == qi) _hoveredQueuedIndex = null;
       }),
-      child: AnimatedContainer(
-        duration: Motion.fast,
-        curve: Motion.enter,
-        padding: EdgeInsets.symmetric(
-          horizontal: showActions ? 10 : 2,
-          vertical: showActions ? 6 : 4,
-        ),
-        decoration: BoxDecoration(
-          color: showActions
-              ? AppColors.surface2.withValues(alpha: 0.6)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
         child: Row(
           children: [
             Expanded(
