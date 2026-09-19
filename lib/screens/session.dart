@@ -249,7 +249,6 @@ class _SessionScreenState extends State<SessionScreen>
   final List<QueuedInput> _optimisticQueued = [];
   // Queue IDs hidden after a local cancel/steer until the daemon confirms them.
   final Set<String> _queueHidden = {};
-  bool _editingQueue = false;
   int? _hoveredQueuedIndex;
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
@@ -2168,7 +2167,6 @@ class _SessionScreenState extends State<SessionScreen>
     setState(() {
       _hideQueuedAt(visible);
       if (_heldQueue.length <= 1) {
-        _editingQueue = false;
         _hoveredQueuedIndex = null;
       }
     });
@@ -2202,7 +2200,6 @@ class _SessionScreenState extends State<SessionScreen>
   void _cancelAllQueued() {
     setState(() {
       _queueHidden.addAll(_heldQueue.map((item) => item.id));
-      _editingQueue = false;
       _hoveredQueuedIndex = null;
     });
     _send({'kind': 'drop_queued'});
@@ -2218,7 +2215,6 @@ class _SessionScreenState extends State<SessionScreen>
       _optimisticQueued.removeWhere((queued) => queued.id == item.id);
       _trackPending(item.text, nonce);
       if (_heldQueue.length <= 1) {
-        _editingQueue = false;
         _hoveredQueuedIndex = null;
       }
     });
@@ -2253,12 +2249,12 @@ class _SessionScreenState extends State<SessionScreen>
                 style: sans(13, weight: W.label, color: AppColors.fg2),
               ),
               const Spacer(),
-              if (_editingQueue && queue.length > 1) ...[
+              if (queue.length > 1) ...[
                 GestureDetector(
                   onTap: _steerAllQueued,
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
-                    padding: const EdgeInsets.only(right: 10),
+                    padding: const EdgeInsets.only(right: 12),
                     child: Text('Send all',
                         style: sans(12,
                             weight: W.label, color: AppColors.accent)),
@@ -2268,30 +2264,12 @@ class _SessionScreenState extends State<SessionScreen>
                   onTap: _cancelAllQueued,
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
-                    padding: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.only(right: 4),
                     child: Text('Cancel all',
                         style: sans(12, color: AppColors.fg3)),
                   ),
                 ),
               ],
-              GestureDetector(
-                onTap: () => setState(() => _editingQueue = !_editingQueue),
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _editingQueue
-                        ? AppColors.surface3
-                        : AppColors.surface2,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    _editingQueue ? 'Done' : 'Edit',
-                    style: sans(12, weight: W.label, color: AppColors.fg2),
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -2306,7 +2284,7 @@ class _SessionScreenState extends State<SessionScreen>
 
   Widget _queuedItemRow(int qi, QueuedInput item) {
     final isHovered = _hoveredQueuedIndex == qi;
-    final showActions = _editingQueue || isHovered;
+    final showActions = kMobile || isHovered;
     final text = _queuedText(item.text);
     final counts = _queuedAttachCounts(item.text);
 
