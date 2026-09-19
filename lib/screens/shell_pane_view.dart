@@ -33,15 +33,7 @@ class PaneSurface extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: readingBg,
-        borderRadius: BorderRadius.only(
-          topLeft: pane == ShellPane.left
-              ? const Radius.circular(R.sheetTop)
-              : Radius.zero,
-          topRight:
-              roundRight ? const Radius.circular(R.sheetTop) : Radius.zero,
-        ),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Stack(fit: StackFit.expand, children: [
         child,
         if (droppable)
@@ -51,14 +43,6 @@ class PaneSurface extends StatelessWidget {
                 decoration: BoxDecoration(
                   border: Border.all(
                       color: AppColors.accent, width: kPaneActiveStroke),
-                  borderRadius: BorderRadius.only(
-                    topLeft: pane == ShellPane.left
-                        ? const Radius.circular(R.sheetTop)
-                        : Radius.zero,
-                    topRight: roundRight
-                        ? const Radius.circular(R.sheetTop)
-                        : Radius.zero,
-                  ),
                 ),
               ),
             ),
