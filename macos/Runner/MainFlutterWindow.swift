@@ -21,11 +21,13 @@ class MainFlutterWindow: NSWindow {
     flutterViewController.backgroundColor = .clear
     self.isOpaque = false
     self.backgroundColor = .clear
+    self.appearance = NSAppearance(named: .darkAqua)
 
     let visualEffectView = NSVisualEffectView()
+    visualEffectView.appearance = NSAppearance(named: .darkAqua)
     visualEffectView.blendingMode = .behindWindow
     visualEffectView.state = .active
-    visualEffectView.material = .sidebar
+    visualEffectView.material = .underWindowBackground
     visualEffectView.autoresizingMask = [.width, .height]
     visualEffectView.frame = flutterViewController.view.bounds
     flutterViewController.view.addSubview(visualEffectView, positioned: .below, relativeTo: nil)
@@ -64,6 +66,7 @@ class MainFlutterWindow: NSWindow {
     self.isOpaque = false
     self.backgroundColor = .clear
     flutterViewController.backgroundColor = .clear
+    self.appearance = NSAppearance(named: .darkAqua)
     self.invalidateShadow()
 
     // AppKit sizes the native titlebar for a ~28pt band and centres the traffic

@@ -299,10 +299,13 @@ class AppColors {
   static Color get diffGutter => currentTheme.diffGutter;
 }
 
-/// Reading/content surfaces (chat, editor, file viewer, diff). Always the dark
-/// `canvas`, so the content the user is actually reading recedes and the grey
-/// chrome around it carries the structure.
-Color get readingBg => AppColors.canvas;
+/// Reading/content surfaces (chat, editor, file viewer, diff).
+/// On desktop, a smoked pure black tint (82% opacity) preserves the deep, rich
+/// shade of black and text contrast without turning grey, while letting the
+/// native desktop vibrancy subtly diffuse through.
+Color get readingBg => (kMacOS || kWindows)
+    ? const Color(0xFF000000).withValues(alpha: 0.82)
+    : AppColors.canvas;
 
 // ---------------------------------------------------------------------------
 // Radius — small and precise. Large radii read consumer/toy; a developer tool
