@@ -4096,7 +4096,9 @@ class _SessionScreenState extends State<SessionScreen>
       flushPending(fallbackKey);
       if (run.isEmpty) return;
       final start = runStartKey ?? fallbackKey;
-      final running = run.any((w) => w is DenseToolRow && w.pending);
+      final isSessionRunning = _state?.status == 'running';
+      final running =
+          isSessionRunning && run.any((w) => w is DenseToolRow && w.pending);
       final completedToolKey = 'transcript-tools-$start';
       // A live batch grows as calls/results stream in. It must keep one fixed
       // identity, otherwise a new first/pending event replaces the accordion
