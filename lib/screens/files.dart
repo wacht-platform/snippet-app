@@ -997,7 +997,7 @@ class _FileViewerState extends State<FileViewer> {
                 ).then((_) => _load())),
     ];
     return Scaffold(
-      backgroundColor: readingBg,
+      backgroundColor: (kMacOS || kWindows) ? Colors.transparent : readingBg,
       body: SafeArea(
         bottom: false,
         child: Column(children: [

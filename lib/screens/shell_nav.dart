@@ -568,7 +568,7 @@ class PaneTabStrip extends StatelessWidget {
     Theme.of(context);
     return Container(
       height: kPaneHeaderHeight,
-      color: readingBg,
+      color: Colors.transparent,
       child: Stack(fit: StackFit.expand, children: [
         LayoutBuilder(builder: (context, c) {
           final w = kPaneTabWidth(c.maxWidth, tabs.length);
@@ -611,7 +611,7 @@ class PaneTabStrip extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: readingBg,
+              color: active ? AppColors.windowBg : Colors.transparent,
               border: Border(
                 right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
                 top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),

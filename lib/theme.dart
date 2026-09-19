@@ -256,14 +256,14 @@ class AppColors {
   /// Translucent window background for desktop vibrancy (macOS) and Acrylic/Mica (Windows).
   /// Blends subtly with the native frosted desktop backdrop without losing contrast.
   static Color get windowBg =>
-      (kMacOS || kWindows) ? currentTheme.bg.withValues(alpha: 0.65) : currentTheme.bg;
+      (kMacOS || kWindows) ? currentTheme.bg.withValues(alpha: 0.22) : currentTheme.bg;
 
   /// Translucent frosted glass surface for modals, dialogs, drawers, bottom sheets,
   /// and floating action bars across desktop and mobile.
-  static Color get glassSurface => currentTheme.surface1.withValues(alpha: 0.80);
+  static Color get glassSurface => currentTheme.surface1.withValues(alpha: 0.65);
 
   /// Subtle translucent border for glassy surfaces.
-  static Color get glassBorder => currentTheme.border2.withValues(alpha: 0.6);
+  static Color get glassBorder => currentTheme.border2.withValues(alpha: 0.4);
 
   // Foreground
   static Color get fg1 => currentTheme.fg1;
@@ -303,7 +303,7 @@ class AppColors {
 /// Translucent on desktop so vibrancy shines through the entire app canvas,
 /// while maintaining deep contrast for text.
 Color get readingBg => (kMacOS || kWindows)
-    ? currentTheme.canvas.withValues(alpha: 0.72)
+    ? currentTheme.canvas.withValues(alpha: 0.38)
     : currentTheme.canvas;
 
 // ---------------------------------------------------------------------------
@@ -532,9 +532,9 @@ ThemeData buildAppTheme() {
   );
   return base.copyWith(
     scaffoldBackgroundColor:
-        (kMacOS || kWindows) ? c.bg.withValues(alpha: 0.65) : c.bg,
+        (kMacOS || kWindows) ? Colors.transparent : c.bg,
     canvasColor:
-        (kMacOS || kWindows) ? c.bg.withValues(alpha: 0.65) : c.bg,
+        (kMacOS || kWindows) ? Colors.transparent : c.bg,
     dividerColor: c.border,
     textSelectionTheme: TextSelectionThemeData(
       selectionColor: _withAlpha(c.accent, 0.35),

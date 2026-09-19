@@ -656,10 +656,12 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
         Expanded(child: _diffBody(_patch!)),
     ]);
     if (widget.embedded) {
-      return ColoredBox(color: readingBg, child: body);
+      return ColoredBox(
+          color: (kMacOS || kWindows) ? Colors.transparent : readingBg,
+          child: body);
     }
     return Scaffold(
-      backgroundColor: readingBg,
+      backgroundColor: (kMacOS || kWindows) ? Colors.transparent : readingBg,
       body: SafeArea(bottom: false, child: body),
     );
   }

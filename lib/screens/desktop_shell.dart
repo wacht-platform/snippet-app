@@ -1939,7 +1939,7 @@ class _DesktopShellState extends State<DesktopShell>
     Theme.of(context); // Rebuild on theme change
     if (_loading) {
       return Scaffold(
-        backgroundColor: readingBg,
+        backgroundColor: Colors.transparent,
         body: Center(
             child: SizedBox(
                 width: 22,
@@ -1966,7 +1966,7 @@ class _DesktopShellState extends State<DesktopShell>
           },
           child: Scaffold(
             key: _scaffoldKey,
-            backgroundColor: readingBg,
+            backgroundColor: Colors.transparent,
             onDrawerChanged: (open) => setState(() => _drawerOpen = open),
             // Keep drawer gestures confined to the physical edge. A wide edge
             // target competes with fast, slightly angled transcript scrolling.
@@ -2000,7 +2000,7 @@ class _DesktopShellState extends State<DesktopShell>
         return Scaffold(
           // The window paints the chrome surface; the reading pane inside it is
           // the darker canvas.
-          backgroundColor: AppColors.windowBg,
+          backgroundColor: Colors.transparent,
           body: SafeArea(
             child: Column(children: [
               _macWindowBar(),
@@ -2019,7 +2019,7 @@ class _DesktopShellState extends State<DesktopShell>
       }
 
       return Scaffold(
-        backgroundColor: AppColors.windowBg,
+        backgroundColor: Colors.transparent,
         body: SafeArea(
           child: Column(children: [
             // The navigation band is a shell-level row: full window width,
