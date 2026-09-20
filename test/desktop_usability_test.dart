@@ -8,7 +8,9 @@ import 'package:snippet/api.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/file_tree_sidebar_panel.dart';
 import 'package:snippet/screens/git_diff_sidebar_panel.dart';
+import 'package:snippet/screens/shell_models.dart';
 import 'package:snippet/screens/shell_shortcuts.dart';
+import 'package:snippet/screens/sidebar.dart';
 
 class _FakeDaemonClient extends DaemonClient {
   _FakeDaemonClient() : super('https://daemon.invalid', 'test-token');
@@ -189,6 +191,105 @@ void main() {
 
       // Dispose cleanly to cancel timer
       await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
+  group('Sidebar session list recency ordering', () {
+    testWidgets('sessions are ordered strictly by recency across different folders without folder grouping',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        tester.view.physicalSize = const Size(1200, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final client = _FakeDaemonClient();
+        // Create 4 sessions across 3 different folders with different lastActive timestamps:
+        // Session A: repo-alpha, lastActive 1000 (oldest)
+        // Session B: repo-beta, lastActive 2000
+        // Session C: repo-alpha, lastActive 3000
+        // Session D: repo-gamma, lastActive 4000 (newest)
+        final sessions = [
+          SessionInfo.fromJson({
+            'id': 'sess-a',
+            'title': 'Alpha Session Old',
+            'folder': '/workspace/repo-alpha',
+            'last_active': 1000,
+          }),
+          SessionInfo.fromJson({
+            'id': 'sess-b',
+            'title': 'Beta Session Middle',
+            'folder': '/workspace/repo-beta',
+            'last_active': 2000,
+          }),
+          SessionInfo.fromJson({
+            'id': 'sess-c',
+            'title': 'Alpha Session New',
+            'folder': '/workspace/repo-alpha',
+            'last_active': 3000,
+          }),
+          SessionInfo.fromJson({
+            'id': 'sess-d',
+            'title': 'Gamma Session Newest',
+            'folder': '/workspace/repo-gamma',
+            'last_active': 4000,
+          }),
+        ];
+
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 300,
+              height: 900,
+              child: Sidebar(
+                client: client,
+                active: null,
+                instances: const [],
+                health: const {},
+                sessions: sessions,
+                sessionsLoading: false,
+                onRefreshSessions: () async {},
+                selectedSessionId: null,
+                onOpenSession: (_, __, ___) {},
+                onNewSession: () {},
+                onSelectInstance: (_) {},
+                onAddInstance: () {},
+                onRenameInstance: (_, __) {},
+                onRemoveInstance: (_) {},
+                onSessionDeleted: (_) {},
+                onRefreshHealth: () {},
+                onOpenMissionControl: () {},
+                topInset: false,
+                mobileHome: MobileHome.chats,
+                onMobileHome: (_) {},
+                settingsSection: null,
+                onSettingsSection: (_) {},
+                agent: null,
+                onAgent: (_) {},
+              ),
+            ),
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        // Check vertical order of sessions on screen:
+        // Must be D (4000) -> C (3000) -> B (2000) -> A (1000)
+        final posD = tester.getTopLeft(find.text('Gamma Session Newest')).dy;
+        final posC = tester.getTopLeft(find.text('Alpha Session New')) .dy;
+        final posB = tester.getTopLeft(find.text('Beta Session Middle')).dy;
+        final posA = tester.getTopLeft(find.text('Alpha Session Old')) .dy;
+
+        expect(posD, lessThan(posC), reason: 'Gamma (4000) should be above Alpha New (3000)');
+        expect(posC, lessThan(posB), reason: 'Alpha New (3000) should be above Beta (2000)');
+        expect(posB, lessThan(posA), reason: 'Beta (2000) should be above Alpha Old (1000)');
+
+        // No folder grouping headers
+        expect(find.text('repo-alpha'), findsNothing);
+        expect(find.text('repo-beta'), findsNothing);
+        expect(find.text('repo-gamma'), findsNothing);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   });
 }

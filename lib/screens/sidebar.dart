@@ -977,45 +977,16 @@ class SidebarState extends State<Sidebar> {
     if (mc.isNotEmpty) {
       children.add(_missionControlPin(mc.first));
     }
-    final newest = <String, int>{};
-    for (final s in list) {
-      final t = newest[s.folder];
-      if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
-    }
-    list.sort((a, b) {
-      final fa = newest[a.folder] ?? 0;
-      final fb = newest[b.folder] ?? 0;
-      if (fa != fb) return fb.compareTo(fa);
-      final byFolder = a.folder.compareTo(b.folder);
-      if (byFolder != 0) return byFolder;
-      return b.lastActive.compareTo(a.lastActive);
-    });
-    final groups = <String, List<SessionInfo>>{};
-    final order = <String>[];
-    for (final s in list) {
-      final bucket = groups.putIfAbsent(s.folder, () {
-        order.add(s.folder);
-        return <SessionInfo>[];
-      });
-      bucket.add(s);
-    }
-    var firstFolder = true;
-    for (final key in order) {
-      final sessions = groups[key]!;
-      children.add(_folderHeader(key,
-          first: firstFolder && mc.isEmpty, count: sessions.length));
-      firstFolder = false;
-      // A collapsed group keeps its header (with its count) but hides its rows.
-      if (_collapsed.contains(key)) continue;
-      for (var i = 0; i < sessions.length; i++) {
-        if (kMobile) {
-          children.add(Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: _sessionCard(sessions[i])));
-        } else {
-          children.add(
-              _desktopTreeRow(sessions[i], last: i == sessions.length - 1));
-        }
+    // Purely based on recency.
+    list.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+    for (var i = 0; i < list.length; i++) {
+      if (kMobile) {
+        children.add(Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: _sessionCard(list[i])));
+      } else {
+        children.add(
+            _desktopTreeRow(list[i], last: i == list.length - 1));
       }
     }
     if (list.isEmpty && mc.isEmpty) {
@@ -1055,29 +1026,8 @@ class SidebarState extends State<Sidebar> {
             _matchesQuery(s))
         .toList();
 
-    // Newest folder first, then newest session within it.
-    final newest = <String, int>{};
-    for (final s in list) {
-      final t = newest[s.folder];
-      if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
-    }
-    list.sort((a, b) {
-      final fa = newest[a.folder] ?? 0;
-      final fb = newest[b.folder] ?? 0;
-      if (fa != fb) return fb.compareTo(fa);
-      final byFolder = a.folder.compareTo(b.folder);
-      if (byFolder != 0) return byFolder;
-      return b.lastActive.compareTo(a.lastActive);
-    });
-
-    final groups = <String, List<SessionInfo>>{};
-    final order = <String>[];
-    for (final s in list) {
-      groups.putIfAbsent(s.folder, () {
-        order.add(s.folder);
-        return <SessionInfo>[];
-      }).add(s);
-    }
+    // Purely based on recency.
+    list.sort((a, b) => b.lastActive.compareTo(a.lastActive));
 
     final chatsOpen = !_collapsed.contains(_chatsKey);
     return ListView(
@@ -1207,99 +1157,6 @@ class SidebarState extends State<Sidebar> {
   }
 
 
-  Widget _folderHeader(String folder, {required bool first, int count = 0}) {
-    final name =
-        folder.isEmpty ? 'No folder' : lastPathSegment(folder, ifEmpty: folder);
-    final isSearching = _filterQuery.trim().isNotEmpty;
-    final collapsed = isSearching ? false : _collapsed.contains(folder);
-    // Collapsing is a local view preference, not state worth persisting — a
-    // fresh session list should show everything.
-    void toggle() => setState(() {
-          if (collapsed) {
-            _collapsed.remove(folder);
-          } else {
-            _collapsed.add(folder);
-          }
-        });
-    final chevron = collapsed ? 'chevron-right' : 'chevron-down';
-    if (kMobile) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: toggle,
-          child: SizedBox(
-            width: double.infinity,
-            child: Padding(
-              padding: EdgeInsets.only(top: first ? 2 : 16),
-              child: Row(
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  Expanded(
-                    flex: 7,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.max,
-                      children: [
-                        AppIcon(chevron, size: 14, color: AppColors.fg4),
-                        const SizedBox(width: 4),
-                        AppIcon('folder', size: 16, color: AppColors.fg4),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(12, weight: W.label, color: AppColors.fg3)),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(height: 1, color: AppColors.border),
-                        ),
-                        if (collapsed && count > 0) ...[
-                          const SizedBox(width: 8),
-                          Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: toggle,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(4, first ? 10 : 16, 6, 4),
-          child: Row(children: [
-            AppIcon(chevron, size: 13, color: AppColors.fg4),
-            const SizedBox(width: 3),
-            AppIcon('folder', size: 13, color: AppColors.fg4),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.left,
-                  style: sans(11, weight: W.title, color: AppColors.fg3)),
-            ),
-            if (collapsed && count > 0)
-              Text('$count', style: sans(10, tabular: true, color: AppColors.fg3)),
-          ]),
-        ),
-      ),
-    );
-  }
 
   Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
     return _sessionRow(s);
