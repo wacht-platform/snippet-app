@@ -2289,74 +2289,113 @@ class _SessionScreenState extends State<SessionScreen>
     final text = _queuedText(item.text);
     final counts = _queuedAttachCounts(item.text);
 
+    final actionButtons = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconBtn(
+          'trash',
+          size: 26,
+          iconSize: 14,
+          tooltip: 'Delete',
+          onTap: () => _cancelQueuedAt(qi),
+        ),
+        const SizedBox(width: 2),
+        IconBtn(
+          'edit',
+          size: 26,
+          iconSize: 14,
+          tooltip: 'Edit',
+          onTap: () => _editQueuedAt(qi),
+        ),
+        const SizedBox(width: 2),
+        IconBtn(
+          'arrow-up',
+          size: 26,
+          iconSize: 14,
+          tooltip: 'Send now',
+          onTap: () => _steerQueuedAt(qi),
+        ),
+      ],
+    );
+
     return MouseRegion(
-      onEnter: (_) => setState(() => _hoveredQueuedIndex = qi),
-      onExit: (_) => setState(() {
-        if (_hoveredQueuedIndex == qi) _hoveredQueuedIndex = null;
-      }),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    text.isEmpty ? '(attachment)' : text,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(13, color: AppColors.fg1),
-                  ),
-                  if (counts.$1 + counts.$2 + counts.$3 > 0) ...[
-                    const SizedBox(height: 4),
-                    AttachmentPill(
-                      audio: counts.$1,
-                      images: counts.$2,
-                      files: counts.$3,
+      onEnter: (_) {
+        if (_hoveredQueuedIndex != qi) {
+          setState(() => _hoveredQueuedIndex = qi);
+        }
+      },
+      onExit: (_) {
+        if (_hoveredQueuedIndex == qi) {
+          setState(() => _hoveredQueuedIndex = null);
+        }
+      },
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 26),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      text.isEmpty ? '(attachment)' : text,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13, color: AppColors.fg1),
                     ),
+                    if (counts.$1 + counts.$2 + counts.$3 > 0) ...[
+                      const SizedBox(height: 4),
+                      AttachmentPill(
+                        audio: counts.$1,
+                        images: counts.$2,
+                        files: counts.$3,
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (showActions) ...[
-              IconBtn(
-                'trash',
-                size: 26,
-                iconSize: 14,
-                tooltip: 'Delete',
-                onTap: () => _cancelQueuedAt(qi),
-              ),
-              const SizedBox(width: 2),
-              IconBtn(
-                'edit',
-                size: 26,
-                iconSize: 14,
-                tooltip: 'Edit',
-                onTap: () => _editQueuedAt(qi),
-              ),
-              const SizedBox(width: 2),
-              IconBtn(
-                'arrow-up',
-                size: 26,
-                iconSize: 14,
-                tooltip: 'Send now',
-                onTap: () => _steerQueuedAt(qi),
-              ),
-            ] else ...[
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: AppColors.fg4,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 8),
+              if (kMobile)
+                actionButtons
+              else
+                SizedBox(
+                  width: 82,
+                  height: 26,
+                  child: Stack(
+                    alignment: Alignment.centerRight,
+                    children: [
+                      AnimatedOpacity(
+                        opacity: showActions ? 0.0 : 1.0,
+                        duration: const Duration(milliseconds: 120),
+                        child: Padding(
+                          padding: EdgeInsets.only(right: 6),
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: AppColors.fg4,
+                            ),
+                          ),
+                        ),
+                      ),
+                      AnimatedOpacity(
+                        opacity: showActions ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 120),
+                        child: IgnorePointer(
+                          ignoring: !showActions,
+                          child: actionButtons,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
-          ],
+          ),
         ),
       ),
     );
