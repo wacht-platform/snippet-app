@@ -2526,7 +2526,8 @@ class _DesktopShellState extends State<DesktopShell>
     if (i >= 0) {
       _closeTab(i);
       if (nextKey != null && mounted) {
-        setState(() => _activeKey[pane] = nextKey);
+        final key = nextKey;
+        setState(() => _activeKey[pane] = key);
       }
     }
   }
