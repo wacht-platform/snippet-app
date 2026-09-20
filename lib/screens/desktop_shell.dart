@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
+import '../command_palette.dart';
 import '../device_events.dart';
 import '../models.dart';
 import '../notifications.dart';
@@ -478,16 +479,19 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   late final _shortcutsHandler = ShellShortcutsHandler(
-    onCloseActiveTab: () {
-      if (_activeIndex >= 0) _closeTab(_activeIndex);
-    },
+    onCloseActiveTab: _closeActiveTab,
     onNewSession: _newSessionFlow,
-    onActivateRelativeTab: _activateRelativeTab,
+    onActivateRelativeTab: _activateRelativeMainTab,
+    onActivateTab: _activateMainTab,
     onOpenActiveFiles: _openActiveFiles,
     onOpenMacGit: _openMacGit,
+    onToggleSidebar: _toggleSidebar,
+    onToggleRightPanel: _toggleSecondaryPane,
+    onOpenCommandPalette: _openCommandPalette,
+    onFocusComposer: () =>
+        _macSessionControls[_activeTab?.key]?.performAction('focus_composer'),
     onStopRunningTask: () => _macSessionControls[_activeTab?.key]?.stop(),
     onShowShortcuts: _showDesktopShortcuts,
-    onActivateTab: _activateTab,
   );
 
   bool _handleGlobalShortcuts(KeyEvent event) =>
@@ -1202,14 +1206,157 @@ class _DesktopShellState extends State<DesktopShell>
     _syncPage();
   }
 
-  void _activateRelativeTab(int delta) {
-    if (_tabs.length < 2 || _activeIndex < 0) return;
-    final next = (_activeIndex + delta) % _tabs.length;
-    _activateTab(next < 0 ? next + _tabs.length : next);
+  void _closeActiveTab() {
+    if (_activeIndex >= 0 && _activeIndex < _tabs.length) {
+      final current = _tabs[_activeIndex];
+      if (_isAuxiliary(current)) {
+        _closeTab(_activeIndex, force: true);
+        return;
+      }
+    }
+    final active = _activeTab;
+    if (active != null && _canCloseTopTab(active)) {
+      _closeTabAt(active, force: true);
+    }
   }
 
-  void _openActiveFiles() =>
+  void _activateMainTab(int index) {
+    final mains = _mainTabs;
+    if (mains.isEmpty) return;
+    if (index >= mains.length) {
+      index = mains.length - 1;
+    }
+    if (index < 0) index = 0;
+    _activateTabAt(mains[index]);
+  }
+
+  void _activateRelativeMainTab(int delta) {
+    final mains = _mainTabs;
+    if (mains.length < 2) return;
+    final active = _activeTab;
+    final currentIndex = active != null ? mains.indexOf(active) : -1;
+    final nextIndex = currentIndex >= 0
+        ? (currentIndex + delta) % mains.length
+        : 0;
+    final target = mains[nextIndex < 0 ? nextIndex + mains.length : nextIndex];
+    _activateTabAt(target);
+  }
+
+  void _activateRelativeTab(int delta) => _activateRelativeMainTab(delta);
+
+  void _toggleSidebar() {
+    setState(() => _leftCollapsed = !_leftCollapsed);
+  }
+
+  void _toggleSecondaryPane() {
+    setState(() => _rightCollapsed = !_rightCollapsed);
+  }
+
+  void _openActiveFiles() {
+    if (kMobile) {
       _macSessionControls[_activeTab?.key]?.performAction('files');
+    } else {
+      setState(() {
+        if (_section == ShellSection.files && !_leftCollapsed) {
+          _leftCollapsed = true;
+        } else {
+          _section = ShellSection.files;
+          _leftCollapsed = false;
+        }
+      });
+    }
+  }
+
+  void _openMacGit() {
+    setState(() {
+      _sidebarGit = !_sidebarGit;
+      if (_section == ShellSection.git && !_leftCollapsed) {
+        _leftCollapsed = true;
+      } else {
+        _section = ShellSection.git;
+        _leftCollapsed = false;
+      }
+    });
+  }
+
+  void _openCommandPalette() {
+    showCommandPalette(
+      context,
+      sessions: _sessions ?? const <SessionInfo>[],
+      onOpenChat: (s) => _openSession(s.id, s.title, s.profile),
+      commands: [
+        PaletteCommand(
+          'plus',
+          'New Session',
+          '⌘/Ctrl T',
+          _newSessionFlow,
+        ),
+        PaletteCommand(
+          'sidebar',
+          'Toggle Primary Sidebar',
+          '⌘/Ctrl B',
+          _toggleSidebar,
+        ),
+        PaletteCommand(
+          'layout-sidebar-right',
+          'Toggle Secondary Panel',
+          '⌘/Ctrl \\',
+          _toggleSecondaryPane,
+        ),
+        PaletteCommand(
+          'file',
+          'Open File Tree',
+          '⌘/Ctrl ⇧ E',
+          _openActiveFiles,
+        ),
+        PaletteCommand(
+          'git-branch',
+          'Open Git Diff',
+          '⌘/Ctrl ⇧ G',
+          _openMacGit,
+        ),
+        PaletteCommand(
+          'terminal',
+          'Open Terminals',
+          '',
+          () => setState(() {
+            _section = ShellSection.terminal;
+            _leftCollapsed = false;
+          }),
+        ),
+        PaletteCommand(
+          'agent',
+          'Open Agents',
+          '',
+          () => setState(() {
+            _section = ShellSection.agents;
+            _leftCollapsed = false;
+          }),
+        ),
+        PaletteCommand(
+          'message-text',
+          'Open Chats List',
+          '',
+          () => setState(() {
+            _section = ShellSection.sessions;
+            _leftCollapsed = false;
+          }),
+        ),
+        PaletteCommand(
+          'help-circle',
+          'Keyboard Shortcuts',
+          '⌘/Ctrl /',
+          _showDesktopShortcuts,
+        ),
+        PaletteCommand(
+          'stop-circle',
+          'Stop Active Run',
+          '⌘/Ctrl .',
+          () => _macSessionControls[_activeTab?.key]?.stop(),
+        ),
+      ],
+    );
+  }
 
   void _showDesktopShortcuts() => showDesktopShortcutsDialog(context);
 
@@ -1867,9 +2014,6 @@ class _DesktopShellState extends State<DesktopShell>
     );
   }
 
-  void _openMacGit() {
-    setState(() => _sidebarGit = !_sidebarGit);
-  }
 
   void _showMobileChats() {
     if (!kMobile) return;

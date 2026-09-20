@@ -3126,6 +3126,9 @@ class _SessionScreenState extends State<SessionScreen>
   void _performMacAction(String action, [String? extra]) {
     final s = _state;
     switch (action) {
+      case 'focus_composer':
+        _inputFocus.requestFocus();
+        return;
       case 'rename':
         _renameCurrent();
         return;

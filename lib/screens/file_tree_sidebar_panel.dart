@@ -34,11 +34,13 @@ class FileTreeSidebarPanel extends StatefulWidget {
     required this.client,
     required this.workspacePath,
     required this.onOpenFile,
+    this.autoRevalidatePeriod = const Duration(milliseconds: 3500),
   });
 
   final DaemonClient client;
   final String workspacePath;
   final void Function(String path, String name) onOpenFile;
+  final Duration autoRevalidatePeriod;
 
   @override
   State<FileTreeSidebarPanel> createState() => _FileTreeSidebarPanelState();
@@ -57,10 +59,28 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   /// tap cannot start an overlapping batch, and drives the icon's spinner.
   bool _uploading = false;
 
+  Timer? _autoRevalidateTimer;
+  bool _revalidating = false;
+
   @override
   void initState() {
     super.initState();
     refresh();
+    if (widget.autoRevalidatePeriod > Duration.zero) {
+      _autoRevalidateTimer = Timer.periodic(
+        widget.autoRevalidatePeriod,
+        (_) {
+          if (!mounted || _uploading || _revalidating) return;
+          refresh(background: true);
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoRevalidateTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -89,10 +109,12 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
         onOpen: widget.onOpenFile,
       );
 
-  Future<void> refresh() async {
-    if (mounted) {
+  Future<void> refresh({bool background = false}) async {
+    if (_revalidating) return;
+    _revalidating = true;
+    if (!background && mounted) {
       setState(() {
-        _loading = true;
+        if (_listing == null) _loading = true;
         _error = null;
       });
     }
@@ -101,17 +123,43 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
         widget.workspacePath.isEmpty ? null : widget.workspacePath,
       );
       if (!mounted) return;
+
+      final expandedList = _expandedFolders.toList();
+      final folderResults = await Future.wait(
+        expandedList.map((path) async {
+          try {
+            final listing = await widget.client.fs(path);
+            return MapEntry<String, List<FsEntry>?>(path, listing.entries);
+          } catch (_) {
+            return MapEntry<String, List<FsEntry>?>(path, null);
+          }
+        }),
+      );
+
+      if (!mounted) return;
+
       setState(() {
         _listing = res;
-        _childrenByPath.clear();
-        _folderErrors.clear();
-        _expandedFolders.clear();
         _error = null;
+        for (final entry in folderResults) {
+          if (entry.value != null) {
+            _childrenByPath[entry.key] = entry.value!;
+            _folderErrors.remove(entry.key);
+          } else {
+            _expandedFolders.remove(entry.key);
+            _childrenByPath.remove(entry.key);
+          }
+        }
       });
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (!background && mounted) {
+        setState(() => _error = '$e');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      _revalidating = false;
+      if (!background && mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -270,6 +318,11 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
           ShellSectionHeader(
             label: 'File Tree',
             actions: [
+              ShellSectionAction(
+                icon: 'refresh',
+                tooltip: 'Refresh files',
+                onTap: () => refresh(),
+              ),
               // `Builder` gives each menu a context that anchors to its OWN
               // button: `Element.findRenderObject` walks DOWN to the button's
               // box, so the popover opens under the control that summoned it

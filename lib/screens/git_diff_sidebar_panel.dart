@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -20,6 +22,7 @@ class GitDiffSidebarPanel extends StatefulWidget {
     required this.workspacePath,
     this.sessionId,
     this.onOpenDiff,
+    this.autoRefreshPeriod = const Duration(seconds: 4),
   });
 
   final DaemonClient client;
@@ -29,6 +32,7 @@ class GitDiffSidebarPanel extends StatefulWidget {
   /// Called when a changed file is tapped. The host opens it as a tab in the
   /// main pane, so a diff reads in the same tab system as everything else.
   final void Function(GitFile file)? onOpenDiff;
+  final Duration autoRefreshPeriod;
 
   @override
   State<GitDiffSidebarPanel> createState() => _GitDiffSidebarPanelState();
@@ -39,17 +43,46 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   bool _loading = true;
   String? _error;
   DateTime _lastUpdated = DateTime.now();
+  Timer? _autoRefreshTimer;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
     refresh();
+    if (widget.autoRefreshPeriod > Duration.zero) {
+      _autoRefreshTimer = Timer.periodic(
+        widget.autoRefreshPeriod,
+        (_) {
+          if (!mounted || _refreshing) return;
+          refresh(background: true);
+        },
+      );
+    }
   }
 
-  Future<void> refresh() async {
-    if (mounted) {
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant GitDiffSidebarPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sessionId != widget.sessionId ||
+        oldWidget.workspacePath != widget.workspacePath ||
+        oldWidget.client != widget.client) {
+      refresh();
+    }
+  }
+
+  Future<void> refresh({bool background = false}) async {
+    if (_refreshing) return;
+    _refreshing = true;
+    if (!background && mounted) {
       setState(() {
-        _loading = true;
+        if (_status == null) _loading = true;
         _error = null;
       });
     }
@@ -59,11 +92,17 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
       setState(() {
         _status = res;
         _lastUpdated = DateTime.now();
+        if (background) _error = null;
       });
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (!background && mounted) {
+        setState(() => _error = '$e');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      _refreshing = false;
+      if (!background && mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
