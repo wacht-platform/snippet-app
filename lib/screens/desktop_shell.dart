@@ -283,6 +283,9 @@ class _DesktopShellState extends State<DesktopShell>
   /// so the two containers keep independent selections.
   final Map<_Pane, String> _activeKey = {};
 
+  /// The pane that was last activated or interacted with.
+  _Pane _activePane = _Pane.left;
+
   /// Root session selected for each inner tab group. A root is always present as
   /// that group's first, locked tab; its files, diffs and terminals reference it
   /// through `_ShellTab.groupSessionKey`.
@@ -324,6 +327,7 @@ class _DesktopShellState extends State<DesktopShell>
       } else {
         existing.pane = _Pane.right;
       }
+      _activePane = _Pane.right;
       _activeKey[_Pane.right] = key;
     });
   }
@@ -339,6 +343,7 @@ class _DesktopShellState extends State<DesktopShell>
       } else {
         existing.pane = _Pane.right;
       }
+      _activePane = _Pane.right;
       _activeKey[_Pane.right] = key;
     });
   }
@@ -1196,6 +1201,7 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() {
       _activeIndex = i;
       final tab = _tabs[i];
+      _activePane = tab.pane;
       // The window bar switches the selected nested group, not merely the
       // highlight: the conversation becomes the locked first item in its own
       // full-width inner strip.
@@ -1206,14 +1212,62 @@ class _DesktopShellState extends State<DesktopShell>
     _syncPage();
   }
 
-  void _closeActiveTab() {
-    if (_activeIndex >= 0 && _activeIndex < _tabs.length) {
-      final current = _tabs[_activeIndex];
-      if (_isAuxiliary(current)) {
-        _closeTab(_activeIndex, force: true);
-        return;
-      }
+  /// Active tab or readout currently showing in pane [p].
+  (_ShellTab?, _RightTab?) _shownItemInPane(_Pane p) {
+    final list = _tabsIn(p);
+    final readouts = [
+      for (final r in _rightTabs)
+        if (r.pane == p) r
+    ];
+    final key = _activeKey[p];
+
+    final selectedTab = list.where((t) => t.key == key).firstOrNull;
+    _RightTab? selectedReadout;
+    for (final r in readouts) {
+      if (r.key == key) selectedReadout = r;
     }
+    final shownTab = selectedTab ??
+        (selectedReadout == null && list.isNotEmpty ? list.first : null);
+    final shownReadout = selectedReadout ??
+        (shownTab == null && readouts.isNotEmpty ? readouts.first : null);
+    return (shownTab, shownReadout);
+  }
+
+  void _closeActiveTab() {
+    final primaryPane = _focusedPane;
+    final secondaryPane = primaryPane == _Pane.left ? _Pane.right : _Pane.left;
+
+    bool tryCloseInwardTabIn(_Pane p) {
+      if (p == _Pane.right &&
+          _rightCollapsed &&
+          _tabsIn(p).isEmpty &&
+          !_rightTabs.any((r) => r.pane == p)) {
+        return false;
+      }
+      final (shownTab, shownReadout) = _shownItemInPane(p);
+      if (shownReadout != null) {
+        _closeRightTab(shownReadout.key);
+        return true;
+      }
+      if (shownTab != null && _isAuxiliary(shownTab)) {
+        if (shownTab.isTerminal) {
+          _hideTabView(p, shownTab);
+        } else {
+          _closePaneTab(shownTab);
+        }
+        return true;
+      }
+      return false;
+    }
+
+    // 1. Prioritize closing the active inward tab in the focused pane.
+    if (tryCloseInwardTabIn(primaryPane)) return;
+
+    // 2. If the focused pane has no inward tab, check if the other visible pane has an inward tab.
+    if (!_rightCollapsed && tryCloseInwardTabIn(secondaryPane)) return;
+
+    // 3. No inward tab is active/open in any visible pane — the session tab is open.
+    // Close the outward tab (the active workspace session).
     final active = _activeTab;
     if (active != null && _canCloseTopTab(active)) {
       _closeTabAt(active, force: true);
@@ -1737,8 +1791,13 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _closeTabByKey(String key) {
-    final i = _tabs.indexWhere((t) => t.key == key);
-    if (i >= 0) _closeTab(i);
+    final t = _tabs.where((t) => t.key == key).firstOrNull;
+    if (t != null) {
+      _closePaneTab(t);
+    } else {
+      final i = _tabs.indexWhere((t) => t.key == key);
+      if (i >= 0) _closeTab(i);
+    }
   }
 
   // Full-screen on phones (QR scan); a compact natural-height dialog on
@@ -2349,12 +2408,16 @@ class _DesktopShellState extends State<DesktopShell>
   String? _activeGroupKeyFor(_Pane p) =>
       _groupRootFor(p) ?? (_activeTab?.pane == p ? _activeTab?.key : null);
 
-  /// The pane holding the focused tab. Drives drops and inbound shares, so a
-  /// dropped file lands in one composer rather than both.
+  /// The pane holding the focused tab. Drives drops, inbound shares, and keyboard
+  /// actions like closing tabs.
   _Pane get _focusedPane {
-    final i = _activeIndex;
-    if (i >= 0 && i < _tabs.length) return _tabs[i].pane;
-    return _Pane.left;
+    if (_rightCollapsed) return _Pane.left;
+    if (_activePane == _Pane.right) {
+      final rightHasContent = _tabsIn(_Pane.right).isNotEmpty ||
+          _rightTabs.any((r) => r.pane == _Pane.right);
+      if (rightHasContent) return _Pane.right;
+    }
+    return _activeTab?.pane ?? _Pane.left;
   }
 
   /// Make a tab its pane's active tab, and the shell's focused tab.
@@ -2363,6 +2426,7 @@ class _DesktopShellState extends State<DesktopShell>
     if (i < 0) return;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
+      _activePane = p;
       _activeKey[p] = tab.key;
       // Selecting a nested item also selects its one locked session root. The
       // inner strip therefore never turns into a rootless bag of files.
@@ -2391,6 +2455,7 @@ class _DesktopShellState extends State<DesktopShell>
     // tab), which would make the lookup self-referential.
     final targetRoot = _groupRootFor(p);
     setState(() {
+      _activePane = p;
       tab.pane = p;
       // Moving an AUXILIARY tab is a pane concern; it must not drag the window
       // bar's selection with it.
@@ -2434,6 +2499,7 @@ class _DesktopShellState extends State<DesktopShell>
   /// place it somewhere invisible: the content exists, but nothing shows it and
   /// the new tab looks like it did nothing. Docking always reveals.
   void _dockAux(_Pane p, String key) {
+    _activePane = p;
     _activeKey[p] = key;
     if (p == _Pane.right) {
       // Reveal the pane. Docked `_ShellTab`s take precedence over readouts in
@@ -2445,8 +2511,24 @@ class _DesktopShellState extends State<DesktopShell>
 
   /// Close a tab by identity, from either pane's strip.
   void _closePaneTab(_ShellTab t) {
+    final pane = t.pane;
+    final tabs = _tabsIn(pane);
+    final idx = tabs.indexOf(t);
+    String? nextKey;
+    if (idx >= 0) {
+      if (idx + 1 < tabs.length) {
+        nextKey = tabs[idx + 1].key;
+      } else if (idx - 1 >= 0) {
+        nextKey = tabs[idx - 1].key;
+      }
+    }
     final i = _tabs.indexOf(t);
-    if (i >= 0) _closeTab(i);
+    if (i >= 0) {
+      _closeTab(i);
+      if (nextKey != null && mounted) {
+        setState(() => _activeKey[pane] = nextKey);
+      }
+    }
   }
 
   /// Close a tab by IDENTITY. Identity, not index: the window bar lists

@@ -31,6 +31,7 @@ class ShellSplitView extends StatefulWidget {
     required this.onActivateReadout,
     required this.onDismissTab,
     required this.onCloseReadout,
+    this.onFocusPane,
   });
 
   final Widget sidebar;
@@ -55,6 +56,7 @@ class ShellSplitView extends StatefulWidget {
   final void Function(ShellPane pane, RightTab readout) onActivateReadout;
   final void Function(ShellPane pane, ShellTab tab) onDismissTab;
   final ValueChanged<RightTab> onCloseReadout;
+  final ValueChanged<ShellPane>? onFocusPane;
 
   @override
   State<ShellSplitView> createState() => _ShellSplitViewState();
@@ -127,37 +129,41 @@ class _ShellSplitViewState extends State<ShellSplitView> {
       ]);
     }
 
-    return PaneSurface(
-      pane: p,
-      roundRight: roundRight,
-      droppable: _dragOverPane == p,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (list.isNotEmpty || readouts.isNotEmpty)
-            PaneStrip(
-              pane: p,
-              tabs: list,
-              readouts: readouts,
-              activeKey: key,
-              statusForTab: widget.statusForTab,
-              canDismissTab: (t) => widget.canCloseTab(t) || t.isTerminal,
-              onActivateTab: (t) => widget.onActivateTab(p, t),
-              onDismissTab: (t) => widget.onDismissTab(p, t),
-              onActivateReadout: (r) => widget.onActivateReadout(p, r),
-              onCloseReadout: widget.onCloseReadout,
-              onDragStarted: () => setState(() => _dragActive = true),
-              onDragEnd: (_) {
-                if (_dragActive || _dragOverPane != null) {
-                  setState(() {
-                    _dragActive = false;
-                    _dragOverPane = null;
-                  });
-                }
-              },
-            ),
-          Expanded(child: content),
-        ],
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => widget.onFocusPane?.call(p),
+      child: PaneSurface(
+        pane: p,
+        roundRight: roundRight,
+        droppable: _dragOverPane == p,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (list.isNotEmpty || readouts.isNotEmpty)
+              PaneStrip(
+                pane: p,
+                tabs: list,
+                readouts: readouts,
+                activeKey: key,
+                statusForTab: widget.statusForTab,
+                canDismissTab: (t) => widget.canCloseTab(t) || t.isTerminal,
+                onActivateTab: (t) => widget.onActivateTab(p, t),
+                onDismissTab: (t) => widget.onDismissTab(p, t),
+                onActivateReadout: (r) => widget.onActivateReadout(p, r),
+                onCloseReadout: widget.onCloseReadout,
+                onDragStarted: () => setState(() => _dragActive = true),
+                onDragEnd: (_) {
+                  if (_dragActive || _dragOverPane != null) {
+                    setState(() {
+                      _dragActive = false;
+                      _dragOverPane = null;
+                    });
+                  }
+                },
+              ),
+            Expanded(child: content),
+          ],
+        ),
       ),
     );
   }

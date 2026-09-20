@@ -2365,33 +2365,13 @@ class _SessionScreenState extends State<SessionScreen>
                 SizedBox(
                   width: 82,
                   height: 26,
-                  child: Stack(
-                    alignment: Alignment.centerRight,
-                    children: [
-                      AnimatedOpacity(
-                        opacity: showActions ? 0.0 : 1.0,
-                        duration: const Duration(milliseconds: 120),
-                        child: Padding(
-                          padding: EdgeInsets.only(right: 6),
-                          child: SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              color: AppColors.fg4,
-                            ),
-                          ),
-                        ),
-                      ),
-                      AnimatedOpacity(
-                        opacity: showActions ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 120),
-                        child: IgnorePointer(
-                          ignoring: !showActions,
-                          child: actionButtons,
-                        ),
-                      ),
-                    ],
+                  child: AnimatedOpacity(
+                    opacity: showActions ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 120),
+                    child: IgnorePointer(
+                      ignoring: !showActions,
+                      child: actionButtons,
+                    ),
                   ),
                 ),
             ],
