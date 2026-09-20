@@ -3583,14 +3583,6 @@ class _SessionScreenState extends State<SessionScreen>
           child: Container(
             height: 28,
             padding: EdgeInsets.fromLTRB(9, 0, onClear == null ? 8 : 4, 0),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(R.sm),
-              border: Border.all(
-                color: selected
-                    ? AppColors.accent.withValues(alpha: 0.25)
-                    : AppColors.border,
-              ),
-            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
