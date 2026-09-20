@@ -2289,34 +2289,31 @@ class _SessionScreenState extends State<SessionScreen>
     final text = _queuedText(item.text);
     final counts = _queuedAttachCounts(item.text);
 
+    Widget _action(String icon, String tip, VoidCallback onTap) {
+      return Tooltip(
+        message: tip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: AppIcon(icon, size: 13, color: AppColors.fg3),
+          ),
+        ),
+      );
+    }
+
     final actionButtons = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconBtn(
-          'trash',
-          size: 26,
-          iconSize: 14,
-          tooltip: 'Delete',
-          onTap: () => _cancelQueuedAt(qi),
-        ),
-        const SizedBox(width: 2),
-        IconBtn(
-          'edit',
-          size: 26,
-          iconSize: 14,
-          tooltip: 'Edit',
-          onTap: () => _editQueuedAt(qi),
-        ),
-        const SizedBox(width: 2),
-        IconBtn(
-          'arrow-up',
-          size: 26,
-          iconSize: 14,
-          tooltip: 'Send now',
-          onTap: () => _steerQueuedAt(qi),
-        ),
+        _action('trash', 'Delete', () => _cancelQueuedAt(qi)),
+        _action('edit', 'Edit', () => _editQueuedAt(qi)),
+        _action('arrow-up', 'Send now', () => _steerQueuedAt(qi)),
       ],
     );
+
+    // 3 icons × 13px + 3 × 8px padding = 63px
+    const trailingWidth = 63.0;
 
     return MouseRegion(
       onEnter: (_) {
@@ -2329,53 +2326,49 @@ class _SessionScreenState extends State<SessionScreen>
           setState(() => _hoveredQueuedIndex = null);
         }
       },
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 26),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      text.isEmpty ? '(attachment)' : text,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(13, color: AppColors.fg1),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    text.isEmpty ? '(attachment)' : text,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, color: AppColors.fg1),
+                  ),
+                  if (counts.$1 + counts.$2 + counts.$3 > 0) ...[
+                    const SizedBox(height: 4),
+                    AttachmentPill(
+                      audio: counts.$1,
+                      images: counts.$2,
+                      files: counts.$3,
                     ),
-                    if (counts.$1 + counts.$2 + counts.$3 > 0) ...[
-                      const SizedBox(height: 4),
-                      AttachmentPill(
-                        audio: counts.$1,
-                        images: counts.$2,
-                        files: counts.$3,
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
-              const SizedBox(width: 8),
-              if (kMobile)
-                actionButtons
-              else
-                SizedBox(
-                  width: 82,
-                  height: 26,
-                  child: AnimatedOpacity(
-                    opacity: showActions ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 120),
-                    child: IgnorePointer(
-                      ignoring: !showActions,
-                      child: actionButtons,
-                    ),
+            ),
+            const SizedBox(width: 4),
+            if (kMobile)
+              actionButtons
+            else
+              SizedBox(
+                width: trailingWidth,
+                child: AnimatedOpacity(
+                  opacity: showActions ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 120),
+                  child: IgnorePointer(
+                    ignoring: !showActions,
+                    child: actionButtons,
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
