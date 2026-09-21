@@ -367,8 +367,6 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
               ),
             ),
             _deleteProfileButton(p),
-            const SizedBox(width: 4),
-            AppIcon('chevron-right', size: 14, color: AppColors.fg4),
           ]),
         ),
       ),
