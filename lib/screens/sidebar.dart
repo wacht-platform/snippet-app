@@ -182,12 +182,6 @@ class SidebarState extends State<Sidebar> {
 
 
 
-  /// Folder groups the user has collapsed. Keyed by folder path; a group is
-  /// expanded by default, so a fresh session list is fully visible.
-  final Set<String> _collapsed = {};
-
-  /// Collapse key for the whole CHATS section — distinct from any folder path.
-  static const String _chatsKey = '__chats__';
   String? _renamingId;
   String? _hoveredId;
   final TextEditingController _renameCtl = TextEditingController();
@@ -893,6 +887,12 @@ class SidebarState extends State<Sidebar> {
         s.folder.toLowerCase().contains(q);
   }
 
+  List<SessionInfo> _sortSessionsByRecency(Iterable<SessionInfo> sessions) {
+    final sorted = sessions.toList();
+    sorted.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+    return sorted;
+  }
+
   Widget _sessionList() {
     if (_loading && _sessions == null) {
       return Center(
@@ -938,16 +938,13 @@ class SidebarState extends State<Sidebar> {
           ]);
     }
     final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
-    final list = all
-        .where((s) =>
+    final list = _sortSessionsByRecency(all.where((s) =>
             !isDedicatedMcSession(s.id) &&
             !isInboxSessionRow(s) &&
-            _matchesQuery(s))
-        .toList();
+            _matchesQuery(s)));
     // Phone chats are one flat, chronological surface.
     if (kMobile) {
-      final allSorted = [...list]
-        ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      final allSorted = _sortSessionsByRecency(list);
       final mobileChildren = <Widget>[];
       for (final session in allSorted) {
         mobileChildren.add(_sessionCard(session));
@@ -1010,26 +1007,16 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  /// Desktop sidebar as stacked, collapsible sections — the reference's left
-  /// column: an UPPERCASE section header with an action cluster, then nested
-  /// collapsible folder groups, then compact rows.
-  ///
-  /// Separate from `_sessionList()` because mobile keeps its card list; only the
-  /// wide layout uses this density.
+  /// Desktop sidebar as a single recency-ordered chat stream. Workspace is
+  /// metadata on each row, never a grouping or sort key.
   Widget _sectionedSidebar() {
     final hasClient = widget.client != null;
     final all = _sessions ?? const <SessionInfo>[];
-    final list = all
-        .where((s) =>
+    final list = _sortSessionsByRecency(all.where((s) =>
             !isDedicatedMcSession(s.id) &&
             !isInboxSessionRow(s) &&
-            _matchesQuery(s))
-        .toList();
+            _matchesQuery(s)));
 
-    // Purely based on recency.
-    list.sort((a, b) => b.lastActive.compareTo(a.lastActive));
-
-    final chatsOpen = !_collapsed.contains(_chatsKey);
     return ListView(
       // Top inset keeps the first section header clear of the navigation band,
       // matching the reference's 8px section padding.
@@ -1037,7 +1024,6 @@ class SidebarState extends State<Sidebar> {
       children: [
         ShellSectionHeader(
           label: 'Chats',
-          onToggle: () => setState(() => _toggleCollapsed(_chatsKey)),
           actions: [
             ShellSectionAction(
               icon: 'search',
@@ -1064,7 +1050,7 @@ class SidebarState extends State<Sidebar> {
             ),
           ],
         ),
-        if (chatsOpen && _desktopChatsSearchOpen)
+        if (_desktopChatsSearchOpen)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
             child: Container(
@@ -1102,9 +1088,7 @@ class SidebarState extends State<Sidebar> {
               ),
             ),
           ),
-        if (!chatsOpen)
-          const SizedBox.shrink()
-        else if (!hasClient)
+        if (!hasClient)
           const SidebarEmpty('Add a machine to begin.')
         else if (list.isEmpty)
           // Distinguish "no conversations" from "none match the search": saying
@@ -1119,16 +1103,8 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  void _toggleCollapsed(String key) {
-    if (_collapsed.contains(key)) {
-      _collapsed.remove(key);
-    } else {
-      _collapsed.add(key);
-    }
-  }
-
-  /// One chat row. The folder is already conveyed by its group header, so the
-  /// row stays a single line; the trailing dot carries run/needs-input state.
+  /// One chat row. Workspace is metadata on the row, never a grouping key;
+  /// recency determines the list order.
   Widget _sidebarSessionRow(SessionInfo s) {
     final selected = s.id == widget.selectedSessionId;
     return ShellNavRow(
