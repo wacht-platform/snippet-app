@@ -7,11 +7,11 @@ import 'package:flutter/material.dart';
 
 import '../../../theme.dart';
 import '../../../widgets.dart';
-import '../../../panel.dart';
 import '../../mission_control/coordination_agent_directory.dart';
 import '../task_board_screen.dart';
 import '../mission_control_state.dart';
-import '../mobile/mobile_mc.dart' show showNotificationInbox;
+import '../mobile/mobile_mc.dart'
+    show showMissionControlPanel, showNotificationInbox;
 
 class MissionControlHeader extends StatelessWidget {
   const MissionControlHeader.compact({
@@ -91,11 +91,9 @@ class MissionControlHeader extends StatelessWidget {
           size: 40,
           iconSize: 18,
           tooltip: 'Agents',
-          onTap: () => presentScreen(
+          onTap: () => showMissionControlPanel(
             context,
-            style: PanelStyle.drawer,
-            builder: (_, close) =>
-                CoordinationAgentDirectory(client: state.client),
+            CoordinationAgentDirectory(client: state.client),
           ),
         ),
         IconBtn(
@@ -103,12 +101,9 @@ class MissionControlHeader extends StatelessWidget {
           size: 40,
           iconSize: 18,
           tooltip: 'Tasks',
-          onTap: () => presentScreen(
+          onTap: () => showMissionControlPanel(
             context,
-            style: PanelStyle.drawer,
-            builder: (_, close) => TaskBoardScreen(
-              client: state.client,
-            ),
+            TaskBoardScreen(client: state.client),
           ),
         ),
         Stack(clipBehavior: Clip.none, children: [

@@ -79,6 +79,64 @@ Future<T?> presentScreen<T>(
   );
 }
 
+/// Present an adaptive panel: a rounded, dismissible bottom sheet on phones
+/// and the existing drawer/dialog treatment on wider layouts.
+Future<T?> presentAdaptivePanel<T>(
+  BuildContext context,
+  Widget child, {
+  PanelStyle style = PanelStyle.drawer,
+  double maxWidth = 720,
+  double maxHeight = 820,
+}) {
+  if (!kMobile) {
+    return presentScreen<T>(
+      context,
+      style: style,
+      maxWidth: maxWidth,
+      maxHeight: maxHeight,
+      builder: (_, __) => child,
+    );
+  }
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    isDismissible: true,
+    enableDrag: true,
+    useSafeArea: false,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.56),
+    builder: (sheetContext) {
+      final height = MediaQuery.sizeOf(sheetContext).height * 0.92;
+      return SafeArea(
+        top: false,
+        child: SizedBox(
+          height: height,
+          child: Material(
+            color: AppColors.bg,
+            clipBehavior: Clip.antiAlias,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(R.sheetTop),
+            ),
+            child: Column(children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 30,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: AppColors.border2,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Expanded(child: child),
+            ]),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 /// Present a SELF-CONTAINED screen (no internal sub-pushes) as a centered modal
 /// that returns a value. The screen's own `Navigator.pop(context, value)` closes
 /// the modal and yields that value (e.g. AddInstanceScreen returning an Instance).

@@ -10,6 +10,7 @@ import '../shell_nav.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import 'mission_control_state.dart';
+import 'mobile/mobile_mc.dart' show showMissionControlPanel;
 import 'task_detail_screen.dart';
 
 /// The task board — where a human files work.
@@ -118,22 +119,34 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
   }
 
   Future<void> _open(TaskItem task) async {
-    await presentScreen(
-      context,
-      style: PanelStyle.drawer,
-      maxWidth: 720,
-      maxHeight: 820,
-      builder: (_, close) => TaskDetailScreen(
-        client: widget.client,
-        taskId: task.id,
-        // The board may have changed while the detail was open, so the list is
-        // refetched on close rather than trusting a local edit.
-        onClose: () {
-          close();
-          refresh();
-        },
-      ),
+    final detail = TaskDetailScreen(
+      client: widget.client,
+      taskId: task.id,
+      // The board may have changed while the detail was open, so the list is
+      // refetched on close rather than trusting a local edit.
+      onClose: () {
+        Navigator.of(context).pop();
+        refresh();
+      },
     );
+    if (kMobile) {
+      await showMissionControlPanel(context, detail);
+    } else {
+      await presentScreen(
+        context,
+        style: PanelStyle.drawer,
+        maxWidth: 720,
+        maxHeight: 820,
+        builder: (_, close) => TaskDetailScreen(
+          client: widget.client,
+          taskId: task.id,
+          onClose: () {
+            close();
+            refresh();
+          },
+        ),
+      );
+    }
     if (mounted) await refresh();
   }
 

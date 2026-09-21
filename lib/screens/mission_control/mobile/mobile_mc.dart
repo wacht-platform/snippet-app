@@ -1,7 +1,3 @@
-/// Mobile Mission Control — full-screen, single column. The MC agent lives in
-/// the header, the activity feed is the body, the composer is pinned to the
-/// bottom. Tap a task to expand it in a draggable bottom sheet; tap the bell
-/// to see unresolved notifications.
 library;
 
 import 'package:flutter/material.dart';
@@ -18,6 +14,61 @@ import '../widgets/mission_composer.dart';
 import '../widgets/task_detail_sheet.dart';
 import '../widgets/notification_inbox.dart';
 
+Future<void> showMissionControlPanel(
+  BuildContext context,
+  Widget child,
+) {
+  if (!kMobile) {
+    return presentScreen<void>(
+      context,
+      style: PanelStyle.drawer,
+      builder: (_, close) => child,
+    );
+  }
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    isDismissible: true,
+    enableDrag: true,
+    useSafeArea: false,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.56),
+    builder: (sheetContext) {
+      final height = MediaQuery.sizeOf(sheetContext).height * 0.92;
+      return SafeArea(
+        top: false,
+        child: SizedBox(
+          height: height,
+          child: Material(
+            color: AppColors.bg,
+            clipBehavior: Clip.antiAlias,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(R.sheetTop),
+            ),
+            child: Column(children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 30,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: AppColors.border2,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Expanded(child: child),
+            ]),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+/// Mobile Mission Control — full-screen, single column. The MC agent lives in
+/// the header, the activity feed is the body, the composer is pinned to the
+/// bottom. Tap a task to expand it in a draggable bottom sheet; tap the bell
+/// to see unresolved notifications.
 class MobileMissionControl extends StatelessWidget {
   const MobileMissionControl({super.key});
 
@@ -60,14 +111,9 @@ class MobileMissionControl extends StatelessWidget {
       state.refresh(silent: true);
       return;
     }
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.bg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetCtx) => TaskDetailSheet(task: task, state: state),
+    await showMissionControlPanel(
+      context,
+      TaskDetailSheet(task: task, state: state),
     );
     state.refresh(silent: true);
   }
