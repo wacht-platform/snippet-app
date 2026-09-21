@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:hugeicons/hugeicons.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -13,6 +14,51 @@ import 'theme.dart';
 
 OverlayEntry? _activeToast;
 Timer? _toastTimer;
+
+/// Full-surface loading state for mobile screens. A quiet brand mark avoids the
+/// generic circular progress indicator and keeps partial content hidden.
+class AppLoading extends StatefulWidget {
+  const AppLoading({super.key, this.label = 'Loading'});
+  final String label;
+
+  @override
+  State<AppLoading> createState() => _AppLoadingState();
+}
+
+class _AppLoadingState extends State<AppLoading>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 0.35, end: 1).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+        ),
+        child: Semantics(
+          label: widget.label,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
+              CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+            ),
+            child: AppIcon('sparkles', size: 28, color: AppColors.fg1),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 ShapeBorder get appMenuShape => RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(R.md),
@@ -45,8 +91,283 @@ PopupMenuItem<T> appMenuItem<T>({
             overflow: TextOverflow.ellipsis,
             style: sans(13, color: color)),
       ),
-      if (detail != null) Text(detail, style: sans(11.5, color: AppColors.fg4)),
+      if (detail != null) Text(detail, style: sans(11, color: AppColors.fg3)),
     ]),
+  );
+}
+
+/// A richer popover row: icon, title, optional one-line description, and a
+/// trailing check when selected. Used by the composer's approval and provider
+/// menus, where the choice needs explaining rather than just naming.
+PopupMenuItem<T> appMenuRow<T>({
+  required T value,
+  required String icon,
+  required String label,
+  String? description,
+  String? trailing,
+  bool selected = false,
+  double height = 56,
+}) {
+  return PopupMenuItem<T>(
+    value: value,
+    height: height,
+    // Deliberately small: the row draws its own rounded, filled hit area, so a
+    // large outer padding would double up and inset the fill too far.
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
+      ),
+      child: Row(children: [
+        // Icon in a tinted tile. A bare 15px glyph floating beside two lines of
+        // text had no visual anchor, which is most of why these menus read flat.
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? AppColors.accentBg : AppColors.surface3,
+            borderRadius: BorderRadius.circular(R.sm),
+          ),
+          child: AppIcon(icon,
+              size: 14.5, color: selected ? AppColors.accent : AppColors.fg3),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, weight: W.label, color: AppColors.fg1)),
+              if (description != null) ...[
+                const SizedBox(height: 2.5),
+                Text(description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(11.5, color: AppColors.fg3)),
+              ],
+            ],
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          Text(trailing, style: sans(11, color: AppColors.fg3)),
+        ],
+        // The check is the one saturated mark in the row, so "this is the
+        // current setting" is legible at a glance rather than one grey glyph
+        // among four.
+        if (selected) ...[
+          const SizedBox(width: 8),
+          AppIcon('check', size: 15, color: AppColors.accent),
+        ],
+      ]),
+    ),
+  );
+}
+
+/// A menu title placed above a group of rows (showMenu takes these as disabled
+/// items, which is the only way to put non-selectable text in a popup menu).
+PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
+      enabled: false,
+      height: 34,
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
+      // Upper case -> `caps()`, and a group heading is a label, not a
+      // disabled control, so `fg3` rather than the `fg4` placeholder rung.
+      child: Text(label.toUpperCase(),
+          style: caps(10, color: AppColors.fg3)),
+    );
+
+/// Present a menu in the shape the platform expects.
+///
+/// ONE entry point for every `appMenuItem`/`appMenuRow` menu in the app: a bottom
+/// sheet on a phone (full width, rows at real touch height, thumb reachable) and
+/// an anchored popover on desktop.
+///
+/// Callers previously each computed a `RelativeRect` and called `showMenu`
+/// directly, which is why the same menu opened as a cramped floating card on a
+/// phone — 40px rows, 12px padding, no grab handle, no sheet affordance.
+Future<T?> showAppMenu<T>(
+  BuildContext context, {
+  required List<PopupMenuEntry<T>> items,
+
+  /// The control this menu belongs to; the desktop popover anchors to it.
+  BuildContext? anchor,
+
+  /// Optional vertical reference box (e.g. the composer card container).
+  /// When provided, the menu positions its top/bottom edge relative to this
+  /// box instead of the anchor control, avoiding covering the input area.
+  BuildContext? verticalAnchor,
+
+  /// Explicit screen point (long-press / right-click). Wins over [anchor].
+  Offset? point,
+  double minWidth = 260,
+  double maxWidth = 340,
+  Color? color,
+
+  /// Open BELOW the anchor instead of above it. Set for controls at the TOP of
+  /// the window (the shell menu), where an upward menu would be clipped offscreen.
+  bool below = false,
+
+  /// Align the popover's RIGHT edge with the anchor's, instead of its left.
+  /// Set for a control at the right end of a narrow bar — a section header's
+  /// actions, say — where a left-aligned popover would open away from the button
+  /// it belongs to.
+  bool alignEnd = false,
+}) {
+  final bg = color ?? AppColors.surface1;
+
+  if (kMobile) {
+    return showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: const Color(0x9E000000),
+      isScrollControlled: true,
+      builder: (sheet) {
+        final media = MediaQuery.of(sheet);
+        return ClipRRect(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: (color ?? AppColors.surface1).withValues(alpha: 0.88),
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+                border: Border(top: BorderSide(color: AppColors.glassBorder)),
+              ),
+              child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                Center(
+                    child: Container(
+                        width: 32,
+                        height: 3,
+                        decoration: BoxDecoration(
+                            color: AppColors.border2,
+                            borderRadius: BorderRadius.circular(99)))),
+                const SizedBox(height: 6),
+                Flexible(
+                  child: SingleChildScrollView(
+                    // STRETCH, not the default `center`. A heading is a bare `Text`
+                    // with no width constraint, so under `center` it shrank to its
+                    // intrinsic width and floated to the middle of the sheet while
+                    // every row below it started at the left edge.
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final item in items)
+                            _appMenuSheetEntry(sheet, item),
+                        ]),
+                  ),
+                ),
+                SizedBox(height: media.padding.bottom + 8),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+  RelativeRect position;
+  if (overlay == null) {
+    position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+  } else if (point != null) {
+    position = RelativeRect.fromRect(
+      Rect.fromCircle(center: point, radius: 0),
+      Offset.zero & overlay.size,
+    );
+  } else if (anchor != null) {
+    final box = anchor.findRenderObject() as RenderBox?;
+    if (box == null) {
+      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+    } else {
+      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+      final vertBox = verticalAnchor?.findRenderObject() as RenderBox?;
+      final vertOrigin = vertBox != null
+          ? vertBox.localToGlobal(Offset.zero, ancestor: overlay)
+          : origin;
+      final topY = below
+          ? (vertOrigin.dy + (vertBox?.size.height ?? box.size.height) + 6)
+          : (vertOrigin.dy - 6);
+      final alignRight = origin.dx + box.size.width;
+      final left = alignEnd
+          ? (alignRight - minWidth)
+              .clamp(12.0, overlay.size.width - minWidth - 12)
+          : origin.dx.clamp(12.0, overlay.size.width - minWidth - 12);
+
+      position = RelativeRect.fromLTRB(
+        alignEnd ? overlay.size.width : left,
+        topY,
+        alignEnd ? (overlay.size.width - alignRight) : overlay.size.width,
+        below ? overlay.size.height : 0,
+      );
+    }
+  } else {
+    position = const RelativeRect.fromLTRB(16, 80, 16, 80);
+  }
+
+  return showMenu<T>(
+    context: context,
+    position: position,
+    color: bg,
+    elevation: 0,
+    shadowColor: Colors.transparent,
+    surfaceTintColor: Colors.transparent,
+    shape: appMenuShape,
+    constraints: BoxConstraints(minWidth: minWidth, maxWidth: maxWidth),
+    items: items,
+  );
+}
+
+/// One entry inside the phone menu sheet.
+///
+/// Mirrors what `PopupMenuItem` draws, so a helper-built row needs no
+/// mobile-specific variant — but sized to a real touch target, which the popup
+/// defaults are not.
+Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
+  if (entry is PopupMenuDivider) {
+    return Divider(height: 13, thickness: 1, color: AppColors.border);
+  }
+  if (entry is! PopupMenuItem<T>) {
+    return const SizedBox.shrink();
+  }
+  final pad = entry.padding ?? const EdgeInsets.symmetric(horizontal: M.gutter);
+  // A heading is a section label and is deliberately NOT tappable.
+  if (!entry.enabled) {
+    return Padding(
+      padding: pad,
+      child: SizedBox(height: entry.height, child: entry.child),
+    );
+  }
+  return InkWell(
+    onTap: () => Navigator.pop(sheet, entry.value),
+    child: Padding(
+      // The row now draws its own rounded, filled hit area for desktop, where a
+      // 4px outer inset is right — the popover supplies the surrounding gutter.
+      // A SHEET does not: it is full width, so inheriting 4px would run the fill
+      // nearly edge-to-edge. Impose the sheet's own gutter here and let the row's
+      // fill sit inside it.
+      padding: EdgeInsets.symmetric(
+        horizontal: pad.horizontal < M.gutter ? M.gutter : pad.horizontal,
+        vertical: 2,
+      ),
+      child: SizedBox(
+        // Never below the 44px touch minimum, whatever the desktop helper used.
+        height: entry.height < 48 ? 52 : entry.height,
+        child: entry.child,
+      ),
+    ),
   );
 }
 
@@ -139,9 +460,19 @@ class _ToastCard extends StatefulWidget {
 
 class _ToastCardState extends State<_ToastCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 220))
-    ..forward();
+  /// Eager, in initState — a lazy `late final` makes `dispose` the first access
+  /// when `build` never runs, constructing a controller on a dead element. Same
+  /// defect class as `_StatusDotState`; fixed together so it cannot recur.
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: Motion.base)
+      ..forward();
+  }
+
   @override
   void dispose() {
     _c.dispose();
@@ -151,7 +482,7 @@ class _ToastCardState extends State<_ToastCard>
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final curve = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+    final curve = CurvedAnimation(parent: _c, curve: Motion.enter);
     final fg = widget.danger ? AppColors.danger : AppColors.fg1;
     // Material ancestor: without it, text floating in the root Overlay falls back
     // to the debug default style (the yellow underline). It also gives clean ink.
@@ -177,7 +508,7 @@ class _ToastCardState extends State<_ToastCard>
               const SizedBox(width: 8),
               Flexible(
                 child: Text(widget.message,
-                    style: sans(12.5, height: 1.3, color: fg)
+                    style: sans(12, height: 1.3, color: fg)
                         .copyWith(decoration: TextDecoration.none)),
               ),
               for (final a in widget.actions) ...[
@@ -189,10 +520,9 @@ class _ToastCardState extends State<_ToastCard>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(a.label,
-                        style: sans(12,
-                                weight: FontWeight.w600,
-                                color: AppColors.accent)
-                            .copyWith(decoration: TextDecoration.none)),
+                        style:
+                            sans(12, weight: W.label, color: AppColors.accent)
+                                .copyWith(decoration: TextDecoration.none)),
                   ),
                 ),
               ],
@@ -244,24 +574,33 @@ class Pills<T> extends StatelessWidget {
   Widget build(BuildContext context) =>
       Wrap(spacing: 7, runSpacing: 7, children: [
         for (final (val, label) in items)
-          GestureDetector(
-            onTap: onSelect == null ? null : () => onSelect!(val),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-              decoration: BoxDecoration(
-                color:
-                    selected == val ? AppColors.accentBg : AppColors.surface2,
-                borderRadius: BorderRadius.circular(99),
-                border: Border.all(
-                    color: selected == val
-                        ? AppColors.accentLine
-                        : AppColors.border),
+          Pressable(
+            enabled: onSelect != null,
+            child: GestureDetector(
+              onTap: onSelect == null ? null : () => onSelect!(val),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                decoration: BoxDecoration(
+                  // Selection is a NEUTRAL surface step, not the accent. The
+                  // accent is reserved for STATE (running, needs-attention), so
+                  // an accent-filled chip reads as an alert rather than "this is
+                  // on" — and it collides with the same hue already meaning
+                  // status elsewhere. Matches IconBtn.active and the nav rows.
+                  color:
+                      selected == val ? AppColors.surface3 : AppColors.surface2,
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                      color: selected == val
+                          ? AppColors.border2
+                          : AppColors.border),
+                ),
+                child: Text(label,
+                    style: sans(12,
+                        weight: W.label,
+                        color:
+                            selected == val ? AppColors.fg1 : AppColors.fg2)),
               ),
-              child: Text(label,
-                  style: sans(12.5,
-                      weight: FontWeight.w500,
-                      color:
-                          selected == val ? AppColors.accent : AppColors.fg2)),
             ),
           ),
       ]);
@@ -292,15 +631,15 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     p: sans(16, height: 1.5, color: AppColors.fg1),
     pPadding: EdgeInsets.zero,
     a: sans(16, height: 1.5, color: AppColors.accent),
-    h1: sans(21, weight: FontWeight.w600, height: 1.25, color: AppColors.fg1),
+    h1: sans(20, weight: W.label, height: 1.25, color: AppColors.fg1),
     h1Padding: const EdgeInsets.only(top: 8, bottom: 4),
-    h2: sans(18, weight: FontWeight.w600, height: 1.28, color: AppColors.fg1),
+    h2: sans(18, weight: W.label, height: 1.28, color: AppColors.fg1),
     h2Padding: const EdgeInsets.only(top: 8, bottom: 3),
-    h3: sans(16.5, weight: FontWeight.w600, height: 1.3, color: AppColors.fg1),
+    h3: sans(16, weight: W.label, height: 1.3, color: AppColors.fg1),
     h3Padding: const EdgeInsets.only(top: 6, bottom: 2),
     listIndent: 18,
     listBulletPadding: const EdgeInsets.only(right: 6),
-    code: mono(13.5, color: AppColors.accent),
+    code: mono(13, color: AppColors.accent),
     // PreBlockBuilder owns fenced chrome — keep these empty to avoid a double box.
     codeblockPadding: EdgeInsets.zero,
     codeblockDecoration: const BoxDecoration(),
@@ -311,7 +650,7 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
       border: Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
     ),
     listBullet: sans(16, height: 1.5, color: AppColors.fg1),
-    tableBody: sans(14.5, color: AppColors.fg1),
+    tableBody: sans(14, color: AppColors.fg1),
     // FlexColumnWidth stretches every markdown table to the full message width.
     // Intrinsic columns keep phone tables content-sized; the markdown package
     // supplies horizontal scrolling when a long URL or code value needs it.
@@ -339,19 +678,19 @@ MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
   final dim2 = AppColors.fg4;
   _cachedThinkingMarkdownStyle =
       MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-    p: sans(13.5, height: 1.45, color: dim),
+    p: sans(13, height: 1.45, color: dim),
     pPadding: EdgeInsets.zero,
-    em: sans(13.5, height: 1.45, color: dim)
+    em: sans(13, height: 1.45, color: dim)
         .copyWith(fontStyle: FontStyle.italic),
-    strong: sans(13.5, height: 1.45, color: dim, weight: FontWeight.w600),
-    a: sans(13.5, height: 1.45, color: AppColors.accent),
-    h1: sans(15, weight: FontWeight.w600, height: 1.3, color: dim),
+    strong: sans(13, height: 1.45, color: dim, weight: W.label),
+    a: sans(13, height: 1.45, color: AppColors.accent),
+    h1: sans(16, weight: W.label, height: 1.3, color: dim),
     h1Padding: const EdgeInsets.only(top: 4, bottom: 2),
-    h2: sans(14.5, weight: FontWeight.w600, height: 1.3, color: dim),
+    h2: sans(14, weight: W.label, height: 1.3, color: dim),
     h2Padding: const EdgeInsets.only(top: 4, bottom: 2),
-    h3: sans(14, weight: FontWeight.w600, height: 1.3, color: dim),
+    h3: sans(14, weight: W.label, height: 1.3, color: dim),
     h3Padding: const EdgeInsets.only(top: 2, bottom: 1),
-    code: mono(12.5, color: dim2),
+    code: mono(12, color: dim2),
     codeblockPadding: EdgeInsets.zero,
     codeblockDecoration: const BoxDecoration(),
     blockquote: sans(13, height: 1.45, color: dim2),
@@ -360,8 +699,8 @@ MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
       borderRadius: BorderRadius.circular(R.xs),
       border: Border(left: BorderSide(color: AppColors.border, width: 2)),
     ),
-    listBullet: sans(13.5, height: 1.45, color: dim),
-    tableBody: sans(12.5, color: dim),
+    listBullet: sans(13, height: 1.45, color: dim),
+    tableBody: sans(12, color: dim),
     tableColumnWidth:
         kMobile ? const IntrinsicColumnWidth() : const FlexColumnWidth(),
     horizontalRuleDecoration:
@@ -410,7 +749,7 @@ class MarkdownPreview extends StatelessWidget {
       data.replaceAll(RegExp(r'\s+'), ' ').trim(),
       maxLines: maxLines,
       overflow: TextOverflow.ellipsis,
-      style: sans(12.5, height: 1.35, color: AppColors.fg3),
+      style: sans(12, height: 1.35, color: AppColors.fg3),
     );
   }
 }
@@ -435,7 +774,7 @@ class CodeBlockBuilder extends MarkdownElementBuilder {
         color: AppColors.accentBg,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(raw, style: mono(13.5, color: AppColors.accent)),
+      child: Text(raw, style: mono(13, color: AppColors.accent)),
     );
   }
 }
@@ -486,7 +825,7 @@ class _MdCodeBlock extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
               child: Row(children: [
-                Text(lang, style: mono(11.5, color: AppColors.fg3)),
+                Text(lang, style: mono(11, color: AppColors.fg3)),
                 const Spacer(),
                 IconBtn(
                   'clipboard',
@@ -511,7 +850,7 @@ class _MdCodeBlock extends StatelessWidget {
                     for (var i = 0; i < lines.length; i++) ...[
                       TextSpan(
                         text: '${i + 1}'.padLeft(3),
-                        style: mono(12, height: 1.55, color: AppColors.fg4),
+                        style: mono(12, height: 1.55, color: AppColors.fg3),
                       ),
                       const TextSpan(text: '  '),
                       highlightedCodeSpan(
@@ -529,15 +868,35 @@ class _MdCodeBlock extends StatelessWidget {
   }
 }
 
-/// Line icon (Material outlined, mapped from the handoff's Lucide names).
+/// HugeIcons sit inside an explicit square and are optically scaled below its
+/// layout bound. This prevents round/full-canvas SVGs from reading larger than
+/// adjacent text or controls.
 class AppIcon extends StatelessWidget {
   final String name;
   final double size;
   final Color? color;
-  const AppIcon(this.name, {super.key, this.size = 18, this.color});
+
+  /// Extra correction on top of the per-glyph table.
+  ///
+  /// Rarely needed — [glyphInkScale] already normalises the glyphs whose ink
+  /// differs from the norm — so this is a one-off escape hatch.
+  final double visualScale;
+  const AppIcon(this.name,
+      {super.key, this.size = 18, this.color, this.visualScale = 1.0});
+
   @override
-  Widget build(BuildContext context) =>
-      Icon(iconFor(name), size: size, color: color ?? AppColors.fg2);
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: size,
+        child: Center(
+          child: HugeIcon(
+            icon: hugeIconFor(name),
+            // Layout keeps the nominal `size`; only the INK is normalised, so a
+            // corrected glyph still occupies the same box as its neighbours.
+            size: size * visualScale * glyphInkScale(name),
+            color: color ?? AppColors.fg2,
+          ),
+        ),
+      );
 }
 
 /// Glowing status dot.
@@ -551,9 +910,35 @@ class StatusDot extends StatefulWidget {
 
 class _StatusDotState extends State<StatusDot>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1200))
-    ..repeat(reverse: true);
+  /// Assigned in initState, NOT as a lazy `late final` initialiser.
+  ///
+  /// A lazy initialiser is evaluated on FIRST ACCESS, and for a static status
+  /// ('online'/'offline') `build` never reads it — so `dispose` became the first
+  /// access and constructed an AnimationController on an element that was
+  /// already unmounting, throwing "the widget's element tree is no longer
+  /// stable". Creating it eagerly removes the ordering dependency entirely.
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200));
+  }
+
+  /// Reduced motion stops the breath but keeps the lit dot: the state is still
+  /// readable from colour alone, so nothing is lost by holding it steady.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (reduceMotion(context)) {
+      if (_c.isAnimating) _c.stop();
+      _c.value = 1;
+    } else if (!_c.isAnimating) {
+      _c.repeat(reverse: true);
+    }
+  }
+
   @override
   void dispose() {
     _c.dispose();
@@ -620,7 +1005,7 @@ class StatusPill extends StatelessWidget {
             height: 6,
             decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
         const SizedBox(width: 6),
-        Text(label, style: sans(11, weight: FontWeight.w500, color: c)),
+        Text(label, style: sans(11, weight: W.label, color: c)),
       ]),
     );
   }
@@ -639,26 +1024,42 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return Material(
-      color: AppColors.surface1,
-      borderRadius: BorderRadius.circular(R.card),
-      child: InkWell(
-        onTap: onTap,
+    return Pressable(
+      enabled: onTap != null,
+      child: Material(
+        color: AppColors.surface1,
         borderRadius: BorderRadius.circular(R.card),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: AppColors.border),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.card),
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(R.card),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: child,
           ),
-          child: child,
         ),
       ),
     );
   }
 }
 
-enum BtnVariant { primary, secondary, outline, ghost, danger }
+enum BtnVariant {
+  primary,
+  secondary,
+
+  /// A surface STEP, no border.
+  ///
+  /// The design language has no borders and reserves the accent hue for state,
+  /// so neither [primary] (accent fill) nor [secondary] (hairline) is right for
+  /// a plain action. This is the doc's chip/active ladder doing the work.
+  surface,
+  outline,
+  ghost,
+  danger,
+}
 
 class Btn extends StatelessWidget {
   final String label;
@@ -689,6 +1090,8 @@ class Btn extends StatelessWidget {
           AppColors.fg1,
           AppColors.border
         ),
+      // Ladder, not a line: the fill is the separation.
+      BtnVariant.surface => (AppColors.surface3, AppColors.fg2, null),
       BtnVariant.outline => (
           Colors.transparent,
           AppColors.fg1,
@@ -702,7 +1105,11 @@ class Btn extends StatelessWidget {
         ),
     };
     // Compact on desktop (mouse), roomy touch targets on mobile.
-    final h = small ? (kMobile ? 34.0 : 28.0) : (kMobile ? 44.0 : 34.0);
+    // 44 on mobile for BOTH variants. `small` was 34 — under Apple's 44pt and
+    // Material's 48dp floors — and it is the primary action of the agent thread
+    // composer and every dialog footer. Desktop keeps the compact 28/34 so a
+    // mouse-sized toolbar does not grow.
+    final h = small ? (kMobile ? 36.0 : 28.0) : (kMobile ? 44.0 : 34.0);
     final child = Row(
       mainAxisSize: full ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -712,8 +1119,7 @@ class Btn extends StatelessWidget {
           const SizedBox(width: 8)
         ],
         Text(label,
-            style:
-                sans(small ? 12.5 : 13.5, weight: FontWeight.w500, color: fg)),
+            style: sans(small ? 12 : 13, weight: W.label, color: fg)),
         if (iconRight != null) ...[
           const SizedBox(width: 8),
           AppIcon(iconRight!, size: small ? 15 : 17, color: fg)
@@ -722,21 +1128,24 @@ class Btn extends StatelessWidget {
     );
     return Opacity(
       opacity: disabled ? 0.45 : 1,
-      child: Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          onTap: disabled ? null : onTap,
+      child: Pressable(
+        enabled: !disabled && onTap != null,
+        child: Material(
+          color: bg,
           borderRadius: BorderRadius.circular(R.sm),
-          child: Container(
-            height: h,
-            width: full ? double.infinity : null,
-            padding: EdgeInsets.symmetric(horizontal: small ? 12 : 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(R.sm),
-              border: bd != null ? Border.all(color: bd) : null,
+          child: InkWell(
+            onTap: disabled ? null : onTap,
+            borderRadius: BorderRadius.circular(R.sm),
+            child: Container(
+              height: h,
+              width: full ? double.infinity : null,
+              padding: EdgeInsets.symmetric(horizontal: small ? 12 : 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(R.sm),
+                border: bd != null ? Border.all(color: bd) : null,
+              ),
+              child: child,
             ),
-            child: child,
           ),
         ),
       ),
@@ -755,27 +1164,84 @@ class PillBtn extends StatelessWidget {
     Theme.of(context); // Rebuild on theme change
     return Opacity(
       opacity: onTap == null ? 0.45 : 1,
-      child: Material(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(99),
-        child: InkWell(
-          onTap: onTap,
+      child: Pressable(
+        enabled: onTap != null,
+        child: Material(
+          color: AppColors.accent,
           borderRadius: BorderRadius.circular(99),
-          child: Container(
-            height: kMobile ? 48 : 36,
-            padding: EdgeInsets.symmetric(horizontal: kMobile ? 20 : 16),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              if (icon != null) ...[
-                AppIcon(icon!,
-                    size: kMobile ? 18 : 16, color: AppColors.accentFg),
-                const SizedBox(width: 8),
-              ],
-              Text(label,
-                  style: sans(kMobile ? 14.5 : 13,
-                      weight: FontWeight.w500, color: AppColors.accentFg)),
-            ]),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(99),
+            child: Container(
+              height: kMobile ? 48 : 36,
+              padding: EdgeInsets.symmetric(horizontal: kMobile ? 20 : 16),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (icon != null) ...[
+                  AppIcon(icon!,
+                      size: kMobile ? 18 : 16, color: AppColors.accentFg),
+                  const SizedBox(width: 8),
+                ],
+                Text(label,
+                    style: sans(kMobile ? 14 : 13,
+                        weight: W.label, color: AppColors.accentFg)),
+              ]),
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Tactile press feedback: a small scale-down while the finger or button is
+/// held down.
+///
+/// An ink ripple confirms the RELEASE, so the control only answers once the
+/// touch is over. This answers on the way down, which is what makes a button
+/// feel like it is listening. It wraps a Material without disturbing the ink or
+/// the tap: a `Listener` observes the pointer but never joins the gesture arena.
+class Pressable extends StatefulWidget {
+  final Widget child;
+
+  /// Off for inert controls, and for a surface where motion would distract.
+  final bool enabled;
+
+  /// Subtle by design — 0.96 reads as tactile, below 0.95 reads as exaggerated.
+  final double scale;
+
+  const Pressable({
+    super.key,
+    required this.child,
+    this.enabled = true,
+    this.scale = 0.97,
+  });
+
+  @override
+  State<Pressable> createState() => _PressableState();
+}
+
+class _PressableState extends State<Pressable> {
+  bool _down = false;
+
+  void _set(bool down) {
+    if (!widget.enabled || _down == down) return;
+    setState(() => _down = down);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Reduced motion keeps the press feedback but drops the travel: the state
+    // still changes, it just does not move across the screen.
+    final reduced = reduceMotion(context);
+    return Listener(
+      onPointerDown: (_) => _set(true),
+      onPointerUp: (_) => _set(false),
+      onPointerCancel: (_) => _set(false),
+      child: AnimatedScale(
+        scale: _down && !reduced ? widget.scale : 1.0,
+        duration: reduced ? Duration.zero : Motion.press,
+        curve: Motion.enter,
+        child: widget.child,
       ),
     );
   }
@@ -798,17 +1264,29 @@ class IconBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final btn = Material(
-      color: active ? AppColors.accentBg : Colors.transparent,
-      borderRadius: BorderRadius.circular(R.md),
-      child: InkWell(
-        onTap: onTap,
+    // A touch target may not be smaller than a fingertip just because the ink
+    // is small: on a phone the layout box grows to [M.minTarget] while the glyph
+    // keeps its size, so a 22px clear button is still comfortably tappable. On
+    // desktop the pointer is precise, so `size` is taken at its word.
+    final box = kMobile && onTap != null && size < M.minTarget ? M.minTarget : size;
+    final btn = Pressable(
+      enabled: onTap != null,
+      child: Material(
+        // Selection is surface-only, matching the sidebar/rail selection
+        // language. The accent is reserved for state, not for "this is on".
+        color: active ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.md),
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Icon(iconFor(name),
-              size: iconSize, color: active ? AppColors.accent : AppColors.fg2),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.md),
+          child: SizedBox(
+            width: box,
+            height: box,
+            child: Center(
+              child: AppIcon(name,
+                  size: iconSize, color: active ? AppColors.fg1 : AppColors.fg2),
+            ),
+          ),
         ),
       ),
     );
@@ -824,23 +1302,24 @@ class AddCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(R.card),
-      child: CustomPaint(
-        painter: _DashedBorder(color: AppColors.border2, radius: R.card),
-        child: Container(
-          width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.all(12),
-          alignment: Alignment.center,
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            const AppIcon('plus', size: 15),
-            const SizedBox(width: 8),
-            Text(label,
-                style:
-                    sans(12.5, weight: FontWeight.w500, color: AppColors.fg2)),
-          ]),
+    return Pressable(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(R.card),
+        child: CustomPaint(
+          painter: _DashedBorder(color: AppColors.border2, radius: R.card),
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 44),
+            padding: const EdgeInsets.all(12),
+            alignment: Alignment.center,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const AppIcon('plus', size: 15),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: sans(12, weight: W.label, color: AppColors.fg2)),
+            ]),
+          ),
         ),
       ),
     );
@@ -1040,7 +1519,7 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
                     _preview.isEmpty ? 'Transcript' : _preview,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(12.5, height: 1.4, color: AppColors.fg2),
+                    style: sans(12, height: 1.4, color: AppColors.fg2),
                   ),
                 ),
                 if (_canExpand) ...[
@@ -1053,7 +1532,7 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
                 if (i > 0) const SizedBox(height: 6),
                 Text(
                   _lineFor(widget.items[i]),
-                  style: sans(12.5,
+                  style: sans(12,
                       height: 1.4,
                       color: widget.items[i].unavailable
                           ? AppColors.fg3
@@ -1160,7 +1639,7 @@ class Bubble extends StatelessWidget {
                       children: [
                         AppIcon('clipboard', size: 12, color: AppColors.fg4),
                         const SizedBox(width: 5),
-                        Text('Copy', style: sans(12, color: AppColors.fg4)),
+                        Text('Copy', style: sans(12, color: AppColors.fg3)),
                       ],
                     ),
                   ),
@@ -1214,73 +1693,6 @@ class Bubble extends StatelessWidget {
   }
 }
 
-/// Mono tool-activity line with an optional result. Tappable → detail drawer.
-class ToolLine extends StatelessWidget {
-  final String tool;
-  final String arg;
-  final String? out;
-  final bool done;
-  final String icon;
-  final VoidCallback? onTap;
-  const ToolLine(
-      {super.key,
-      required this.tool,
-      this.arg = '',
-      this.out,
-      this.done = true,
-      this.icon = 'terminal',
-      this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final inner =
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        AppIcon(icon, size: 13, color: AppColors.fg3),
-        const SizedBox(width: 7),
-        Text(tool, style: mono(12, color: AppColors.fg1)),
-        const SizedBox(width: 7),
-        Expanded(
-            child: Text(arg,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: mono(12, color: AppColors.fg3))),
-        if (onTap != null)
-          Padding(
-              padding: EdgeInsets.only(left: 4),
-              child: AppIcon('chevron-right', size: 14, color: AppColors.fg4)),
-      ]),
-      if (out != null)
-        Padding(
-          padding: const EdgeInsets.only(left: 20, top: 3),
-          child: Row(children: [
-            Text('↳ ',
-                style: mono(11.5, color: done ? AppColors.fg2 : AppColors.fg4)),
-            Expanded(
-                child: Text(out!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(11.5, color: AppColors.fg3))),
-          ]),
-        ),
-    ]);
-    if (onTap == null)
-      return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2), child: inner);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(R.sm),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-            child: inner),
-      ),
-    );
-  }
-}
-
 /// Dim note (centered) / error (left-aligned, capped at two lines).
 class NoteLine extends StatelessWidget {
   final String text;
@@ -1290,11 +1702,14 @@ class NoteLine extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final c = error ? AppColors.danger : AppColors.fg3;
+    // Left-aligned in both cases. These sit in a stacked transcript directly
+    // under a tool line, and centring the quiet ones made them float to the
+    // middle of the pane while the failed ones snapped to the left edge — the
+    // same element shifting position based on tone.
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
       child: Row(
-        mainAxisAlignment:
-            error ? MainAxisAlignment.start : MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (error) ...[
@@ -1309,7 +1724,7 @@ class NoteLine extends StatelessWidget {
                 textAlign: error ? TextAlign.left : TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: mono(11.5, height: 1.35, color: c)),
+                style: mono(11, height: 1.35, color: c)),
           ),
         ],
       ),
@@ -1342,15 +1757,15 @@ class StatTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: sans(10.5, color: AppColors.fg3)),
+            Text(label, style: sans(10, color: AppColors.fg3)),
             const SizedBox(height: 5),
             Text(value,
                 style: mono(16,
-                    weight: FontWeight.w500,
+                    weight: W.label,
                     color: accent ? AppColors.accent : AppColors.fg1)),
             if (sub != null) ...[
               const SizedBox(height: 4),
-              Text(sub!, style: mono(10, color: AppColors.fg4))
+              Text(sub!, style: mono(10, color: AppColors.fg3))
             ],
           ]),
     );
@@ -1390,20 +1805,28 @@ class WarnChip extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         AppIcon('alert-triangle', size: 11, color: AppColors.run),
         const SizedBox(width: 5),
-        Text(label,
-            style: sans(10.5, weight: FontWeight.w500, color: AppColors.run)),
+        Text(label, style: sans(10, weight: W.label, color: AppColors.run)),
       ]),
     );
   }
 }
 
+/// A section label above a group of rows.
+///
+/// `fg2` at weight 500, matching BOTH other section-header treatments in the app
+/// (`ShellSectionHeader` in the sidebar, `_StatusHeader` on the task board).
+/// This rendered at `fg4` — the placeholder/disabled rung — which measured
+/// 2.98:1 against the panel background, below the 4.5 AA floor, and read as
+/// disabled chrome rather than a label. `shell_nav.dart` had already documented
+/// and fixed exactly this mistake for its own header; this one was missed.
 class SectionLabel extends StatelessWidget {
   final String text;
   const SectionLabel(this.text, {super.key});
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(2, 0, 2, 2),
-        child: Text(text, style: sans(11, color: AppColors.fg4)),
+        child: Text(text,
+            style: sans(11, weight: W.label, color: AppColors.fg2)),
       );
 }
 
@@ -1421,33 +1844,41 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 28),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(R.md),
+    // Fills the box it is handed and centers inside it. Call sites give this the
+    // whole body of a pane or an `Expanded`, and a shrink-wrapping child there
+    // aligns to the top-left instead of the middle — so the centering has to
+    // live here rather than be repeated at every call site.
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 44, horizontal: 28),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              // Separation by surface step, not a hairline — the design
+              // language's first rule. surface2 is the ladder's "quiet raised
+              // content" step, which is what this tile is; the border was
+              // standing in for a step that already existed.
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(R.md),
+            ),
+            child: AppIcon(icon, size: 24, color: AppColors.fg3),
           ),
-          child: AppIcon(icon, size: 24, color: AppColors.fg3),
-        ),
-        const SizedBox(height: 12),
-        Text(title,
-            style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
-        if (body != null) ...[
-          const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 240),
-            child: Text(body!,
-                textAlign: TextAlign.center,
-                style: sans(12.5, height: 1.5, color: AppColors.fg3)),
-          ),
-        ],
-        if (action != null) ...[const SizedBox(height: 16), action!],
-      ]),
+          const SizedBox(height: 12),
+          Text(title, style: sans(16, weight: W.label, color: AppColors.fg1)),
+          if (body != null) ...[
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 240),
+              child: Text(body!,
+                  textAlign: TextAlign.center,
+                  style: sans(12, height: 1.5, color: AppColors.fg3)),
+            ),
+          ],
+          if (action != null) ...[const SizedBox(height: 16), action!],
+        ]),
+      ),
     );
   }
 }
@@ -1461,6 +1892,20 @@ class SnAppBar extends StatelessWidget {
   final List<Widget> actions;
   final double titleSize;
   final bool compact;
+
+  /// Which surface the bar sits on. Defaults to the ambient scaffold colour,
+  /// which is what the desktop panels re-theme.
+  final Color? background;
+
+  /// Draws the 1px bottom hairline.
+  ///
+  /// The design language uses NO borders — separation comes from the surface
+  /// ladder — so a page that pairs a chrome bar with a canvas body passes
+  /// `false` and lets the step do the work. Defaulted to true rather than
+  /// flipped globally: the existing call sites share the scaffold's own colour,
+  /// where the hairline is currently the only separation they have. Removing it
+  /// for them is a follow-up, not something to fold into one page's fix.
+  final bool bordered;
   const SnAppBar(
       {super.key,
       required this.title,
@@ -1469,7 +1914,9 @@ class SnAppBar extends StatelessWidget {
       this.leading,
       this.actions = const [],
       this.titleSize = 17,
-      this.compact = false});
+      this.compact = false,
+      this.background,
+      this.bordered = true});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -1479,8 +1926,10 @@ class SnAppBar extends StatelessWidget {
       decoration: BoxDecoration(
         // Follows the ambient shell surface — desktop panels re-theme this to
         // surface1 so the bar never reads as a darker strip (mobile: still bg).
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+        color: background ?? Theme.of(context).scaffoldBackgroundColor,
+        border: bordered
+            ? Border(bottom: BorderSide(color: AppColors.border))
+            : null,
       ),
       child: Row(children: [
         if (leading != null)
@@ -1489,6 +1938,7 @@ class SnAppBar extends StatelessWidget {
           IconBtn('chevron-left',
               size: kMobile ? 42 : 38,
               iconSize: kMobile ? 27 : 22,
+              tooltip: 'Back',
               onTap: onBack)
         else
           const SizedBox(width: 8),
@@ -1506,7 +1956,7 @@ class SnAppBar extends StatelessWidget {
                   Text(subtitle!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(11.5, color: AppColors.fg3)),
+                      style: mono(11, color: AppColors.fg3)),
               ]),
         ),
         ...actions,
@@ -1572,11 +2022,11 @@ class _AppFieldState extends State<AppField> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (widget.label != null) ...[
         Text(widget.label!,
-            style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+            style: sans(12, weight: W.label, color: AppColors.fg2)),
         const SizedBox(height: 7),
       ],
       AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: Motion.quick,
         padding: const EdgeInsets.symmetric(horizontal: 11),
         constraints: BoxConstraints(minHeight: kMobile ? 44 : 34),
         decoration: BoxDecoration(
@@ -1608,7 +2058,7 @@ class _AppFieldState extends State<AppField> {
               decoration: InputDecoration(
                 isCollapsed: true,
                 contentPadding:
-                    EdgeInsets.symmetric(vertical: kMobile ? 12 : 8),
+                    EdgeInsets.symmetric(vertical: kMobile ? 8 : 8),
                 border: InputBorder.none,
                 hintText: widget.hint,
                 hintStyle: widget.mono
@@ -1640,54 +2090,85 @@ Future<bool> confirmAction(
   String confirmLabel = 'Delete',
   bool danger = true,
 }) async {
+  final accent = danger ? AppColors.danger : AppColors.accent;
   final result = await showDialog<bool>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.58),
     builder: (ctx) {
       return BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Dialog(
-          backgroundColor: AppColors.surface1,
+          backgroundColor: AppColors.glassSurface,
           elevation: 0,
           insetPadding:
-              EdgeInsets.symmetric(horizontal: kMobile ? 28 : 40, vertical: 24),
+              EdgeInsets.symmetric(horizontal: kMobile ? 24 : 40, vertical: 24),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.md),
-            side: BorderSide(color: AppColors.border2),
+            borderRadius: BorderRadius.circular(R.card),
+            side: BorderSide(color: AppColors.glassBorder),
           ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(title,
-                        style: sans(15,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(body,
-                          style: sans(13, height: 1.45, color: AppColors.fg3)),
-                    ),
-                  ]),
-                  const SizedBox(height: 16),
-                  Row(children: [
-                    const Spacer(),
-                    Btn('Cancel',
-                        variant: BtnVariant.ghost,
-                        small: true,
-                        onTap: () => Navigator.pop(ctx, false)),
-                    const SizedBox(width: 8),
-                    Btn(confirmLabel,
-                        variant:
-                            danger ? BtnVariant.danger : BtnVariant.primary,
-                        small: true,
-                        onTap: () => Navigator.pop(ctx, true)),
-                  ]),
-                ],
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(R.card),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        // Tinted badge: a destructive confirm should look
+                        // destructive before you read a word of it.
+                        Container(
+                          width: 32,
+                          height: 32,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: AppIcon(danger ? 'alert-triangle' : 'alert-circle',
+                              size: 16, color: accent),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 5),
+                            child: Text(title,
+                                style: sans(14,
+                                    weight: W.label, color: AppColors.fg1)),
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 10),
+                      // The body gets its OWN line, aligned under the title rather
+                      // than beside it. Sharing one Row made the body wrap into a
+                      // narrow column next to a one-line title, so the dialog read
+                      // as two unrelated fragments.
+                      Padding(
+                        padding: const EdgeInsets.only(left: 44),
+                        child: Text(body,
+                            style: sans(12, height: 1.5, color: AppColors.fg3)),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(children: [
+                        const Spacer(),
+                        Btn('Cancel',
+                            variant: BtnVariant.ghost,
+                            small: true,
+                            onTap: () => Navigator.pop(ctx, false)),
+                        const SizedBox(width: 8),
+                        Btn(confirmLabel,
+                            variant:
+                                danger ? BtnVariant.danger : BtnVariant.primary,
+                            small: true,
+                            onTap: () => Navigator.pop(ctx, true)),
+                      ]),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -1711,27 +2192,31 @@ Future<String?> promptText(BuildContext context,
       barrierColor: Colors.black.withValues(alpha: 0.58),
       builder: (ctx) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Dialog(
-            backgroundColor: AppColors.surface1,
+            backgroundColor: AppColors.glassSurface,
             elevation: 0,
             insetPadding:
                 const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(R.md),
-              side: BorderSide(color: AppColors.border2),
+              side: BorderSide(color: AppColors.glassBorder),
             ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 320),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(title,
-                        style: sans(13.5,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(R.md),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(title,
+                        style:
+                            sans(13, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     _TextPromptSheet(
                         initial: initial,
@@ -1744,9 +2229,11 @@ Future<String?> promptText(BuildContext context,
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
+  },
+);
   }
   return showAppSheet<String>(context,
       title: title,
@@ -1790,81 +2277,88 @@ class _TextPromptSheetState extends State<_TextPromptSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AppField(
-                controller: _controller,
-                hint: widget.hint,
-                autofocus: true,
-                minLines: widget.minLines,
-                maxLines: widget.maxLines,
-                onSubmitted: (_) => _done()),
-            const SizedBox(height: 10),
-            Row(children: [
-              const Spacer(),
-              Btn('Cancel',
-                  variant: BtnVariant.ghost,
-                  small: true,
-                  onTap: () => Navigator.pop(context)),
-              const SizedBox(width: 6),
-              Btn(widget.saveLabel, small: true, onTap: _done),
-            ]),
+    return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppField(
+              controller: _controller,
+              hint: widget.hint,
+              autofocus: true,
+              minLines: widget.minLines,
+              maxLines: widget.maxLines,
+              onSubmitted: (_) => _done()),
+          const SizedBox(height: 10),
+          Row(children: [
+            const Spacer(),
+            Btn('Cancel',
+                variant: BtnVariant.ghost,
+                small: true,
+                onTap: () => Navigator.pop(context)),
+            const SizedBox(width: 6),
+            Btn(widget.saveLabel, small: true, onTap: _done),
           ]),
-    );
+        ]);
   }
 }
 
 Future<T?> showAppSheet<T>(BuildContext context,
-    {required String title, required Widget child}) {
+    {required String title,
+    required Widget child,
+    // Per-caller sizing. A dialog has room for a wider sheet than the 340px
+    // default, which is what the agent picker uses to fit names and roles.
+    double maxWidth = 340,
+    double maxHeight = 520}) {
   if (!kMobile) {
     return showDialog<T>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.58),
       builder: (ctx) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Dialog(
-            backgroundColor: AppColors.surface1,
+            backgroundColor: AppColors.glassSurface,
             elevation: 0,
             insetPadding:
                 const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(R.md),
-              side: BorderSide(color: AppColors.border2),
+              side: BorderSide(color: AppColors.glassBorder),
             ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 340, maxHeight: 520),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                          child: Text(title,
-                              style: sans(13.5,
-                                  weight: FontWeight.w600,
-                                  color: AppColors.fg1))),
-                      IconBtn('x',
-                          size: 28,
-                          iconSize: 14,
-                          tooltip: 'Close',
-                          onTap: () => Navigator.pop(ctx)),
-                    ]),
-                    const SizedBox(height: 6),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
-                        child: child,
-                      ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(R.md),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: ConstrainedBox(
+                  constraints:
+                      BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(children: [
+                          Expanded(
+                              child: Text(title,
+                                  style: sans(13,
+                                      weight: W.label, color: AppColors.fg1))),
+                          IconBtn('x',
+                              size: 28,
+                              iconSize: 14,
+                              tooltip: 'Close',
+                              onTap: () => Navigator.pop(ctx)),
+                        ]),
+                        const SizedBox(height: 6),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
+                            child: child,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -1876,55 +2370,150 @@ Future<T?> showAppSheet<T>(BuildContext context,
   return showModalBottomSheet<T>(
     context: context,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.62),
+    barrierColor: Colors.black.withValues(alpha: 0.5),
     isScrollControlled: true,
+    useSafeArea: false,
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
-      return BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
+      final keyboard = media.viewInsets.bottom;
+      // Lift the whole sheet above the keyboard. Padding the *inside* of a
+      // pinned-to-bottom sheet just grew a blank band under the field while
+      // the keyboard still covered the inputs.
+      final aboveKeyboard = media.size.height - keyboard;
+      final available = aboveKeyboard * 0.92;
+      final limit = available < maxHeight ? available : maxHeight;
+      return Padding(
+        padding: EdgeInsets.only(bottom: keyboard),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: ClipRRect(
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-            border: Border(top: BorderSide(color: AppColors.border2)),
-          ),
-          constraints: BoxConstraints(
-              maxHeight: (media.size.height - media.viewInsets.bottom) * 0.88),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const SizedBox(height: 10),
-            Center(
-                child: Container(
-                    width: 32,
-                    height: 3,
-                    decoration: BoxDecoration(
-                        color: AppColors.border2,
-                        borderRadius: BorderRadius.circular(99)))),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
-              child: Row(children: [
-                Expanded(
-                    child: Text(title,
-                        style: sans(14.5,
-                            weight: FontWeight.w600, color: AppColors.fg1))),
-                IconBtn('x',
-                    size: 32,
-                    iconSize: 16,
-                    onTap: () => Navigator.pop(sheetContext)),
-              ]),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                child: child,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Material(
+                color: AppColors.surface1.withValues(alpha: 0.88),
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+                  side: BorderSide(color: AppColors.glassBorder),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: limit),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const SizedBox(height: 8),
+                    Center(
+                        child: Container(
+                            width: 28,
+                            height: 3,
+                            decoration: BoxDecoration(
+                                color: AppColors.border2,
+                                borderRadius: BorderRadius.circular(99)))),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
+                      child: Row(children: [
+                        Expanded(
+                            child: Text(title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(16,
+                                    weight: W.label, color: AppColors.fg1))),
+                        IconBtn('x',
+                            size: 32,
+                            iconSize: 16,
+                            tooltip: 'Close',
+                            onTap: () => Navigator.pop(sheetContext)),
+                      ]),
+                    ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                            20, 0, 20, 16 + media.padding.bottom),
+                        child: child,
+                      ),
+                    ),
+                  ]),
+                ),
               ),
             ),
-            SizedBox(height: media.padding.bottom + media.viewInsets.bottom),
-          ]),
+          ),
         ),
       );
     },
   );
+}
+
+/// A theme-styled switch track + thumb.
+///
+/// Extracted so a settings row can use the switch WITHOUT the card chrome that
+/// [AppToggle] wraps around it. Call sites previously reached for
+/// `Transform.scale(child: Switch(...))` to size a Material switch down, which
+/// scales the whole widget including its touch target and distorts Material's
+/// fixed internal proportions — that is why the result looked wrong.
+class AppSwitch extends StatelessWidget {
+  final bool on;
+  final ValueChanged<bool> onChanged;
+
+  /// Whole-track size. The thumb and its inset derive from this, so the
+  /// proportions hold at any size.
+  final double width;
+  final double height;
+  final double thumb;
+
+  const AppSwitch({
+    super.key,
+    required this.on,
+    required this.onChanged,
+    this.width = 44,
+    this.height = 26,
+    this.thumb = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context); // Rebuild on theme change
+    const inset = 3.0;
+    return Semantics(
+      toggled: on,
+      child: GestureDetector(
+        onTap: () => onChanged(!on),
+        // The visible track is small; this keeps the tappable area comfortable
+        // without scaling the drawing.
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: width,
+          height: height + 12,
+          child: Center(
+            child: AnimatedContainer(
+              duration: Motion.fast,
+              curve: Motion.enter,
+              width: width,
+              height: height,
+              decoration: BoxDecoration(
+                color: on ? AppColors.accent : AppColors.surface3,
+                borderRadius: BorderRadius.circular(height / 2),
+              ),
+              child: AnimatedAlign(
+                duration: Motion.fast,
+                curve: Motion.enter,
+                alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: inset),
+                  child: Container(
+                    width: thumb,
+                    height: thumb,
+                    decoration: const BoxDecoration(
+                        color: Colors.white, shape: BoxShape.circle),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class AppToggle extends StatelessWidget {
@@ -1941,51 +2530,34 @@ class AppToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    return InkWell(
-      onTap: () => onChanged(!on),
-      borderRadius: BorderRadius.circular(R.md),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Row(children: [
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label,
-                  style:
-                      sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
-              if (sub != null) ...[
-                const SizedBox(height: 3),
-                Text(sub!, style: sans(11, color: AppColors.fg3))
-              ],
-            ]),
+    return Pressable(
+      child: InkWell(
+        onTap: () => onChanged(!on),
+        borderRadius: BorderRadius.circular(R.md),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(R.md),
           ),
-          const SizedBox(width: 12),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 40,
-            height: 24,
-            decoration: BoxDecoration(
-                color: on ? AppColors.accent : AppColors.surface3,
-                borderRadius: BorderRadius.circular(99)),
-            child: AnimatedAlign(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              alignment: on ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.all(3),
-                width: 18,
-                height: 18,
-                decoration: const BoxDecoration(
-                    color: Colors.white, shape: BoxShape.circle),
-              ),
+          child: Row(children: [
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: sans(13, weight: W.label, color: AppColors.fg1)),
+                    if (sub != null) ...[
+                      const SizedBox(height: 3),
+                      Text(sub!, style: sans(11, color: AppColors.fg3))
+                    ],
+                  ]),
             ),
-          ),
-        ]),
+            const SizedBox(width: 12),
+            AppSwitch(on: on, onChanged: onChanged),
+          ]),
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 #include "win32_window.h"
 
+#include <uxtheme.h>
 #include <dwmapi.h>
 #include <flutter_windows.h>
 
@@ -15,6 +16,18 @@ namespace {
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
+
+#ifndef DWMWA_SYSTEMBACKDROP_TYPE
+#define DWMWA_SYSTEMBACKDROP_TYPE 38
+#endif
+
+#ifndef DWMWA_MICA_EFFECT
+#define DWMWA_MICA_EFFECT 1029
+#endif
+
+// Backdrop types for DWMWA_SYSTEMBACKDROP_TYPE (Windows 11 Build 22621+)
+constexpr int kBackdropAcrylic = 3;
+constexpr int kBackdropMica = 2;
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
@@ -280,9 +293,26 @@ void Win32Window::UpdateTheme(HWND const window) {
                                RRF_RT_REG_DWORD, nullptr, &light_mode,
                                &light_mode_size);
 
-  if (result == ERROR_SUCCESS) {
-    BOOL enable_dark_mode = light_mode == 0;
-    DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
-                          &enable_dark_mode, sizeof(enable_dark_mode));
+  BOOL enable_dark_mode = (result == ERROR_SUCCESS) ? (light_mode == 0) : TRUE;
+  DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                        &enable_dark_mode, sizeof(enable_dark_mode));
+
+  // Enable Windows 11 Acrylic translucent backdrop (fallback to Mica).
+  int backdrop_type = kBackdropAcrylic;
+  HRESULT hr = DwmSetWindowAttribute(window, DWMWA_SYSTEMBACKDROP_TYPE,
+                                     &backdrop_type, sizeof(backdrop_type));
+  if (FAILED(hr)) {
+    backdrop_type = kBackdropMica;
+    hr = DwmSetWindowAttribute(window, DWMWA_SYSTEMBACKDROP_TYPE,
+                               &backdrop_type, sizeof(backdrop_type));
   }
+  if (FAILED(hr)) {
+    // Fallback for Windows 11 Build 22000
+    BOOL mica = TRUE;
+    DwmSetWindowAttribute(window, DWMWA_MICA_EFFECT, &mica, sizeof(mica));
+  }
+
+  // Extend frame into client area for seamless translucent backdrop
+  MARGINS margins = {-1, -1, -1, -1};
+  DwmExtendFrameIntoClientArea(window, &margins);
 }

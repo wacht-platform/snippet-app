@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import 'models.dart';
@@ -32,7 +34,7 @@ Future<void> showCommandPalette(
       barrierDismissible: true,
       barrierLabel: 'palette',
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      transitionDuration: const Duration(milliseconds: 140),
+      transitionDuration: Motion.quick,
       pageBuilder: (ctx, _, __) => Align(
         alignment: const Alignment(0, -0.5),
         child: Padding(
@@ -44,11 +46,16 @@ Future<void> showCommandPalette(
         ),
       ),
       transitionBuilder: (ctx, anim, _, child) {
-        final c = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return FadeTransition(
-            opacity: c,
-            child: ScaleTransition(
-                scale: Tween(begin: 0.98, end: 1.0).animate(c), child: child));
+        final c = CurvedAnimation(parent: anim, curve: Motion.enter);
+        return BackdropFilter(
+          filter: ImageFilter.blur(
+              sigmaX: 20 * c.value, sigmaY: 20 * c.value),
+          child: FadeTransition(
+              opacity: c,
+              child: ScaleTransition(
+                  scale: Tween(begin: 0.98, end: 1.0).animate(c),
+                  child: child)),
+        );
       },
     );
   }
@@ -70,15 +77,20 @@ Future<void> showCommandPalette(
   );
 }
 
-Widget _frame(Widget child) => Material(
-      color: AppColors.surface1,
+Widget _frame(Widget child) => ClipRRect(
       borderRadius: BorderRadius.circular(R.card),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: AppColors.border2)),
-        child: child,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Material(
+          color: AppColors.glassSurface,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(R.card),
+              border: Border.all(color: AppColors.glassBorder),
+            ),
+            child: child,
+          ),
+        ),
       ),
     );
 
@@ -182,7 +194,7 @@ class _PaletteState extends State<_Palette> {
                   padding: EdgeInsets.all(20),
                   child: Center(
                       child: Text('No matches',
-                          style: sans(12.5, color: AppColors.fg4)))),
+                          style: sans(12, color: AppColors.fg3)))),
           ],
         ),
       ),
@@ -213,7 +225,7 @@ class _PaletteState extends State<_Palette> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(13, color: AppColors.fg1))),
-            if (hint != null) Text(hint, style: mono(11, color: AppColors.fg4)),
+            if (hint != null) Text(hint, style: mono(11, color: AppColors.fg3)),
           ]),
         ),
       ),

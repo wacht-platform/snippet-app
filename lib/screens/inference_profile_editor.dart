@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -36,9 +37,9 @@ bool _usesOpenAiAdapter(String p) =>
     p == 'opencode-zen' ||
     p == 'opencode-go';
 
-class ModelEditorScreen extends StatefulWidget {
+class InferenceProfileEditor extends StatefulWidget {
   final DaemonClient client;
-  final ModelProfile? existing;
+  final InferenceProfile? existing;
   final String? delegateName;
 
   /// Skip Scaffold / app bar and fill the parent (settings Models pane).
@@ -49,7 +50,7 @@ class ModelEditorScreen extends StatefulWidget {
 
   /// Called after a successful save, before [onClose].
   final VoidCallback? onSaved;
-  const ModelEditorScreen(
+  const InferenceProfileEditor(
       {super.key,
       required this.client,
       this.existing,
@@ -58,10 +59,10 @@ class ModelEditorScreen extends StatefulWidget {
       this.onClose,
       this.onSaved});
   @override
-  State<ModelEditorScreen> createState() => _ModelEditorScreenState();
+  State<InferenceProfileEditor> createState() => _InferenceProfileEditorState();
 }
 
-class _ModelEditorScreenState extends State<ModelEditorScreen> {
+class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   late String _provider;
   late final TextEditingController _name;
   late final TextEditingController _baseUrl;
@@ -81,6 +82,11 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
   /// Capability line under the Model field, from the provider's live catalog
   /// (effort tiers on Anthropic, reasoning yes/no on OpenRouter, context size).
   String? _modelHint;
+
+  bool _showModelBrowser = false;
+  bool _loadingModels = false;
+  List<CatalogModel>? _catalogModels;
+  final TextEditingController _modelSearch = TextEditingController();
 
   bool get _isEdit => widget.existing != null;
   bool get _isChatgpt => _provider == 'chatgpt';
@@ -109,6 +115,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     // The Save button's enabled state depends on this field; without a listener
     // typing never rebuilt, leaving Save stuck disabled on desktop.
     _model.addListener(() => setState(() {}));
+    _modelSearch.addListener(() => setState(() {}));
   }
 
   @override
@@ -118,6 +125,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     _model.dispose();
     _ctx.dispose();
     _key.dispose();
+    _modelSearch.dispose();
     super.dispose();
   }
 
@@ -144,7 +152,18 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
   }
 
   Future<void> _browseModels() async {
-    setState(() => _error = null);
+    if (_showModelBrowser) {
+      setState(() => _showModelBrowser = false);
+      return;
+    }
+    if (_catalogModels != null && _catalogModels!.isNotEmpty) {
+      setState(() => _showModelBrowser = true);
+      return;
+    }
+    setState(() {
+      _loadingModels = true;
+      _error = null;
+    });
     final List<CatalogModel> models;
     try {
       models = await widget.client.providerModels(
@@ -154,13 +173,26 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
         apiKey: _key.text.trim(),
       );
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted) {
+        setState(() {
+          _loadingModels = false;
+          _error = '$e';
+        });
+      }
       return;
     }
     if (!mounted) return;
+    setState(() => _loadingModels = false);
     if (models.isEmpty) {
       setState(() => _error =
           'The provider returned no models (this provider may not have a catalog).');
+      return;
+    }
+    if (!kMobile || widget.embedded) {
+      setState(() {
+        _catalogModels = models;
+        _showModelBrowser = true;
+      });
       return;
     }
     final picked = await showModalBottomSheet<CatalogModel>(
@@ -173,6 +205,134 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
       builder: (ctx) => _ModelPickerSheet(models: models),
     );
     if (picked != null) _applyPick(picked);
+  }
+
+  Widget _inlineModelBrowser() {
+    final q = _modelSearch.text.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? _catalogModels!
+        : _catalogModels!
+            .where((m) =>
+                m.id.toLowerCase().contains(q) ||
+                (m.displayName?.toLowerCase().contains(q) ?? false))
+            .toList();
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      constraints: const BoxConstraints(maxHeight: 220),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.sm),
+        border: Border.all(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+            child: Row(
+              children: [
+                AppIcon('search', size: 14, color: AppColors.fg3),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _modelSearch,
+                    autofocus: true,
+                    style: sans(12, color: AppColors.fg1),
+                    decoration: InputDecoration(
+                      hintText: 'Search ${_catalogModels!.length} models…',
+                      hintStyle: sans(12, color: AppColors.fg4),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                Text('${filtered.length}',
+                    style: mono(11, color: AppColors.fg4)),
+                const SizedBox(width: 4),
+                IconBtn('x',
+                    size: 22,
+                    iconSize: 12,
+                    tooltip: 'Close catalog',
+                    onTap: () => setState(() => _showModelBrowser = false)),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border.withValues(alpha: 0.5)),
+          Flexible(
+            child: filtered.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
+                      child: Text('No matching models',
+                          style: sans(11.5, color: AppColors.fg3)),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    shrinkWrap: true,
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        color: AppColors.border.withValues(alpha: 0.25)),
+                    itemBuilder: (ctx, i) {
+                      final m = filtered[i];
+                      final isSelected = m.id == _model.text.trim();
+                      return InkWell(
+                        onTap: () {
+                          _applyPick(m);
+                          setState(() => _showModelBrowser = false);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(m.id,
+                                        style: mono(12,
+                                            weight: isSelected
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
+                                            color: isSelected
+                                                ? AppColors.accent
+                                                : AppColors.fg1)),
+                                    if (m.displayName != null &&
+                                        m.displayName!.isNotEmpty &&
+                                        m.displayName != m.id) ...[
+                                      const SizedBox(height: 1),
+                                      Text(m.displayName!,
+                                          style: sans(10.5,
+                                              color: AppColors.fg3)),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (m.contextWindow != null &&
+                                  m.contextWindow! > 0)
+                                Text(_fmtCtx(m.contextWindow!),
+                                    style: mono(10, color: AppColors.fg4)),
+                              if (isSelected) ...[
+                                const SizedBox(width: 8),
+                                AppIcon('check',
+                                    size: 14, color: AppColors.accent),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _dismiss({bool saved = false}) {
@@ -239,7 +399,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     final pills = [..._providers];
     if (!pills.any((p) => p.$1 == _provider))
       pills.insert(0, (_provider, _provider));
-    final title = _isEdit ? 'Edit model' : 'Add model';
+    final title = _isEdit ? 'Edit profile' : 'Add profile';
     final form = Expanded(
       child: ListView(
         padding: EdgeInsets.fromLTRB(
@@ -250,7 +410,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
           const SizedBox(height: 7),
           if (_isEdit)
             Text(_providerLabel(_provider),
-                style: sans(15, color: AppColors.fg1))
+                style: sans(16, color: AppColors.fg1))
           else
             Pills<String>(
               items: pills,
@@ -258,6 +418,9 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
               onSelect: (val) => setState(() {
                 _provider = val;
                 _images = _defaultImages(val);
+                _catalogModels = null;
+                _showModelBrowser = false;
+                _modelSearch.clear();
               }),
             ),
           const SizedBox(height: 16),
@@ -284,9 +447,25 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
                     mono: true,
                     hint: _isChatgpt ? 'gpt-5.1-codex' : 'claude-sonnet-4.5')),
             const SizedBox(width: 8),
-            IconBtn('list',
-                size: 44, iconSize: 18, onTap: _busy ? null : _browseModels),
+            if (_loadingModels)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8, right: 8),
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else
+              IconBtn(_showModelBrowser ? 'x' : 'list',
+                  size: 44,
+                  iconSize: 18,
+                  tooltip: _showModelBrowser ? 'Hide catalog' : 'Browse models',
+                  onTap: _busy ? null : _browseModels),
           ]),
+          if (_showModelBrowser && _catalogModels != null) ...[
+            _inlineModelBrowser(),
+          ],
           if (_modelHint != null) ...[
             const SizedBox(height: 6),
             Text(_modelHint!,
@@ -322,7 +501,7 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
           const SizedBox(height: 6),
           Text(
               "Higher means more thinking — better on hard problems, more tokens. Default uses the provider's own; Off disables reasoning. X-High/Max are the top tiers (gpt-5.1-codex-max, gpt-5.6, Claude). If a model rejects a tier, snippet steps down automatically instead of failing.",
-              style: sans(11.5, height: 1.4, color: AppColors.fg4)),
+              style: sans(11, height: 1.4, color: AppColors.fg3)),
           const SizedBox(height: 16),
           if (_isChatgpt)
             _SubSignIn(
@@ -411,12 +590,11 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
     );
     final footer = Container(
       padding: EdgeInsets.fromLTRB(
-          widget.embedded ? 16 : 16,
-          10,
-          widget.embedded ? 16 : 16,
-          widget.embedded ? 12 : 12 + MediaQuery.of(context).padding.bottom),
-      decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.border))),
+          16,
+          6,
+          16,
+          widget.embedded ? 8 : 8 + MediaQuery.of(context).padding.bottom),
+      decoration: const BoxDecoration(),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -431,25 +609,11 @@ class _ModelEditorScreenState extends State<ModelEditorScreen> {
       ),
     );
     final body = Column(children: [
-      if (widget.embedded)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(6, 6, 16, 4),
-          child: Row(children: [
-            IconBtn('chevron-left',
-                size: 30,
-                iconSize: 18,
-                tooltip: 'Back to models',
-                onTap: _dismiss),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(title,
-                  style: sans(14.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
-            ),
-          ]),
-        )
-      else
-        SnAppBar(title: title, onBack: _dismiss),
+      // No embedded header. When embedded, the HOST level owns the header
+      // (inference_profiles.dart draws "Edit profile" / "Add profile"), so
+      // drawing one here stacked a second back row under it — two rows, two
+      // exits, same screen.
+      if (!widget.embedded) SnAppBar(title: title, onBack: _dismiss),
       form,
       footer,
     ]);
@@ -506,66 +670,133 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                       MediaQuery.of(context).viewInsets.bottom) *
                   0.75),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const SizedBox(height: 10),
-            Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.surface3,
-                    borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 8),
+            // Grab handle: the only cue that this is a sheet rather than a
+            // dialog, so it stays.
+            Center(
+              child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: AppColors.surface3,
+                      borderRadius: BorderRadius.circular(2))),
+            ),
+            // Header: title, count, close. The old sheet had no title at all --
+            // just a grab handle and a labelled field, so nothing named the
+            // surface or offered a visible way out.
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+              child: Row(children: [
+                AppIcon('cpu', size: 16, color: AppColors.fg2),
+                const SizedBox(width: 9),
+                Text('Inference profiles',
+                    style: sans(16, weight: W.label, color: AppColors.fg1)),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface3,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text('${widget.models.length}',
+                      style: mono(10, color: AppColors.fg3)),
+                ),
+                const Spacer(),
+                IconBtn('x',
+                    size: 32,
+                    iconSize: 16,
+                    tooltip: 'Close',
+                    onTap: () => Navigator.pop(context)),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: AppField(
-                label: 'Models (${widget.models.length})',
                 controller: _query,
                 mono: true,
-                hint: 'filter…',
+                hint: 'Search profiles…',
               ),
             ),
             Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: filtered.length,
-                itemBuilder: (ctx, i) {
-                  final m = filtered[i];
-                  final meta = <String>[
-                    if (m.efforts != null)
-                      m.efforts!.isEmpty
-                          ? 'no effort control'
-                          : 'effort: ${m.efforts!.join('/')}'
-                    else if (m.reasoning != null)
-                      m.reasoning! ? 'reasoning' : 'no reasoning',
-                    if ((m.contextWindow ?? 0) > 0)
-                      _ModelEditorScreenState._fmtCtx(m.contextWindow!),
-                  ];
-                  return InkWell(
-                    onTap: () => Navigator.pop(ctx, m),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(m.id, style: mono(13, color: AppColors.fg1)),
-                            if (m.displayName != null || meta.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                [
-                                  if (m.displayName != null) m.displayName!,
-                                  ...meta
-                                ].join(' · '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(11.5, color: AppColors.fg3),
-                              ),
-                            ],
-                          ]),
+              child: filtered.isEmpty
+                  // An empty filter result used to render as a blank sheet --
+                  // indistinguishable from "still loading".
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 28, 16, 32),
+                      child: Column(children: [
+                        AppIcon('search', size: 18, color: AppColors.fg4),
+                        const SizedBox(height: 9),
+                        Text('No profile matches “${_query.text.trim()}”',
+                            textAlign: TextAlign.center,
+                            style: sans(12, color: AppColors.fg3)),
+                      ]),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, i) => _modelRow(ctx, filtered[i]),
                     ),
-                  );
-                },
-              ),
             ),
           ]),
+        ),
+      ),
+    );
+  }
+
+  /// One model row: the ID is what actually gets sent, so it leads; everything
+  /// else is supporting detail on the second line.
+  Widget _modelRow(BuildContext ctx, CatalogModel m) {
+    final meta = <String>[
+      if (m.efforts != null)
+        m.efforts!.isEmpty
+            ? 'no effort control'
+            : 'effort: ${m.efforts!.join('/')}'
+      else if (m.reasoning != null)
+        m.reasoning! ? 'reasoning' : 'no reasoning',
+      if ((m.contextWindow ?? 0) > 0)
+        _InferenceProfileEditorState._fmtCtx(m.contextWindow!),
+    ];
+    final subtitle = [
+      if (m.displayName != null) m.displayName!,
+      ...meta,
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(R.sm),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.sm),
+          hoverColor: AppColors.surface2,
+          onTap: () => Navigator.pop(ctx, m),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(m.id,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: mono(13, color: AppColors.fg1)),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(11, color: AppColors.fg3)),
+                      ],
+                    ]),
+              ),
+              const SizedBox(width: 8),
+              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+            ]),
+          ),
         ),
       ),
     );
@@ -684,13 +915,13 @@ class _SubSignInState extends State<_SubSignIn> {
     if (_code != null) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Open this URL and enter the code:',
-            style: sans(12.5, height: 1.4, color: AppColors.fg2)),
+            style: sans(12, height: 1.4, color: AppColors.fg2)),
         const SizedBox(height: 8),
-        SelectableText(_url ?? '', style: mono(12.5, color: AppColors.accent)),
+        SelectableText(_url ?? '', style: mono(12, color: AppColors.accent)),
         const SizedBox(height: 8),
         Row(children: [
           Text(_code!,
-              style: mono(18, weight: FontWeight.w600, color: AppColors.fg1)),
+              style: mono(18, weight: FontWeight.w500, color: AppColors.fg1)),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () => Clipboard.setData(ClipboardData(text: _code!)),

@@ -25,7 +25,7 @@ Future<T?> presentScreen<T>(
     barrierDismissible: dismissible,
     barrierLabel: 'panel',
     barrierColor: Colors.black.withValues(alpha: 0.58),
-    transitionDuration: const Duration(milliseconds: 180),
+    transitionDuration: Motion.fast,
     pageBuilder: (ctx, _, __) {
       void close() => Navigator.of(ctx).pop();
       // Host the screen directly; sub-pushes (file viewer, diff) go to the root
@@ -57,7 +57,7 @@ Future<T?> presentScreen<T>(
       });
     },
     transitionBuilder: (ctx, anim, _, child) {
-      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+      final curved = CurvedAnimation(parent: anim, curve: Motion.enter);
       final transition = (style == PanelStyle.dialog)
           ? FadeTransition(
               opacity: curved,
@@ -72,8 +72,66 @@ Future<T?> presentScreen<T>(
             );
       return BackdropFilter(
         filter: ImageFilter.blur(
-            sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
+            sigmaX: 20.0 * curved.value, sigmaY: 20.0 * curved.value),
         child: transition,
+      );
+    },
+  );
+}
+
+/// Present an adaptive panel: a rounded, dismissible bottom sheet on phones
+/// and the existing drawer/dialog treatment on wider layouts.
+Future<T?> presentAdaptivePanel<T>(
+  BuildContext context,
+  Widget child, {
+  PanelStyle style = PanelStyle.drawer,
+  double maxWidth = 720,
+  double maxHeight = 820,
+}) {
+  if (!kMobile) {
+    return presentScreen<T>(
+      context,
+      style: style,
+      maxWidth: maxWidth,
+      maxHeight: maxHeight,
+      builder: (_, __) => child,
+    );
+  }
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    isDismissible: true,
+    enableDrag: true,
+    useSafeArea: false,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.56),
+    builder: (sheetContext) {
+      final height = MediaQuery.sizeOf(sheetContext).height * 0.92;
+      return SafeArea(
+        top: false,
+        child: SizedBox(
+          height: height,
+          child: Material(
+            color: AppColors.bg,
+            clipBehavior: Clip.antiAlias,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(R.sheetTop),
+            ),
+            child: Column(children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 30,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: AppColors.border2,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Expanded(child: child),
+            ]),
+          ),
+        ),
       );
     },
   );
@@ -100,7 +158,7 @@ Future<T?> showModal<T>(
     barrierDismissible: true,
     barrierLabel: 'modal',
     barrierColor: Colors.black.withValues(alpha: 0.58),
-    transitionDuration: const Duration(milliseconds: 160),
+    transitionDuration: Motion.fast,
     pageBuilder: (ctx, _, __) => Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -111,10 +169,10 @@ Future<T?> showModal<T>(
       ),
     ),
     transitionBuilder: (ctx, anim, _, child) {
-      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+      final curved = CurvedAnimation(parent: anim, curve: Motion.enter);
       return BackdropFilter(
         filter: ImageFilter.blur(
-            sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
+            sigmaX: 20.0 * curved.value, sigmaY: 20.0 * curved.value),
         child: FadeTransition(
           opacity: curved,
           child: ScaleTransition(
@@ -132,7 +190,7 @@ Future<T?> showModal<T>(
 // plain shell background so phones look exactly as before.
 Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
   final panel = rounded || edge;
-  final color = panel ? AppColors.surface1 : AppColors.bg;
+  final color = panel ? AppColors.glassSurface : AppColors.bg;
   final radius = BorderRadius.circular(R.card);
 
   Widget themedBody = !panel
@@ -145,24 +203,35 @@ Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
         );
 
   if (rounded) {
-    return Material(
-      color: color,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: AppColors.border2),
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Material(
+          color: color,
+          shape: RoundedRectangleBorder(
+            borderRadius: radius,
+            side: BorderSide(color: AppColors.glassBorder),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: themedBody,
+        ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: themedBody,
     );
   }
 
   if (edge) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        border: Border(left: BorderSide(color: AppColors.border)),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: color,
+            border: Border(left: BorderSide(color: AppColors.glassBorder)),
+          ),
+          child: themedBody,
+        ),
       ),
-      child: themedBody,
     );
   }
 

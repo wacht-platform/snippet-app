@@ -89,6 +89,7 @@ class _FeedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (item) {
       UserMessageItem m => Bubble(mine: true, text: m.text),
+      BoardMessageItem b => _BoardMessageRow(message: b.message),
       AgentTextItem a => Bubble(mine: false, text: a.text),
       TaskEventItem t => _TaskEventRow(item: t, onTap: () => onTapTask(t.task)),
       QuestionItem q => _QuestionRow(item: q, onTap: () => onTapQuestion(q)),
@@ -97,7 +98,9 @@ class _FeedRow extends StatelessWidget {
           child: Center(
             child: Text(s.text,
                 textAlign: TextAlign.center,
-                style: sans(12, color: AppColors.fg4)),
+                // Information, not a placeholder: `fg3`, never `fg4` (the
+                // disabled ramp). Same rule the board's count already states.
+                style: sans(12, color: AppColors.fg3)),
           ),
         ),
     };
@@ -136,12 +139,63 @@ class _TaskEventRow extends StatelessWidget {
                 item.task.title.isEmpty ? item.kind : item.task.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(13.5, color: AppColors.fg1),
+                style: sans(13, color: AppColors.fg1),
               ),
             ),
-            Text(item.kind, style: sans(12, color: AppColors.fg4)),
+            Text(item.kind, style: sans(12, color: AppColors.fg3)),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+class _BoardMessageRow extends StatelessWidget {
+  const _BoardMessageRow({required this.message});
+  final BoardMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final from = message.fromId.trim().isEmpty ? 'someone' : message.fromId;
+    final label =
+        message.threadId.isEmpty ? 'board' : 'board · ${message.threadId}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                  color: AppColors.accent, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(from,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13, color: AppColors.fg1)),
+                  ),
+                  Text(label, style: sans(12, color: AppColors.fg3)),
+                ]),
+                if (message.body.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(message.body.trim(),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -169,7 +223,7 @@ class _QuestionRow extends StatelessWidget {
                 children: [
                   Text('Needs input', style: sans(12, color: AppColors.fg3)),
                   const SizedBox(height: 4),
-                  Text(item.question, style: sans(15.5, color: AppColors.fg1)),
+                  Text(item.question, style: sans(16, color: AppColors.fg1)),
                 ],
               ),
             ),
