@@ -142,7 +142,7 @@ class _GitScreenState extends State<GitScreen> {
     await showAppSheet<void>(
       context,
       title: 'Branches',
-      child: _BranchPicker(
+      child: GitBranchPicker(
         current: data.current,
         local: data.local,
         remotes: data.remotes,
@@ -414,22 +414,23 @@ class _GitScreenState extends State<GitScreen> {
       };
 }
 
-class _BranchPicker extends StatefulWidget {
+class GitBranchPicker extends StatefulWidget {
   final String current;
   final List<String> local;
   final List<String> remotes;
   final void Function(String name, {required bool create}) onSelect;
-  const _BranchPicker({
+  const GitBranchPicker({
+    super.key,
     required this.current,
     required this.local,
     required this.remotes,
     required this.onSelect,
   });
   @override
-  State<_BranchPicker> createState() => _BranchPickerState();
+  State<GitBranchPicker> createState() => _GitBranchPickerState();
 }
 
-class _BranchPickerState extends State<_BranchPicker> {
+class _GitBranchPickerState extends State<GitBranchPicker> {
   final _q = TextEditingController();
 
   @override

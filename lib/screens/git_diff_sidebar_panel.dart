@@ -6,6 +6,7 @@ import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'git.dart';
 import 'shell_nav.dart';
 
 /// Git Diff sidebar panel.
@@ -45,6 +46,12 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   DateTime _lastUpdated = DateTime.now();
   Timer? _autoRefreshTimer;
   bool _refreshing = false;
+  bool _branchBusy = false;
+
+  String get _repo =>
+      widget.sessionId != null && widget.sessionId!.trim().isNotEmpty
+          ? widget.sessionId!
+          : widget.workspacePath;
 
   @override
   void initState() {
@@ -87,7 +94,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
       });
     }
     try {
-      final res = await widget.client.gitStatus(widget.sessionId ?? '');
+      final res = await widget.client.gitStatus(_repo);
       if (!mounted) return;
       setState(() {
         _status = res;
@@ -102,6 +109,58 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
       _refreshing = false;
       if (!background && mounted) {
         setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _branchSheet() async {
+    if (_branchBusy) return;
+    late final ({
+      String current,
+      List<String> local,
+      List<String> remotes
+    }) data;
+    try {
+      data = await widget.client.gitBranches(_repo);
+    } catch (e) {
+      if (mounted) toast(context, '$e');
+      return;
+    }
+    if (!mounted) return;
+    await showAppSheet<void>(
+      context,
+      title: 'Branches',
+      child: GitBranchPicker(
+        current: data.current,
+        local: data.local,
+        remotes: data.remotes,
+        onSelect: (name, {required bool create}) {
+          Navigator.pop(context);
+          unawaited(_checkoutBranch(name, create: create));
+        },
+      ),
+    );
+  }
+
+  Future<void> _checkoutBranch(String name, {required bool create}) async {
+    if (_branchBusy) return;
+    setState(() => _branchBusy = true);
+    try {
+      final result = await widget.client
+          .gitCheckout(_repo, name, create: create);
+      if (!mounted) return;
+      if (result['ok'] != true) {
+        final error = (result['stderr'] as String?)?.trim();
+        toast(context, error == null || error.isEmpty ? 'git failed' : error);
+      } else {
+        toast(context, create ? 'Created $name' : 'Switched to $name');
+      }
+    } catch (e) {
+      if (mounted) toast(context, '$e');
+    } finally {
+      if (mounted) {
+        setState(() => _branchBusy = false);
+        await refresh();
       }
     }
   }
@@ -156,30 +215,40 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     );
   }
 
-  /// Branch + change count on one flat row, matching the file tree's workspace
-  /// selector. No card, no border: the surface step alone separates it.
+  /// Branch + change count on one flat row. Tapping the row opens the same
+  /// local/remote branch picker used by the full Git screen.
   Widget _branchRow(String repoName, String branch, int changes) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
-          child: Row(children: [
-            AppIcon('git-branch', size: 14, color: AppColors.fg3),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                branch.isEmpty ? repoName : branch,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(13, weight: W.label, color: AppColors.fg1),
-              ),
+        child: Material(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(R.sm),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(R.sm),
+            onTap: _branchBusy ? null : _branchSheet,
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+              child: Row(children: [
+                AppIcon('git-branch', size: 14, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    branch.isEmpty ? repoName : branch,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, weight: W.label, color: AppColors.fg1),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  changes == 0 ? 'clean' : '$changes changed',
+                  style: sans(12, color: AppColors.fg3),
+                ),
+                const SizedBox(width: 6),
+                AppIcon('chevron-down', size: 13, color: AppColors.fg3),
+              ]),
             ),
-            const SizedBox(width: 6),
-            Text(
-              changes == 0 ? 'clean' : '$changes changed',
-              style: sans(12, color: AppColors.fg3),
-            ),
-          ]),
+          ),
         ),
       );
 
@@ -211,14 +280,41 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   }
 
   Widget _cleanState() => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('No changes',
-              style: sans(13, weight: W.label, color: AppColors.fg2)),
-          const SizedBox(height: 3),
-          Text('Last updated ${_timeAgo(_lastUpdated)}',
-              style: sans(12, color: AppColors.fg3)),
-        ]),
+        padding: const EdgeInsets.fromLTRB(kSidebarContentInset, 10,
+            kSidebarContentInset, 8),
+        child: AppCard(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppColors.okBg,
+                borderRadius: BorderRadius.circular(R.xs),
+              ),
+              child: AppIcon('check-check', size: 15, color: AppColors.ok),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Working tree clean',
+                      style: sans(13, weight: W.label, color: AppColors.fg1)),
+                  const SizedBox(height: 3),
+                  Text('No local changes · ${_timeAgo(_lastUpdated)}',
+                      style: sans(11, color: AppColors.fg3)),
+                  const SizedBox(height: 8),
+                  Btn('Switch branch',
+                      small: true,
+                      icon: 'git-branch',
+                      variant: BtnVariant.ghost,
+                      onTap: _branchBusy ? null : _branchSheet),
+                ],
+              ),
+            ),
+          ]),
+        ),
       );
 
   Widget _errorState() => Padding(

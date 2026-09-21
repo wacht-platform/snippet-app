@@ -53,6 +53,19 @@ class _FakeDaemonClient extends DaemonClient {
       'files': gitFiles,
     });
   }
+
+  @override
+  Future<({String current, List<String> local, List<String> remotes})>
+      gitBranches(String session) async => (
+        current: 'main',
+        local: ['main', 'feature/mobile'],
+        remotes: ['origin/main'],
+      );
+
+  @override
+  Future<Map<String, dynamic>> gitCheckout(String session, String target,
+          {bool create = false}) async =>
+      {'ok': true};
 }
 
 void main() {
@@ -187,7 +200,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.text('clean'), findsOneWidget);
-      expect(find.text('No changes'), findsOneWidget);
+      expect(find.text('Working tree clean'), findsOneWidget);
 
       // Dispose cleanly to cancel timer
       await tester.pumpWidget(const SizedBox.shrink());
