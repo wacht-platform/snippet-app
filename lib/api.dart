@@ -1149,21 +1149,15 @@ class DaemonClient {
     if (r.statusCode != 204) throw _err('remove task agent', r);
   }
 
-  /// Opens the live coordination event stream. Events are also persisted and can
-  /// be replayed with [coordinationEvents] after reconnect.
-  WebSocketChannel attachCoordinationEvents() {
-    final base = Uri.parse(baseUrl);
-    final wsScheme = base.scheme == 'https' ? 'wss' : 'ws';
-    final uri = base.replace(
-      scheme: wsScheme,
-      path: '/coordination/events',
-      queryParameters: {'token': token},
+  Future<void> transferTaskLease(
+      String id, String agentId, String toAgentId) async {
+    final r = await http.post(
+      _uri(
+          '/coordination/tasks/${Uri.encodeComponent(id)}/agents/${Uri.encodeComponent(agentId)}/lease'),
+      headers: _json,
+      body: jsonEncode({'to_agent_id': toAgentId}),
     );
-    return _connectWs(
-      uri,
-      connectTimeout: const Duration(seconds: 10),
-      pingInterval: const Duration(seconds: 45),
-    );
+    if (r.statusCode != 204) throw _err('transfer task lease', r);
   }
 
   // ---- Recurring jobs ----

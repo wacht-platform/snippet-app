@@ -90,10 +90,6 @@ class _FakeDaemon extends DaemonClient {
   @override
   WebSocketChannel attach(String sessionId) =>
       throw UnimplementedError('no live socket');
-
-  @override
-  WebSocketChannel attachCoordinationEvents() =>
-      throw UnimplementedError('no live socket');
 }
 
 Map<String, dynamic> _agent(String id, String name, List<String> caps) => {

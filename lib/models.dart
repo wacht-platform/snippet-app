@@ -1183,27 +1183,31 @@ class TaskAgent {
   final String taskId;
   final String agentId;
   final String role;
+  final String? workSessionId;
+  final String scope;
+  final String status;
   final String addedAt;
   final String? removedAt;
 
-  /// Still on the task. A removed member is kept for history, so callers must
-  /// ask rather than assume presence means membership.
   bool get active => removedAt == null;
+  bool get hasSessionLease => status == 'active';
 
   TaskAgent.fromJson(Map<String, dynamic> j)
       : taskId = j['task_id'] as String? ?? '',
         agentId = j['agent_id'] as String? ?? '',
         role = j['role'] as String? ?? '',
+        workSessionId = j['work_session_id'] as String?,
+        scope = j['scope'] as String? ?? '',
+        status = j['status'] as String? ?? 'pending',
         addedAt = j['added_at'] as String? ?? '',
         removedAt = j['removed_at'] as String?;
 }
 
-/// One task on the board. The thread that carries its conversation is derived
-/// from the id by the daemon, so a client never has to invent one.
 class TaskItem {
   final String id;
   final String title;
   final String description;
+  final String plan;
   final TaskStatus status;
   final int priority;
   final String createdByKind;
@@ -1217,6 +1221,7 @@ class TaskItem {
       : id = j['id'] as String? ?? '',
         title = j['title'] as String? ?? '',
         description = j['description'] as String? ?? '',
+        plan = j['plan'] as String? ?? '',
         status = TaskStatus.parse(j['status'] as String?),
         priority = (j['priority'] as num?)?.toInt() ?? 0,
         createdByKind = j['created_by_kind'] as String? ?? '',

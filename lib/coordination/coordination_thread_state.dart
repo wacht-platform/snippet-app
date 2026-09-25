@@ -24,23 +24,20 @@ class CoordinationThreadState extends ChangeNotifier {
     _coordinationSubscription?.cancel();
     _coordinationSocket?.sink.close();
     try {
-      final socket = client.attachCoordinationEvents();
+      final socket = client.events();
       _coordinationSocket = socket;
       _coordinationSubscription = socket.stream.listen((raw) {
         try {
           final frame = jsonDecode(raw as String) as Map<String, dynamic>;
+          if (frame['kind'] != 'coordination_event') return;
           final event = CoordinationEvent.fromJson(
               frame['event'] as Map<String, dynamic>);
           if (event.threadId != threadId) return;
           _merge([event], advanceReplayCursor: false);
           notifyListeners();
-        } catch (_) {
-          // Persisted replay remains authoritative when a malformed frame arrives.
-        }
+        } catch (_) {}
       }, onDone: () {}, onError: (_) {});
-    } catch (_) {
-      // The next refresh/reconnect may attach again.
-    }
+    } catch (_) {}
   }
 
   @override

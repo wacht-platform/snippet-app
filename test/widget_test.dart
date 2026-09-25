@@ -137,7 +137,7 @@ void main() {
     expect(isDedicatedMcSession(null), isFalse);
     expect(isDedicatedMcSession(''), isFalse);
     expect(
-      isDedicatedMcSession('snippet-service-61c2d836aee8dc5b/state.json'),
+      isDedicatedMcSession('snippet-service-61c2d836aee8dc5b'),
       isFalse,
     );
     expect(
@@ -157,7 +157,7 @@ void main() {
     );
     expect(
       isMissionControlTab(
-        sessionId: 'snippet-service-61c2d836aee8dc5b/state.json',
+        sessionId: 'snippet-service-61c2d836aee8dc5b',
         title: 'Design Mission Control',
       ),
       isFalse,
@@ -178,7 +178,7 @@ void main() {
     );
     expect(
       isMissionControlListRow(SessionInfo.fromJson({
-        'id': 'snippet-service-61c2d836aee8dc5b/state.json',
+        'id': 'snippet-service-61c2d836aee8dc5b',
         'title': 'Design Mission Control',
       })),
       isFalse,

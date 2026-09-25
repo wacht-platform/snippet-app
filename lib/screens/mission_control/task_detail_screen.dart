@@ -156,6 +156,58 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
   }
 
+  Future<void> _transferLeaseTo(TaskAgent target) async {
+    final currentActive = roster.firstWhere(
+      (a) => a.hasSessionLease && a.active,
+      orElse: () => roster.first,
+    );
+    final confirm = await showAppSheet<bool>(
+      context,
+      title: 'Transfer session lease',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Transfer the active work session lease to ${target.agentId}?\nOnly one agent can work in the session at a time.',
+              style: sans(13, color: AppColors.fg2, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel', style: sans(13, color: AppColors.fg3)),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('Transfer lease', style: sans(13)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    try {
+      await widget.client.transferTaskLease(
+        widget.taskId,
+        currentActive.agentId,
+        target.agentId,
+      );
+      final updated = await widget.client.taskAgents(widget.taskId);
+      if (mounted) setState(() => roster = updated);
+      if (mounted) toast(context, 'Lease transferred to ${target.agentId}');
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
   Future<void> _linkTask() async {
     final all = await widget.client.tasks();
     if (!mounted) return;
@@ -313,25 +365,50 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 runSpacing: 6,
                 children: [
                   for (final a in roster)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color:
-                            a.active ? AppColors.accentBg : AppColors.surface2,
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: (a.active && !a.hasSessionLease)
+                            ? () => _transferLeaseTo(a)
+                            : null,
                         borderRadius: BorderRadius.circular(R.chip),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: a.hasSessionLease
+                                ? AppColors.accentBg
+                                : (a.active
+                                    ? AppColors.surface2
+                                    : AppColors.surface3),
+                            borderRadius: BorderRadius.circular(R.chip),
+                            border: a.hasSessionLease
+                                ? Border.all(
+                                    color: AppColors.accent.withValues(alpha: 0.4),
+                                    width: 1)
+                                : null,
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text(a.agentId,
+                                style: sans(12,
+                                    color: a.hasSessionLease
+                                        ? AppColors.accent
+                                        : (a.active
+                                            ? AppColors.fg1
+                                            : AppColors.fg3))),
+                            const SizedBox(width: 5),
+                            Text(
+                              a.hasSessionLease
+                                  ? 'active lease'
+                                  : (a.active ? 'waiting' : 'left'),
+                              style: sans(10,
+                                  color: a.hasSessionLease
+                                      ? AppColors.ok
+                                      : AppColors.fg3),
+                            ),
+                          ]),
+                        ),
                       ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Text(a.agentId,
-                            style: sans(12,
-                                color: a.active
-                                    ? AppColors.accent
-                                    : AppColors.fg3)),
-                        if (!a.active) ...[
-                          const SizedBox(width: 5),
-                          Text('left', style: sans(10, color: AppColors.fg3)),
-                        ],
-                      ]),
                     ),
                 ],
               ),

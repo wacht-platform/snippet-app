@@ -15,19 +15,8 @@ import 'settings_panel.dart';
 import 'shell_components.dart';
 import 'shell_models.dart';
 import 'shell_nav.dart';
-
-class SidebarEmpty extends StatelessWidget {
-  const SidebarEmpty(this.message, {super.key});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-        child: Text(message,
-            textAlign: TextAlign.center,
-            style: sans(12, color: AppColors.fg3, height: 1.45)),
-      );
-}
+import 'sidebar_mobile.dart';
+export 'sidebar_mobile.dart';
 
 class Sidebar extends StatefulWidget {
   final List<Instance> instances;
@@ -242,7 +231,7 @@ class SidebarState extends State<Sidebar> {
               },
               children: [
                 for (final h in MobileHome.values)
-                  _KeepAlivePage(
+                  SidebarKeepAlivePage(
                     key: ValueKey('mobile-${h.name}'),
                     child: _mobileHomeBody(hasClient, h),
                   ),
@@ -635,81 +624,43 @@ class SidebarState extends State<Sidebar> {
   /// Rendered as a sibling of the body by the caller, never an overlay, so it
   /// cannot hide the last row of a list.
   Widget _mobileBar(bool hasClient) {
-    final radius = BorderRadius.circular(kMobileBarRadius);
-    final searching = _mobileSearchOpen && hasClient;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 6, M.gutter, 8),
-      child: AnimatedSwitcher(
-        duration: Motion.fast,
-        switchInCurve: Motion.enter,
-        switchOutCurve: Motion.exit,
-        child: searching
-            ? _mobileBarPill(radius, key: 'search', child: _mobileSearchRow())
-            : _mobileBarPill(radius,
-                key: 'bar', child: _mobileBarRow(hasClient)),
-      ),
-    );
-  }
-
-  Widget _mobileBarPill(BorderRadius radius,
-      {required String key, required Widget child}) {
-    return Container(
-      key: ValueKey(key),
-      height: kMobileBarHeight,
-      // Shadow on the OUTER container; fill, border and rounded clip on the
-      // inner Material. An InkWell paints its ripple onto the nearest Material
-      // ancestor — with none local it splashes onto the Scaffold and bleeds
-      // outside the pill's corners.
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x59000000),
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Material(
-            color: AppColors.surface1.withValues(alpha: 0.82),
-            shape: RoundedRectangleBorder(
-              borderRadius: radius,
-              side: BorderSide(color: AppColors.glassBorder),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _mobileBarRow(bool hasClient) {
-    return Row(
-      children: [
-        const SizedBox(width: 4),
-        for (final h in MobileHome.values)
-          Expanded(
-            child: _mobileBarDest(h, widget.mobileHome == h, true),
-          ),
-        const SizedBox(width: 2),
-        // Divider separates "where you are" from "what you can do".
-        Container(width: 1, height: 20, color: AppColors.border),
-        const SizedBox(width: 2),
-        Expanded(
-          child: _mobileBarAction('search', 'Search',
-              onTap: hasClient ? _toggleMobileSearch : null),
-        ),
-        Expanded(
-          child: _mobileBarAction('plus', 'New',
-              onTap: hasClient ? _handleMobileNew : null),
-        ),
-        const SizedBox(width: 4),
-      ],
+    final isAgents = widget.mobileHome == MobileHome.agents;
+    return SidebarMobileBar(
+      hasClient: hasClient,
+      mobileSearchOpen: _mobileSearchOpen,
+      activeHome: widget.mobileHome,
+      onMobileHome: (h) {
+        if (widget.mobileHome != h) {
+          _goToPage(h.index);
+          widget.onMobileHome(h);
+        }
+      },
+      onToggleMobileSearch: _toggleMobileSearch,
+      onHandleMobileNew: _handleMobileNew,
+      searchCtl: isAgents ? _agentSearchCtl : _searchCtl,
+      searchFocus: isAgents ? _agentSearchFocus : _searchFocus,
+      filterQuery: isAgents ? _agentFilterQuery : _filterQuery,
+      searchHint: isAgents ? 'Search agents' : 'Search chats',
+      onSearchChanged: (v) {
+        setState(() {
+          if (isAgents) {
+            _agentFilterQuery = v;
+          } else {
+            _filterQuery = v;
+          }
+        });
+      },
+      onClearSearch: () {
+        final ctl = isAgents ? _agentSearchCtl : _searchCtl;
+        ctl.clear();
+        setState(() {
+          if (isAgents) {
+            _agentFilterQuery = '';
+          } else {
+            _filterQuery = '';
+          }
+        });
+      },
     );
   }
 
@@ -724,64 +675,6 @@ class SidebarState extends State<Sidebar> {
     }
   }
 
-  /// The expanded search field. Occupies the whole pill, so the destinations and
-  /// the create action yield to it rather than competing with it.
-  Widget _mobileSearchRow() {
-    final isAgents = widget.mobileHome == MobileHome.agents;
-    final ctl = isAgents ? _agentSearchCtl : _searchCtl;
-    final focus = isAgents ? _agentSearchFocus : _searchFocus;
-    final query = isAgents ? _agentFilterQuery : _filterQuery;
-    final hint = isAgents ? 'Search agents' : 'Search chats';
-
-    return Row(children: [
-      const SizedBox(width: 12),
-      AppIcon('search', size: 16, color: AppColors.fg3),
-      const SizedBox(width: 9),
-      Expanded(
-        child: TextField(
-          controller: ctl,
-          focusNode: focus,
-          autofocus: true,
-          cursorColor: AppColors.accent,
-          textInputAction: TextInputAction.search,
-          onChanged: (v) {
-            setState(() {
-              if (isAgents) {
-                _agentFilterQuery = v;
-              } else {
-                _filterQuery = v;
-              }
-            });
-          },
-          style: sans(15, color: AppColors.fg1),
-          decoration: InputDecoration(
-            isCollapsed: true,
-            border: InputBorder.none,
-            hintText: hint,
-            hintStyle: sans(15, color: AppColors.fg4),
-          ),
-        ),
-      ),
-      if (query.isNotEmpty)
-        IconBtn('x', size: 32, iconSize: 14, tooltip: 'Clear', onTap: () {
-          ctl.clear();
-          setState(() {
-            if (isAgents) {
-              _agentFilterQuery = '';
-            } else {
-              _filterQuery = '';
-            }
-          });
-        }),
-      IconBtn('arrow-down',
-          size: 36,
-          iconSize: 16,
-          tooltip: 'Close search',
-          onTap: _toggleMobileSearch),
-      const SizedBox(width: 4),
-    ]);
-  }
-
   void _toggleMobileSearch() {
     final open = !_mobileSearchOpen;
     FocusManager.instance.primaryFocus?.unfocus();
@@ -792,8 +685,8 @@ class SidebarState extends State<Sidebar> {
       _mobileSearchOpen = open;
       if (!open) {
         _searchCtl.clear();
-        _filterQuery = '';
         _agentSearchCtl.clear();
+        _filterQuery = '';
         _agentFilterQuery = '';
       }
     });
@@ -809,77 +702,6 @@ class SidebarState extends State<Sidebar> {
     }
   }
 
-  Widget _mobileBarDest(MobileHome h, bool active, bool enabled) {
-    return Tooltip(
-      message: h.label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(kMobileBarRadius - 4),
-          onTap: enabled
-              ? () {
-                  if (widget.mobileHome != h) {
-                    _goToPage(h.index);
-                    widget.onMobileHome(h);
-                  }
-                }
-              : null,
-          child: SizedBox(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon(h.icon,
-                      size: 23, color: active ? AppColors.fg1 : AppColors.fg3),
-                  const SizedBox(height: 2),
-                  Text(h.label,
-                      style: caps(10,
-                          color: active ? AppColors.fg1 : AppColors.fg3,
-                          spacing: 0.35)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _mobileBarAction(String icon, String tooltip, {VoidCallback? onTap}) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(kMobileBarRadius - 4),
-          onTap: onTap,
-          child: SizedBox(
-            height: kMobileBarHeight,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon(icon,
-                      size: 23,
-                      color: onTap == null ? AppColors.fg4 : AppColors.fg2),
-                  const SizedBox(height: 2),
-                  Text(tooltip,
-                      style: caps(10,
-                          color: onTap == null ? AppColors.fg4 : AppColors.fg2,
-                          spacing: 0.35)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Free-text match against a session's title and folder. An empty query
-  /// matches everything, so the text filter is inert until the user types.
   bool _matchesQuery(SessionInfo s) {
     final q = _filterQuery.trim().toLowerCase();
     if (q.isEmpty) return true;
@@ -1655,100 +1477,23 @@ class SidebarState extends State<Sidebar> {
 
   /// Machine list: bottom sheet on phones, a popover anchored to the block on
   /// desktop. Same rows + "Add machine" footer either way.
-  Future<void> _openMachines() async {
-    widget.onRefreshHealth();
-    final content = MachineList(
-      instances: widget.instances,
-      active: widget.active,
-      health: widget.health,
-      onSelect: widget.onSelectInstance,
-      onAdd: widget.onAddInstance,
-      onManage: _machineActions,
-    );
-    if (kMobile) {
-      await showAppSheet(
+  Future<void> _openMachines() => showSidebarMachinesPicker(
         context,
-        title: 'Machines',
-        child: content,
+        anchorKey: _machineKey,
+        instances: widget.instances,
+        active: widget.active,
+        health: widget.health,
+        onSelect: widget.onSelectInstance,
+        onAdd: widget.onAddInstance,
+        onManage: _machineActions,
+        onRefreshHealth: widget.onRefreshHealth,
       );
-      return;
-    }
-    final box = _machineKey.currentContext!.findRenderObject() as RenderBox;
-    final origin = box.localToGlobal(Offset.zero);
-    await showGeneralDialog(
-      context: context,
-      barrierDismissible: true, // click-away and Esc dismiss
-      barrierLabel: 'machines',
-      barrierColor: Colors.transparent,
-      transitionDuration: Motion.press,
-      pageBuilder: (_, __, ___) => Stack(children: [
-        // Inset from the edge-to-edge header so it reads as a popover.
-        Positioned(
-          left: origin.dx + 10,
-          top: origin.dy + box.size.height + 4,
-          width: box.size.width - 20,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(R.md),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Material(
-                color: AppColors.glassSurface,
-                elevation: 12,
-                shadowColor: Colors.black87,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(R.md),
-                    border: Border.all(color: AppColors.glassBorder),
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 420),
-                    child: SingleChildScrollView(child: content),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ]),
-      transitionBuilder: (_, anim, __, child) {
-        final curved =
-            CurvedAnimation(parent: anim, curve: Motion.enter);
-        return BackdropFilter(
-          filter: ImageFilter.blur(
-              sigmaX: 20.0 * curved.value, sigmaY: 20.0 * curved.value),
-          child: FadeTransition(opacity: curved, child: child),
-        );
-      },
-    );
-  }
 
-  // Overflow / long-press on a machine row → rename or remove (existing flows).
   void _machineActions(Instance i) => showManageMachineSheet(
         context: context,
         instance: i,
         onRename: (inst, name) => widget.onRenameInstance(inst, name),
         onRemove: (inst) => widget.onRemoveInstance(inst),
       );
-}
-
-class _KeepAlivePage extends StatefulWidget {
-  final Widget child;
-  const _KeepAlivePage({super.key, required this.child});
-
-  @override
-  State<_KeepAlivePage> createState() => _KeepAlivePageState();
-}
-
-class _KeepAlivePageState extends State<_KeepAlivePage>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return widget.child;
-  }
 }
 
