@@ -56,9 +56,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
                   size: 15, color: failed ? AppColors.danger : AppColors.fg3),
               const SizedBox(width: 8),
               Text(toolTitle(widget.tool),
-                  style: sans(M.rowTitle,
-                      weight: W.label,
-                      color: failed ? AppColors.danger : AppColors.fg1)),
+                  style: TS.label(failed ? AppColors.danger : AppColors.fg2)),
               if (summary.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Flexible(
