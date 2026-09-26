@@ -519,7 +519,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           const SizedBox(width: 8),
           Expanded(
             child: Material(
-              color: AppColors.accent,
+              color: AppColors.accentFill,
               borderRadius: BorderRadius.circular(R.md),
               child: InkWell(
                 borderRadius: BorderRadius.circular(R.md),

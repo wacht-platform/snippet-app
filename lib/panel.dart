@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import 'platform.dart';
@@ -70,11 +68,7 @@ Future<T?> presentScreen<T>(
                   .animate(curved),
               child: child,
             );
-      return BackdropFilter(
-        filter: ImageFilter.blur(
-            sigmaX: 20.0 * curved.value, sigmaY: 20.0 * curved.value),
-        child: transition,
-      );
+      return transition;
     },
   );
 }
@@ -170,15 +164,10 @@ Future<T?> showModal<T>(
     ),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Motion.enter);
-      return BackdropFilter(
-        filter: ImageFilter.blur(
-            sigmaX: 20.0 * curved.value, sigmaY: 20.0 * curved.value),
-        child: FadeTransition(
-          opacity: curved,
-          child: ScaleTransition(
-              scale: Tween(begin: 0.98, end: 1.0).animate(curved),
-              child: child),
-        ),
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+            scale: Tween(begin: 0.98, end: 1.0).animate(curved), child: child),
       );
     },
   );
@@ -205,32 +194,26 @@ Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
   if (rounded) {
     return ClipRRect(
       borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Material(
-          color: color,
-          shape: RoundedRectangleBorder(
-            borderRadius: radius,
-            side: BorderSide(color: AppColors.glassBorder),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: themedBody,
+      child: Material(
+        color: color,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: AppColors.glassBorder),
         ),
+        clipBehavior: Clip.antiAlias,
+        child: themedBody,
       ),
     );
   }
 
   if (edge) {
     return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: color,
-            border: Border(left: BorderSide(color: AppColors.glassBorder)),
-          ),
-          child: themedBody,
+      child: Container(
+        decoration: BoxDecoration(
+          color: color,
+          border: Border(left: BorderSide(color: AppColors.glassBorder)),
         ),
+        child: themedBody,
       ),
     );
   }

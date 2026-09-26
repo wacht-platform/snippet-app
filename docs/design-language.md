@@ -1,130 +1,138 @@
 # Design language
 
-Extracted from the reference desktop shell by inspecting its live DOM
-(`getBoundingClientRect` + `getComputedStyle`), not from screenshots. Every
-number below is a measured value. Window under measurement: 1132 × 792.
+The single source of truth for how snippet looks and moves, on phone and
+desktop. `lib/theme.dart` implements exactly this; if the two disagree, the
+code is wrong. Supersedes the earlier DOM-measured reference and the
+2026-09-15 audit.
 
-The single most important finding: **the reference uses no borders at all.**
-Separation comes entirely from a ladder of background colours. There is not one
-`border` in the whole tree. Our UI compensates with hairlines everywhere, which
-is why it reads busier and flatter at the same time.
+Benchmark for feel: the Claude app. Every tap answers instantly, panels track
+the finger, motion is short and interruptible, and nothing stutters.
 
-## 1. Surfaces
+## Principles
 
-A four-step ladder. Depth is expressed by *darkening*, and the reading surface
-is the darkest thing on screen — the inverse of raising cards.
+1. **One system, two densities.** Phone and desktop share every colour, type
+   role, radius and curve. Only touch targets and gutters differ.
+2. **Depth from surfaces, not lines.** Hierarchy comes from the surface ladder.
+   Lines exist only where a boundary carries meaning (inputs, dividers inside
+   a list card, the diff gutter).
+3. **Opaque everywhere.** No window vibrancy, no backdrop blur. Overlays lift
+   with a surface step and a soft shadow.
+4. **Colour means something.** Blue is interaction. Green, amber and red are
+   state. Nothing decorative borrows either.
+5. **Motion is feedback, not decoration.** It confirms input, shows where
+   something came from, and never makes anyone wait.
 
-| Role | Hex | Size in reference | Notes |
+## Colour — dark only
+
+### Surfaces
+
+| Token | Hex | Use |
+| --- | --- | --- |
+| `canvas` | `#0F0F10` | Reading planes: chat, editor, file viewer, diff |
+| `base` | `#151516` | App shell, sidebar, secondary panes, page backgrounds |
+| `raised` | `#1C1C1E` | Cards, list groups, composer, selected row |
+| `overlay` | `#232325` | Menus, sheets, dialogs, popovers, inputs |
+| `hover` | `#2A2A2D` | Hover and pressed fill on any of the above |
+| `line` | `#2A2A2D` | Input outline, in-card dividers |
+| `lineStrong` | `#36363A` | Focused-but-not-primary outline, table rules |
+
+Adjacent steps are 6–7 RGB points apart, which reads as a boundary without a
+line. Tokens from the old ladder map onto these (see `theme.dart`) until each
+screen is migrated.
+
+### Text
+
+| Token | Hex | On canvas | Use |
 | --- | --- | --- | --- |
-| Canvas (chat / editor) | `#010101` | 481 × 712 | darkest; content recedes |
-| Floor (window, side pane) | `#0D0D0D` | 1132 × 792, 393 × 712 | app shell + secondary pane |
-| Chrome (strip, sidebar, cards) | `#171717` | 1132 × 40, 258 × 712 | the main "grey" |
-| Active row | `#222222` | 218 × 26 | selected nav row |
-| Chip / pill / hover | `#2D2D2D` | 61 × 20 | inline tokens, raise on hover |
-| Overlay wash | `rgba(255,255,255,0.12)` | 4 × 4 | faint highlight on dark |
+| `fg1` | `#EDEDEF` | 16.5:1 | Titles, active row, user's own message |
+| `fg2` | `#C8C8CC` | 11.8:1 | **Default body text** |
+| `fg3` | `#9A9AA2` | 7.1:1 | Secondary text, metadata, icons at rest |
+| `fg4` | `#6E6E76` | 3.9:1 | Placeholder, disabled only — never content |
 
-Adjacent surface steps are ~10% apart in luminance — enough to read as a
-boundary without a line.
+### Accent — mascot blue
 
-## 2. Geometry
+The accent is the mascot's blue (`#3B7DF7`), split into two roles because no
+single blue works as both a button fill with a white label and as text on
+near-black.
 
-```
-window            1132 × 792   radius 20
-├─ top bar        1132 × 40
-├─ strip          1132 × 40    bg #171717   (FULL WIDTH)
-│   ├─ icon zone   291 × 24    icons centred inside it
-│   └─ status      121 × 14    right-aligned
-└─ body           1132 × 712   bg #171717
-    ├─ sidebar     258 × 712
-    ├─ chat        481 × 712   bg #010101   radius 10 0 0 0
-    └─ detail      393 × 712   bg #0D0D0D   radius 0 10 0 0
-```
+| Token | Hex | Contrast | Use |
+| --- | --- | --- | --- |
+| `accentFill` | `#2F6FEB` | white label 4.6:1 | Primary buttons, switches on, send |
+| `accentFillHover` | `#2A63D6` | white label 5.4:1 | Hover/pressed primary |
+| `accent` | `#6EA2FF` | 7.6:1 on canvas | Links, selected icons, focus ring, active tab |
+| `accentBg` | accent @ 14% | — | Selected row tint, active chip |
 
-The second-level strip spans the **entire window width** and sits between the
-top bar and the body. It is a shell-level band, not a sidebar header.
-
-### Sidebar
-- Column: **258 px**
-- Outer padding: `0 8px` (top section), `8px 8px 0` (lower section)
-- Section radius: 10 px
-
-### Rows — the core metric
-| Element | Height | Radius | Padding | Gap |
-| --- | --- | --- | --- | --- |
-| Section header | 32 | 0 | `8px 12px` | 8 |
-| Nav row | **26** | **8** | `5px 12px` | 8 |
-
-Nav rows are 26 px tall, not the 34 px we ship. Indentation: **24 px** for a
-top-level row, **48 px** for a nested one.
-
-### Icon slots
-Icons are drawn inside a fixed slot, and the glyph never fills it:
-
-| Slot | Glyph | Use |
-| --- | --- | --- |
-| 24 × 24 | 16 × 16 | nav / toolbar buttons |
-| 16 × 16 | 12 × 12 | inline with text |
-| 18 × 18 | 18 × 18 | section markers |
-| 20 × 20 | 20 × 20 | header actions |
-| 28 × 28 | 24 × 24 | prominent actions |
-
-The 24 → 16 relationship is the important one: **a 16 px glyph inside a 24 px
-hit target.** We were drawing glyphs at full slot size, which is what made them
-look oversized.
-
-### Radii
-```
-8px      ×26   rows, cards, inputs      <- dominant
-999px    ×10   pills, dots, avatars
-4px      ×7    small inline marks
-6px      ×1    chip
-10px     ×4    window, sections, panes
-```
-
-## 3. Typography
-
-Two families: **Geist** (primary, 53 uses) and **Inter** (secondary, 13 uses).
-Everything is 11–13 px except a single 20 px title.
-
-| Size | Weight | Colour | Uses | Sample |
-| --- | --- | --- | --- | --- |
-| 12 | 400 | `#C1C1C1` | 22 | message body |
-| 13 | 400 | `#C1C1C1` | 19 | list titles, transcript |
-| 12 | 500 | `#C1C1C1` | 14 | controls, labels |
-| 13 | 500 | `#C1C1C1` | 6 | row title, user message |
-| 11 | 500 | `#C1C1C1` | 2 | `CHATS` (Inter) |
-| 20 | 600 | `#FFFFFF` | 2 | the one page title |
-| 16 | 500 | `#FFFFFF` | 1 | section heading |
-
-- **Line height**: 16 px for 12 px text (1.33); 15.6 px for 13 px (1.2)
-- **Letter spacing**: `-0.05px` (22 uses); `-0.3px` on the 20 px title
-- **Ceiling is 500.** `600` appears exactly once, on the single 20 px title.
-  Body, list titles and transcript are all 400.
-
-## 4. Text colours
-
-| Hex | Uses | Role |
-| --- | --- | --- |
-| `#C1C1C1` | 31 | default body — most text is this, not white |
-| `#D2D5DB` | 12 | slightly cooler, denser prose |
-| `#FFFFFF` | 11 | emphasis only: active row, title, user turn |
-| `#C1C1C1` @ 0.8 | 6 | muted label |
-| `#C1C1C1` @ 0.75 | 4 | very muted |
-| `#C1C1C1` @ 0.45 | 1 | placeholder |
-
-Default text is a **light grey**, not white. White is reserved for the few
-elements that must outrank their surroundings.
+Why blue: it is the brand's own colour; it is the established "interactive"
+hue in the tools snippet sits beside (VS Code, GitHub, Geist, Zed), so it
+needs no learning; and it is the hue farthest from all three status colours.
 
 ### Status
-`#3EAF3F` green (online), `#AF8D3E` amber, `#979797` neutral grey.
 
-## 5. What this means for us
+| Token | Hex | Use |
+| --- | --- | --- |
+| `ok` | `#39C57E` | Online, completed, added (mascot green) |
+| `run` | `#E5A93B` | Running, busy, modified |
+| `danger` | `#F06464` | Failed, destructive, deleted |
 
-1. Delete the borders. Replace every hairline separator with a surface step.
-2. Adopt the ladder: `#010101` canvas → `#0D0D0D` floor → `#171717` chrome →
-   `#222222` active → `#2D2D2D` chip.
-3. Default text `#C1C1C1`; white only for the active row and the title.
-4. Switch the UI family to Geist; keep Inter for incidental labels.
-5. Rows 26 px (not 34), radius 8, indent 24/48.
-6. Explicit slots: 24 px target, 16 px glyph. Never let a glyph fill its slot.
-7. Sidebar 258 px. Strip full width at 40 px.
+Each has a `…Bg` at 13% for tinted badges. Status colour always pairs with a
+label or glyph; colour is never the only channel.
+
+## Typography
+
+Geist for UI, JetBrains Mono for code, paths and identifiers. Both bundled —
+never fetched at runtime.
+
+| Role | Size / line | Weight | Use |
+| --- | --- | --- | --- |
+| `pageTitle` | 22 / 28 | 600 | One per page |
+| `sectionTitle` | 17 / 24 | 600 | Sheet and section headings |
+| `rowTitle` | 15 / 20 | 500 | List rows, card titles |
+| `body` | 15 / 22 | 400 | Chat and reading text (16 on phones) |
+| `ui` | 14 / 20 | 400 | Controls, form text, secondary copy |
+| `label` | 13 / 18 | 500 | Buttons, tabs, field labels |
+| `meta` | 12 / 16 | 400 | Timestamps, counts, captions |
+| `caps` | 11 / 14 | 500, +0.5 tracking | Overline section labels, sparingly |
+| `code` | 13 / 20 | 400 | Code blocks, diffs, terminal |
+| `codeSmall` | 12 / 16 | 400 | Inline paths, ids, hashes |
+
+Three weights: 400, 500, 600. No 700. No half-pixel sizes. Counters and timers
+use tabular figures.
+
+## Space, shape, size
+
+- **Spacing scale (px):** 2, 4, 6, 8, 12, 16, 20, 24, 32, 40. Nothing else.
+- **Radius:** `xs` 4 (inline marks), `sm` 6 (buttons, inputs, chips),
+  `md` 10 (cards, rows, list groups), `lg` 14 (sheets, dialogs, menus),
+  `pill` 999. A nested radius is the outer radius minus the inset.
+- **Rows:** 36 desktop, 52 phone. **Touch target:** 44 minimum on phones.
+- **Icons:** 14 inline, 16 default, 20 prominent — always centred in a slot
+  larger than the glyph.
+- **Gutters:** 16 phone, 20 desktop pane.
+- **Shadow (overlays only):** black 45%, blur 24, y 8.
+
+## Motion
+
+Only `transform` and `opacity` animate. Never blur, never layout-affecting
+size on a hot path.
+
+| Token | Duration | Curve | Use |
+| --- | --- | --- | --- |
+| `press` | 100ms | ease-out | Scale to 0.97 on pointer **down** |
+| `quick` | 150ms | ease-out | Hover, colour, icon swaps |
+| `enter` | 240ms | `cubic(0.32, 0.72, 0, 1)` | Sheets, panels, menus arriving |
+| `exit` | 180ms | ease-in | Leaving — always shorter than entering |
+| `page` | 260ms | `cubic(0.32, 0.72, 0, 1)` | Route push/pop |
+
+Rules:
+
+- **Instant acknowledgement.** Every control reacts on pointer down.
+- **Interruptible.** Sheets and drawers follow the finger and settle with the
+  release velocity; a new gesture mid-animation takes over, never queues.
+- **Optimistic.** A sent message, a staged file or a toggled switch shows its
+  new state immediately; the network confirms or reverts it.
+- **No spinner flash.** Loading indicators appear only after 300ms; content
+  that returns sooner just appears. Prefer skeletons shaped like the content.
+- **Reduced motion.** Drop movement and scale, keep short fades.
+- **Frame budget.** Nothing on screen may rebuild a whole page per token,
+  tick or keystroke. Streaming, timers and inputs update the smallest widget
+  that shows them.

@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -127,8 +126,7 @@ PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
       // Upper case -> `caps()`, and a group heading is a label, not a
       // disabled control, so `fg3` rather than the `fg4` placeholder rung.
-      child: Text(label.toUpperCase(),
-          style: caps(10, color: AppColors.fg3)),
+      child: Text(label.toUpperCase(), style: caps(10, color: AppColors.fg3)),
     );
 
 /// Present a menu in the shape the platform expects.
@@ -179,48 +177,44 @@ Future<T?> showAppMenu<T>(
       builder: (sheet) {
         final media = MediaQuery.of(sheet);
         return ClipRRect(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              decoration: BoxDecoration(
-                color: (color ?? AppColors.surface1).withValues(alpha: 0.88),
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-                border: Border(top: BorderSide(color: AppColors.glassBorder)),
-              ),
-              child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 10),
-                Center(
-                    child: Container(
-                        width: 32,
-                        height: 3,
-                        decoration: BoxDecoration(
-                            color: AppColors.border2,
-                            borderRadius: BorderRadius.circular(99)))),
-                const SizedBox(height: 6),
-                Flexible(
-                  child: SingleChildScrollView(
-                    // STRETCH, not the default `center`. A heading is a bare `Text`
-                    // with no width constraint, so under `center` it shrank to its
-                    // intrinsic width and floated to the middle of the sheet while
-                    // every row below it started at the left edge.
-                    child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final item in items)
-                            _appMenuSheetEntry(sheet, item),
-                        ]),
-                  ),
-                ),
-                SizedBox(height: media.padding.bottom + 8),
-              ]),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color ?? AppColors.surface1,
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+              border: Border(top: BorderSide(color: AppColors.glassBorder)),
             ),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 10),
+                  Center(
+                      child: Container(
+                          width: 32,
+                          height: 3,
+                          decoration: BoxDecoration(
+                              color: AppColors.border2,
+                              borderRadius: BorderRadius.circular(99)))),
+                  const SizedBox(height: 6),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      // STRETCH, not the default `center`. A heading is a bare `Text`
+                      // with no width constraint, so under `center` it shrank to its
+                      // intrinsic width and floated to the middle of the sheet while
+                      // every row below it started at the left edge.
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final item in items)
+                              _appMenuSheetEntry(sheet, item),
+                          ]),
+                    ),
+                  ),
+                  SizedBox(height: media.padding.bottom + 8),
+                ]),
           ),
         );
       },
@@ -417,9 +411,7 @@ class _ToastCardState extends State<_ToastCard>
   @override
   void initState() {
     super.initState();
-    _c = AnimationController(
-        vsync: this, duration: Motion.base)
-      ..forward();
+    _c = AnimationController(vsync: this, duration: Motion.base)..forward();
   }
 
   @override

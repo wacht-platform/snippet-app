@@ -17,20 +17,11 @@ class MainFlutterWindow: NSWindow {
     // narrow-desktop drawer layout stays reachable between 800 and 900 —
     // pinning the floor at 900 would make that path dead code on macOS.
     self.minSize = NSSize(width: 800, height: 600)
-    // Enable translucent glassy vibrancy background behind the window
-    flutterViewController.backgroundColor = .clear
-    self.isOpaque = false
-    self.backgroundColor = .clear
+    let shellColor = NSColor(srgbRed: 0x15 / 255.0, green: 0x15 / 255.0, blue: 0x16 / 255.0, alpha: 1)
+    self.isOpaque = true
+    self.backgroundColor = shellColor
+    flutterViewController.backgroundColor = shellColor
     self.appearance = NSAppearance(named: .darkAqua)
-
-    let visualEffectView = NSVisualEffectView()
-    visualEffectView.appearance = NSAppearance(named: .darkAqua)
-    visualEffectView.blendingMode = .behindWindow
-    visualEffectView.state = .active
-    visualEffectView.material = .underWindowBackground
-    visualEffectView.autoresizingMask = [.width, .height]
-    visualEffectView.frame = flutterViewController.view.bounds
-    flutterViewController.view.addSubview(visualEffectView, positioned: .below, relativeTo: nil)
 
     // Use the native traffic lights, but let Flutter paint a cohesive title
     // surface beneath them instead of leaving a separate blank title strip.
@@ -62,12 +53,9 @@ class MainFlutterWindow: NSWindow {
 
     super.awakeFromNib()
 
-    // Ensure transparency persists after nib unpacking
-    self.isOpaque = false
-    self.backgroundColor = .clear
-    flutterViewController.backgroundColor = .clear
+    self.isOpaque = true
+    self.backgroundColor = shellColor
     self.appearance = NSAppearance(named: .darkAqua)
-    self.invalidateShadow()
 
     // AppKit sizes the native titlebar for a ~28pt band and centres the traffic
     // lights in it. The app paints a taller bar, so the lights would sit high

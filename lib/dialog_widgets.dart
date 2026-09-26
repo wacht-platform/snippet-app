@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -98,8 +97,7 @@ class _AppFieldState extends State<AppField> {
                   : sans(13, color: AppColors.fg1),
               decoration: InputDecoration(
                 isCollapsed: true,
-                contentPadding:
-                    EdgeInsets.symmetric(vertical: kMobile ? 8 : 8),
+                contentPadding: EdgeInsets.symmetric(vertical: kMobile ? 8 : 8),
                 border: InputBorder.none,
                 hintText: widget.hint,
                 hintStyle: widget.mono
@@ -136,80 +134,74 @@ Future<bool> confirmAction(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.58),
     builder: (ctx) {
-      return BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Dialog(
-          backgroundColor: AppColors.glassSurface,
-          elevation: 0,
-          insetPadding:
-              EdgeInsets.symmetric(horizontal: kMobile ? 24 : 40, vertical: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.card),
-            side: BorderSide(color: AppColors.glassBorder),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(R.card),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        // Tinted badge: a destructive confirm should look
-                        // destructive before you read a word of it.
-                        Container(
-                          width: 32,
-                          height: 32,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: accent.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: AppIcon(danger ? 'alert-triangle' : 'alert-circle',
-                              size: 16, color: accent),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 5),
-                            child: Text(title,
-                                style: sans(14,
-                                    weight: W.label, color: AppColors.fg1)),
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 10),
-                      // The body gets its OWN line, aligned under the title rather
-                      // than beside it. Sharing one Row made the body wrap into a
-                      // narrow column next to a one-line title, so the dialog read
-                      // as two unrelated fragments.
-                      Padding(
-                        padding: const EdgeInsets.only(left: 44),
-                        child: Text(body,
-                            style: sans(12, height: 1.5, color: AppColors.fg3)),
+      return Dialog(
+        backgroundColor: AppColors.glassSurface,
+        elevation: 0,
+        insetPadding:
+            EdgeInsets.symmetric(horizontal: kMobile ? 24 : 40, vertical: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(R.card),
+          side: BorderSide(color: AppColors.glassBorder),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(R.card),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    // Tinted badge: a destructive confirm should look
+                    // destructive before you read a word of it.
+                    Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(height: 18),
-                      Row(children: [
-                        const Spacer(),
-                        Btn('Cancel',
-                            variant: BtnVariant.ghost,
-                            small: true,
-                            onTap: () => Navigator.pop(ctx, false)),
-                        const SizedBox(width: 8),
-                        Btn(confirmLabel,
-                            variant:
-                                danger ? BtnVariant.danger : BtnVariant.primary,
-                            small: true,
-                            onTap: () => Navigator.pop(ctx, true)),
-                      ]),
-                    ],
+                      child: AppIcon(danger ? 'alert-triangle' : 'alert-circle',
+                          size: 16, color: accent),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Text(title,
+                            style: sans(14,
+                                weight: W.label, color: AppColors.fg1)),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  // The body gets its OWN line, aligned under the title rather
+                  // than beside it. Sharing one Row made the body wrap into a
+                  // narrow column next to a one-line title, so the dialog read
+                  // as two unrelated fragments.
+                  Padding(
+                    padding: const EdgeInsets.only(left: 44),
+                    child: Text(body,
+                        style: sans(12, height: 1.5, color: AppColors.fg3)),
                   ),
-                ),
+                  const SizedBox(height: 18),
+                  Row(children: [
+                    const Spacer(),
+                    Btn('Cancel',
+                        variant: BtnVariant.ghost,
+                        small: true,
+                        onTap: () => Navigator.pop(ctx, false)),
+                    const SizedBox(width: 8),
+                    Btn(confirmLabel,
+                        variant:
+                            danger ? BtnVariant.danger : BtnVariant.primary,
+                        small: true,
+                        onTap: () => Navigator.pop(ctx, true)),
+                  ]),
+                ],
               ),
             ),
           ),
@@ -232,32 +224,27 @@ Future<String?> promptText(BuildContext context,
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.58),
       builder: (ctx) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Dialog(
-            backgroundColor: AppColors.glassSurface,
-            elevation: 0,
-            insetPadding:
-                const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(R.md),
-              side: BorderSide(color: AppColors.glassBorder),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(R.md),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 320),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(title,
-                        style:
-                            sans(13, weight: W.label, color: AppColors.fg1)),
+        return Dialog(
+          backgroundColor: AppColors.glassSurface,
+          elevation: 0,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(R.md),
+            side: BorderSide(color: AppColors.glassBorder),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(R.md),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(title,
+                        style: sans(13, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     _TextPromptSheet(
                         initial: initial,
@@ -270,11 +257,9 @@ Future<String?> promptText(BuildContext context,
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
-  },
-);
   }
   return showAppSheet<String>(context,
       title: title,
@@ -355,51 +340,45 @@ Future<T?> showAppSheet<T>(BuildContext context,
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.58),
       builder: (ctx) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Dialog(
-            backgroundColor: AppColors.glassSurface,
-            elevation: 0,
-            insetPadding:
-                const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(R.md),
-              side: BorderSide(color: AppColors.glassBorder),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(R.md),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(children: [
-                          Expanded(
-                              child: Text(title,
-                                  style: sans(13,
-                                      weight: W.label, color: AppColors.fg1))),
-                          IconBtn('x',
-                              size: 28,
-                              iconSize: 14,
-                              tooltip: 'Close',
-                              onTap: () => Navigator.pop(ctx)),
-                        ]),
-                        const SizedBox(height: 6),
-                        Flexible(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
-                            child: child,
-                          ),
-                        ),
-                      ],
+        return Dialog(
+          backgroundColor: AppColors.glassSurface,
+          elevation: 0,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(R.md),
+            side: BorderSide(color: AppColors.glassBorder),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(R.md),
+            child: ConstrainedBox(
+              constraints:
+                  BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text(title,
+                              style: sans(13,
+                                  weight: W.label, color: AppColors.fg1))),
+                      IconBtn('x',
+                          size: 28,
+                          iconSize: 14,
+                          tooltip: 'Close',
+                          onTap: () => Navigator.pop(ctx)),
+                    ]),
+                    const SizedBox(height: 6),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
+                        child: child,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -430,52 +409,49 @@ Future<T?> showAppSheet<T>(BuildContext context,
           child: ClipRRect(
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Material(
-                color: AppColors.surface1.withValues(alpha: 0.88),
-                shape: RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-                  side: BorderSide(color: AppColors.glassBorder),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: limit),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const SizedBox(height: 8),
-                    Center(
-                        child: Container(
-                            width: 28,
-                            height: 3,
-                            decoration: BoxDecoration(
-                                color: AppColors.border2,
-                                borderRadius: BorderRadius.circular(99)))),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
-                      child: Row(children: [
-                        Expanded(
-                            child: Text(title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(16,
-                                    weight: W.label, color: AppColors.fg1))),
-                        IconBtn('x',
-                            size: 32,
-                            iconSize: 16,
-                            tooltip: 'Close',
-                            onTap: () => Navigator.pop(sheetContext)),
-                      ]),
+            child: Material(
+              color: AppColors.surface1,
+              shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+                side: BorderSide(color: AppColors.glassBorder),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: limit),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const SizedBox(height: 8),
+                  Center(
+                      child: Container(
+                          width: 28,
+                          height: 3,
+                          decoration: BoxDecoration(
+                              color: AppColors.border2,
+                              borderRadius: BorderRadius.circular(99)))),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
+                    child: Row(children: [
+                      Expanded(
+                          child: Text(title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(16,
+                                  weight: W.label, color: AppColors.fg1))),
+                      IconBtn('x',
+                          size: 32,
+                          iconSize: 16,
+                          tooltip: 'Close',
+                          onTap: () => Navigator.pop(sheetContext)),
+                    ]),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                          20, 0, 20, 16 + media.padding.bottom),
+                      child: child,
                     ),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(
-                            20, 0, 20, 16 + media.padding.bottom),
-                        child: child,
-                      ),
-                    ),
-                  ]),
-                ),
+                  ),
+                ]),
               ),
             ),
           ),

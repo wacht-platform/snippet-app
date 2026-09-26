@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'platform.dart';
 
 // ---------------------------------------------------------------------------
 // Theme presets — each one defines every color the app uses. Ported from the
@@ -38,6 +37,8 @@ class ThemePreset {
   final Color accentBg;
   final Color accentLine;
   final Color accentRing;
+  final Color accentFill;
+  final Color accentFillHover;
 
   // Status
   final Color ok;
@@ -75,6 +76,8 @@ class ThemePreset {
     required this.accentBg,
     required this.accentLine,
     required this.accentRing,
+    required this.accentFill,
+    required this.accentFillHover,
     required this.ok,
     required this.okBg,
     required this.run,
@@ -96,6 +99,8 @@ ThemePreset _dark({
   required String name,
   required String label,
   required Color accent,
+  required Color accentFill,
+  required Color accentFillHover,
   required Color ink,
   required Color inkMuted,
   required Color inkSubtle,
@@ -104,21 +109,12 @@ ThemePreset _dark({
   required Color danger,
   required Color warn,
 }) {
-  // One dark surface ladder for desktop and phone. Reading content is the
-  // darkest plane; shell chrome, active rows, and inputs step upward without
-  // borders or card shadows inventing a separate visual language.
-  //
-  // NEUTRAL GREY — deliberately no blue channel offset. The previous ladder
-  // carried a small blue bias (each surface had B = R + 3..8), which is
-  // invisible in isolation but reads as a lavender/purple cast in a large
-  // filled area such as the composer card or a sheet. Depth comes from
-  // lightness alone.
-  final canvas = const Color(0xFF0C0C0C); // chat / reader — darkest
-  final bg = const Color(0xFF101010); // shell chrome and navigation
-  final floor = const Color(0xFF141414); // secondary panes and sheets
-  final surface1 = const Color(0xFF161616); // quiet raised content
-  final surface2 = const Color(0xFF1B1B1B); // active row / selection
-  final surface3 = const Color(0xFF222222); // inputs, menus, hover
+  const canvas = Color(0xFF0F0F10);
+  const bg = Color(0xFF151516);
+  const floor = Color(0xFF151516);
+  const surface1 = Color(0xFF1C1C1E);
+  const surface2 = Color(0xFF232325);
+  const surface3 = Color(0xFF2A2A2D);
 
   return ThemePreset(
     name: name,
@@ -133,21 +129,16 @@ ThemePreset _dark({
     fg2: inkMuted,
     fg3: inkSubtle,
     fg4: inkFaint,
-    // Hairlines stay a single step off their surface, so a border reads as a
-    // soft edge rather than a drawn line.
-    border: const Color(0xFF262626),
-    border2: const Color(0xFF333333),
+    border: const Color(0xFF2A2A2D),
+    border2: const Color(0xFF36363A),
     accent: accent,
-    accentHover: _lighten(accent, 0.10),
-    // Near-black ink, not white. A filled accent button is `accentFg` on
-    // `accent`, and white-on-accent cannot clear WCAG AA for ANY usable accent
-    // hue: accent-as-text needs a light colour, while white-on-fill needs a dark
-    // one, and those two windows never overlap. Dark ink clears both roles for
-    // the chosen slate (8.6:1 as text on the canvas, 8.4:1 on the fill).
-    accentFg: const Color(0xFF0C0C0C),
+    accentHover: _lighten(accent, 0.06),
+    accentFg: const Color(0xFFFFFFFF),
     accentBg: _withAlpha(accent, 0.14),
     accentLine: _withAlpha(accent, 0.38),
     accentRing: _withAlpha(accent, 0.45),
+    accentFill: accentFill,
+    accentFillHover: accentFillHover,
     ok: success,
     okBg: _withAlpha(success, 0.13),
     run: warn,
@@ -158,30 +149,24 @@ ThemePreset _dark({
     diffDelBg: _withAlpha(danger, 0.10),
     diffAddFg: _lighten(success, 0.14),
     diffDelFg: _lighten(danger, 0.14),
-    diffGutter: const Color(0xFF383838),
+    diffGutter: const Color(0xFF36363A),
   );
 }
 
-// The only client theme.
+// The only client theme. Values and rationale: docs/design-language.md.
 final _amoled = _dark(
   name: 'amoled',
   label: 'Dark',
-  // Slate, not blue. A neutral accent keeps the accent channel about BRIGHTNESS
-  // rather than hue, so it cannot be mistaken for a status colour (green =
-  // online, amber = busy, red = danger). #94A3B8.
-  //
-  // One cost: it is close to the neutral ink it sits beside (fg2 #C1C1C1 and
-  // fg3 #8F8F8F), so a state that uses accent as its ONLY channel stops reading.
-  // `sessionStateColor` therefore stops painting "needs you" with the accent and
-  // uses `fg1`; see the note there.
-  accent: const Color(0xFF94A3B8), // slate
-  ink: const Color(0xFFFFFFFF), // white — emphasis only
-  inkMuted: const Color(0xFFC1C1C1), // DEFAULT body text
-  inkSubtle: const Color(0xFF8F8F8F), // muted
-  inkFaint: const Color(0xFF5F5F5F), // placeholder / disabled
-  success: const Color(0xFF3EAF3F), // online green
-  danger: const Color(0xFFEF4444), // red danger
-  warn: const Color(0xFFAF8D3E), // amber
+  accent: const Color(0xFF6EA2FF),
+  accentFill: const Color(0xFF2F6FEB),
+  accentFillHover: const Color(0xFF2A63D6),
+  ink: const Color(0xFFEDEDEF),
+  inkMuted: const Color(0xFFC8C8CC),
+  inkSubtle: const Color(0xFF9A9AA2),
+  inkFaint: const Color(0xFF6E6E76),
+  success: const Color(0xFF39C57E),
+  danger: const Color(0xFFF06464),
+  warn: const Color(0xFFE5A93B),
 );
 
 final List<ThemePreset> allPresets = [_amoled];
@@ -252,17 +237,16 @@ class AppColors {
   static Color get surface2 => currentTheme.surface2;
   static Color get surface3 => currentTheme.surface3;
 
-  /// Translucent window background for desktop vibrancy (macOS) and Acrylic/Mica (Windows).
-  /// Blends subtly with the native frosted desktop backdrop without losing contrast.
-  static Color get windowBg =>
-      (kMacOS || kWindows) ? currentTheme.bg.withValues(alpha: 0.70) : currentTheme.bg;
+  static Color get base => currentTheme.bg;
+  static Color get raised => currentTheme.surface1;
+  static Color get overlay => currentTheme.surface2;
+  static Color get hover => currentTheme.surface3;
+  static Color get line => currentTheme.border;
+  static Color get lineStrong => currentTheme.border2;
 
-  /// Translucent frosted glass surface for modals, dialogs, drawers, bottom sheets,
-  /// and floating action bars across desktop and mobile.
-  static Color get glassSurface => currentTheme.surface1.withValues(alpha: 0.65);
-
-  /// Subtle translucent border for glassy surfaces.
-  static Color get glassBorder => currentTheme.border2.withValues(alpha: 0.4);
+  static Color get windowBg => currentTheme.bg;
+  static Color get glassSurface => currentTheme.surface2;
+  static Color get glassBorder => currentTheme.border;
 
   // Foreground
   static Color get fg1 => currentTheme.fg1;
@@ -281,6 +265,8 @@ class AppColors {
   static Color get accentBg => currentTheme.accentBg;
   static Color get accentLine => currentTheme.accentLine;
   static Color get accentRing => currentTheme.accentRing;
+  static Color get accentFill => currentTheme.accentFill;
+  static Color get accentFillHover => currentTheme.accentFillHover;
 
   // Status
   static Color get ok => currentTheme.ok;
@@ -298,13 +284,7 @@ class AppColors {
   static Color get diffGutter => currentTheme.diffGutter;
 }
 
-/// Reading/content surfaces (chat, editor, file viewer, diff).
-/// Translucent deep dark on desktop so vibrancy shines through with a sleek
-/// smoked-glass feel, closely harmonized with the sidebar to reduce contrast
-/// and make the interface smooth and cohesive.
-Color get readingBg => (kMacOS || kWindows)
-    ? currentTheme.canvas.withValues(alpha: 0.74)
-    : AppColors.canvas;
+Color get readingBg => AppColors.canvas;
 
 // ---------------------------------------------------------------------------
 // Radius — small and precise. Large radii read consumer/toy; a developer tool
@@ -312,13 +292,34 @@ Color get readingBg => (kMacOS || kWindows)
 // ---------------------------------------------------------------------------
 
 class R {
-  static const card = 8.0; // rows, cards, inputs — the dominant radius
-  static const md = 8.0;
-  static const sm = 8.0;
-  static const xs = 4.0; // small inline marks
+  static const xs = 4.0;
+  static const sm = 6.0;
   static const chip = 6.0;
-  static const sheetTop = 10.0; // window + section corners
+  static const md = 10.0;
+  static const card = 10.0;
+  static const lg = 14.0;
+  static const sheetTop = 14.0;
+  static const pill = 999.0;
 }
+
+/// The only spacing values the app uses.
+class S {
+  static const s2 = 2.0;
+  static const s4 = 4.0;
+  static const s6 = 6.0;
+  static const s8 = 8.0;
+  static const s12 = 12.0;
+  static const s16 = 16.0;
+  static const s20 = 20.0;
+  static const s24 = 24.0;
+  static const s32 = 32.0;
+  static const s40 = 40.0;
+}
+
+/// Overlays lift with a surface step plus this shadow; nothing else casts one.
+List<BoxShadow> get overlayShadow => const [
+      BoxShadow(color: Color(0x73000000), blurRadius: 24, offset: Offset(0, 8)),
+    ];
 
 // ---------------------------------------------------------------------------
 // Motion — the ONE place durations and curves are decided.
@@ -330,17 +331,26 @@ class R {
 // ---------------------------------------------------------------------------
 
 class Motion {
-  /// Press feedback — the fastest thing in the app.
-  static const press = Duration(milliseconds: 120);
+  /// Pointer-down acknowledgement — the fastest thing in the app.
+  static const press = Duration(milliseconds: 100);
 
-  /// Hover, colour and opacity swaps on high-frequency controls.
+  /// Hover, colour and icon swaps.
   static const quick = Duration(milliseconds: 150);
 
   /// A small surface appearing or changing: pills, chips, inline rows.
   static const fast = Duration(milliseconds: 180);
 
-  /// The standard transition — panels, drawers, switches.
+  /// Panels, drawers, switches.
   static const base = Duration(milliseconds: 220);
+
+  /// Sheets, menus and dialogs arriving.
+  static const open = Duration(milliseconds: 240);
+
+  /// Anything leaving — always shorter than it took to arrive.
+  static const close = Duration(milliseconds: 180);
+
+  /// Route push and pop.
+  static const page = Duration(milliseconds: 260);
 
   /// A deliberate, infrequent change. Never for a repeated interaction.
   static const slow = Duration(milliseconds: 300);
@@ -348,13 +358,11 @@ class Motion {
   /// One direction of the looping "working" breath on a live status glyph.
   static const pulse = Duration(milliseconds: 1150);
 
-  /// Entrances start fast and settle; the first frame must carry the motion.
-  static const enter = Curves.easeOutCubic;
+  /// Fast start, long soft settle — the iOS sheet curve.
+  static const enter = Cubic(0.32, 0.72, 0, 1);
 
-  /// Exits leave the same way but shorter — an exit must never be waited on.
   static const exit = Curves.easeInCubic;
 
-  /// On-screen movement that is neither an arrival nor a departure.
   static const move = Curves.easeInOut;
 }
 
@@ -462,8 +470,7 @@ TextStyle sans(double size,
       // Proportional digits have different widths, so a ticking timer or a
       // counter shimmers and reflows as it updates. Geist ships `tnum`
       // (verified in the font's GSUB table), so this is a real substitution.
-      fontFeatures:
-          tabular ? const [FontFeature.tabularFigures()] : null,
+      fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
     );
 
 TextStyle display(double size,
@@ -493,8 +500,7 @@ TextStyle mono(double size,
       height: height ?? 1.45,
       letterSpacing: spacing,
       color: color ?? AppColors.fg1,
-      fontFeatures:
-          tabular ? const [FontFeature.tabularFigures()] : null,
+      fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
     );
 
 /// The ONE uppercase label style: small, 500, with POSITIVE tracking.
@@ -529,8 +535,8 @@ ThemeData buildAppTheme() {
       brightness:
           c.bg.computeLuminance() > 0.18 ? Brightness.light : Brightness.dark,
       surface: c.bg,
-      primary: c.accent,
-      secondary: c.accent,
+      primary: c.accentFill,
+      secondary: c.accentFill,
       error: c.danger,
       onSurface: c.fg1,
       onPrimary: c.accentFg,
@@ -539,27 +545,33 @@ ThemeData buildAppTheme() {
     ),
   );
   return base.copyWith(
-    scaffoldBackgroundColor:
-        (kMacOS || kWindows) ? Colors.transparent : c.bg,
-    canvasColor:
-        (kMacOS || kWindows) ? Colors.transparent : c.bg,
+    scaffoldBackgroundColor: c.bg,
+    canvasColor: c.bg,
+    pageTransitionsTheme: const PageTransitionsTheme(builders: {
+      TargetPlatform.android: SnappyPageTransitionsBuilder(),
+      TargetPlatform.iOS: SnappyPageTransitionsBuilder(),
+      TargetPlatform.macOS: SnappyPageTransitionsBuilder(),
+      TargetPlatform.windows: SnappyPageTransitionsBuilder(),
+      TargetPlatform.linux: SnappyPageTransitionsBuilder(),
+    }),
     dividerColor: c.border,
     textSelectionTheme: TextSelectionThemeData(
       selectionColor: _withAlpha(c.accent, 0.35),
       cursorColor: c.accent,
       selectionHandleColor: c.accent,
     ),
-    splashColor: c.surface3.withValues(alpha: 0.4),
-    highlightColor: c.surface3.withValues(alpha: 0.3),
-    hoverColor: c.surface3.withValues(alpha: 0.35),
+    splashFactory: NoSplash.splashFactory,
+    splashColor: Colors.transparent,
+    highlightColor: c.surface3.withValues(alpha: 0.7),
+    hoverColor: c.surface3.withValues(alpha: 0.5),
     popupMenuTheme: PopupMenuThemeData(
-      color: c.surface1,
+      color: c.surface2,
       elevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       menuPadding: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(R.lg),
           side: BorderSide(color: c.border)),
     ),
     // Geist, not Inter. Inter was a second near-identical sans-serif: at UI
@@ -567,9 +579,21 @@ ThemeData buildAppTheme() {
     // (menus, tooltips, dialogs, text fields) rendered in a different family
     // than the app's own text around it — which reads as a mistake rather than
     // a pairing. One UI family.
-    textTheme: _weightedTextTheme(base.textTheme.apply(
-        fontFamily: kSansFamily, bodyColor: c.fg1, displayColor: c.fg1)),
+    textTheme: _weightedTextTheme(base.textTheme
+        .apply(fontFamily: kSansFamily, bodyColor: c.fg1, displayColor: c.fg1)),
     dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 12),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: c.accentFill,
+      foregroundColor: c.accentFg,
+      elevation: 0,
+      focusElevation: 0,
+      hoverElevation: 0,
+      highlightElevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.lg)),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: c.accent),
+    ),
   );
 }
 
@@ -811,3 +835,43 @@ double glyphInkScale(String name) => switch (name) {
       'refresh' => 0.72,
       _ => 1.0,
     };
+
+/// Route transition: a short slide with a fade, settling on [Motion.enter].
+/// The outgoing page drifts a little the other way so the two read as one move.
+class SnappyPageTransitionsBuilder extends PageTransitionsBuilder {
+  const SnappyPageTransitionsBuilder();
+
+  @override
+  Duration get transitionDuration => Motion.page;
+
+  @override
+  Duration get reverseTransitionDuration => Motion.close;
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (reduceMotion(context)) {
+      return FadeTransition(opacity: animation, child: child);
+    }
+    final incoming = CurvedAnimation(
+        parent: animation, curve: Motion.enter, reverseCurve: Motion.exit);
+    final outgoing = CurvedAnimation(
+        parent: secondaryAnimation,
+        curve: Motion.enter,
+        reverseCurve: Motion.exit);
+    return SlideTransition(
+      position: Tween(begin: Offset.zero, end: const Offset(-0.06, 0))
+          .animate(outgoing),
+      child: SlideTransition(
+        position: Tween(begin: const Offset(0.08, 0), end: Offset.zero)
+            .animate(incoming),
+        child: FadeTransition(opacity: incoming, child: child),
+      ),
+    );
+  }
+}

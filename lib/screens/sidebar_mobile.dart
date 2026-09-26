@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -18,8 +17,7 @@ class SidebarEmpty extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Text(message,
-            style: sans(12, color: AppColors.fg3),
-            textAlign: TextAlign.center),
+            style: sans(12, color: AppColors.fg3), textAlign: TextAlign.center),
       );
 }
 
@@ -88,17 +86,14 @@ class SidebarMobileBar extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Material(
-            color: AppColors.surface1.withValues(alpha: 0.82),
-            shape: RoundedRectangleBorder(
-              borderRadius: radius,
-              side: BorderSide(color: AppColors.glassBorder),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: child,
+        child: Material(
+          color: AppColors.surface1,
+          shape: RoundedRectangleBorder(
+            borderRadius: radius,
+            side: BorderSide(color: AppColors.glassBorder),
           ),
+          clipBehavior: Clip.antiAlias,
+          child: child,
         ),
       ),
     );
@@ -151,7 +146,8 @@ class SidebarMobileBar extends StatelessWidget {
         ),
       ),
       if (filterQuery.isNotEmpty)
-        IconBtn('x', size: 32, iconSize: 14, tooltip: 'Clear', onTap: onClearSearch),
+        IconBtn('x',
+            size: 32, iconSize: 14, tooltip: 'Clear', onTap: onClearSearch),
       IconBtn('arrow-down',
           size: 36,
           iconSize: 16,
@@ -273,22 +269,19 @@ Future<void> showSidebarMachinesPicker(
         width: box.size.width - 20,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(R.md),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Material(
-              color: AppColors.glassSurface,
-              elevation: 12,
-              shadowColor: Colors.black87,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(R.md),
-                  border: Border.all(color: AppColors.glassBorder),
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 420),
-                  child: SingleChildScrollView(child: content),
-                ),
+          child: Material(
+            color: AppColors.glassSurface,
+            elevation: 12,
+            shadowColor: Colors.black87,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(R.md),
+                border: Border.all(color: AppColors.glassBorder),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 420),
+                child: SingleChildScrollView(child: content),
               ),
             ),
           ),
@@ -296,13 +289,8 @@ Future<void> showSidebarMachinesPicker(
       ),
     ]),
     transitionBuilder: (_, anim, __, child) {
-      final curved =
-          CurvedAnimation(parent: anim, curve: Motion.enter);
-      return BackdropFilter(
-        filter: ImageFilter.blur(
-            sigmaX: 20.0 * curved.value, sigmaY: 20.0 * curved.value),
-        child: FadeTransition(opacity: curved, child: child),
-      );
+      final curved = CurvedAnimation(parent: anim, curve: Motion.enter);
+      return FadeTransition(opacity: curved, child: child);
     },
   );
 }

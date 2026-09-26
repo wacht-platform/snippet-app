@@ -500,7 +500,7 @@ class _GitScreenState extends State<GitScreen> {
               decoration: InputDecoration(
                 isDense: true,
                 hintText:
-                    'Commit message (${kMacOS ? '⌘↵' : 'Ctrl+↵'} to commit)...',
+                    'Commit message (${kMacOS ? 'Cmd' : 'Ctrl'}+Enter to commit)',
                 hintStyle: sans(12, color: AppColors.fg3),
                 contentPadding: const EdgeInsets.all(6),
                 border: InputBorder.none,

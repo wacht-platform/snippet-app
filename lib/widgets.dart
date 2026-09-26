@@ -423,7 +423,7 @@ class Btn extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final (Color bg, Color fg, Color? bd) = switch (variant) {
-      BtnVariant.primary => (AppColors.accent, AppColors.accentFg, null),
+      BtnVariant.primary => (AppColors.accentFill, AppColors.accentFg, null),
       BtnVariant.secondary => (
           AppColors.surface2,
           AppColors.fg1,
@@ -506,7 +506,7 @@ class PillBtn extends StatelessWidget {
       child: Pressable(
         enabled: onTap != null,
         child: Material(
-          color: AppColors.accent,
+          color: AppColors.accentFill,
           borderRadius: BorderRadius.circular(99),
           child: InkWell(
             onTap: onTap,

@@ -796,9 +796,9 @@ class _Row extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: on ? AppColors.accent : Colors.transparent,
+          color: on ? AppColors.accentFill : Colors.transparent,
           border: Border.all(
-              color: on ? AppColors.accent : AppColors.border2, width: 1.5),
+              color: on ? AppColors.accentFill : AppColors.border2, width: 1.5),
         ),
         child:
             on ? AppIcon('check', size: 12, color: AppColors.accentFg) : null,

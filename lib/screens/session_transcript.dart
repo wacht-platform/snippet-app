@@ -364,7 +364,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               foregroundColor: AppColors.accentFg,
-              backgroundColor: AppColors.accent,
+              backgroundColor: AppColors.accentFill,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(4)),
             ),

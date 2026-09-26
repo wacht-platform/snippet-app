@@ -496,7 +496,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
                   height: kMobile ? 48 : 36,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                      color: AppColors.accent, shape: BoxShape.circle),
+                      color: AppColors.accentFill, shape: BoxShape.circle),
                   child: SizedBox(
                       width: 16,
                       height: 16,
