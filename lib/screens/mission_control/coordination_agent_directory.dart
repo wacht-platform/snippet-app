@@ -104,7 +104,7 @@ class _CoordinationAgentDirectoryState
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                       itemCount: agents.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (_, __) => const SizedBox(height: S.s8),
                       itemBuilder: (_, index) =>
                           _AgentCard(agents[index], widget.client),
                     ),
@@ -151,211 +151,85 @@ class _AgentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = agent.displayName.trim().isEmpty
-        ? '?'
-        : agent.displayName.trim()[0].toUpperCase();
-    final isActive = agent.available;
-    final statusColor = isActive ? AppColors.ok : AppColors.fg4;
-    final statusText = agent.status.toUpperCase();
-
-    void openDetail() {
-      presentScreen(
-        context,
-        style: PanelStyle.drawer,
-        builder: (_, __) =>
-            CoordinationAgentDetail(agent: agent, client: client),
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(R.card),
-        border: Border.all(color: AppColors.border),
-      ),
+    final sessions = agent.assignedSessions.length;
+    return Material(
+      color: AppColors.raised,
+      borderRadius: BorderRadius.circular(R.md),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(R.card),
-        onTap: openDetail,
+        onTap: () => presentScreen(
+          context,
+          style: PanelStyle.drawer,
+          builder: (_, __) =>
+              CoordinationAgentDetail(agent: agent, client: client),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(S.s16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
+              Row(children: [
+                Avatar(agent.displayName,
+                    size: 40,
+                    presence: agent.available,
+                    ring: AppColors.raised),
+                const SizedBox(width: S.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(R.sm),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Text(
-                          initial,
-                          style: sans(16,
-                              weight: FontWeight.w700,
-                              color: AppColors.accent),
-                        ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: AppColors.surface1, width: 2),
-                          ),
-                        ),
+                      Text(agent.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TS.rowTitle()),
+                      const SizedBox(height: S.s2),
+                      Text(
+                        [
+                          '@${agent.handle}',
+                          if (agent.role.trim().isNotEmpty) agent.role.trim(),
+                        ].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TS.meta(),
                       ),
                     ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                agent.displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(15,
-                                    weight: FontWeight.w600,
-                                    color: AppColors.fg1),
-                              ),
-                            ),
-                            if (agent.role.trim().isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: AppColors.accent
-                                        .withValues(alpha: 0.25),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  agent.role.trim(),
-                                  style: mono(9,
-                                      weight: FontWeight.w600,
-                                      color: AppColors.accent),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '@${agent.handle}',
-                          style: mono(11, color: AppColors.fg3),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: statusColor.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          statusText,
-                          style: mono(10,
-                              weight: FontWeight.w600,
-                              spacing: 0.4,
-                              color: statusColor),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: S.s8),
+                Tag(_statusLabel(agent.status),
+                    tone: agent.available ? Tone.ok : Tone.neutral, dot: true),
+              ]),
               if (agent.capabilities.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: S.s12),
                 Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+                  spacing: S.s6,
+                  runSpacing: S.s6,
                   children: [
-                    for (final cap in agent.capabilities)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.8),
-                          ),
-                        ),
-                        child: Text(
-                          cap,
-                          style: mono(10, color: AppColors.fg2),
-                        ),
-                      ),
+                    for (final cap in agent.capabilities) Tag(cap, mono: true),
                   ],
                 ),
               ],
-              if (agent.assignedSessions.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(R.sm),
-                  ),
-                  child: Row(
-                    children: [
-                      AppIcon('folder', size: 13, color: AppColors.fg3),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${agent.assignedSessions.length} active ${agent.assignedSessions.length == 1 ? 'session' : 'sessions'}',
-                        style: sans(11, color: AppColors.fg3),
-                      ),
-                      const Spacer(),
-                      AppIcon('chevron-right', size: 13, color: AppColors.fg4),
-                    ],
-                  ),
-                ),
+              if (sessions > 0) ...[
+                const SizedBox(height: S.s12),
+                Row(children: [
+                  AppIcon('folder', size: 14, color: AppColors.fg3),
+                  const SizedBox(width: S.s6),
+                  Text(
+                      '$sessions active ${sessions == 1 ? 'session' : 'sessions'}',
+                      style: TS.meta()),
+                ]),
               ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  String _statusLabel(String status) {
+    final t = status.trim();
+    if (t.isEmpty) return agent.available ? 'Online' : 'Offline';
+    return t[0].toUpperCase() + t.substring(1);
   }
 }
 

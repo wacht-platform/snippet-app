@@ -500,8 +500,10 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     }
     final chevron = collapsed ? 'chevron-right' : 'chevron-down';
 
-    final isActive = agent.available;
-    final statusColor = isActive ? AppColors.ok : AppColors.fg4;
+    final meta = [
+      if (agent.role.trim().isNotEmpty) agent.role.trim(),
+      agent.available ? 'Online' : 'Offline',
+    ].join(' · ');
 
     return Row(children: [
       Expanded(
@@ -511,122 +513,27 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             borderRadius: BorderRadius.circular(R.sm),
             onTap: openAgent,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
+              padding: const EdgeInsets.symmetric(vertical: S.s8),
+              child: Row(children: [
+                Avatar(name, size: 36, presence: agent.available),
+                const SizedBox(width: S.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(R.sm),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Text(
-                          name.isEmpty ? '?' : name.characters.first.toUpperCase(),
-                          style: sans(16, weight: W.label, color: AppColors.fg1),
-                        ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.bg, width: 2),
-                          ),
-                        ),
-                      ),
+                      Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TS.rowTitle()),
+                      const SizedBox(height: S.s2),
+                      Text(meta,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TS.meta()),
                     ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(15, weight: W.label, color: AppColors.fg1),
-                              ),
-                            ),
-                            if (agent.role.trim().isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: AppColors.accent.withValues(alpha: 0.25),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  agent.role.trim(),
-                                  style: mono(9,
-                                      weight: FontWeight.w600,
-                                      color: AppColors.accent),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Text('@${agent.handle}',
-                                style: mono(11, color: AppColors.fg3)),
-                            const SizedBox(width: 6),
-                            Text('·', style: sans(11, color: AppColors.fg4)),
-                            const SizedBox(width: 6),
-                            Text(
-                              isActive ? 'Online' : 'Offline',
-                              style: sans(11,
-                                  weight: FontWeight.w500,
-                                  color: statusColor),
-                            ),
-                          ],
-                        ),
-                        if (agent.capabilities.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 5,
-                            runSpacing: 4,
-                            children: [
-                              for (final cap in agent.capabilities.take(3))
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surface2,
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                        color: AppColors.border.withValues(alpha: 0.8)),
-                                  ),
-                                  child: Text(cap,
-                                      style: mono(9, color: AppColors.fg3)),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ]),
             ),
           ),
         ),
@@ -776,34 +683,10 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.left,
-                          style: sans(12, weight: W.body, color: AppColors.fg1),
-                        ),
-                      ),
-                      if (agent.role.trim().isNotEmpty) ...[
-                        const SizedBox(width: 5),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface2,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(
-                            agent.role.trim(),
-                            style: mono(8.5, color: AppColors.fg3),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                  child: Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TS.ui(AppColors.fg1)),
                 ),
                 if (collapsed && count > 0) ...[
                   InkWell(

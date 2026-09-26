@@ -298,14 +298,14 @@ class _GitScreenState extends State<GitScreen> {
             else ...[
               if (st.staged.isNotEmpty) ...[
                 _sectionCard(
-                  title: 'Staged Changes',
+                  title: 'Staged',
                   count: st.staged.length,
                   actionLabel: 'Unstage all',
                   onAction: () => _op(() => widget.client.gitUnstage(_repo)),
                   files: st.staged,
                   staged: true,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: S.s16),
               ],
               if (st.changed.isNotEmpty) ...[
                 _sectionCard(
@@ -321,7 +321,7 @@ class _GitScreenState extends State<GitScreen> {
               ],
               if (st.untracked.isNotEmpty) ...[
                 _sectionCard(
-                  title: 'Untracked Files',
+                  title: 'Untracked',
                   count: st.untracked.length,
                   actionLabel: 'Stage all',
                   onAction: () =>
@@ -339,105 +339,59 @@ class _GitScreenState extends State<GitScreen> {
 
   Widget _header(GitStatus st) {
     final hasUp = st.upstream != null;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s8, S.s8),
       child: Row(children: [
-        // Branch selector pill
         Flexible(
-          child: GestureDetector(
-            onTap: _busy ? null : _branchSheet,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: AppColors.border2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon('git-branch', size: 13, color: AppColors.accent),
-                  const SizedBox(width: 6),
+          child: Material(
+            color: AppColors.overlay,
+            borderRadius: BorderRadius.circular(R.sm),
+            child: InkWell(
+              onTap: _busy ? null : _branchSheet,
+              borderRadius: BorderRadius.circular(R.sm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: S.s8, vertical: S.s6),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  AppIcon('git-branch', size: 14, color: AppColors.accent),
+                  const SizedBox(width: S.s6),
                   Flexible(
                     child: Text(
                       st.branch.isEmpty ? '(no branch)' : st.branch,
-                      style: sans(12,
-                          weight: FontWeight.w600, color: AppColors.fg1),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: TS.label(AppColors.fg1),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  AppIcon('chevron-down', size: 11, color: AppColors.fg3),
-                ],
+                  const SizedBox(width: S.s4),
+                  AppIcon('chevron-down', size: 14, color: AppColors.fg3),
+                ]),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        // Sync / Upstream info
+        const SizedBox(width: S.s8),
         if (hasUp) ...[
           if (st.ahead > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.accentBg,
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(
-                    color: AppColors.accentLine.withValues(alpha: 0.5)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon('upload', size: 11, color: AppColors.accent),
-                  const SizedBox(width: 3),
-                  Text('${st.ahead}',
-                      style: mono(11,
-                          weight: FontWeight.w600, color: AppColors.accent)),
-                ],
-              ),
-            ),
-          if (st.ahead > 0 && st.behind > 0) const SizedBox(width: 4),
+            Tag('${st.ahead}', tone: Tone.accent, icon: 'upload', mono: true),
+          if (st.ahead > 0 && st.behind > 0) const SizedBox(width: S.s4),
           if (st.behind > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.runBg,
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(
-                    color: AppColors.run.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon('download', size: 11, color: AppColors.run),
-                  const SizedBox(width: 3),
-                  Text('${st.behind}',
-                      style: mono(11,
-                          weight: FontWeight.w600, color: AppColors.run)),
-                ],
-              ),
-            ),
-          const SizedBox(width: 6),
+            Tag('${st.behind}', tone: Tone.run, icon: 'download', mono: true),
+          const Spacer(),
           IconBtn(
             'download',
-            size: 28,
-            iconSize: 14,
+            size: 30,
+            iconSize: 16,
             tooltip: st.behind > 0 ? 'Pull (${st.behind})' : 'Pull',
             onTap: _busy
                 ? null
                 : () =>
                     _op(() => widget.client.gitPull(_repo), okMsg: 'Pulled'),
           ),
-          const SizedBox(width: 2),
           IconBtn(
             'upload',
-            size: 28,
-            iconSize: 14,
+            size: 30,
+            iconSize: 16,
             tooltip: st.ahead > 0 ? 'Push (${st.ahead})' : 'Push',
             onTap: _busy
                 ? null
@@ -465,86 +419,70 @@ class _GitScreenState extends State<GitScreen> {
     final hasAny = st.files.isNotEmpty;
     final hasMsg = _commitController.text.trim().isNotEmpty;
     final canCommit = !_busy && hasMsg && hasAny;
+    void submit() {
+      if (canCommit) hasStaged ? _commit() : _stageAllAndCommit();
+    }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: S.s16),
+      padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s8, S.s8),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(R.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           CallbackShortcuts(
             bindings: {
-              const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
-                if (canCommit) {
-                  hasStaged ? _commit() : _stageAllAndCommit();
-                }
-              },
+              const SingleActivator(LogicalKeyboardKey.enter, meta: true):
+                  submit,
               const SingleActivator(LogicalKeyboardKey.enter, control: true):
-                  () {
-                if (canCommit) {
-                  hasStaged ? _commit() : _stageAllAndCommit();
-                }
-              },
+                  submit,
             },
             child: TextField(
               controller: _commitController,
               focusNode: _commitFocus,
               minLines: 2,
               maxLines: 4,
-              style: sans(12.5, color: AppColors.fg1),
+              style: TS.ui(AppColors.fg1),
               decoration: InputDecoration(
                 isDense: true,
                 hintText:
                     'Commit message (${kMacOS ? 'Cmd' : 'Ctrl'}+Enter to commit)',
-                hintStyle: sans(12, color: AppColors.fg3),
-                contentPadding: const EdgeInsets.all(6),
+                hintStyle: TS.ui(AppColors.fg4),
+                contentPadding: const EdgeInsets.symmetric(vertical: S.s4),
                 border: InputBorder.none,
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Text(
-                hasStaged
-                    ? '${st.staged.length} staged'
-                    : (hasAny
-                        ? '0 staged (${st.changed.length + st.untracked.length} changes)'
-                        : 'Clean'),
-                style: mono(11, color: AppColors.fg3),
-              ),
-              const Spacer(),
-              if (hasStaged)
-                Btn(
-                  'Commit (${st.staged.length})',
+          const SizedBox(height: S.s8),
+          Row(children: [
+            Text(
+              hasStaged
+                  ? '${st.staged.length} staged'
+                  : hasAny
+                      ? 'Nothing staged · ${st.changed.length + st.untracked.length} changed'
+                      : 'Clean',
+              style: TS.meta(),
+            ),
+            const Spacer(),
+            if (hasStaged)
+              Btn('Commit ${st.staged.length}',
                   icon: 'check',
                   small: true,
                   disabled: !canCommit,
-                  onTap: _commit,
-                )
-              else if (hasAny)
-                Btn(
-                  'Commit all',
+                  onTap: _commit)
+            else if (hasAny)
+              Btn('Commit all',
                   icon: 'check',
                   small: true,
                   variant: BtnVariant.secondary,
                   disabled: !canCommit,
-                  onTap: _stageAllAndCommit,
-                )
-              else
-                const Btn(
-                  'Commit',
-                  icon: 'check',
-                  small: true,
-                  disabled: true,
-                ),
-            ],
-          ),
+                  onTap: _stageAllAndCommit)
+            else
+              const Btn('Commit', icon: 'check', small: true, disabled: true),
+          ]),
         ],
       ),
     );
@@ -558,148 +496,81 @@ class _GitScreenState extends State<GitScreen> {
     required List<GitFile> files,
     required bool staged,
   }) {
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
-            decoration: BoxDecoration(
-              color: AppColors.surface2.withValues(alpha: 0.5),
-              border: Border(
-                  bottom: BorderSide(
-                      color: AppColors.border.withValues(alpha: 0.5))),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  title.toUpperCase(),
-                  style: sans(10.5,
-                      weight: FontWeight.w600,
-                      color: AppColors.fg3,
-                      spacing: 0.5),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface3,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: mono(10,
-                        weight: FontWeight.w600, color: AppColors.fg2),
-                  ),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _busy ? null : onAction,
-                  child: Container(
-                    constraints:
-                        BoxConstraints(minHeight: kMobile ? M.minTarget : 0),
-                    alignment: Alignment.center,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: Text(
-                      actionLabel,
-                      style: sans(11,
-                          weight: FontWeight.w500, color: AppColors.accent),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          for (int i = 0; i < files.length; i++) ...[
-            if (i > 0)
-              Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: AppColors.border.withValues(alpha: 0.25)),
-            _fileItem(files[i], staged: staged),
-          ],
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(
+          title,
+          count: count,
+          action: actionLabel,
+          onAction: _busy ? null : onAction,
+          padding: const EdgeInsets.fromLTRB(S.s4, 0, 0, S.s4),
+        ),
+        ListGroup(children: [
+          for (final f in files) _fileItem(f, staged: staged),
+        ]),
+      ],
     );
   }
 
   Widget _fileItem(GitFile f, {required bool staged}) {
     final code = staged ? f.x : (f.untracked ? '?' : f.y);
-    final (Color fg, Color bg, _) = _statusColor(code);
+    final tone = _statusTone(code);
+    final (fg, bg) = toneColors(tone);
+    final slash = f.path.lastIndexOf('/');
+    final dir = slash != -1 ? f.path.substring(0, slash + 1) : '';
+    final fileName = slash != -1 ? f.path.substring(slash + 1) : f.path;
 
-    final slashIdx = f.path.lastIndexOf('/');
-    final dir = slashIdx != -1 ? f.path.substring(0, slashIdx + 1) : '';
-    final fileName = slashIdx != -1 ? f.path.substring(slashIdx + 1) : f.path;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _openDiff(f),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          child: Row(
-            children: [
-              Container(
-                width: 18,
-                height: 18,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: bg,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  code == '?' ? 'U' : code,
-                  style: mono(10, weight: FontWeight.w700, color: fg),
-                ),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text.rich(
-                  TextSpan(children: [
-                    if (dir.isNotEmpty)
-                      TextSpan(
-                        text: dir,
-                        style: mono(12, color: AppColors.fg3),
-                      ),
-                    TextSpan(
-                      text: fileName,
-                      style: mono(12,
-                          weight: FontWeight.w600, color: AppColors.fg1),
-                    ),
-                  ]),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconBtn(
-                staged ? 'minus' : 'plus',
-                size: 26,
-                iconSize: 13,
-                tooltip: staged ? 'Unstage' : 'Stage',
-                onTap: _busy
-                    ? null
-                    : () => _op(() => staged
-                        ? widget.client.gitUnstage(_repo, paths: [f.path])
-                        : widget.client.gitStage(_repo, paths: [f.path])),
-              ),
-            ],
+    return InkWell(
+      onTap: () => _openDiff(f),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(S.s12, S.s4, S.s4, S.s4),
+        child: Row(children: [
+          Container(
+            width: 20,
+            height: 20,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(R.xs),
+            ),
+            child: Text(code == '?' ? 'U' : code,
+                style: TS.codeSmall(fg).copyWith(fontWeight: W.label)),
           ),
-        ),
+          const SizedBox(width: S.s8),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                if (dir.isNotEmpty)
+                  TextSpan(text: dir, style: TS.codeSmall(AppColors.fg3)),
+                TextSpan(text: fileName, style: TS.codeSmall(AppColors.fg1)),
+              ]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconBtn(
+            staged ? 'minus' : 'plus',
+            size: 30,
+            iconSize: 14,
+            tooltip: staged ? 'Unstage' : 'Stage',
+            onTap: _busy
+                ? null
+                : () => _op(() => staged
+                    ? widget.client.gitUnstage(_repo, paths: [f.path])
+                    : widget.client.gitStage(_repo, paths: [f.path])),
+          ),
+        ]),
       ),
     );
   }
 
-  (Color, Color, String) _statusColor(String code) => switch (code) {
-        'M' => (AppColors.run, AppColors.runBg, 'modified'),
-        'A' => (AppColors.ok, AppColors.okBg, 'added'),
-        'D' => (AppColors.danger, AppColors.dangerBg, 'deleted'),
-        'R' => (AppColors.accent, AppColors.accentBg, 'renamed'),
-        '?' => (AppColors.fg3, AppColors.surface3, 'untracked'),
-        _ => (AppColors.fg3, AppColors.surface3, code),
+  Tone _statusTone(String code) => switch (code) {
+        'M' => Tone.run,
+        'A' => Tone.ok,
+        'D' => Tone.danger,
+        'R' => Tone.accent,
+        _ => Tone.neutral,
       };
 }
 
@@ -766,70 +637,32 @@ class _GitBranchPickerState extends State<GitBranchPicker> {
         ),
         const SizedBox(height: 10),
         if (local.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 6),
-            child: Text(
-              'LOCAL',
-              style: sans(10.5,
-                  weight: FontWeight.w600,
-                  color: AppColors.fg3,
-                  spacing: 0.5),
-            ),
-          ),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (int i = 0; i < local.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: AppColors.border.withValues(alpha: 0.3)),
-                  _branchRow(
-                    name: local[i],
-                    current: local[i] == widget.current,
-                    onTap: local[i] == widget.current
-                        ? null
-                        : () => widget.onSelect(local[i], create: false),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
+          const SectionHeader('Local',
+              padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+          ListGroup(children: [
+            for (final b in local)
+              _branchRow(
+                name: b,
+                current: b == widget.current,
+                onTap: b == widget.current
+                    ? null
+                    : () => widget.onSelect(b, create: false),
+              ),
+          ]),
+          const SizedBox(height: S.s16),
         ],
         if (remotes.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 6),
-            child: Text(
-              'REMOTE',
-              style: sans(10.5,
-                  weight: FontWeight.w600,
-                  color: AppColors.fg3,
-                  spacing: 0.5),
-            ),
-          ),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (int i = 0; i < remotes.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: AppColors.border.withValues(alpha: 0.3)),
-                  _branchRow(
-                    name: remotes[i],
-                    remote: true,
-                    onTap: () => widget.onSelect(remotes[i], create: false),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
+          const SectionHeader('Remote',
+              padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+          ListGroup(children: [
+            for (final b in remotes)
+              _branchRow(
+                name: b,
+                remote: true,
+                onTap: () => widget.onSelect(b, create: false),
+              ),
+          ]),
+          const SizedBox(height: S.s16),
         ],
         if (local.isEmpty && remotes.isEmpty)
           Padding(
@@ -837,7 +670,7 @@ class _GitBranchPickerState extends State<GitBranchPicker> {
             child: Center(
               child: Text(
                 q.isEmpty ? 'No branches.' : 'No matches for “$q”.',
-                style: sans(13, color: AppColors.fg3),
+                style: TS.ui(AppColors.fg3),
               ),
             ),
           ),
@@ -867,42 +700,20 @@ class _GitBranchPickerState extends State<GitBranchPicker> {
     bool current = false,
     bool remote = false,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(children: [
-            AppIcon('git-branch',
-                size: 14, color: current ? AppColors.accent : AppColors.fg3),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Text(
-                remote ? _localNameForRemote(name) : name,
-                style: mono(12.5,
-                    weight: current ? FontWeight.w600 : FontWeight.w400,
-                    color: current ? AppColors.accent : AppColors.fg1),
-              ),
-            ),
-            if (current)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.accentBg,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text('current',
-                    style: sans(10.5,
-                        weight: FontWeight.w600, color: AppColors.accent)),
-              )
-            else if (remote)
-              Text(name, style: mono(10.5, color: AppColors.fg3)),
-          ]),
-        ),
-      ),
+    return ListRow(
+      title: name,
+      onTap: onTap,
+      leading: AppIcon('git-branch',
+          size: 16, color: current ? AppColors.accent : AppColors.fg3),
+      titleWidget: Text(remote ? _localNameForRemote(name) : name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TS.code(current ? AppColors.accent : AppColors.fg1)),
+      subtitle: remote ? name : null,
+      trailing: current ? const Tag('Current', tone: Tone.accent) : null,
     );
   }
+
 }
 
 enum _DiffLineType { meta, hunk, add, del, context }
@@ -1078,37 +889,15 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
       actions: [
         if (_additions > 0 || _deletions > 0)
           Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_additions > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.okBg,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text('+$_additions',
-                        style: mono(10.5,
-                            weight: FontWeight.w600, color: AppColors.ok)),
-                  ),
-                if (_additions > 0 && _deletions > 0) const SizedBox(width: 4),
-                if (_deletions > 0)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.dangerBg,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text('-$_deletions',
-                        style: mono(10.5,
-                            weight: FontWeight.w600, color: AppColors.danger)),
-                  ),
-              ],
-            ),
+            padding: const EdgeInsets.only(right: S.s8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (_additions > 0)
+                Tag('+$_additions', tone: Tone.ok, mono: true),
+              if (_additions > 0 && _deletions > 0)
+                const SizedBox(width: S.s4),
+              if (_deletions > 0)
+                Tag('-$_deletions', tone: Tone.danger, mono: true),
+            ]),
           ),
         if (_patch != null && _patch!.isNotEmpty)
           IconBtn('clipboard', tooltip: 'Copy diff', onTap: () {
@@ -1190,19 +979,10 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
     if (line.type == _DiffLineType.hunk) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          border: Border.symmetric(
-            horizontal:
-                BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-          ),
-        ),
-        child: Text(
-          line.text,
-          style: mono(11.5,
-              weight: FontWeight.w500, color: AppColors.accent),
-        ),
+        margin: const EdgeInsets.symmetric(vertical: S.s4),
+        padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s4),
+        color: AppColors.raised,
+        child: Text(line.text, style: TS.codeSmall(AppColors.accent)),
       );
     }
 
@@ -1210,10 +990,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
-        child: Text(
-          line.text,
-          style: mono(11.5, color: AppColors.fg4),
-        ),
+        child: Text(line.text, style: TS.codeSmall(AppColors.fg4)),
       );
     }
 
@@ -1272,7 +1049,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
             child: Text(
               sign,
               textAlign: TextAlign.center,
-              style: mono(12, weight: FontWeight.w700, color: fg),
+              style: mono(12, weight: W.label, color: fg),
             ),
           ),
           // Code content

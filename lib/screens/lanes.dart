@@ -49,57 +49,8 @@ class _LanesScreenState extends State<LanesScreen> {
     Theme.of(context);
     final lanes = widget.liveLanes();
     _shown = lanes;
-    final running = lanes.where((lane) => lane.running).toList();
-    // Group by OUTCOME, not by "still running or not". Folding every finished
-    // lane into one bucket labelled "Completed" filed failed and cancelled lanes
-    // under a header that claimed they succeeded.
-    final failed = lanes.where((lane) => lane.status == 'failed').toList();
-    final cancelled =
-        lanes.where((lane) => lane.status == 'cancelled').toList();
-    final completed = lanes
-        .where((lane) =>
-            !lane.running &&
-            lane.status != 'failed' &&
-            lane.status != 'cancelled')
-        .toList();
-
-    final groups = <Widget>[];
-    void section(String label, List<LaneInfo> items, {Color? badgeColor}) {
-      if (items.isEmpty) return;
-      if (groups.isNotEmpty) groups.add(const SizedBox(height: 16));
-      groups.add(Row(
-        children: [
-          SectionLabel(label),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: (badgeColor ?? AppColors.fg3).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: (badgeColor ?? AppColors.fg3).withValues(alpha: 0.25),
-                width: 1,
-              ),
-            ),
-            child: Text(
-              '${items.length}',
-              style: mono(10,
-                  weight: FontWeight.w600, color: badgeColor ?? AppColors.fg3),
-            ),
-          ),
-        ],
-      ));
-      groups.add(const SizedBox(height: 10));
-      for (final lane in items) {
-        groups.add(LaneDetailCard(lane: lane));
-        groups.add(const SizedBox(height: 10));
-      }
-    }
-
-    section('In progress', running, badgeColor: AppColors.accent);
-    section('Failed', failed, badgeColor: AppColors.danger);
-    section('Completed', completed, badgeColor: AppColors.ok);
-    section('Cancelled', cancelled, badgeColor: AppColors.fg3);
+    final running = lanes.where((lane) => lane.running).length;
+    final failed = lanes.where((lane) => lane.status == 'failed').length;
 
     return Scaffold(
       body: SafeArea(
@@ -109,7 +60,7 @@ class _LanesScreenState extends State<LanesScreen> {
             title: 'Delegated lanes',
             titleSize: 14,
             compact: true,
-            subtitle: _subtitle(lanes, running.length, failed.length),
+            subtitle: _subtitle(lanes, running, failed),
             onBack: widget.onClose ?? () => Navigator.pop(context),
           ),
           Expanded(
@@ -119,8 +70,9 @@ class _LanesScreenState extends State<LanesScreen> {
                     title: 'No delegated lanes',
                     body: 'Parallel agent work will appear here when started.')
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
-                    children: groups,
+                    padding:
+                        const EdgeInsets.fromLTRB(S.s16, S.s16, S.s16, S.s32),
+                    children: laneSections(lanes),
                   ),
           ),
         ]),
@@ -135,6 +87,35 @@ class _LanesScreenState extends State<LanesScreen> {
     if (failed > 0) return '$total · $failed failed';
     return '$total · complete';
   }
+}
+
+List<Widget> laneSections(List<LaneInfo> lanes) {
+  final running = lanes.where((l) => l.running).toList();
+  final failed = lanes.where((l) => l.status == 'failed').toList();
+  final cancelled = lanes.where((l) => l.status == 'cancelled').toList();
+  final completed = lanes
+      .where(
+          (l) => !l.running && l.status != 'failed' && l.status != 'cancelled')
+      .toList();
+  final out = <Widget>[];
+  void section(String label, List<LaneInfo> items, Tone tone) {
+    if (items.isEmpty) return;
+    if (out.isNotEmpty) out.add(const SizedBox(height: S.s20));
+    out.add(SectionHeader(label,
+        count: items.length,
+        tone: tone,
+        padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s8)));
+    for (var i = 0; i < items.length; i++) {
+      if (i > 0) out.add(const SizedBox(height: S.s8));
+      out.add(LaneDetailCard(key: ValueKey(items[i].id), lane: items[i]));
+    }
+  }
+
+  section('In progress', running, Tone.accent);
+  section('Failed', failed, Tone.danger);
+  section('Completed', completed, Tone.ok);
+  section('Cancelled', cancelled, Tone.neutral);
+  return out;
 }
 
 class LaneDetailCard extends StatefulWidget {
@@ -152,210 +133,108 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final hasDetails = _hasDetails(lane);
     final failed = lane.status == 'failed';
     final cancelled = lane.status == 'cancelled';
-    final color = lane.running
-        ? AppColors.accent
+    final tone = lane.running
+        ? Tone.accent
         : failed
-            ? AppColors.danger
+            ? Tone.danger
             : cancelled
-                ? AppColors.fg3
-                : AppColors.ok;
-
-    final statusLabel = lane.running
-        ? 'RUNNING · ${_elapsed(lane.startedAt)}'
-        : failed
-            ? 'FAILED'
-            : cancelled
-                ? 'CANCELLED'
-                : 'COMPLETED';
-
-    final iconName = lane.running
+                ? Tone.neutral
+                : Tone.ok;
+    final icon = lane.running
         ? 'cpu'
         : failed
             ? 'alert-triangle'
             : cancelled
                 ? 'x-circle'
                 : 'check-circle';
-
+    final status = lane.running
+        ? 'Running · ${_elapsed(lane.startedAt)}'
+        : failed
+            ? 'Failed'
+            : cancelled
+                ? 'Cancelled'
+                : 'Completed';
     final activity = lane.activity?.trim();
     final summary = lane.summary?.trim();
     final error = lane.error?.trim();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(R.card),
-        border: Border.all(
-          color: lane.running
-              ? AppColors.accent.withValues(alpha: 0.4)
-              : failed
-                  ? AppColors.danger.withValues(alpha: 0.3)
-                  : AppColors.border,
-          width: lane.running ? 1.5 : 1.0,
-        ),
-      ),
+    return Material(
+      color: AppColors.raised,
+      borderRadius: BorderRadius.circular(R.md),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(R.card),
         onTap: hasDetails ? () => setState(() => _expanded = !_expanded) : null,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          padding: const EdgeInsets.all(S.s16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(R.sm),
-                      border: Border.all(
-                        color: color.withValues(alpha: 0.25),
-                        width: 1,
-                      ),
-                    ),
-                    child: AppIcon(iconName, size: 16, color: color),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          lane.title,
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                IconTile(icon, tone: tone),
+                const SizedBox(width: S.s12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(lane.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(13,
-                              weight: FontWeight.w600, color: AppColors.fg1),
-                        ),
-                        if (lane.id.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            lane.id,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: mono(10, color: AppColors.fg4),
-                          ),
-                        ],
-                      ],
-                    ),
+                          style: TS.rowTitle()),
+                      const SizedBox(height: S.s6),
+                      Tag(status, tone: tone, live: lane.running),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: color.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        StatusDot(
-                          status: lane.running
-                              ? 'running'
-                              : (failed ? 'offline' : 'online'),
-                          size: 6,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          statusLabel,
-                          style: mono(10,
-                              weight: FontWeight.w600,
-                              spacing: 0.4,
-                              color: color),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ]),
               if (activity != null && activity.isNotEmpty && lane.running) ...[
-                const SizedBox(height: 10),
-                _ActivityLine(text: activity, color: color),
+                const SizedBox(height: S.s12),
+                _ActivityLine(text: activity),
               ],
               if (summary != null && summary.isNotEmpty && !_expanded) ...[
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(R.sm),
-                    border: Border.all(
-                        color: AppColors.border.withValues(alpha: 0.6)),
-                  ),
-                  child: MarkdownPreview(data: summary, maxLines: 2),
-                ),
+                const SizedBox(height: S.s12),
+                InsetPanel(child: MarkdownPreview(data: summary, maxLines: 2)),
               ],
               if (failed &&
                   error != null &&
                   error.isNotEmpty &&
                   !_expanded) ...[
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(R.sm),
-                    border: Border.all(
-                      color: AppColors.danger.withValues(alpha: 0.25),
-                    ),
-                  ),
+                const SizedBox(height: S.s12),
+                InsetPanel(
+                  tone: Tone.danger,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(top: 2),
+                        padding: const EdgeInsets.only(top: S.s2),
                         child: AppIcon('alert-triangle',
-                            size: 13, color: AppColors.danger),
+                            size: 14, color: AppColors.danger),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: S.s8),
                       Expanded(
-                        child: Text(
-                          error,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12, height: 1.4, color: AppColors.danger),
-                        ),
+                        child: Text(error,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TS.ui(AppColors.danger)),
                       ),
                     ],
                   ),
                 ),
               ],
               if (hasDetails) ...[
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Text(
-                      _expanded
-                          ? 'Hide execution details'
-                          : 'View execution details',
-                      style: mono(10,
-                          weight: FontWeight.w500, color: AppColors.accent),
-                    ),
-                    const SizedBox(width: 4),
-                    AppIcon(
-                      _expanded ? 'chevron-up' : 'chevron-down',
-                      size: 13,
-                      color: AppColors.accent,
-                    ),
-                  ],
-                ),
+                const SizedBox(height: S.s12),
+                Row(children: [
+                  Text(_expanded ? 'Hide details' : 'Show details',
+                      style: TS.label(AppColors.accent)),
+                  const SizedBox(width: S.s4),
+                  AppIcon(_expanded ? 'chevron-up' : 'chevron-down',
+                      size: 14, color: AppColors.accent),
+                ]),
               ],
               if (_expanded) ...[
-                const SizedBox(height: 14),
+                const SizedBox(height: S.s16),
                 _details(context),
               ],
             ],
@@ -368,95 +247,46 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
   Widget _details(BuildContext context) {
     final sections = <Widget>[];
 
-    void addSection(
-      String label,
-      String? value, {
-      required String icon,
-      bool danger = false,
-      Color? iconColor,
-    }) {
+    void addSection(String label, String? value,
+        {required String icon, Tone tone = Tone.neutral}) {
       if (value == null || value.trim().isEmpty) return;
-      sections.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  AppIcon(
-                    icon,
-                    size: 12,
-                    color: danger
-                        ? AppColors.danger
-                        : (iconColor ?? AppColors.fg3),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    style: mono(
-                      10,
-                      weight: FontWeight.w600,
-                      spacing: 0.5,
-                      color: danger ? AppColors.danger : AppColors.fg3,
-                    ),
-                  ),
-                  const Spacer(),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(4),
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: value));
-                      toast(context, 'Copied');
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AppIcon('clipboard', size: 11, color: AppColors.fg4),
-                          const SizedBox(width: 4),
-                          Text('Copy', style: mono(9, color: AppColors.fg4)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+      final (fg, _) = toneColors(tone);
+      sections.add(Padding(
+        padding: const EdgeInsets.only(bottom: S.s16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              AppIcon(icon, size: 14, color: fg),
+              const SizedBox(width: S.s6),
+              Text(label,
+                  style: TS.label(
+                      tone == Tone.danger ? AppColors.danger : AppColors.fg2)),
+              const Spacer(),
+              TextAction('Copy', icon: 'copy', onTap: () {
+                Clipboard.setData(ClipboardData(text: value));
+                toast(context, 'Copied');
+              }),
+            ]),
+            const SizedBox(height: S.s6),
+            InsetPanel(
+              tone: tone == Tone.danger ? Tone.danger : null,
+              child: MarkdownBody(
+                data: value,
+                selectable: true,
+                styleSheet: markdownStyle(context),
+                builders: {'pre': PreBlockBuilder()},
               ),
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                  color: danger
-                      ? AppColors.danger.withValues(alpha: 0.06)
-                      : AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.sm),
-                  border: Border.all(
-                    color: danger
-                        ? AppColors.danger.withValues(alpha: 0.2)
-                        : AppColors.border.withValues(alpha: 0.6),
-                  ),
-                ),
-                child: MarkdownBody(
-                  data: value,
-                  selectable: true,
-                  styleSheet: markdownStyle(context),
-                  builders: {'pre': PreBlockBuilder()},
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
+      ));
     }
 
-    addSection('HANDOFF PROMPT', lane.handoff,
-        icon: 'corner-down-right', iconColor: AppColors.accent);
-    addSection('EXECUTION REPORT', lane.report,
-        icon: 'file-text', iconColor: AppColors.ok);
-    addSection('FAILURE DETAILS', lane.error,
-        icon: 'alert-triangle', danger: true);
+    addSection('Handoff', lane.handoff,
+        icon: 'corner-down-right', tone: Tone.accent);
+    addSection('Report', lane.report, icon: 'file-text', tone: Tone.ok);
+    addSection('Error', lane.error, icon: 'alert-triangle', tone: Tone.danger);
 
     if (lane.activityLog.isNotEmpty) {
       sections.add(_ActivityHistory(entries: lane.activityLog));
@@ -485,34 +315,21 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
 
 class _ActivityLine extends StatelessWidget {
   final String text;
-  final Color color;
-  const _ActivityLine({required this.text, required this.color});
+  const _ActivityLine({required this.text});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(
-            color: color.withValues(alpha: 0.25),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            AppIcon('terminal', size: 13, color: color),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text,
+  Widget build(BuildContext context) => InsetPanel(
+        padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s8),
+        child: Row(children: [
+          AppIcon('terminal', size: 14, color: AppColors.accent),
+          const SizedBox(width: S.s8),
+          Expanded(
+            child: Text(text,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: mono(11, color: AppColors.fg2),
-              ),
-            ),
-          ],
-        ),
+                style: TS.codeSmall(AppColors.fg2)),
+          ),
+        ]),
       );
 }
 
@@ -523,40 +340,26 @@ class _ActivityHistory extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = entries.reversed.take(24).toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            AppIcon('activity', size: 12, color: AppColors.fg3),
-            const SizedBox(width: 6),
-            Text(
-              'ACTIVITY HISTORY (${entries.length})',
-              style: mono(10,
-                  weight: FontWeight.w600, spacing: 0.5, color: AppColors.fg3),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(R.sm),
-            border: Border.all(
-              color: AppColors.border.withValues(alpha: 0.6),
-            ),
-          ),
-          child: Column(
-            children: [
-              for (int i = 0; i < items.length; i++)
-                _TimelineEntryRow(
-                  entry: items[i],
-                  isLast: i == items.length - 1,
-                ),
-            ],
-          ),
+        Row(children: [
+          AppIcon('activity', size: 14, color: AppColors.fg3),
+          const SizedBox(width: S.s6),
+          Text('Activity', style: TS.label()),
+          const SizedBox(width: S.s8),
+          CountBadge(entries.length),
+        ]),
+        const SizedBox(height: S.s8),
+        InsetPanel(
+          child: Column(children: [
+            for (var i = 0; i < items.length; i++)
+              _TimelineEntryRow(
+                entry: items[i],
+                first: i == 0,
+                last: i == items.length - 1,
+              ),
+          ]),
         ),
       ],
     );
@@ -565,12 +368,11 @@ class _ActivityHistory extends StatelessWidget {
 
 class _TimelineEntryRow extends StatelessWidget {
   final LaneActivity entry;
-  final bool isLast;
+  final bool first;
+  final bool last;
 
-  const _TimelineEntryRow({
-    required this.entry,
-    required this.isLast,
-  });
+  const _TimelineEntryRow(
+      {required this.entry, required this.first, required this.last});
 
   @override
   Widget build(BuildContext context) {
@@ -579,61 +381,37 @@ class _TimelineEntryRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 14,
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    shape: BoxShape.circle,
-                  ),
+            width: 12,
+            child: Column(children: [
+              Container(
+                margin: const EdgeInsets.only(top: S.s6),
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: first ? AppColors.accent : AppColors.fg4,
+                  shape: BoxShape.circle,
                 ),
-                if (!isLast)
-                  Expanded(
-                    child: Container(
-                      width: 1.5,
-                      color: AppColors.border,
-                    ),
-                  ),
-              ],
-            ),
+              ),
+              if (!last)
+                Expanded(child: Container(width: 1, color: AppColors.line)),
+            ]),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: S.s8),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
+              padding: EdgeInsets.only(bottom: last ? 0 : S.s12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (entry.kind.isNotEmpty || entry.at.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Row(
-                        children: [
-                          if (entry.kind.isNotEmpty)
-                            Text(
-                              entry.kind.toUpperCase(),
-                              style: mono(9,
-                                  weight: FontWeight.w600,
-                                  color: AppColors.accent),
-                            ),
-                          if (entry.kind.isNotEmpty && entry.at.isNotEmpty)
-                            Text(' · ', style: mono(9, color: AppColors.fg4)),
-                          if (entry.at.isNotEmpty)
-                            Text(
-                              _formatTime(entry.at),
-                              style: mono(9, color: AppColors.fg4),
-                            ),
-                        ],
-                      ),
+                    Text(
+                      [
+                        if (entry.kind.isNotEmpty) entry.kind,
+                        if (entry.at.isNotEmpty) _formatTime(entry.at),
+                      ].join(' · '),
+                      style: TS.meta(),
                     ),
-                  Text(
-                    entry.text,
-                    style: mono(11, height: 1.35, color: AppColors.fg2),
-                  ),
+                  Text(entry.text, style: TS.codeSmall(AppColors.fg2)),
                 ],
               ),
             ),
@@ -644,11 +422,9 @@ class _TimelineEntryRow extends StatelessWidget {
   }
 
   String _formatTime(String raw) {
-    final parsed = DateTime.tryParse(raw);
+    final parsed = DateTime.tryParse(raw)?.toLocal();
     if (parsed == null) return raw;
-    final h = parsed.toLocal().hour.toString().padLeft(2, '0');
-    final m = parsed.toLocal().minute.toString().padLeft(2, '0');
-    final s = parsed.toLocal().second.toString().padLeft(2, '0');
-    return '$h:$m:$s';
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(parsed.hour)}:${two(parsed.minute)}:${two(parsed.second)}';
   }
 }

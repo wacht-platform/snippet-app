@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'lanes.dart' show LaneDetailCard;
+import 'lanes.dart' show laneSections;
 
 /// Human-readable checkpoint timestamp ('Today · 3:04 PM').
 ///
@@ -140,56 +140,9 @@ class SessionLanesPanel extends StatelessWidget {
           title: 'No delegated lanes',
           body: 'Parallel agent work will appear here when started.');
     }
-    final running = lanes.where((l) => l.running).toList();
-    final failed = lanes.where((l) => l.status == 'failed').toList();
-    final cancelled = lanes.where((l) => l.status == 'cancelled').toList();
-    final completed = lanes
-        .where((l) =>
-            !l.running && l.status != 'failed' && l.status != 'cancelled')
-        .toList();
-
-    final groups = <Widget>[];
-    void section(String label, List<LaneInfo> items, {Color? badgeColor}) {
-      if (items.isEmpty) return;
-      if (groups.isNotEmpty) groups.add(const SizedBox(height: 14));
-      groups.add(Row(
-        children: [
-          SectionLabel(label),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: (badgeColor ?? AppColors.fg3).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: (badgeColor ?? AppColors.fg3).withValues(alpha: 0.25),
-                width: 1,
-              ),
-            ),
-            child: Text(
-              '${items.length}',
-              style: mono(10,
-                  weight: FontWeight.w600,
-                  color: badgeColor ?? AppColors.fg3),
-            ),
-          ),
-        ],
-      ));
-      groups.add(const SizedBox(height: 8));
-      for (final lane in items) {
-        groups.add(LaneDetailCard(lane: lane));
-        groups.add(const SizedBox(height: 8));
-      }
-    }
-
-    section('In progress', running, badgeColor: AppColors.accent);
-    section('Failed', failed, badgeColor: AppColors.danger);
-    section('Completed', completed, badgeColor: AppColors.ok);
-    section('Cancelled', cancelled, badgeColor: AppColors.fg3);
-
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      children: groups,
+      padding: const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s24),
+      children: laneSections(lanes),
     );
   }
 }

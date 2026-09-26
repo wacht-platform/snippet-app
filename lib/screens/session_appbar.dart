@@ -272,33 +272,16 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   /// state — the chat canvas already carries working/idle, so a second readout
   /// here was one more thing competing with the title for the same 56px.
   Widget _runningLanesBadge(HarnessState s, EdgeInsets margin) {
-    final runningCount = s.lanes.where((l) => l.running).length;
+    final n = s.lanes.where((l) => l.running).length;
     return Tooltip(
-      message:
-          '$runningCount parallel agent${runningCount == 1 ? '' : 's'} running',
+      message: '$n parallel agent${n == 1 ? '' : 's'} running',
       child: GestureDetector(
         onTap: _showLanes,
-        child: Container(
-          margin: margin,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.accentBg,
-            borderRadius: BorderRadius.circular(12),
-            border:
-                Border.all(color: AppColors.accentLine.withValues(alpha: 0.6)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const StatusDot(status: 'running', size: 6),
-              const SizedBox(width: 5),
-              Text(
-                '$runningCount ${runningCount == 1 ? 'agent' : 'agents'}',
-                style:
-                    mono(11, weight: FontWeight.w600, color: AppColors.accent),
-              ),
-            ],
-          ),
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: margin,
+          child: Tag('$n ${n == 1 ? 'agent' : 'agents'}',
+              tone: Tone.accent, live: true),
         ),
       ),
     );
