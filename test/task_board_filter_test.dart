@@ -91,7 +91,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Selection is multi — pick only Blocked and apply.
-    await tester.tap(find.text('Blocked'));
+    await tester.tap(find.text('Blocked').last);
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Apply'));
     await tester.tap(find.text('Apply'));

@@ -485,18 +485,10 @@ class _StatusHeader extends StatelessWidget {
             decoration: BoxDecoration(
                 color: statusColor(status), shape: BoxShape.circle),
           ),
-          const SizedBox(width: 7),
-          // `caps()`: Geist (not Inter — two near-identical sans-serifs read as
-          // a mistake) at 500, `fg2` (#C1C1C1), and POSITIVE tracking. The note
-          // that stood here claimed -0.05 was correct for small caps; that is
-          // backwards. Upper case carries more visual mass, so it needs a little
-          // POSITIVE letter-spacing or the letters crowd.
-          Text(status.label.toUpperCase(),
-              style: caps(11, color: AppColors.fg2)),
-          const SizedBox(width: 6),
-          // A count is information, not a placeholder: the muted tone (`fg3`),
-          // never `fg4` which is the disabled/placeholder ramp.
-          Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
+          const SizedBox(width: S.s8),
+          Text(status.label, style: TS.label()),
+          const SizedBox(width: S.s8),
+          CountBadge(count),
         ]),
       );
 }

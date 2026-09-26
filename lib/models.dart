@@ -1132,7 +1132,7 @@ final ValueNotifier<int> modelsRevision = ValueNotifier<int>(0);
 /// filed, so it carries the columns a person works in and nothing about
 /// dispatch, which is Mission Control's concern.
 enum TaskStatus {
-  todo('todo', 'Todo'),
+  todo('todo', 'To do'),
   inProgress('in_progress', 'In progress'),
   blocked('blocked', 'Blocked'),
   done('done', 'Done'),

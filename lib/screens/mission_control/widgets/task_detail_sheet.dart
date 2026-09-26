@@ -163,19 +163,18 @@ class _StatusPill extends StatelessWidget {
   final String status;
   @override
   Widget build(BuildContext context) {
-    final color = switch (status) {
-      'in_progress' => AppColors.run,
-      'done' || 'completed' => AppColors.ok,
-      'blocked' || 'failed' || 'cancelled' => AppColors.danger,
-      _ => AppColors.fg3,
+    final tone = switch (status) {
+      'in_progress' => Tone.run,
+      'done' || 'completed' => Tone.ok,
+      'blocked' || 'failed' || 'cancelled' => Tone.danger,
+      _ => Tone.neutral,
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(R.sm),
-      ),
-      child: Text(status, style: mono(10, color: color)),
+    final label = status.replaceAll('_', ' ');
+    return Tag(
+      label.isEmpty ? status : label[0].toUpperCase() + label.substring(1),
+      tone: tone,
+      dot: true,
+      live: status == 'in_progress',
     );
   }
 }
@@ -184,16 +183,7 @@ class _MetaPill extends StatelessWidget {
   const _MetaPill({required this.text});
   final String text;
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.sm),
-      ),
-      child: Text(text, style: mono(10, color: AppColors.fg3)),
-    );
-  }
+  Widget build(BuildContext context) => Tag(text);
 }
 
 String _ago(int epoch) {
