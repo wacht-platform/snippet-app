@@ -322,9 +322,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 16, 12, 10, 8),
         child: Row(children: [
           Expanded(
-            child: Text('New chat',
-                style: sans(kMobile ? 18 : 16,
-                    weight: W.label, color: AppColors.fg1)),
+            child: Text('New chat', style: TS.sectionTitle()),
           ),
           if (widget.onClose != null)
             IconBtn('x',
@@ -384,9 +382,11 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                           c.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: mono(kMobile ? 12 : 12,
-                              weight: last ? W.label : W.body,
-                              color: last ? AppColors.fg1 : AppColors.fg3),
+                          style: last
+                              ? TS.label(AppColors.fg1)
+                              : TS
+                                  .label(AppColors.fg3)
+                                  .copyWith(fontWeight: W.body),
                         ),
                       ),
                     ),
@@ -415,8 +415,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         padding: const EdgeInsets.symmetric(vertical: 44),
         children: [
           Text('This folder is empty.',
-              textAlign: TextAlign.center,
-              style: TS.meta()),
+              textAlign: TextAlign.center, style: TS.meta()),
         ],
       );
     }
@@ -444,13 +443,16 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
       height: kMobile ? 40 : 32,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(children: [
-        AppIcon('file', size: 14, color: AppColors.fg4),
-        const SizedBox(width: 12),
+        SizedBox(
+            width: 34,
+            child:
+                Center(child: AppIcon('file', size: 16, color: AppColors.fg4))),
+        const SizedBox(width: S.s12),
         Expanded(
           child: Text(e.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: sans(kMobile ? 12 : 12, color: AppColors.fg3)),
+              style: TS.ui(AppColors.fg3)),
         ),
       ]),
     );
@@ -468,18 +470,27 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           // The desktop half of "this goes somewhere".
           cursor: SystemMouseCursors.click,
           child: Container(
-            height: kMobile ? 46 : 36,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            height: kMobile ? M.rowHeight : 40,
+            padding: const EdgeInsets.symmetric(horizontal: S.s8),
             child: Row(children: [
-              AppIcon('folder', size: 15, color: AppColors.fg2),
-              const SizedBox(width: 12),
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.accentBg,
+                  borderRadius: BorderRadius.circular(R.sm + 2),
+                ),
+                child: AppIcon('folder', size: 17, color: AppColors.accent),
+              ),
+              const SizedBox(width: S.s12),
               Expanded(
                 child: Text(e.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? 13 : 12, color: AppColors.fg1)),
+                    style: kMobile ? TS.rowTitle() : TS.ui(AppColors.fg1)),
               ),
-              AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
             ]),
           ),
         ),
@@ -495,9 +506,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   Widget _actionBar() => Container(
         padding: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 16, 8, kMobile ? M.gutter : 16, 10),
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
+        color: AppColors.base,
         child: Row(children: [
           IconBtn('folder-plus',
               size: kMobile ? 40 : 34,
@@ -549,8 +558,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                           _busy ?? 'Start chat in $_hereName',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(kMobile ? 13 : 12,
-                              weight: W.label, color: AppColors.accentFg),
+                          style: TS.label(AppColors.accentFg),
                         ),
                       ),
                     ],
