@@ -75,6 +75,7 @@ void showTabContextMenu({
   }
 
   showModalBottomSheet(
+    sheetAnimationStyle: sheetMotion,
     context: context,
     backgroundColor: AppColors.surface1,
     shape: const RoundedRectangleBorder(

@@ -361,10 +361,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(children: [
-                      Expanded(
-                          child: Text(title,
-                              style: sans(13,
-                                  weight: W.label, color: AppColors.fg1))),
+                      Expanded(child: Text(title, style: TS.rowTitle())),
                       IconBtn('x',
                           size: 28,
                           iconSize: 14,
@@ -393,6 +390,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
     barrierColor: Colors.black.withValues(alpha: 0.5),
     isScrollControlled: true,
     useSafeArea: false,
+    sheetAnimationStyle: sheetMotion,
     builder: (sheetContext) {
       final media = MediaQuery.of(sheetContext);
       final keyboard = media.viewInsets.bottom;
@@ -410,11 +408,10 @@ Future<T?> showAppSheet<T>(BuildContext context,
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
             child: Material(
-              color: AppColors.surface1,
-              shape: RoundedRectangleBorder(
+              color: AppColors.overlay,
+              shape: const RoundedRectangleBorder(
                 borderRadius:
                     BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-                side: BorderSide(color: AppColors.glassBorder),
               ),
               clipBehavior: Clip.antiAlias,
               child: ConstrainedBox(
@@ -435,8 +432,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                           child: Text(title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: sans(16,
-                                  weight: W.label, color: AppColors.fg1))),
+                              style: TS.sectionTitle())),
                       IconBtn('x',
                           size: 32,
                           iconSize: 16,

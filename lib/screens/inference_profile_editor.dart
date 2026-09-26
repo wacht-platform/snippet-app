@@ -196,6 +196,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       return;
     }
     final picked = await showModalBottomSheet<CatalogModel>(
+      sheetAnimationStyle: sheetMotion,
       context: context,
       backgroundColor: AppColors.surface1,
       isScrollControlled: true,

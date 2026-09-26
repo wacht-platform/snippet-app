@@ -702,6 +702,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       return;
     }
     final choice = await showModalBottomSheet<String>(
+      sheetAnimationStyle: sheetMotion,
       context: context,
       backgroundColor: AppColors.surface1,
       shape: const RoundedRectangleBorder(

@@ -712,11 +712,11 @@ void main() {
     // swapped in without checking the label that sits on it.
     expect(ratio(AppColors.accent, AppColors.canvas), greaterThanOrEqualTo(4.5),
         reason: 'accent is used AS text (links, selected labels, state)');
-    expect(ratio(AppColors.accentFg, AppColors.accent), greaterThanOrEqualTo(4.5),
+    expect(
+        ratio(AppColors.accentFg, AppColors.accentFill), greaterThanOrEqualTo(4.5),
         reason: 'accentFg is the label ON an accent-filled button');
-    // And the label on an accent fill must not be the same tone as the fill.
     expect(AppColors.accentFg.computeLuminance(),
-        isNot(closeTo(AppColors.accent.computeLuminance(), 0.05)),
+        isNot(closeTo(AppColors.accentFill.computeLuminance(), 0.05)),
         reason: 'label and fill must differ in brightness, not just hue');
   });
 }

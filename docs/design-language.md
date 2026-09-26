@@ -71,7 +71,7 @@ needs no learning; and it is the hue farthest from all three status colours.
 | Token | Hex | Use |
 | --- | --- | --- |
 | `ok` | `#39C57E` | Online, completed, added (mascot green) |
-| `run` | `#E5A93B` | Running, busy, modified |
+| `run` | `#D4982F` | Running, busy, modified |
 | `danger` | `#F06464` | Failed, destructive, deleted |
 
 Each has a `…Bg` at 13% for tinted badges. Status colour always pairs with a

@@ -630,6 +630,7 @@ Future<void> showFileSearchDialog(
     );
   }
   return showModalBottomSheet(
+    sheetAnimationStyle: sheetMotion,
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

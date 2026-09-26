@@ -170,6 +170,7 @@ Future<T?> showAppMenu<T>(
 
   if (kMobile) {
     return showModalBottomSheet<T>(
+      sheetAnimationStyle: sheetMotion,
       context: context,
       backgroundColor: Colors.transparent,
       barrierColor: const Color(0x9E000000),

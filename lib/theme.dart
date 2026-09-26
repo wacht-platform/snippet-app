@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'platform.dart';
 
 // ---------------------------------------------------------------------------
 // Theme presets — each one defines every color the app uses. Ported from the
@@ -166,7 +167,7 @@ final _amoled = _dark(
   inkFaint: const Color(0xFF6E6E76),
   success: const Color(0xFF39C57E),
   danger: const Color(0xFFF06464),
-  warn: const Color(0xFFE5A93B),
+  warn: const Color(0xFFD4982F),
 );
 
 final List<ThemePreset> allPresets = [_amoled];
@@ -301,6 +302,13 @@ class R {
   static const sheetTop = 14.0;
   static const pill = 999.0;
 }
+
+AnimationStyle get sheetMotion => AnimationStyle(
+      duration: Motion.open,
+      reverseDuration: Motion.close,
+      curve: Motion.enter,
+      reverseCurve: Motion.exit,
+    );
 
 /// The only spacing values the app uses.
 class S {
@@ -519,6 +527,30 @@ const kSansFamily = 'Geist';
 const kMonoFamily = 'JetBrainsMono';
 
 String get monoFamily => kMonoFamily;
+
+/// Type roles from docs/design-language.md. Screens use these, not raw sizes.
+class TS {
+  static TextStyle pageTitle([Color? c]) =>
+      sans(22, weight: W.strong, height: 28 / 22, color: c ?? AppColors.fg1);
+  static TextStyle sectionTitle([Color? c]) =>
+      sans(17, weight: W.strong, height: 24 / 17, color: c ?? AppColors.fg1);
+  static TextStyle rowTitle([Color? c]) =>
+      sans(15, weight: W.label, height: 20 / 15, color: c ?? AppColors.fg1);
+  static TextStyle body([Color? c]) => sans(kMobile ? 16 : 15,
+      height: kMobile ? 24 / 16 : 22 / 15, color: c ?? AppColors.fg2);
+  static TextStyle ui([Color? c]) =>
+      sans(14, height: 20 / 14, color: c ?? AppColors.fg2);
+  static TextStyle label([Color? c]) =>
+      sans(13, weight: W.label, height: 18 / 13, color: c ?? AppColors.fg2);
+  static TextStyle meta([Color? c]) =>
+      sans(12, height: 16 / 12, color: c ?? AppColors.fg3, tabular: true);
+  static TextStyle overline([Color? c]) =>
+      caps(11, color: c ?? AppColors.fg3).copyWith(height: 14 / 11);
+  static TextStyle code([Color? c]) =>
+      mono(13, height: 20 / 13, color: c ?? AppColors.fg2);
+  static TextStyle codeSmall([Color? c]) =>
+      mono(12, height: 16 / 12, color: c ?? AppColors.fg3);
+}
 
 // ---------------------------------------------------------------------------
 // Material ThemeData — derived from the active palette.

@@ -26,6 +26,7 @@ Future<void> showMissionControlPanel(
     );
   }
   return showModalBottomSheet<void>(
+    sheetAnimationStyle: sheetMotion,
     context: context,
     isScrollControlled: true,
     isDismissible: true,
@@ -155,8 +156,7 @@ class MobileMissionControl extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: () =>
-                      Navigator.pop(ctx, controller.text.trim()),
+                  onPressed: () => Navigator.pop(ctx, controller.text.trim()),
                   child: const Text('Send'),
                 ),
               ],
@@ -176,6 +176,7 @@ class MobileMissionControl extends StatelessWidget {
       );
     } else {
       reply = await showModalBottomSheet<String>(
+        sheetAnimationStyle: sheetMotion,
         context: context,
         isScrollControlled: true,
         backgroundColor: AppColors.bg,
@@ -209,6 +210,7 @@ Future<void> showNotificationInbox(
     );
   }
   return showModalBottomSheet<void>(
+    sheetAnimationStyle: sheetMotion,
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.bg,

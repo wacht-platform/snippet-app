@@ -9,10 +9,12 @@ import 'package:hugeicons/hugeicons.dart';
 
 import 'platform.dart';
 import 'theme.dart';
+import 'components.dart';
 import 'dialog_widgets.dart';
 import 'markdown_widgets.dart';
 import 'menu_widgets.dart';
 
+export 'components.dart';
 export 'dialog_widgets.dart';
 export 'markdown_widgets.dart';
 export 'menu_widgets.dart';
@@ -242,7 +244,9 @@ class AppIcon extends StatelessWidget {
 class StatusDot extends StatefulWidget {
   final String status; // online | running | offline | checking
   final double size;
-  const StatusDot({super.key, this.status = 'online', this.size = 9});
+  final Color? color;
+  const StatusDot(
+      {super.key, this.status = 'online', this.size = 9, this.color});
   @override
   State<StatusDot> createState() => _StatusDotState();
 }
@@ -267,10 +271,10 @@ class _StatusDotState extends State<StatusDot>
 
   /// Reduced motion stops the breath but keeps the lit dot: the state is still
   /// readable from colour alone, so nothing is lost by holding it steady.
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (reduceMotion(context)) {
+  bool get _pulses => widget.status == 'checking' || widget.status == 'running';
+
+  void _sync() {
+    if (!_pulses || reduceMotion(context)) {
       if (_c.isAnimating) _c.stop();
       _c.value = 1;
     } else if (!_c.isAnimating) {
@@ -279,12 +283,26 @@ class _StatusDotState extends State<StatusDot>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(StatusDot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.status != widget.status) _sync();
+  }
+
+  @override
   void dispose() {
     _c.dispose();
     super.dispose();
   }
 
-  Color get _color => switch (widget.status) {
+  Color get _color =>
+      widget.color ??
+      switch (widget.status) {
         'online' => AppColors.ok,
         'running' => AppColors.run,
         'offline' => AppColors.danger,
@@ -311,7 +329,7 @@ class _StatusDotState extends State<StatusDot>
               ],
       ),
     );
-    if (widget.status == 'checking' || widget.status == 'running') {
+    if (_pulses) {
       return FadeTransition(
           opacity: Tween(begin: 0.45, end: 1.0).animate(_c), child: dot);
     }
@@ -324,30 +342,14 @@ class StatusPill extends StatelessWidget {
   final String status;
   const StatusPill({super.key, required this.status});
   @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final (Color c, Color bg, String label, bool live) = switch (status) {
-      'running' => (AppColors.run, AppColors.runBg, 'Running', true),
-      'online' => (AppColors.ok, AppColors.okBg, 'Online', true),
-      'offline' => (AppColors.danger, AppColors.dangerBg, 'Offline', false),
-      'error' => (AppColors.danger, AppColors.dangerBg, 'Error', false),
-      'checking' => (AppColors.fg3, AppColors.surface2, 'Checking', false),
-      _ => (AppColors.fg3, AppColors.surface2, 'Idle', false),
-    };
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8, 3, 9, 3),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(99)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
-        const SizedBox(width: 6),
-        Text(label, style: sans(11, weight: W.label, color: c)),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) => switch (status) {
+        'running' => const Tag('Running', tone: Tone.run, live: true),
+        'online' => const Tag('Online', tone: Tone.ok, dot: true),
+        'offline' => const Tag('Offline', tone: Tone.danger, dot: true),
+        'error' => const Tag('Error', tone: Tone.danger, dot: true),
+        'checking' => const Tag('Checking', dot: true),
+        _ => const Tag('Idle', dot: true),
+      };
 }
 
 /// Surface-1 card with a hairline border.
@@ -371,14 +373,7 @@ class AppCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(R.card),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(R.card),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: child,
-          ),
+          child: Padding(padding: padding, child: child),
         ),
       ),
     );
@@ -457,8 +452,7 @@ class Btn extends StatelessWidget {
           AppIcon(icon!, size: small ? 15 : 17, color: fg),
           const SizedBox(width: 8)
         ],
-        Text(label,
-            style: sans(small ? 12 : 13, weight: W.label, color: fg)),
+        Text(label, style: sans(small ? 12 : 13, weight: W.label, color: fg)),
         if (iconRight != null) ...[
           const SizedBox(width: 8),
           AppIcon(iconRight!, size: small ? 15 : 17, color: fg)
@@ -607,7 +601,8 @@ class IconBtn extends StatelessWidget {
     // is small: on a phone the layout box grows to [M.minTarget] while the glyph
     // keeps its size, so a 22px clear button is still comfortably tappable. On
     // desktop the pointer is precise, so `size` is taken at its word.
-    final box = kMobile && onTap != null && size < M.minTarget ? M.minTarget : size;
+    final box =
+        kMobile && onTap != null && size < M.minTarget ? M.minTarget : size;
     final btn = Pressable(
       enabled: onTap != null,
       child: Material(
@@ -623,7 +618,8 @@ class IconBtn extends StatelessWidget {
             height: box,
             child: Center(
               child: AppIcon(name,
-                  size: iconSize, color: active ? AppColors.fg1 : AppColors.fg2),
+                  size: iconSize,
+                  color: active ? AppColors.fg1 : AppColors.fg2),
             ),
           ),
         ),
@@ -1135,19 +1131,8 @@ class WarnChip extends StatelessWidget {
   final String label;
   const WarnChip({super.key, this.label = 'No key'});
   @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-          color: AppColors.runBg, borderRadius: BorderRadius.circular(99)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        AppIcon('alert-triangle', size: 11, color: AppColors.run),
-        const SizedBox(width: 5),
-        Text(label, style: sans(10, weight: W.label, color: AppColors.run)),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) =>
+      Tag(label, tone: Tone.run, icon: 'alert-triangle');
 }
 
 /// A section label above a group of rows.
@@ -1163,9 +1148,8 @@ class SectionLabel extends StatelessWidget {
   const SectionLabel(this.text, {super.key});
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 0, 2, 2),
-        child: Text(text,
-            style: sans(11, weight: W.label, color: AppColors.fg2)),
+        padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s2),
+        child: Text(text, style: TS.label(AppColors.fg2)),
       );
 }
 

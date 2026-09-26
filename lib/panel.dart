@@ -92,6 +92,7 @@ Future<T?> presentAdaptivePanel<T>(
     );
   }
   return showModalBottomSheet<T>(
+    sheetAnimationStyle: sheetMotion,
     context: context,
     isScrollControlled: true,
     isDismissible: true,

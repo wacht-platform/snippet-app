@@ -178,6 +178,7 @@ class RecurringScreenState extends State<RecurringScreen>
     var schedule = 'every 1h';
     var mode = 'preset'; // preset | custom | daily | onceAt | onceIn
     final saved = await showModalBottomSheet<bool>(
+      sheetAnimationStyle: sheetMotion,
       context: context,
       backgroundColor: AppColors.surface1,
       isScrollControlled: true,

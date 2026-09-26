@@ -53,6 +53,7 @@ Future<void> showCommandPalette(
     );
   }
   return showModalBottomSheet(
+    sheetAnimationStyle: sheetMotion,
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
