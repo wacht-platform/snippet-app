@@ -518,7 +518,7 @@ List<Widget> _webReadView(Map? a, Map? d) {
   final title = d?['title']?.toString() ?? '';
   if (title.isNotEmpty) {
     out.add(Text(title,
-        style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)));
+        style: sans(14, weight: W.label, color: AppColors.fg1)));
     out.add(const SizedBox(height: 4));
   }
   if (d?['published_date'] != null) {
@@ -540,7 +540,7 @@ List<Widget> _titleView(Map? a, Map? d) {
   }
   return [
     Text(title,
-        style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)),
+        style: sans(14, weight: W.label, color: AppColors.fg1)),
   ];
 }
 
@@ -550,7 +550,7 @@ List<Widget> _memoryView(String tool, Map? a, Map? d) {
   final content = (d?['content'] ?? a?['content'])?.toString() ?? '';
   if (id.isNotEmpty) {
     out.add(Text(id,
-        style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)));
+        style: sans(13, weight: W.label, color: AppColors.fg1)));
   }
   if (content.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -569,7 +569,7 @@ List<Widget> _skillView(String tool, Map? a, Map? d) {
   final out = <Widget>[];
   if (name.isNotEmpty) {
     out.add(Text(name,
-        style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)));
+        style: sans(13, weight: W.label, color: AppColors.fg1)));
   }
   if (text.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -587,7 +587,7 @@ List<Widget> _monitorView(Map? a, Map? d) {
   final filter = (a?['filter'] ?? d?['filter'])?.toString() ?? '';
   final out = <Widget>[
     Text(action,
-        style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
+        style: sans(13, weight: W.label, color: AppColors.fg1)),
   ];
   if (path.isNotEmpty) {
     out.add(const SizedBox(height: 4));
@@ -606,7 +606,7 @@ List<Widget> _presentView(Map? a, Map? d) {
   return [
     if (path.isNotEmpty)
       Text(path,
-          style: sans(13, weight: FontWeight.w500, color: AppColors.fg1)),
+          style: sans(13, weight: W.label, color: AppColors.fg1)),
     if (caption.isNotEmpty) ...[
       const SizedBox(height: 4),
       Text(caption, style: sans(13, color: AppColors.fg3)),
@@ -664,7 +664,7 @@ Widget _statusChip(bool ok, String label) => Container(
       padding: const EdgeInsets.fromLTRB(7, 4, 9, 4),
       decoration: BoxDecoration(
         color: ok ? AppColors.okBg : AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(99),
+        borderRadius: BorderRadius.circular(R.pill),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         AppIcon(ok ? 'check' : 'alert-triangle',
@@ -675,7 +675,7 @@ Widget _statusChip(bool ok, String label) => Container(
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: mono(10,
-                    weight: FontWeight.w500,
+                    weight: W.label,
                     color: ok ? AppColors.ok : AppColors.danger))),
       ]),
     );
@@ -791,7 +791,7 @@ Widget _highlightedLine(String text, String query) {
     spans.add(TextSpan(
       text: text.substring(at, at + needle.length),
       style: mono(11,
-              height: 1.45, color: AppColors.accent, weight: FontWeight.w500)
+              height: 1.45, color: AppColors.accent, weight: W.label)
           .copyWith(backgroundColor: AppColors.accentBg),
     ));
     i = at + needle.length;
@@ -816,7 +816,7 @@ class _SymbolRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
           decoration: BoxDecoration(
               color: AppColors.accentBg,
-              borderRadius: BorderRadius.circular(4)),
+              borderRadius: BorderRadius.circular(R.xs)),
           child: Text(kind, style: mono(10, color: AppColors.accent)),
         ),
         const SizedBox(width: 8),
@@ -857,7 +857,7 @@ class _ResultCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style:
-                  sans(13, weight: FontWeight.w500, color: AppColors.accent)),
+                  sans(13, weight: W.label, color: AppColors.accent)),
         if (url.isNotEmpty) ...[
           if (title.isNotEmpty) const SizedBox(height: 2),
           Text(url,

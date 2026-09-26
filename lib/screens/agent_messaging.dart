@@ -706,7 +706,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       context: context,
       backgroundColor: AppColors.surface1,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -1088,7 +1088,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       child: Row(children: [
         InkWell(
           onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
-          borderRadius: BorderRadius.circular(99),
+          borderRadius: BorderRadius.circular(R.pill),
           child: SizedBox(
             width: 32,
             height: 32,
@@ -1171,7 +1171,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                 child: Text(a.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(10,
+                    style: sans(11,
                         color: isAudio ? AppColors.accent : AppColors.fg2)),
               ),
             ]),
@@ -1182,7 +1182,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
-                color: Colors.black45,
+                color: AppColors.scrim,
                 borderRadius: BorderRadius.circular(R.sm)),
             alignment: Alignment.center,
             child: SizedBox(
@@ -1201,7 +1201,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           child: Container(
             padding: const EdgeInsets.all(3),
             decoration: const BoxDecoration(
-                color: Colors.black87, shape: BoxShape.circle),
+                color: AppColors.scrim, shape: BoxShape.circle),
             child: AppIcon('x', size: 8, color: Colors.white),
           ),
         ),
@@ -1227,7 +1227,6 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           decoration: BoxDecoration(
             color: AppColors.bg,
             borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(color: AppColors.border),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Column(
@@ -1296,7 +1295,6 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.surface2,
                       borderRadius: BorderRadius.circular(R.sm),
-                      border: Border.all(color: AppColors.border),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

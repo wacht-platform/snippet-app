@@ -127,15 +127,21 @@ class SectionHeader extends StatelessWidget {
 }
 
 class TextAction extends StatelessWidget {
-  const TextAction(this.label, {super.key, this.onTap, this.icon});
+  const TextAction(this.label,
+      {super.key, this.onTap, this.icon, this.danger = false});
 
   final String label;
+  final bool danger;
   final String? icon;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = onTap == null ? AppColors.fg4 : AppColors.accent;
+    final color = onTap == null
+        ? AppColors.fg4
+        : danger
+            ? AppColors.danger
+            : AppColors.accent;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(R.sm),

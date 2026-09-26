@@ -28,7 +28,7 @@ class TaskInspector extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      sans(16, weight: FontWeight.w500, color: AppColors.fg1),
+                      sans(16, weight: W.label, color: AppColors.fg1),
                 ),
               ),
               _StatusPill(status: t.status as String),
@@ -106,7 +106,7 @@ class _StatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(R.sm),
       ),
       child: Text(status, style: mono(10, color: color)),
     );

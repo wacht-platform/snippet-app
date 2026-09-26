@@ -294,7 +294,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       child: Row(children: [
         InkWell(
           onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
-          borderRadius: BorderRadius.circular(99),
+          borderRadius: BorderRadius.circular(R.pill),
           child: SizedBox(
             width: 32,
             height: 32,

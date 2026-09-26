@@ -32,8 +32,8 @@ Future<String?> showInboundSharePicker({
                 overflow: TextOverflow.ellipsis,
                 style: sans(16,
                     weight: t.isMissionControl
-                        ? FontWeight.w500
-                        : FontWeight.w400,
+                        ? W.label
+                        : W.body,
                     color: AppColors.fg1)),
             subtitle: Text(
                 t.isMissionControl ? machineLabel : 'Open tab',

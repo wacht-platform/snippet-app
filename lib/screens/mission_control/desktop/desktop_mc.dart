@@ -209,7 +209,7 @@ class _TaskRow extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(R.md),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -268,7 +268,7 @@ class _SessionRow extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(R.md),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -433,7 +433,7 @@ class _SessionInspector extends StatelessWidget {
             (session.title as String).isEmpty
                 ? session.folder as String
                 : session.title as String,
-            style: sans(16, weight: FontWeight.w500, color: AppColors.fg1),
+            style: sans(16, weight: W.label, color: AppColors.fg1),
           ),
           const SizedBox(height: 4),
           Text(session.folder as String, style: mono(11, color: AppColors.fg3)),

@@ -268,7 +268,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: (kMacOS || kWindows) ? AppColors.glassSurface : AppColors.surface1,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(R.lg),
         border: Border.all(
             color: (kMacOS || kWindows) ? AppColors.glassBorder : AppColors.border),
       ),
@@ -910,7 +910,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                 child: Text(a.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(10,
+                    style: sans(11,
                         color: isAudio ? AppColors.accent : AppColors.fg2)),
               ),
             ]),
@@ -921,7 +921,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
-                color: Colors.black45,
+                color: AppColors.scrim,
                 borderRadius: BorderRadius.circular(R.sm)),
             alignment: Alignment.center,
             child: SizedBox(
@@ -940,7 +940,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           child: Container(
             padding: const EdgeInsets.all(3),
             decoration: const BoxDecoration(
-                color: Colors.black87, shape: BoxShape.circle),
+                color: AppColors.scrim, shape: BoxShape.circle),
             child: AppIcon('x', size: 11, color: AppColors.fg1),
           ),
         ),

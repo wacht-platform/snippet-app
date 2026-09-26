@@ -23,7 +23,6 @@ class TabDragFeedback extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface3,
           borderRadius: BorderRadius.circular(R.md),
-          border: Border.all(color: AppColors.border2),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           AppIcon(tabIconKind(tab), size: 13, color: AppColors.accent),
@@ -159,11 +158,10 @@ class TopMachineSwitcher extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.surface2,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.border2),
                     ),
                     child: Text(
                       initial,
-                      style: sans(10, weight: W.title, color: AppColors.fg1),
+                      style: sans(11, weight: W.title, color: AppColors.fg1),
                     ),
                   ),
                 ),
@@ -364,11 +362,10 @@ Future<void> showTopMachinesPopover({
           color: AppColors.surface1,
           borderRadius: BorderRadius.circular(R.md),
           elevation: 12,
-          shadowColor: Colors.black87,
+          shadowColor: AppColors.scrim,
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(R.md),
-              border: Border.all(color: AppColors.border),
             ),
             child: content,
           ),

@@ -329,7 +329,7 @@ class _FileExplorerState extends State<FileExplorer> {
                         child: segs.isEmpty
                             ? Text(widget.title,
                                 style: sans(13,
-                                    weight: FontWeight.w500,
+                                    weight: W.label,
                                     color: AppColors.fg1))
                             : SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
@@ -408,7 +408,7 @@ class _FileExplorerState extends State<FileExplorer> {
                                     const SizedBox(width: 4),
                                     Text('New chat here',
                                         style: sans(11,
-                                            weight: FontWeight.w500,
+                                            weight: W.label,
                                             color: AppColors.accent)),
                                   ]),
                             ),

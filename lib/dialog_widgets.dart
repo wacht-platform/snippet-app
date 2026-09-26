@@ -132,7 +132,7 @@ Future<bool> confirmAction(
   final accent = danger ? AppColors.danger : AppColors.accent;
   final result = await showDialog<bool>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.58),
+    barrierColor: AppColors.scrim,
     builder: (ctx) {
       return Dialog(
         backgroundColor: AppColors.glassSurface,
@@ -222,7 +222,7 @@ Future<String?> promptText(BuildContext context,
   if (!kMobile) {
     return showDialog<String>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.58),
+      barrierColor: AppColors.scrim,
       builder: (ctx) {
         return Dialog(
           backgroundColor: AppColors.glassSurface,
@@ -338,7 +338,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
   if (!kMobile) {
     return showDialog<T>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.58),
+      barrierColor: AppColors.scrim,
       builder: (ctx) {
         return Dialog(
           backgroundColor: AppColors.glassSurface,
@@ -387,7 +387,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
   return showModalBottomSheet<T>(
     context: context,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.5),
+    barrierColor: AppColors.scrim,
     isScrollControlled: true,
     useSafeArea: false,
     sheetAnimationStyle: sheetMotion,
@@ -424,7 +424,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
                           height: 3,
                           decoration: BoxDecoration(
                               color: AppColors.border2,
-                              borderRadius: BorderRadius.circular(99)))),
+                              borderRadius: BorderRadius.circular(R.pill)))),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
                     child: Row(children: [

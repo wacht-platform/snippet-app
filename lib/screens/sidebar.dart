@@ -576,7 +576,6 @@ class SidebarState extends State<Sidebar> {
                     decoration: BoxDecoration(
                       color: AppColors.surface2,
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.border2),
                     ),
                     child: Text(initial,
                         style: sans(13, weight: W.title, color: AppColors.fg1)),
@@ -881,7 +880,6 @@ class SidebarState extends State<Sidebar> {
               decoration: BoxDecoration(
                 color: AppColors.surface2,
                 borderRadius: BorderRadius.circular(R.xs),
-                border: Border.all(color: AppColors.border),
               ),
               child: Row(
                 children: [

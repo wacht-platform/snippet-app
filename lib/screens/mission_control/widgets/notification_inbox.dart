@@ -78,8 +78,7 @@ class _InboxRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(R.md),
       ),
       child: Row(
         children: [
@@ -93,7 +92,7 @@ class _InboxRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(13,
-                        weight: FontWeight.w500, color: AppColors.fg1)),
+                        weight: W.label, color: AppColors.fg1)),
                 const SizedBox(height: 2),
                 Text(entry.notification.message as String,
                     maxLines: 2,

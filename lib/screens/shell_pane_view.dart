@@ -183,7 +183,6 @@ class ReadoutDragFeedback extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surface3,
           borderRadius: BorderRadius.circular(R.md),
-          border: Border.all(color: AppColors.border2),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           AppIcon(tab.icon, size: 13, color: AppColors.accent),

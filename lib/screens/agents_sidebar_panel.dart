@@ -61,7 +61,7 @@ Future<bool?> showCreateAgentDialog(
                 color: AppColors.surface1,
                 borderRadius: BorderRadius.circular(R.md),
                 elevation: 12,
-                shadowColor: Colors.black87,
+                shadowColor: AppColors.scrim,
                 child: CreateAgentForm(client: client),
               ),
             ),
@@ -439,7 +439,6 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.xs),
-        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -692,14 +691,14 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                   InkWell(
                     onTap: toggle,
                     child: Text('$count',
-                        style: sans(10, tabular: true, color: AppColors.fg3)),
+                        style: sans(11, tabular: true, color: AppColors.fg3)),
                   ),
                   const SizedBox(width: 6),
                 ],
                 if (lastActive > 0)
                   Text(
                     relativeTime(lastActive),
-                    style: sans(10, tabular: true, color: AppColors.fg3),
+                    style: sans(11, tabular: true, color: AppColors.fg3),
                   ),
               ],
             ),
@@ -745,13 +744,13 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(11.5, color: AppColors.fg2),
+                  style: sans(12, color: AppColors.fg2),
                 ),
               ),
               if (s.lastActive > 0)
                 Text(
                   relativeTime(s.lastActive),
-                  style: sans(10, tabular: true, color: AppColors.fg3),
+                  style: sans(11, tabular: true, color: AppColors.fg3),
                 ),
             ],
           ),

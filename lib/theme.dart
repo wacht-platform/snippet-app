@@ -245,6 +245,7 @@ class AppColors {
   static Color get line => currentTheme.border;
   static Color get lineStrong => currentTheme.border2;
 
+  static const Color scrim = Color(0x99000000);
   static Color get windowBg => currentTheme.bg;
   static Color get glassSurface => currentTheme.surface2;
   static Color get glassBorder => currentTheme.border;

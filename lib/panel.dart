@@ -22,7 +22,7 @@ Future<T?> presentScreen<T>(
     context: context,
     barrierDismissible: dismissible,
     barrierLabel: 'panel',
-    barrierColor: Colors.black.withValues(alpha: 0.58),
+    barrierColor: AppColors.scrim,
     transitionDuration: Motion.fast,
     pageBuilder: (ctx, _, __) {
       void close() => Navigator.of(ctx).pop();
@@ -99,7 +99,7 @@ Future<T?> presentAdaptivePanel<T>(
     enableDrag: true,
     useSafeArea: false,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.56),
+    barrierColor: AppColors.scrim,
     builder: (sheetContext) {
       final height = MediaQuery.sizeOf(sheetContext).height * 0.92;
       return SafeArea(
@@ -119,7 +119,7 @@ Future<T?> presentAdaptivePanel<T>(
                 height: 3,
                 decoration: BoxDecoration(
                   color: AppColors.border2,
-                  borderRadius: BorderRadius.circular(99),
+                  borderRadius: BorderRadius.circular(R.pill),
                 ),
               ),
               const SizedBox(height: 4),
@@ -152,7 +152,7 @@ Future<T?> showModal<T>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'modal',
-    barrierColor: Colors.black.withValues(alpha: 0.58),
+    barrierColor: AppColors.scrim,
     transitionDuration: Motion.fast,
     pageBuilder: (ctx, _, __) => Center(
       child: Padding(

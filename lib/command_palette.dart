@@ -31,7 +31,7 @@ Future<void> showCommandPalette(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'palette',
-      barrierColor: Colors.black.withValues(alpha: 0.45),
+      barrierColor: AppColors.scrim,
       transitionDuration: Motion.quick,
       pageBuilder: (ctx, _, __) => Align(
         alignment: const Alignment(0, -0.5),
@@ -78,7 +78,6 @@ Widget _frame(Widget child) => ClipRRect(
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: AppColors.glassBorder),
           ),
           child: child,
         ),

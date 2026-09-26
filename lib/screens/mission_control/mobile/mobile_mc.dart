@@ -33,7 +33,7 @@ Future<void> showMissionControlPanel(
     enableDrag: true,
     useSafeArea: false,
     backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.56),
+    barrierColor: AppColors.scrim,
     builder: (sheetContext) {
       final height = MediaQuery.sizeOf(sheetContext).height * 0.92;
       return SafeArea(
@@ -53,7 +53,7 @@ Future<void> showMissionControlPanel(
                 height: 3,
                 decoration: BoxDecoration(
                   color: AppColors.border2,
-                  borderRadius: BorderRadius.circular(99),
+                  borderRadius: BorderRadius.circular(R.pill),
                 ),
               ),
               const SizedBox(height: 4),
@@ -181,7 +181,7 @@ class MobileMissionControl extends StatelessWidget {
         isScrollControlled: true,
         backgroundColor: AppColors.bg,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
         ),
         builder: (sheetCtx) => Padding(
           padding: EdgeInsets.only(
@@ -215,7 +215,7 @@ Future<void> showNotificationInbox(
     isScrollControlled: true,
     backgroundColor: AppColors.bg,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
     ),
     builder: (_) => NotificationInbox(state: state),
   );

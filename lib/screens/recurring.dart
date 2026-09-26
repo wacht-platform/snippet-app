@@ -217,7 +217,7 @@ class RecurringScreenState extends State<RecurringScreen>
                   children: [
                     Text('Schedule a goal or message',
                         style: sans(14,
-                            weight: FontWeight.w500, color: AppColors.fg1)),
+                            weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     Text(
                       'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',
@@ -505,7 +505,6 @@ class RecurringScreenState extends State<RecurringScreen>
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.md),
-        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -531,7 +530,7 @@ class RecurringScreenState extends State<RecurringScreen>
           const SizedBox(height: 4),
           Text(
             'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes.',
-            style: sans(11.5, color: AppColors.fg3),
+            style: sans(12, color: AppColors.fg3),
           ),
           const SizedBox(height: 12),
           AppField(
@@ -540,7 +539,7 @@ class RecurringScreenState extends State<RecurringScreen>
             hint: 'Nightly review',
           ),
           const SizedBox(height: 10),
-          Text('Schedule', style: sans(11.5, color: AppColors.fg3)),
+          Text('Schedule', style: sans(12, color: AppColors.fg3)),
           const SizedBox(height: 6),
           Wrap(spacing: 6, runSpacing: 6, children: [
             for (final s in const [

@@ -654,8 +654,7 @@ Widget _fileSearchFrame(Widget child) => Material(
       clipBehavior: Clip.antiAlias,
       child: Container(
         decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: AppColors.border2)),
+            borderRadius: BorderRadius.circular(R.card)),
         child: child,
       ),
     );

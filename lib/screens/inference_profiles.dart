@@ -206,7 +206,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                       children: [
                         Text('Inference profiles',
                             style: sans(18,
-                                weight: FontWeight.w500, color: AppColors.fg1)),
+                                weight: W.label, color: AppColors.fg1)),
                         const SizedBox(height: 3),
                         Text(
                             'Choose the profile used for new sessions and delegated work.',
@@ -323,7 +323,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: sans(compact ? 13.5 : 13.5,
-                              weight: FontWeight.w500, color: AppColors.fg1)),
+                              weight: W.label, color: AppColors.fg1)),
                     ),
                     if (p.active) ...[
                       const SizedBox(width: 8),
@@ -332,10 +332,10 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.accentBg,
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(R.xs),
                         ),
                         child: Text('active',
-                            style: sans(10,
+                            style: sans(11,
                                 weight: W.label, color: AppColors.accent)),
                       ),
                     ],
@@ -346,10 +346,10 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(R.xs),
                         ),
                         child: Text('delegate',
-                            style: sans(10,
+                            style: sans(11,
                                 weight: W.label, color: AppColors.fg2)),
                       ),
                     ],
@@ -362,7 +362,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                   Text('${p.provider} · ${p.model}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(11.5, color: AppColors.fg3)),
+                      style: mono(12, color: AppColors.fg3)),
                 ],
               ),
             ),

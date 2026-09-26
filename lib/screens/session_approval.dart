@@ -443,7 +443,7 @@ class QuestionBarState extends State<QuestionBar> {
                   child: Text(label,
                       style: sans(14,
                           height: 1.4,
-                          weight: sel ? FontWeight.w500 : FontWeight.w500,
+                          weight: sel ? W.label : W.label,
                           color: sel ? AppColors.fg1 : AppColors.fg2))),
               if (sel) ...[
                 const SizedBox(width: 10),
@@ -732,7 +732,6 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           decoration: BoxDecoration(
             color: AppColors.surface1,
             borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(color: AppColors.border),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(

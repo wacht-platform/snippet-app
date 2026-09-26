@@ -233,7 +233,7 @@ class CardTabChip extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(10, color: AppColors.fg3),
+                    style: sans(11, color: AppColors.fg3),
                   ),
                 ],
               ),

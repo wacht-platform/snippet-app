@@ -216,7 +216,7 @@ class _GitScreenState extends State<GitScreen> {
                     : 'Source Control',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(12, weight: FontWeight.w500, color: AppColors.fg1),
+                style: sans(12, weight: W.label, color: AppColors.fg1),
               ),
             ),
             IconBtn('refresh',

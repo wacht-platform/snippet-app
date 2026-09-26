@@ -56,7 +56,6 @@ class ShellWelcomeView extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.surface2,
                     borderRadius: BorderRadius.circular(R.card),
-                    border: Border.all(color: AppColors.border),
                   ),
                   child: AppIcon('server', size: 24, color: AppColors.fg3),
                 ),

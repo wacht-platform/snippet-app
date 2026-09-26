@@ -166,7 +166,7 @@ class RailIcon extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
           decoration: BoxDecoration(
             color: AppColors.surface3,
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(R.pill),
           ),
           child: Text(badge!, style: mono(10, color: AppColors.fg2)),
         ),

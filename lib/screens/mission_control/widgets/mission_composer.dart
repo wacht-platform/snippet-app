@@ -61,7 +61,6 @@ class _MissionComposerState extends State<MissionComposer> {
         decoration: BoxDecoration(
           color: AppColors.bg,
           borderRadius: BorderRadius.circular(R.card),
-          border: Border.all(color: AppColors.border),
         ),
         padding: const EdgeInsets.fromLTRB(18, 20, 12, 14),
         child: Column(

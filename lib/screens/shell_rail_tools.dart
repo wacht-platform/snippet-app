@@ -33,7 +33,7 @@ Future<void> showGoalPopover({
           color: AppColors.surface3,
           borderRadius: BorderRadius.circular(R.md),
           elevation: 12,
-          shadowColor: Colors.black87,
+          shadowColor: AppColors.scrim,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: GoalPopover(

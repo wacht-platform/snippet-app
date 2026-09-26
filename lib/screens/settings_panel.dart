@@ -394,7 +394,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                                 size: 15, color: AppColors.accent),
                             const SizedBox(width: 9),
                             Text('Settings',
-                                style: sans(13.5,
+                                style: sans(14,
                                     weight: W.title, color: AppColors.fg1)),
                           ],
                         ),
@@ -791,7 +791,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                 child: Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(12.5,
+                    style: sans(13,
                         weight: selected ? W.label : W.body,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
@@ -909,7 +909,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                   const SizedBox(height: 4),
                   Text(
                     'Connect to a remote machine running the snippet daemon.',
-                    style: sans(11.5, color: AppColors.fg3),
+                    style: sans(12, color: AppColors.fg3),
                   ),
                   const SizedBox(height: 14),
                   Btn('Connect machine',
@@ -975,14 +975,13 @@ class SettingsPanelState extends State<SettingsPanel> {
           decoration: BoxDecoration(
             color: AppColors.surface2,
             borderRadius: BorderRadius.circular(R.sm),
-            border: Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
               Expanded(
                 child: SelectableText(
                   'snippet daemon link',
-                  style: mono(12.5, color: AppColors.accent),
+                  style: mono(13, color: AppColors.accent),
                 ),
               ),
               IconBtn('copy', size: 26, iconSize: 13, tooltip: 'Copy command',
@@ -1004,7 +1003,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           style: mono(12, color: AppColors.fg1),
           decoration: InputDecoration(
             hintText: 'https://host:port?token=... or {"url":..., "token":...}',
-            hintStyle: mono(11.5, color: AppColors.fg4),
+            hintStyle: mono(12, color: AppColors.fg4),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             filled: true,
@@ -1138,10 +1137,10 @@ class SettingsPanelState extends State<SettingsPanel> {
                         horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: AppColors.accentBg,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(R.xs),
                     ),
                     child: Text('active',
-                        style: sans(10,
+                        style: sans(11,
                             weight: W.label, color: AppColors.accent)),
                   ),
                 )
@@ -1188,7 +1187,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                       weight: W.label, color: AppColors.fg1)),
               const SizedBox(height: 2),
               Text('Notify when a session completes or requires input',
-                  style: sans(11.5, color: AppColors.fg3)),
+                  style: sans(12, color: AppColors.fg3)),
             ],
           ),
         ),

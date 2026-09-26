@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
-import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -128,13 +127,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             actions: [IconBtn('refresh', onTap: () => _load())],
           ),
           if (_loading)
-            Expanded(
-                child: Center(
-                    child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3))))
+            const Expanded(child: Center(child: DelayedSpinner()))
           else if (_error != null)
             Expanded(
                 child: EmptyState(
@@ -149,7 +142,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
           else
             Expanded(
                 child: ListView(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(S.s16),
                     children: [for (final p in procs) _row(p)])),
         ]),
       ),
@@ -176,85 +169,63 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
     // — the same "failure is invisible" defect the tool rows had. Colour now
     // summarises the outcome: green live, danger for non-zero/killed, grey for
     // a clean exit.
-    final dotColor = running
-        ? AppColors.ok
+    final tone = running
+        ? Tone.ok
         : failed
-            ? AppColors.danger
-            : AppColors.fg4;
-    final labelColor = failed ? AppColors.danger : AppColors.fg3;
+            ? Tone.danger
+            : Tone.neutral;
     final open = _openLogId == id;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-      decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.card),
-          border: Border.all(color: AppColors.border)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: dotColor)),
-          const SizedBox(width: 9),
-          Expanded(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: S.s8),
+      child: Material(
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(R.md),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s8, S.s8),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+              padding: const EdgeInsets.only(right: S.s8),
               child: Text(cmd,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: mono(12, color: AppColors.fg1))),
-          if (running)
-            TextButton(
-                onPressed: () => _kill(id),
-                style: TextButton.styleFrom(
-                    // 'Stop' is a destructive action on a live process; 22px was
-                    // well under the 44pt floor on a phone.
-                    minimumSize: Size(0, kMobile ? M.minTarget : 0),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4)),
-                child: Text('Stop', style: sans(12, color: AppColors.danger))),
-        ]),
-        const SizedBox(height: 4),
-        Row(children: [
-          Text('pid $pid', style: mono(10, color: AppColors.fg3)),
-          const SizedBox(width: 12),
-          Text(statusLabel, style: mono(10, color: labelColor)),
-          const Spacer(),
-          GestureDetector(
-              onTap: () => _toggleLog(id),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                  // A 24px target; the text itself is only ~16px.
-                  padding: EdgeInsets.all(kMobile ? 14 : 4),
-                  child: Text(open ? 'hide log' : 'log',
-                      style: mono(11,
-                          color: open ? AppColors.accent : AppColors.fg3)))),
-        ]),
-        if (open) ...[
-          const SizedBox(height: 6),
-          Container(
-            constraints: const BoxConstraints(maxHeight: 240),
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-                color: AppColors.bg,
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border)),
-            child: _logLoading
-                ? Center(
-                    child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3)))
-                : SingleChildScrollView(
-                    child: Text(_log.trim().isEmpty ? '(empty)' : _log,
-                        style: mono(10, height: 1.4, color: AppColors.fg2))),
-          ),
-        ],
-      ]),
+                  style: TS.code(AppColors.fg1)),
+            ),
+            const SizedBox(height: S.s8),
+            Row(children: [
+              Tag(statusLabel, tone: tone, dot: !running, live: running),
+              const SizedBox(width: S.s8),
+              Text('pid $pid', style: TS.meta()),
+              const Spacer(),
+              TextAction(open ? 'Hide log' : 'Log',
+                  onTap: () => _toggleLog(id)),
+              if (running)
+                TextAction('Stop', onTap: () => _kill(id), danger: true),
+            ]),
+            if (open) ...[
+              const SizedBox(height: S.s8),
+              Padding(
+                padding: const EdgeInsets.only(right: S.s8, bottom: S.s4),
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(S.s12),
+                  decoration: BoxDecoration(
+                      color: AppColors.canvas,
+                      borderRadius: BorderRadius.circular(R.sm + 2)),
+                  child: _logLoading
+                      ? const Center(child: DelayedSpinner(size: 16))
+                      : SingleChildScrollView(
+                          child: SelectableText(
+                              _log.trim().isEmpty ? '(empty)' : _log,
+                              style: TS.codeSmall(AppColors.fg2))),
+                ),
+              ),
+            ],
+          ]),
+        ),
+      ),
     );
   }
 }

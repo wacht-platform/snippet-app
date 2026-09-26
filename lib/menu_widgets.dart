@@ -97,7 +97,7 @@ PopupMenuItem<T> appMenuRow<T>({
                 Text(description,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(11.5, color: AppColors.fg3)),
+                    style: sans(12, color: AppColors.fg3)),
               ],
             ],
           ),
@@ -173,7 +173,7 @@ Future<T?> showAppMenu<T>(
       sheetAnimationStyle: sheetMotion,
       context: context,
       backgroundColor: Colors.transparent,
-      barrierColor: const Color(0x9E000000),
+      barrierColor: AppColors.scrim,
       isScrollControlled: true,
       builder: (sheet) {
         final media = MediaQuery.of(sheet);
@@ -197,7 +197,7 @@ Future<T?> showAppMenu<T>(
                           height: 3,
                           decoration: BoxDecoration(
                               color: AppColors.border2,
-                              borderRadius: BorderRadius.circular(99)))),
+                              borderRadius: BorderRadius.circular(R.pill)))),
                   const SizedBox(height: 6),
                   Flexible(
                     child: SingleChildScrollView(
@@ -442,7 +442,6 @@ class _ToastCardState extends State<_ToastCard>
             decoration: BoxDecoration(
               color: AppColors.surface1,
               borderRadius: BorderRadius.circular(R.md),
-              border: Border.all(color: AppColors.border2),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               AppIcon(widget.danger ? 'alert-triangle' : 'check',

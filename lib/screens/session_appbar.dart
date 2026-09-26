@@ -485,7 +485,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                         Text(
                           pane.title,
                           style: sans(compact ? 12 : 13,
-                              weight: on ? FontWeight.w500 : FontWeight.w400,
+                              weight: on ? W.label : W.body,
                               color: on ? AppColors.fg1 : AppColors.fg3),
                         ),
                         const SizedBox(width: 2),

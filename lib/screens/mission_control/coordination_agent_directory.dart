@@ -252,7 +252,7 @@ class _MessageState extends StatelessWidget {
           const SizedBox(height: 18),
           Text(title,
               textAlign: TextAlign.center,
-              style: sans(20, weight: FontWeight.w500, color: AppColors.fg1)),
+              style: sans(20, weight: W.label, color: AppColors.fg1)),
           const SizedBox(height: 8),
           Text(message,
               textAlign: TextAlign.center,

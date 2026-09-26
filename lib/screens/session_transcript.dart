@@ -366,7 +366,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               foregroundColor: AppColors.accentFg,
               backgroundColor: AppColors.accentFill,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4)),
+                  borderRadius: BorderRadius.circular(R.xs)),
             ),
             child: Text('Download',
                 style: sans(12, weight: W.label, color: AppColors.accentFg)),

@@ -134,7 +134,7 @@ class _ProviderCard extends StatelessWidget {
         Row(children: [
           Expanded(
             child: Text(provider.provider,
-                style: sans(14, weight: FontWeight.w500, color: AppColors.fg1)),
+                style: sans(14, weight: W.label, color: AppColors.fg1)),
           ),
           Text(
               '${provider.sessions} session${provider.sessions == 1 ? '' : 's'}',
@@ -212,7 +212,7 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: sans(10, color: AppColors.fg3)),
+          Text(label, style: sans(11, color: AppColors.fg3)),
           const SizedBox(height: 2),
           Text(value, style: mono(12, color: AppColors.fg2)),
         ],

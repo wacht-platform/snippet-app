@@ -162,7 +162,7 @@ class AgentBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: working ? AppColors.runBg : AppColors.accentBg,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(R.xs),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         AppIcon('agent', size: 11, color: fg),
@@ -173,7 +173,7 @@ class AgentBadge extends StatelessWidget {
             agentId,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: sans(10, weight: W.label, color: fg),
+            style: sans(11, weight: W.label, color: fg),
           ),
         ),
       ]),

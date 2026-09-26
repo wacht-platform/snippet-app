@@ -223,7 +223,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(R.sm),
-        border: Border.all(color: AppColors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -268,7 +267,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Center(
                       child: Text('No matching models',
-                          style: sans(11.5, color: AppColors.fg3)),
+                          style: sans(12, color: AppColors.fg3)),
                     ),
                   )
                 : ListView.separated(
@@ -299,7 +298,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                                     Text(m.id,
                                         style: mono(12,
                                             weight: isSelected
-                                                ? FontWeight.w600
+                                                ? W.label
                                                 : FontWeight.normal,
                                             color: isSelected
                                                 ? AppColors.accent
@@ -309,7 +308,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                                         m.displayName != m.id) ...[
                                       const SizedBox(height: 1),
                                       Text(m.displayName!,
-                                          style: sans(10.5,
+                                          style: sans(11,
                                               color: AppColors.fg3)),
                                     ],
                                   ],
@@ -407,7 +406,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             widget.embedded ? 20 : 16, widget.embedded ? 8 : 16, 20, 24),
         children: [
           Text('Provider',
-              style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+              style: sans(12, weight: W.label, color: AppColors.fg2)),
           const SizedBox(height: 7),
           if (_isEdit)
             Text(_providerLabel(_provider),
@@ -484,7 +483,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           ),
           const SizedBox(height: 16),
           Text('Reasoning effort',
-              style: sans(12, weight: FontWeight.w500, color: AppColors.fg2)),
+              style: sans(12, weight: W.label, color: AppColors.fg2)),
           const SizedBox(height: 7),
           Pills<String>(
             items: const [
@@ -680,7 +679,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                   height: 4,
                   decoration: BoxDecoration(
                       color: AppColors.surface3,
-                      borderRadius: BorderRadius.circular(2))),
+                      borderRadius: BorderRadius.circular(R.xs))),
             ),
             // Header: title, count, close. The old sheet had no title at all --
             // just a grab handle and a labelled field, so nothing named the
@@ -698,7 +697,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.surface3,
-                    borderRadius: BorderRadius.circular(99),
+                    borderRadius: BorderRadius.circular(R.pill),
                   ),
                   child: Text('${widget.models.length}',
                       style: mono(10, color: AppColors.fg3)),
@@ -922,7 +921,7 @@ class _SubSignInState extends State<_SubSignIn> {
         const SizedBox(height: 8),
         Row(children: [
           Text(_code!,
-              style: mono(18, weight: FontWeight.w500, color: AppColors.fg1)),
+              style: mono(18, weight: W.label, color: AppColors.fg1)),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () => Clipboard.setData(ClipboardData(text: _code!)),

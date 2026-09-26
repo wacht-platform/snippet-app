@@ -38,7 +38,7 @@ Future<Instance?> showAddMachineDialog(BuildContext context) {
     context: context,
     barrierDismissible: true,
     barrierLabel: 'add-machine',
-    barrierColor: Colors.black.withValues(alpha: 0.5),
+    barrierColor: AppColors.scrim,
     transitionDuration: Motion.fast,
     pageBuilder: (_, __, ___) => const Center(child: _AddMachineDialog()),
     transitionBuilder: (_, anim, __, child) {
@@ -270,10 +270,10 @@ class _StepLabel extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppColors.surface3,
-          borderRadius: BorderRadius.circular(99),
+          borderRadius: BorderRadius.circular(R.pill),
         ),
         child:
-            Text(step, style: sans(10, weight: W.label, color: AppColors.fg3)),
+            Text(step, style: sans(11, weight: W.label, color: AppColors.fg3)),
       ),
       const SizedBox(width: 8),
       Text(text, style: sans(11, weight: W.label, color: AppColors.fg2)),
@@ -397,7 +397,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
               const SizedBox(height: 12),
               Text('Camera access needed',
                   style:
-                      sans(16, weight: FontWeight.w500, color: AppColors.fg1)),
+                      sans(16, weight: W.label, color: AppColors.fg1)),
               const SizedBox(height: 8),
               ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: 250),
@@ -451,9 +451,9 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                    color: Colors.black54,
+                    color: AppColors.scrim,
                     border: Border.all(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(99)),
+                    borderRadius: BorderRadius.circular(R.pill)),
                 child: Text.rich(
                   TextSpan(style: sans(12, color: AppColors.fg1), children: [
                     const TextSpan(text: 'Scan the QR from '),
@@ -599,7 +599,7 @@ class _ReticleState extends State<_Reticle>
                 height: 2,
                 decoration: BoxDecoration(
                     color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(99),
+                    borderRadius: BorderRadius.circular(R.pill),
                     boxShadow: [
                       BoxShadow(color: AppColors.accent, blurRadius: 12)
                     ])),

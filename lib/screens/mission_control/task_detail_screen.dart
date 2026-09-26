@@ -401,7 +401,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               a.hasSessionLease
                                   ? 'active lease'
                                   : (a.active ? 'waiting' : 'left'),
-                              style: sans(10,
+                              style: sans(11,
                                   color: a.hasSessionLease
                                       ? AppColors.ok
                                       : AppColors.fg3),
@@ -498,7 +498,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 3),
                     child: Text(e.actorId,
-                        style: sans(10,
+                        style: sans(11,
                             weight: W.label, color: AppColors.accent)),
                   ),
                 Text(body, style: sans(13, color: AppColors.fg1, height: 1.4)),

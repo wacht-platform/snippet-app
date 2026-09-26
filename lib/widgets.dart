@@ -87,7 +87,7 @@ class Pills<T> extends StatelessWidget {
                   // status elsewhere. Matches IconBtn.active and the nav rows.
                   color:
                       selected == val ? AppColors.surface3 : AppColors.surface2,
-                  borderRadius: BorderRadius.circular(99),
+                  borderRadius: BorderRadius.circular(R.pill),
                   border: Border.all(
                       color: selected == val
                           ? AppColors.border2
@@ -501,10 +501,10 @@ class PillBtn extends StatelessWidget {
         enabled: onTap != null,
         child: Material(
           color: AppColors.accentFill,
-          borderRadius: BorderRadius.circular(99),
+          borderRadius: BorderRadius.circular(R.pill),
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(99),
+            borderRadius: BorderRadius.circular(R.pill),
             child: Container(
               height: kMobile ? 48 : 36,
               padding: EdgeInsets.symmetric(horizontal: kMobile ? 20 : 16),
@@ -1085,14 +1085,13 @@ class StatTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
         color: AppColors.surface2,
-        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(R.md),
       ),
       child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: sans(10, color: AppColors.fg3)),
+            Text(label, style: sans(11, color: AppColors.fg3)),
             const SizedBox(height: 5),
             Text(value,
                 style: mono(16,
@@ -1116,7 +1115,7 @@ class Progress extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     return ClipRRect(
-      borderRadius: BorderRadius.circular(99),
+      borderRadius: BorderRadius.circular(R.pill),
       child: LinearProgressIndicator(
         value: (pct / 100).clamp(0, 1),
         minHeight: height,
@@ -1330,7 +1329,7 @@ class AppSwitch extends StatelessWidget {
               width: width,
               height: height,
               decoration: BoxDecoration(
-                color: on ? AppColors.accent : AppColors.surface3,
+                color: on ? AppColors.accentFill : AppColors.surface3,
                 borderRadius: BorderRadius.circular(height / 2),
               ),
               child: AnimatedAlign(
@@ -1377,7 +1376,6 @@ class AppToggle extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
             borderRadius: BorderRadius.circular(R.md),
           ),
           child: Row(children: [

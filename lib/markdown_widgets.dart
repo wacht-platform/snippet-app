@@ -69,7 +69,7 @@ class CodeBlockBuilder extends MarkdownElementBuilder {
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
         color: AppColors.accentBg,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(R.xs),
       ),
       child: Text(raw, style: mono(13, color: AppColors.accent)),
     );

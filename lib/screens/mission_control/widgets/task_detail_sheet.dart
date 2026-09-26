@@ -173,7 +173,7 @@ class _StatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(R.sm),
       ),
       child: Text(status, style: mono(10, color: color)),
     );
@@ -189,8 +189,7 @@ class _MetaPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(R.sm),
       ),
       child: Text(text, style: mono(10, color: AppColors.fg3)),
     );

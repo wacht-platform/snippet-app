@@ -272,12 +272,11 @@ Future<void> showSidebarMachinesPicker(
           child: Material(
             color: AppColors.glassSurface,
             elevation: 12,
-            shadowColor: Colors.black87,
+            shadowColor: AppColors.scrim,
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 6),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.glassBorder),
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 420),

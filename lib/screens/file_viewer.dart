@@ -548,7 +548,6 @@ class _AudioViewState extends State<_AudioView> {
             height: 76,
             decoration: BoxDecoration(
               color: AppColors.surface2,
-              border: Border.all(color: AppColors.border),
               borderRadius: BorderRadius.circular(R.md),
             ),
             child: AppIcon('music', size: 30, color: AppColors.fg3),
