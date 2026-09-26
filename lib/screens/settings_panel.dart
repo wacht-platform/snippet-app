@@ -83,7 +83,8 @@ class _MachineListState extends State<MachineList> {
         widget.onManage(i);
       },
       child: Padding(
-        padding: EdgeInsets.fromLTRB(14, kMobile ? 9 : 6, 4, kMobile ? 9 : 6),
+        padding: EdgeInsets.fromLTRB(
+            S.s12, kMobile ? S.s8 : S.s6, S.s4, kMobile ? S.s8 : S.s6),
         child: Row(children: [
           Container(
             width: 8,
@@ -95,19 +96,20 @@ class _MachineListState extends State<MachineList> {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(i.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(kMobile ? 14 : 12, color: AppColors.fg1)),
+                  style: TS.ui(AppColors.fg1)),
               const SizedBox(height: 1),
               Text(hostOf(i.url),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: mono(kMobile ? 11 : 10, color: AppColors.fg3)),
+                  style: TS.codeSmall()),
             ]),
           ),
-          if (selected) AppIcon('check', size: 14, color: AppColors.accent),
+          if (selected) AppIcon('check', size: 16, color: AppColors.accent),
           IconBtn('more-vertical', size: 30, iconSize: 15, tooltip: 'Manage',
               onTap: () {
             Navigator.pop(context);
@@ -129,11 +131,9 @@ class _MachineListState extends State<MachineList> {
           padding:
               EdgeInsets.fromLTRB(14, kMobile ? 11 : 8, 14, kMobile ? 11 : 8),
           child: Row(children: [
-            AppIcon('plus', size: 15, color: AppColors.accent),
+            AppIcon('plus', size: 16, color: AppColors.accent),
             const SizedBox(width: 10),
-            Text('Add machine',
-                style: sans(kMobile ? 14 : 12,
-                    weight: W.label, color: AppColors.accent)),
+            Text('Add machine', style: TS.label(AppColors.accent)),
           ]),
         ),
       ),
@@ -463,8 +463,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                                   child: Text(
                                     _pageTitle(_page),
                                     style: sans(14,
-                                        weight: W.title,
-                                        color: AppColors.fg1),
+                                        weight: W.title, color: AppColors.fg1),
                                   ),
                                 ),
                                 if (_pageAction(_page) != null)
@@ -493,8 +492,7 @@ class SettingsPanelState extends State<SettingsPanel> {
               child: Row(children: [
                 AppIcon('settings', size: 15, color: AppColors.accent),
                 const SizedBox(width: 8),
-                Text('Settings',
-                    style: TS.label(AppColors.fg1)),
+                Text('Settings', style: TS.label(AppColors.fg1)),
                 const Spacer(),
                 IconBtn('x',
                     size: 26,
@@ -545,42 +543,38 @@ class SettingsPanelState extends State<SettingsPanel> {
       children: [
         if (kCanNotify) section('Notifications', _notifRow()),
         section(
-            'Inference profile',
-            InferenceProfilesScreen(client: widget.client, embedded: true),
-            trailing: IconBtn(
-                'plus',
-                size: 28,
-                iconSize: 15,
-                tooltip: 'Add profile',
-                onTap: () {
-                  Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => InferenceProfileEditor(
-                        client: widget.client,
-                        onClose: () => Navigator.pop(context),
-                        onSaved: () => Navigator.pop(context, true),
-                      ),
-                    ),
-                  );
-                }),
+          'Inference profile',
+          InferenceProfilesScreen(client: widget.client, embedded: true),
+          trailing: IconBtn('plus',
+              size: 28, iconSize: 15, tooltip: 'Add profile', onTap: () {
+            Navigator.of(context).push<bool>(
+              MaterialPageRoute(
+                builder: (_) => InferenceProfileEditor(
+                  client: widget.client,
+                  onClose: () => Navigator.pop(context),
+                  onSaved: () => Navigator.pop(context, true),
+                ),
+              ),
+            );
+          }),
         ),
         section(
           'Vault',
           inlineScreen(VaultScreen(
               key: _vaultKey, client: widget.client, embedded: true)),
-          trailing: IconBtn(
-              'plus',
+          trailing: IconBtn('plus',
               size: 28,
               iconSize: 15,
               tooltip: 'Add secret',
               onTap: () => _vaultKey.currentState?.add()),
         ),
-        section('Scheduled jobs', inlineScreen(RecurringScreen(client: widget.client, listOnly: true, embedded: true))),
+        section(
+            'Scheduled jobs',
+            inlineScreen(RecurringScreen(
+                client: widget.client, listOnly: true, embedded: true))),
       ],
     );
   }
-
-
 
   /// Section label, shared so the inline and nested settings cannot diverge.
   Widget _inlineLabel(String t) => Padding(
@@ -588,7 +582,6 @@ class SettingsPanelState extends State<SettingsPanel> {
         child: Text(t.toUpperCase(),
             style: caps(kMobile ? 11 : 10, color: AppColors.fg3)),
       );
-
 
   /// One phone settings section.
   Widget _mobileSectionPage() {
@@ -780,12 +773,11 @@ class SettingsPanelState extends State<SettingsPanel> {
             _renamingUrl = null;
           }),
           child: Container(
-            height: 28,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            height: 34,
+            padding: const EdgeInsets.symmetric(horizontal: S.s8),
             child: Row(children: [
               AppIcon(icon,
-                  size: 13.5,
-                  color: selected ? AppColors.accent : AppColors.fg3),
+                  size: 16, color: selected ? AppColors.accent : AppColors.fg3),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(label,
@@ -817,15 +809,15 @@ class SettingsPanelState extends State<SettingsPanel> {
                 onTap: () => setState(() => _page = page),
                 borderRadius: BorderRadius.circular(R.sm),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: S.s12, vertical: S.s6),
                   child: Row(children: [
                     AppIcon(icon,
-                        size: 13,
+                        size: 14,
                         color: _page == page ? AppColors.fg1 : AppColors.fg3),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: S.s6),
                     Text(label,
-                        style: sans(11,
+                        style: sans(13,
                             weight: _page == page ? W.label : W.body,
                             color:
                                 _page == page ? AppColors.fg1 : AppColors.fg2)),
@@ -856,8 +848,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           key: _vaultKey,
           client: widget.client,
           embedded: true,
-          onAddingChanged: (adding) =>
-              setState(() => _vaultAdding = adding),
+          onAddingChanged: (adding) => setState(() => _vaultAdding = adding),
         ),
       SettingsPage.scheduled => RecurringScreen(
           key: _recurringKey,
@@ -904,8 +895,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                 children: [
                   AppIcon('server', size: 28, color: AppColors.fg4),
                   const SizedBox(height: 10),
-                  Text('No saved connections',
-                      style: TS.label()),
+                  Text('No saved connections', style: TS.label()),
                   const SizedBox(height: 4),
                   Text(
                     'Connect to a remote machine running the snippet daemon.',
@@ -913,9 +903,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                   ),
                   const SizedBox(height: 14),
                   Btn('Connect machine',
-                      icon: 'plus',
-                      small: true,
-                      onTap: _addMachine),
+                      icon: 'plus', small: true, onTap: _addMachine),
                 ],
               ),
             ),
@@ -948,14 +936,16 @@ class SettingsPanelState extends State<SettingsPanel> {
       children: [
         Row(
           children: [
-            IconBtn('arrow-left', size: 30, iconSize: 16, tooltip: 'Back',
+            IconBtn('arrow-left',
+                size: 30,
+                iconSize: 16,
+                tooltip: 'Back',
                 onTap: () => setState(() {
                       _addingMachine = false;
                       _addMachineError = null;
                     })),
             const SizedBox(width: 8),
-            Text('Connect a machine',
-                style: TS.sectionTitle()),
+            Text('Connect a machine', style: TS.sectionTitle()),
           ],
         ),
         const SizedBox(height: 4),
@@ -1021,8 +1011,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         ),
         if (_addMachineError != null) ...[
           const SizedBox(height: 10),
-          Text(_addMachineError!,
-              style: sans(12, color: AppColors.danger)),
+          Text(_addMachineError!, style: sans(12, color: AppColors.danger)),
         ],
         const SizedBox(height: 24),
         Row(
@@ -1038,8 +1027,8 @@ class SettingsPanelState extends State<SettingsPanel> {
             const SizedBox(width: 8),
             Btn(_addMachineBusy ? 'Connecting…' : 'Connect machine',
                 small: true,
-                disabled: _addMachineBusy ||
-                    _addMachinePaste.text.trim().isEmpty,
+                disabled:
+                    _addMachineBusy || _addMachinePaste.text.trim().isEmpty,
                 onTap: _submitAddMachine),
           ],
         ),
@@ -1054,21 +1043,11 @@ class SettingsPanelState extends State<SettingsPanel> {
     return Material(
       color: Colors.transparent,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: 0,
-          vertical: compact ? 4 : 6,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: S.s8),
         child: Row(
           children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.ok : AppColors.fg4,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 10),
+            IconTile('server', tone: isActive ? Tone.ok : Tone.neutral),
+            const SizedBox(width: S.s12),
             if (isRenaming) ...[
               Expanded(
                 child: SizedBox(
@@ -1109,57 +1088,35 @@ class SettingsPanelState extends State<SettingsPanel> {
                   onTap: () => setState(() => _renamingUrl = null)),
             ] else ...[
               Expanded(
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(i.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(compact ? 13 : 13.5,
-                              weight: W.label, color: AppColors.fg1)),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(hostOf(i.url),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: mono(compact ? 11 : 11,
-                              color: AppColors.fg3)),
-                    ),
+                    Text(i.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TS.rowTitle()),
+                    const SizedBox(height: S.s2),
+                    Text(hostOf(i.url),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TS.codeSmall()),
                   ],
                 ),
               ),
+              const SizedBox(width: S.s8),
               if (isActive)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentBg,
-                      borderRadius: BorderRadius.circular(R.xs),
-                    ),
-                    child: Text('active',
-                        style: sans(11,
-                            weight: W.label, color: AppColors.accent)),
-                  ),
-                )
+                const Tag('Active', tone: Tone.ok, dot: true)
               else if (widget.onSelect != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Btn('Connect',
-                      small: true,
-                      variant: BtnVariant.ghost,
-                      onTap: () => _selectInstance(i)),
-                ),
+                TextAction('Connect', onTap: () => _selectInstance(i)),
+              const SizedBox(width: S.s4),
               IconBtn('edit',
-                  size: compact ? M.minTarget : 28,
-                  iconSize: compact ? 16 : 13,
+                  size: compact ? M.minTarget : 30,
+                  iconSize: 16,
                   tooltip: 'Rename machine',
                   onTap: () => _startRename(i)),
               IconBtn('trash',
-                  size: compact ? M.minTarget : 28,
-                  iconSize: compact ? 17 : 13,
+                  size: compact ? M.minTarget : 30,
+                  iconSize: 16,
                   tooltip: 'Remove machine',
                   onTap: () => _confirmRemove(i)),
             ],
@@ -1173,8 +1130,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     final compact = kMobile && widget.embedded;
     return Padding(
       padding: EdgeInsets.symmetric(
-          horizontal: compact ? 0 : 8,
-          vertical: compact ? 2 : 8),
+          horizontal: compact ? 0 : 8, vertical: compact ? 2 : 8),
       child: Row(children: [
         AppIcon('bell', size: 16, color: AppColors.fg3),
         const SizedBox(width: 12),
