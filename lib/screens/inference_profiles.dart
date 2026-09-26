@@ -180,89 +180,24 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         }
         final cfg = snap.data;
         final profiles = cfg?.profiles ?? const [];
-        final list = ListView(
-          physics: (widget.embedded && kMobile)
-              ? const NeverScrollableScrollPhysics()
-              : null,
-          shrinkWrap: (widget.embedded && kMobile),
-          padding: EdgeInsets.fromLTRB(
-              (widget.embedded && kMobile) ? 0 : 24,
-              (widget.embedded && kMobile) ? 0 : (widget.embedded ? 4 : 20),
-              (widget.embedded && kMobile) ? 0 : 24,
-              28),
-          children: [
-            if (!widget.embedded) ...[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Inference profiles',
-                            style: sans(18,
-                                weight: W.label, color: AppColors.fg1)),
-                        const SizedBox(height: 3),
-                        Text(
-                            'Choose the profile used for new sessions and delegated work.',
-                            style: TS.meta()),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  IconBtn('plus',
-                      size: 36,
-                      iconSize: 17,
-                      tooltip: 'Add profile',
-                      onTap: () => _edit(null)),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
-            if (profiles.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 40),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AppIcon('ai-chip', size: 30, color: AppColors.fg4),
-                      const SizedBox(height: 12),
-                      Text('No inference profiles configured',
-                          style: sans(14, weight: W.label, color: AppColors.fg1)),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Add an API key or local model provider to start sessions.',
-                        textAlign: TextAlign.center,
-                        style: TS.meta(),
-                      ),
-                      const SizedBox(height: 16),
-                      Btn('Add profile',
-                          icon: 'plus',
-                          small: true,
-                          onTap: () => _edit(null)),
-                    ],
-                  ),
-                ),
-              )
-            else
-              Column(
-                children: [
-                  for (var i = 0; i < profiles.length; i++) ...[
-                    _profileCard(profiles[i], cfg?.delegate),
-                    if (i < profiles.length - 1)
-                      Divider(
-                          height: 1,
-                          color: AppColors.border.withValues(alpha: 0.4)),
-                  ],
-                ],
-              ),
+        return PageBody(children: [
+          if (profiles.isEmpty)
+            EmptyState(
+              icon: 'ai-chip',
+              title: 'No inference profiles',
+              body:
+                  'Add an API key or a local model provider to start sessions.',
+              action: Btn('Add profile',
+                  icon: 'plus', small: true, onTap: () => _edit(null)),
+            )
+          else ...[
+            ListGroup(children: [
+              for (final p in profiles) _profileCard(p, cfg?.delegate),
+            ]),
+            const SettingsNote(
+                'New chats use the active profile. Parallel lanes use the delegate.'),
           ],
-        );
-        if (widget.embedded || kMobile) return list;
-        return Center(
-            child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 680), child: list));
+        ]);
       },
     );
     if (widget.embedded) {
@@ -272,7 +207,13 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NavBackRow(title: 'Inference profiles', onBack: widget.onBack!),
+          NavBackRow(
+              title: 'Inference profiles',
+              onBack: widget.onBack!,
+              trailing: [
+                Btn('Add profile',
+                    icon: 'plus', small: true, onTap: () => _edit(null)),
+              ]),
           Expanded(child: body),
         ],
       );
@@ -283,7 +224,12 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         child: Column(children: [
           SnAppBar(
               title: 'Inference profiles',
-              onBack: widget.onClose ?? () => Navigator.pop(context)),
+              compact: true,
+              onBack: widget.onClose ?? () => Navigator.pop(context),
+              actions: [
+                Btn('Add profile',
+                    icon: 'plus', small: true, onTap: () => _edit(null)),
+              ]),
           Expanded(child: body),
         ]),
       ),
@@ -293,78 +239,32 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   Widget _profileCard(InferenceProfile p, String? delegate) {
     final isDelegate =
         delegate != null && delegate.isNotEmpty && delegate == p.name;
-    final compact = kMobile && widget.embedded;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _edit(p),
-        borderRadius: BorderRadius.circular(compact ? R.sm : R.md),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-              horizontal: compact ? 0 : 8,
-              vertical: compact ? 6 : 11),
-          child: Row(children: [
-            AppIcon('ai-chip',
-                size: compact ? 18 : 20,
-                color: p.active ? AppColors.accent : AppColors.fg3),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Flexible(
-                      child: Text(p.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(compact ? 13.5 : 13.5,
-                              weight: W.label, color: AppColors.fg1)),
-                    ),
-                    if (p.active) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.accentBg,
-                          borderRadius: BorderRadius.circular(R.xs),
-                        ),
-                        child: Text('active',
-                            style: sans(11,
-                                weight: W.label, color: AppColors.accent)),
-                      ),
-                    ],
-                    if (isDelegate) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(R.xs),
-                        ),
-                        child: Text('delegate',
-                            style: sans(11,
-                                weight: W.label, color: AppColors.fg2)),
-                      ),
-                    ],
-                    if (!p.usable) ...[
-                      const SizedBox(width: 6),
-                      const WarnChip(),
-                    ],
-                  ]),
-                  const SizedBox(height: 2),
-                  Text('${p.provider} · ${p.model}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(12, color: AppColors.fg3)),
-                ],
-              ),
-            ),
-            _deleteProfileButton(p),
-          ]),
+    return ListRow(
+      title: p.name,
+      onTap: () => _edit(p),
+      leading: IconTile('ai-chip', tone: p.active ? Tone.accent : Tone.neutral),
+      titleWidget: Row(children: [
+        Flexible(
+          child: Text(p.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TS.rowTitle()),
         ),
-      ),
+        if (p.active) ...[
+          const SizedBox(width: S.s8),
+          const Tag('Active', tone: Tone.accent),
+        ],
+        if (isDelegate) ...[
+          const SizedBox(width: S.s6),
+          const Tag('Delegate'),
+        ],
+        if (!p.usable) ...[
+          const SizedBox(width: S.s6),
+          const WarnChip(),
+        ],
+      ]),
+      subtitle: '${p.provider} · ${p.model}',
+      trailing: _deleteProfileButton(p),
     );
   }
 

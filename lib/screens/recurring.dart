@@ -216,8 +216,7 @@ class RecurringScreenState extends State<RecurringScreen>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text('Schedule a goal or message',
-                        style: sans(14,
-                            weight: W.label, color: AppColors.fg1)),
+                        style: sans(14, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     Text(
                       'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',
@@ -408,8 +407,8 @@ class RecurringScreenState extends State<RecurringScreen>
       onTap: onTap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        padding: EdgeInsets.symmetric(
-            horizontal: 10, vertical: kMobile ? 14 : 6),
+        padding:
+            EdgeInsets.symmetric(horizontal: 10, vertical: kMobile ? 14 : 6),
         decoration: BoxDecoration(
           // Selection = a NEUTRAL surface step, accent reserved for state.
           color: on ? AppColors.surface3 : AppColors.surface2,
@@ -478,9 +477,8 @@ class RecurringScreenState extends State<RecurringScreen>
   }
 
   Future<void> _pickPlanInline() async {
-    final start = (widget.workspace?.trim().isNotEmpty == true)
-        ? widget.workspace
-        : null;
+    final start =
+        (widget.workspace?.trim().isNotEmpty == true) ? widget.workspace : null;
     final picked = await presentScreen<String>(
       context,
       builder: (_, close) => FileExplorer(
@@ -517,14 +515,11 @@ class RecurringScreenState extends State<RecurringScreen>
                   style: TS.label(AppColors.fg1),
                 ),
               ),
-              IconBtn('x',
-                  size: 24,
-                  iconSize: 13,
-                  tooltip: 'Cancel',
+              IconBtn('x', size: 24, iconSize: 13, tooltip: 'Cancel',
                   onTap: () {
-                    setState(() => _adding = false);
-                    widget.onAddingChanged?.call(false);
-                  }),
+                setState(() => _adding = false);
+                widget.onAddingChanged?.call(false);
+              }),
             ],
           ),
           const SizedBox(height: 4),
@@ -627,18 +622,13 @@ class RecurringScreenState extends State<RecurringScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Btn('Cancel',
-                  small: true,
-                  variant: BtnVariant.ghost,
-                  onTap: () {
-                    setState(() => _adding = false);
-                    widget.onAddingChanged?.call(false);
-                  }),
+              Btn('Cancel', small: true, variant: BtnVariant.ghost, onTap: () {
+                setState(() => _adding = false);
+                widget.onAddingChanged?.call(false);
+              }),
               const SizedBox(width: 8),
               Btn('Save job',
-                  small: true,
-                  disabled: _submitting,
-                  onTap: _saveInline),
+                  small: true, disabled: _submitting, onTap: _saveInline),
             ],
           ),
         ],
@@ -676,50 +666,21 @@ class RecurringScreenState extends State<RecurringScreen>
                 return j.sessionId == bound || j.sessionId.contains(bound);
               }).toList()
             : allJobs;
-        final list = ListView(
-          physics: (widget.embedded && kMobile)
-              ? const NeverScrollableScrollPhysics()
-              : null,
-          shrinkWrap: (widget.embedded && kMobile),
-          padding: (widget.embedded && kMobile)
-              ? EdgeInsets.zero
-              : EdgeInsets.fromLTRB(24, widget.embedded ? 4 : 20, 24, 28),
-          children: [
-            if (_adding) _inlineAddCard(),
-            if (jobs.isEmpty && !_adding)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
-                child: Text('No scheduled jobs yet.',
-                    style: sans(13, color: AppColors.fg3)),
-              ),
-            ...jobs.map(_jobRow),
-            if (_canAdd && !_adding && !widget.embedded) ...[
-              const SizedBox(height: 4),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _add,
-                  borderRadius: BorderRadius.circular(R.md),
-                  child: Padding(
-                    // ~39px at 10; the primary action of the screen needs the
-                    // 44pt floor on a phone.
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 8, vertical: kMobile ? 14 : 10),
-                    child: Row(children: [
-                      AppIcon('plus', size: 16, color: AppColors.fg3),
-                      const SizedBox(width: 12),
-                      Text('Add job', style: TS.ui()),
-                    ]),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        );
-        if (widget.embedded || kMobile) return list;
-        return Center(
-            child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 680), child: list));
+        return PageBody(children: [
+          if (_adding) ...[_inlineAddCard(), const SizedBox(height: S.s12)],
+          if (jobs.isEmpty && !_adding)
+            EmptyState(
+              icon: 'repeat',
+              title: 'No scheduled jobs',
+              body:
+                  'Run a prompt on a schedule, like a morning triage or a nightly audit.',
+              action: _canAdd
+                  ? Btn('New job', icon: 'plus', small: true, onTap: _add)
+                  : null,
+            )
+          else if (jobs.isNotEmpty)
+            ListGroup(children: [for (final j in jobs) _jobRow(j)]),
+        ]);
       },
     );
     // Three cases, and the header differs for each:
@@ -734,10 +695,13 @@ class RecurringScreenState extends State<RecurringScreen>
           bottom: false,
           child: Column(children: [
             SnAppBar(
-                title: 'Scheduled',
-                titleSize: 14,
+                title: 'Scheduled jobs',
                 compact: true,
-                onBack: widget.onClose ?? () => Navigator.pop(context)),
+                onBack: widget.onClose ?? () => Navigator.pop(context),
+                actions: [
+                  if (_canAdd && !_adding)
+                    Btn('New job', icon: 'plus', small: true, onTap: _add),
+                ]),
             Expanded(child: body),
           ]),
         ),
@@ -750,7 +714,10 @@ class RecurringScreenState extends State<RecurringScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        NavBackRow(title: 'Scheduled', onBack: widget.onBack!),
+        NavBackRow(title: 'Scheduled jobs', onBack: widget.onBack!, trailing: [
+          if (_canAdd && !_adding)
+            Btn('New job', icon: 'plus', small: true, onTap: _add),
+        ]),
         Expanded(child: body),
       ],
     );
@@ -807,25 +774,35 @@ class RecurringScreenState extends State<RecurringScreen>
       if (job.planPath != null) job.planPath!,
     ];
     final sub = bits.where((s) => s.isNotEmpty).join(' · ');
+    final error = job.lastError?.trim() ?? '';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(children: [
-        AppIcon('scheduled',
-            size: 16, color: paused ? AppColors.fg4 : AppColors.fg3),
-        const SizedBox(width: 12),
+      padding: const EdgeInsets.fromLTRB(S.s12, S.s12, S.s4, S.s12),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        IconTile('repeat', tone: paused ? Tone.neutral : Tone.accent),
+        const SizedBox(width: S.s12),
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(job.title.isEmpty ? job.id : job.title,
-                style: sans(14, color: paused ? AppColors.fg3 : AppColors.fg1)),
-            const SizedBox(height: 2),
-            Text(sub, style: sans(12, tabular: true, color: AppColors.fg3)),
-            if (job.lastError != null && job.lastError!.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(job.lastError!,
+            Row(children: [
+              Flexible(
+                child: Text(job.title.isEmpty ? job.id : job.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TS.rowTitle(paused ? AppColors.fg3 : AppColors.fg1)),
+              ),
+              if (paused) ...[
+                const SizedBox(width: S.s8),
+                const Tag('Paused'),
+              ],
+            ]),
+            const SizedBox(height: S.s2),
+            Text(sub, style: TS.meta()),
+            if (error.isNotEmpty) ...[
+              const SizedBox(height: S.s4),
+              Text(error,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.danger)),
+                  style: TS.meta(AppColors.danger)),
             ],
           ]),
         ),

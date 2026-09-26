@@ -12,7 +12,6 @@ import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
-import 'inference_profile_editor.dart';
 import 'inference_profiles.dart';
 import 'recurring.dart';
 import 'shell_nav.dart';
@@ -237,9 +236,9 @@ class SettingsPanelState extends State<SettingsPanel> {
   static const _nav = [
     (SettingsPage.general, 'server', 'General'),
     (SettingsPage.models, 'ai-chip', 'Inference profiles'),
-    (SettingsPage.usage, 'analytics', 'Usage & Tokens'),
-    (SettingsPage.vault, 'lock-key', 'Vault & Secrets'),
-    (SettingsPage.scheduled, 'repeat', 'Scheduled Jobs'),
+    (SettingsPage.usage, 'analytics', 'Usage'),
+    (SettingsPage.vault, 'lock-key', 'Vault'),
+    (SettingsPage.scheduled, 'repeat', 'Scheduled jobs'),
   ];
 
   @override
@@ -259,12 +258,21 @@ class SettingsPanelState extends State<SettingsPanel> {
     super.dispose();
   }
 
+  ServerConfig? _cfg;
+  UsageSummary? _usage;
+  List<String> _vaultNames = const [];
+  List<RecurringJob> _jobs = const [];
+
   Future<void> _loadMobileSettings() async {
     await Future.wait<void>([
-      widget.client.getConfig(),
-      widget.client.getUsage(),
-      widget.client.vaultList(),
-      widget.client.recurringJobs(),
+      widget.client.getConfig().then<void>((v) => _cfg = v),
+      widget.client.getUsage().then<void>((v) => _usage = v, onError: (_) {}),
+      widget.client
+          .vaultList()
+          .then<void>((v) => _vaultNames = v, onError: (_) {}),
+      widget.client
+          .recurringJobs()
+          .then<void>((v) => _jobs = v, onError: (_) {}),
     ]);
   }
 
@@ -366,36 +374,19 @@ class SettingsPanelState extends State<SettingsPanel> {
               children: [
                 // Left Column (Sidebar Rail)
                 Container(
-                  width: 215,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface1,
-                    border: Border(
-                      right: BorderSide(
-                          color: AppColors.border.withValues(alpha: 0.7)),
-                    ),
-                  ),
+                  width: 220,
+                  decoration: BoxDecoration(color: AppColors.raised),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Sidebar Header
                       Container(
-                        height: 48,
+                        height: 64,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                                color: AppColors.border.withValues(alpha: 0.5)),
-                          ),
-                        ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            AppIcon('settings',
-                                size: 15, color: AppColors.accent),
-                            const SizedBox(width: 9),
-                            Text('Settings',
-                                style: sans(14,
-                                    weight: W.title, color: AppColors.fg1)),
+                            Text('Settings', style: TS.sectionTitle()),
                           ],
                         ),
                       ),
@@ -412,13 +403,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                       ),
                       // Machine Status in Sidebar Footer
                       Container(
-                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            top: BorderSide(
-                                color: AppColors.border.withValues(alpha: 0.6)),
-                          ),
-                        ),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         child: Row(children: [
                           Container(
                             width: 7,
@@ -454,7 +439,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                         // Content Pane Header
                         if (!_isNested)
                           Container(
-                            height: 48,
+                            height: 64,
                             padding: const EdgeInsets.symmetric(horizontal: 24),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -462,8 +447,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                                 Expanded(
                                   child: Text(
                                     _pageTitle(_page),
-                                    style: sans(14,
-                                        weight: W.title, color: AppColors.fg1),
+                                    style: TS.sectionTitle(),
                                   ),
                                 ),
                                 if (_pageAction(_page) != null)
@@ -512,76 +496,72 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   /// Phone settings HOME.
   Widget _mobileSettingsHome() {
-    Widget section(String label, Widget child, {Widget? trailing}) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(label.toUpperCase(),
-                        style: caps(11, color: AppColors.fg3)),
-                  ),
-                  if (trailing != null) trailing,
-                ],
+    final active = widget.active;
+    final totalTokens = (_usage?.providers ?? const [])
+        .fold<int>(0, (sum, p) => sum + p.totalTokens);
+    final activeProfile = _cfg?.active ?? '';
+    final nVault = _vaultNames.length;
+    final nJobs = _jobs.length;
+    Widget nav(SettingsPage page, String icon, String label, String summary) =>
+        ListRow(
+          title: label,
+          leading: IconTile(icon),
+          onTap: () => widget.onSection?.call(page),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (summary.isNotEmpty)
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 140),
+                child: Text(summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TS.meta()),
               ),
-            ),
-            child,
-          ],
-        ),
-      );
-    }
-
-    Widget inlineScreen(Widget child) => child;
-
+            const SizedBox(width: S.s4),
+            AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+          ]),
+        );
     return ListView(
-      padding: EdgeInsets.fromLTRB(M.gutter, 12, M.gutter, 32),
+      padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s16, S.s40),
       children: [
-        if (kCanNotify) section('Notifications', _notifRow()),
-        section(
-          'Inference profile',
-          InferenceProfilesScreen(client: widget.client, embedded: true),
-          trailing: IconBtn('plus',
-              size: 28, iconSize: 15, tooltip: 'Add profile', onTap: () {
-            Navigator.of(context).push<bool>(
-              MaterialPageRoute(
-                builder: (_) => InferenceProfileEditor(
-                  client: widget.client,
-                  onClose: () => Navigator.pop(context),
-                  onSaved: () => Navigator.pop(context, true),
-                ),
-              ),
-            );
-          }),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(S.s4, S.s4, S.s4, S.s16),
+          child: Text('Settings', style: TS.pageTitle()),
         ),
-        section(
-          'Vault',
-          inlineScreen(VaultScreen(
-              key: _vaultKey, client: widget.client, embedded: true)),
-          trailing: IconBtn('plus',
-              size: 28,
-              iconSize: 15,
-              tooltip: 'Add secret',
-              onTap: () => _vaultKey.currentState?.add()),
-        ),
-        section(
-            'Scheduled jobs',
-            inlineScreen(RecurringScreen(
-                client: widget.client, listOnly: true, embedded: true))),
+        const SectionHeader('Machine',
+            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+        ListGroup(children: [
+          if (active != null)
+            ListRow(
+              title: active.label,
+              subtitle: hostOf(active.url),
+              leading: const IconTile('server', tone: Tone.ok),
+              trailing: const Tag('Connected', tone: Tone.ok, dot: true),
+            ),
+          nav(SettingsPage.general, 'layers', 'Manage machines',
+              '${_instances.length}'),
+        ]),
+        if (kCanNotify) ...[
+          const SizedBox(height: S.s20),
+          const SectionHeader('Notifications',
+              padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+          ListGroup(children: [_notifRow()]),
+        ],
+        const SizedBox(height: S.s20),
+        const SectionHeader('Workspace',
+            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+        ListGroup(children: [
+          nav(SettingsPage.models, 'ai-chip', 'Inference profiles',
+              activeProfile),
+          nav(SettingsPage.usage, 'analytics', 'Usage',
+              totalTokens > 0 ? '${fmtSi(totalTokens)} tokens' : ''),
+          nav(SettingsPage.vault, 'lock-key', 'Vault',
+              '$nVault ${nVault == 1 ? 'secret' : 'secrets'}'),
+          nav(SettingsPage.scheduled, 'repeat', 'Scheduled jobs',
+              '$nJobs ${nJobs == 1 ? 'job' : 'jobs'}'),
+        ]),
       ],
     );
   }
-
-  /// Section label, shared so the inline and nested settings cannot diverge.
-  Widget _inlineLabel(String t) => Padding(
-        padding: const EdgeInsets.only(left: 2),
-        child: Text(t.toUpperCase(),
-            style: caps(kMobile ? 11 : 10, color: AppColors.fg3)),
-      );
 
   /// One phone settings section.
   Widget _mobileSectionPage() {
@@ -591,8 +571,10 @@ class SettingsPanelState extends State<SettingsPanel> {
       SettingsPage.general => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            NavBackRow(title: 'General', onBack: back),
-            Expanded(child: _generalPage()),
+            NavBackRow(title: 'Machines', onBack: back, trailing: [
+              Btn('Add machine', icon: 'plus', small: true, onTap: _addMachine),
+            ]),
+            Expanded(child: _generalPage(includeNotifications: false)),
           ],
         ),
       SettingsPage.models => InferenceProfilesScreen(
@@ -710,49 +692,34 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   String _pageTitle(SettingsPage page) => switch (page) {
         SettingsPage.general => 'General',
-        SettingsPage.models => 'Inference Profiles',
-        SettingsPage.usage => 'Usage & Tokens',
-        SettingsPage.vault => 'Vault & Secrets',
-        SettingsPage.scheduled => 'Scheduled Jobs',
+        SettingsPage.models => 'Inference profiles',
+        SettingsPage.usage => 'Usage',
+        SettingsPage.vault => 'Vault',
+        SettingsPage.scheduled => 'Scheduled jobs',
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
         SettingsPage.general => _addingMachine
             ? null
-            : IconBtn(
-                'plus',
-                size: 28,
-                iconSize: 15,
-                tooltip: 'Add machine',
-                onTap: _addMachine,
-              ),
+            : Btn('Add machine', icon: 'plus', small: true, onTap: _addMachine),
         SettingsPage.models => _modelsEditing
             ? null
-            : IconBtn(
-                'plus',
-                size: 28,
-                iconSize: 15,
-                tooltip: 'Add profile',
-                onTap: () => _modelsKey.currentState?.addProfile(),
-              ),
+            : Btn('Add profile',
+                icon: 'plus',
+                small: true,
+                onTap: () => _modelsKey.currentState?.addProfile()),
         SettingsPage.vault => _vaultAdding
             ? null
-            : IconBtn(
-                'plus',
-                size: 28,
-                iconSize: 15,
-                tooltip: 'Add secret',
-                onTap: () => _vaultKey.currentState?.add(),
-              ),
+            : Btn('Add secret',
+                icon: 'plus',
+                small: true,
+                onTap: () => _vaultKey.currentState?.add()),
         SettingsPage.scheduled => _recurringAdding
             ? null
-            : IconBtn(
-                'plus',
-                size: 28,
-                iconSize: 15,
-                tooltip: 'Add job',
-                onTap: () => _recurringKey.currentState?.add(),
-              ),
+            : Btn('New job',
+                icon: 'plus',
+                small: true,
+                onTap: () => _recurringKey.currentState?.add()),
         _ => null,
       };
 
@@ -861,73 +828,29 @@ class SettingsPanelState extends State<SettingsPanel> {
   }
 
   /// The General section's content.
-  Widget _generalPage() {
+  Widget _generalPage({bool includeNotifications = true}) {
     if (_addingMachine) return _addMachinePane();
-    final compact = kMobile && widget.embedded;
-    return ListView(
-      padding: EdgeInsets.fromLTRB(
-        compact ? M.gutter : 24,
-        compact ? 16 : 4,
-        compact ? M.gutter : 24,
-        28,
-      ),
-      children: [
-        if (compact)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconBtn('plus',
-                    size: 28,
-                    iconSize: 15,
-                    tooltip: 'Add machine',
-                    onTap: _addMachine),
-              ],
-            ),
-          ),
-        if (_instances.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 36),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppIcon('server', size: 28, color: AppColors.fg4),
-                  const SizedBox(height: 10),
-                  Text('No saved connections', style: TS.label()),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Connect to a remote machine running the snippet daemon.',
-                    style: TS.meta(),
-                  ),
-                  const SizedBox(height: 14),
-                  Btn('Connect machine',
-                      icon: 'plus', small: true, onTap: _addMachine),
-                ],
-              ),
-            ),
-          )
-        else
-          Column(
-            children: [
-              for (var i = 0; i < _instances.length; i++) ...[
-                _instanceRow(_instances[i]),
-                if (i < _instances.length - 1)
-                  Divider(
-                      height: 1,
-                      color: AppColors.border.withValues(alpha: 0.4)),
-              ],
-            ],
-          ),
-        if (kCanNotify) ...[
-          const SizedBox(height: 20),
-          _inlineLabel('Alerts & Notifications'),
-          const SizedBox(height: 8),
-          _notifRow(),
-        ],
+    return PageBody(children: [
+      if (includeNotifications)
+        const SectionHeader('Machines',
+            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+      if (_instances.isEmpty)
+        EmptyState(
+          icon: 'server',
+          title: 'No saved machines',
+          body: 'Connect to a machine running snippet serve.',
+          action:
+              Btn('Add machine', icon: 'plus', small: true, onTap: _addMachine),
+        )
+      else
+        ListGroup(children: [for (final i in _instances) _instanceRow(i)]),
+      if (includeNotifications && kCanNotify) ...[
+        const SizedBox(height: S.s24),
+        const SectionHeader('Notifications',
+            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+        ListGroup(children: [_notifRow()]),
       ],
-    );
+    ]);
   }
 
   Widget _addMachinePane() {
@@ -1043,7 +966,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     return Material(
       color: Colors.transparent,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: S.s8),
+        padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s4, S.s8),
         child: Row(
           children: [
             IconTile('server', tone: isActive ? Tone.ok : Tone.neutral),
@@ -1127,32 +1050,25 @@ class SettingsPanelState extends State<SettingsPanel> {
   }
 
   Widget _notifRow() {
-    final compact = kMobile && widget.embedded;
     return Padding(
-      padding: EdgeInsets.symmetric(
-          horizontal: compact ? 0 : 8, vertical: compact ? 2 : 8),
+      padding: const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s12),
       child: Row(children: [
-        AppIcon('bell', size: 16, color: AppColors.fg3),
-        const SizedBox(width: 12),
+        const IconTile('bell'),
+        const SizedBox(width: S.s12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Session notifications',
-                  style: sans(compact ? M.rowTitle : 13,
-                      weight: W.label, color: AppColors.fg1)),
-              const SizedBox(height: 2),
-              Text('Notify when a session completes or requires input',
+              Text('Session notifications', style: TS.rowTitle()),
+              const SizedBox(height: S.s2),
+              Text('When a session finishes or needs your input',
                   style: TS.meta()),
             ],
           ),
         ),
+        const SizedBox(width: S.s8),
         if (_notifBusy)
-          const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
+          const DelayedSpinner(size: 18)
         else
           AppSwitch(on: _notif, onChanged: _toggleNotif),
       ]),

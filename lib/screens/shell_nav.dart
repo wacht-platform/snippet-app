@@ -261,28 +261,27 @@ class NavBackRow extends StatelessWidget {
 
   final String title;
   final VoidCallback onBack;
-
-  /// Rendered right-aligned, after the title.
   final List<Widget> trailing;
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 6, 8, 6),
-      child: Row(children: [
-        IconBtn('arrow-left',
-            size: M.minTarget, iconSize: 19, tooltip: 'Back', onTap: onBack),
-        const SizedBox(width: 2),
-        Expanded(
-          child: Text(title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
-        ),
-        ...trailing,
-      ]),
+    return SizedBox(
+      height: 56,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s12, 0),
+        child: Row(children: [
+          IconBtn('chevron-left',
+              size: M.minTarget, iconSize: 22, tooltip: 'Back', onTap: onBack),
+          const SizedBox(width: S.s2),
+          Expanded(
+            child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TS.sectionTitle()),
+          ),
+          ...trailing,
+        ]),
+      ),
     );
   }
 }

@@ -305,7 +305,7 @@ class Avatar extends StatelessWidget {
 
 class IconTile extends StatelessWidget {
   const IconTile(this.icon,
-      {super.key, this.tone = Tone.neutral, this.size = 32});
+      {super.key, this.tone = Tone.neutral, this.size = 36});
 
   final String icon;
   final Tone tone;
@@ -414,4 +414,38 @@ class InsetPanel extends StatelessWidget {
       child: child,
     );
   }
+}
+
+class PageBody extends StatelessWidget {
+  const PageBody({super.key, required this.children, this.maxWidth = 720});
+
+  final List<Widget> children;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final side = kMobile ? S.s16 : S.s24;
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth + side * 2),
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(side, S.s8, side, S.s40),
+          children: children,
+        ),
+      ),
+    );
+  }
+}
+
+class SettingsNote extends StatelessWidget {
+  const SettingsNote(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(S.s4, S.s8, S.s4, 0),
+        child: Text(text, style: TS.meta()),
+      );
 }

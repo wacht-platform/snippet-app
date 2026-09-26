@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
-import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
@@ -58,7 +57,7 @@ class _UsageScreenState extends State<UsageScreen> {
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
-          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+          return const Center(child: DelayedSpinner(size: 22));
         }
         if (snap.hasError) {
           return Center(
@@ -79,24 +78,19 @@ class _UsageScreenState extends State<UsageScreen> {
         }
         final summary = snap.data!;
         if (summary.providers.isEmpty) {
-          return Center(
-              child: Text('No provider usage has been reported yet.',
-                  style: TS.meta()));
+          return const EmptyState(
+              icon: 'analytics',
+              title: 'No usage yet',
+              body: 'Token counts appear here once a session has run.');
         }
-        return ListView.separated(
-          physics: (widget.embedded && kMobile)
-              ? const NeverScrollableScrollPhysics()
-              : null,
-          shrinkWrap: (widget.embedded && kMobile),
-          padding: EdgeInsets.fromLTRB(
-              (widget.embedded && kMobile) ? 0 : 24,
-              (widget.embedded && kMobile) ? 0 : (widget.embedded ? 4 : 20),
-              (widget.embedded && kMobile) ? 0 : 24,
-              28),
-          itemCount: summary.providers.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
-          itemBuilder: (_, i) => _ProviderCard(provider: summary.providers[i]),
-        );
+        return PageBody(children: [
+          for (var i = 0; i < summary.providers.length; i++) ...[
+            if (i > 0) const SizedBox(height: S.s12),
+            _ProviderCard(provider: summary.providers[i]),
+          ],
+          const SettingsNote(
+              'Token totals since the daemon started. Rate limits come from each provider\'s own reports.'),
+        ]);
       },
     );
     if (widget.embedded) {
@@ -112,9 +106,11 @@ class _UsageScreenState extends State<UsageScreen> {
       );
     }
     return Scaffold(
-      backgroundColor: AppColors.surface1,
       body: Column(children: [
-        SnAppBar(title: 'Usage', onBack: () => Navigator.pop(context)),
+        SnAppBar(
+            title: 'Usage',
+            compact: true,
+            onBack: () => Navigator.pop(context)),
         Expanded(child: body),
       ]),
     );
@@ -129,26 +125,23 @@ class _ProviderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasTokens = provider.totalTokens > 0;
     return AppCard(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      padding: const EdgeInsets.all(S.s16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(
-            child: Text(provider.provider,
-                style: sans(14, weight: W.label, color: AppColors.fg1)),
+            child: Text(provider.provider, style: TS.rowTitle()),
           ),
-          Text(
-              '${provider.sessions} session${provider.sessions == 1 ? '' : 's'}',
-              style: mono(10, color: AppColors.fg3)),
+          Tag('${provider.sessions} session${provider.sessions == 1 ? '' : 's'}'),
         ]),
         if (provider.profile != null || provider.model.isNotEmpty) ...[
           const SizedBox(height: 3),
           Text(
               [if (provider.profile != null) provider.profile!, provider.model]
                   .join(' · '),
-              style: TS.caption()),
+              style: TS.meta()),
         ],
         if (hasTokens) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: S.s16),
           Row(children: [
             Expanded(child: _Metric('Total', fmtSi(provider.totalTokens))),
             Expanded(child: _Metric('Input', fmtSi(provider.promptTokens))),
@@ -171,9 +164,9 @@ class _ProviderCard extends StatelessWidget {
                   false => 'alert-circle',
                   null => 'sparkles',
                 },
-                size: 12,
+                size: 14,
                 color: AppColors.fg4),
-            const SizedBox(width: 7),
+            const SizedBox(width: S.s8),
             Expanded(
               child: Text(
                   switch (provider.rateLimitsSupported) {
@@ -188,7 +181,7 @@ class _ProviderCard extends StatelessWidget {
                       'Subscription limits aren’t exposed by this provider’s API.',
                     null => 'No reported rate-limit usage.',
                   },
-                  style: sans(11, height: 1.35, color: AppColors.fg3)),
+                  style: TS.meta()),
             ),
           ]),
         ] else ...[
@@ -212,9 +205,11 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TS.caption()),
-          const SizedBox(height: 2),
-          Text(value, style: mono(12, color: AppColors.fg2)),
+          Text(label, style: TS.meta()),
+          const SizedBox(height: S.s2),
+          Text(value,
+              style: TS.sectionTitle().copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()])),
         ],
       );
 }
@@ -231,11 +226,9 @@ class _RateRow extends StatelessWidget {
     // were current (99% used / 1% left on a window that has already reset).
     if (rate.isExpired) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(rateWindowLabel(rate.windowMinutes),
-            style: TS.caption()),
-        const SizedBox(height: 4),
-        Text('rolled over · awaiting the next report',
-            style: mono(10, color: AppColors.fg3)),
+        Text(rateWindowLabel(rate.windowMinutes), style: TS.ui()),
+        const SizedBox(height: S.s4),
+        Text('Rolled over · awaiting the next report', style: TS.meta()),
       ]);
     }
 
@@ -247,15 +240,14 @@ class _RateRow extends StatelessWidget {
             : AppColors.ok;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(rateWindowLabel(rate.windowMinutes),
-            style: sans(11, color: AppColors.fg2)),
-        Text('${remaining.round()}% left', style: mono(10, color: color)),
+        Text(rateWindowLabel(rate.windowMinutes), style: TS.ui()),
+        Text('${remaining.round()}% left', style: TS.label(color)),
       ]),
-      const SizedBox(height: 5),
+      const SizedBox(height: S.s6),
       Progress(pct: remaining, color: color, height: 6),
       if (reset != null) ...[
-        const SizedBox(height: 4),
-        Text(reset, style: mono(10, color: AppColors.fg3)),
+        const SizedBox(height: S.s4),
+        Text(reset, style: TS.meta()),
       ],
     ]);
   }

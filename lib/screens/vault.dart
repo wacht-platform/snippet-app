@@ -150,8 +150,7 @@ class VaultScreenState extends State<VaultScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             AppIcon('alert-triangle', size: 20, color: AppColors.danger),
             const SizedBox(height: 10),
-            Text("Couldn't load secrets",
-                style: TS.label(AppColors.fg1)),
+            Text("Couldn't load secrets", style: TS.label(AppColors.fg1)),
             const SizedBox(height: 5),
             Text(_error!,
                 textAlign: TextAlign.center,
@@ -163,87 +162,27 @@ class VaultScreenState extends State<VaultScreen> {
       );
     } else {
       final names = _names ?? const [];
-      final list = ListView(
-        physics: (widget.embedded && kMobile)
-            ? const NeverScrollableScrollPhysics()
-            : null,
-        shrinkWrap: (widget.embedded && kMobile),
-        padding: EdgeInsets.fromLTRB(
-            (widget.embedded && kMobile) ? 0 : (kMobile ? M.gutter : 24),
-            (widget.embedded && kMobile) ? 0 : (widget.embedded ? 4 : 20),
-            (widget.embedded && kMobile) ? 0 : (kMobile ? M.gutter : 24),
-            28),
-        children: [
-          if (!widget.embedded && !kMobile) ...[
-            Text(
-              'Use these as \$NAME in shell commands. Values stay on the daemon and are never shown again.',
-              style: sans(kMobile ? M.meta : 12,
-                  height: 1.45, color: AppColors.fg3),
+      body = PageBody(children: [
+        if (names.isEmpty && !_adding)
+          _emptyRow()
+        else if (names.isNotEmpty)
+          ListGroup(children: [for (final n in names) _secretRow(n)]),
+        if (_adding)
+          Padding(
+            padding: const EdgeInsets.only(top: S.s12),
+            child: _AddSecretForm(
+              client: widget.client,
+              inline: true,
+              onSaved: _afterAdded,
+              onCancel: () {
+                setState(() => _adding = false);
+                widget.onAddingChanged?.call(false);
+              },
             ),
-            const SizedBox(height: 16),
-            _inlineLabel('Secrets'),
-            const SizedBox(height: 8),
-          ],
-          if (kMobile)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (names.isEmpty) _emptyRow() else ...[for (final n in names) _secretRow(n)],
-                if (_adding)
-                  _AddSecretForm(
-                    client: widget.client,
-                    inline: true,
-                    onSaved: _afterAdded,
-                    onCancel: () {
-                      setState(() => _adding = false);
-                      widget.onAddingChanged?.call(false);
-                    },
-                  ),
-              ],
-            )
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (names.isEmpty)
-                  _emptyRow()
-                else
-                  for (var i = 0; i < names.length; i++) ...[
-                    _secretRow(names[i]),
-                    if (i < names.length - 1)
-                      Divider(
-                          height: 1,
-                          color: AppColors.border.withValues(alpha: 0.4)),
-                  ],
-                if (_adding)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: _AddSecretForm(
-                      client: widget.client,
-                      inline: true,
-                      onSaved: _afterAdded,
-                      onCancel: () {
-                        setState(() => _adding = false);
-                        widget.onAddingChanged?.call(false);
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          // The add row hides while the form is open: two ways to do the same
-          // thing at once is what makes a form feel unanchored.
-          if (!_adding && !widget.embedded && !kMobile) ...[
-            const SizedBox(height: 12),
-            _addRow(),
-          ],
-        ],
-      );
-      body = widget.embedded || kMobile
-          ? list
-          : Center(
-              child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 680),
-                  child: list));
+          ),
+        const SettingsNote(
+            'Use these as \$NAME in shell commands. Values stay on the daemon and are never shown again.'),
+      ]);
     }
     if (widget.embedded) {
       // See usage.dart: a null back action means the host owns navigation.
@@ -251,7 +190,10 @@ class VaultScreenState extends State<VaultScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NavBackRow(title: 'Vault', onBack: widget.onBack!),
+          NavBackRow(title: 'Vault', onBack: widget.onBack!, trailing: [
+            if (!_adding)
+              Btn('Add secret', icon: 'plus', small: true, onTap: _add),
+          ]),
           Expanded(child: body),
         ],
       );
@@ -262,20 +204,17 @@ class VaultScreenState extends State<VaultScreen> {
         child: Column(children: [
           SnAppBar(
               title: 'Vault',
-              onBack: widget.onClose ?? () => Navigator.pop(context)),
+              compact: true,
+              onBack: widget.onClose ?? () => Navigator.pop(context),
+              actions: [
+                if (!_adding)
+                  Btn('Add secret', icon: 'plus', small: true, onTap: _add),
+              ]),
           Expanded(child: body),
         ]),
       ),
     );
   }
-
-  /// Section label, matching the settings screens so the two cannot drift.
-  Widget _inlineLabel(String t) => Padding(
-        padding: const EdgeInsets.only(left: 2),
-        child: Text(t.toUpperCase(),
-            style: caps(kMobile ? 11 : 10, color: AppColors.fg3)),
-      );
-
 
   Widget _emptyRow() => Padding(
         padding: EdgeInsets.symmetric(
@@ -296,58 +235,18 @@ class VaultScreenState extends State<VaultScreen> {
   /// 32px trash, both under the app's 52/44 scale, and the trash had neither a
   /// tooltip nor a label.
   Widget _secretRow(String name) {
-    return SizedBox(
-      height: kMobile ? M.rowHeight : 44,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-            horizontal: widget.embedded ? 0 : 14),
-        child: Row(children: [
-          // Tinted tile, matching the settings index rows.
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surface3,
-              borderRadius: BorderRadius.circular(R.xs),
-            ),
-            child: AppIcon('lock-key', size: 14, color: AppColors.fg3),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: mono(kMobile ? 13 : 12, color: AppColors.fg1)),
-          ),
-          IconBtn('trash',
-              size: kMobile ? M.minTarget : 32,
-              iconSize: kMobile ? 16 : 14,
-              tooltip: 'Remove $name',
-              onTap: () => _remove(name)),
-        ]),
-      ),
-    );
-  }
-
-  /// The add affordance, matching recurring.dart add job row.
-  Widget _addRow() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _add,
-        borderRadius: BorderRadius.circular(R.md),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-              horizontal: widget.embedded ? 2 : 14,
-              vertical: kMobile ? 14 : 10),
-          child: Row(children: [
-            AppIcon('plus', size: 16, color: AppColors.fg3),
-            const SizedBox(width: 12),
-            Text('Add secret', style: TS.ui()),
-          ]),
-        ),
-      ),
+    return ListRow(
+      title: name,
+      leading: const IconTile('lock-key'),
+      titleWidget: Text(name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TS.code(AppColors.fg1)),
+      trailing: IconBtn('trash',
+          size: kMobile ? M.minTarget : 32,
+          iconSize: 16,
+          tooltip: 'Remove $name',
+          onTap: () => _remove(name)),
     );
   }
 }
