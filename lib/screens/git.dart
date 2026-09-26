@@ -45,7 +45,10 @@ class _GitScreenState extends State<GitScreen> {
 
   GitStatus? _st;
   bool _loading = true;
+  bool _refreshing = false;
   bool _busy = false;
+  final Set<String> _optStaged = {};
+  final Set<String> _optUnstaged = {};
   String? _error;
 
   final TextEditingController _commitController = TextEditingController();
@@ -70,7 +73,11 @@ class _GitScreenState extends State<GitScreen> {
   Future<void> _load() async {
     if (!mounted) return;
     setState(() {
-      _loading = true;
+      if (_st == null) {
+        _loading = true;
+      } else {
+        _refreshing = true;
+      }
       _error = null;
     });
     try {
@@ -79,6 +86,7 @@ class _GitScreenState extends State<GitScreen> {
       setState(() {
         _st = st;
         _loading = false;
+        _refreshing = false;
         if (!st.ok) _error = st.error ?? 'not a git repository';
       });
     } catch (e) {
@@ -86,8 +94,29 @@ class _GitScreenState extends State<GitScreen> {
         setState(() {
           _error = '$e';
           _loading = false;
+          _refreshing = false;
         });
       }
+    }
+  }
+
+  Future<void> _toggleStage(GitFile f, {required bool staged}) async {
+    HapticFeedback.selectionClick();
+    setState(() => (staged ? _optUnstaged : _optStaged).add(f.path));
+    try {
+      final r = staged
+          ? await widget.client.gitUnstage(_repo, paths: [f.path])
+          : await widget.client.gitStage(_repo, paths: [f.path]);
+      if (r['ok'] != true) {
+        final err = (r['stderr'] as String?)?.trim();
+        _toast(err == null || err.isEmpty ? 'git failed' : err);
+      }
+    } catch (e) {
+      _toast('$e');
+    }
+    await _load();
+    if (mounted) {
+      setState(() => (staged ? _optUnstaged : _optStaged).remove(f.path));
     }
   }
 
@@ -243,7 +272,7 @@ class _GitScreenState extends State<GitScreen> {
           onBack: widget.onClose ?? () => Navigator.pop(context),
           actions: [IconBtn('refresh', onTap: _busy ? null : _load)],
         ),
-      if (_busy)
+      if (_busy || _refreshing)
         LinearProgressIndicator(
           minHeight: 2,
           backgroundColor: AppColors.surface2,
@@ -272,6 +301,22 @@ class _GitScreenState extends State<GitScreen> {
   }
 
   Widget _body(GitStatus st) {
+    final moving = {..._optStaged, ..._optUnstaged};
+    final staged = [
+      ...st.staged.where((f) => !_optUnstaged.contains(f.path)),
+      ...[...st.changed, ...st.untracked]
+          .where((f) => _optStaged.contains(f.path) && !f.staged),
+    ];
+    final changed = [
+      ...st.changed.where((f) => !_optStaged.contains(f.path)),
+      ...st.staged.where(
+          (f) => _optUnstaged.contains(f.path) && f.x != 'A' && !f.unstaged),
+    ];
+    final untracked = [
+      ...st.untracked.where((f) => !_optStaged.contains(f.path)),
+      ...st.staged.where((f) => _optUnstaged.contains(f.path) && f.x == 'A'),
+    ];
+    final empty = st.files.isEmpty && moving.isEmpty;
     return Column(children: [
       _header(st),
       Expanded(
@@ -279,7 +324,7 @@ class _GitScreenState extends State<GitScreen> {
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
           children: [
             _commitComposer(st),
-            if (st.files.isEmpty)
+            if (empty)
               const Padding(
                 padding: EdgeInsets.only(top: 24),
                 child: EmptyState(
@@ -289,37 +334,37 @@ class _GitScreenState extends State<GitScreen> {
                 ),
               )
             else ...[
-              if (st.staged.isNotEmpty) ...[
+              if (staged.isNotEmpty) ...[
                 _sectionCard(
                   title: 'Staged',
-                  count: st.staged.length,
+                  count: staged.length,
                   actionLabel: 'Unstage all',
                   onAction: () => _op(() => widget.client.gitUnstage(_repo)),
-                  files: st.staged,
+                  files: staged,
                   staged: true,
                 ),
                 const SizedBox(height: S.s16),
               ],
-              if (st.changed.isNotEmpty) ...[
+              if (changed.isNotEmpty) ...[
                 _sectionCard(
                   title: 'Changes',
-                  count: st.changed.length,
+                  count: changed.length,
                   actionLabel: 'Stage all',
                   onAction: () =>
                       _op(() => widget.client.gitStage(_repo, all: true)),
-                  files: st.changed,
+                  files: changed,
                   staged: false,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: S.s16),
               ],
-              if (st.untracked.isNotEmpty) ...[
+              if (untracked.isNotEmpty) ...[
                 _sectionCard(
                   title: 'Untracked',
-                  count: st.untracked.length,
+                  count: untracked.length,
                   actionLabel: 'Stage all',
                   onAction: () =>
                       _op(() => widget.client.gitStage(_repo, all: true)),
-                  files: st.untracked,
+                  files: untracked,
                   staged: false,
                 ),
               ],
@@ -511,7 +556,9 @@ class _GitScreenState extends State<GitScreen> {
   }
 
   Widget _fileItem(GitFile f, {required bool staged}) {
-    final code = staged ? f.x : (f.untracked ? '?' : f.y);
+    final code = staged
+        ? (f.x.trim().isNotEmpty ? f.x : (f.untracked ? 'A' : f.y))
+        : (f.untracked ? '?' : (f.y.trim().isNotEmpty ? f.y : f.x));
     final tone = _statusTone(code);
     final (fg, bg) = toneColors(tone);
     final slash = f.path.lastIndexOf('/');
@@ -551,11 +598,7 @@ class _GitScreenState extends State<GitScreen> {
             size: 30,
             iconSize: 14,
             tooltip: staged ? 'Unstage' : 'Stage',
-            onTap: _busy
-                ? null
-                : () => _op(() => staged
-                    ? widget.client.gitUnstage(_repo, paths: [f.path])
-                    : widget.client.gitStage(_repo, paths: [f.path])),
+            onTap: _busy ? null : () => _toggleStage(f, staged: staged),
           ),
         ]),
       ),
