@@ -267,10 +267,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: (kMacOS || kWindows) ? AppColors.glassSurface : AppColors.surface1,
+        color: AppColors.raised,
         borderRadius: BorderRadius.circular(R.lg),
-        border: Border.all(
-            color: (kMacOS || kWindows) ? AppColors.glassBorder : AppColors.border),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -280,7 +278,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             children: [
               Text(
                 title,
-                style: sans(13, weight: W.label, color: AppColors.fg2),
+                style: TS.label(),
               ),
               const Spacer(),
               if (queue.length > 1) ...[
@@ -667,15 +665,11 @@ extension _SessionScreenComposerExt on _SessionScreenState {
               Container(
                 key: _composerCardKey,
                 decoration: BoxDecoration(
-                  // Uses the shell `bg` — the SAME surface as the sidebar — so the
-                  // composer reads as part of the chrome rather than a separate
-                  // raised card. The step above the reading canvas is what keeps
-                  // it visible without a heavier fill.
-                  color: AppColors.bg,
-                  borderRadius: BorderRadius.circular(R.md),
-                  border: Border.all(
-                      color:
-                          _draggingFiles ? AppColors.accent : AppColors.border),
+                  color: AppColors.raised,
+                  borderRadius: BorderRadius.circular(R.lg),
+                  border: _draggingFiles
+                      ? Border.all(color: AppColors.accent, width: 1.5)
+                      : null,
                 ),
                 // The card owns the inset and the rows sit inside it, so there is
                 // no per-row vertical padding to keep in sync. Slightly taller
@@ -736,10 +730,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                           // composer accepts multi-line prose.
                           minLines: 2,
                           maxLines: 8,
-                          cursorColor: AppColors.fg1,
+                          cursorColor: AppColors.accent,
                           onSubmitted: (_) => _sendMessage(),
-                          style: sans(kMobile ? M.body : 16,
-                              height: 1.45, color: AppColors.fg1),
+                          style: TS.body(AppColors.fg1),
                           decoration: InputDecoration(
                             isCollapsed: true,
                             // The card supplies the inset; this only adds the gap
@@ -748,8 +741,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                 const EdgeInsets.fromLTRB(2, 2, 8, 10),
                             border: InputBorder.none,
                             hintText: 'Ask anything',
-                            hintStyle: sans(kMobile ? M.body : 16,
-                                height: 1.45, color: AppColors.fg4),
+                            hintStyle: TS.body(AppColors.fg4),
                           ),
                         ),
                       ),
