@@ -17,6 +17,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   }
 
   Future<void> _sendMessage() async {
+    if (_input.text.trim().isNotEmpty || _attachments.isNotEmpty) {
+      HapticFeedback.lightImpact();
+    }
     // The composer can be triggered by both the send button and keyboard submit;
     // serialize the entire async path so a rapid double tap cannot create two
     // distinct nonces and two server turns.

@@ -50,6 +50,8 @@ class _GitScreenState extends State<GitScreen> {
 
   final TextEditingController _commitController = TextEditingController();
   final FocusNode _commitFocus = FocusNode();
+  final Set<String> _expandedSections = {};
+  static const _collapsedLimit = 8;
 
   @override
   void initState() {
@@ -340,66 +342,61 @@ class _GitScreenState extends State<GitScreen> {
   Widget _header(GitStatus st) {
     final hasUp = st.upstream != null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s8, S.s8),
+      padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s4),
       child: Row(children: [
-        Flexible(
-          child: Material(
-            color: AppColors.overlay,
-            borderRadius: BorderRadius.circular(R.sm),
-            child: InkWell(
-              onTap: _busy ? null : _branchSheet,
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Material(
+              color: AppColors.overlay,
               borderRadius: BorderRadius.circular(R.sm),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: S.s8, vertical: S.s6),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon('git-branch', size: 14, color: AppColors.accent),
-                  const SizedBox(width: S.s6),
-                  Flexible(
-                    child: Text(
-                      st.branch.isEmpty ? '(no branch)' : st.branch,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TS.label(AppColors.fg1),
+              child: InkWell(
+                onTap: _busy ? null : _branchSheet,
+                borderRadius: BorderRadius.circular(R.sm),
+                child: Container(
+                  height: kMobile ? 36 : 28,
+                  padding: const EdgeInsets.symmetric(horizontal: S.s8),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    AppIcon('git-branch', size: 16, color: AppColors.accent),
+                    const SizedBox(width: S.s6),
+                    Flexible(
+                      child: Text(
+                        st.branch.isEmpty ? '(no branch)' : st.branch,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TS.label(AppColors.fg1),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: S.s4),
-                  AppIcon('chevron-down', size: 14, color: AppColors.fg3),
-                ]),
+                    const SizedBox(width: S.s4),
+                    AppIcon('chevron-down', size: 14, color: AppColors.fg3),
+                  ]),
+                ),
               ),
             ),
           ),
         ),
         const SizedBox(width: S.s8),
         if (hasUp) ...[
-          if (st.ahead > 0)
-            Tag('${st.ahead}', tone: Tone.accent, icon: 'upload', mono: true),
-          if (st.ahead > 0 && st.behind > 0) const SizedBox(width: S.s4),
-          if (st.behind > 0)
-            Tag('${st.behind}', tone: Tone.run, icon: 'download', mono: true),
-          const Spacer(),
-          IconBtn(
-            'download',
-            size: 30,
-            iconSize: 16,
-            tooltip: st.behind > 0 ? 'Pull (${st.behind})' : 'Pull',
-            onTap: _busy
-                ? null
-                : () =>
-                    _op(() => widget.client.gitPull(_repo), okMsg: 'Pulled'),
+          Btn(
+            st.behind > 0 ? 'Pull ${st.behind}' : 'Pull',
+            small: true,
+            icon: 'download',
+            variant: BtnVariant.secondary,
+            disabled: _busy,
+            onTap: () =>
+                _op(() => widget.client.gitPull(_repo), okMsg: 'Pulled'),
           ),
-          IconBtn(
-            'upload',
-            size: 30,
-            iconSize: 16,
-            tooltip: st.ahead > 0 ? 'Push (${st.ahead})' : 'Push',
-            onTap: _busy
-                ? null
-                : () =>
-                    _op(() => widget.client.gitPush(_repo), okMsg: 'Pushed'),
+          const SizedBox(width: S.s6),
+          Btn(
+            st.ahead > 0 ? 'Push ${st.ahead}' : 'Push',
+            small: true,
+            icon: 'upload',
+            variant: st.ahead > 0 ? BtnVariant.primary : BtnVariant.secondary,
+            disabled: _busy,
+            onTap: () =>
+                _op(() => widget.client.gitPush(_repo), okMsg: 'Pushed'),
           ),
-        ] else ...[
-          const Spacer(),
+        ] else
           Btn(
             'Publish',
             small: true,
@@ -409,7 +406,6 @@ class _GitScreenState extends State<GitScreen> {
             onTap: () =>
                 _op(() => widget.client.gitPush(_repo), okMsg: 'Published'),
           ),
-        ],
       ]),
     );
   }
@@ -496,6 +492,8 @@ class _GitScreenState extends State<GitScreen> {
     required List<GitFile> files,
     required bool staged,
   }) {
+    final expanded = files.length <= _collapsedLimit + 2 ||
+        _expandedSections.contains(title);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -507,7 +505,15 @@ class _GitScreenState extends State<GitScreen> {
           padding: const EdgeInsets.fromLTRB(S.s4, 0, 0, S.s4),
         ),
         ListGroup(children: [
-          for (final f in files) _fileItem(f, staged: staged),
+          for (final f in expanded ? files : files.take(_collapsedLimit))
+            _fileItem(f, staged: staged),
+          if (!expanded)
+            ListRow(
+              title: 'Show ${files.length - _collapsedLimit} more',
+              titleWidget: Text('Show ${files.length - _collapsedLimit} more',
+                  style: TS.label(AppColors.accent)),
+              onTap: () => setState(() => _expandedSections.add(title)),
+            ),
         ]),
       ],
     );
@@ -713,7 +719,6 @@ class _GitBranchPickerState extends State<GitBranchPicker> {
       trailing: current ? const Tag('Current', tone: Tone.accent) : null,
     );
   }
-
 }
 
 enum _DiffLineType { meta, hunk, add, del, context }
@@ -893,8 +898,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               if (_additions > 0)
                 Tag('+$_additions', tone: Tone.ok, mono: true),
-              if (_additions > 0 && _deletions > 0)
-                const SizedBox(width: S.s4),
+              if (_additions > 0 && _deletions > 0) const SizedBox(width: S.s4),
               if (_deletions > 0)
                 Tag('-$_deletions', tone: Tone.danger, mono: true),
             ]),

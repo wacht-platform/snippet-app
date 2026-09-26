@@ -35,7 +35,8 @@ Future<void> showMissionControlPanel(
     backgroundColor: Colors.transparent,
     barrierColor: AppColors.scrim,
     builder: (sheetContext) {
-      final height = MediaQuery.sizeOf(sheetContext).height * 0.92;
+      final media = MediaQuery.of(sheetContext);
+      final height = (media.size.height - media.padding.top) * 0.9;
       return SafeArea(
         top: false,
         child: SizedBox(

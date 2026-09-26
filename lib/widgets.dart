@@ -75,7 +75,12 @@ class Pills<T> extends StatelessWidget {
           Pressable(
             enabled: onSelect != null,
             child: GestureDetector(
-              onTap: onSelect == null ? null : () => onSelect!(val),
+              onTap: onSelect == null
+                  ? null
+                  : () {
+                      HapticFeedback.selectionClick();
+                      onSelect!(val);
+                    },
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
@@ -469,7 +474,14 @@ class Btn extends StatelessWidget {
           color: bg,
           borderRadius: BorderRadius.circular(R.sm),
           child: InkWell(
-            onTap: disabled ? null : onTap,
+            onTap: disabled || onTap == null
+                ? null
+                : () {
+                    if (variant == BtnVariant.primary) {
+                      HapticFeedback.lightImpact();
+                    }
+                    onTap!();
+                  },
             borderRadius: BorderRadius.circular(R.sm),
             child: Container(
               height: h,
@@ -1317,7 +1329,10 @@ class AppSwitch extends StatelessWidget {
     return Semantics(
       toggled: on,
       child: GestureDetector(
-        onTap: () => onChanged(!on),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onChanged(!on);
+        },
         // The visible track is small; this keeps the tappable area comfortable
         // without scaling the drawing.
         behavior: HitTestBehavior.opaque,
@@ -1372,7 +1387,10 @@ class AppToggle extends StatelessWidget {
     Theme.of(context); // Rebuild on theme change
     return Pressable(
       child: InkWell(
-        onTap: () => onChanged(!on),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onChanged(!on);
+        },
         borderRadius: BorderRadius.circular(R.md),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

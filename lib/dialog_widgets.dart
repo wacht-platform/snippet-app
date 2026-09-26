@@ -404,6 +404,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
         padding: EdgeInsets.only(bottom: keyboard),
         child: Align(
           alignment: Alignment.bottomCenter,
+          heightFactor: 1,
           child: ClipRRect(
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
