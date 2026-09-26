@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -185,7 +184,7 @@ final _amoled = _dark(
   warn: const Color(0xFFAF8D3E), // amber
 );
 
-List<ThemePreset> get allPresets => [_amoled];
+final List<ThemePreset> allPresets = [_amoled];
 
 // ---------------------------------------------------------------------------
 // Color helpers
@@ -214,7 +213,7 @@ class ThemeManager extends ChangeNotifier {
 
   int _index = _defaultIndex;
   int get index => _index;
-  ThemePreset get current => allPresets[0];
+  ThemePreset get current => _amoled;
 
   Future<void> init() async {
     _index = 0;
@@ -453,7 +452,8 @@ TextStyle sans(double size,
         double? spacing,
         Color? color,
         bool tabular = false}) =>
-    GoogleFonts.geist(
+    TextStyle(
+      fontFamily: kSansFamily,
       fontSize: size,
       fontWeight: weight,
       height: height ?? 1.33,
@@ -468,7 +468,8 @@ TextStyle sans(double size,
 
 TextStyle display(double size,
         {FontWeight weight = W.title, Color? color, double? height}) =>
-    GoogleFonts.geist(
+    TextStyle(
+      fontFamily: kSansFamily,
       fontSize: size,
       fontWeight: weight,
       height: height ?? 1.15,
@@ -484,7 +485,9 @@ TextStyle mono(double size,
         bool tabular = true}) =>
     // A monospace face is fixed-width already, so `tabular` defaults on and is
     // accepted only so call sites can share one signature with `sans()`.
-    GoogleFonts.jetBrainsMono(
+    TextStyle(
+      fontFamily: kMonoFamily,
+      fontFamilyFallback: const ['monospace'],
       fontSize: size,
       fontWeight: weight,
       height: height ?? 1.45,
@@ -506,7 +509,10 @@ TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-String get monoFamily => GoogleFonts.jetBrainsMono().fontFamily ?? 'monospace';
+const kSansFamily = 'Geist';
+const kMonoFamily = 'JetBrainsMono';
+
+String get monoFamily => kMonoFamily;
 
 // ---------------------------------------------------------------------------
 // Material ThemeData — derived from the active palette.
@@ -516,6 +522,7 @@ ThemeData buildAppTheme() {
   final c = currentTheme;
   final base = ThemeData(
     useMaterial3: true,
+    fontFamily: kSansFamily,
     brightness:
         c.bg.computeLuminance() > 0.18 ? Brightness.light : Brightness.dark,
     colorScheme: ColorScheme(
@@ -560,8 +567,8 @@ ThemeData buildAppTheme() {
     // (menus, tooltips, dialogs, text fields) rendered in a different family
     // than the app's own text around it — which reads as a mistake rather than
     // a pairing. One UI family.
-    textTheme: _weightedTextTheme(GoogleFonts.geistTextTheme(base.textTheme)
-        .apply(bodyColor: c.fg1, displayColor: c.fg1)),
+    textTheme: _weightedTextTheme(base.textTheme.apply(
+        fontFamily: kSansFamily, bodyColor: c.fg1, displayColor: c.fg1)),
     dividerTheme: DividerThemeData(color: c.border, thickness: 1, space: 12),
   );
 }

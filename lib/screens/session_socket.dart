@@ -15,6 +15,7 @@ extension _SessionScreenSocketExt on _SessionScreenState {
     _channel?.sink.close();
     if (mounted) _setState(() => _connError = null);
     _freshConn = true;
+    _decodeQueue = null;
     final ch = widget.client.attach(widget.sessionId);
     _channel = ch;
     _connectionWatchdog?.cancel();
@@ -51,225 +52,23 @@ extension _SessionScreenSocketExt on _SessionScreenState {
             _ => '',
           };
           if (raw.isEmpty) return;
-          final decoded = jsonDecode(raw);
-          if (decoded is! Map) return;
-          final j = decoded.cast<String, dynamic>();
-          if (!mounted) return;
-          // Only snapshot/delta carry HarnessState. Stream frames are live
-          // token/thinking updates with no events — applying them via
-          // fromJson wiped the transcript to empty until the next real state
-          // frame (often only after a TUI-side persist).
-          final wire = j['wire'] as String? ?? 'snapshot';
-          if (wire == 'history') {
-            final rawEvents = j['events'];
-            final older = rawEvents is List
-                ? rawEvents
-                    .whereType<Map>()
-                    .map((e) => e.cast<String, dynamic>())
-                    .toList()
-                : const <Map<String, dynamic>>[];
-            if (older.isNotEmpty) {
-              _setState(() {
-                _state = _state?.prependEvents(older);
-                _transcriptStart = (j['start'] as num?)?.toInt() ?? 0;
-                _transcriptDirty = true;
-              });
-            } else {
-              _transcriptStart = 0;
-            }
-            _loadingOlderTranscript = false;
-            if (_transcriptStart > 0) _scheduleHistoryPrefetch();
+          if (_decodeQueue == null && raw.length < _kInlineDecodeLimit) {
+            _applyFrame(ch, jsonDecode(raw));
             return;
           }
-          if (wire == 'term') {
-            _applyTermFrame(j);
-            return;
-          }
-          if (wire == 'stream') {
-            final text = (j['text'] as String?) ?? '';
-            final thinking = (j['thinking'] as String?) ?? '';
-            final visible = j['text_visible'] == true;
-            if (!mounted) return;
-            // Ignore non-empty stream while the run is idle/stopped — a late
-            // frame after commit would re-show thinking/answer next to the
-            // durable AssistantText (duplicate bubble + sticky reasoning).
-            final status = _state?.status;
-            final liveOk = status == null ||
-                status == 'running' ||
-                status == 'waiting_for_input' ||
-                (text.isEmpty && thinking.isEmpty);
-            if (!liveOk) {
-              if (_liveText.isNotEmpty ||
-                  _liveThinking.isNotEmpty ||
-                  _liveTextVisible) {
-                _setState(() {
-                  _liveText = '';
-                  _liveThinking = '';
-                  _liveTextVisible = false;
-                });
-              }
-              return;
-            }
-            // Throttle stream frames: store latest payload and flush at most
-            // every 50ms to avoid rebuilding the full widget tree on every token.
-            _pendingLiveText = text;
-            _pendingLiveThinking = thinking;
-            _pendingLiveTextVisible = visible;
-            if (_streamFlushTimer?.isActive ?? false) return;
-            _streamFlushTimer =
-                Timer(const Duration(milliseconds: 50), () => _flushStreamFrame());
-            return;
-          }
-          if (wire != 'snapshot' && wire != 'delta') return;
-          final cur = _state;
-          // Reject duplicate/out-of-order attach frames before applying them.
-          // Replayed equal revisions are harmless and should not churn a healthy
-          // socket; only a non-consecutive newer revision requires resync.
-          final revision = j['revision'];
-          if (revision is int) {
-            if (wire == 'snapshot') {
-              _lastAttachRevision = revision;
-            } else if (_lastAttachRevision != 0 &&
-                revision == _lastAttachRevision) {
-              return;
-            } else if (_lastAttachRevision != 0 &&
-                revision != _lastAttachRevision + 1) {
-              _resync(ch);
-              return;
-            } else {
-              _lastAttachRevision = revision;
-            }
-          }
-          final next = (wire == 'delta' && cur != null)
-              ? cur.applyDelta(j)
-              : HarnessState.fromJson(j);
-          // Drift check: our event log must line up with the server's count — a
-          // mismatch (dropped/bad frame) resyncs via reconnect, since a fresh
-          // socket's first frame is always a full snapshot.
-          final ec = j['event_count'];
-          if (wire == 'delta' && ec is int && next.events.length != ec) {
-            _resync(ch);
-            return;
-          }
-          // A reversed transcript is anchored at offset 0 (latest). No initial
-          // jump is needed; preserve whether the user has scrolled into history.
-          final follow = _stickToBottom;
-          _syncOptimisticQueue(next.queuedInputs);
-          _queueHidden.removeWhere((id) =>
-              !next.queuedInputs.any((item) => item.id == id) &&
-              !_optimisticQueued.any((item) => item.id == id));
-          // Held messages live on the daemon (`queued_inputs`) and flush there
-          // when the run lands on idle. Clients only display / enqueue / cancel.
-          // A pending approval/answer is acknowledged the moment the run leaves
-          // waiting_for_input — clear it so its watchdog can't fire a needless
-          // resync (and so a resent decision isn't double-applied).
-          if (next.status != 'waiting_for_input' && _pendingDecision != null) {
-            _pendingDecision = null;
-            _decisionTimer?.cancel();
-          }
-          // Retire optimistic bubbles once the daemon has echoed them:
-          // 1) FIFO by echo-count delta (prev→next) when we have prior state
-          // 2) by per-item baseline (covers missed delta / same-count snapshot)
-          // 3) by normalized text match against the authoritative event log
-          //    (every frame — not only snapshots — so stuck faint bubbles clear)
-          final prevEchoes = cur == null ? null : _userEchoCount(cur.events);
-          final nextEchoes = _userEchoCount(next.events);
-          if (prevEchoes != null) {
-            var retired = (nextEchoes - prevEchoes).clamp(0, _pending.length);
-            while (retired-- > 0) {
-              _popPendingFront();
-            }
-          } else if (wire != 'delta') {
-            // first-ever snapshot: nothing optimistic predates it
-            _clearPendingAll();
-          }
-          if (_pending.isNotEmpty) {
-            _retirePendingByBaseline(nextEchoes);
-            _retirePendingAlreadyEchoed(next.events);
-          }
-          // First full snapshot after a (re)connect is authoritative: anything
-          // still in _pending was never received by the server — resend it with
-          // the same nonce so the server deduplicates if it DID land.
-          if (_freshConn && wire != 'delta') {
-            _freshConn = false;
-            for (var i = 0; i < _pending.length; i++) {
-              final m = _pending[i];
-              final nonce = i < _pendingNonce.length ? _pendingNonce[i] : null;
-              final msg = nonce != null
-                  ? {'kind': 'user_message', 'value': m, 'nonce': nonce}
-                  : {'kind': 'user_message', 'value': m};
-              try {
-                ch.sink.add(jsonEncode(msg));
-              } catch (_) {
-                _outbox.add(jsonEncode(msg));
-              }
-            }
-            // A decision still pending while the snapshot STILL shows the run
-            // waiting means it never landed — resend it. (If it had landed, the
-            // status/clear above already dropped it, so no double-approve.)
-            if (_pendingDecision != null &&
-                next.status == 'waiting_for_input') {
-              final payload = jsonEncode(_pendingDecision);
-              try {
-                ch.sink.add(payload);
-              } catch (_) {
-                _outbox.add(payload);
-              }
-            }
-          }
-          // Only rebuild the transcript widget list when events actually
-          // changed — status-only deltas waste a full transcript rebuild.
-          final eventsChanged = cur == null ||
-              next.events.length != cur.events.length ||
-              (next.events.isNotEmpty &&
-                  cur.events.isNotEmpty &&
-                  next.events.last != cur.events.last);
-          if (eventsChanged) _transcriptDirty = true;
-          if (wire == 'snapshot') {
-            final offset = (j['event_offset'] as num?)?.toInt();
-            _transcriptStart = offset ??
-                (next.events.length > _transcriptPageSize
-                    ? next.events.length - _transcriptPageSize
-                    : 0);
-          }
-          _setState(() {
-            _state = next;
-            if (!_isMissionControl) {
-              final nextTitle = next.title ?? widget.title;
-              if (nextTitle != _title && nextTitle.isNotEmpty) {
-                _title = nextTitle;
-                widget.onTitle?.call(nextTitle);
-              }
-            }
-            // Snapshot/delta commit durable events; drop the live answer so it
-            // doesn't double-render against AssistantText once it lands.
-            if (wire == 'snapshot' || wire == 'delta') {
-              _liveText = '';
-              _liveTextVisible = false;
-              // Thought process is live-only until the first tool/action of
-              // this turn. After that the UI should show the action, not
-              // leftover reasoning.
-              if (next.status != 'running' ||
-                  _turnHasVisibleAction(next.events)) {
-                _liveThinking = '';
-                _pendingLiveThinking = '';
-                _streamFlushTimer?.cancel();
-                _streamFlushTimer = null;
-              }
-            }
+          late final Future<void> queued;
+          queued = (_decodeQueue ?? Future<void>.value()).then((_) async {
+            final decoded = raw.length < _kInlineDecodeLimit
+                ? jsonDecode(raw)
+                : await compute(_decodeFrame, raw);
+            if (identical(ch, _channel)) _applyFrame(ch, decoded);
+          }).catchError((Object _) {
+            if (identical(ch, _channel)) _resync(ch);
+          }).whenComplete(() {
+            if (identical(_decodeQueue, queued)) _decodeQueue = null;
           });
-          if (wire == 'snapshot' && _transcriptStart > 0) {
-            _scheduleHistoryPrefetch();
-          }
-          widget.onMacStatus?.call(next, next.status == 'running');
-          widget.onMacControls
-              ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
-          // Re-arm (or cancel) the ack watchdog against the new _pending state.
-          _armAckWatchdog();
-          if (follow) _scheduleBottom();
+          _decodeQueue = queued;
         } catch (_) {
-          // A frame we couldn't apply would silently corrupt the transcript —
-          // resync instead of swallowing it.
           _resync(ch);
         }
       },
@@ -277,6 +76,228 @@ extension _SessionScreenSocketExt on _SessionScreenState {
       onDone: () => _scheduleReconnect(ch),
       cancelOnError: true,
     );
+  }
+
+  void _applyFrame(WebSocketChannel ch, Object? decoded) {
+    try {
+      if (decoded is! Map) return;
+      final j = decoded.cast<String, dynamic>();
+      if (!mounted) return;
+      // Only snapshot/delta carry HarnessState. Stream frames are live
+      // token/thinking updates with no events — applying them via
+      // fromJson wiped the transcript to empty until the next real state
+      // frame (often only after a TUI-side persist).
+      final wire = j['wire'] as String? ?? 'snapshot';
+      if (wire == 'history') {
+        final rawEvents = j['events'];
+        final older = rawEvents is List
+            ? rawEvents
+                .whereType<Map>()
+                .map((e) => e.cast<String, dynamic>())
+                .toList()
+            : const <Map<String, dynamic>>[];
+        if (older.isNotEmpty) {
+          _setState(() {
+            _state = _state?.prependEvents(older);
+            _transcriptStart = (j['start'] as num?)?.toInt() ?? 0;
+            _transcriptDirty = true;
+          });
+        } else {
+          _transcriptStart = 0;
+        }
+        _loadingOlderTranscript = false;
+        if (_transcriptStart > 0) _scheduleHistoryPrefetch();
+        return;
+      }
+      if (wire == 'term') {
+        _applyTermFrame(j);
+        return;
+      }
+      if (wire == 'stream') {
+        final text = (j['text'] as String?) ?? '';
+        final thinking = (j['thinking'] as String?) ?? '';
+        final visible = j['text_visible'] == true;
+        if (!mounted) return;
+        // Ignore non-empty stream while the run is idle/stopped — a late
+        // frame after commit would re-show thinking/answer next to the
+        // durable AssistantText (duplicate bubble + sticky reasoning).
+        final status = _state?.status;
+        final liveOk = status == null ||
+            status == 'running' ||
+            status == 'waiting_for_input' ||
+            (text.isEmpty && thinking.isEmpty);
+        if (!liveOk) {
+          if (_liveText.isNotEmpty ||
+              _liveThinking.isNotEmpty ||
+              _liveTextVisible) {
+            _setState(() {
+              _liveText = '';
+              _liveThinking = '';
+              _liveTextVisible = false;
+            });
+          }
+          return;
+        }
+        // Throttle stream frames: store latest payload and flush at most
+        // every 50ms to avoid rebuilding the full widget tree on every token.
+        _pendingLiveText = text;
+        _pendingLiveThinking = thinking;
+        _pendingLiveTextVisible = visible;
+        if (_streamFlushTimer?.isActive ?? false) return;
+        _streamFlushTimer =
+            Timer(const Duration(milliseconds: 50), () => _flushStreamFrame());
+        return;
+      }
+      if (wire != 'snapshot' && wire != 'delta') return;
+      final cur = _state;
+      // Reject duplicate/out-of-order attach frames before applying them.
+      // Replayed equal revisions are harmless and should not churn a healthy
+      // socket; only a non-consecutive newer revision requires resync.
+      final revision = j['revision'];
+      if (revision is int) {
+        if (wire == 'snapshot') {
+          _lastAttachRevision = revision;
+        } else if (_lastAttachRevision != 0 &&
+            revision == _lastAttachRevision) {
+          return;
+        } else if (_lastAttachRevision != 0 &&
+            revision != _lastAttachRevision + 1) {
+          _resync(ch);
+          return;
+        } else {
+          _lastAttachRevision = revision;
+        }
+      }
+      final next = (wire == 'delta' && cur != null)
+          ? cur.applyDelta(j)
+          : HarnessState.fromJson(j);
+      // Drift check: our event log must line up with the server's count — a
+      // mismatch (dropped/bad frame) resyncs via reconnect, since a fresh
+      // socket's first frame is always a full snapshot.
+      final ec = j['event_count'];
+      if (wire == 'delta' && ec is int && next.events.length != ec) {
+        _resync(ch);
+        return;
+      }
+      // A reversed transcript is anchored at offset 0 (latest). No initial
+      // jump is needed; preserve whether the user has scrolled into history.
+      final follow = _stickToBottom;
+      _syncOptimisticQueue(next.queuedInputs);
+      _queueHidden.removeWhere((id) =>
+          !next.queuedInputs.any((item) => item.id == id) &&
+          !_optimisticQueued.any((item) => item.id == id));
+      // Held messages live on the daemon (`queued_inputs`) and flush there
+      // when the run lands on idle. Clients only display / enqueue / cancel.
+      // A pending approval/answer is acknowledged the moment the run leaves
+      // waiting_for_input — clear it so its watchdog can't fire a needless
+      // resync (and so a resent decision isn't double-applied).
+      if (next.status != 'waiting_for_input' && _pendingDecision != null) {
+        _pendingDecision = null;
+        _decisionTimer?.cancel();
+      }
+      // Retire optimistic bubbles once the daemon has echoed them:
+      // 1) FIFO by echo-count delta (prev→next) when we have prior state
+      // 2) by per-item baseline (covers missed delta / same-count snapshot)
+      // 3) by normalized text match against the authoritative event log
+      //    (every frame — not only snapshots — so stuck faint bubbles clear)
+      final prevEchoes = cur == null ? null : _userEchoCount(cur.events);
+      final nextEchoes = _userEchoCount(next.events);
+      if (prevEchoes != null) {
+        var retired = (nextEchoes - prevEchoes).clamp(0, _pending.length);
+        while (retired-- > 0) {
+          _popPendingFront();
+        }
+      } else if (wire != 'delta') {
+        // first-ever snapshot: nothing optimistic predates it
+        _clearPendingAll();
+      }
+      if (_pending.isNotEmpty) {
+        _retirePendingByBaseline(nextEchoes);
+        _retirePendingAlreadyEchoed(next.events);
+      }
+      // First full snapshot after a (re)connect is authoritative: anything
+      // still in _pending was never received by the server — resend it with
+      // the same nonce so the server deduplicates if it DID land.
+      if (_freshConn && wire != 'delta') {
+        _freshConn = false;
+        for (var i = 0; i < _pending.length; i++) {
+          final m = _pending[i];
+          final nonce = i < _pendingNonce.length ? _pendingNonce[i] : null;
+          final msg = nonce != null
+              ? {'kind': 'user_message', 'value': m, 'nonce': nonce}
+              : {'kind': 'user_message', 'value': m};
+          try {
+            ch.sink.add(jsonEncode(msg));
+          } catch (_) {
+            _outbox.add(jsonEncode(msg));
+          }
+        }
+        // A decision still pending while the snapshot STILL shows the run
+        // waiting means it never landed — resend it. (If it had landed, the
+        // status/clear above already dropped it, so no double-approve.)
+        if (_pendingDecision != null && next.status == 'waiting_for_input') {
+          final payload = jsonEncode(_pendingDecision);
+          try {
+            ch.sink.add(payload);
+          } catch (_) {
+            _outbox.add(payload);
+          }
+        }
+      }
+      // Only rebuild the transcript widget list when events actually
+      // changed — status-only deltas waste a full transcript rebuild.
+      final eventsChanged = cur == null ||
+          next.events.length != cur.events.length ||
+          (next.events.isNotEmpty &&
+              cur.events.isNotEmpty &&
+              next.events.last != cur.events.last);
+      if (eventsChanged) _transcriptDirty = true;
+      if (wire == 'snapshot') {
+        final offset = (j['event_offset'] as num?)?.toInt();
+        _transcriptStart = offset ??
+            (next.events.length > _transcriptPageSize
+                ? next.events.length - _transcriptPageSize
+                : 0);
+      }
+      _setState(() {
+        _state = next;
+        if (!_isMissionControl) {
+          final nextTitle = next.title ?? widget.title;
+          if (nextTitle != _title && nextTitle.isNotEmpty) {
+            _title = nextTitle;
+            widget.onTitle?.call(nextTitle);
+          }
+        }
+        // Snapshot/delta commit durable events; drop the live answer so it
+        // doesn't double-render against AssistantText once it lands.
+        if (wire == 'snapshot' || wire == 'delta') {
+          _liveText = '';
+          _liveTextVisible = false;
+          // Thought process is live-only until the first tool/action of
+          // this turn. After that the UI should show the action, not
+          // leftover reasoning.
+          if (next.status != 'running' || _turnHasVisibleAction(next.events)) {
+            _liveThinking = '';
+            _pendingLiveThinking = '';
+            _streamFlushTimer?.cancel();
+            _streamFlushTimer = null;
+          }
+        }
+      });
+      if (wire == 'snapshot' && _transcriptStart > 0) {
+        _scheduleHistoryPrefetch();
+      }
+      widget.onMacStatus?.call(next, next.status == 'running');
+      widget.onMacControls
+          ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
+      // Re-arm (or cancel) the ack watchdog against the new _pending state.
+      _armAckWatchdog();
+      if (follow) _scheduleBottom();
+    } catch (_) {
+      // A frame we couldn't apply would silently corrupt the transcript —
+      // resync instead of swallowing it.
+      _resync(ch);
+    }
   }
 
   // Tear down this socket and rejoin — the fresh connection opens with a full
@@ -371,3 +392,7 @@ extension _SessionScreenSocketExt on _SessionScreenState {
     }
   }
 }
+
+const int _kInlineDecodeLimit = 64 * 1024;
+
+Object? _decodeFrame(String raw) => jsonDecode(raw);

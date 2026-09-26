@@ -18,7 +18,6 @@ dependencies:
   flutter_zxing: ^2.3.0
   permission_handler: ^13.0.1
   record: ^7.1.1
-  google_fonts: ^8.1.0
   flutter_animate: ^4.5.2
   flutter_markdown_plus: ^1.0.7
   markdown: ^7.2.2
@@ -50,6 +49,27 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/Geist-400.ttf
+          weight: 400
+        - asset: assets/fonts/Geist-500.ttf
+          weight: 500
+        - asset: assets/fonts/Geist-600.ttf
+          weight: 600
+        - asset: assets/fonts/Geist-700.ttf
+          weight: 700
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-400.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-500.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-600.ttf
+          weight: 600
+        - asset: assets/fonts/JetBrainsMono-700.ttf
+          weight: 700
 
 flutter_launcher_icons:
   android: true

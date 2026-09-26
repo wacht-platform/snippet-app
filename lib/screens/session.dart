@@ -189,8 +189,7 @@ int _userEchoCount(List<Map<String, dynamic>> events) => events
     .where((e) => e['kind'] == 'user_input' || e['kind'] == 'steer')
     .length;
 
-String _normEchoText(String s) =>
-    s.trim().replaceAll(RegExp(r'\s+'), ' ');
+String _normEchoText(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ');
 
 String? _inboxAgentId(String sessionId) {
   const prefix = 'inbox-';
@@ -479,6 +478,7 @@ class _SessionScreenState extends State<SessionScreen>
   String _pendingLiveThinking = '';
   bool _pendingLiveTextVisible = false;
   Timer? _streamFlushTimer;
+  Future<void>? _decodeQueue;
   // Auto-reconnect: backoff timer + attempt counter; _closed stops retries on leave.
   Timer? _reconnectTimer;
   Timer? _connectionWatchdog;
@@ -645,7 +645,6 @@ class _SessionScreenState extends State<SessionScreen>
     }
     return null;
   }
-
 
   /// One inline coordination row.
   Widget _agentEventRow(Map<String, dynamic> e, int index) {
@@ -883,8 +882,7 @@ class _SessionScreenState extends State<SessionScreen>
   void _scheduleBottom({bool settle = false, bool smooth = false}) {
     if (!_scroll.hasClients) return;
     if (smooth) {
-      _scroll.animateTo(0,
-          duration: Motion.base, curve: Motion.enter);
+      _scroll.animateTo(0, duration: Motion.base, curve: Motion.enter);
     } else if (_scroll.offset != 0) {
       _scroll.jumpTo(0);
     }

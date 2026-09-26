@@ -25,12 +25,16 @@ class LanesScreen extends StatefulWidget {
 
 class _LanesScreenState extends State<LanesScreen> {
   Timer? _ticker;
+  List<LaneInfo>? _shown;
 
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      final lanes = widget.liveLanes();
+      if (identical(lanes, _shown) && !lanes.any((l) => l.running)) return;
+      setState(() {});
     });
   }
 
@@ -44,6 +48,7 @@ class _LanesScreenState extends State<LanesScreen> {
   Widget build(BuildContext context) {
     Theme.of(context);
     final lanes = widget.liveLanes();
+    _shown = lanes;
     final running = lanes.where((lane) => lane.running).toList();
     // Group by OUTCOME, not by "still running or not". Folding every finished
     // lane into one bucket labelled "Completed" filed failed and cancelled lanes
@@ -79,8 +84,7 @@ class _LanesScreenState extends State<LanesScreen> {
             child: Text(
               '${items.length}',
               style: mono(10,
-                  weight: FontWeight.w600,
-                  color: badgeColor ?? AppColors.fg3),
+                  weight: FontWeight.w600, color: badgeColor ?? AppColors.fg3),
             ),
           ),
         ],
@@ -294,7 +298,10 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                   child: MarkdownPreview(data: summary, maxLines: 2),
                 ),
               ],
-              if (failed && error != null && error.isNotEmpty && !_expanded) ...[
+              if (failed &&
+                  error != null &&
+                  error.isNotEmpty &&
+                  !_expanded) ...[
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
@@ -320,8 +327,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                           error,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              sans(12, height: 1.4, color: AppColors.danger),
+                          style: sans(12, height: 1.4, color: AppColors.danger),
                         ),
                       ),
                     ],
@@ -408,11 +414,9 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          AppIcon('clipboard',
-                              size: 11, color: AppColors.fg4),
+                          AppIcon('clipboard', size: 11, color: AppColors.fg4),
                           const SizedBox(width: 4),
-                          Text('Copy',
-                              style: mono(9, color: AppColors.fg4)),
+                          Text('Copy', style: mono(9, color: AppColors.fg4)),
                         ],
                       ),
                     ),
@@ -530,9 +534,7 @@ class _ActivityHistory extends StatelessWidget {
             Text(
               'ACTIVITY HISTORY (${entries.length})',
               style: mono(10,
-                  weight: FontWeight.w600,
-                  spacing: 0.5,
-                  color: AppColors.fg3),
+                  weight: FontWeight.w600, spacing: 0.5, color: AppColors.fg3),
             ),
           ],
         ),
@@ -619,8 +621,7 @@ class _TimelineEntryRow extends StatelessWidget {
                                   color: AppColors.accent),
                             ),
                           if (entry.kind.isNotEmpty && entry.at.isNotEmpty)
-                            Text(' · ',
-                                style: mono(9, color: AppColors.fg4)),
+                            Text(' · ', style: mono(9, color: AppColors.fg4)),
                           if (entry.at.isNotEmpty)
                             Text(
                               _formatTime(entry.at),
