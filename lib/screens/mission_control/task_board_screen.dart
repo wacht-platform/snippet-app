@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../api.dart';
 import '../../models.dart';
@@ -363,7 +364,7 @@ class _FilterPanelState extends State<_FilterPanel> {
             selected: _selected.isEmpty,
             onTap: () => setState(() => _selected.clear()),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: S.s8),
           for (final s in TaskStatus.values)
             _row(
               label: s.label,
@@ -376,7 +377,7 @@ class _FilterPanelState extends State<_FilterPanel> {
                 if (!_selected.remove(s)) _selected.add(s);
               }),
             ),
-          const SizedBox(height: 14),
+          const SizedBox(height: S.s16),
           // Labelled "Apply", not "Done": the panel already has a `Done` status
           // row, and two identical labels would be ambiguous to both a reader
           // and a widget test.
@@ -393,64 +394,58 @@ class _FilterPanelState extends State<_FilterPanel> {
     int? count,
     Color? dot,
   }) =>
-      InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.md),
-        child: Container(
-          // A phone touch target; compact on desktop.
-          height: kMobile ? M.minTarget : 34,
-          margin: const EdgeInsets.only(bottom: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            // Separation by surface STEP, never a hairline and never the accent
-            // hue — the doc reserves the accent for state, and the selected row
-            // is the ladder's "active row" rung.
-            color: selected ? AppColors.surface2 : Colors.transparent,
+      Padding(
+        padding: const EdgeInsets.only(bottom: S.s2),
+        child: Material(
+          color: selected ? AppColors.accentBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(R.md),
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
             borderRadius: BorderRadius.circular(R.md),
+            child: Container(
+              height: kMobile ? M.minTarget + 4 : 36,
+              padding: const EdgeInsets.symmetric(horizontal: S.s12),
+              child: Row(children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? AppColors.accentFill : Colors.transparent,
+                    border: Border.all(
+                        color: selected
+                            ? AppColors.accentFill
+                            : AppColors.lineStrong,
+                        width: 1.5),
+                  ),
+                  child: selected
+                      ? AppIcon('check', size: 12, color: AppColors.accentFg)
+                      : null,
+                ),
+                const SizedBox(width: S.s12),
+                if (dot != null) ...[
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration:
+                        BoxDecoration(color: dot, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: S.s8),
+                ],
+                Expanded(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TS.ui(selected ? AppColors.fg1 : AppColors.fg2)),
+                ),
+                if (count != null) Text('$count', style: TS.meta()),
+              ]),
+            ),
           ),
-          child: Row(children: [
-            // The dot slot is reserved even when there is no dot, so every
-            // label shares one left edge whether or not it carries a mark.
-            SizedBox(
-              width: 6,
-              child: dot == null
-                  ? null
-                  : Container(
-                      width: 6,
-                      height: 6,
-                      decoration:
-                          BoxDecoration(color: dot, shape: BoxShape.circle),
-                    ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13,
-                      weight: selected ? W.label : W.body,
-                      // The normal text ramp: white is the selected/active row,
-                      // and the rest default to the doc's light grey.
-                      color: selected ? AppColors.fg1 : AppColors.fg2)),
-            ),
-            if (count != null) ...[
-              const SizedBox(width: 8),
-              // A count is information, not a placeholder: the muted ramp.
-              Text('$count', style: sans(11, tabular: true, color: AppColors.fg3)),
-            ],
-            // Selection is carried by the surface step AND a mark, so the state
-            // is unambiguous where the step alone is subtle. 16px glyph in a
-            // 24px slot — the doc's icon relationship.
-            SizedBox(
-              width: 24,
-              child: selected
-                  ? const Align(
-                      alignment: Alignment.centerRight,
-                      child: AppIcon('check', size: 16),
-                    )
-                  : null,
-            ),
-          ]),
         ),
       );
 }

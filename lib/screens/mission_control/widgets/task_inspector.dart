@@ -27,8 +27,7 @@ class TaskInspector extends StatelessWidget {
                   t.title as String,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style:
-                      TS.sectionTitle(),
+                  style: TS.sectionTitle(),
                 ),
               ),
               _StatusPill(status: t.status as String),
@@ -45,8 +44,12 @@ class TaskInspector extends StatelessWidget {
           if ((t.description as String).isNotEmpty) ...[
             const SectionLabel('Description'),
             const SizedBox(height: 4),
-            Text(t.description as String,
-                style: sans(13, color: AppColors.fg2)),
+            MarkdownBody(
+                data: t.description as String,
+                selectable: true,
+                styleSheet: markdownStyle(context),
+                builders: {'pre': PreBlockBuilder()},
+                onTapLink: (txt, href, title) => openMarkdownLink(href)),
             const SizedBox(height: 12),
           ],
           if (state != null) ...[

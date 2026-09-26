@@ -1207,9 +1207,7 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: 8),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 240),
-              child: Text(body!,
-                  textAlign: TextAlign.center,
-                  style: TS.meta()),
+              child: Text(body!, textAlign: TextAlign.center, style: TS.meta()),
             ),
           ],
           if (action != null) ...[const SizedBox(height: 16), action!],
@@ -1258,7 +1256,8 @@ class SnAppBar extends StatelessWidget {
     Theme.of(context); // Rebuild on theme change
     return Container(
       height: compact ? 52 : 64,
-      padding: EdgeInsets.fromLTRB(compact ? 10 : 12, 0, compact ? 10 : 12, 0),
+      padding: EdgeInsets.fromLTRB(
+          onBack != null || leading != null ? S.s4 : S.s12, 0, S.s8, 0),
       decoration: BoxDecoration(
         // Follows the ambient shell surface — desktop panels re-theme this to
         // surface1 so the bar never reads as a darker strip (mobile: still bg).
@@ -1272,13 +1271,11 @@ class SnAppBar extends StatelessWidget {
           leading!
         else if (onBack != null)
           IconBtn('chevron-left',
-              size: kMobile ? 42 : 38,
-              iconSize: kMobile ? 27 : 22,
+              size: kMobile ? M.minTarget : 36,
+              iconSize: kMobile ? 22 : 20,
               tooltip: 'Back',
-              onTap: onBack)
-        else
-          const SizedBox(width: 8),
-        const SizedBox(width: 4),
+              onTap: onBack),
+        if (leading != null || onBack != null) const SizedBox(width: S.s2),
         Expanded(
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1292,7 +1289,7 @@ class SnAppBar extends StatelessWidget {
                   Text(subtitle!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(11, color: AppColors.fg3)),
+                      style: TS.codeSmall()),
               ]),
         ),
         ...actions,
@@ -1403,8 +1400,7 @@ class AppToggle extends StatelessWidget {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label,
-                        style: TS.label(AppColors.fg1)),
+                    Text(label, style: TS.label(AppColors.fg1)),
                     if (sub != null) ...[
                       const SizedBox(height: 3),
                       Text(sub!, style: TS.caption())

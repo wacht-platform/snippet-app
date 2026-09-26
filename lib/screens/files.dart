@@ -52,7 +52,13 @@ class FileExplorer extends StatefulWidget {
 }
 
 class _FileExplorerState extends State<FileExplorer> {
-  late Future<FsListing> _future;
+  FsListing? _listing;
+  bool _dirLoading = true;
+  String? _dirError;
+  final Map<String, FsListing> _cache = {};
+  bool _forward = true;
+  int _req = 0;
+  bool _searching = false;
   bool _selecting = false;
   final Set<String> _selected = {};
   String?
@@ -67,7 +73,7 @@ class _FileExplorerState extends State<FileExplorer> {
   @override
   void initState() {
     super.initState();
-    _future = widget.client.fs(widget.start);
+    _go(widget.start);
   }
 
   @override
@@ -76,13 +82,38 @@ class _FileExplorerState extends State<FileExplorer> {
     super.dispose();
   }
 
-  void _go(String? path) => setState(() {
-        _future = widget.client.fs(path);
-        _filterCtl.clear();
-        _filter = '';
-        _selecting = false;
-        _selected.clear();
+  void _go(String? path, {bool forward = true}) {
+    final req = ++_req;
+    final cached = path == null ? null : _cache[path];
+    setState(() {
+      _forward = forward;
+      if (cached != null) _listing = cached;
+      _dirLoading = true;
+      _dirError = null;
+      _filterCtl.clear();
+      _filter = '';
+      _searching = false;
+      _selecting = false;
+      _selected.clear();
+    });
+    widget.client.fs(path).then((l) {
+      _cache[l.path] = l;
+      if (!mounted || req != _req) return;
+      setState(() {
+        _listing = l;
+        _dirLoading = false;
       });
+    }, onError: (Object e) {
+      if (!mounted || req != _req) return;
+      setState(() {
+        _dirLoading = false;
+        if (_listing == null) _dirError = '$e';
+      });
+      if (_listing != null) toast(context, '$e', danger: true);
+    });
+  }
+
+  void _up(FsListing listing) => _go(listing.parent, forward: false);
 
   void _toggle(FsEntry e) => setState(() {
         if (!_selected.remove(e.path)) _selected.add(e.path);
@@ -275,10 +306,9 @@ class _FileExplorerState extends State<FileExplorer> {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: FutureBuilder<FsListing>(
-          future: _future,
-          builder: (context, snap) {
-            final listing = snap.data;
+        child: Builder(
+          builder: (context) {
+            final listing = _listing;
             if (listing != null) _root ??= listing.path;
             final segs = (listing?.path ?? '')
                 .split('/')
@@ -299,7 +329,7 @@ class _FileExplorerState extends State<FileExplorer> {
                 } else if (listing != null &&
                     listing.parent != null &&
                     listing.path != _root) {
-                  _go(listing.parent);
+                  _up(listing);
                 }
               },
               child: Column(children: [
@@ -321,7 +351,7 @@ class _FileExplorerState extends State<FileExplorer> {
                               ? _exitSelect
                               : (listing?.parent != null &&
                                       listing?.path != _root
-                                  ? () => _go(listing!.parent!)
+                                  ? () => _up(listing!)
                                   : (widget.onClose ??
                                       () => Navigator.pop(context)))),
                       const SizedBox(width: 4),
@@ -329,15 +359,14 @@ class _FileExplorerState extends State<FileExplorer> {
                         child: segs.isEmpty
                             ? Text(widget.title,
                                 style: sans(13,
-                                    weight: W.label,
-                                    color: AppColors.fg1))
+                                    weight: W.label, color: AppColors.fg1))
                             : SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Row(children: [
                                   GestureDetector(
                                     onTap: listing?.parent == null
                                         ? null
-                                        : () => _go('/'),
+                                        : () => _go('/', forward: false),
                                     child: AppIcon('folder',
                                         size: 14, color: AppColors.fg3),
                                   ),
@@ -354,7 +383,8 @@ class _FileExplorerState extends State<FileExplorer> {
                                       onTap: i == segs.length - 1
                                           ? null
                                           : () => _go(
-                                              '/${segs.sublist(0, i + 1).join('/')}'),
+                                              '/${segs.sublist(0, i + 1).join('/')}',
+                                              forward: false),
                                       child: Text(segs[i],
                                           style: mono(12,
                                               color: i == segs.length - 1
@@ -448,8 +478,9 @@ class _FileExplorerState extends State<FileExplorer> {
                   )
                 else ...[
                   SnAppBar(
-                    title:
-                        _selecting ? '${_selected.length} selected' : 'Files',
+                    title: _selecting
+                        ? '${_selected.length} selected'
+                        : _folderTitle(listing),
                     // No subtitle. The folder path was printed TWICE — here and
                     // again in the row below the divider — so the same long
                     // string appeared twice within ~40dp and the header read as
@@ -460,7 +491,7 @@ class _FileExplorerState extends State<FileExplorer> {
                     onBack: _selecting
                         ? _exitSelect
                         : (listing?.parent != null && listing?.path != _root
-                            ? () => _go(listing!.parent!)
+                            ? () => _up(listing!)
                             : (widget.onClose ?? () => Navigator.pop(context))),
                     actions: _selecting
                         ? [
@@ -474,6 +505,17 @@ class _FileExplorerState extends State<FileExplorer> {
                             IconBtn('x', tooltip: 'Cancel', onTap: _exitSelect),
                           ]
                         : [
+                            if (listing != null)
+                              IconBtn('search',
+                                  tooltip: 'Filter files',
+                                  active: _searching || _filter.isNotEmpty,
+                                  onTap: () => setState(() {
+                                        _searching = !_searching;
+                                        if (!_searching) {
+                                          _filterCtl.clear();
+                                          _filter = '';
+                                        }
+                                      })),
                             if (listing != null && widget.onNewChat != null)
                               IconBtn('plus',
                                   tooltip: 'New chat here',
@@ -483,65 +525,33 @@ class _FileExplorerState extends State<FileExplorer> {
                                   tooltip: 'Folder actions',
                                   onTap: () =>
                                       _showFolderActions(listing.path)),
-                            if (widget.onClose != null && listing?.path != _root)
+                            if (widget.onClose != null &&
+                                listing?.path != _root)
                               IconBtn('x',
-                                  tooltip: 'Close',
-                                  onTap: widget.onClose),
+                                  tooltip: 'Close', onTap: widget.onClose),
                           ],
                   ),
                   if (!_selecting && listing != null)
                     _mobileSwitcherContext(listing),
                 ],
+                if (_dirLoading && listing != null)
+                  LinearProgressIndicator(
+                      minHeight: 2,
+                      backgroundColor: Colors.transparent,
+                      color: AppColors.accent)
+                else
+                  const SizedBox(height: 2),
                 Expanded(
-                  child: snap.connectionState == ConnectionState.waiting
+                  child: listing == null && _dirError == null
                       ? Center(child: DelayedSpinner(size: 22))
-                      : snap.hasError
+                      : listing == null
                           ? Center(
                               child: Padding(
                                   padding: const EdgeInsets.all(24),
-                                  child: Text('${snap.error}',
+                                  child: Text(_dirError ?? '',
                                       textAlign: TextAlign.center,
                                       style: TS.meta())))
-                          : Builder(builder: (context) {
-                              final entries = _visibleEntries(listing!);
-                              return ListView(
-                                padding: EdgeInsets.fromLTRB(
-                                    M.gutter, 4, M.gutter, 16),
-                                children: [
-                                  if (listing.parent != null && !_selecting)
-                                    _Row(
-                                        icon: 'folder-open',
-                                        name: '.. (parent directory)',
-                                        muted: true,
-                                        onTap: () => _go(listing.parent)),
-                                  if (entries.isEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 28),
-                                      child: Text('No matching files.',
-                                          textAlign: TextAlign.center,
-                                          style: sans(M.meta,
-                                              color: AppColors.fg3)),
-                                    ),
-                                  ...entries.map((e) => _Row(
-                                        icon: _entryIcon(e.name, e.isDir),
-                                        name: e.name,
-                                        git: e.git,
-                                        chevron:
-                                            e.isDir && kMobile && !_selecting,
-                                        selecting: _selecting,
-                                        selected: _selected.contains(e.path),
-                                        onTap: _selecting
-                                            ? () => _toggle(e)
-                                            : (e.isDir
-                                                ? () => _go(e.path)
-                                                : () => _openFile(e)),
-                                        onLongPress: () => _selecting
-                                            ? _toggle(e)
-                                            : _enterSelect(e),
-                                      )),
-                                ],
-                              );
-                            }),
+                          : _animatedList(listing),
                 ),
               ]),
             );
@@ -551,63 +561,161 @@ class _FileExplorerState extends State<FileExplorer> {
     );
   }
 
-  Widget _mobileSwitcherContext(FsListing listing) {
-    final visible = _visibleEntries(listing);
-    final noun = visible.length == 1 ? 'item' : 'items';
-    return Padding(
-      // Top inset is NOT 0. The app bar draws a divider along its bottom edge,
-      // and with no inset the path row started ~3dp under it — the text read as
-      // touching the rule above it rather than sitting below it.
-      padding: EdgeInsets.fromLTRB(M.gutter, 10, M.gutter, 8),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(2, 0, 2, 6),
-          child: Row(children: [
-            AppIcon('folder', size: 14, color: AppColors.fg4),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(listing.path,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(M.monoMeta, color: AppColors.fg3)),
-            ),
-            const SizedBox(width: 8),
-            Text('${visible.length} $noun',
-                style: sans(M.meta, tabular: true, color: AppColors.fg3)),
-          ]),
-        ),
-        Container(
-          height: M.minTarget,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
+  String _folderTitle(FsListing? listing) {
+    final path = listing?.path ?? '';
+    if (path.isEmpty) return widget.title;
+    if (path == '/') return '/';
+    final segs = path.split('/').where((p) => p.isNotEmpty).toList();
+    if (segs.length == 2 && segs[0] == 'home') return 'Home';
+    return segs.isEmpty ? widget.title : segs.last;
+  }
+
+  Widget _animatedList(FsListing listing) {
+    final reduced = reduceMotion(context);
+    return AnimatedSwitcher(
+      duration: Motion.base,
+      switchInCurve: Motion.enter,
+      switchOutCurve: Motion.exit,
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topCenter,
+        children: [...previous, if (current != null) current],
+      ),
+      transitionBuilder: (child, anim) {
+        if (reduced) return FadeTransition(opacity: anim, child: child);
+        final incoming = child.key == ValueKey(listing.path);
+        final dir = _forward ? 1.0 : -1.0;
+        final dx = incoming ? 0.15 * dir : -0.15 * dir;
+        return FadeTransition(
+          opacity: anim,
+          child: SlideTransition(
+            position:
+                Tween(begin: Offset(dx, 0), end: Offset.zero).animate(anim),
+            child: child,
           ),
-          child: Row(children: [
-            AppIcon('search', size: 17, color: AppColors.fg4),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _filterCtl,
-                autofocus: false,
-                onChanged: (value) => setState(() => _filter = value),
-                style: sans(M.rowTitle, color: AppColors.fg1),
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  border: InputBorder.none,
-                  hintText: 'Filter files',
-                  hintStyle: sans(M.rowTitle, color: AppColors.fg4),
-                ),
-              ),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey(listing.path),
+        child: _entryList(listing),
+      ),
+    );
+  }
+
+  Widget _entryList(FsListing listing) {
+    final entries = _visibleEntries(listing);
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+          kMobile ? S.s8 : M.gutter, S.s4, kMobile ? S.s8 : M.gutter, S.s24),
+      children: [
+        if (!kMobile && listing.parent != null && !_selecting)
+          _Row(
+              icon: 'folder-open',
+              name: '.. (parent directory)',
+              muted: true,
+              onTap: () => _up(listing)),
+        if (entries.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: S.s40),
+            child: Text(
+                _filter.isEmpty
+                    ? 'This folder is empty.'
+                    : 'No matching files.',
+                textAlign: TextAlign.center,
+                style: TS.ui(AppColors.fg3)),
+          ),
+        ...entries.map((e) => _Row(
+              icon: _entryIcon(e.name, e.isDir),
+              name: e.name,
+              git: e.git,
+              chevron: e.isDir && kMobile && !_selecting,
+              selecting: _selecting,
+              selected: _selected.contains(e.path),
+              onTap: _selecting
+                  ? () => _toggle(e)
+                  : (e.isDir ? () => _go(e.path) : () => _openFile(e)),
+              onLongPress: () => _selecting ? _toggle(e) : _enterSelect(e),
+            )),
+      ],
+    );
+  }
+
+  Widget _mobileSwitcherContext(FsListing listing) {
+    final segs = listing.path.split('/').where((p) => p.isNotEmpty).toList();
+    final home = segs.length >= 2 && segs[0] == 'home' ? 2 : 0;
+    final crumbs = <(String, String)>[
+      if (home == 2) ('~', '/${segs[0]}/${segs[1]}') else ('/', '/'),
+      for (var i = home; i < segs.length - 1; i++)
+        (segs[i], '/${segs.sublist(0, i + 1).join('/')}'),
+    ];
+    final showCrumbs = segs.length > home;
+    if (!showCrumbs && !_searching && _filter.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(S.s8, S.s4, M.gutter, S.s4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(children: [
+                for (var i = 0; i < (showCrumbs ? crumbs.length : 0); i++) ...[
+                  if (i > 0)
+                    AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(R.sm),
+                    onTap: () => _go(crumbs[i].$2, forward: false),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: S.s6, vertical: S.s8),
+                      child: Text(crumbs[i].$1,
+                          style: TS
+                              .label(AppColors.fg3)
+                              .copyWith(fontWeight: W.body)),
+                    ),
+                  ),
+                ],
+              ]),
             ),
-            if (_filter.isNotEmpty)
-              IconBtn('x', size: 32, iconSize: 14, tooltip: 'Clear filter',
-                  onTap: () {
-                _filterCtl.clear();
-                setState(() => _filter = '');
-              }),
-          ]),
-        ),
+          ),
+        ]),
+        if (_searching || _filter.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.s6, S.s4, 0, S.s4),
+            child: Container(
+              height: M.minTarget,
+              padding: const EdgeInsets.symmetric(horizontal: S.s12),
+              decoration: BoxDecoration(
+                color: AppColors.raised,
+                borderRadius: BorderRadius.circular(R.md),
+              ),
+              child: Row(children: [
+                AppIcon('search', size: 16, color: AppColors.fg4),
+                const SizedBox(width: S.s8),
+                Expanded(
+                  child: TextField(
+                    controller: _filterCtl,
+                    autofocus: true,
+                    onChanged: (value) => setState(() => _filter = value),
+                    style: TS.ui(AppColors.fg1),
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: 'Filter this folder',
+                      hintStyle: TS.ui(AppColors.fg4),
+                    ),
+                  ),
+                ),
+                if (_filter.isNotEmpty)
+                  IconBtn('x', size: 32, iconSize: 14, tooltip: 'Clear filter',
+                      onTap: () {
+                    _filterCtl.clear();
+                    setState(() => _filter = '');
+                  }),
+              ]),
+            ),
+          ),
       ]),
     );
   }
@@ -761,8 +869,22 @@ class _Row extends StatelessWidget {
                 _checkbox(selected),
                 const SizedBox(width: 11)
               ],
-              AppIcon(icon, size: 16, color: iconColor),
-              const SizedBox(width: 10),
+              if (kMobile)
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isFolder ? AppColors.accentBg : AppColors.raised,
+                    borderRadius: BorderRadius.circular(R.sm + 2),
+                  ),
+                  child: AppIcon(icon,
+                      size: 17,
+                      color: isFolder ? AppColors.accent : AppColors.fg3),
+                )
+              else
+                AppIcon(icon, size: 16, color: iconColor),
+              SizedBox(width: kMobile ? S.s12 : 10),
               Expanded(
                   child: Text(name,
                       maxLines: 1,
@@ -771,10 +893,8 @@ class _Row extends StatelessWidget {
                           weight: isFolder && kMobile ? W.label : W.body,
                           color: muted ? AppColors.fg3 : AppColors.fg1))),
               if (git) ...[
-                AppIcon('git-branch', size: 12, color: AppColors.ok),
-                const SizedBox(width: 4),
-                Text('git', style: mono(10, color: AppColors.fg3)),
-                const SizedBox(width: 8),
+                const Tag('git', tone: Tone.ok, icon: 'git-branch'),
+                const SizedBox(width: S.s8),
               ],
               if (chevron)
                 AppIcon('chevron-right', size: 16, color: AppColors.fg4),
@@ -802,5 +922,3 @@ class _Row extends StatelessWidget {
 
 /// Push the file viewer as a full-screen route.
 ///
-
-

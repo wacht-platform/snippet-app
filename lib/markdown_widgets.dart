@@ -33,20 +33,36 @@ class ThinkingMarkdown extends StatelessWidget {
 class MarkdownPreview extends StatelessWidget {
   final String data;
   final int maxLines;
+  final TextStyle? style;
 
   const MarkdownPreview({
     super.key,
     required this.data,
     this.maxLines = 2,
+    this.style,
   });
+
+  static String plain(String md) {
+    var t = md.replaceAll(RegExp(r'```[a-zA-Z0-9_-]*'), '');
+    t = t.replaceAllMapped(
+        RegExp(r'!?\[([^\]]*)\]\([^)]*\)'), (m) => m.group(1) ?? '');
+    t = t.replaceAll(RegExp(r'^\s{0,3}#{1,6}\s+', multiLine: true), '');
+    t = t.replaceAll(RegExp(r'^\s{0,3}>\s?', multiLine: true), '');
+    t = t.replaceAll(RegExp(r'^\s*([-*+]|\d+\.)\s+', multiLine: true), '• ');
+    t = t.replaceAllMapped(RegExp(r'(\*\*|__)(.+?)\1'), (m) => m.group(2)!);
+    t = t.replaceAllMapped(
+        RegExp(r'(?<![\w*])[*_]([^*_\n]+)[*_](?![\w*])'), (m) => m.group(1)!);
+    t = t.replaceAll('`', '');
+    return t.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      data.replaceAll(RegExp(r'\s+'), ' ').trim(),
+      plain(data),
       maxLines: maxLines,
       overflow: TextOverflow.ellipsis,
-      style: sans(12, height: 1.35, color: AppColors.fg3),
+      style: style ?? sans(12, height: 1.35, color: AppColors.fg3),
     );
   }
 }

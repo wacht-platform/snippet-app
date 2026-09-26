@@ -701,6 +701,16 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedMinusSign;
     case 'x':
       return HugeIcons.strokeRoundedCancel01;
+    case 'undo':
+      return HugeIcons.strokeRoundedUndo02;
+    case 'redo':
+      return HugeIcons.strokeRoundedRedo02;
+    case 'wrap':
+      return HugeIcons.strokeRoundedTextWrap;
+    case 'keyboard':
+      return HugeIcons.strokeRoundedKeyboard;
+    case 'file-code':
+      return HugeIcons.strokeRoundedFileCode;
     case 'x-circle':
       return HugeIcons.strokeRoundedCancelCircle;
     case 'check-circle':

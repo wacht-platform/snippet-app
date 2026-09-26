@@ -272,48 +272,55 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Widget build(BuildContext context) {
     final t = task;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t?.title ?? 'Task'),
-        leading: IconButton(
-          onPressed: widget.onClose ?? () => Navigator.of(context).pop(),
-          icon: AppIcon('chevron-left', size: 20, color: AppColors.fg2),
-        ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(children: [
+          SnAppBar(
+            title: t?.title ?? 'Task',
+            compact: true,
+            onBack: widget.onClose ?? () => Navigator.of(context).pop(),
+          ),
+          Expanded(child: _body(t)),
+        ]),
       ),
-      body: loading
-          ? const Center(
-              child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2)))
-          : error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(error!,
-                        textAlign: TextAlign.center,
-                        style: sans(12, color: AppColors.danger)),
-                  ),
-                )
-              : t == null
-                  ? const EmptyState(icon: 'layers', title: 'Task not found')
-                  : Column(children: [
-                      _meta(t),
-                      Divider(height: 1, color: AppColors.border),
-                      Expanded(child: _roomView()),
-                      _composerBar(),
-                    ]),
     );
   }
 
+  Widget _body(TaskItem? t) {
+    return loading
+        ? const Center(child: DelayedSpinner(size: 22))
+        : error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(error!,
+                      textAlign: TextAlign.center,
+                      style: sans(12, color: AppColors.danger)),
+                ),
+              )
+            : t == null
+                ? const EmptyState(icon: 'layers', title: 'Task not found')
+                : Column(children: [
+                    Expanded(
+                      child: CustomScrollView(slivers: [
+                        SliverToBoxAdapter(child: _meta(t)),
+                        SliverToBoxAdapter(
+                            child: Divider(height: 1, color: AppColors.line)),
+                        ..._roomSlivers(),
+                      ]),
+                    ),
+                    _composerBar(),
+                  ]);
+  }
+
   Widget _meta(TaskItem t) => Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s16, S.s12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (t.description.trim().isNotEmpty) ...[
-              Text(t.description,
-                  style: sans(13, color: AppColors.fg2, height: 1.45)),
-              const SizedBox(height: 14),
+              _Description(markdown: t.description),
+              const SizedBox(height: S.s12),
             ],
             // Column picker. Every state is offered, including the current one,
             // so the row reads as the task's position rather than a menu.
@@ -357,8 +364,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             const SizedBox(height: 14),
             _section('Agents', onAdd: _addAgent),
             if (roster.isEmpty)
-              Text('Nobody assigned yet.',
-                  style: TS.meta())
+              Text('Nobody assigned yet.', style: TS.meta())
             else
               Wrap(
                 spacing: 6,
@@ -384,7 +390,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             borderRadius: BorderRadius.circular(R.chip),
                             border: a.hasSessionLease
                                 ? Border.all(
-                                    color: AppColors.accent.withValues(alpha: 0.4),
+                                    color:
+                                        AppColors.accent.withValues(alpha: 0.4),
                                     width: 1)
                                 : null,
                           ),
@@ -461,53 +468,68 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ]),
       );
 
-  Widget _roomView() {
+  List<Widget> _roomSlivers() {
     final room = this.room;
-    if (room == null) return const SizedBox.shrink();
+    if (room == null) return const [];
     if (room.events.isEmpty) {
-      return const EmptyState(
-        icon: 'message-text',
-        title: 'No messages yet',
-        body: 'Agents on this task talk here. You can post too.',
-      );
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      itemCount: room.events.length,
-      itemBuilder: (_, i) {
-        final e = room.events[i];
-        final mine = e.actorKind == 'human';
-        final body = e.payload['body']?.toString() ?? '';
-        if (body.trim().isEmpty) return const SizedBox.shrink();
-        return Align(
-          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            constraints: const BoxConstraints(maxWidth: 420),
-            decoration: BoxDecoration(
-              color: mine ? AppColors.surface2 : AppColors.surface1,
-              borderRadius: BorderRadius.circular(R.card),
-            ),
-            child: Column(
-              crossAxisAlignment:
-                  mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!mine)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Text(e.actorId,
-                        style: sans(11,
-                            weight: W.label, color: AppColors.accent)),
-                  ),
-                Text(body, style: sans(13, color: AppColors.fg1, height: 1.4)),
-              ],
+      return const [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(top: S.s16),
+            child: EmptyState(
+              icon: 'message-text',
+              title: 'No messages yet',
+              body: 'Agents on this task talk here. You can post too.',
             ),
           ),
-        );
-      },
-    );
+        ),
+      ];
+    }
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.all(S.s12),
+        sliver: SliverList.builder(
+          itemCount: room.events.length,
+          itemBuilder: (_, i) {
+            final e = room.events[i];
+            final mine = e.actorKind == 'human';
+            final body = e.payload['body']?.toString() ?? '';
+            if (body.trim().isEmpty) return const SizedBox.shrink();
+            return Align(
+              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: S.s8),
+                padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
+                constraints: const BoxConstraints(maxWidth: 520),
+                decoration: BoxDecoration(
+                  color: mine ? AppColors.overlay : AppColors.raised,
+                  borderRadius: BorderRadius.circular(R.md),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!mine)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: S.s4),
+                        child:
+                            Text(e.actorId, style: TS.label(AppColors.accent)),
+                      ),
+                    MarkdownBody(
+                      data: body,
+                      selectable: true,
+                      styleSheet: markdownStyle(context),
+                      builders: {'pre': PreBlockBuilder()},
+                      onTapLink: (txt, href, title) => openMarkdownLink(href),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ];
   }
 
   Widget _composerBar() => SafeArea(
@@ -532,4 +554,69 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ]),
         ),
       );
+}
+
+class _Description extends StatefulWidget {
+  const _Description({required this.markdown});
+
+  final String markdown;
+
+  @override
+  State<_Description> createState() => _DescriptionState();
+}
+
+class _DescriptionState extends State<_Description> {
+  static const _foldHeight = 260.0;
+  bool _expanded = false;
+
+  bool get _long =>
+      widget.markdown.length > 700 ||
+      '\n'.allMatches(widget.markdown).length > 14;
+
+  @override
+  Widget build(BuildContext context) {
+    final body = MarkdownBody(
+      data: widget.markdown,
+      selectable: true,
+      styleSheet: markdownStyle(context),
+      builders: {'pre': PreBlockBuilder()},
+      onTapLink: (txt, href, title) => openMarkdownLink(href),
+    );
+    if (!_long) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedSize(
+          duration: Motion.base,
+          curve: Motion.enter,
+          alignment: Alignment.topCenter,
+          child: _expanded
+              ? body
+              : SizedBox(
+                  height: _foldHeight,
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: (r) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.7, 1],
+                      colors: [Colors.white, Colors.transparent],
+                    ).createShader(r),
+                    child: ClipRect(
+                      child: OverflowBox(
+                        alignment: Alignment.topLeft,
+                        minHeight: 0,
+                        maxHeight: double.infinity,
+                        child: body,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+        TextAction(_expanded ? 'Show less' : 'Show more',
+            icon: _expanded ? 'chevron-up' : 'chevron-down',
+            onTap: () => setState(() => _expanded = !_expanded)),
+      ],
+    );
+  }
 }

@@ -15,7 +15,9 @@ class TaskDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = task;
-    final title = (t.title as String).trim().isEmpty ? 'Untitled task' : t.title as String;
+    final title = (t.title as String).trim().isEmpty
+        ? 'Untitled task'
+        : t.title as String;
     final description = (t.description as String).trim();
     final sessionId = (t.sessionId as String?)?.trim() ?? '';
     final status = t.status as String;
@@ -85,7 +87,8 @@ class TaskDetailSheet extends StatelessWidget {
                   children: [
                     _StatusPill(status: status),
                     if (sessionId.isNotEmpty) _MetaPill(text: 'Session linked'),
-                    _MetaPill(text: 'Updated ${_ago((t.updatedAt as num).toInt())}'),
+                    _MetaPill(
+                        text: 'Updated ${_ago((t.updatedAt as num).toInt())}'),
                   ],
                 ),
                 if (description.isNotEmpty) ...[
@@ -94,8 +97,13 @@ class TaskDetailSheet extends StatelessWidget {
                   const SizedBox(height: 7),
                   AppCard(
                     padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-                    child: Text(description,
-                        style: sans(13, color: AppColors.fg2, height: 1.45)),
+                    child: MarkdownBody(
+                        data: description,
+                        selectable: true,
+                        styleSheet: markdownStyle(context),
+                        builders: {'pre': PreBlockBuilder()},
+                        onTapLink: (txt, href, title) =>
+                            openMarkdownLink(href)),
                   ),
                 ],
                 const SizedBox(height: 18),
@@ -103,14 +111,12 @@ class TaskDetailSheet extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(children: [
                   Expanded(
-                    child: Btn('Ask agent',
-                        small: true,
-                        icon: 'message',
+                    child: Btn('Ask agent', small: true, icon: 'message',
                         onTap: () async {
-                          Navigator.of(context).pop();
-                          await state.sendMessage(
-                              'Tell me about task "$title" — what\'s the current status?');
-                        }),
+                      Navigator.of(context).pop();
+                      await state.sendMessage(
+                          'Tell me about task "$title" — what\'s the current status?');
+                    }),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -127,7 +133,8 @@ class TaskDetailSheet extends StatelessWidget {
                 AppCard(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                   child: Column(children: [
-                    _contextRow('Status', statusLabel(status), _statusColor(status)),
+                    _contextRow(
+                        'Status', statusLabel(status), _statusColor(status)),
                     if (sessionId.isNotEmpty) ...[
                       const Divider(height: 16),
                       _contextRow('Session', sessionId, AppColors.fg2),
@@ -144,8 +151,11 @@ class TaskDetailSheet extends StatelessWidget {
 
   Widget _contextRow(String label, String value, Color color) => Row(children: [
         SizedBox(width: 68, child: Text(label, style: TS.caption())),
-        Expanded(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: sans(12, weight: W.label, color: color))),
+        Expanded(
+            child: Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(12, weight: W.label, color: color))),
       ]);
 
   String statusLabel(String status) => status.replaceAll('_', ' ');

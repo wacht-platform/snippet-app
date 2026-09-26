@@ -123,8 +123,8 @@ void main() {
       // The banner carried the path as BOTH the app bar subtitle and the meta
       // row under the divider, so the same long string appeared twice within
       // ~40dp and the header read as broken.
-      expect(find.text('/root'), findsOneWidget,
-          reason: 'the folder path belongs to the list row, not the app bar too');
+      expect(find.text('root'), findsOneWidget,
+          reason: 'the folder is named once: the title, not the breadcrumb too');
     });
   });
 
@@ -237,7 +237,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('main.dart'), findsOneWidget);
-      expect(find.text('/root/lib'), findsOneWidget);
+      expect(find.text('lib'), findsOneWidget);
+      expect(find.text('root'), findsOneWidget);
 
       // In subfolder, 'New chat here' action targets '/root/lib'
       await tester.tap(find.byTooltip('New chat here'));
@@ -248,7 +249,7 @@ void main() {
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
 
-      expect(find.text('/root'), findsOneWidget);
+      expect(find.text('root'), findsOneWidget);
       expect(find.text('notes.txt'), findsOneWidget);
       expect(closed, isFalse);
 
