@@ -271,6 +271,39 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   /// Phone session bar: back, title, and the shell action. Deliberately NO run
   /// state — the chat canvas already carries working/idle, so a second readout
   /// here was one more thing competing with the title for the same 56px.
+  Widget _runningLanesBadge(HarnessState s, EdgeInsets margin) {
+    final runningCount = s.lanes.where((l) => l.running).length;
+    return Tooltip(
+      message:
+          '$runningCount parallel agent${runningCount == 1 ? '' : 's'} running',
+      child: GestureDetector(
+        onTap: _showLanes,
+        child: Container(
+          margin: margin,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.accentBg,
+            borderRadius: BorderRadius.circular(12),
+            border:
+                Border.all(color: AppColors.accentLine.withValues(alpha: 0.6)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const StatusDot(status: 'running', size: 6),
+              const SizedBox(width: 5),
+              Text(
+                '$runningCount ${runningCount == 1 ? 'agent' : 'agents'}',
+                style:
+                    mono(11, weight: FontWeight.w600, color: AppColors.accent),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _mobileHeader(HarnessState? s) {
     return Container(
       height: M.appBarHeight,
@@ -306,6 +339,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             ),
           ),
         ),
+        if (s != null && s.lanes.any((l) => l.running))
+          _runningLanesBadge(s, const EdgeInsets.only(right: 6)),
         // Mission Control orchestrates other sessions' work and has no working
         // tree of its own, so it gets no shell. Its slot carries the TASK BOARD
         // instead — the thing you keep returning to from here — mirroring the
@@ -520,9 +555,11 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           child: Text(title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: sans(mac ? 13 : 16,
-                  weight: W.label, color: AppColors.fg1)),
+              style:
+                  sans(mac ? 13 : 16, weight: W.label, color: AppColors.fg1)),
         ),
+        if (s != null && s.lanes.any((l) => l.running))
+          _runningLanesBadge(s, const EdgeInsets.symmetric(horizontal: 8)),
         if (mac && running)
           IconBtn('stop',
               size: 30,
@@ -942,7 +979,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
-
   /// Open the full-screen actions panel (slides in from the right).
   ///
   /// Dismisses the keyboard first: the panel is a navigation surface, and a
@@ -1013,5 +1049,4 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       ),
     );
   }
-
 }

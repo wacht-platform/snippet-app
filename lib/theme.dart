@@ -631,8 +631,16 @@ List<List<dynamic>> hugeIconFor(String name) {
     case 'plus':
     case 'add':
       return HugeIcons.strokeRoundedAdd01;
+    case 'minus':
+      return HugeIcons.strokeRoundedMinusSign;
     case 'x':
       return HugeIcons.strokeRoundedCancel01;
+    case 'x-circle':
+      return HugeIcons.strokeRoundedCancelCircle;
+    case 'check-circle':
+      return HugeIcons.strokeRoundedCheckmarkCircle02;
+    case 'file-text':
+      return HugeIcons.strokeRoundedNote01;
     case 'more-horizontal':
       return HugeIcons.strokeRoundedMoreHorizontal;
     case 'more-vertical':

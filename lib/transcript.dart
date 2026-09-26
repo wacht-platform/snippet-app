@@ -53,8 +53,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
               // changes the mark, so a broken call is visible while scrolling
               // rather than only after expanding it.
               AppIcon(failed ? 'alert-triangle' : toolIcon(widget.tool),
-                  size: 15,
-                  color: failed ? AppColors.danger : AppColors.fg3),
+                  size: 15, color: failed ? AppColors.danger : AppColors.fg3),
               const SizedBox(width: 8),
               Text(toolTitle(widget.tool),
                   style: sans(M.rowTitle,
@@ -288,59 +287,164 @@ class LaneNotice extends StatelessWidget {
     final lane = live();
     final failed = lane?.status == 'failed';
     final running = lane?.running ?? false;
-    final color = running
+    final activity = lane?.activity?.trim();
+    final displaySummary = summary?.trim().isNotEmpty == true
+        ? summary!.trim()
+        : lane?.summary?.trim();
+
+    final badgeColor = running
         ? AppColors.accent
         : failed
             ? AppColors.danger
-            : AppColors.fg4;
-    final status = running
-        ? 'running'
+            : AppColors.ok;
+    final badgeBg = running
+        ? AppColors.accentBg
         : failed
-            ? 'failed'
-            : 'complete';
+            ? AppColors.dangerBg
+            : AppColors.okBg;
+    final statusText = running
+        ? 'RUNNING'
+        : failed
+            ? 'FAILED'
+            : 'COMPLETED';
+
     return Semantics(
       button: true,
-      label: '$title, $status. Open delegated lanes.',
+      label: '$title, ${statusText.toLowerCase()}. Open delegated lanes.',
       onTap: onOpen,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: onOpen,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(children: [
-                  AppIcon('layers', size: 15, color: color),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(12,
-                          weight: FontWeight.w500, color: AppColors.fg2),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: running
+                  ? AppColors.accentLine
+                  : (failed
+                      ? AppColors.danger.withValues(alpha: 0.4)
+                      : AppColors.border),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onOpen,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: badgeBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Center(
+                            child: AppIcon(
+                              running
+                                  ? 'agent'
+                                  : (failed ? 'alert-triangle' : 'check'),
+                              size: 14,
+                              color: badgeColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(13,
+                                    weight: FontWeight.w600,
+                                    color: AppColors.fg1),
+                              ),
+                              if (activity != null &&
+                                  activity.isNotEmpty &&
+                                  running)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    activity,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: mono(11, color: AppColors.fg3),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: badgeBg,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: badgeColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (running) ...[
+                                const StatusDot(status: 'running', size: 5),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                statusText,
+                                style: mono(9.5,
+                                    weight: FontWeight.w700, color: badgeColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 9),
-                  Text(status, style: mono(10, color: color)),
-                  const SizedBox(width: 5),
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Center(
-                      child: AppIcon('chevron-right',
-                          size: 11, color: AppColors.fg4),
+                    if (displaySummary != null &&
+                        displaySummary.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child:
+                            MarkdownPreview(data: displaySummary, maxLines: 2),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'Delegated Subagent Lane',
+                          style: sans(10.5, color: AppColors.fg4),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Inspect lane',
+                          style: sans(11,
+                              weight: FontWeight.w500, color: AppColors.accent),
+                        ),
+                        const SizedBox(width: 3),
+                        AppIcon('arrow-right',
+                            size: 10, color: AppColors.accent),
+                      ],
                     ),
-                  ),
-                ]),
-                if (summary != null && summary!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  MarkdownPreview(data: summary!, maxLines: 2),
-                ],
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
