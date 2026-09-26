@@ -879,18 +879,18 @@ class SidebarState extends State<Sidebar> {
               padding: const EdgeInsets.symmetric(horizontal: 6),
               decoration: BoxDecoration(
                 color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.xs),
+                borderRadius: BorderRadius.circular(R.sm),
               ),
               child: Row(
                 children: [
-                  AppIcon('search', size: 13, color: AppColors.fg3),
+                  AppIcon('search', size: 14, color: AppColors.fg3),
                   const SizedBox(width: 6),
                   Expanded(
                     child: TextField(
                       controller: _desktopChatsSearchCtl,
                       focusNode: _desktopChatsSearchFocus,
                       onChanged: (v) => setState(() => _filterQuery = v),
-                      style: sans(12, color: AppColors.fg1),
+                      style: sans(13, color: AppColors.fg1),
                       decoration: InputDecoration(
                         isCollapsed: true,
                         border: InputBorder.none,
@@ -1012,16 +1012,16 @@ class SidebarState extends State<Sidebar> {
           borderRadius: BorderRadius.circular(R.sm),
           onTap: open,
           child: Container(
-            height: 32,
+            height: 36,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(children: [
               AppIcon('layers',
-                  size: 14,
+                  size: 16,
                   color: selected ? AppColors.fg1 : AppColors.fg3),
               const SizedBox(width: 8),
               Expanded(
                 child: Text('Mission Control',
-                    style: sans(12,
+                    style: sans(13,
                         weight: W.label,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
@@ -1074,18 +1074,18 @@ class SidebarState extends State<Sidebar> {
               : (details) =>
                   _sessionActions(s, position: details.globalPosition),
           child: Container(
-            height: 32,
+            height: 36,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(children: [
               if (_selecting) ...[
                 AppIcon(checked ? 'check' : 'plus',
-                    size: 13,
+                    size: 15,
                     color: checked ? AppColors.accent : AppColors.fg4),
                 const SizedBox(width: 6),
               ] else ...[
                 // Always present, so titles share one left edge; the colour is
                 // what carries state.
-                SessionStateIcon(status: s.status, size: 14),
+                SessionStateIcon(status: s.status, size: 16),
                 const SizedBox(width: 8),
               ],
               Expanded(
@@ -1094,7 +1094,7 @@ class SidebarState extends State<Sidebar> {
                       : Text(s.title.isEmpty ? '(untitled)' : s.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(12,
+                          style: sans(13,
                               color:
                                   selected ? AppColors.fg1 : AppColors.fg2))),
               if (!renaming) ...[
