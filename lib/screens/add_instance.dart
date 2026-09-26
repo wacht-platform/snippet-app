@@ -371,12 +371,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
     if (perm == null) {
       return ColoredBox(
           color: AppColors.surface1,
-          child: Center(
-              child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.fg3))));
+          child: Center(child: DelayedSpinner(size: 22)));
     }
     if (!perm.isGranted) {
       final permanent = perm.isPermanentlyDenied || perm.isRestricted;

@@ -210,12 +210,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   color: AppColors.accent),
             if (_loading)
               Expanded(
-                  child: Center(
-                      child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.fg3))))
+                  child: Center(child: DelayedSpinner(size: 22)))
             else if (_error != null)
               Expanded(
                   child: EmptyState(

@@ -1025,13 +1025,7 @@ class _SessionScreenState extends State<SessionScreen>
                           Expanded(
                             child: Stack(children: [
                               s == null
-                                  ? Center(
-                                      child: SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: AppColors.fg3)))
+                                  ? Center(child: DelayedSpinner(size: 22))
                                   : NotificationListener<ScrollNotification>(
                                       onNotification: _onScroll,
                                       child: Builder(builder: (context) {

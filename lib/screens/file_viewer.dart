@@ -246,12 +246,7 @@ class _FileViewerState extends State<FileViewer> {
                       fit: BoxFit.contain,
                       loadingBuilder: (ctx, child, prog) => prog == null
                           ? child
-                          : Center(
-                              child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.fg3))),
+                          : Center(child: DelayedSpinner(size: 22)),
                       errorBuilder: (ctx, e, st) => EmptyState(
                           icon: 'alert-triangle',
                           title: "Can't load image",
@@ -283,12 +278,7 @@ class _FileViewerState extends State<FileViewer> {
             )
           else if (_loading)
             Expanded(
-                child: Center(
-                    child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3))))
+                child: Center(child: DelayedSpinner(size: 22)))
           else if (_error != null)
             Expanded(
                 child: EmptyState(
@@ -433,12 +423,7 @@ class _VideoViewState extends State<_VideoView> {
     }
     final ch = _chewie;
     if (ch == null) {
-      return Center(
-          child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.fg3)));
+      return Center(child: DelayedSpinner(size: 22));
     }
     // Chewie sizes the video from its own aspectRatio; letterbox on black.
     return ColoredBox(color: Colors.black, child: Chewie(controller: ch));

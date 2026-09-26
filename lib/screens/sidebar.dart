@@ -716,12 +716,7 @@ class SidebarState extends State<Sidebar> {
 
   Widget _sessionList() {
     if (_loading && _sessions == null) {
-      return Center(
-          child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.fg3)));
+      return Center(child: DelayedSpinner(size: 20));
     }
     final all = _sessions ?? const <SessionInfo>[];
     if (all.isEmpty) {

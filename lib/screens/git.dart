@@ -251,16 +251,7 @@ class _GitScreenState extends State<GitScreen> {
         ),
       if (_loading)
         Expanded(
-          child: Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.fg3,
-              ),
-            ),
-          ),
+          child: Center(child: DelayedSpinner(size: 22)),
         )
       else if (_error != null && (st == null || !st.ok))
         Expanded(
@@ -915,16 +906,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
       if (!widget.embedded) bar,
       if (_loading)
         Expanded(
-          child: Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.fg3,
-              ),
-            ),
-          ),
+          child: Center(child: DelayedSpinner(size: 22)),
         )
       else if (_error != null)
         Expanded(

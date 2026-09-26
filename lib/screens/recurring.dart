@@ -656,12 +656,7 @@ class RecurringScreenState extends State<RecurringScreen>
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return widget.embedded
               ? const SizedBox.shrink()
-              : Center(
-                  child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.fg3)));
+              : Center(child: DelayedSpinner(size: 22));
         }
         if (snap.hasError) {
           return Padding(

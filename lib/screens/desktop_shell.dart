@@ -1312,12 +1312,7 @@ class _DesktopShellState extends State<DesktopShell>
     if (_loading) {
       return Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(
-            child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg3))),
+        body: Center(child: DelayedSpinner(size: 22)),
       );
     }
     if (kMobile) return _mobileShell();

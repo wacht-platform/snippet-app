@@ -176,12 +176,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return widget.embedded
               ? const SizedBox.shrink()
-              : Center(
-                  child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.fg3)));
+              : Center(child: DelayedSpinner(size: 22));
         }
         final cfg = snap.data;
         final profiles = cfg?.profiles ?? const [];
