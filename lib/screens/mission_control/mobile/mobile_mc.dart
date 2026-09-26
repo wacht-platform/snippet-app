@@ -135,7 +135,7 @@ class MobileMissionControl extends StatelessWidget {
           children: [
             const SectionLabel('Agent is asking'),
             const SizedBox(height: 8),
-            Text(q.question, style: sans(14, color: AppColors.fg1)),
+            Text(q.question, style: TS.ui(AppColors.fg1)),
             const SizedBox(height: 16),
             TextField(
               controller: controller,

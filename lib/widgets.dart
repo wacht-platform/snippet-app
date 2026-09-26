@@ -944,7 +944,7 @@ class Bubble extends StatelessWidget {
         Row(mainAxisSize: MainAxisSize.min, children: [
           AppIcon('activity', size: 12, color: AppColors.fg3),
           const SizedBox(width: 6),
-          Text('Transcribing audio…', style: sans(12, color: AppColors.fg3)),
+          Text('Transcribing audio…', style: TS.meta()),
         ]),
     ];
     final extras = <Widget>[
@@ -988,7 +988,7 @@ class Bubble extends StatelessWidget {
                       children: [
                         AppIcon('clipboard', size: 12, color: AppColors.fg4),
                         const SizedBox(width: 5),
-                        Text('Copy', style: sans(12, color: AppColors.fg3)),
+                        Text('Copy', style: TS.meta()),
                       ],
                     ),
                   ),
@@ -1105,7 +1105,7 @@ class StatTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: sans(11, color: AppColors.fg3)),
+            Text(label, style: TS.caption()),
             const SizedBox(height: 5),
             Text(value,
                 style: mono(16,
@@ -1202,14 +1202,14 @@ class EmptyState extends StatelessWidget {
             child: AppIcon(icon, size: 24, color: AppColors.fg3),
           ),
           const SizedBox(height: 12),
-          Text(title, style: sans(16, weight: W.label, color: AppColors.fg1)),
+          Text(title, style: TS.sectionTitle()),
           if (body != null) ...[
             const SizedBox(height: 8),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 240),
               child: Text(body!,
                   textAlign: TextAlign.center,
-                  style: sans(12, height: 1.5, color: AppColors.fg3)),
+                  style: TS.meta()),
             ),
           ],
           if (action != null) ...[const SizedBox(height: 16), action!],
@@ -1404,10 +1404,10 @@ class AppToggle extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(label,
-                        style: sans(13, weight: W.label, color: AppColors.fg1)),
+                        style: TS.label(AppColors.fg1)),
                     if (sub != null) ...[
                       const SizedBox(height: 3),
-                      Text(sub!, style: sans(11, color: AppColors.fg3))
+                      Text(sub!, style: TS.caption())
                     ],
                   ]),
             ),

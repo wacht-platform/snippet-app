@@ -248,7 +248,7 @@ Widget toolDetailView(BuildContext context,
   rows.addAll(_toolBody(context, tool, a, d, status));
 
   if (rows.isEmpty) {
-    rows.add(Text('No details.', style: sans(12, color: AppColors.fg3)));
+    rows.add(Text('No details.', style: TS.meta()));
   }
   return _wrap(rows);
 }
@@ -550,7 +550,7 @@ List<Widget> _memoryView(String tool, Map? a, Map? d) {
   final content = (d?['content'] ?? a?['content'])?.toString() ?? '';
   if (id.isNotEmpty) {
     out.add(Text(id,
-        style: sans(13, weight: W.label, color: AppColors.fg1)));
+        style: TS.label(AppColors.fg1)));
   }
   if (content.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -569,7 +569,7 @@ List<Widget> _skillView(String tool, Map? a, Map? d) {
   final out = <Widget>[];
   if (name.isNotEmpty) {
     out.add(Text(name,
-        style: sans(13, weight: W.label, color: AppColors.fg1)));
+        style: TS.label(AppColors.fg1)));
   }
   if (text.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -587,7 +587,7 @@ List<Widget> _monitorView(Map? a, Map? d) {
   final filter = (a?['filter'] ?? d?['filter'])?.toString() ?? '';
   final out = <Widget>[
     Text(action,
-        style: sans(13, weight: W.label, color: AppColors.fg1)),
+        style: TS.label(AppColors.fg1)),
   ];
   if (path.isNotEmpty) {
     out.add(const SizedBox(height: 4));
@@ -606,7 +606,7 @@ List<Widget> _presentView(Map? a, Map? d) {
   return [
     if (path.isNotEmpty)
       Text(path,
-          style: sans(13, weight: W.label, color: AppColors.fg1)),
+          style: TS.label(AppColors.fg1)),
     if (caption.isNotEmpty) ...[
       const SizedBox(height: 4),
       Text(caption, style: sans(13, color: AppColors.fg3)),
@@ -686,7 +686,7 @@ Widget _done(String label) => Padding(
     );
 
 Widget _empty(String label) =>
-    Text(label, style: sans(12, color: AppColors.fg3));
+    Text(label, style: TS.meta());
 
 class _Card extends StatelessWidget {
   final List<Widget> children;

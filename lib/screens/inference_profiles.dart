@@ -210,7 +210,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                         const SizedBox(height: 3),
                         Text(
                             'Choose the profile used for new sessions and delegated work.',
-                            style: sans(12, color: AppColors.fg3)),
+                            style: TS.meta()),
                       ],
                     ),
                   ),
@@ -239,7 +239,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                       Text(
                         'Add an API key or local model provider to start sessions.',
                         textAlign: TextAlign.center,
-                        style: sans(12, color: AppColors.fg3),
+                        style: TS.meta(),
                       ),
                       const SizedBox(height: 16),
                       Btn('Add profile',

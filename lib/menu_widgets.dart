@@ -39,7 +39,7 @@ PopupMenuItem<T> appMenuItem<T>({
             overflow: TextOverflow.ellipsis,
             style: sans(13, color: color)),
       ),
-      if (detail != null) Text(detail, style: sans(11, color: AppColors.fg3)),
+      if (detail != null) Text(detail, style: TS.caption()),
     ]),
   );
 }
@@ -91,20 +91,20 @@ PopupMenuItem<T> appMenuRow<T>({
               Text(label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(13, weight: W.label, color: AppColors.fg1)),
+                  style: TS.label(AppColors.fg1)),
               if (description != null) ...[
                 const SizedBox(height: 2.5),
                 Text(description,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(12, color: AppColors.fg3)),
+                    style: TS.meta()),
               ],
             ],
           ),
         ),
         if (trailing != null) ...[
           const SizedBox(width: 8),
-          Text(trailing, style: sans(11, color: AppColors.fg3)),
+          Text(trailing, style: TS.caption()),
         ],
         // The check is the one saturated mark in the row, so "this is the
         // current setting" is legible at a glance rather than one grey glyph

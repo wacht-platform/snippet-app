@@ -156,7 +156,7 @@ class VaultScreenState extends State<VaultScreen> {
             AppIcon('alert-triangle', size: 20, color: AppColors.danger),
             const SizedBox(height: 10),
             Text("Couldn't load secrets",
-                style: sans(13, weight: W.label, color: AppColors.fg1)),
+                style: TS.label(AppColors.fg1)),
             const SizedBox(height: 5),
             Text(_error!,
                 textAlign: TextAlign.center,
@@ -349,7 +349,7 @@ class VaultScreenState extends State<VaultScreen> {
           child: Row(children: [
             AppIcon('plus', size: 16, color: AppColors.fg3),
             const SizedBox(width: 12),
-            Text('Add secret', style: sans(14, color: AppColors.fg2)),
+            Text('Add secret', style: TS.ui()),
           ]),
         ),
       ),

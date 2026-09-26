@@ -506,7 +506,7 @@ class _FileExplorerState extends State<FileExplorer> {
                                   padding: const EdgeInsets.all(24),
                                   child: Text('${snap.error}',
                                       textAlign: TextAlign.center,
-                                      style: sans(12, color: AppColors.fg3))))
+                                      style: TS.meta())))
                           : Builder(builder: (context) {
                               final entries = _visibleEntries(listing!);
                               return ListView(

@@ -100,7 +100,7 @@ class _FeedRow extends StatelessWidget {
                 textAlign: TextAlign.center,
                 // Information, not a placeholder: `fg3`, never `fg4` (the
                 // disabled ramp). Same rule the board's count already states.
-                style: sans(12, color: AppColors.fg3)),
+                style: TS.meta()),
           ),
         ),
     };
@@ -142,7 +142,7 @@ class _TaskEventRow extends StatelessWidget {
                 style: sans(13, color: AppColors.fg1),
               ),
             ),
-            Text(item.kind, style: sans(12, color: AppColors.fg3)),
+            Text(item.kind, style: TS.meta()),
           ]),
         ),
       ),
@@ -185,7 +185,7 @@ class _BoardMessageRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: sans(13, color: AppColors.fg1)),
                   ),
-                  Text(label, style: sans(12, color: AppColors.fg3)),
+                  Text(label, style: TS.meta()),
                 ]),
                 if (message.body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -221,7 +221,7 @@ class _QuestionRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Needs input', style: sans(12, color: AppColors.fg3)),
+                  Text('Needs input', style: TS.meta()),
                   const SizedBox(height: 4),
                   Text(item.question, style: sans(16, color: AppColors.fg1)),
                 ],

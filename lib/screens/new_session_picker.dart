@@ -416,7 +416,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         children: [
           Text('This folder is empty.',
               textAlign: TextAlign.center,
-              style: sans(12, color: AppColors.fg3)),
+              style: TS.meta()),
         ],
       );
     }

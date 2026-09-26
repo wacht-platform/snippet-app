@@ -90,7 +90,7 @@ class _NoConnection extends StatelessWidget {
                 padding: const EdgeInsets.all(28),
                 child: Text('Connect to a machine to message this agent.',
                     textAlign: TextAlign.center,
-                    style: sans(12, color: AppColors.fg3)),
+                    style: TS.meta()),
               ),
             ),
           ),

@@ -251,7 +251,7 @@ class SidebarState extends State<Sidebar> {
               padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
               child: Row(children: [
                 Text('${_selected.length} selected',
-                    style: sans(11, color: AppColors.fg3)),
+                    style: TS.caption()),
                 const Spacer(),
                 _selectAllToggle(),
                 IconBtn('x',
@@ -310,7 +310,7 @@ class SidebarState extends State<Sidebar> {
                           padding: const EdgeInsets.all(20),
                           child: Text('Add a machine to begin.',
                               textAlign: TextAlign.center,
-                              style: sans(12, color: AppColors.fg3))))
+                              style: TS.meta())))
                   : _sessionList(),
             ),
           ],
@@ -738,7 +738,7 @@ class SidebarState extends State<Sidebar> {
                     const SizedBox(height: 10),
                     Text(widget.sessionsError!,
                         textAlign: TextAlign.center,
-                        style: sans(12, color: AppColors.fg3)),
+                        style: TS.meta()),
                     const SizedBox(height: 12),
                     TextButton(
                         onPressed: widget.onRefreshSessions,
@@ -755,7 +755,7 @@ class SidebarState extends State<Sidebar> {
                 padding: const EdgeInsets.all(20),
                 child: Text('No chats yet.',
                     textAlign: TextAlign.center,
-                    style: sans(12, color: AppColors.fg3))),
+                    style: TS.meta())),
           ]);
     }
     final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
@@ -778,7 +778,7 @@ class SidebarState extends State<Sidebar> {
                   ? 'No chats match the search.'
                   : 'No chats yet.',
               textAlign: TextAlign.center,
-              style: sans(12, color: AppColors.fg3)),
+              style: TS.meta()),
         ));
       }
       return RefreshIndicator(
@@ -812,7 +812,7 @@ class SidebarState extends State<Sidebar> {
           padding: const EdgeInsets.all(20),
           child: Text('Nothing here.',
               textAlign: TextAlign.center,
-              style: sans(12, color: AppColors.fg3))));
+              style: TS.meta())));
     }
     final listView = ListView(
         padding: EdgeInsets.fromLTRB(
@@ -895,7 +895,7 @@ class SidebarState extends State<Sidebar> {
                         isCollapsed: true,
                         border: InputBorder.none,
                         hintText: 'Search chats…',
-                        hintStyle: sans(12, color: AppColors.fg4),
+                        hintStyle: TS.meta(AppColors.fg4),
                       ),
                     ),
                   ),

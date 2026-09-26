@@ -358,7 +358,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             _section('Agents', onAdd: _addAgent),
             if (roster.isEmpty)
               Text('Nobody assigned yet.',
-                  style: sans(12, color: AppColors.fg3))
+                  style: TS.meta())
             else
               Wrap(
                 spacing: 6,
@@ -415,7 +415,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             const SizedBox(height: 14),
             _section('Related', onAdd: _linkTask),
             if (links.links.isEmpty && links.blockedBy.isEmpty)
-              Text('No linked tasks.', style: sans(12, color: AppColors.fg3))
+              Text('No linked tasks.', style: TS.meta())
             else ...[
               // Blockers first: "what is holding this up" is the question the
               // links exist to answer.

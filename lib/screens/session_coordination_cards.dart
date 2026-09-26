@@ -48,7 +48,7 @@ class MissionEnvelopeCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: sans(13, color: AppColors.fg1)),
                   ),
-                  Text(label, style: sans(12, color: AppColors.fg3)),
+                  Text(label, style: TS.meta()),
                 ]),
                 if (summary.isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -102,7 +102,7 @@ class BoardMessageCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: sans(13, color: AppColors.fg1)),
                   ),
-                  Text(label, style: sans(12, color: AppColors.fg3)),
+                  Text(label, style: TS.meta()),
                 ]),
                 if (message.body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -156,7 +156,7 @@ class DirectMessageCard extends StatelessWidget {
                         style: sans(13, color: AppColors.fg1)),
                   ),
                   Text(message.isReply ? 'reply' : 'direct',
-                      style: sans(12, color: AppColors.fg3)),
+                      style: TS.meta()),
                 ]),
                 if (message.body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -217,7 +217,7 @@ class AgentMessageCard extends StatelessWidget {
                         style: sans(13, color: AppColors.fg1)),
                   ),
                   Text(outbound ? 'sent' : 'reply',
-                      style: sans(12, color: AppColors.fg3)),
+                      style: TS.meta()),
                 ]),
                 if (body.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -270,7 +270,7 @@ class AssignmentCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: sans(13, color: AppColors.fg1)),
                   ),
-                  Text('assigned', style: sans(12, color: AppColors.fg3)),
+                  Text('assigned', style: TS.meta()),
                 ]),
                 if (assignment.scope.trim().isNotEmpty) ...[
                   const SizedBox(height: 4),

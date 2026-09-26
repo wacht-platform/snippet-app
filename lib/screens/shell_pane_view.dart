@@ -106,7 +106,7 @@ class EmptyPaneHint extends StatelessWidget {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: sans(12, color: AppColors.fg3),
+          style: TS.meta(),
         ),
       ),
     );

@@ -76,7 +76,7 @@ class SessionCheckpointsPanel extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.all(20),
         child: Text('No checkpoints yet.',
-            style: sans(12, color: AppColors.fg3)),
+            style: TS.meta()),
       );
     }
     return ListView(
@@ -89,13 +89,7 @@ class SessionCheckpointsPanel extends StatelessWidget {
               padding: const EdgeInsets.all(13),
               onTap: () => onRewind(c),
               child: Row(children: [
-                Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(R.md)),
-                    child: AppIcon('history', size: 17, color: AppColors.fg3)),
+                const IconTile('history', size: 36),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -104,13 +98,10 @@ class SessionCheckpointsPanel extends StatelessWidget {
                         Text(c.label.isEmpty ? c.id : c.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(13,
-                                weight: W.label,
-                                height: 1.2,
-                                color: AppColors.fg1)),
+                            style: TS.rowTitle()),
                         const SizedBox(height: 3),
                         Text(formatCheckpointDate(c.createdAt),
-                            style: mono(11, color: AppColors.fg3)),
+                            style: TS.meta()),
                       ]),
                 ),
                 IconBtn('git-branch',

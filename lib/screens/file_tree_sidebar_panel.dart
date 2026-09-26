@@ -373,7 +373,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
               child: Text('Empty directory',
-                  style: sans(12, color: AppColors.fg3)),
+                  style: TS.meta()),
             )
           else ...[
             const SizedBox(height: 4),
@@ -436,7 +436,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
               child: Text(wsName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(13, weight: W.label, color: AppColors.fg1)),
+                  style: TS.label(AppColors.fg1)),
             ),
             AppIcon('chevron-down', size: 12, color: AppColors.fg4),
           ]),
@@ -837,14 +837,14 @@ class _FileSearchState extends State<_FileSearch> {
                 padding: const EdgeInsets.all(12),
                 child: Center(
                     child: Text('Type to search the workspace',
-                        style: sans(12, color: AppColors.fg3))),
+                        style: TS.meta())),
               )
             : (_hits.isEmpty && !_crawling
                 ? Padding(
                     padding: const EdgeInsets.all(12),
                     child: Center(
                         child: Text('No matching files',
-                            style: sans(12, color: AppColors.fg3))),
+                            style: TS.meta())),
                   )
                 : ListView(
                     shrinkWrap: true,

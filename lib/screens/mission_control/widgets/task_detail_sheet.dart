@@ -143,7 +143,7 @@ class TaskDetailSheet extends StatelessWidget {
   }
 
   Widget _contextRow(String label, String value, Color color) => Row(children: [
-        SizedBox(width: 68, child: Text(label, style: sans(11, color: AppColors.fg3))),
+        SizedBox(width: 68, child: Text(label, style: TS.caption())),
         Expanded(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
             style: sans(12, weight: W.label, color: color))),
       ]);

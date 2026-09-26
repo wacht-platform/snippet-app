@@ -17,7 +17,7 @@ class SidebarEmpty extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Text(message,
-            style: sans(12, color: AppColors.fg3), textAlign: TextAlign.center),
+            style: TS.meta(), textAlign: TextAlign.center),
       );
 }
 

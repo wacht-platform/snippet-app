@@ -436,7 +436,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                                   : 'Connected',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: sans(11, color: AppColors.fg3),
+                              style: TS.caption(),
                             ),
                           ),
                         ]),
@@ -494,7 +494,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                 AppIcon('settings', size: 15, color: AppColors.accent),
                 const SizedBox(width: 8),
                 Text('Settings',
-                    style: sans(13, weight: W.label, color: AppColors.fg1)),
+                    style: TS.label(AppColors.fg1)),
                 const Spacer(),
                 IconBtn('x',
                     size: 26,
@@ -905,11 +905,11 @@ class SettingsPanelState extends State<SettingsPanel> {
                   AppIcon('server', size: 28, color: AppColors.fg4),
                   const SizedBox(height: 10),
                   Text('No saved connections',
-                      style: sans(13, weight: W.label, color: AppColors.fg2)),
+                      style: TS.label()),
                   const SizedBox(height: 4),
                   Text(
                     'Connect to a remote machine running the snippet daemon.',
-                    style: sans(12, color: AppColors.fg3),
+                    style: TS.meta(),
                   ),
                   const SizedBox(height: 14),
                   Btn('Connect machine',
@@ -955,7 +955,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                     })),
             const SizedBox(width: 8),
             Text('Connect a machine',
-                style: sans(16, weight: W.label, color: AppColors.fg1)),
+                style: TS.sectionTitle()),
           ],
         ),
         const SizedBox(height: 4),
@@ -963,7 +963,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           padding: const EdgeInsets.only(left: 38),
           child: Text(
             'Control a remote machine running the snippet daemon.',
-            style: sans(12, color: AppColors.fg3),
+            style: TS.meta(),
           ),
         ),
         const SizedBox(height: 24),
@@ -1187,7 +1187,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                       weight: W.label, color: AppColors.fg1)),
               const SizedBox(height: 2),
               Text('Notify when a session completes or requires input',
-                  style: sans(12, color: AppColors.fg3)),
+                  style: TS.meta()),
             ],
           ),
         ),
@@ -1220,7 +1220,7 @@ Future<void> showManageMachineSheet({
       children: [
         ListTile(
           leading: AppIcon('edit', size: 16, color: AppColors.fg2),
-          title: Text('Rename', style: sans(14, color: AppColors.fg1)),
+          title: Text('Rename', style: TS.ui(AppColors.fg1)),
           onTap: () async {
             Navigator.pop(context);
             final name = await promptText(

@@ -545,6 +545,8 @@ class TS {
       sans(13, weight: W.label, height: 18 / 13, color: c ?? AppColors.fg2);
   static TextStyle meta([Color? c]) =>
       sans(12, height: 16 / 12, color: c ?? AppColors.fg3, tabular: true);
+  static TextStyle caption([Color? c]) =>
+      sans(11, height: 14 / 11, color: c ?? AppColors.fg3);
   static TextStyle overline([Color? c]) =>
       caps(11, color: c ?? AppColors.fg3).copyWith(height: 14 / 11);
   static TextStyle code([Color? c]) =>

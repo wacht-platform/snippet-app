@@ -28,7 +28,7 @@ class TaskInspector extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      sans(16, weight: W.label, color: AppColors.fg1),
+                      TS.sectionTitle(),
                 ),
               ),
               _StatusPill(status: t.status as String),

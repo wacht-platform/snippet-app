@@ -229,7 +229,7 @@ class RecurringScreenState extends State<RecurringScreen>
                         controller: title,
                         hint: 'Nightly review'),
                     const SizedBox(height: 12),
-                    Text('Schedule', style: sans(12, color: AppColors.fg3)),
+                    Text('Schedule', style: TS.meta()),
                     const SizedBox(height: 6),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final s in const [
@@ -514,7 +514,7 @@ class RecurringScreenState extends State<RecurringScreen>
               Expanded(
                 child: Text(
                   'Schedule a goal or message',
-                  style: sans(13, weight: W.label, color: AppColors.fg1),
+                  style: TS.label(AppColors.fg1),
                 ),
               ),
               IconBtn('x',
@@ -530,7 +530,7 @@ class RecurringScreenState extends State<RecurringScreen>
           const SizedBox(height: 4),
           Text(
             'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes.',
-            style: sans(12, color: AppColors.fg3),
+            style: TS.meta(),
           ),
           const SizedBox(height: 12),
           AppField(
@@ -539,7 +539,7 @@ class RecurringScreenState extends State<RecurringScreen>
             hint: 'Nightly review',
           ),
           const SizedBox(height: 10),
-          Text('Schedule', style: sans(12, color: AppColors.fg3)),
+          Text('Schedule', style: TS.meta()),
           const SizedBox(height: 6),
           Wrap(spacing: 6, runSpacing: 6, children: [
             for (final s in const [
@@ -713,7 +713,7 @@ class RecurringScreenState extends State<RecurringScreen>
                     child: Row(children: [
                       AppIcon('plus', size: 16, color: AppColors.fg3),
                       const SizedBox(width: 12),
-                      Text('Add job', style: sans(14, color: AppColors.fg2)),
+                      Text('Add job', style: TS.ui()),
                     ]),
                   ),
                 ),

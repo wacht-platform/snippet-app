@@ -97,7 +97,7 @@ class _InboxRow extends StatelessWidget {
                 Text(entry.notification.message as String,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(12, color: AppColors.fg3)),
+                    style: TS.meta()),
               ],
             ),
           ),

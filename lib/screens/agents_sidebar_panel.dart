@@ -457,7 +457,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                 isCollapsed: true,
                 border: InputBorder.none,
                 hintText: 'Search agents…',
-                hintStyle: sans(12, color: AppColors.fg4),
+                hintStyle: TS.meta(AppColors.fg4),
               ),
             ),
           ),

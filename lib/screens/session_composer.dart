@@ -301,7 +301,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                   child: Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: Text('Cancel all',
-                        style: sans(12, color: AppColors.fg3)),
+                        style: TS.meta()),
                   ),
                 ),
               ],
@@ -598,7 +598,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                     child: Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg3)),
+                        style: TS.caption()),
                   ),
                 ]),
         ),
@@ -664,7 +664,11 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             children: [
               if (_heldQueue.isNotEmpty) _queuedCard(),
               if (_attachments.isNotEmpty) _attachmentBar(),
-              if (_isRecording || _recordingPath != null) _recordingPanel(),
+              if (_isRecording || _recordingPath != null)
+                ValueListenableBuilder<int>(
+                  valueListenable: _recorderTick,
+                  builder: (_, __, ___) => _recordingPanel(),
+                ),
               Container(
                 key: _composerCardKey,
                 decoration: BoxDecoration(

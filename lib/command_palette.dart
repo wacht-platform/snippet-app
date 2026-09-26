@@ -139,7 +139,7 @@ class _PaletteState extends State<_Palette> {
               controller: _ctrl,
               autofocus: true,
               cursorColor: AppColors.accent,
-              style: sans(14, color: AppColors.fg1),
+              style: TS.ui(AppColors.fg1),
               decoration: InputDecoration(
                 isCollapsed: true,
                 border: InputBorder.none,
@@ -184,7 +184,7 @@ class _PaletteState extends State<_Palette> {
                   padding: EdgeInsets.all(20),
                   child: Center(
                       child: Text('No matches',
-                          style: sans(12, color: AppColors.fg3)))),
+                          style: TS.meta()))),
           ],
         ),
       ),

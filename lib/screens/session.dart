@@ -163,7 +163,7 @@ class _SessionActionPanel extends StatelessWidget {
             child: Row(children: [
               Expanded(
                   child: Text(title,
-                      style: sans(16, weight: W.label, color: AppColors.fg1))),
+                      style: TS.sectionTitle())),
               IconBtn('x',
                   size: 34, iconSize: 18, tooltip: 'Close', onTap: onClose),
             ]),
@@ -264,6 +264,7 @@ class _SessionScreenState extends State<SessionScreen>
   String? _recordingPath;
   Uint8List? _recordingBytes;
   Duration _recordingElapsed = Duration.zero;
+  final ValueNotifier<int> _recorderTick = ValueNotifier(0);
   Duration _playbackPosition = Duration.zero;
   Duration _playbackDuration = Duration.zero;
   final List<double> _waveform = [];
@@ -566,10 +567,14 @@ class _SessionScreenState extends State<SessionScreen>
       });
     });
     _positionSub = _audioPlayer.onPositionChanged.listen((position) {
-      if (mounted) setState(() => _playbackPosition = position);
+      if (!mounted) return;
+      _playbackPosition = position;
+      _recorderTick.value++;
     });
     _durationSub = _audioPlayer.onDurationChanged.listen((duration) {
-      if (mounted) setState(() => _playbackDuration = duration);
+      if (!mounted) return;
+      _playbackDuration = duration;
+      _recorderTick.value++;
     });
     if (!widget.acceptDrops && _state != null) _parked = true;
     _startSession();
@@ -915,6 +920,7 @@ class _SessionScreenState extends State<SessionScreen>
     _historyPrefetchTimer?.cancel();
     _streamFlushTimer?.cancel();
     _liveFrame.dispose();
+    _recorderTick.dispose();
     _sub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Only clear the suppression key if this screen still owns it — on a session

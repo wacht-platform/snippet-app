@@ -546,7 +546,7 @@ class _TaskRow extends StatelessWidget {
                       // The doc's row title: 13 / 500 / #C1C1C1 (`fg2`).
                       // 13.5 was off the scale, and white is reserved for the
                       // active row and the page title — a resting row is not it.
-                      style: sans(13, weight: W.label, color: AppColors.fg2)),
+                      style: TS.label()),
                 ),
                 const SizedBox(width: 8),
                 // 16px glyph, never filling its slot.

@@ -95,12 +95,11 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
           .listen((a) {
         final level = ((a.current + 60) / 60).clamp(0.04, 1.0).toDouble();
         if (!mounted) return;
-        _setState(() {
           _waveform.add(level);
           // Keep a denser rolling waveform so the bars stay close together
           // when the strip spans the full composer width.
           if (_waveform.length > 180) _waveform.removeAt(0);
-        });
+        _recorderTick.value++;
       });
       _recordingTimer?.cancel();
       _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -111,7 +110,8 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
           unawaited(_stopRecording());
           _toast('Recording stopped at the 3-minute limit.');
         } else {
-          _setState(() => _recordingElapsed = next);
+          _recordingElapsed = next;
+          _recorderTick.value++;
         }
       });
       if (mounted) _setState(() => _recordingPath = path);

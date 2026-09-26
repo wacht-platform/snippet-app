@@ -78,7 +78,7 @@ class MissionControlHeader extends StatelessWidget {
                       state.loading ? 'Connecting…' : facts.join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(12, color: AppColors.fg3),
+                      style: TS.meta(),
                     ),
                   ),
                 ]),

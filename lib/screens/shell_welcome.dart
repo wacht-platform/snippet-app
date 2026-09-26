@@ -69,7 +69,7 @@ class ShellWelcomeView extends StatelessWidget {
               const SizedBox(height: 8),
               Text.rich(
                 TextSpan(
-                  style: sans(12, height: 1.5, color: AppColors.fg3),
+                  style: TS.meta(),
                   children: [
                     const TextSpan(text: 'Run '),
                     TextSpan(
@@ -151,7 +151,7 @@ class ShellRecentPlaceholder extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
                     'No sessions yet.',
-                    style: sans(12, color: AppColors.fg3),
+                    style: TS.meta(),
                   ),
                 )
               else

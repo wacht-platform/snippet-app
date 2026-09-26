@@ -1359,9 +1359,9 @@ class _SendBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = kMobile ? M.minTarget : 28.0;
+    final size = kMobile ? M.minTarget : 32.0;
     return Material(
-      color: enabled ? AppColors.fg1 : AppColors.surface2,
+      color: enabled ? AppColors.accentFill : AppColors.hover,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -1376,12 +1376,12 @@ class _SendBtn extends StatelessWidget {
                     height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 1.8,
-                      color: AppColors.bg,
+                      color: AppColors.accentFg,
                     ),
                   )
                 : AppIcon('arrow-up',
-                    size: 15,
-                    color: enabled ? AppColors.bg : AppColors.fg4),
+                    size: 16,
+                    color: enabled ? AppColors.accentFg : AppColors.fg4),
           ),
         ),
       ),

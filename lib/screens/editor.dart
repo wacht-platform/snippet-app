@@ -140,7 +140,7 @@ class _EditorScreenState extends State<EditorScreen> {
           children: [
             Text(
                 'This file was modified on the server since you opened it (likely by the agent). Keep your version, or reload theirs and lose your edits?',
-                style: sans(13, height: 1.45, color: AppColors.fg2)),
+                style: TS.ui()),
             const SizedBox(height: 16),
             Btn('Overwrite with mine',
                 icon: 'check',

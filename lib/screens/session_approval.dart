@@ -75,7 +75,7 @@ class _QuestionRecord extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: BoxDecoration(
-          color: AppColors.surface2,
+          color: AppColors.raised,
           borderRadius: BorderRadius.circular(R.md),
         ),
         child: Column(
@@ -84,14 +84,14 @@ class _QuestionRecord extends StatelessWidget {
             Row(children: [
               Expanded(
                 child: Text('Question',
-                    style: sans(16, weight: W.label, color: AppColors.fg1)),
+                    style: TS.rowTitle()),
               ),
-              Text(answers.isEmpty ? 'Asked' : 'Answered',
-                  style: sans(12, color: AppColors.accent)),
+              Tag(answers.isEmpty ? 'Asked' : 'Answered',
+                  tone: answers.isEmpty ? Tone.accent : Tone.ok, dot: true),
             ]),
             if (ctx != null) ...[
               const SizedBox(height: 8),
-              Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg3)),
+              Text(ctx, style: TS.ui(AppColors.fg3)),
             ],
             for (var i = 0; i < qs.length; i++) ...[
               const SizedBox(height: 12),
@@ -99,23 +99,23 @@ class _QuestionRecord extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text('${i + 1} of ${qs.length}',
-                      style: sans(12, color: AppColors.fg3)),
+                      style: TS.meta()),
                 ),
               Text(qs[i]['text']?.toString() ?? '',
-                  style: sans(14, height: 1.45, color: AppColors.fg1)),
+                  style: TS.ui(AppColors.fg1)),
               if (answers[qs[i]['id']?.toString() ?? ''] != null ||
                   answers['0'] != null) ...[
                 const SizedBox(height: 8),
                 Text(
                   answers[qs[i]['id']?.toString()] ?? answers['0'] ?? '',
-                  style: sans(13, height: 1.45, color: AppColors.fg2),
+                  style: TS.ui(),
                 ),
               ],
             ],
             if (qs.isEmpty && (event['text'] != null)) ...[
               const SizedBox(height: 8),
               Text(event['text']?.toString() ?? '',
-                  style: sans(14, height: 1.45, color: AppColors.fg1)),
+                  style: TS.ui(AppColors.fg1)),
             ],
           ],
         ),
@@ -170,7 +170,7 @@ class ApprovalBarState extends State<ApprovalBar> {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: BoxDecoration(
-          color: AppColors.surface2,
+          color: AppColors.raised,
           borderRadius: BorderRadius.circular(R.md),
         ),
         child: Column(
@@ -180,10 +180,10 @@ class ApprovalBarState extends State<ApprovalBar> {
             Row(children: [
               Expanded(
                 child: Text(_sent ? 'Sending…' : title,
-                    style: sans(16, weight: W.label, color: AppColors.fg1)),
+                    style: TS.rowTitle()),
               ),
-              Text(total > 1 ? '$index of $total' : 'Input required',
-                  style: sans(12, color: AppColors.accent)),
+              Tag(total > 1 ? '$index of $total' : 'Input required',
+                  tone: Tone.accent, live: true),
             ]),
             if (detail.isNotEmpty)
               Flexible(
@@ -191,7 +191,7 @@ class ApprovalBarState extends State<ApprovalBar> {
                   child: Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(detail,
-                        style: sans(13, height: 1.45, color: AppColors.fg3)),
+                        style: TS.ui(AppColors.fg3)),
                   ),
                 ),
               ),
@@ -388,7 +388,7 @@ class QuestionBarState extends State<QuestionBar> {
                 _freeText.contains(id)
                     ? 'Writing a response'
                     : 'Write your own answer',
-                style: sans(12, color: AppColors.accent)),
+                style: TS.label(AppColors.accent)),
           ]),
         ),
       );
@@ -398,12 +398,12 @@ class QuestionBarState extends State<QuestionBar> {
         style: TextButton.styleFrom(
             foregroundColor: AppColors.fg3,
             padding: const EdgeInsets.symmetric(horizontal: 8)),
-        child: Text('Skip', style: sans(12, color: AppColors.fg3)),
+        child: Text('Skip', style: TS.meta()),
       );
 
   Widget _chip(String label, bool sel, VoidCallback onTap) => Material(
         color:
-            sel ? AppColors.accent.withValues(alpha: 0.18) : AppColors.surface2,
+            sel ? AppColors.accentBg : AppColors.hover,
         shape: StadiumBorder(
           side: BorderSide(
             color: sel ? AppColors.accent : Colors.transparent,
@@ -425,7 +425,7 @@ class QuestionBarState extends State<QuestionBar> {
 
   Widget _choiceRow(String label, bool sel, VoidCallback onTap) => Material(
         color:
-            sel ? AppColors.accent.withValues(alpha: 0.14) : Colors.transparent,
+            sel ? AppColors.accentBg : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(
@@ -443,7 +443,7 @@ class QuestionBarState extends State<QuestionBar> {
                   child: Text(label,
                       style: sans(14,
                           height: 1.4,
-                          weight: sel ? W.label : W.label,
+                          weight: W.label,
                           color: sel ? AppColors.fg1 : AppColors.fg2))),
               if (sel) ...[
                 const SizedBox(width: 10),
@@ -513,7 +513,7 @@ class QuestionBarState extends State<QuestionBar> {
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: BoxDecoration(
-          color: AppColors.surface2,
+          color: AppColors.raised,
           borderRadius: BorderRadius.circular(R.md),
         ),
         child: Column(
@@ -523,12 +523,10 @@ class QuestionBarState extends State<QuestionBar> {
               Row(children: [
                 Expanded(
                   child: Text(_sent ? 'Sending…' : 'Question',
-                      style: sans(16, weight: W.label, color: AppColors.fg1)),
+                      style: TS.rowTitle()),
                 ),
-                Text(
-                  total > 1 ? '${_step + 1} of $total' : 'Input required',
-                  style: sans(12, color: AppColors.accent),
-                ),
+                Tag(total > 1 ? '${_step + 1} of $total' : 'Input required',
+                    tone: Tone.accent, live: true),
               ]),
               Flexible(
                 child: SingleChildScrollView(
@@ -539,7 +537,7 @@ class QuestionBarState extends State<QuestionBar> {
                         const SizedBox(height: 8),
                         Text(ctx,
                             style:
-                                sans(13, height: 1.45, color: AppColors.fg3)),
+                                TS.ui(AppColors.fg3)),
                       ],
                       ...() {
                         final q = _currentQuestion;
@@ -548,7 +546,7 @@ class QuestionBarState extends State<QuestionBar> {
                           const SizedBox(height: 12),
                           Text(q['text']?.toString() ?? '',
                               style:
-                                  sans(14, height: 1.45, color: AppColors.fg1)),
+                                  TS.ui(AppColors.fg1)),
                           const SizedBox(height: 10),
                           ..._inputFor(q),
                         ];
@@ -641,10 +639,20 @@ class _SendBtn extends StatelessWidget {
   const _SendBtn({required this.enabled, this.running = false, this.onTap});
   @override
   Widget build(BuildContext context) {
-    final size = kMobile ? M.minTarget : 28.0;
-    final iconSize = running ? 14.0 : 15.0;
+    final size = kMobile ? M.minTarget : 32.0;
+    final iconSize = running ? 14.0 : 16.0;
+    final fill = !enabled
+        ? AppColors.hover
+        : running
+            ? AppColors.fg1
+            : AppColors.accentFill;
+    final ink = !enabled
+        ? AppColors.fg4
+        : running
+            ? AppColors.canvas
+            : AppColors.accentFg;
     return Material(
-      color: enabled ? AppColors.fg1 : AppColors.surface2,
+      color: fill,
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -655,7 +663,7 @@ class _SendBtn extends StatelessWidget {
           child: Center(
               child: AppIcon(running ? 'stop' : 'arrow-up',
                   size: iconSize,
-                  color: enabled ? AppColors.bg : AppColors.fg4)),
+                  color: ink)),
         ),
       ),
     );

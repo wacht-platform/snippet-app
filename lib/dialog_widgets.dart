@@ -185,7 +185,7 @@ Future<bool> confirmAction(
                   Padding(
                     padding: const EdgeInsets.only(left: 44),
                     child: Text(body,
-                        style: sans(12, height: 1.5, color: AppColors.fg3)),
+                        style: TS.meta()),
                   ),
                   const SizedBox(height: 18),
                   Row(children: [
@@ -244,7 +244,7 @@ Future<String?> promptText(BuildContext context,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(title,
-                        style: sans(13, weight: W.label, color: AppColors.fg1)),
+                        style: TS.label(AppColors.fg1)),
                     const SizedBox(height: 10),
                     _TextPromptSheet(
                         initial: initial,

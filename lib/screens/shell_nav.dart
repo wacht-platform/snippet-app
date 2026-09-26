@@ -372,7 +372,7 @@ class ShellGroupHeader extends StatelessWidget {
                 child: Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(13, weight: W.label, color: AppColors.fg2)),
+                    style: TS.label()),
               ),
               if (trailing != null) trailing!,
             ]),

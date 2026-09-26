@@ -39,7 +39,7 @@ Future<String?> showInboundSharePicker({
                 t.isMissionControl ? machineLabel : 'Open tab',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(12, color: AppColors.fg3)),
+                style: TS.meta()),
             onTap: () => Navigator.pop(
                 context, t.isMissionControl ? 'mission-control' : t.sessionId),
           ),
@@ -48,8 +48,8 @@ Future<String?> showInboundSharePicker({
             contentPadding: EdgeInsets.zero,
             leading: AppIcon('layers', size: 18, color: AppColors.accent),
             title: Text('Mission Control',
-                style: sans(16, weight: W.label, color: AppColors.fg1)),
-            subtitle: Text(machineLabel, style: sans(12, color: AppColors.fg3)),
+                style: TS.sectionTitle()),
+            subtitle: Text(machineLabel, style: TS.meta()),
             onTap: () => Navigator.pop(context, 'mission-control'),
           ),
         for (final s in restSessions)
@@ -66,7 +66,7 @@ Future<String?> showInboundSharePicker({
                     : '${s.folder.trim().isEmpty ? 'session' : s.folder} · ${s.displayAgentId}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(12, color: AppColors.fg3)),
+                style: TS.meta()),
             onTap: () => Navigator.pop(context, s.id),
           ),
       ],

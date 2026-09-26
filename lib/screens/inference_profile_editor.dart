@@ -242,7 +242,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                     style: sans(12, color: AppColors.fg1),
                     decoration: InputDecoration(
                       hintText: 'Search ${_catalogModels!.length} models…',
-                      hintStyle: sans(12, color: AppColors.fg4),
+                      hintStyle: TS.meta(AppColors.fg4),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(vertical: 4),
                       border: InputBorder.none,
@@ -267,7 +267,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Center(
                       child: Text('No matching models',
-                          style: sans(12, color: AppColors.fg3)),
+                          style: TS.meta()),
                     ),
                   )
                 : ListView.separated(
@@ -542,7 +542,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                 child: Padding(
                     padding: EdgeInsets.all(4),
                     child: Text(_showKey ? 'Hide' : 'Show',
-                        style: sans(11, color: AppColors.fg3))),
+                        style: TS.caption())),
               ),
             ),
           const SizedBox(height: 16),
@@ -690,7 +690,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                 AppIcon('cpu', size: 16, color: AppColors.fg2),
                 const SizedBox(width: 9),
                 Text('Inference profiles',
-                    style: sans(16, weight: W.label, color: AppColors.fg1)),
+                    style: TS.sectionTitle()),
                 const SizedBox(width: 8),
                 Container(
                   padding:
@@ -729,7 +729,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                         const SizedBox(height: 9),
                         Text('No profile matches “${_query.text.trim()}”',
                             textAlign: TextAlign.center,
-                            style: sans(12, color: AppColors.fg3)),
+                            style: TS.meta()),
                       ]),
                     )
                   : ListView.builder(
@@ -789,7 +789,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                         Text(subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(11, color: AppColors.fg3)),
+                            style: TS.caption()),
                       ],
                     ]),
               ),
@@ -909,7 +909,7 @@ class _SubSignInState extends State<_SubSignIn> {
         const Spacer(),
         GestureDetector(
             onTap: _signOut,
-            child: Text('Sign out', style: sans(12, color: AppColors.fg3))),
+            child: Text('Sign out', style: TS.meta())),
       ]);
     }
     if (_code != null) {
@@ -925,11 +925,11 @@ class _SubSignInState extends State<_SubSignIn> {
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () => Clipboard.setData(ClipboardData(text: _code!)),
-            child: Text('copy', style: sans(12, color: AppColors.fg3)),
+            child: Text('copy', style: TS.meta()),
           ),
         ]),
         const SizedBox(height: 8),
-        Text('Waiting for approval…', style: sans(12, color: AppColors.fg3)),
+        Text('Waiting for approval…', style: TS.meta()),
       ]);
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

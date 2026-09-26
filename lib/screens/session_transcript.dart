@@ -340,7 +340,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                         Text(caption.isNotEmpty ? caption : path,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(11, color: AppColors.fg3)),
+                            style: TS.caption()),
                       ]),
                 ),
               ]),
@@ -507,20 +507,14 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         Padding(
             padding: const EdgeInsets.all(20),
             child: Text('No checkpoints yet.',
-                style: sans(12, color: AppColors.fg3))),
+                style: TS.meta())),
       ...cps.map((c) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: AppCard(
               padding: const EdgeInsets.all(13),
               onTap: () => _confirmRewind(c),
               child: Row(children: [
-                Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(R.md)),
-                    child: AppIcon('history', size: 17, color: AppColors.fg3)),
+                const IconTile('history', size: 36),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -529,13 +523,10 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                         Text(c.label.isEmpty ? c.id : c.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(13,
-                                weight: W.label,
-                                height: 1.2,
-                                color: AppColors.fg1)),
+                            style: TS.rowTitle()),
                         const SizedBox(height: 3),
                         Text(formatCheckpointDate(c.createdAt),
-                            style: mono(11, color: AppColors.fg3)),
+                            style: TS.meta()),
                       ]),
                 ),
                 IconBtn('git-branch',
@@ -612,7 +603,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                 children: [
                   Text(
                       'No checkpoints yet — you can still fork the full history.',
-                      style: sans(12, color: AppColors.fg3)),
+                      style: TS.meta()),
                   const SizedBox(height: 12),
                   Btn('Fork full history', onTap: () => _confirmFork(null)),
                 ],
@@ -641,11 +632,10 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Full history',
-                            style: sans(13,
-                                weight: W.label, color: AppColors.fg1)),
+                            style: TS.rowTitle()),
                         const SizedBox(height: 3),
                         Text('Branch everything so far',
-                            style: mono(11, color: AppColors.fg3)),
+                            style: TS.meta()),
                       ],
                     ),
                   ),
@@ -677,13 +667,10 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                             Text(c.label.isEmpty ? c.id : c.label,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: sans(13,
-                                    weight: W.label,
-                                    height: 1.2,
-                                    color: AppColors.fg1)),
+                                style: TS.rowTitle()),
                             const SizedBox(height: 3),
                             Text(formatCheckpointDate(c.createdAt),
-                                style: mono(11, color: AppColors.fg3)),
+                                style: TS.meta()),
                           ],
                         ),
                       ),

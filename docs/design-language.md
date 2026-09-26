@@ -91,6 +91,7 @@ never fetched at runtime.
 | `ui` | 14 / 20 | 400 | Controls, form text, secondary copy |
 | `label` | 13 / 18 | 500 | Buttons, tabs, field labels |
 | `meta` | 12 / 16 | 400 | Timestamps, counts, captions |
+| `caption` | 11 / 14 | 400 | Dense secondary hints, counters beside controls |
 | `caps` | 11 / 14 | 500, +0.5 tracking | Overline section labels, sparingly |
 | `code` | 13 / 20 | 400 | Code blocks, diffs, terminal |
 | `codeSmall` | 12 / 16 | 400 | Inline paths, ids, hashes |

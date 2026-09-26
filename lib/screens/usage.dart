@@ -81,7 +81,7 @@ class _UsageScreenState extends State<UsageScreen> {
         if (summary.providers.isEmpty) {
           return Center(
               child: Text('No provider usage has been reported yet.',
-                  style: sans(12, color: AppColors.fg3)));
+                  style: TS.meta()));
         }
         return ListView.separated(
           physics: (widget.embedded && kMobile)
@@ -145,7 +145,7 @@ class _ProviderCard extends StatelessWidget {
           Text(
               [if (provider.profile != null) provider.profile!, provider.model]
                   .join(' · '),
-              style: sans(11, color: AppColors.fg3)),
+              style: TS.caption()),
         ],
         if (hasTokens) ...[
           const SizedBox(height: 12),
@@ -212,7 +212,7 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: sans(11, color: AppColors.fg3)),
+          Text(label, style: TS.caption()),
           const SizedBox(height: 2),
           Text(value, style: mono(12, color: AppColors.fg2)),
         ],
@@ -232,7 +232,7 @@ class _RateRow extends StatelessWidget {
     if (rate.isExpired) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(rateWindowLabel(rate.windowMinutes),
-            style: sans(11, color: AppColors.fg3)),
+            style: TS.caption()),
         const SizedBox(height: 4),
         Text('rolled over · awaiting the next report',
             style: mono(10, color: AppColors.fg3)),

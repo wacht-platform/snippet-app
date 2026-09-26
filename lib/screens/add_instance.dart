@@ -141,7 +141,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                           Text('Connect a machine', style: display(16)),
                           const SizedBox(height: 2),
                           Text('Control another machine from here',
-                              style: sans(11, color: AppColors.fg3)),
+                              style: TS.caption()),
                         ]),
                   ),
                   IconBtn('x',
@@ -237,10 +237,10 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                         child: CircularProgressIndicator(
                             strokeWidth: 1.8, color: AppColors.fg3)),
                     const SizedBox(width: 9),
-                    Text('Connecting…', style: sans(12, color: AppColors.fg3)),
+                    Text('Connecting…', style: TS.meta()),
                   ] else
                     Text('Connection stays on this device',
-                        style: sans(11, color: AppColors.fg3)),
+                        style: TS.caption()),
                   const Spacer(),
                   Btn('Connect',
                       small: true,
@@ -397,14 +397,14 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
               const SizedBox(height: 12),
               Text('Camera access needed',
                   style:
-                      sans(16, weight: W.label, color: AppColors.fg1)),
+                      TS.sectionTitle()),
               const SizedBox(height: 8),
               ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: 250),
                   child: Text(
                       'Grant camera access to scan a QR, or paste your connection string below.',
                       textAlign: TextAlign.center,
-                      style: sans(12, height: 1.5, color: AppColors.fg3))),
+                      style: TS.meta())),
               const SizedBox(height: 16),
               Btn('Grant camera access',
                   variant: BtnVariant.secondary, icon: 'camera', onTap: () {
