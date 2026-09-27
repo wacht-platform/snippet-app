@@ -792,7 +792,7 @@ class _FileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: S.s8, vertical: S.s4),
       child: Row(children: [
         AppIcon(icon, size: 14, color: dir ? AppColors.accent : AppColors.fg3),
         const SizedBox(width: 9),
@@ -833,7 +833,7 @@ class _MatchRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: S.s4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text.rich(
           TextSpan(children: [
@@ -929,7 +929,7 @@ class _ResultCard extends StatelessWidget {
     final snippetText = snippet ?? '';
     final dateText = date ?? '';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: S.s4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (title.isNotEmpty)
           Text(title,
@@ -1082,7 +1082,7 @@ class _ShellPanel extends StatelessWidget {
 }
 
 TextStyle _panelCode([Color? color]) =>
-    mono(12, height: 1.5, color: color ?? AppColors.fg2);
+    mono(12, height: 1.4, color: color ?? AppColors.fg2);
 
 class _PanelText extends StatelessWidget {
   const _PanelText(this.text, {this.color});
@@ -1152,28 +1152,40 @@ class _ToolPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            constraints: const BoxConstraints(minHeight: 36),
-            color: AppColors.overlay,
-            padding: const EdgeInsets.fromLTRB(S.s12, S.s4, S.s4, S.s4),
-            child: Row(children: [
-              Expanded(child: header ?? const SizedBox.shrink()),
-              for (final t in trailing) ...[const SizedBox(width: S.s6), t],
-              if (copy != null && copy.isNotEmpty)
-                IconBtn('copy', size: 28, iconSize: 14, tooltip: 'Copy',
-                    onTap: () {
-                  Clipboard.setData(ClipboardData(text: copy));
-                  toast(context, 'Copied');
-                })
-              else
-                const SizedBox(width: S.s8),
-            ]),
-          ),
+          if (trailing.isNotEmpty || (copy != null && copy.isNotEmpty))
+            Container(
+              constraints: const BoxConstraints(minHeight: 28),
+              color: AppColors.overlay,
+              padding: const EdgeInsets.fromLTRB(S.s8, S.s2, S.s2, S.s2),
+              child: Row(children: [
+                const Spacer(),
+                for (final t in trailing) ...[t, const SizedBox(width: S.s6)],
+                if (copy != null && copy.isNotEmpty)
+                  Tooltip(
+                    message: 'Copy',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(R.sm),
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        Clipboard.setData(ClipboardData(text: copy));
+                        toast(context, 'Copied');
+                      },
+                      child: SizedBox.square(
+                        dimension: 28,
+                        child: Center(
+                            child: AppIcon('copy',
+                                size: 13, color: AppColors.fg3)),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(width: S.s8),
+              ]),
+            ),
           if (body != null)
             padBody
                 ? Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s12),
+                    padding: const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s8),
                     child: body)
                 : body!,
         ],
@@ -1228,7 +1240,7 @@ class _HiCodeBlockState extends State<_HiCodeBlock> {
     Theme.of(context); // Rebuild on theme change
     final lineCount = '\n'.allMatches(widget.text).length + 1;
     // Snug height for short files; cap + internal scroll for long ones.
-    final h = (lineCount * 20.0 + 16).clamp(44.0, 360.0);
+    final h = (lineCount * 20.0 + 10).clamp(32.0, 320.0);
     return SizedBox(
       width: double.infinity,
       height: h,
@@ -1313,7 +1325,7 @@ class _DiffBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      padding: const EdgeInsets.symmetric(vertical: S.s4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [for (final l in diffLines) _row(l)],
@@ -1330,7 +1342,7 @@ class _DiffBlock extends StatelessWidget {
     return Container(
       width: double.infinity,
       color: bg,
-      padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: S.s8),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(width: 16, child: Text(sign, style: _panelCode(fg))),
         Expanded(

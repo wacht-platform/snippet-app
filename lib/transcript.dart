@@ -18,7 +18,15 @@ class DenseToolRow extends StatefulWidget {
   final String tool;
   final dynamic args;
   final dynamic result; // null while running
-  const DenseToolRow({super.key, required this.tool, this.args, this.result});
+  final bool? open;
+  final ValueChanged<bool>? onOpenChanged;
+  const DenseToolRow(
+      {super.key,
+      required this.tool,
+      this.args,
+      this.result,
+      this.open,
+      this.onOpenChanged});
 
   bool get pending => result == null;
 
@@ -27,7 +35,18 @@ class DenseToolRow extends StatefulWidget {
 }
 
 class _DenseToolRowState extends State<DenseToolRow> {
-  bool _open = false;
+  bool _localOpen = false;
+
+  bool get _open => widget.open ?? _localOpen;
+
+  void _toggle() {
+    final next = !_open;
+    if (widget.onOpenChanged != null) {
+      widget.onOpenChanged!(next);
+    } else {
+      setState(() => _localOpen = next);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +63,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: canExpand ? () => setState(() => _open = !_open) : null,
+          onTap: canExpand ? _toggle : null,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: S.s6),
             child: Row(children: [
@@ -85,7 +104,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
         ),
         if (_open && canExpand)
           Padding(
-            padding: const EdgeInsets.fromLTRB(23, S.s6, 0, S.s8),
+            padding: const EdgeInsets.fromLTRB(24, S.s2, 0, S.s6),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 360),
               child: SingleChildScrollView(

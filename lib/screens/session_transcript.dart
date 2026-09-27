@@ -44,12 +44,33 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       run.add(child);
     }
 
+    DenseToolRow toolRow(String key,
+            {required String tool, dynamic args, dynamic result}) =>
+        DenseToolRow(
+          key: ValueKey('tool-row-$key'),
+          tool: tool,
+          args: args,
+          result: result,
+          open: _openToolRows.contains(key),
+          onOpenChanged: (next) {
+            if (!mounted) return;
+            _setState(() {
+              if (next) {
+                _openToolRows.add(key);
+              } else {
+                _openToolRows.remove(key);
+              }
+              _transcriptDirty = true;
+            });
+          },
+        );
+
     void flushPending(String fallbackKey) {
       final p = pending;
       if (p != null) {
         final name = _s(p['tool_name']);
-        addToolRow(DenseToolRow(tool: name, args: p['arguments']),
-            pendingKey ?? fallbackKey);
+        final k = pendingKey ?? fallbackKey;
+        addToolRow(toolRow(k, tool: name, args: p['arguments']), k);
         pending = null;
         pendingKey = null;
       }
@@ -121,18 +142,19 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           {
             final p = pending;
             if (p != null) {
+              final k = pendingKey ?? key;
               addToolRow(
-                  DenseToolRow(
+                  toolRow(k,
                       tool: _s(p['tool_name']),
                       args: p['arguments'],
                       result: e['result']),
-                  pendingKey ?? key);
+                  k);
               pending = null;
               pendingKey = null;
             } else {
               final name = _s(e['tool_name']);
               if (_isMetaTool(name)) break;
-              addToolRow(DenseToolRow(tool: name, result: e['result']), key);
+              addToolRow(toolRow(key, tool: name, result: e['result']), key);
             }
           }
         case 'user_input':
@@ -506,8 +528,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       if (cps.isEmpty)
         Padding(
             padding: const EdgeInsets.all(20),
-            child: Text('No checkpoints yet.',
-                style: TS.meta())),
+            child: Text('No checkpoints yet.', style: TS.meta())),
       ...cps.map((c) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: AppCard(
@@ -631,11 +652,9 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Full history',
-                            style: TS.rowTitle()),
+                        Text('Full history', style: TS.rowTitle()),
                         const SizedBox(height: 3),
-                        Text('Branch everything so far',
-                            style: TS.meta()),
+                        Text('Branch everything so far', style: TS.meta()),
                       ],
                     ),
                   ),
