@@ -427,7 +427,7 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   // Pending attachments (images + files, up to 5): each uploads to the daemon
-  // and is referenced in the next message. Images → read_image, files → read.
+  // and is referenced in the next message. Images → view_image, files → bash.
   final List<_Attachment> _attachments = [];
   int _attachmentGeneration = 0;
   bool get _anyUploading => _attachments.any((a) => a.uploading);

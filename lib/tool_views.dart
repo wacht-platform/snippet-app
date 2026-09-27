@@ -18,14 +18,9 @@ List<Map> _mapItems(dynamic value) =>
 
 /// Lucide-ish glyph name for a tool (resolved via [iconFor]).
 String toolIcon(String tool) => switch (tool) {
-      'edit_file' || 'replace_file_content' => 'edit',
-      'write_file' || 'append_file' => 'file-plus',
-      'read_file' => 'file',
-      'read_image' => 'image',
+      'change_files' => 'edit',
+      'view_image' => 'image',
       'bash' => 'terminal',
-      'search_content' || 'search_files' => 'search',
-      'list_files' => 'folder',
-      'code_map' || 'view_outline' => 'code',
       'web_search' || 'web_read' => 'globe',
       'set_session_title' => 'edit',
       'memory_read' ||
@@ -60,10 +55,10 @@ String toolArgSummary(String tool, dynamic args) {
         },
         if (s('action') != 'list' && s('id').isNotEmpty) s('id'),
       ].join(' '),
-    'search_content' || 'web_search' => s('query'),
-    'search_files' => s('pattern'),
+    'web_search' => s('query'),
     'web_read' => s('url'),
-    'code_map' => args['path']?.toString() ?? args['query']?.toString() ?? '.',
+    'change_files' => _changesSummary(args['changes']),
+    'view_image' => s('path'),
     'set_session_title' => s('title'),
     'memory_read' || 'memory_write' || 'memory_delete' => s('id'),
     'memory_index' ||
@@ -74,15 +69,6 @@ String toolArgSummary(String tool, dynamic args) {
     'skill' => s('name'),
     'monitor' => s('path').isNotEmpty ? s('path') : s('action'),
     'present_file' => s('path'),
-    'read_file' ||
-    'write_file' ||
-    'append_file' ||
-    'read_image' ||
-    'edit_file' ||
-    'replace_file_content' ||
-    'view_outline' ||
-    'list_files' =>
-      s('path'),
     _ => '',
   };
   if (v.isNotEmpty) return first(v);
@@ -125,11 +111,9 @@ bool toolIsExpandable(String tool, dynamic args, dynamic result) {
   }
 
   switch (tool) {
-    case 'write_file':
-    case 'append_file':
-      return arg('content').trim().isNotEmpty;
-    case 'edit_file':
-      return arg('old_string').isNotEmpty || arg('new_string').isNotEmpty;
+    case 'change_files':
+      final changes = args is Map ? args['changes'] : null;
+      return changes is List && changes.isNotEmpty;
     case 'bash':
       final cmd = arg('command');
       return arg('label').trim().isNotEmpty ||
@@ -141,14 +125,8 @@ bool toolIsExpandable(String tool, dynamic args, dynamic result) {
     case 'memory_pattern':
     case 'memory_index':
       return arg('content').trim().isNotEmpty;
-    case 'read_file':
-    case 'search_content':
-    case 'search_files':
     case 'web_search':
-    case 'list_files':
     case 'web_read':
-    case 'view_outline':
-    case 'code_map':
       return resultHasBody();
     default:
       final shown = toolArgSummary(tool, args);
@@ -158,17 +136,9 @@ bool toolIsExpandable(String tool, dynamic args, dynamic result) {
 
 /// Friendly title for the drawer header.
 String toolTitle(String tool) => switch (tool) {
-      'edit_file' || 'replace_file_content' => 'Edit',
-      'write_file' => 'Write',
-      'append_file' => 'Append',
-      'read_file' => 'Read',
-      'read_image' => 'Image',
+      'change_files' => 'Change',
+      'view_image' => 'Image',
       'bash' => 'Run',
-      'search_content' => 'Search',
-      'search_files' => 'Find',
-      'list_files' => 'List',
-      'code_map' => 'Map',
-      'view_outline' => 'Outline',
       'web_search' => 'Search',
       'web_read' => 'Page',
       'set_session_title' => 'Title',
@@ -285,31 +255,12 @@ Widget _wrap(List<Widget> rows) =>
 List<Widget> _toolBody(
     BuildContext context, String tool, Map? a, Map? d, String? status) {
   switch (tool) {
-    case 'edit_file':
-      return _editView(a, d, oldKey: 'old_string', newKey: 'new_string');
-    case 'replace_file_content':
-      return _editView(a, d,
-          oldKey: 'target_content', newKey: 'replacement_content');
-    case 'write_file':
-      return _writeView(a, d, verb: 'Wrote');
-    case 'append_file':
-      return _appendView(a, d);
-    case 'read_file':
-      return _readView(a, d);
-    case 'read_image':
+    case 'change_files':
+      return _changeFilesView(a, d);
+    case 'view_image':
       return _imageView(a, d);
     case 'bash':
       return _bashView(a, d);
-    case 'search_content':
-      return _grepView(a, d);
-    case 'search_files':
-      return _findView(a, d);
-    case 'list_files':
-      return _lsView(a, d);
-    case 'view_outline':
-      return _outlineView(a, d);
-    case 'code_map':
-      return _codeMapView(a, d);
     case 'web_search':
       return _webSearchView(a, d);
     case 'web_read':
@@ -337,92 +288,65 @@ List<Widget> _toolBody(
 
 // ---- per-tool views ----
 
-List<Widget> _editView(Map? a, Map? d,
-    {required String oldKey, required String newKey}) {
+String _changesSummary(dynamic changes) {
+  if (changes is! List || changes.isEmpty) return '';
+  final first = changes.first is Map ? (changes.first as Map)['path']?.toString() ?? '' : '';
+  return changes.length == 1 ? first : '$first (+${changes.length - 1} more)';
+}
+
+List<Widget> _changeFilesView(Map? a, Map? d) {
+  final changes = a?['changes'];
+  if (changes is! List) return const [];
   final out = <Widget>[];
-  if (a != null && a[oldKey] != null && a[newKey] != null) {
-    final lines = _diff(a[oldKey].toString(), a[newKey].toString());
-    final adds = lines.where((l) => l.kind == _DKind.add).length;
-    final dels = lines.where((l) => l.kind == _DKind.del).length;
-    out.add(_ToolPanel(
-      header: _PanelPath(a['path']?.toString() ?? ''),
-      trailing: [
-        if (adds > 0) Tag('+$adds', tone: Tone.ok, mono: true),
-        if (dels > 0) Tag('-$dels', tone: Tone.danger, mono: true),
-      ],
-      copyText: a[newKey].toString(),
-      padBody: false,
-      body: _DiffBlock.lines(lines),
-    ));
-  } else if (a == null) {
-    out.add(_done(d?['edited'] == true || d?['replaced'] == true
-        ? 'Applied'
-        : 'Pending'));
-  }
-  if (d != null && d['note'] != null) {
-    final note = d['note'].toString();
-    if (!note.contains('whitespace normalization')) {
-      out.add(const SizedBox(height: 10));
-      out.add(_Hint(note));
+  for (final raw in changes.whereType<Map>()) {
+    String field(String key) => raw[key]?.toString() ?? '';
+    final path = field('path');
+    if (out.isNotEmpty) out.add(const SizedBox(height: S.s8));
+    switch (field('action')) {
+      case 'replace':
+        final lines = _diff(field('find'), field('with'));
+        final adds = lines.where((l) => l.kind == _DKind.add).length;
+        final dels = lines.where((l) => l.kind == _DKind.del).length;
+        out.add(_ToolPanel(
+          header: _PanelPath(path),
+          trailing: [
+            if (raw['all'] == true) const Tag('All matches', mono: true),
+            if (adds > 0) Tag('+$adds', tone: Tone.ok, mono: true),
+            if (dels > 0) Tag('-$dels', tone: Tone.danger, mono: true),
+          ],
+          copyText: field('with'),
+          padBody: false,
+          body: _DiffBlock.lines(lines),
+        ));
+      case 'create':
+        final content = field('content');
+        final n = content.isEmpty ? 0 : '\n'.allMatches(content.trimRight()).length + 1;
+        out.add(_ToolPanel(
+          header: _PanelPath(path),
+          trailing: [
+            if (raw['overwrite'] == true) const Tag('Overwrite', tone: Tone.run),
+            Tag('$n ${n == 1 ? 'line' : 'lines'}', mono: true),
+          ],
+          copyText: content,
+          padBody: false,
+          body: _HiCodeBlock(path, content.replaceFirst(RegExp(r'\n$'), '')),
+        ));
+      case 'delete':
+        out.add(_ToolPanel(
+          header: _PanelPath(path),
+          trailing: const [Tag('Deleted', tone: Tone.danger)],
+        ));
+      case 'move':
+        out.add(_ToolPanel(
+          header: _PanelPath('$path → ${field('to')}'),
+          trailing: const [Tag('Moved')],
+        ));
     }
   }
-  return out;
-}
-
-List<Widget> _writeView(Map? a, Map? d, {required String verb}) {
-  final out = <Widget>[];
-  final path = a?['path']?.toString() ?? d?['path']?.toString() ?? '';
-  final content = a?['content']?.toString();
-  if (content != null) {
-    final n = '\n'.allMatches(content).length + 1;
-    out.add(_ToolPanel(
-      header: _PanelPath(path),
-      trailing: [Tag('$n ${n == 1 ? 'line' : 'lines'}', mono: true)],
-      copyText: content,
-      padBody: false,
-      body: _HiCodeBlock(path, content),
-    ));
-  } else if (d?['written'] == true) {
-    out.add(_done('$verb file'));
-  }
-  return out;
-}
-
-List<Widget> _appendView(Map? a, Map? d) {
-  final out = <Widget>[];
-  final content = a?['content']?.toString();
-  if (content != null && content.isNotEmpty) {
-    out.add(_ToolPanel(
-      header: _PanelPath(a?['path']?.toString() ?? ''),
-      trailing: const [Tag('Appended', tone: Tone.ok)],
-      copyText: content,
-      body: _PanelText(content, color: AppColors.diffAddFg),
-    ));
-  }
-  return out;
-}
-
-List<Widget> _readView(Map? a, Map? d) {
-  final out = <Widget>[];
-  final path = a?['path']?.toString() ?? d?['path']?.toString() ?? '';
-  final content = d?['content']?.toString();
-  if (content != null && content.trim().isNotEmpty) {
-    final offset = (a?['offset'] as num?)?.toInt();
-    final total = (d?['total_lines'] as num?)?.toInt();
-    final shown = '\n'.allMatches(content.trimRight()).length + 1;
-    final range = offset != null && offset > 1
-        ? 'lines $offset–${offset + shown - 1}'
-        : '$shown ${shown == 1 ? 'line' : 'lines'}';
-    out.add(_ToolPanel(
-      header: _PanelPath(path),
-      trailing: [
-        Tag(total != null && total > shown ? '$range of $total' : range,
-            mono: true),
-      ],
-      copyText: content,
-      padBody: false,
-      body: _HiCodeBlock(path, content),
-    ));
+  final notes = d?['notes']?.toString();
+  if (notes != null && notes.isNotEmpty) {
+    out.add(const SizedBox(height: S.s8));
+    out.add(_Hint(notes));
   }
   return out;
 }
@@ -456,140 +380,6 @@ List<Widget> _bashView(Map? a, Map? d) {
         exitCode: exit,
         showCommand: labelled)
   ];
-}
-
-List<Widget> _grepView(Map? a, Map? d) {
-  final out = <Widget>[];
-  final results = _mapItems(d?['results']);
-  final query = (a?['query'] ?? a?['pattern'])?.toString() ?? '';
-  if (results.isNotEmpty) {
-    out.add(_ToolPanel(
-      header: _PanelPath(query, icon: 'search'),
-      trailing: [
-        Tag('${results.length} ${results.length == 1 ? 'match' : 'matches'}',
-            mono: true),
-      ],
-      body: _SearchHitList(children: [
-        for (final m in results)
-          _MatchRow(
-            path: m['path']?.toString() ?? '',
-            line: (m['line_number'] ?? m['line'])?.toString(),
-            text: (m['content'] ?? m['text'])?.toString() ?? '',
-            query: query,
-          ),
-      ]),
-    ));
-  } else if (d != null) {
-    out.add(_empty('No matches'));
-  }
-  if (d?['truncated'] == true && d?['hint'] != null) {
-    out.add(const SizedBox(height: S.s8));
-    out.add(_Hint(d?['hint']?.toString() ?? ''));
-  }
-  return out;
-}
-
-List<Widget> _findView(Map? a, Map? d) {
-  final out = <Widget>[];
-  final results = _mapItems(d?['results']);
-  final query = (a?['pattern'] ?? a?['query'] ?? a?['glob'])?.toString() ?? '';
-  if (results.isNotEmpty) {
-    out.add(_ToolPanel(
-      header: _PanelPath(query, icon: 'search'),
-      trailing: [
-        Tag('${results.length} ${results.length == 1 ? 'file' : 'files'}',
-            mono: true),
-      ],
-      padBody: false,
-      body: _Card(children: [
-        for (final f in results)
-          _FileRow(
-              icon: 'file',
-              name: f['path']?.toString() ?? f['name']?.toString() ?? ''),
-      ]),
-    ));
-  } else if (d != null) {
-    out.add(_empty('No files found'));
-  }
-  return out;
-}
-
-List<Widget> _lsView(Map? a, Map? d) {
-  final out = <Widget>[];
-  final entries = _mapItems(d?['entries'])
-    ..sort((x, y) {
-      final dx = x['kind'] == 'dir' ? 0 : 1, dy = y['kind'] == 'dir' ? 0 : 1;
-      if (dx != dy) return dx - dy;
-      return (x['name']?.toString() ?? '')
-          .compareTo(y['name']?.toString() ?? '');
-    });
-  if (entries.isNotEmpty) {
-    out.add(_ToolPanel(
-      header: _PanelPath((a?['path'] ?? d?['path'])?.toString() ?? ''),
-      trailing: [
-        Tag('${entries.length} ${entries.length == 1 ? 'item' : 'items'}',
-            mono: true),
-      ],
-      padBody: false,
-      body: _Card(children: [
-        for (final e in entries)
-          _FileRow(
-            icon: e['kind'] == 'dir' ? 'folder' : 'file',
-            name: e['name']?.toString() ?? '',
-            dir: e['kind'] == 'dir',
-          ),
-      ]),
-    ));
-  } else if (d != null) {
-    out.add(_empty('Empty directory'));
-  }
-  return out;
-}
-
-List<Widget> _outlineView(Map? a, Map? d) {
-  final out = <Widget>[];
-  if (d?['is_directory'] == true) return _lsView(a, d);
-  if (d?['supported'] == false) {
-    out.add(_Hint(d?['note']?.toString() ?? 'No outline available.'));
-    return out;
-  }
-  final outline = _mapItems(d?['outline']);
-  if (outline.isNotEmpty) {
-    out.add(_Card(children: [
-      for (final s in outline)
-        _SymbolRow(
-          kind: s['kind']?.toString() ?? '',
-          signature: s['signature']?.toString() ?? '',
-          line: s['line_number']?.toString(),
-          depth: (s['depth'] is int) ? s['depth'] as int : 0,
-        ),
-    ]));
-  }
-  return out;
-}
-
-List<Widget> _codeMapView(Map? a, Map? d) {
-  final out = <Widget>[];
-  final files = _mapItems(d?['files']);
-  for (final f in files) {
-    if (out.isNotEmpty) out.add(const SizedBox(height: 8));
-    out.add(_FileRow(icon: 'file', name: f['path']?.toString() ?? ''));
-    final syms = f['symbols'] is List ? (f['symbols'] as List) : const [];
-    out.add(const SizedBox(height: 4));
-    out.add(_Card(children: [
-      for (final s in syms)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          child: Text(s.toString(),
-              style: mono(11, height: 1.4, color: AppColors.fg2)),
-        ),
-    ]));
-  }
-  if (d?['truncated'] == true && d?['hint'] != null) {
-    out.add(const SizedBox(height: 10));
-    out.add(_Hint(d?['hint']?.toString() ?? ''));
-  }
-  return out;
 }
 
 List<Widget> _webSearchView(Map? a, Map? d) {
@@ -755,72 +545,6 @@ List<Widget> _simpleFallback(Map? a, Map? d) {
 
 // ---- shared pieces ----
 
-Widget _meta(List<Widget> chips) =>
-    Wrap(spacing: 7, runSpacing: 7, children: chips);
-
-Widget _statusChip(bool ok, String label) => Container(
-      padding: const EdgeInsets.fromLTRB(7, 4, 9, 4),
-      decoration: BoxDecoration(
-        color: ok ? AppColors.okBg : AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(R.pill),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        AppIcon(ok ? 'check' : 'alert-triangle',
-            size: 11, color: ok ? AppColors.ok : AppColors.danger),
-        const SizedBox(width: 5),
-        Flexible(
-            child: Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: mono(10,
-                    weight: W.label,
-                    color: ok ? AppColors.ok : AppColors.danger))),
-      ]),
-    );
-
-Widget _done(String label) => Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: _meta([_statusChip(true, label)]),
-    );
-
-Widget _empty(String label) => Text(label, style: TS.meta());
-
-class _Card extends StatelessWidget {
-  final List<Widget> children;
-  const _Card({required this.children});
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < children.length; i++) children[i],
-      ],
-    );
-  }
-}
-
-class _FileRow extends StatelessWidget {
-  final String icon;
-  final String name;
-  final bool dir;
-  const _FileRow({required this.icon, required this.name, this.dir = false});
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: S.s8, vertical: S.s4),
-      child: Row(children: [
-        AppIcon(icon, size: 14, color: dir ? AppColors.accent : AppColors.fg3),
-        const SizedBox(width: 9),
-        Expanded(
-            child: Text(name,
-                style: mono(12, color: dir ? AppColors.fg1 : AppColors.fg2))),
-      ]),
-    );
-  }
-}
-
 class _SearchHitList extends StatelessWidget {
   final List<Widget> children;
   const _SearchHitList({required this.children});
@@ -835,37 +559,6 @@ class _SearchHitList extends StatelessWidget {
           children[i],
         ],
       ],
-    );
-  }
-}
-
-class _MatchRow extends StatelessWidget {
-  final String path;
-  final String? line;
-  final String text;
-  final String query;
-  const _MatchRow(
-      {required this.path, this.line, required this.text, this.query = ''});
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s4),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text.rich(
-          TextSpan(children: [
-            TextSpan(text: path, style: mono(12, color: AppColors.accent)),
-            if (line != null)
-              TextSpan(
-                  text: ':$line',
-                  style: mono(12, color: AppColors.ok.withValues(alpha: 0.9))),
-          ]),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 3),
-        _highlightedLine(text, query),
-      ]),
     );
   }
 }
@@ -893,39 +586,6 @@ Widget _highlightedLine(String text, String query) {
     i = at + needle.length;
   }
   return Text.rich(TextSpan(style: base, children: spans));
-}
-
-class _SymbolRow extends StatelessWidget {
-  final String kind;
-  final String signature;
-  final String? line;
-  final int depth;
-  const _SymbolRow(
-      {required this.kind, required this.signature, this.line, this.depth = 0});
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: EdgeInsets.fromLTRB(10.0 + depth * 14, 7, 10, 7),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-          decoration: BoxDecoration(
-              color: AppColors.accentBg,
-              borderRadius: BorderRadius.circular(R.xs)),
-          child: Text(kind, style: mono(10, color: AppColors.accent)),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-            child: Text(signature,
-                style: mono(11, height: 1.4, color: AppColors.fg1))),
-        if (line != null) ...[
-          const SizedBox(width: 6),
-          Text(':$line', style: mono(10, color: AppColors.fg3)),
-        ],
-      ]),
-    );
-  }
 }
 
 class _ResultCard extends StatelessWidget {
@@ -1191,13 +851,19 @@ class _ToolPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (trailing.isNotEmpty || (copy != null && copy.isNotEmpty))
+          if (header != null ||
+              trailing.isNotEmpty ||
+              (copy != null && copy.isNotEmpty))
             Container(
               constraints: const BoxConstraints(minHeight: 28),
               color: AppColors.overlay,
               padding: const EdgeInsets.fromLTRB(S.s8, S.s2, S.s2, S.s2),
               child: Row(children: [
-                const Spacer(),
+                if (header != null)
+                  Expanded(child: header!)
+                else
+                  const Spacer(),
+                const SizedBox(width: S.s6),
                 for (final t in trailing) ...[t, const SizedBox(width: S.s6)],
                 if (copy != null && copy.isNotEmpty)
                   Tooltip(

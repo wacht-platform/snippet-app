@@ -11,18 +11,18 @@ class ToolStep {
 
   bool get failed =>
       result is Map && (result['status'] ?? '').toString() == 'error';
+
+  List<Map> get changes {
+    final raw = args is Map ? (args as Map)['changes'] : null;
+    return raw is List ? raw.whereType<Map>().toList() : const [];
+  }
 }
 
-enum ToolKind { read, edit, run, search, web, memory, other }
+enum ToolKind { change, run, web, memory, other }
 
 ToolKind toolKind(String tool) => switch (tool) {
-      'read_file' || 'read_image' || 'list_files' || 'view_outline' ||
-      'code_map' =>
-        ToolKind.read,
-      'edit_file' || 'replace_file_content' || 'write_file' || 'append_file' =>
-        ToolKind.edit,
+      'change_files' => ToolKind.change,
       'bash' || 'manage_process' => ToolKind.run,
-      'search_content' || 'search_files' || 'search_skills' => ToolKind.search,
       'web_search' || 'web_read' => ToolKind.web,
       'memory_read' ||
       'memory_write' ||
@@ -36,17 +36,10 @@ ToolKind toolKind(String tool) => switch (tool) {
 
 String toolVerb(String tool, {required bool running}) {
   final (done, doing) = switch (tool) {
-    'read_file' => ('Read', 'Reading'),
-    'read_image' => ('Viewed', 'Viewing'),
-    'list_files' => ('Listed', 'Listing'),
-    'view_outline' || 'code_map' => ('Mapped', 'Mapping'),
-    'edit_file' || 'replace_file_content' => ('Edited', 'Editing'),
-    'write_file' => ('Wrote', 'Writing'),
-    'append_file' => ('Appended to', 'Appending to'),
+    'change_files' => ('Changed', 'Changing'),
+    'view_image' => ('Viewed', 'Viewing'),
     'bash' => ('Ran', 'Running'),
     'manage_process' => ('Managed', 'Managing'),
-    'search_content' => ('Searched for', 'Searching for'),
-    'search_files' => ('Found files', 'Finding files'),
     'search_skills' => ('Looked up skills', 'Looking up skills'),
     'skill' => ('Used skill', 'Using skill'),
     'web_search' => ('Searched the web for', 'Searching the web for'),
@@ -65,48 +58,96 @@ String toolVerb(String tool, {required bool running}) {
   return running ? doing : done;
 }
 
-bool _isPathTool(String tool) =>
-    toolKind(tool) == ToolKind.read || toolKind(tool) == ToolKind.edit;
+String _fileName(String path) => path.split('/').last;
+
+/// A change_files step as (verb, object): what it did to which file, or how
+/// many files a mixed batch touched.
+(String, String) _changeParts(ToolStep step, bool running) {
+  final changes = step.changes;
+  if (changes.isEmpty) return (toolVerb(step.tool, running: running), '');
+  final paths = {for (final c in changes) c['path']?.toString() ?? ''};
+  final actions = {for (final c in changes) c['action']?.toString() ?? ''};
+  if (paths.length > 1 || actions.length > 1) {
+    final n = paths.length;
+    return (running ? 'Changing' : 'Changed', '$n ${n == 1 ? 'file' : 'files'}');
+  }
+  final first = changes.first;
+  final name = _fileName(first['path']?.toString() ?? '');
+  final (done, doing) = switch (actions.first) {
+    'create' => ('Created', 'Creating'),
+    'delete' => ('Deleted', 'Deleting'),
+    'move' => ('Moved', 'Moving'),
+    _ => ('Edited', 'Editing'),
+  };
+  final target = actions.first == 'move'
+      ? '$name → ${first['to'] ?? ''}'
+      : name;
+  return (running ? doing : done, target);
+}
 
 String toolObject(ToolStep step) {
   final summary = toolArgSummary(step.tool, step.args);
   if (summary.isEmpty) return '';
-  if (_isPathTool(step.tool)) return summary.split('/').last;
+  if (step.tool == 'view_image') return _fileName(summary);
   return summary;
 }
 
+(String, String) toolSentenceParts(ToolStep step, {bool? running}) {
+  final isRunning = running ?? step.running;
+  if (step.tool == 'change_files') return _changeParts(step, isRunning);
+  return (toolVerb(step.tool, running: isRunning), toolObject(step));
+}
+
 String toolSentence(ToolStep step, {bool? running}) {
-  final verb = toolVerb(step.tool, running: running ?? step.running);
-  final object = toolObject(step);
+  final (verb, object) = toolSentenceParts(step, running: running);
   return object.isEmpty ? verb : '$verb $object';
 }
 
+enum FileChangeKind { created, edited, deleted, moved }
+
 class FileChange {
-  FileChange(this.path, this.created);
+  FileChange(this.path, this.kind);
 
   final String path;
-  bool created;
+  FileChangeKind kind;
   int added = 0;
   int removed = 0;
 
-  String get name => path.split('/').last;
+  String get name => kind == FileChangeKind.moved ? path : _fileName(path);
 }
 
+int _lineCount(dynamic text) {
+  final s = text?.toString() ?? '';
+  return s.isEmpty ? 0 : '\n'.allMatches(s.trimRight()).length + 1;
+}
+
+/// Every file the successful change_files steps touched, with net line counts.
 List<FileChange> fileChanges(Iterable<ToolStep> steps) {
   final byPath = <String, FileChange>{};
   for (final step in steps) {
-    if (toolKind(step.tool) != ToolKind.edit || step.failed) continue;
-    final a = step.args;
-    if (a is! Map) continue;
-    final path = (a['path'] ?? a['file_path'] ?? '').toString();
-    if (path.isEmpty) continue;
-    final change =
-        byPath.putIfAbsent(path, () => FileChange(path, step.tool == 'write_file'));
-    final added = (a['new_string'] ?? a['content'] ?? '').toString();
-    final removed = a['old_string']?.toString();
-    change.added += added.isEmpty ? 0 : added.split('\n').length;
-    change.removed +=
-        removed == null || removed.isEmpty ? 0 : removed.split('\n').length;
+    if (step.tool != 'change_files' || step.failed) continue;
+    for (final c in step.changes) {
+      final action = c['action']?.toString() ?? '';
+      final path = action == 'move'
+          ? '${c['path']} → ${c['to']}'
+          : c['path']?.toString() ?? '';
+      if (path.isEmpty) continue;
+      final kind = switch (action) {
+        'create' => FileChangeKind.created,
+        'delete' => FileChangeKind.deleted,
+        'move' => FileChangeKind.moved,
+        _ => FileChangeKind.edited,
+      };
+      final change = byPath.putIfAbsent(path, () => FileChange(path, kind));
+      if (kind == FileChangeKind.deleted) change.kind = kind;
+      switch (action) {
+        case 'replace':
+          change.added += _lineCount(c['with']);
+          change.removed += _lineCount(c['find']);
+        case 'create':
+          change.added += _lineCount(c['content']);
+      }
+    }
   }
   return byPath.values.toList();
 }
@@ -114,26 +155,22 @@ List<FileChange> fileChanges(Iterable<ToolStep> steps) {
 String activitySummary(List<ToolStep> steps) {
   if (steps.length == 1) return toolSentence(steps.first);
   String plural(int n, String one, String many) => n == 1 ? one : many;
-  int count(bool Function(ToolKind) test) =>
-      steps.where((s) => test(toolKind(s.tool))).length;
-  final reads = count((k) => k == ToolKind.read);
-  final editSteps = count((k) => k == ToolKind.edit);
-  final edited = fileChanges(steps).length;
-  final runs = count((k) => k == ToolKind.run);
-  final searches = count((k) => k == ToolKind.search || k == ToolKind.web);
+  int count(ToolKind kind) => steps.where((s) => toolKind(s.tool) == kind).length;
+  final changeSteps = count(ToolKind.change);
+  final changed = fileChanges(steps).length;
+  final runs = count(ToolKind.run);
+  final searches = count(ToolKind.web);
   final groups = <(int, String)>[
-    if (reads > 0) (reads, 'read $reads ${plural(reads, 'file', 'files')}'),
-    if (editSteps > 0)
-      (editSteps, 'edited $edited ${plural(edited, 'file', 'files')}'),
+    if (changeSteps > 0)
+      (changeSteps, 'changed $changed ${plural(changed, 'file', 'files')}'),
     if (runs > 0) (runs, 'ran $runs ${plural(runs, 'command', 'commands')}'),
     if (searches > 0)
-      (searches, '$searches ${plural(searches, 'search', 'searches')}'),
+      (searches, '$searches web ${plural(searches, 'search', 'searches')}'),
   ];
   if (groups.isEmpty) return '${steps.length} steps';
-  final shown = groups.take(3).toList();
-  final rest = steps.length - shown.fold<int>(0, (sum, g) => sum + g.$1);
+  final rest = steps.length - groups.fold<int>(0, (sum, g) => sum + g.$1);
   final sentence = [
-    for (final g in shown) g.$2,
+    for (final g in groups) g.$2,
     if (rest > 0) '$rest more',
   ].join(', ');
   return '${sentence[0].toUpperCase()}${sentence.substring(1)}';

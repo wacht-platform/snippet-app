@@ -849,7 +849,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     final ready = _attachments.where((a) => a.remotePath != null).toList();
     final markers = ready
         .map((a) => a.isImage
-            ? '[attached image — call read_image on this exact path to view it: ${a.remotePath}]'
+            ? '[attached image — call view_image on this exact path to see it: ${a.remotePath}]'
             : '[attached file — read it at this exact path: ${a.remotePath}]')
         .toList();
     var body = _input.text.trim();

@@ -56,7 +56,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
     final step =
         ToolStep(tool: widget.tool, args: widget.args, result: widget.result);
     final failed = step.failed;
-    final object = toolObject(step);
+    final (verb, object) = toolSentenceParts(step);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -82,7 +82,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
                 child: Text.rich(
                   TextSpan(children: [
                     TextSpan(
-                        text: toolVerb(widget.tool, running: step.running),
+                        text: verb,
                         style: TS.ui(failed ? AppColors.danger : AppColors.fg2)),
                     if (object.isNotEmpty)
                       TextSpan(text: ' $object', style: TS.ui(AppColors.fg3)),
@@ -121,27 +121,19 @@ class _DenseToolRowState extends State<DenseToolRow> {
   }
 
   List<Widget> _metaWidgets() {
-    if (widget.tool == 'edit_file' ||
-        widget.tool == 'write_file' ||
-        widget.tool == 'replace_file_content') {
-      final a = widget.args;
-      if (a is Map) {
-        final add = (a['new_string'] ?? a['content'] ?? '')
-            .toString()
-            .split('\n')
-            .length;
-        final del = a['old_string'] == null
-            ? 0
-            : (a['old_string'] ?? '').toString().split('\n').length;
-        return [
-          const SizedBox(width: S.s8),
-          Text('+$add', style: TS.meta(AppColors.ok)),
-          const SizedBox(width: S.s4),
-          Text('-$del', style: TS.meta(AppColors.danger)),
-        ];
-      }
-    }
-    return const [];
+    if (widget.tool != 'change_files') return const [];
+    final step =
+        ToolStep(tool: widget.tool, args: widget.args, result: widget.result);
+    final changes = fileChanges([step]);
+    final added = changes.fold<int>(0, (sum, c) => sum + c.added);
+    final removed = changes.fold<int>(0, (sum, c) => sum + c.removed);
+    if (added == 0 && removed == 0) return const [];
+    return [
+      const SizedBox(width: S.s8),
+      Text('+$added', style: TS.meta(AppColors.ok)),
+      const SizedBox(width: S.s4),
+      Text('-$removed', style: TS.meta(AppColors.danger)),
+    ];
   }
 }
 
@@ -277,7 +269,13 @@ class _ChangedFiles extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: S.s12),
                   child: Row(children: [
-                    AppIcon(changes[i].created ? 'file-plus' : 'edit',
+                    AppIcon(
+                        switch (changes[i].kind) {
+                          FileChangeKind.created => 'file-plus',
+                          FileChangeKind.deleted => 'trash',
+                          FileChangeKind.moved => 'arrow-right',
+                          FileChangeKind.edited => 'edit',
+                        },
                         size: 13, color: AppColors.fg3),
                     const SizedBox(width: S.s8),
                     Expanded(
@@ -286,11 +284,14 @@ class _ChangedFiles extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TS.codeSmall(AppColors.fg1)),
                     ),
-                    const SizedBox(width: S.s8),
-                    Text('+${changes[i].added}', style: TS.meta(AppColors.ok)),
-                    const SizedBox(width: S.s4),
-                    Text('−${changes[i].removed}',
-                        style: TS.meta(AppColors.danger)),
+                    if (changes[i].added + changes[i].removed > 0) ...[
+                      const SizedBox(width: S.s8),
+                      Text('+${changes[i].added}',
+                          style: TS.meta(AppColors.ok)),
+                      const SizedBox(width: S.s4),
+                      Text('−${changes[i].removed}',
+                          style: TS.meta(AppColors.danger)),
+                    ],
                   ]),
                 ),
               ),

@@ -181,9 +181,7 @@ class ApprovalBarState extends State<ApprovalBar> {
     final total = (req?['total'] as num?)?.toInt() ?? 1;
     final question = switch (tool) {
       'bash' => 'Run this command?',
-      'edit_file' || 'replace_file_content' => 'Edit this file?',
-      'write_file' => 'Write this file?',
-      'append_file' => 'Append to this file?',
+      'change_files' => 'Make these file changes?',
       '' => 'Allow this action?',
       _ => 'Allow ${toolTitle(tool).toLowerCase()}?',
     };

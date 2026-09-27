@@ -321,14 +321,13 @@ void main() {
   });
 
   test('tool rows expand only when they have content', () {
-    expect(toolIsExpandable('read_file', {'path': 'a.dart'}, null), isFalse);
+    expect(toolIsExpandable('change_files', {'changes': []}, null), isFalse);
     expect(
-      toolIsExpandable('read_file', {
-        'path': 'a.dart'
-      }, {
-        'status': 'success',
-        'data': {'content': 'hello'},
-      }),
+      toolIsExpandable('change_files', {
+        'changes': [
+          {'action': 'replace', 'path': 'a.dart', 'find': 'a', 'with': 'b'}
+        ]
+      }, null),
       isTrue,
     );
     expect(toolIsExpandable('bash', {'command': 'ls'}, null), isFalse);
@@ -370,36 +369,9 @@ void main() {
 
   testWidgets('tool panels tolerate malformed result lists', (tester) async {
     final cases = <String, Map<String, dynamic>>{
-      'search_content': {
-        'results': [
-          1,
-          'unexpected',
-          {'path': 'ok.dart'}
-        ]
-      },
-      'search_files': {
-        'results': [
-          false,
-          {'path': 'ok.dart'}
-        ]
-      },
-      'list_files': {
-        'entries': [
-          'unexpected',
-          {'name': 'ok.dart'}
-        ]
-      },
-      'view_outline': {
-        'outline': [
-          null,
-          {'signature': 'ok()'}
-        ]
-      },
-      'code_map': {
-        'files': [
-          'unexpected',
-          {'path': 'ok.dart', 'symbols': 'not-a-list'},
-        ],
+      'change_files': {
+        'summary': 5,
+        'notes': ['unexpected'],
       },
       'web_search': {
         'results': [
@@ -555,28 +527,8 @@ void main() {
 
   testWidgets('tool panels tolerate null optional fields', (tester) async {
     final cases = <String, Map<String, dynamic>>{
-      'edit_file': {'note': null},
-      'append_file': {'lines_written': null, 'total_lines': null},
-      'read_file': {
-        'total_lines': null,
-        'total_chars': null,
-        'truncated': true,
-        'hint': null,
-      },
-      'view_outline': {
-        'language': null,
-        'symbol_count': null,
-        'outline': [
-          {'kind': null, 'signature': null, 'depth': null},
-        ],
-      },
-      'code_map': {
-        'file_count': null,
-        'symbol_count': null,
-        'files': [
-          {'path': null, 'symbols': null},
-        ],
-      },
+      'change_files': {'summary': null, 'notes': null, 'changed_lines': null},
+      'view_image': {'path': null, 'mime': null, 'size_bytes': null},
       'web_search': {
         'count': null,
         'results': [

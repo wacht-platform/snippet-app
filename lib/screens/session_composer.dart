@@ -68,7 +68,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     // Reference each upload by its exact path so the agent reads it this turn.
     final markers = ready
         .map((a) => a.isImage
-            ? '[attached image — call read_image on this exact path to view it: ${a.remotePath}]'
+            ? '[attached image — call view_image on this exact path to see it: ${a.remotePath}]'
             : '[attached file — read it at this exact path: ${a.remotePath}]')
         .join('\n');
     final msg = markers.isEmpty ? t : (t.isEmpty ? markers : '$t\n\n$markers');
@@ -109,7 +109,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     if (text.isEmpty && ready.isEmpty) return;
     final markers = ready
         .map((a) => a.isImage
-            ? '[attached image — call read_image on this exact path to view it: ${a.remotePath}]'
+            ? '[attached image — call view_image on this exact path to see it: ${a.remotePath}]'
             : '[attached file — read it at this exact path: ${a.remotePath}]')
         .join('\n');
     final body = markers.isEmpty ? text : (text.isEmpty ? markers : '$text\n\n$markers');
