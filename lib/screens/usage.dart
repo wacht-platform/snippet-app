@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -8,7 +6,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
-import '../live_refresh.dart';
+import '../swr.dart';
 
 class UsageScreen extends StatefulWidget {
   final DaemonClient client;
@@ -51,54 +49,44 @@ extension on _Period {
 }
 
 class _UsageScreenState extends State<UsageScreen> {
-  late Future<UsageSummary> _future;
-  UsageSummary? _last;
-  LiveRefresh? _live;
+  late Swr<UsageSummary> _usage = _watch();
   _Period _period = _Period.all;
 
-  Future<UsageSummary> _load() => widget.client
-      .getUsage(since: _period.since)
-      .then((value) => _last = value);
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _load();
-    _live = LiveRefresh(
-      client: widget.client,
-      when: (e) => const {'idle', 'done', 'error'}.contains(e['kind']),
-      refresh: () {
-        if (mounted) _refresh();
-      },
-      debounce: const Duration(seconds: 2),
-    );
-  }
+  Swr<UsageSummary> _watch() => Swr<UsageSummary>(
+        client: widget.client,
+        key: 'usage:${_period.name}',
+        fetch: () => widget.client.getUsage(since: _period.since),
+        revalidateOn: (e) => const {'idle', 'done', 'error'}.contains(e['kind']),
+        onChange: () {
+          if (mounted) setState(() {});
+        },
+        debounce: const Duration(seconds: 2),
+      );
 
   @override
   void dispose() {
-    _live?.dispose();
+    _usage.dispose();
     super.dispose();
   }
 
-  void _refresh() {
-    setState(() => _future = _load());
-  }
+  void _refresh() => _usage.refresh();
 
   void _setPeriod(_Period period) {
     if (period == _period) return;
-    _period = period;
-    _last = null;
-    _refresh();
+    setState(() {
+      _period = period;
+      _usage.dispose();
+      _usage = _watch();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final body = FutureBuilder<UsageSummary>(
-      future: _future,
-      builder: (context, snap) {
-        final data = snap.data ?? _last;
-        if (data == null && !snap.hasError) {
+    final body = Builder(
+      builder: (context) {
+        final data = _usage.data;
+        if (data == null && _usage.error == null) {
           return const Center(child: DelayedSpinner(size: 22));
         }
         if (data == null) {
@@ -109,7 +97,7 @@ class _UsageScreenState extends State<UsageScreen> {
               const SizedBox(height: 6),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text('${snap.error}',
+                child: Text('${_usage.error}',
                     textAlign: TextAlign.center,
                     style: mono(10, color: AppColors.fg3)),
               ),

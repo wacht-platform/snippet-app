@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../swr.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -23,7 +24,6 @@ class GitDiffSidebarPanel extends StatefulWidget {
     required this.workspacePath,
     this.sessionId,
     this.onOpenDiff,
-    this.autoRefreshPeriod = const Duration(seconds: 4),
   });
 
   final DaemonClient client;
@@ -33,7 +33,6 @@ class GitDiffSidebarPanel extends StatefulWidget {
   /// Called when a changed file is tapped. The host opens it as a tab in the
   /// main pane, so a diff reads in the same tab system as everything else.
   final void Function(GitFile file)? onOpenDiff;
-  final Duration autoRefreshPeriod;
 
   @override
   State<GitDiffSidebarPanel> createState() => _GitDiffSidebarPanelState();
@@ -44,8 +43,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   bool _loading = true;
   String? _error;
   DateTime _lastUpdated = DateTime.now();
-  Timer? _autoRefreshTimer;
-  bool _refreshing = false;
+  Swr<GitStatus>? _git;
   bool _branchBusy = false;
 
   String get _repo =>
@@ -56,21 +54,12 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   @override
   void initState() {
     super.initState();
-    refresh();
-    if (widget.autoRefreshPeriod > Duration.zero) {
-      _autoRefreshTimer = Timer.periodic(
-        widget.autoRefreshPeriod,
-        (_) {
-          if (!mounted || _refreshing) return;
-          refresh(background: true);
-        },
-      );
-    }
+    _watch();
   }
 
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
+    _git?.dispose();
     super.dispose();
   }
 
@@ -80,37 +69,46 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     if (oldWidget.sessionId != widget.sessionId ||
         oldWidget.workspacePath != widget.workspacePath ||
         oldWidget.client != widget.client) {
-      refresh();
+      _watch();
     }
   }
 
-  Future<void> refresh({bool background = false}) async {
-    if (_refreshing) return;
-    _refreshing = true;
-    if (!background && mounted) {
-      setState(() {
-        if (_status == null) _loading = true;
-        _error = null;
-      });
-    }
-    try {
-      final res = await widget.client.gitStatus(_repo);
-      if (!mounted) return;
-      setState(() {
-        _status = res;
+  void _watch() {
+    _git?.dispose();
+    final git = Swr<GitStatus>(
+      client: widget.client,
+      key: 'git:$_repo',
+      fetch: () => widget.client.gitStatus(_repo),
+      revalidateOn: _touchesRepo,
+      onChange: _sync,
+    );
+    _git = git;
+    _status = git.data;
+    _loading = git.data == null;
+    _error = null;
+  }
+
+  bool _touchesRepo(DeviceEventFrame e) =>
+      const {'activity', 'idle', 'done', 'error'}.contains(e['kind']) &&
+      ((widget.sessionId != null && e['session'] == widget.sessionId) ||
+          e['workspace'] == widget.workspacePath);
+
+  void _sync() {
+    final git = _git;
+    if (!mounted || git == null) return;
+    setState(() {
+      final data = git.data;
+      if (data != null && !identical(data, _status)) {
+        _status = data;
         _lastUpdated = DateTime.now();
-        if (background) _error = null;
-      });
-    } catch (e) {
-      if (!background && mounted) {
-        setState(() => _error = '$e');
       }
-    } finally {
-      _refreshing = false;
-      if (!background && mounted) {
-        setState(() => _loading = false);
-      }
-    }
+      _loading = git.loading;
+      _error = data == null && git.error != null ? '${git.error}' : null;
+    });
+  }
+
+  Future<void> refresh({bool background = false}) async {
+    await _git?.refresh();
   }
 
   Future<void> _branchSheet() async {

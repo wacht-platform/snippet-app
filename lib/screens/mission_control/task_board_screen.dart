@@ -13,7 +13,7 @@ import '../../widgets.dart';
 import 'mission_control_state.dart';
 import 'mobile/mobile_mc.dart' show showMissionControlPanel;
 import 'task_detail_screen.dart';
-import '../../live_refresh.dart';
+import '../../swr.dart';
 
 /// The task board — where a human files work.
 ///
@@ -53,11 +53,10 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
   /// Auto-refresh cadence. 25s sits inside the 20–30s window the board asked
   /// for; tune it here.
 
-  LiveRefresh? _live;
+  late final Swr<List<TaskItem>> _board;
 
   /// Guards against overlapping fetches: a background tick that lands while a
   /// request is already in flight is dropped rather than stacked.
-  bool _fetching = false;
 
   /// Statuses to show. EMPTY means "every column" — the inverse of the old
   /// single nullable filter, and what makes multi-select work.
@@ -66,54 +65,37 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
   @override
   void initState() {
     super.initState();
-    refresh();
-    widget.refreshSignal?.addListener(refresh);
-    _live = LiveRefresh(
+    _board = Swr<List<TaskItem>>(
       client: widget.client,
-      when: LiveRefresh.coordination,
-      refresh: () {
-        if (mounted) _load(silent: true);
-      },
+      key: 'coordination:tasks',
+      fetch: () => widget.client.tasks(),
+      revalidateOn: Swr.coordination,
+      onChange: _sync,
     );
+    tasks = _board.data ?? const [];
+    loading = _board.data == null;
+    widget.refreshSignal?.addListener(refresh);
   }
 
   @override
   void dispose() {
-    _live?.dispose();
+    _board.dispose();
     widget.refreshSignal?.removeListener(refresh);
     super.dispose();
   }
 
-  /// User-initiated load: may show the full-screen spinner and may report
-  /// errors. Pull-to-refresh and the first paint both go through here.
-  Future<void> refresh() => _load(silent: false);
-
-  /// Fetch tasks. [silent] is the background/auto-refresh path, and it differs
-  /// from the user-initiated one in three ways that matter:
-  ///  - it never touches [loading], so it cannot blank the list it updates;
-  ///  - it swallows transient failures instead of replacing the board with an
-  ///    error state every 25 seconds;
-  ///  - it bails if a fetch is already running, so ticks cannot stack.
-  Future<void> _load({required bool silent}) async {
-    if (_fetching) return;
-    _fetching = true;
-    if (!silent && mounted) setState(() => loading = tasks.isEmpty);
-    try {
-      final fetched = await widget.client.tasks();
-      if (!mounted) return;
-      setState(() {
-        tasks = fetched;
-        error = null;
-      });
-    } catch (e) {
-      // Background failures are dropped: a stale-but-visible board beats an
-      // error screen the user never asked for. Only an explicit load reports.
-      if (!silent && mounted) setState(() => error = '$e');
-    } finally {
-      _fetching = false;
-      if (!silent && mounted) setState(() => loading = false);
-    }
+  void _sync() {
+    if (!mounted) return;
+    setState(() {
+      tasks = _board.data ?? tasks;
+      loading = _board.loading;
+      error = _board.data == null && _board.error != null
+          ? '${_board.error}'
+          : null;
+    });
   }
+
+  Future<void> refresh() => _board.refresh();
 
   Future<void> _create() async {
     final created = await showAppSheet<bool>(

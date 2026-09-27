@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hugeicons/hugeicons.dart';
 
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/agents_sidebar_panel.dart';
 import 'package:snippet/screens/create_agent_form.dart';
@@ -21,6 +22,9 @@ import 'package:snippet/widgets.dart';
 /// describes. `flutter analyze` cannot see any of it.
 class _FakeAgentsClient extends DaemonClient {
   _FakeAgentsClient() : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   @override
   Future<List<CoordinationAgent>> coordinationAgents() async => [

@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../swr.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
 /// Background processes the agent started (dev servers, tunnels, a browser) via
 /// `bash {background:true}`. Lists them from /bg with a live status, a log tail,
-/// and a stop button. Auto-refreshes while open.
+/// and a stop button. Revalidates when the daemon reports a process change.
 class ProcessesScreen extends StatefulWidget {
   final DaemonClient client;
   final String sessionId;
@@ -26,48 +27,43 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
   String? _openLogId;
   String _log = '';
   bool _logLoading = false;
-  Timer? _ticker;
+  late final Swr<List<Map<String, dynamic>>> _list;
 
   @override
   void initState() {
     super.initState();
-    _load();
-    _ticker = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (mounted) _load(silent: true);
-    });
+    _list = Swr<List<Map<String, dynamic>>>(
+      client: widget.client,
+      key: 'bg:${widget.sessionId}',
+      fetch: () => widget.client.bgList(widget.sessionId),
+      revalidateOn: (e) => e['kind'] == 'process',
+      onChange: _sync,
+    );
+    _procs = _list.data;
+    _loading = _procs == null;
   }
 
   @override
   void dispose() {
-    _ticker?.cancel();
+    _list.dispose();
     super.dispose();
   }
 
-  Future<void> _load({bool silent = false}) async {
-    if (!silent && mounted) {
-      setState(() {
-        _loading = _procs == null;
-        _error = null;
-      });
-    }
-    try {
-      final p = await widget.client.bgList(widget.sessionId);
-      if (!mounted) return;
-      setState(() {
-        _procs = p;
-        _loading = false;
-        if (_openLogId != null && !p.any((e) => '${e['id']}' == _openLogId)) {
-          _openLogId = null;
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = '$e';
-          _loading = false;
-        });
+  Future<void> _load({bool silent = false}) => _list.refresh();
+
+  void _sync() {
+    if (!mounted) return;
+    final p = _list.data;
+    setState(() {
+      _procs = p ?? _procs;
+      _loading = _list.loading;
+      _error = p == null && _list.error != null ? '${_list.error}' : null;
+      if (p != null &&
+          _openLogId != null &&
+          !p.any((e) => '${e['id']}' == _openLogId)) {
+        _openLogId = null;
       }
-    }
+    });
   }
 
   Future<void> _kill(String id) async {

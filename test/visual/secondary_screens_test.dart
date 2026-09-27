@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/lanes.dart';
 import 'package:snippet/screens/processes.dart';
@@ -24,6 +25,9 @@ import 'golden.dart';
 class _FakeDaemon extends DaemonClient {
   _FakeDaemon() : super('https://daemon.invalid', 'test-token');
 
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
+
   List<String> vault = [];
   List<Map<String, dynamic>> procs = [];
   Map<String, dynamic> usage = {};
@@ -40,7 +44,8 @@ class _FakeDaemon extends DaemonClient {
       'listening on :8080\nready';
 
   @override
-  Future<UsageSummary> getUsage() async => UsageSummary.fromJson(usage);
+  Future<UsageSummary> getUsage({DateTime? since}) async =>
+      UsageSummary.fromJson(usage);
 
   @override
   Future<List<RecurringJob>> recurringJobs() async =>

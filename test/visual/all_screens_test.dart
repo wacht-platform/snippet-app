@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/agents_sidebar_panel.dart';
 import 'package:snippet/screens/file_tree_sidebar_panel.dart';
@@ -28,6 +29,9 @@ import 'golden.dart';
 ///    ends, so `dispose` runs.
 class _FakeDaemon extends DaemonClient {
   _FakeDaemon() : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   FsListing listing = FsListing.fromJson({'path': '/w', 'entries': []});
   List<Map<String, dynamic>> agents = [];

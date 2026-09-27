@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/screens/git.dart';
 import 'package:snippet/widgets.dart';
 
@@ -15,6 +16,9 @@ import 'package:snippet/widgets.dart';
 /// nothing is malformed; the geometry is simply wrong.
 class _FakeGitClient extends DaemonClient {
   _FakeGitClient(this.patch) : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   final String patch;
 

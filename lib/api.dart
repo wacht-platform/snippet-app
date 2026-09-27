@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/io.dart' as ws_io;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'live_refresh.dart';
+import 'swr.dart';
 import 'models.dart';
 
 class DownloadCancelled implements Exception {
@@ -180,6 +180,7 @@ class DaemonClient {
   /// the notification watcher so the session list can update live even when
   /// OS banners are off.
   late final DeviceEventHub deviceEvents = DeviceEventHub(events);
+  final SwrCache swr = SwrCache();
 
   WebSocketChannel events() {
     final base = Uri.parse(baseUrl);

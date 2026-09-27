@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/add_instance.dart';
 import 'package:snippet/screens/agent_messaging.dart';
@@ -25,6 +26,9 @@ import 'golden.dart';
 /// handles it.
 class _FakeDaemon extends DaemonClient {
   _FakeDaemon() : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   List<Map<String, dynamic>> agents = [];
   List<Map<String, dynamic>> thread = [];

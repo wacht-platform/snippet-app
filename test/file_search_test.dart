@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/file_tree_sidebar_panel.dart';
 
@@ -21,6 +22,9 @@ import 'package:snippet/screens/file_tree_sidebar_panel.dart';
 /// they are pinned here.
 class _CountingFsClient extends DaemonClient {
   _CountingFsClient(this.tree) : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   /// path → entry maps, exactly as the daemon's `/fs` would return them.
   final Map<String, List<Map<String, dynamic>>> tree;

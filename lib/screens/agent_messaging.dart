@@ -17,7 +17,7 @@ import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import '../live_refresh.dart';
+import '../swr.dart';
 
 /// Pick one agent from the directory, as an anchored DROPDOWN.
 ///
@@ -337,7 +337,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   bool _loading = true;
   bool _sending = false;
   String? _error;
-  LiveRefresh? _live;
+  late final Swr<List<CoordinationEvent>> _thread;
 
   final List<_AgentAttachment> _attachments = [];
   int _attachmentGeneration = 0;
@@ -361,15 +361,16 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
-    _live = LiveRefresh(
+    _thread = Swr<List<CoordinationEvent>>(
       client: widget.client,
-      when: LiveRefresh.coordination,
-      refresh: () {
-        if (mounted && !_sending) _load(silent: true);
-      },
-      backstop: const Duration(seconds: 30),
+      key: 'agent-thread:${widget.agentId}',
+      fetch: () => widget.client.agentThread(peerId: widget.agentId),
+      revalidateOn: Swr.coordination,
+      onChange: _sync,
     );
+    _events = _thread.data ?? const [];
+    _loading = _thread.data == null;
+    if (_events.isNotEmpty) _jumpToBottom();
     _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
       if (!mounted) return;
       setState(() => _isPlayingRecording = state == PlayerState.playing);
@@ -382,7 +383,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   @override
   void dispose() {
-    _live?.dispose();
+    _thread.dispose();
     _amplitudeSub?.cancel();
     _recordingTimer?.cancel();
     _playerStateSub?.cancel();
@@ -406,31 +407,21 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     super.dispose();
   }
 
-  Future<void> _load({bool silent = false}) async {
-    if (!silent && _events.isEmpty) {
-      setState(() => _loading = true);
-    }
-    try {
-      final events = await widget.client.agentThread(peerId: widget.agentId);
-      if (!mounted) return;
-      final hadNew = events.length > _events.length;
-      setState(() {
-        _events = events;
-        _loading = false;
-        _error = null;
-      });
+  Future<void> _load({bool silent = false}) => _thread.refresh();
+
+  void _sync() {
+    if (!mounted) return;
+    final next = _thread.data;
+    final hadNew = next != null && next.length > _events.length;
+    final first = _events.isEmpty;
+    setState(() {
+      if (next != null) _events = next;
+      _loading = _thread.loading;
+      _error = next == null && _thread.error != null ? '${_thread.error}' : null;
+    });
+    if (hadNew) {
       unawaitedMarkRead();
-      if (hadNew) {
-        _jumpToBottom(animated: silent);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      if (!silent) {
-        setState(() {
-          _error = '$e';
-          _loading = false;
-        });
-      }
+      _jumpToBottom(animated: !first);
     }
   }
 

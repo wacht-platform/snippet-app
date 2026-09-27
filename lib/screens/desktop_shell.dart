@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
+import '../swr.dart';
 import '../command_palette.dart';
 import '../device_events.dart';
 import '../models.dart';
@@ -183,6 +184,7 @@ class _DesktopShellState extends State<DesktopShell>
   GitStatus? _macGit;
   String _macGitKey = '';
 
+  Revalidator? _sessionsRevalidator;
   Timer? _sessionsTicker;
   bool _appForeground = true;
   WebSocketChannel? _eventsChannel;
@@ -434,11 +436,8 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _startSessionsTicker() {
     _sessionsTicker?.cancel();
-    final period = Duration(seconds: kMobile ? 90 : 30);
-    _sessionsTicker = Timer.periodic(period, (_) {
-      if (!mounted || !_appForeground) return;
-      if (!_sessionsLoading) _loadSessions();
-      _refreshHealth();
+    _sessionsTicker = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted && _appForeground) _refreshHealth();
     });
   }
 
@@ -649,6 +648,8 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _stopEventsWatch() {
+    _sessionsRevalidator?.dispose();
+    _sessionsRevalidator = null;
     _eventsGeneration++;
     _eventsReconnect?.cancel();
     _eventsReconnect = null;
@@ -665,6 +666,14 @@ class _DesktopShellState extends State<DesktopShell>
       return;
     }
     _stopEventsWatch();
+    _sessionsRevalidator = Revalidator(
+      client: c,
+      on: Swr.sessionStatus,
+      debounce: const Duration(seconds: 1),
+      onRevalidate: ({required bool force}) {
+        if (mounted && _appForeground && !_sessionsLoading) _loadSessions();
+      },
+    );
     final generation = _eventsGeneration;
     try {
       final ch = c.events();

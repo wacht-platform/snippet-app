@@ -17,7 +17,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../api.dart';
 import '../../models.dart';
-import '../../live_refresh.dart';
+import '../../swr.dart';
 
 /// One row in the activity feed. The feed is a chat-style log of everything
 /// that has happened between the user and the MC session, plus the events
@@ -462,12 +462,10 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   MissionControlState({
     required this.client,
     this.mcSessionId,
-    Duration pollInterval = const Duration(seconds: 20),
-  }) : _pollInterval = pollInterval;
+  });
 
   final DaemonClient client;
   String? mcSessionId;
-  final Duration _pollInterval;
 
   MissionControlOverview? overview;
   List<MissionControlTask> tasks = const [];
@@ -481,7 +479,8 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   bool loading = true;
   bool sending = false;
   int _feedGeneration = 0;
-  LiveRefresh? _live;
+  Swr<_McSnapshot>? _snapshot;
+  _McSnapshot? _applied;
   Timer? _reconnectTimer;
   Timer? _hydrateTimer;
   WebSocketChannel? _ws;
@@ -522,7 +521,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   void start() {
     WidgetsBinding.instance.addObserver(this);
     _bootstrap();
-    _startPoll();
+    _watchSnapshot();
   }
 
   @override
@@ -530,7 +529,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       if (!_foreground) {
         _foreground = true;
-        _startPoll();
+        _watchSnapshot();
       }
       if (_ws == null) _connectWs();
       _refresh(silent: true);
@@ -539,22 +538,50 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _foreground = false;
-      _live?.dispose();
-      _live = null;
+      _snapshot?.dispose();
+      _snapshot = null;
     }
   }
 
-  void _startPoll() {
-    _live?.dispose();
-    _live = LiveRefresh(
+  void _watchSnapshot() {
+    _snapshot?.dispose();
+    _snapshot = Swr<_McSnapshot>(
       client: client,
-      when: (e) => LiveRefresh.coordination(e) || LiveRefresh.sessionStatus(e),
-      refresh: () {
-        if (!_foreground || mcSessionId == null) return;
-        _refresh(silent: true);
-      },
-      backstop: _pollInterval * 3,
+      key: 'mc:snapshot',
+      fetch: _fetchSnapshot,
+      revalidateOn: (e) => Swr.coordination(e) || Swr.sessionStatus(e),
+      onChange: _applySnapshot,
     );
+    _applySnapshot();
+  }
+
+  Future<_McSnapshot> _fetchSnapshot() async {
+    final results = await Future.wait([
+      client.mcOverview(),
+      client.mcTasks(archived: false),
+      client.mcSessions(archived: false),
+    ]).timeout(const Duration(seconds: 8));
+    return (
+      overview: results[0] as MissionControlOverview,
+      tasks: results[1] as List<MissionControlTask>,
+      sessions: results[2] as List<ManagedSession>,
+    );
+  }
+
+  void _applySnapshot() {
+    final swr = _snapshot;
+    if (swr == null || _closed) return;
+    final data = swr.data;
+    if (data != null && !identical(data, _applied)) {
+      _applied = data;
+      overview = data.overview;
+      tasks = data.tasks;
+      sessions = data.sessions;
+      _reconcileFeed();
+      _recomputeAgent();
+    }
+    staleError = swr.error == null ? null : '${swr.error}';
+    notifyListeners();
   }
 
   Future<void> _bootstrap() async {
@@ -591,7 +618,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     _closed = true;
     WidgetsBinding.instance.removeObserver(this);
-    _live?.dispose();
+    _snapshot?.dispose();
     _reconnectTimer?.cancel();
     _hydrateTimer?.cancel();
     _detachWs();
@@ -605,23 +632,12 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _refresh({bool silent = false}) async {
     if (silent && !_foreground) return;
     if (!silent) fatalError = null;
-    try {
-      final results = await Future.wait([
-        client.mcOverview(),
-        client.mcTasks(archived: false),
-        client.mcSessions(archived: false),
-      ]).timeout(const Duration(seconds: 8));
-      overview = results[0] as MissionControlOverview;
-      tasks = (results[1] as List<MissionControlTask>);
-      sessions = (results[2] as List<ManagedSession>);
-      _reconcileFeed();
-      _recomputeAgent();
-      staleError = null;
-    } catch (e) {
-      staleError = '$e';
-    } finally {
-      if (!_closed) notifyListeners();
+    final swr = _snapshot;
+    if (swr == null) {
+      if (_foreground) _watchSnapshot();
+      return;
     }
+    await swr.refresh();
   }
 
   void _detachWs() {
@@ -948,3 +964,9 @@ Widget? withFullTask(
         build(snap.data ?? MissionControlTask.preview(task)),
   );
 }
+
+typedef _McSnapshot = ({
+  MissionControlOverview overview,
+  List<MissionControlTask> tasks,
+  List<ManagedSession> sessions,
+});

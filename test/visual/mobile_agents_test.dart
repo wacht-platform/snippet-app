@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/agents_sidebar_panel.dart';
 import 'package:snippet/screens/create_agent_form.dart';
@@ -12,6 +13,9 @@ import 'golden.dart';
 
 class _AgentsClient extends DaemonClient {
   _AgentsClient({this.fail = false}) : super('https://daemon.invalid', 'test');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
   final bool fail;
 
   @override

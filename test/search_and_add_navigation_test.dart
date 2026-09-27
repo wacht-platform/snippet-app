@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/create_agent_form.dart';
 import 'package:snippet/screens/shell_models.dart';
@@ -12,6 +13,9 @@ import 'package:snippet/theme.dart';
 class _FakeTestClient extends DaemonClient {
   _FakeTestClient(this._agents)
       : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   final List<CoordinationAgent> _agents;
 

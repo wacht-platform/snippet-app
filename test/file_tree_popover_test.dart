@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/file_tree_sidebar_panel.dart';
 import 'package:snippet/screens/shell_rail.dart';
@@ -17,6 +18,9 @@ import 'package:snippet/screens/shell_rail.dart';
 /// this environment: they are the only evidence the anchoring actually works.
 class _FakeFsClient extends DaemonClient {
   _FakeFsClient() : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   @override
   Future<FsListing> fs(String? path) async => FsListing.fromJson({

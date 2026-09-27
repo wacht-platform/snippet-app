@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/file_tree_sidebar_panel.dart';
 import 'package:snippet/screens/git_diff_sidebar_panel.dart';
@@ -14,6 +15,9 @@ import 'package:snippet/screens/sidebar.dart';
 
 class _FakeDaemonClient extends DaemonClient {
   _FakeDaemonClient() : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   int fsCallCount = 0;
   List<String> fsCalls = [];
@@ -116,7 +120,7 @@ void main() {
     });
   });
 
-  group('FileTreeSidebarPanel auto-revalidation', () {
+  group('FileTreeSidebarPanel revalidation', () {
     testWidgets('background refresh preserves expanded folders and re-fetches subdirectories',
         (tester) async {
       final fake = _FakeDaemonClient();
@@ -127,7 +131,6 @@ void main() {
             client: fake,
             workspacePath: '/workspace',
             onOpenFile: (_, __) {},
-            autoRevalidatePeriod: const Duration(milliseconds: 300),
           ),
         ),
       ));
@@ -150,7 +153,7 @@ void main() {
         'git': false,
       });
 
-      // Wait for auto-revalidation periodic timer to fire
+      fake.deviceEvents.add({'kind': 'activity', 'workspace': '/workspace'});
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -172,7 +175,7 @@ void main() {
     });
   });
 
-  group('GitDiffSidebarPanel auto-refresh', () {
+  group('GitDiffSidebarPanel revalidation', () {
     testWidgets('background refresh updates git status silently',
         (tester) async {
       final fake = _FakeDaemonClient();
@@ -183,7 +186,6 @@ void main() {
             client: fake,
             workspacePath: '/workspace',
             sessionId: 'sess-1',
-            autoRefreshPeriod: const Duration(milliseconds: 300),
           ),
         ),
       ));
@@ -195,7 +197,8 @@ void main() {
       // Mutate git status to clean
       fake.gitFiles.clear();
 
-      // Wait for auto-refresh periodic timer to fire
+      fake.deviceEvents
+          .add({'kind': 'activity', 'session': 'sess-1', 'workspace': '/workspace'});
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pump(const Duration(milliseconds: 50));
 

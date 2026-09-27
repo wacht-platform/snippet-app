@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/mission_control/mission_control_state.dart';
 import 'package:snippet/screens/mission_control/widgets/activity_feed.dart';
@@ -23,6 +24,9 @@ import 'golden.dart';
 /// pure data here and there is no timer to outlive the test.
 class _FakeDaemon extends DaemonClient {
   _FakeDaemon(this._tasks) : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   final List<Map<String, dynamic>> _tasks;
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/mission_control/task_board_screen.dart';
 
@@ -12,6 +13,9 @@ import 'package:snippet/screens/mission_control/task_board_screen.dart';
 /// and a `Set`-based filter that no longer narrows would still compile.
 class _FakeDaemon extends DaemonClient {
   _FakeDaemon() : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   List<Map<String, dynamic>> items = [];
   bool fail = false;
@@ -39,7 +43,7 @@ Future<void> _pump(WidgetTester tester, _FakeDaemon client) async {
 }
 
 void main() {
-  testWidgets('a background tick updates silently — no spinner, no error state',
+  testWidgets('a background revalidation updates silently — no spinner, no error state',
       (tester) async {
     final client = _FakeDaemon()
       ..items = [_task('1', 'First task', 'todo')];
@@ -52,24 +56,25 @@ void main() {
       _task('1', 'First task', 'todo'),
       _task('2', 'Second task', 'done'),
     ];
-    await tester.pump(const Duration(seconds: 25));
+    client.deviceEvents.add({'kind': 'coordination_event'});
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();
     expect(find.text('Second task'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing,
-        reason: 'a background tick must not set the loading state');
+        reason: 'a background revalidation must not set the loading state');
 
     // Now the daemon refuses the poll. The visible board must survive: a
     // transient failure is not allowed to replace the page with an error.
     client.fail = true;
-    await tester.pump(const Duration(seconds: 25));
+    client.deviceEvents.add({'kind': 'coordination_event'});
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();
     expect(find.text('First task'), findsOneWidget);
     expect(find.text('Second task'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.textContaining('network down'), findsNothing,
-        reason: 'the timer path must not surface transient errors');
+        reason: 'background revalidation must not surface transient errors');
 
-    // Unmount so the periodic timer is cancelled in dispose().
     await tester.pumpWidget(const SizedBox.shrink());
     expect(tester.takeException(), isNull);
   });

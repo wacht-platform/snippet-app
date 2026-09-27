@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/files.dart';
 import 'package:snippet/widgets.dart';
@@ -17,6 +18,9 @@ import 'package:snippet/widgets.dart';
 /// These tests pin the split: phones get the viewer route, desktop keeps tabs.
 class _FakeFilesClient extends DaemonClient {
   _FakeFilesClient() : super('https://daemon.invalid', 'test-token');
+
+  @override
+  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
 
   @override
   Future<FsListing> fs(String? path) async {

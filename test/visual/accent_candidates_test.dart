@@ -43,6 +43,8 @@ ThemePreset _withAccent(Color accent) {
     border2: b.border2,
     accent: accent,
     accentHover: hover,
+    accentFill: accent,
+    accentFillHover: hover,
     accentFg: b.accentFg,
     accentBg: accent.withValues(alpha: 0.14),
     accentLine: accent.withValues(alpha: 0.38),
