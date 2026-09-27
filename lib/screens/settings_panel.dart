@@ -188,7 +188,6 @@ class SettingsPanelState extends State<SettingsPanel> {
   late final List<Instance> _instances = [...widget.instances];
   bool _notif = false;
   bool _notifBusy = false;
-  late Future<void> _mobileSettingsReady;
   final GlobalKey<VaultScreenState> _vaultKey = GlobalKey<VaultScreenState>();
   final GlobalKey<InferenceProfilesScreenState> _modelsKey =
       GlobalKey<InferenceProfilesScreenState>();
@@ -245,7 +244,6 @@ class SettingsPanelState extends State<SettingsPanel> {
   void initState() {
     super.initState();
     _addMachinePaste.addListener(() => setState(() {}));
-    _mobileSettingsReady = _loadMobileSettings();
     notificationsEnabled().then((v) {
       if (mounted) setState(() => _notif = v);
     });
@@ -256,24 +254,6 @@ class SettingsPanelState extends State<SettingsPanel> {
     _addMachinePaste.dispose();
     _renameController.dispose();
     super.dispose();
-  }
-
-  ServerConfig? _cfg;
-  UsageSummary? _usage;
-  List<String> _vaultNames = const [];
-  List<RecurringJob> _jobs = const [];
-
-  Future<void> _loadMobileSettings() async {
-    await Future.wait<void>([
-      widget.client.getConfig().then<void>((v) => _cfg = v),
-      widget.client.getUsage().then<void>((v) => _usage = v, onError: (_) {}),
-      widget.client
-          .vaultList()
-          .then<void>((v) => _vaultNames = v, onError: (_) {}),
-      widget.client
-          .recurringJobs()
-          .then<void>((v) => _jobs = v, onError: (_) {}),
-    ]);
   }
 
   Future<void> _toggleNotif(bool v) async {
@@ -342,21 +322,7 @@ class SettingsPanelState extends State<SettingsPanel> {
             child: KeyedSubtree(
               key: ValueKey(_mobileSection?.name ?? 'home'),
               child: _mobileSection == null
-                  ? FutureBuilder<void>(
-                      future: _mobileSettingsReady,
-                      builder: (context, snap) {
-                        if (snap.connectionState != ConnectionState.done) {
-                          return const AppLoading(label: 'Loading settings');
-                        }
-                        if (snap.hasError) {
-                          return Center(
-                            child: Text('Unable to load settings',
-                                style: sans(13, color: AppColors.fg2)),
-                          );
-                        }
-                        return _mobileSettingsHome();
-                      },
-                    )
+                  ? _mobileSettingsHome()
                   : _mobileSectionPage(),
             ),
           ),
@@ -497,12 +463,8 @@ class SettingsPanelState extends State<SettingsPanel> {
   /// Phone settings HOME.
   Widget _mobileSettingsHome() {
     final active = widget.active;
-    final totalTokens = (_usage?.providers ?? const [])
-        .fold<int>(0, (sum, p) => sum + p.totalTokens);
-    final activeProfile = _cfg?.active ?? '';
-    final nVault = _vaultNames.length;
-    final nJobs = _jobs.length;
-    Widget nav(SettingsPage page, String icon, String label, String summary) =>
+    Widget nav(SettingsPage page, String icon, String label,
+            [String summary = '']) =>
         ListRow(
           title: label,
           leading: IconTile(icon),
@@ -521,12 +483,8 @@ class SettingsPanelState extends State<SettingsPanel> {
           ]),
         );
     return ListView(
-      padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s16, S.s40),
+      padding: const EdgeInsets.fromLTRB(S.s16, S.s8, S.s16, S.s40),
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(S.s4, S.s4, S.s4, S.s16),
-          child: Text('Settings', style: TS.pageTitle()),
-        ),
         const SectionHeader('Machine',
             padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
         ListGroup(children: [
@@ -550,14 +508,10 @@ class SettingsPanelState extends State<SettingsPanel> {
         const SectionHeader('Workspace',
             padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
         ListGroup(children: [
-          nav(SettingsPage.models, 'ai-chip', 'Inference profiles',
-              activeProfile),
-          nav(SettingsPage.usage, 'analytics', 'Usage',
-              totalTokens > 0 ? '${fmtSi(totalTokens)} tokens' : ''),
-          nav(SettingsPage.vault, 'lock-key', 'Vault',
-              '$nVault ${nVault == 1 ? 'secret' : 'secrets'}'),
-          nav(SettingsPage.scheduled, 'repeat', 'Scheduled jobs',
-              '$nJobs ${nJobs == 1 ? 'job' : 'jobs'}'),
+          nav(SettingsPage.models, 'ai-chip', 'Inference profiles'),
+          nav(SettingsPage.usage, 'analytics', 'Usage'),
+          nav(SettingsPage.vault, 'lock-key', 'Vault'),
+          nav(SettingsPage.scheduled, 'repeat', 'Scheduled jobs'),
         ]),
       ],
     );
