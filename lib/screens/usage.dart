@@ -8,6 +8,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
+import '../live_refresh.dart';
 
 class UsageScreen extends StatefulWidget {
   final DaemonClient client;
@@ -52,7 +53,7 @@ extension on _Period {
 class _UsageScreenState extends State<UsageScreen> {
   late Future<UsageSummary> _future;
   UsageSummary? _last;
-  Timer? _refreshTimer;
+  LiveRefresh? _live;
   _Period _period = _Period.all;
 
   Future<UsageSummary> _load() => widget.client
@@ -63,14 +64,19 @@ class _UsageScreenState extends State<UsageScreen> {
   void initState() {
     super.initState();
     _future = _load();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) _refresh();
-    });
+    _live = LiveRefresh(
+      client: widget.client,
+      when: (e) => const {'idle', 'done', 'error'}.contains(e['kind']),
+      refresh: () {
+        if (mounted) _refresh();
+      },
+      debounce: const Duration(seconds: 2),
+    );
   }
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
+    _live?.dispose();
     super.dispose();
   }
 

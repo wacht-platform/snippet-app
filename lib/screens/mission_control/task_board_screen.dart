@@ -13,6 +13,7 @@ import '../../widgets.dart';
 import 'mission_control_state.dart';
 import 'mobile/mobile_mc.dart' show showMissionControlPanel;
 import 'task_detail_screen.dart';
+import '../../live_refresh.dart';
 
 /// The task board — where a human files work.
 ///
@@ -51,9 +52,8 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
 
   /// Auto-refresh cadence. 25s sits inside the 20–30s window the board asked
   /// for; tune it here.
-  static const _autoRefreshInterval = Duration(seconds: 25);
 
-  Timer? _autoRefreshTimer;
+  LiveRefresh? _live;
 
   /// Guards against overlapping fetches: a background tick that lands while a
   /// request is already in flight is dropped rather than stacked.
@@ -68,13 +68,18 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
     super.initState();
     refresh();
     widget.refreshSignal?.addListener(refresh);
-    _autoRefreshTimer =
-        Timer.periodic(_autoRefreshInterval, (_) => _load(silent: true));
+    _live = LiveRefresh(
+      client: widget.client,
+      when: LiveRefresh.coordination,
+      refresh: () {
+        if (mounted) _load(silent: true);
+      },
+    );
   }
 
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
+    _live?.dispose();
     widget.refreshSignal?.removeListener(refresh);
     super.dispose();
   }

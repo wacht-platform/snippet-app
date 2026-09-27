@@ -17,6 +17,7 @@ import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../live_refresh.dart';
 
 /// Pick one agent from the directory, as an anchored DROPDOWN.
 ///
@@ -336,7 +337,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   bool _loading = true;
   bool _sending = false;
   String? _error;
-  Timer? _pollTimer;
+  LiveRefresh? _live;
 
   final List<_AgentAttachment> _attachments = [];
   int _attachmentGeneration = 0;
@@ -361,11 +362,14 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   void initState() {
     super.initState();
     _load();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted && !_sending) {
-        _load(silent: true);
-      }
-    });
+    _live = LiveRefresh(
+      client: widget.client,
+      when: LiveRefresh.coordination,
+      refresh: () {
+        if (mounted && !_sending) _load(silent: true);
+      },
+      backstop: const Duration(seconds: 30),
+    );
     _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
       if (!mounted) return;
       setState(() => _isPlayingRecording = state == PlayerState.playing);
@@ -378,7 +382,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
+    _live?.dispose();
     _amplitudeSub?.cancel();
     _recordingTimer?.cancel();
     _playerStateSub?.cancel();

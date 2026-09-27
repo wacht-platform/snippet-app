@@ -17,6 +17,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../api.dart';
 import '../../models.dart';
+import '../../live_refresh.dart';
 
 /// One row in the activity feed. The feed is a chat-style log of everything
 /// that has happened between the user and the MC session, plus the events
@@ -480,7 +481,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   bool loading = true;
   bool sending = false;
   int _feedGeneration = 0;
-  Timer? _pollTimer;
+  LiveRefresh? _live;
   Timer? _reconnectTimer;
   Timer? _hydrateTimer;
   WebSocketChannel? _ws;
@@ -538,17 +539,22 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _foreground = false;
-      _pollTimer?.cancel();
-      _pollTimer = null;
+      _live?.dispose();
+      _live = null;
     }
   }
 
   void _startPoll() {
-    _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(_pollInterval, (_) {
-      if (!_foreground || mcSessionId == null) return;
-      _refresh(silent: true);
-    });
+    _live?.dispose();
+    _live = LiveRefresh(
+      client: client,
+      when: (e) => LiveRefresh.coordination(e) || LiveRefresh.sessionStatus(e),
+      refresh: () {
+        if (!_foreground || mcSessionId == null) return;
+        _refresh(silent: true);
+      },
+      backstop: _pollInterval * 3,
+    );
   }
 
   Future<void> _bootstrap() async {
@@ -585,7 +591,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     _closed = true;
     WidgetsBinding.instance.removeObserver(this);
-    _pollTimer?.cancel();
+    _live?.dispose();
     _reconnectTimer?.cancel();
     _hydrateTimer?.cancel();
     _detachWs();
