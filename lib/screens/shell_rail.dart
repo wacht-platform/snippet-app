@@ -168,7 +168,7 @@ class RailIcon extends StatelessWidget {
             color: AppColors.surface3,
             borderRadius: BorderRadius.circular(R.pill),
           ),
-          child: Text(badge!, style: mono(10, color: AppColors.fg2)),
+          child: Text(badge!, style: TS.caption(AppColors.fg2)),
         ),
       ),
     ]);

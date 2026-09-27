@@ -29,7 +29,7 @@ class TabDragFeedback extends StatelessWidget {
           const SizedBox(width: 7),
           Text(
             tab.title.isEmpty ? '(untitled)' : tab.title,
-            style: sans(12, color: AppColors.fg1),
+            style: sans(13, color: AppColors.fg1),
           ),
         ]),
       ),

@@ -149,26 +149,23 @@ class CardTabChip extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
           padding: const EdgeInsets.only(left: 12, right: 6),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.surface2 : Colors.transparent,
+            color: isActive ? AppColors.hover : Colors.transparent,
             borderRadius: BorderRadius.circular(R.sm),
-            border: Border.all(
-              color: isActive ? AppColors.border : Colors.transparent,
-            ),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             AppIcon(
               tabIconKind(tab),
-              size: 12,
+              size: 14,
               color: isActive ? AppColors.accent : AppColors.fg4,
             ),
-            const SizedBox(width: 7),
+            const SizedBox(width: S.s6),
             Flexible(
               child: Text(
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style:
-                    sans(12, color: isActive ? AppColors.fg1 : AppColors.fg3),
+                    sans(13, color: isActive ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
             if (canClose) ...[
@@ -200,11 +197,8 @@ class CardTabChip extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.surface2 : Colors.transparent,
+          color: isActive ? AppColors.hover : Colors.transparent,
           borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(
-            color: activeBorderColor(isActive),
-          ),
         ),
         child: Row(
           children: [

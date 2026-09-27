@@ -187,7 +187,7 @@ class ReadoutDragFeedback extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           AppIcon(tab.icon, size: 13, color: AppColors.accent),
           const SizedBox(width: 7),
-          Text(tab.label, style: sans(12, color: AppColors.fg1)),
+          Text(tab.label, style: sans(13, color: AppColors.fg1)),
         ]),
       ),
     );

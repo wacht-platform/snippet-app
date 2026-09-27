@@ -536,7 +536,7 @@ bool paneTabBelongsInGroup({
 }
 
 /// Pane tab label size.
-const double kPaneTabText = 12;
+const double kPaneTabText = 13;
 
 /// One tab in a pane header. Readout tabs may close themselves; the pane never
 /// owns a separate close action.
