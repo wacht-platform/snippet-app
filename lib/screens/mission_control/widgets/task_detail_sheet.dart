@@ -14,6 +14,9 @@ class TaskDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final full = withFullTask(
+        state, task, (t) => TaskDetailSheet(task: t, state: state));
+    if (full != null) return full;
     final t = task;
     final title = (t.title as String).trim().isEmpty
         ? 'Untitled task'

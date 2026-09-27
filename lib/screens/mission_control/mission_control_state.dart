@@ -497,6 +497,16 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
     detail: '',
   );
 
+  final Map<String, Future<MissionControlTask>> _fullTasks = {};
+
+  Future<MissionControlTask> fullTask(MissionControlTask task) {
+    final key = '${task.id}@${task.updatedAt}';
+    return _fullTasks[key] ??= client.mcTask(task.id).catchError((Object _) {
+      _fullTasks.remove(key);
+      return MissionControlTask.preview(task);
+    });
+  }
+
   /// Read-only views.
   List<MissionControlTask> get activeTasks =>
       tasks.where((task) => task.isActive).toList();
@@ -916,4 +926,19 @@ extension on AgentSnapshot {
         blockedCount: blockedCount ?? this.blockedCount,
         unreadNotifications: unreadNotifications ?? this.unreadNotifications,
       );
+}
+
+Widget? withFullTask(
+  MissionControlState? state,
+  Object? task,
+  Widget Function(MissionControlTask task) build,
+) {
+  if (state == null || task is! MissionControlTask || !task.summary) {
+    return null;
+  }
+  return FutureBuilder<MissionControlTask>(
+    future: state.fullTask(task),
+    builder: (context, snap) =>
+        build(snap.data ?? MissionControlTask.preview(task)),
+  );
 }

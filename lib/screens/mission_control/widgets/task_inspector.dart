@@ -14,6 +14,9 @@ class TaskInspector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final full = withFullTask(
+        state, task, (t) => TaskInspector(task: t, state: state));
+    if (full != null) return full;
     final t = task;
     return Padding(
       padding: const EdgeInsets.all(16),

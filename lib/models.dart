@@ -1032,14 +1032,28 @@ class MissionControlTask {
   final String? sessionId; // link to a managed session
   final bool archived;
   final List<NotificationMarker> notifications;
+  final bool summary;
+
+  MissionControlTask.preview(MissionControlTask o)
+      : id = o.id,
+        title = o.title,
+        description = o.description,
+        status = o.status,
+        createdAt = o.createdAt,
+        updatedAt = o.updatedAt,
+        sessionId = o.sessionId,
+        archived = o.archived,
+        notifications = o.notifications,
+        summary = false;
 
   MissionControlTask.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
+        summary = j['summary'] == true,
         title = j['title'] as String? ?? '',
         description = j['description'] as String? ?? '',
         status = j['status'] as String? ?? 'pending',
-        createdAt = (j['created_at'] as num?)?.toInt() ?? 0,
-        updatedAt = (j['updated_at'] as num?)?.toInt() ?? 0,
+        createdAt = _epochSeconds(j['created_at']),
+        updatedAt = _epochSeconds(j['updated_at']),
         sessionId = j['session_id'] as String?,
         archived = j['archived'] as bool? ?? false,
         notifications = ((j['notifications'] as List?) ?? const [])
@@ -1049,6 +1063,15 @@ class MissionControlTask {
 
   bool get isActive =>
       !archived && (status == 'pending' || status == 'in_progress');
+}
+
+int _epochSeconds(dynamic raw) {
+  if (raw is num) return raw.toInt();
+  if (raw is String) {
+    final parsed = DateTime.tryParse(raw);
+    if (parsed != null) return parsed.millisecondsSinceEpoch ~/ 1000;
+  }
+  return 0;
 }
 
 /// A managed session registered in Mission Control.

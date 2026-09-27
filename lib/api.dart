@@ -662,15 +662,21 @@ class DaemonClient {
 
   /// GET /mission-control/tasks — list all tasks (optionally filtered).
   Future<List<MissionControlTask>> mcTasks({bool? archived}) async {
-    final q = <String, String>{};
+    final q = <String, String>{'view': 'summary'};
     if (archived != null) q['archived'] = '$archived';
-    final r =
-        await http.get(_uri('/mission-control/tasks', q.isEmpty ? null : q));
+    final r = await http.get(_uri('/mission-control/tasks', q));
     if (r.statusCode != 200) throw _err('list mission control tasks', r);
     final list = jsonDecode(r.body) as List;
     return list
         .map((e) => MissionControlTask.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<MissionControlTask> mcTask(String id) async {
+    final r = await http
+        .get(_uri('/mission-control/tasks/${Uri.encodeComponent(id)}'));
+    if (r.statusCode != 200) throw _err('load mission control task', r);
+    return MissionControlTask.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
   /// POST /mission-control/tasks — create a new task. Returns the created task.
@@ -1016,7 +1022,7 @@ class DaemonClient {
     String? agentId,
     int limit = 200,
   }) async {
-    final query = <String, String>{'limit': '$limit'};
+    final query = <String, String>{'limit': '$limit', 'view': 'summary'};
     if (status != null && status.isNotEmpty) query['status'] = status;
     if (agentId != null && agentId.isNotEmpty) query['agent_id'] = agentId;
     final r = await http.get(_uri('/coordination/tasks', query));
