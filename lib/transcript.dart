@@ -407,37 +407,190 @@ class SystemRow extends StatelessWidget {
       }
       final detail = reasoning.trim();
       return Padding(
-        padding: const EdgeInsets.only(top: 4, bottom: 16),
+        padding: const EdgeInsets.only(top: S.s4, bottom: S.s16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _SystemDivider(label: label),
           if (detail.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: MarkdownPreview(data: detail, maxLines: 12),
+              padding: const EdgeInsets.only(top: S.s8),
+              child: MarkdownBody(
+                data: detail,
+                selectable: true,
+                styleSheet: markdownStyle(context),
+                builders: {'pre': PreBlockBuilder()},
+                onTapLink: (txt, href, title) => openMarkdownLink(href),
+              ),
             ),
         ]),
       );
     }
 
-    final (glyph, color) = switch (step) {
-      'watch_added' || 'watch_removed' => ('◉', AppColors.run),
-      'file_watch' => ('◉', AppColors.accent),
-      'interrupted' => ('■', AppColors.danger),
-      _ => ('·', AppColors.fg4),
-    };
+    switch (step) {
+      case 'watch_added':
+        final m = RegExp(r'^watching "(.*)" \((.*)\)$', dotAll: true)
+            .firstMatch(reasoning.trim());
+        return _WatchLine(
+          icon: 'eye',
+          verb: 'Watching',
+          subject: m?.group(1) ?? reasoning,
+          path: m?.group(2),
+        );
+      case 'watch_removed':
+        final m =
+            RegExp(r'^stopped watching "(.*)"$').firstMatch(reasoning.trim());
+        return _WatchLine(
+          icon: 'eye-off',
+          verb: 'Stopped watching',
+          subject: m?.group(1) ?? reasoning,
+          muted: true,
+        );
+      case 'file_watch':
+        final m = RegExp(r'^"(.*?)" — (.*?) grew: ?(.*)$', dotAll: true)
+            .firstMatch(reasoning);
+        return _WatchFired(
+          subject: m?.group(1) ?? 'Watched file',
+          path: m?.group(2) ?? '',
+          preview: (m?.group(3) ?? reasoning).trim(),
+        );
+      case 'interrupted':
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: S.s6),
+          child: Row(children: [
+            SizedBox(
+                width: 16,
+                child: Center(
+                    child: AppIcon('stop', size: 14, color: AppColors.danger))),
+            const SizedBox(width: S.s8),
+            Text('You stopped the run', style: TS.label(AppColors.danger)),
+          ]),
+        );
+    }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: S.s4),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
             width: 16,
-            child: Center(child: Text(glyph, style: mono(11, color: color)))),
-        const SizedBox(width: 6),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Center(
+                  child: AppIcon('activity', size: 14, color: AppColors.fg4)),
+            )),
+        const SizedBox(width: S.s8),
         Expanded(
           child: Text(reasoning,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: sans(11, height: 1.4, color: AppColors.fg3)),
+              maxLines: 3, overflow: TextOverflow.ellipsis, style: TS.meta()),
         ),
+      ]),
+    );
+  }
+}
+
+class _WatchLine extends StatelessWidget {
+  const _WatchLine({
+    required this.icon,
+    required this.verb,
+    required this.subject,
+    this.path,
+    this.muted = false,
+  });
+
+  final String icon;
+  final String verb;
+  final String subject;
+  final String? path;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    final strong = muted ? AppColors.fg3 : AppColors.fg2;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      child: Row(children: [
+        SizedBox(
+            width: 16,
+            child: Center(
+                child: AppIcon(icon,
+                    size: 16,
+                    color: muted ? AppColors.fg4 : AppColors.accent))),
+        const SizedBox(width: S.s8),
+        Text(verb, style: TS.label(strong).copyWith(fontWeight: W.body)),
+        const SizedBox(width: S.s6),
+        Flexible(
+          flex: 0,
+          child: Text(subject,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TS.label(muted ? AppColors.fg3 : AppColors.fg1)),
+        ),
+        if (path != null && path!.isNotEmpty) ...[
+          const SizedBox(width: S.s8),
+          Expanded(
+            child: Text(path!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TS.codeSmall(AppColors.fg4)),
+          ),
+        ] else
+          const Spacer(),
+      ]),
+    );
+  }
+}
+
+class _WatchFired extends StatelessWidget {
+  const _WatchFired(
+      {required this.subject, required this.path, required this.preview});
+
+  final String subject;
+  final String path;
+  final String preview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          SizedBox(
+              width: 16,
+              child: Center(
+                  child:
+                      AppIcon('activity', size: 16, color: AppColors.accent))),
+          const SizedBox(width: S.s8),
+          Flexible(
+            flex: 0,
+            child: Text('$subject changed',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TS.label(AppColors.fg1)),
+          ),
+          if (path.isNotEmpty) ...[
+            const SizedBox(width: S.s8),
+            Expanded(
+              child: Text(path,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TS.codeSmall(AppColors.fg4)),
+            ),
+          ] else
+            const Spacer(),
+        ]),
+        if (preview.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, S.s4, 0, 0),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s6),
+              decoration: BoxDecoration(
+                color: AppColors.raised,
+                borderRadius: BorderRadius.circular(R.sm + 2),
+              ),
+              child: Text(preview,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(12, height: 1.4, color: AppColors.fg2)),
+            ),
+          ),
       ]),
     );
   }
@@ -509,18 +662,16 @@ class _SystemDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    final style = mono(10, color: AppColors.fg3);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: S.s12),
       child: Row(children: [
-        const Expanded(child: Divider(height: 1, thickness: 0.6)),
+        Expanded(child: Container(height: 1, color: AppColors.line)),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(label,
-              style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+          padding: const EdgeInsets.symmetric(horizontal: S.s12),
+          child: Text(label[0].toUpperCase() + label.substring(1),
+              style: TS.meta(), maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
-        const Expanded(child: Divider(height: 1, thickness: 0.6)),
+        Expanded(child: Container(height: 1, color: AppColors.line)),
       ]),
     );
   }

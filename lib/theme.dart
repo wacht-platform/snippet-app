@@ -778,6 +778,8 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedPencilEdit01;
     case 'eye':
       return HugeIcons.strokeRoundedView;
+    case 'eye-off':
+      return HugeIcons.strokeRoundedViewOff;
     case 'code':
       return HugeIcons.strokeRoundedCode;
     case 'book':
