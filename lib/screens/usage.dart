@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
@@ -27,14 +28,41 @@ class UsageScreen extends StatefulWidget {
   State<UsageScreen> createState() => _UsageScreenState();
 }
 
+enum _Period { day, week, month, all }
+
+extension on _Period {
+  String get label => switch (this) {
+        _Period.day => 'Today',
+        _Period.week => '7 days',
+        _Period.month => '30 days',
+        _Period.all => 'All time',
+      };
+
+  DateTime? get since {
+    final now = DateTime.now();
+    return switch (this) {
+      _Period.day => DateTime(now.year, now.month, now.day),
+      _Period.week => now.subtract(const Duration(days: 7)),
+      _Period.month => now.subtract(const Duration(days: 30)),
+      _Period.all => null,
+    };
+  }
+}
+
 class _UsageScreenState extends State<UsageScreen> {
   late Future<UsageSummary> _future;
+  UsageSummary? _last;
   Timer? _refreshTimer;
+  _Period _period = _Period.all;
+
+  Future<UsageSummary> _load() => widget.client
+      .getUsage(since: _period.since)
+      .then((value) => _last = value);
 
   @override
   void initState() {
     super.initState();
-    _future = widget.client.getUsage();
+    _future = _load();
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) _refresh();
     });
@@ -47,7 +75,14 @@ class _UsageScreenState extends State<UsageScreen> {
   }
 
   void _refresh() {
-    setState(() => _future = widget.client.getUsage());
+    setState(() => _future = _load());
+  }
+
+  void _setPeriod(_Period period) {
+    if (period == _period) return;
+    _period = period;
+    _last = null;
+    _refresh();
   }
 
   @override
@@ -56,10 +91,11 @@ class _UsageScreenState extends State<UsageScreen> {
     final body = FutureBuilder<UsageSummary>(
       future: _future,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+        final data = snap.data ?? _last;
+        if (data == null && !snap.hasError) {
           return const Center(child: DelayedSpinner(size: 22));
         }
-        if (snap.hasError) {
+        if (data == null) {
           return Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Text('Unable to load usage',
@@ -76,20 +112,22 @@ class _UsageScreenState extends State<UsageScreen> {
             ]),
           );
         }
-        final summary = snap.data!;
-        if (summary.providers.isEmpty) {
-          return const EmptyState(
-              icon: 'analytics',
-              title: 'No usage yet',
-              body: 'Token counts appear here once a session has run.');
-        }
+        final summary = data;
         return PageBody(children: [
+          _PeriodTabs(value: _period, onChanged: _setPeriod),
+          const SizedBox(height: S.s16),
+          if (summary.providers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: S.s32),
+              child: Text('No model calls in this period.',
+                  textAlign: TextAlign.center, style: TS.meta()),
+            ),
           for (var i = 0; i < summary.providers.length; i++) ...[
             if (i > 0) const SizedBox(height: S.s12),
             _ProviderCard(provider: summary.providers[i]),
           ],
           const SettingsNote(
-              'Token totals since the daemon started. Rate limits come from each provider\'s own reports.'),
+              'Every model call is recorded against the provider and model that served it. Input includes cached tokens; rate limits come from each provider\'s own reports.'),
         ]);
       },
     );
@@ -124,32 +162,55 @@ class _ProviderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasTokens = provider.totalTokens > 0;
+    final sessions =
+        '${provider.sessions} session${provider.sessions == 1 ? '' : 's'}';
+    final models = provider.models.where((m) => m.model.isNotEmpty).toList();
     return AppCard(
       padding: const EdgeInsets.all(S.s16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(
-            child: Text(provider.provider, style: TS.rowTitle()),
+            child: Text(provider.legacy ? 'Before tracking' : provider.provider,
+                style: TS.rowTitle()),
           ),
-          Tag('${provider.sessions} session${provider.sessions == 1 ? '' : 's'}'),
+          Tag(sessions),
         ]),
-        if (provider.profile != null || provider.model.isNotEmpty) ...[
-          const SizedBox(height: 3),
-          Text(
-              [if (provider.profile != null) provider.profile!, provider.model]
-                  .join(' · '),
-              style: TS.meta()),
-        ],
+        const SizedBox(height: 3),
+        Text(
+            provider.legacy
+                ? 'Lifetime totals recorded before per-call tracking. They can’t be split by provider or model.'
+                : '${provider.calls} call${provider.calls == 1 ? '' : 's'}',
+            style: TS.meta()),
         if (hasTokens) ...[
           const SizedBox(height: S.s16),
           Row(children: [
             Expanded(child: _Metric('Total', fmtSi(provider.totalTokens))),
             Expanded(child: _Metric('Input', fmtSi(provider.promptTokens))),
+            Expanded(child: _Metric('Cached', fmtSi(provider.cacheReadTokens))),
             Expanded(
                 child: _Metric('Output', fmtSi(provider.completionTokens))),
           ]),
         ],
-        if (provider.rateLimits.isEmpty) ...[
+        if (models.length > 1 ||
+            (models.length == 1 && !provider.legacy)) ...[
+          const SizedBox(height: S.s12),
+          for (final m in models)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: S.s4),
+              child: Row(children: [
+                Expanded(
+                  child: Text(m.model,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TS.codeSmall(AppColors.fg2)),
+                ),
+                Text('${fmtSi(m.totalTokens)} · ${m.calls}×',
+                    style: TS.meta().copyWith(
+                        fontFeatures: const [FontFeature.tabularFigures()])),
+              ]),
+            ),
+        ],
+        if (!provider.legacy && provider.rateLimits.isEmpty) ...[
           const SizedBox(height: 12),
           // THREE states, worded distinctly — a single generic "no usage yet"
           // said the wrong thing in two of them:
@@ -184,7 +245,7 @@ class _ProviderCard extends StatelessWidget {
                   style: TS.meta()),
             ),
           ]),
-        ] else ...[
+        ] else if (!provider.legacy) ...[
           const SizedBox(height: 12),
           for (final rate in provider.rateLimits) ...[
             _RateRow(rate: rate),
@@ -251,4 +312,40 @@ class _RateRow extends StatelessWidget {
       ],
     ]);
   }
+}
+
+class _PeriodTabs extends StatelessWidget {
+  final _Period value;
+  final ValueChanged<_Period> onChanged;
+  const _PeriodTabs({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(S.s2),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(R.md),
+        ),
+        child: Row(children: [
+          for (final p in _Period.values)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(p),
+                child: AnimatedContainer(
+                  duration: Motion.quick,
+                  height: kMobile ? 36 : 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: p == value ? AppColors.surface3 : Colors.transparent,
+                    borderRadius: BorderRadius.circular(R.md - S.s2),
+                  ),
+                  child: Text(p.label,
+                      style: TS.label(
+                          p == value ? AppColors.fg1 : AppColors.fg3)),
+                ),
+              ),
+            ),
+        ]),
+      );
 }

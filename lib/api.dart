@@ -42,8 +42,6 @@ class DaemonClient {
 
   ServerConfig? _configCache;
   Future<ServerConfig>? _configInFlight;
-  UsageSummary? _usageCache;
-  Future<UsageSummary>? _usageInFlight;
   List<String>? _vaultCache;
   Future<List<String>>? _vaultInFlight;
   List<RecurringJob>? _recurringCache;
@@ -138,7 +136,7 @@ class DaemonClient {
     final uri = base.replace(
       scheme: wsScheme,
       path: '/attach',
-      queryParameters: {'session': sessionId, 'token': token},
+      queryParameters: {'session': sessionId, 'token': token, 'compact': '1'},
     );
     return _connectWs(
       uri,
@@ -196,20 +194,13 @@ class DaemonClient {
 
   // ---- model configuration (shared with the TUI's config.toml) ----
 
-  Future<UsageSummary> getUsage() async {
-    if (_usageCache != null) return _usageCache!;
-    if (_usageInFlight != null) return _usageInFlight!;
-    final pending = () async {
-      final r = await http.get(_uri('/usage'));
-      if (r.statusCode != 200) throw _err('load usage', r);
-      final value = UsageSummary.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
-      _usageCache = value;
-      return value;
-    }();
-    _usageInFlight = pending;
-    try { return await pending; } finally {
-      if (identical(_usageInFlight, pending)) _usageInFlight = null;
-    }
+  Future<UsageSummary> getUsage({DateTime? since}) async {
+    final r = await http.get(_uri('/usage', {
+      if (since != null)
+        'since': '${since.millisecondsSinceEpoch ~/ 1000}',
+    }));
+    if (r.statusCode != 200) throw _err('load usage', r);
+    return UsageSummary.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
   Future<ServerConfig> getConfig({bool force = false}) async {

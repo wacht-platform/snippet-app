@@ -105,8 +105,22 @@ extension _SessionScreenSocketExt on _SessionScreenState {
         } else {
           _transcriptStart = 0;
         }
-        _loadingOlderTranscript = false;
-        if (_transcriptStart > 0) _scheduleHistoryPrefetch();
+        _setState(() => _loadingOlderTranscript = false);
+        return;
+      }
+      if (wire == 'event') {
+        final index = (j['index'] as num?)?.toInt();
+        final event = j['event'];
+        final cur = _state;
+        if (index != null && event is Map && cur != null) {
+          final rel = index - _transcriptStart;
+          if (rel >= 0 && rel < cur.events.length) {
+            _setState(() {
+              _state = cur.replaceEvent(rel, event.cast<String, dynamic>());
+              _transcriptDirty = true;
+            });
+          }
+        }
         return;
       }
       if (wire == 'term') {
@@ -254,10 +268,7 @@ extension _SessionScreenSocketExt on _SessionScreenState {
       if (eventsChanged) _transcriptDirty = true;
       if (wire == 'snapshot') {
         final offset = (j['event_offset'] as num?)?.toInt();
-        _transcriptStart = offset ??
-            (next.events.length > _transcriptPageSize
-                ? next.events.length - _transcriptPageSize
-                : 0);
+        _transcriptStart = offset ?? 0;
       }
       _setState(() {
         _state = next;
@@ -284,9 +295,6 @@ extension _SessionScreenSocketExt on _SessionScreenState {
           }
         }
       });
-      if (wire == 'snapshot' && _transcriptStart > 0) {
-        _scheduleHistoryPrefetch();
-      }
       widget.onMacStatus?.call(next, next.status == 'running');
       widget.onMacControls
           ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);

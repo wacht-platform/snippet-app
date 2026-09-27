@@ -255,10 +255,30 @@ class RateWindow {
   double get leftPercent => (100 - usedPercent).clamp(0, 100).toDouble();
 }
 
+class UsageModel {
+  final String model;
+  final int calls;
+  final int totalTokens;
+  final int promptTokens;
+  final int completionTokens;
+  final int cacheReadTokens;
+
+  UsageModel.fromJson(Map<String, dynamic> j)
+      : model = j['model'] as String? ?? '',
+        calls = (j['calls'] as num?)?.toInt() ?? 0,
+        totalTokens = (j['total_tokens'] as num?)?.toInt() ?? 0,
+        promptTokens = (j['prompt_tokens'] as num?)?.toInt() ?? 0,
+        completionTokens = (j['completion_tokens'] as num?)?.toInt() ?? 0,
+        cacheReadTokens = (j['cache_read_tokens'] as num?)?.toInt() ?? 0;
+}
+
 class UsageProvider {
   final String provider;
   final String? profile;
   final String model;
+  final bool legacy;
+  final int calls;
+  final List<UsageModel> models;
   final int sessions;
   final int totalTokens;
   final int promptTokens;
@@ -283,6 +303,12 @@ class UsageProvider {
       : provider = j['provider'] as String? ?? '',
         profile = j['profile'] as String?,
         model = j['model'] as String? ?? '',
+        legacy = j['legacy'] == true,
+        calls = (j['calls'] as num?)?.toInt() ?? 0,
+        models = ((j['models'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => UsageModel.fromJson(e.cast<String, dynamic>()))
+            .toList(),
         sessions = (j['sessions'] as num?)?.toInt() ?? 0,
         totalTokens = (j['total_tokens'] as num?)?.toInt() ?? 0,
         promptTokens = (j['prompt_tokens'] as num?)?.toInt() ?? 0,
@@ -522,40 +548,43 @@ class HarnessState {
       turnStartedAt: base.turnStartedAt,
       compactingStartedAt: base.compactingStartedAt,
       watchCount: base.watchCount,
-      lanes: base.lanes,
+      lanes: d.containsKey('lanes') ? base.lanes : lanes,
       queuedInputs:
           d.containsKey('queued_inputs') ? base.queuedInputs : queuedInputs,
     );
   }
 
-  HarnessState prependEvents(List<Map<String, dynamic>> older) {
-    if (older.isEmpty) return this;
-    return HarnessState(
-      status: status,
-      workspace: workspace,
-      title: title,
-      events: [...older, ...events],
-      finalText: finalText,
-      approvalMode: approvalMode,
-      pendingQuestion: pendingQuestion,
-      totalTokens: totalTokens,
-      promptTokens: promptTokens,
-      completionTokens: completionTokens,
-      cacheReadTokens: cacheReadTokens,
-      lastPromptTokens: lastPromptTokens,
-      contextWindow: contextWindow,
-      ratePrimary: ratePrimary,
-      rateSecondary: rateSecondary,
-      checkpoints: checkpoints,
-      goal: goal,
-      compacting: compacting,
-      turnStartedAt: turnStartedAt,
-      compactingStartedAt: compactingStartedAt,
-      watchCount: watchCount,
-      lanes: lanes,
-      queuedInputs: queuedInputs,
-    );
-  }
+  HarnessState replaceEvent(int index, Map<String, dynamic> event) =>
+      _withEvents(List<Map<String, dynamic>>.of(events)..[index] = event);
+
+  HarnessState prependEvents(List<Map<String, dynamic>> older) =>
+      older.isEmpty ? this : _withEvents([...older, ...events]);
+
+  HarnessState _withEvents(List<Map<String, dynamic>> next) => HarnessState(
+        status: status,
+        workspace: workspace,
+        title: title,
+        events: next,
+        finalText: finalText,
+        approvalMode: approvalMode,
+        pendingQuestion: pendingQuestion,
+        totalTokens: totalTokens,
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+        cacheReadTokens: cacheReadTokens,
+        lastPromptTokens: lastPromptTokens,
+        contextWindow: contextWindow,
+        ratePrimary: ratePrimary,
+        rateSecondary: rateSecondary,
+        checkpoints: checkpoints,
+        goal: goal,
+        compacting: compacting,
+        turnStartedAt: turnStartedAt,
+        compactingStartedAt: compactingStartedAt,
+        watchCount: watchCount,
+        lanes: lanes,
+        queuedInputs: queuedInputs,
+      );
 
   HarnessState withApprovalMode(String mode) => HarnessState(
         status: status,

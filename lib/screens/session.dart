@@ -183,7 +183,6 @@ class _SessionActionPanel extends StatelessWidget {
 
 String _registeredOpenKey = '';
 const int _maxAttachments = 5;
-const int _transcriptPageSize = 160;
 
 int _userEchoCount(List<Map<String, dynamic>> events) => events
     .where((e) => e['kind'] == 'user_input' || e['kind'] == 'steer')
@@ -446,18 +445,13 @@ class _SessionScreenState extends State<SessionScreen>
   StreamSubscription<dynamic>? _agentEventsSub;
   int _transcriptStart = 0;
   bool _loadingOlderTranscript = false;
-  Timer? _historyPrefetchTimer;
+  final Set<int> _requestedFullEvents = {};
 
-  void _scheduleHistoryPrefetch() {
-    _historyPrefetchTimer?.cancel();
-    if (_closed || _loadingOlderTranscript || _transcriptStart == 0) return;
-    _historyPrefetchTimer = Timer(const Duration(milliseconds: 700), () {
-      if (!_closed &&
-          mounted &&
-          !_loadingOlderTranscript &&
-          _transcriptStart > 0) {
-        _loadOlderTranscript();
-      }
+  void _requestFullEvent(int index) {
+    if (!_requestedFullEvents.add(index)) return;
+    scheduleMicrotask(() {
+      if (_closed || !mounted) return;
+      _send({'kind': 'event', 'index': index});
     });
   }
 
@@ -465,11 +459,10 @@ class _SessionScreenState extends State<SessionScreen>
     if (_state == null || _transcriptStart == 0 || _loadingOlderTranscript) {
       return;
     }
-    _loadingOlderTranscript = true;
+    setState(() => _loadingOlderTranscript = true);
     _send({
       'kind': 'history',
       'before': _transcriptStart,
-      'limit': _transcriptPageSize,
     });
   }
 
@@ -917,7 +910,6 @@ class _SessionScreenState extends State<SessionScreen>
     _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
-    _historyPrefetchTimer?.cancel();
     _streamFlushTimer?.cancel();
     _liveFrame.dispose();
     _recorderTick.dispose();
@@ -1036,6 +1028,27 @@ class _SessionScreenState extends State<SessionScreen>
                                                 title: 'Session ready',
                                                 body:
                                                     'Send a task to get started.'),
+                                          if (_transcriptStart > 0 &&
+                                              items.isNotEmpty)
+                                            Padding(
+                                              key: const ValueKey(
+                                                  'load-earlier'),
+                                              padding: const EdgeInsets.only(
+                                                  bottom: S.s12),
+                                              child: Center(
+                                                child: _loadingOlderTranscript
+                                                    ? const SizedBox(
+                                                        height: 28,
+                                                        child: Center(
+                                                            child: Spinner(
+                                                                size: 14)))
+                                                    : TextAction(
+                                                        'Show earlier messages',
+                                                        icon: 'history',
+                                                        onTap:
+                                                            _loadOlderTranscript),
+                                              ),
+                                            ),
                                           ...items,
                                           // Optimistic bubbles for messages sent but not yet echoed.
                                           for (var pi = 0;

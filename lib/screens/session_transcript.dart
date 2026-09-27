@@ -45,15 +45,24 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
     }
 
     DenseToolRow toolRow(String key,
-            {required String tool, dynamic args, dynamic result}) =>
-        DenseToolRow(
+        {required String tool,
+        dynamic args,
+        dynamic result,
+        int? resultAt,
+        bool clipped = false}) {
+      final open = _openToolRows.contains(key);
+      if (open && clipped && resultAt != null) _requestFullEvent(resultAt);
+      return DenseToolRow(
           key: ValueKey('tool-row-$key'),
           tool: tool,
           args: args,
           result: result,
-          open: _openToolRows.contains(key),
+          open: open,
           onOpenChanged: (next) {
             if (!mounted) return;
+            if (next && clipped && resultAt != null) {
+              _requestFullEvent(resultAt);
+            }
             _setState(() {
               if (next) {
                 _openToolRows.add(key);
@@ -64,6 +73,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             });
           },
         );
+    }
 
     void flushPending(String fallbackKey) {
       final p = pending;
@@ -136,14 +146,22 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                   toolRow(k,
                       tool: _s(p['tool_name']),
                       args: p['arguments'],
-                      result: e['result']),
+                      result: e['result'],
+                      resultAt: _transcriptStart + idx,
+                      clipped: e['result_clipped'] == true),
                   k);
               pending = null;
               pendingKey = null;
             } else {
               final name = _s(e['tool_name']);
               if (_isMetaTool(name)) break;
-              addToolRow(toolRow(abs, tool: name, result: e['result']), abs);
+              addToolRow(
+                  toolRow(abs,
+                      tool: name,
+                      result: e['result'],
+                      resultAt: _transcriptStart + idx,
+                      clipped: e['result_clipped'] == true),
+                  abs);
             }
           }
         case 'user_input':
