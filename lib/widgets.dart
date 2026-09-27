@@ -235,16 +235,49 @@ class AppIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox.square(
         dimension: size,
-        child: Center(
-          child: HugeIcon(
-            icon: hugeIconFor(name),
-            // Layout keeps the nominal `size`; only the INK is normalised, so a
-            // corrected glyph still occupies the same box as its neighbours.
-            size: size * visualScale * glyphInkScale(name),
-            color: color ?? AppColors.fg2,
-          ),
-        ),
+        child: name == 'check'
+            ? CustomPaint(
+                painter: _CheckPainter(
+                    color ?? AppColors.fg2, size * visualScale / 9),
+              )
+            : Center(
+                child: HugeIcon(
+                  icon: hugeIconFor(name),
+                  // Layout keeps the nominal `size`; only the INK is normalised, so a
+                  // corrected glyph still occupies the same box as its neighbours.
+                  size: size * visualScale * glyphInkScale(name),
+                  color: color ?? AppColors.fg2,
+                ),
+              ),
       );
+}
+
+class _CheckPainter extends CustomPainter {
+  _CheckPainter(this.color, this.stroke);
+
+  final Color color;
+  final double stroke;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke < 1.4 ? 1.4 : stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * 0.2, size.height * 0.53)
+        ..lineTo(size.width * 0.42, size.height * 0.74)
+        ..lineTo(size.width * 0.8, size.height * 0.3),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CheckPainter old) =>
+      old.color != color || old.stroke != stroke;
 }
 
 /// Glowing status dot.
