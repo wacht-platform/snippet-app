@@ -164,16 +164,12 @@ class _ProviderCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(
-            child: Text(provider.legacy ? 'Before tracking' : provider.provider,
-                style: TS.rowTitle()),
+            child: Text(provider.provider, style: TS.rowTitle()),
           ),
           Tag(sessions),
         ]),
         const SizedBox(height: 3),
-        Text(
-            provider.legacy
-                ? 'Lifetime totals recorded before per-call tracking. They can’t be split by provider or model.'
-                : '${provider.calls} call${provider.calls == 1 ? '' : 's'}',
+        Text('${provider.calls} call${provider.calls == 1 ? '' : 's'}',
             style: TS.meta()),
         if (hasTokens) ...[
           const SizedBox(height: S.s16),
@@ -185,8 +181,7 @@ class _ProviderCard extends StatelessWidget {
                 child: _Metric('Output', fmtSi(provider.completionTokens))),
           ]),
         ],
-        if (models.length > 1 ||
-            (models.length == 1 && !provider.legacy)) ...[
+        if (models.isNotEmpty) ...[
           const SizedBox(height: S.s12),
           for (final m in models)
             Padding(
@@ -204,7 +199,7 @@ class _ProviderCard extends StatelessWidget {
               ]),
             ),
         ],
-        if (!provider.legacy && provider.rateLimits.isEmpty) ...[
+        if (provider.rateLimits.isEmpty) ...[
           const SizedBox(height: 12),
           // THREE states, worded distinctly — a single generic "no usage yet"
           // said the wrong thing in two of them:
@@ -239,7 +234,7 @@ class _ProviderCard extends StatelessWidget {
                   style: TS.meta()),
             ),
           ]),
-        ] else if (!provider.legacy) ...[
+        ] else ...[
           const SizedBox(height: 12),
           for (final rate in provider.rateLimits) ...[
             _RateRow(rate: rate),

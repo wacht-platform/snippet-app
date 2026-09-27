@@ -276,7 +276,6 @@ class UsageProvider {
   final String provider;
   final String? profile;
   final String model;
-  final bool legacy;
   final int calls;
   final List<UsageModel> models;
   final int sessions;
@@ -303,7 +302,6 @@ class UsageProvider {
       : provider = j['provider'] as String? ?? '',
         profile = j['profile'] as String?,
         model = j['model'] as String? ?? '',
-        legacy = j['legacy'] == true,
         calls = (j['calls'] as num?)?.toInt() ?? 0,
         models = ((j['models'] as List?) ?? const [])
             .whereType<Map>()

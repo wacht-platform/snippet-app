@@ -140,7 +140,7 @@ class VaultScreenState extends State<VaultScreen> {
     Theme.of(context); // Rebuild on theme change
     Widget body;
     if (_loading && _names == null) {
-      body = Center(child: DelayedSpinner(size: 22));
+      body = const ListSkeleton(subtitle: false);
     } else if (_error != null && _names == null) {
       // An unreachable daemon is not an empty vault. Give it a real message and
       // a retry rather than dumping the raw exception at the user.

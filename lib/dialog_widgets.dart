@@ -409,7 +409,7 @@ Future<T?> showAppSheet<T>(BuildContext context,
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
             child: Material(
-              color: AppColors.overlay,
+              color: AppColors.raised,
               shape: const RoundedRectangleBorder(
                 borderRadius:
                     BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
@@ -418,34 +418,14 @@ Future<T?> showAppSheet<T>(BuildContext context,
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: limit),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const SizedBox(height: 8),
-                  Center(
-                      child: Container(
-                          width: 28,
-                          height: 3,
-                          decoration: BoxDecoration(
-                              color: AppColors.border2,
-                              borderRadius: BorderRadius.circular(R.pill)))),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
-                    child: Row(children: [
-                      Expanded(
-                          child: Text(title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TS.sectionTitle())),
-                      IconBtn('x',
-                          size: 32,
-                          iconSize: 16,
-                          tooltip: 'Close',
-                          onTap: () => Navigator.pop(sheetContext)),
-                    ]),
-                  ),
+                  SheetHeader(
+                      title: title,
+                      onClose: () => Navigator.pop(sheetContext)),
                   Flexible(
                     child: SingleChildScrollView(
                       padding: EdgeInsets.fromLTRB(
-                          20, 0, 20, 16 + media.padding.bottom),
-                      child: child,
+                          S.s12, S.s6, S.s12, S.s12 + media.padding.bottom),
+                      child: SurfaceScope(group: AppColors.overlay, child: child),
                     ),
                   ),
                 ]),

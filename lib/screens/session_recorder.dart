@@ -16,9 +16,9 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
         title: 'Add context',
         child: Row(children: [
           _ctxOption('camera', 'Camera', 'camera'),
-          const SizedBox(width: 10),
+          const SizedBox(width: S.s8),
           _ctxOption('image', 'Photos', 'photos'),
-          const SizedBox(width: 10),
+          const SizedBox(width: S.s8),
           _ctxOption('file', 'Files', 'files'),
         ]));
     if (choice == 'camera') {
@@ -338,19 +338,21 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
 
   Widget _ctxOption(String icon, String label, String value) {
     return Expanded(
-      child: Material(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        child: InkWell(
+      child: Builder(
+        builder: (tileContext) => Material(
+          color: SurfaceScope.groupOf(tileContext),
           borderRadius: BorderRadius.circular(R.md),
-          onTap: () => Navigator.pop(context, value),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(children: [
-              AppIcon(icon, size: 22, color: AppColors.fg2),
-              const SizedBox(height: 8),
-              Text(label, style: sans(12, color: AppColors.fg1)),
-            ]),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(R.md),
+            onTap: () => Navigator.pop(tileContext, value),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: S.s12),
+              child: Column(children: [
+                AppIcon(icon, size: 20, color: AppColors.fg1),
+                const SizedBox(height: S.s6),
+                Text(label, style: TS.label(AppColors.fg2)),
+              ]),
+            ),
           ),
         ),
       ),

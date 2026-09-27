@@ -69,11 +69,19 @@ class _QuestionRecord extends StatelessWidget {
     final qs = _questions;
     final answers = _answers;
     final ctx = _context;
+    Widget answer(String text) => Container(
+          margin: const EdgeInsets.only(top: S.s6),
+          padding: const EdgeInsets.only(left: S.s8),
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: AppColors.accent, width: 2)),
+          ),
+          child: Text(text, style: TS.ui(AppColors.fg2)),
+        );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s12),
         decoration: BoxDecoration(
           color: AppColors.raised,
           borderRadius: BorderRadius.circular(R.md),
@@ -82,36 +90,32 @@ class _QuestionRecord extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Expanded(
-                child: Text('Question', style: TS.rowTitle()),
-              ),
+              AppIcon('message', size: 13, color: AppColors.fg3),
+              const SizedBox(width: S.s6),
+              Expanded(child: Text('Question', style: TS.meta(AppColors.fg3))),
               Tag(answers.isEmpty ? 'Asked' : 'Answered',
                   tone: answers.isEmpty ? Tone.accent : Tone.ok, dot: true),
             ]),
             if (ctx != null) ...[
-              const SizedBox(height: 8),
-              Text(ctx, style: TS.ui(AppColors.fg3)),
+              const SizedBox(height: S.s6),
+              Text(ctx,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TS.meta(AppColors.fg3)),
             ],
             for (var i = 0; i < qs.length; i++) ...[
-              const SizedBox(height: 12),
-              if (qs.length > 1)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('${i + 1} of ${qs.length}', style: TS.meta()),
-                ),
-              Text(qs[i]['text']?.toString() ?? '',
+              SizedBox(height: i == 0 ? S.s6 : S.s12),
+              Text(
+                  qs.length > 1
+                      ? '${i + 1}. ${qs[i]['text'] ?? ''}'
+                      : qs[i]['text']?.toString() ?? '',
                   style: TS.ui(AppColors.fg1)),
               if (answers[qs[i]['id']?.toString() ?? ''] != null ||
-                  answers['0'] != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  answers[qs[i]['id']?.toString()] ?? answers['0'] ?? '',
-                  style: TS.ui(),
-                ),
-              ],
+                  answers['0'] != null)
+                answer(answers[qs[i]['id']?.toString()] ?? answers['0'] ?? ''),
             ],
             if (qs.isEmpty && (event['text'] != null)) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: S.s6),
               Text(event['text']?.toString() ?? '',
                   style: TS.ui(AppColors.fg1)),
             ],
@@ -186,24 +190,21 @@ class ApprovalBarState extends State<ApprovalBar> {
     final isShell = tool == 'bash';
 
     final allow = Btn(_sent ? 'Sending' : 'Allow',
-        small: !kMobile,
-        full: kMobile,
-        icon: 'check',
+        small: true,
         disabled: _sent,
         onTap: () => _decide({'kind': 'approve'}));
     final reject = Btn('Reject',
-        small: !kMobile,
-        full: kMobile,
+        small: true,
         variant: BtnVariant.secondary,
         disabled: _sent,
         onTap: () => _decide({'kind': 'deny'}));
     final canAlways = widget.showApproveAll && !isVault;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s8),
+      padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(S.s16),
+        padding: const EdgeInsets.all(S.s12),
         decoration: BoxDecoration(
           color: AppColors.raised,
           borderRadius: BorderRadius.circular(R.lg),
@@ -216,24 +217,27 @@ class ApprovalBarState extends State<ApprovalBar> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(children: [
-              IconTile(isVault ? 'lock-key' : toolIcon(tool),
-                  tone: isVault ? Tone.run : Tone.accent),
-              const SizedBox(width: S.s12),
-              Expanded(child: Text(question, style: TS.rowTitle())),
+              AppIcon(isVault ? 'lock-key' : toolIcon(tool),
+                  size: 15, color: isVault ? AppColors.run : AppColors.accent),
+              const SizedBox(width: S.s8),
+              Expanded(
+                  child: Text(question,
+                      style: TS.ui(AppColors.fg1)
+                          .copyWith(fontWeight: FontWeight.w600))),
               if (total > 1) ...[
                 const SizedBox(width: S.s8),
                 Tag('$index of $total', mono: true),
               ],
             ]),
             if (detail.isNotEmpty) ...[
-              const SizedBox(height: S.s12),
+              const SizedBox(height: S.s8),
               Flexible(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 180),
+                  constraints: const BoxConstraints(maxHeight: 140),
                   child: Container(
                     width: double.infinity,
                     padding:
-                        const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
+                        const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s6),
                     decoration: BoxDecoration(
                       color: AppColors.canvas,
                       borderRadius: BorderRadius.circular(R.sm + 2),
@@ -243,11 +247,11 @@ class ApprovalBarState extends State<ApprovalBar> {
                         if (isShell)
                           TextSpan(
                               text: '\$ ',
-                              style: mono(13,
-                                  height: 1.5, color: AppColors.accent)),
+                              style: mono(12,
+                                  height: 1.45, color: AppColors.accent)),
                         TextSpan(
                             text: detail,
-                            style: mono(13, height: 1.5, color: AppColors.fg1)),
+                            style: mono(12, height: 1.45, color: AppColors.fg1)),
                       ])),
                     ),
                   ),
@@ -255,42 +259,25 @@ class ApprovalBarState extends State<ApprovalBar> {
               ),
             ],
             if (isVault) ...[
-              const SizedBox(height: S.s12),
+              const SizedBox(height: S.s8),
               InsetPanel(
                 tone: Tone.run,
+                padding: const EdgeInsets.all(S.s8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Uses secrets from your vault',
-                        style: TS.label(AppColors.run)),
-                    const SizedBox(height: S.s8),
+                    Text('Uses vault secrets · values stay on the machine',
+                        style: TS.meta(AppColors.run)),
+                    const SizedBox(height: S.s6),
                     Wrap(spacing: S.s6, runSpacing: S.s6, children: [
                       for (final name in secrets)
                         Tag(name, tone: Tone.run, icon: 'key', mono: true),
                     ]),
-                    const SizedBox(height: S.s8),
-                    Text(
-                        'Values stay on the machine. Vault access is approved one call at a time.',
-                        style: TS.meta()),
                   ],
                 ),
               ),
             ],
-            const SizedBox(height: S.s16),
-            if (kMobile) ...[
-              Row(children: [
-                Expanded(child: reject),
-                const SizedBox(width: S.s8),
-                Expanded(child: allow),
-              ]),
-              if (canAlways)
-                Center(
-                  child: TextAction('Always allow in this session',
-                      onTap: _sent
-                          ? null
-                          : () => _decide({'kind': 'approve_all'})),
-                ),
-            ] else
+            const SizedBox(height: S.s8),
               Row(children: [
                 if (canAlways)
                   TextAction('Always allow',
@@ -498,11 +485,9 @@ class QuestionBarState extends State<QuestionBar> {
           onTap: onTap,
           customBorder: const StadiumBorder(),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s6),
             child: Text(label,
-                style: sans(13,
-                    weight: W.label,
-                    color: sel ? AppColors.accent : AppColors.fg2)),
+                style: TS.label(sel ? AppColors.accent : AppColors.fg2)),
           ),
         ),
       );
@@ -520,14 +505,11 @@ class QuestionBarState extends State<QuestionBar> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(R.md),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s8),
             child: Row(children: [
               Expanded(
                   child: Text(label,
-                      style: sans(14,
-                          height: 1.4,
-                          weight: W.label,
-                          color: sel ? AppColors.fg1 : AppColors.fg2))),
+                      style: TS.ui(sel ? AppColors.fg1 : AppColors.fg2))),
               if (sel) ...[
                 const SizedBox(width: 10),
                 AppIcon('check', size: 16, color: AppColors.accent)
@@ -559,7 +541,7 @@ class QuestionBarState extends State<QuestionBar> {
     return [
       if (k == 'single_choice')
         ...choices.map((c) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: S.s6),
               child: _choiceRow(
                   c.label,
                   _choice[id] == c.value,
@@ -591,10 +573,10 @@ class QuestionBarState extends State<QuestionBar> {
     final ctx = widget.question['context']?.toString();
     final total = _questions.length;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.all(S.s12),
         decoration: BoxDecoration(
           color: AppColors.raised,
           borderRadius: BorderRadius.circular(R.md),
@@ -604,9 +586,12 @@ class QuestionBarState extends State<QuestionBar> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
+                AppIcon('message', size: 15, color: AppColors.accent),
+                const SizedBox(width: S.s8),
                 Expanded(
                   child: Text(_sent ? 'Sending…' : 'Question',
-                      style: TS.rowTitle()),
+                      style: TS.ui(AppColors.fg1)
+                          .copyWith(fontWeight: FontWeight.w600)),
                 ),
                 Tag(total > 1 ? '${_step + 1} of $total' : 'Input required',
                     tone: Tone.accent, live: true),
@@ -617,17 +602,17 @@ class QuestionBarState extends State<QuestionBar> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
-                        const SizedBox(height: 8),
-                        Text(ctx, style: TS.ui(AppColors.fg3)),
+                        const SizedBox(height: S.s6),
+                        Text(ctx, style: TS.meta(AppColors.fg3)),
                       ],
                       ...() {
                         final q = _currentQuestion;
                         if (q == null) return <Widget>[];
                         return <Widget>[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: S.s8),
                           Text(q['text']?.toString() ?? '',
                               style: TS.ui(AppColors.fg1)),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: S.s8),
                           ..._inputFor(q),
                         ];
                       }(),
@@ -635,7 +620,7 @@ class QuestionBarState extends State<QuestionBar> {
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: S.s8),
               Row(children: [
                 _skipButton(),
                 if (_step > 0) ...[

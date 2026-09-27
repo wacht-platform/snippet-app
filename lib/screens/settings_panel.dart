@@ -58,6 +58,9 @@ class _MachineListState extends State<MachineList> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    if (kMobile) {
+      return ListGroup(children: [...widget.instances.map(_row), _addRow()]);
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -83,7 +86,7 @@ class _MachineListState extends State<MachineList> {
       },
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-            S.s12, kMobile ? S.s8 : S.s6, S.s4, kMobile ? S.s8 : S.s6),
+            S.s12, kMobile ? S.s8 : S.s6, S.s2, kMobile ? S.s8 : S.s6),
         child: Row(children: [
           Container(
             width: 8,
@@ -100,16 +103,16 @@ class _MachineListState extends State<MachineList> {
               Text(i.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TS.ui(AppColors.fg1)),
-              const SizedBox(height: 1),
+                  style: kMobile ? TS.rowTitle(AppColors.fg1) : TS.ui(AppColors.fg1)),
+              const SizedBox(height: S.s2),
               Text(hostOf(i.url),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TS.codeSmall()),
+                  style: TS.codeSmall(AppColors.fg3)),
             ]),
           ),
           if (selected) AppIcon('check', size: 16, color: AppColors.accent),
-          IconBtn('more-vertical', size: 30, iconSize: 15, tooltip: 'Manage',
+          IconBtn('more-vertical', size: 32, iconSize: 16, tooltip: 'Manage',
               onTap: () {
             Navigator.pop(context);
             widget.onManage(i);
@@ -127,10 +130,18 @@ class _MachineListState extends State<MachineList> {
           widget.onAdd();
         },
         child: Padding(
-          padding:
-              EdgeInsets.fromLTRB(14, kMobile ? 11 : 8, 14, kMobile ? 11 : 8),
+          padding: EdgeInsets.fromLTRB(
+              S.s12, kMobile ? 14 : 8, S.s12, kMobile ? 14 : 8),
           child: Row(children: [
-            AppIcon('plus', size: 16, color: AppColors.accent),
+            SizedBox(
+              width: kMobile ? 8 : 16,
+              height: 16,
+              child: OverflowBox(
+                maxWidth: 16,
+                maxHeight: 16,
+                child: AppIcon('plus', size: 16, color: AppColors.accent),
+              ),
+            ),
             const SizedBox(width: 10),
             Text('Add machine', style: TS.label(AppColors.accent)),
           ]),

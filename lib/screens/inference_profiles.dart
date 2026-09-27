@@ -174,9 +174,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
-          return widget.embedded
-              ? const SizedBox.shrink()
-              : Center(child: DelayedSpinner(size: 22));
+          return const ListSkeleton();
         }
         final cfg = snap.data;
         final profiles = cfg?.profiles ?? const [];

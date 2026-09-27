@@ -162,6 +162,79 @@ class TextAction extends StatelessWidget {
   }
 }
 
+class SurfaceScope extends InheritedWidget {
+  const SurfaceScope({super.key, required this.group, required super.child});
+
+  final Color group;
+
+  static Color groupOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SurfaceScope>()?.group ??
+      AppColors.raised;
+
+  @override
+  bool updateShouldNotify(SurfaceScope oldWidget) => group != oldWidget.group;
+}
+
+class SheetHeader extends StatelessWidget {
+  const SheetHeader({super.key, required this.title, required this.onClose});
+
+  final String title;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: S.s6),
+          Center(
+            child: Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.lineStrong,
+                borderRadius: BorderRadius.circular(R.pill),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.s16, S.s4, S.s6, S.s2),
+            child: Row(children: [
+              Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TS.rowTitle(AppColors.fg1)
+                        .copyWith(fontWeight: FontWeight.w600)),
+              ),
+              Tooltip(
+                message: 'Close',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onClose,
+                  child: SizedBox.square(
+                    dimension: 40,
+                    child: Center(
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: AppColors.overlay,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: AppIcon('x', size: 13, color: AppColors.fg3),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ],
+      );
+}
+
 class ListGroup extends StatelessWidget {
   const ListGroup({super.key, required this.children, this.header});
 
@@ -171,10 +244,11 @@ class ListGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.raised,
+      color: SurfaceScope.groupOf(context),
       borderRadius: BorderRadius.circular(R.md),
       clipBehavior: Clip.antiAlias,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (header != null) header!,
@@ -402,20 +476,77 @@ class PageLoader extends StatelessWidget {
 }
 
 class Skeleton extends StatelessWidget {
-  const Skeleton({super.key, this.width, this.height = 12, this.radius = R.xs});
+  const Skeleton(
+      {super.key, this.width, this.height = 12, this.radius = R.xs, this.color});
 
   final double? width;
   final double height;
   final double radius;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) => Container(
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: AppColors.raised,
+          color: color ?? AppColors.raised,
           borderRadius: BorderRadius.circular(radius),
         ),
+      );
+}
+
+class ListSkeleton extends StatelessWidget {
+  const ListSkeleton({super.key, this.rows = 3, this.subtitle = true});
+
+  final int rows;
+  final bool subtitle;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: 'Loading',
+        child: PageBody(children: [
+          Material(
+            color: SurfaceScope.groupOf(context),
+            borderRadius: BorderRadius.circular(R.md),
+            clipBehavior: Clip.antiAlias,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              for (var i = 0; i < rows; i++) ...[
+                if (i > 0) Divider(height: 1, thickness: 1, color: AppColors.line),
+                ConstrainedBox(
+                  constraints:
+                      BoxConstraints(minHeight: kMobile ? M.rowHeight : 44),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: S.s12, vertical: S.s12),
+                    child: Row(children: [
+                      Skeleton(width: 20, height: 20, radius: R.sm, color: AppColors.hover),
+                      const SizedBox(width: S.s12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FractionallySizedBox(
+                              widthFactor: i.isEven ? 0.55 : 0.4,
+                              child: Skeleton(height: 12, color: AppColors.hover),
+                            ),
+                            if (subtitle) ...[
+                              const SizedBox(height: S.s6),
+                              FractionallySizedBox(
+                                widthFactor: i.isEven ? 0.35 : 0.5,
+                                child: Skeleton(height: 10, color: AppColors.hover),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              ],
+            ]),
+          ),
+        ]),
       );
 }
 

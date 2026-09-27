@@ -62,7 +62,7 @@ class _CompactingStatusState extends State<_CompactingStatus> {
     Theme.of(context);
     final detail = widget.detail?.trim() ?? '';
     return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 4),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -172,7 +172,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
     Theme.of(context);
     final thought = widget.thinking.trim();
     return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 4),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

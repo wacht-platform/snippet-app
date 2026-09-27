@@ -262,56 +262,59 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   Widget _queuedCard() {
     final queue = _heldQueue;
     if (queue.isEmpty) return const SizedBox.shrink();
-
     final count = queue.length;
-    final title = '$count  Queued messages';
+
+    Widget textAction(String label, VoidCallback onTap, Color color) =>
+        GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: S.s6, vertical: S.s4),
+            child: Text(label, style: TS.label(color)),
+          ),
+        );
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      margin: const EdgeInsets.only(bottom: S.s6),
       decoration: BoxDecoration(
         color: AppColors.raised,
         borderRadius: BorderRadius.circular(R.lg),
+        border: Border.all(color: AppColors.line),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Text(
-                title,
-                style: TS.label(),
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.s12, S.s6, S.s6, S.s2),
+            child: Row(children: [
+              AppIcon('clock', size: 12, color: AppColors.fg3),
+              const SizedBox(width: S.s6),
+              Text('Queued', style: TS.meta(AppColors.fg3)),
+              const SizedBox(width: S.s4),
+              CountBadge(count),
               const Spacer(),
-              if (queue.length > 1) ...[
-                GestureDetector(
-                  onTap: _steerAllQueued,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Text('Send all',
-                        style: sans(12,
-                            weight: W.label, color: AppColors.accent)),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _cancelAllQueued,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Text('Cancel all',
-                        style: TS.meta()),
-                  ),
-                ),
+              if (count > 1) ...[
+                textAction('Clear', _cancelAllQueued, AppColors.fg3),
+                textAction('Send all', _steerAllQueued, AppColors.accent),
               ],
-            ],
+            ]),
           ),
-          const SizedBox(height: 8),
-          for (var qi = 0; qi < queue.length; qi++) ...[
-            if (qi > 0) const SizedBox(height: 6),
-            _queuedItemRow(qi, queue[qi]),
-          ],
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 168),
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(bottom: S.s4),
+              itemCount: count,
+              separatorBuilder: (_, __) => Divider(
+                  height: 1,
+                  thickness: 1,
+                  indent: S.s12,
+                  endIndent: S.s12,
+                  color: AppColors.line),
+              itemBuilder: (_, qi) => _queuedItemRow(qi, queue[qi]),
+            ),
+          ),
         ],
       ),
     );
@@ -323,31 +326,46 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     final text = _queuedText(item.text);
     final counts = _queuedAttachCounts(item.text);
 
-    Widget action(String icon, String tip, VoidCallback onTap) {
-      return Tooltip(
-        message: tip,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: AppIcon(icon, size: 13, color: AppColors.fg3),
+    Widget iconAction(String icon, String tip, VoidCallback onTap) => Tooltip(
+          message: tip,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: SizedBox.square(
+              dimension: kMobile ? 34 : 26,
+              child: Center(child: AppIcon(icon, size: 14, color: AppColors.fg3)),
+            ),
+          ),
+        );
+
+    final sendNow = Tooltip(
+      message: 'Send now',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _steerQueuedAt(qi),
+        child: SizedBox.square(
+          dimension: kMobile ? 34 : 26,
+          child: Center(
+            child: Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: AppColors.accentFill,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: AppIcon('arrow-up', size: 13, color: AppColors.accentFg),
+            ),
           ),
         ),
-      );
-    }
-
-    final actionButtons = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        action('trash', 'Delete', () => _cancelQueuedAt(qi)),
-        action('edit', 'Edit', () => _editQueuedAt(qi)),
-        action('arrow-up', 'Send now', () => _steerQueuedAt(qi)),
-      ],
+      ),
     );
 
-    // 3 icons × 13px + 3 × 8px padding = 63px
-    const trailingWidth = 63.0;
+    final actions = Row(mainAxisSize: MainAxisSize.min, children: [
+      iconAction('edit', 'Edit', () => _editQueuedAt(qi)),
+      iconAction('x', 'Remove', () => _cancelQueuedAt(qi)),
+      sendNow,
+    ]);
 
     return MouseRegion(
       onEnter: (_) {
@@ -361,49 +379,37 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         }
       },
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    text.isEmpty ? '(attachment)' : text,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(13, color: AppColors.fg1),
-                  ),
-                  if (counts.$1 + counts.$2 + counts.$3 > 0) ...[
-                    const SizedBox(height: 4),
-                    AttachmentPill(
-                      audio: counts.$1,
-                      images: counts.$2,
-                      files: counts.$3,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 4),
-            if (kMobile)
-              actionButtons
-            else
-              SizedBox(
-                width: trailingWidth,
-                child: AnimatedOpacity(
-                  opacity: showActions ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 120),
-                  child: IgnorePointer(
-                    ignoring: !showActions,
-                    child: actionButtons,
-                  ),
+        padding: const EdgeInsets.fromLTRB(S.s12, S.s4, S.s4, S.s4),
+        child: Row(children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  text.isEmpty ? 'Attachment' : text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TS.ui(text.isEmpty ? AppColors.fg3 : AppColors.fg1),
                 ),
-              ),
-          ],
-        ),
+                if (counts.$1 + counts.$2 + counts.$3 > 0) ...[
+                  const SizedBox(height: S.s4),
+                  AttachmentPill(
+                    audio: counts.$1,
+                    images: counts.$2,
+                    files: counts.$3,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: S.s4),
+          AnimatedOpacity(
+            opacity: showActions ? 1 : 0,
+            duration: Motion.quick,
+            child: IgnorePointer(ignoring: !showActions, child: actions),
+          ),
+        ]),
       ),
     );
   }

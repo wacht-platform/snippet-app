@@ -185,7 +185,7 @@ Future<T?> showAppMenu<T>(
           borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
           child: Container(
             decoration: BoxDecoration(
-              color: color ?? AppColors.overlay,
+              color: color ?? AppColors.raised,
               borderRadius:
                   BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
             ),
@@ -193,31 +193,36 @@ Future<T?> showAppMenu<T>(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 10),
+                  const SizedBox(height: S.s6),
                   Center(
                       child: Container(
                           width: 32,
-                          height: 3,
+                          height: 4,
                           decoration: BoxDecoration(
-                              color: AppColors.border2,
+                              color: AppColors.lineStrong,
                               borderRadius: BorderRadius.circular(R.pill)))),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: S.s8),
                   Flexible(
                     child: SingleChildScrollView(
-                      // STRETCH, not the default `center`. A heading is a bare `Text`
-                      // with no width constraint, so under `center` it shrank to its
-                      // intrinsic width and floated to the middle of the sheet while
-                      // every row below it started at the left edge.
-                      child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final item in items)
-                              _appMenuSheetEntry(sheet, item),
-                          ]),
+                      padding: const EdgeInsets.symmetric(horizontal: S.s12),
+                      child: Material(
+                        color: AppColors.overlay,
+                        borderRadius: BorderRadius.circular(R.md),
+                        clipBehavior: Clip.antiAlias,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: S.s4),
+                          child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                for (final item in items)
+                                  _appMenuSheetEntry(sheet, item),
+                              ]),
+                        ),
+                      ),
                     ),
                   ),
-                  SizedBox(height: media.padding.bottom + 8),
+                  SizedBox(height: media.padding.bottom + S.s12),
                 ]),
           ),
         );
@@ -285,12 +290,12 @@ Future<T?> showAppMenu<T>(
 /// defaults are not.
 Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
   if (entry is PopupMenuDivider) {
-    return Divider(height: 13, thickness: 1, color: AppColors.line);
+    return Divider(height: 9, thickness: 1, color: AppColors.line);
   }
   if (entry is! PopupMenuItem<T>) {
     return const SizedBox.shrink();
   }
-  final pad = entry.padding ?? const EdgeInsets.symmetric(horizontal: M.gutter);
+  final pad = entry.padding ?? const EdgeInsets.symmetric(horizontal: S.s12);
   // A heading is a section label and is deliberately NOT tappable.
   if (!entry.enabled) {
     return Padding(
@@ -306,13 +311,9 @@ Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
       // A SHEET does not: it is full width, so inheriting 4px would run the fill
       // nearly edge-to-edge. Impose the sheet's own gutter here and let the row's
       // fill sit inside it.
-      padding: EdgeInsets.symmetric(
-        horizontal: pad.horizontal < M.gutter ? M.gutter : pad.horizontal,
-        vertical: 2,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: S.s4),
       child: SizedBox(
-        // Never below the 44px touch minimum, whatever the desktop helper used.
-        height: entry.height < 48 ? 52 : entry.height,
+        height: entry.height < 44 ? 48 : entry.height,
         child: entry.child,
       ),
     ),

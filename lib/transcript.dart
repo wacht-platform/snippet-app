@@ -71,7 +71,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
                 width: 16,
                 child: Center(
                   child: widget.result == null
-                      ? Spinner(size: 12, color: AppColors.run)
+                      ? const BrailleSpinner()
                       : AppIcon(
                           failed ? 'alert-triangle' : toolIcon(widget.tool),
                           size: 16,
@@ -79,17 +79,19 @@ class _DenseToolRowState extends State<DenseToolRow> {
                 ),
               ),
               const SizedBox(width: S.s8),
-              Text(toolTitle(widget.tool),
-                  style: TS.label(failed ? AppColors.danger : AppColors.fg2)),
-              if (summary.isNotEmpty) ...[
-                const SizedBox(width: S.s8),
-                Flexible(
-                  child: Text(summary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TS.codeSmall()),
-                ),
-              ],
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 48),
+                child: Text(toolTitle(widget.tool),
+                    style:
+                        TS.label(failed ? AppColors.danger : AppColors.fg2)),
+              ),
+              const SizedBox(width: S.s6),
+              Expanded(
+                child: Text(summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TS.codeSmall()),
+              ),
               ..._metaWidgets(),
               // The row is tappable only when there is more to see; without a
               // chevron that affordance was invisible and Discoverable only by
@@ -152,7 +154,7 @@ class BrailleSpinner extends StatelessWidget {
   const BrailleSpinner({super.key, this.color});
   @override
   Widget build(BuildContext context) =>
-      Spinner(size: 12, color: color ?? AppColors.run);
+      Spinner(size: 14, color: color ?? AppColors.run);
 }
 
 /// Consecutive tools as a BeUI group: one header row, details on expand.
@@ -188,7 +190,7 @@ class _ToolRunState extends State<ToolRun> {
               width: 16,
               child: Center(
                 child: widget.running
-                    ? Spinner(size: 12, color: AppColors.run)
+                    ? const BrailleSpinner()
                     : AppIcon('check', size: 14, color: AppColors.fg3),
               ),
             ),
