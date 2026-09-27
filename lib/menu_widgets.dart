@@ -313,7 +313,7 @@ Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
       // fill sit inside it.
       padding: const EdgeInsets.symmetric(horizontal: S.s4),
       child: SizedBox(
-        height: entry.height < 44 ? 48 : entry.height,
+        height: 44,
         child: entry.child,
       ),
     ),

@@ -235,6 +235,58 @@ class SheetHeader extends StatelessWidget {
       );
 }
 
+class SheetAction {
+  const SheetAction(this.icon, this.label, this.onTap, {this.danger = false});
+
+  final String icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool danger;
+}
+
+class SheetActions extends StatelessWidget {
+  const SheetActions(this.actions, {super.key});
+
+  final List<SheetAction> actions;
+
+  @override
+  Widget build(BuildContext context) => ListGroup(children: [
+        for (final a in actions)
+          InkWell(
+            onTap: a.onTap,
+            child: SizedBox(
+              height: 44,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: S.s12),
+                child: Row(children: [
+                  SizedBox(
+                    width: 20,
+                    child: AppIcon(a.icon,
+                        size: 16,
+                        color: a.onTap == null
+                            ? AppColors.fg4
+                            : a.danger
+                                ? AppColors.danger
+                                : AppColors.fg3),
+                  ),
+                  const SizedBox(width: S.s12),
+                  Expanded(
+                    child: Text(a.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TS.ui(a.onTap == null
+                            ? AppColors.fg4
+                            : a.danger
+                                ? AppColors.danger
+                                : AppColors.fg1)),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+      ]);
+}
+
 class ListGroup extends StatelessWidget {
   const ListGroup({super.key, required this.children, this.header});
 

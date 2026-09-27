@@ -246,33 +246,16 @@ class _FileExplorerState extends State<FileExplorer> {
     showAppSheet(
       context,
       title: 'Folder actions',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (widget.onNewChat != null)
-            _FileActionRow(
-              icon: 'plus',
-              label: 'New chat here',
-              onTap: () => run(() => widget.onNewChat!(cwd)),
-            ),
-          _FileActionRow(
-            icon: 'git-branch',
-            label: 'Git',
-            onTap: () => run(() => _openGit(cwd)),
-          ),
-          _FileActionRow(
-            icon: 'upload',
-            label: 'Upload files',
-            onTap: _busy == null ? () => run(() => _upload(cwd)) : null,
-          ),
-          _FileActionRow(
-            icon: 'folder-plus',
-            label: 'New folder',
-            onTap: _busy == null ? () => run(() => _newFolder(cwd)) : null,
-          ),
-        ],
-      ),
+      child: SheetActions([
+        if (widget.onNewChat != null)
+          SheetAction('plus', 'New chat here',
+              () => run(() => widget.onNewChat!(cwd))),
+        SheetAction('git-branch', 'Git', () => run(() => _openGit(cwd))),
+        SheetAction('upload', 'Upload files',
+            _busy == null ? () => run(() => _upload(cwd)) : null),
+        SheetAction('folder-plus', 'New folder',
+            _busy == null ? () => run(() => _newFolder(cwd)) : null),
+      ]),
     );
   }
 
@@ -783,45 +766,6 @@ class _FileExplorerState extends State<FileExplorer> {
     // generic fallback circle instead of a document.
     return 'file';
   }
-}
-
-class _FileActionRow extends StatelessWidget {
-  const _FileActionRow({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
-
-  final String icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: onTap,
-          child: Opacity(
-            opacity: onTap == null ? 0.45 : 1,
-            child: SizedBox(
-              height: M.minTarget,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Row(children: [
-                  AppIcon(icon, size: 16, color: AppColors.fg3),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(label,
-                        style: sans(M.rowTitle, color: AppColors.fg1)),
-                  ),
-                ]),
-              ),
-            ),
-          ),
-        ),
-      );
 }
 
 class _Row extends StatelessWidget {

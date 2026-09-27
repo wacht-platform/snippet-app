@@ -506,7 +506,9 @@ void main() {
       ),
     ));
 
-    await tester.tap(find.text('Running tool'));
+    await tester.tap(find
+        .descendant(of: find.byType(ToolRun), matching: find.byType(GestureDetector))
+        .first);
     await tester.pump();
     expect(find.text('first tool'), findsOneWidget);
 
@@ -540,7 +542,9 @@ void main() {
       ),
     ));
 
-    await tester.tap(find.text('Running tool'));
+    await tester.tap(find
+        .descendant(of: find.byType(ToolRun), matching: find.byType(GestureDetector))
+        .first);
     await tester.pump();
     expect(find.text('tool detail'), findsOneWidget);
 

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'models.dart';
 import 'theme.dart';
+import 'tool_activity.dart';
 import 'tool_views.dart';
 import 'widgets.dart';
 
@@ -52,12 +53,10 @@ class _DenseToolRowState extends State<DenseToolRow> {
   Widget build(BuildContext context) {
     Theme.of(context);
     final canExpand = toolIsExpandable(widget.tool, widget.args, widget.result);
-    final summary = toolArgSummary(widget.tool, widget.args);
-    // A failed call must not look like a successful one. The row previously
-    // rendered identically whatever the outcome, so the only way to find a
-    // failure was to expand every tool in the run.
-    final failed = widget.result is Map &&
-        (widget.result['status'] ?? '').toString() == 'error';
+    final step =
+        ToolStep(tool: widget.tool, args: widget.args, result: widget.result);
+    final failed = step.failed;
+    final object = toolObject(step);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -65,7 +64,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
           behavior: HitTestBehavior.opaque,
           onTap: canExpand ? _toggle : null,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: S.s6),
+            padding: const EdgeInsets.symmetric(vertical: S.s4),
             child: Row(children: [
               SizedBox(
                 width: 16,
@@ -74,39 +73,36 @@ class _DenseToolRowState extends State<DenseToolRow> {
                       ? const BrailleSpinner()
                       : AppIcon(
                           failed ? 'alert-triangle' : toolIcon(widget.tool),
-                          size: 16,
-                          color: failed ? AppColors.danger : AppColors.fg3),
+                          size: 14,
+                          color: failed ? AppColors.danger : AppColors.fg4),
                 ),
               ),
               const SizedBox(width: S.s8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 48),
-                child: Text(toolTitle(widget.tool),
-                    style:
-                        TS.label(failed ? AppColors.danger : AppColors.fg2)),
-              ),
-              const SizedBox(width: S.s6),
               Expanded(
-                child: Text(summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TS.codeSmall()),
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                        text: toolVerb(widget.tool, running: step.running),
+                        style: TS.ui(failed ? AppColors.danger : AppColors.fg2)),
+                    if (object.isNotEmpty)
+                      TextSpan(text: ' $object', style: TS.ui(AppColors.fg3)),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               ..._metaWidgets(),
-              // The row is tappable only when there is more to see; without a
-              // chevron that affordance was invisible and Discoverable only by
-              // guessing.
               if (canExpand) ...[
-                const SizedBox(width: 6),
+                const SizedBox(width: S.s6),
                 AppIcon(_open ? 'chevron-down' : 'chevron-right',
-                    size: 14, color: AppColors.fg4),
+                    size: 12, color: AppColors.fg4),
               ],
             ]),
           ),
         ),
         if (_open && canExpand)
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, S.s2, 0, S.s6),
+            padding: const EdgeInsets.fromLTRB(24, S.s2, 0, S.s8),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 360),
               child: SingleChildScrollView(
@@ -175,12 +171,20 @@ class _ToolRunState extends State<ToolRun> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final n = widget.rows.length;
-    final label = widget.running
-        ? (n == 1 ? 'Running tool' : 'Running tools')
-        : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools');
+    final steps = [
+      for (final r in widget.rows.whereType<DenseToolRow>())
+        ToolStep(tool: r.tool, args: r.args, result: r.result),
+    ];
+    final current = steps.lastWhere((s) => s.running,
+        orElse: () => steps.isEmpty ? const ToolStep(tool: '') : steps.last);
+    final running = widget.running && steps.any((s) => s.running);
+    final failures = steps.where((s) => s.failed).length;
+    final changes = fileChanges(steps);
+    final headline = running
+        ? toolSentence(current, running: true)
+        : activitySummary(steps);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -189,53 +193,93 @@ class _ToolRunState extends State<ToolRun> {
             SizedBox(
               width: 16,
               child: Center(
-                child: widget.running
+                child: running
                     ? const BrailleSpinner()
-                    : AppIcon('check', size: 14, color: AppColors.fg3),
+                    : AppIcon(failures > 0 ? 'alert-triangle' : 'check',
+                        size: 14,
+                        color: failures > 0 ? AppColors.danger : AppColors.fg4),
               ),
             ),
             const SizedBox(width: S.s8),
-            Text(label, style: TS.label(AppColors.fg3)),
-            const SizedBox(width: S.s4),
+            Expanded(
+              child: Text(headline,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TS.ui(running ? AppColors.fg2 : AppColors.fg3)),
+            ),
+            if (!running && failures > 0) ...[
+              const SizedBox(width: S.s8),
+              Text('$failures failed', style: TS.meta(AppColors.danger)),
+            ],
+            const SizedBox(width: S.s6),
             AppIcon(widget.open ? 'chevron-down' : 'chevron-right',
-                size: 14, color: AppColors.fg4),
+                size: 12, color: AppColors.fg4),
           ]),
         ),
-        if (widget.open) ...[
-          const SizedBox(height: 6),
-          // Expanded rows are indented under the header AND bracketed by a left
-          // rule, so a run reads as one group. Without this the children sat at
-          // the header's own indent and the whole run dissolved into the
-          // transcript as a flat sequence of unrelated lines — the header's
-          // chevron was the only clue anything was contained.
-          //
-          // A rule is legitimate here: the design language reserves borders for
-          // STRUCTURE, and "these calls belong together" is structure, not
-          // decoration.
+        if (changes.isNotEmpty) ...[
+          const SizedBox(height: S.s6),
           Padding(
-            padding: const EdgeInsets.only(left: 7),
-            child: Container(
-              padding: const EdgeInsets.only(left: 11),
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: AppColors.line, width: 1),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < widget.rows.length; i++) ...[
-                    if (i > 0) const SizedBox(height: 2),
-                    widget.rows[i],
-                  ],
-                ],
-              ),
+            padding: const EdgeInsets.only(left: 24),
+            child: _ChangedFiles(changes: changes, onTap: _toggle),
+          ),
+        ],
+        if (widget.open) ...[
+          const SizedBox(height: S.s4),
+          Padding(
+            padding: const EdgeInsets.only(left: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: widget.rows,
             ),
           ),
         ],
       ]),
     );
   }
+}
+
+class _ChangedFiles extends StatelessWidget {
+  const _ChangedFiles({required this.changes, required this.onTap});
+
+  final List<FileChange> changes;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(R.md),
+        clipBehavior: Clip.antiAlias,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var i = 0; i < changes.length; i++) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, color: AppColors.line),
+            InkWell(
+              onTap: onTap,
+              child: SizedBox(
+                height: 34,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: S.s12),
+                  child: Row(children: [
+                    AppIcon(changes[i].created ? 'file-plus' : 'edit',
+                        size: 13, color: AppColors.fg3),
+                    const SizedBox(width: S.s8),
+                    Expanded(
+                      child: Text(changes[i].name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TS.codeSmall(AppColors.fg1)),
+                    ),
+                    const SizedBox(width: S.s8),
+                    Text('+${changes[i].added}', style: TS.meta(AppColors.ok)),
+                    const SizedBox(width: S.s4),
+                    Text('−${changes[i].removed}',
+                        style: TS.meta(AppColors.danger)),
+                  ]),
+                ),
+              ),
+            ),
+          ],
+        ]),
+      );
 }
 
 // ---------------------------------------------------------------------------

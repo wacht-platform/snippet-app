@@ -1217,50 +1217,20 @@ class SidebarState extends State<Sidebar> {
     }
     showAppSheet(context,
         title: s.title.isEmpty ? '(untitled)' : s.title,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sessionActionTile('check', 'Select', onTap: () {
-              Navigator.pop(context);
-              _enterSelect(seed: s.id);
-            }),
-            _sessionActionTile('edit', 'Rename', onTap: () {
-              Navigator.pop(context);
-              _beginRename(s);
-            }),
-            _sessionActionTile('trash', 'Delete', danger: true, onTap: () {
-              Navigator.pop(context);
-              _confirmDeleteSessions([s]);
-            }),
-          ],
-        ));
-  }
-
-  Widget _sessionActionTile(String icon, String label,
-      {required VoidCallback onTap, bool danger = false}) {
-    final color = danger ? AppColors.danger : AppColors.fg1;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(R.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.md),
-        onTap: onTap,
-        child: SizedBox(
-          height: 52,
-          child: Row(children: [
-            SizedBox(
-                width: 28,
-                child: Center(
-                    child: AppIcon(icon,
-                        size: 18,
-                        color: danger ? AppColors.danger : AppColors.fg3))),
-            const SizedBox(width: S.s12),
-            Text(label, style: TS.ui(color)),
-          ]),
-        ),
-      ),
-    );
+        child: SheetActions([
+          SheetAction('check', 'Select', () {
+            Navigator.pop(context);
+            _enterSelect(seed: s.id);
+          }),
+          SheetAction('edit', 'Rename', () {
+            Navigator.pop(context);
+            _beginRename(s);
+          }),
+          SheetAction('trash', 'Delete', () {
+            Navigator.pop(context);
+            _confirmDeleteSessions([s]);
+          }, danger: true),
+        ]));
   }
 
   void _enterSelect({String? seed}) {

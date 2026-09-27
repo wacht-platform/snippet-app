@@ -1024,43 +1024,31 @@ Future<void> showManageMachineSheet({
   showAppSheet(
     context,
     title: instance.label,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ListTile(
-          leading: AppIcon('edit', size: 16, color: AppColors.fg2),
-          title: Text('Rename', style: TS.ui(AppColors.fg1)),
-          onTap: () async {
-            Navigator.pop(context);
-            final name = await promptText(
-              context,
-              title: 'Rename machine',
-              initial: instance.label,
-              hint: 'Machine name',
-              saveLabel: 'Rename',
-            );
-            if (name != null && name.isNotEmpty) {
-              onRename(instance, name);
-            }
-          },
-        ),
-        ListTile(
-          leading: AppIcon('trash', size: 16, color: AppColors.danger),
-          title: Text('Remove', style: sans(14, color: AppColors.danger)),
-          onTap: () async {
-            Navigator.pop(context);
-            final ok = await confirmAction(
-              context,
-              title: 'Remove machine?',
-              body:
-                  '${instance.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
-              confirmLabel: 'Remove',
-            );
-            if (ok) onRemove(instance);
-          },
-        ),
-      ],
-    ),
+    child: SheetActions([
+      SheetAction('edit', 'Rename', () async {
+        Navigator.pop(context);
+        final name = await promptText(
+          context,
+          title: 'Rename machine',
+          initial: instance.label,
+          hint: 'Machine name',
+          saveLabel: 'Rename',
+        );
+        if (name != null && name.isNotEmpty) {
+          onRename(instance, name);
+        }
+      }),
+      SheetAction('trash', 'Remove', () async {
+        Navigator.pop(context);
+        final ok = await confirmAction(
+          context,
+          title: 'Remove machine?',
+          body:
+              '${instance.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
+          confirmLabel: 'Remove',
+        );
+        if (ok) onRemove(instance);
+      }, danger: true),
+    ]    ),
   );
 }
