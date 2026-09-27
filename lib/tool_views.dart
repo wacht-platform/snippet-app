@@ -109,10 +109,11 @@ bool toolIsExpandable(String tool, dynamic args, dynamic result) {
     for (final key in const ['stdout', 'stderr', 'content', 'text', 'output']) {
       if ((data[key] ?? '').toString().trim().isNotEmpty) return true;
     }
-    final entries = data['entries'];
-    if (entries is List && entries.isNotEmpty) return true;
-    final matches = data['matches'];
-    return matches is List && matches.isNotEmpty;
+    for (final key in const ['entries', 'matches', 'results']) {
+      final list = data[key];
+      if (list is List && list.isNotEmpty) return true;
+    }
+    return false;
   }
 
   switch (tool) {
@@ -131,6 +132,8 @@ bool toolIsExpandable(String tool, dynamic args, dynamic result) {
       return arg('content').trim().isNotEmpty;
     case 'read_file':
     case 'search_content':
+    case 'search_files':
+    case 'web_search':
     case 'list_files':
     case 'web_read':
     case 'view_outline':
@@ -220,10 +223,22 @@ Widget toolDetailView(BuildContext context,
 
   final rows = <Widget>[];
 
+  if (status == 'error' && errMsg != null && tool == 'bash') {
+    final cmd = _displayText(a?['command']?.toString() ?? '').trimRight();
+    return _wrap([
+      _ShellPanel(
+          command: cmd,
+          stdout: '',
+          stderr: errMsg,
+          exitCode: null,
+          failed: true),
+    ]);
+  }
+
   // Error banner first — applies to every tool.
   if (status == 'error' && errMsg != null) {
     rows.add(_ErrorBox(errMsg));
-    rows.add(const SizedBox(height: 14));
+    rows.add(const SizedBox(height: S.s8));
   }
 
   // Spilled / oversized output (generic wrapper the harness may apply).
@@ -315,7 +330,19 @@ List<Widget> _editView(Map? a, Map? d,
     {required String oldKey, required String newKey}) {
   final out = <Widget>[];
   if (a != null && a[oldKey] != null && a[newKey] != null) {
-    out.add(_DiffBlock(a[oldKey].toString(), a[newKey].toString()));
+    final lines = _diff(a[oldKey].toString(), a[newKey].toString());
+    final adds = lines.where((l) => l.kind == _DKind.add).length;
+    final dels = lines.where((l) => l.kind == _DKind.del).length;
+    out.add(_ToolPanel(
+      header: _PanelPath(a['path']?.toString() ?? ''),
+      trailing: [
+        if (adds > 0) Tag('+$adds', tone: Tone.ok, mono: true),
+        if (dels > 0) Tag('-$dels', tone: Tone.danger, mono: true),
+      ],
+      copyText: a[newKey].toString(),
+      padBody: false,
+      body: _DiffBlock.lines(lines),
+    ));
   } else if (a == null) {
     out.add(_done(d?['edited'] == true || d?['replaced'] == true
         ? 'Applied'
@@ -336,7 +363,14 @@ List<Widget> _writeView(Map? a, Map? d, {required String verb}) {
   final path = a?['path']?.toString() ?? d?['path']?.toString() ?? '';
   final content = a?['content']?.toString();
   if (content != null) {
-    out.add(_HiCodeBlock(path, content));
+    final n = '\n'.allMatches(content).length + 1;
+    out.add(_ToolPanel(
+      header: _PanelPath(path),
+      trailing: [Tag('$n ${n == 1 ? 'line' : 'lines'}', mono: true)],
+      copyText: content,
+      padBody: false,
+      body: _HiCodeBlock(path, content),
+    ));
   } else if (d?['written'] == true) {
     out.add(_done('$verb file'));
   }
@@ -347,7 +381,12 @@ List<Widget> _appendView(Map? a, Map? d) {
   final out = <Widget>[];
   final content = a?['content']?.toString();
   if (content != null && content.isNotEmpty) {
-    out.add(_CodeBox(content, addTint: true));
+    out.add(_ToolPanel(
+      header: _PanelPath(a?['path']?.toString() ?? ''),
+      trailing: const [Tag('Appended', tone: Tone.ok)],
+      copyText: content,
+      body: _PanelText(content, color: AppColors.diffAddFg),
+    ));
   }
   return out;
 }
@@ -357,7 +396,22 @@ List<Widget> _readView(Map? a, Map? d) {
   final path = a?['path']?.toString() ?? d?['path']?.toString() ?? '';
   final content = d?['content']?.toString();
   if (content != null && content.trim().isNotEmpty) {
-    out.add(_HiCodeBlock(path, content));
+    final offset = (a?['offset'] as num?)?.toInt();
+    final total = (d?['total_lines'] as num?)?.toInt();
+    final shown = '\n'.allMatches(content.trimRight()).length + 1;
+    final range = offset != null && offset > 1
+        ? 'lines $offset–${offset + shown - 1}'
+        : '$shown ${shown == 1 ? 'line' : 'lines'}';
+    out.add(_ToolPanel(
+      header: _PanelPath(path),
+      trailing: [
+        Tag(total != null && total > shown ? '$range of $total' : range,
+            mono: true),
+      ],
+      copyText: content,
+      padBody: false,
+      body: _HiCodeBlock(path, content),
+    ));
   }
   return out;
 }
@@ -378,31 +432,41 @@ List<Widget> _bashView(Map? a, Map? d) {
       _previewLines(_displayText(d?['stdout']?.toString() ?? '').trimRight());
   final stderr =
       _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
+  final exit = (d?['exit_code'] as num?)?.toInt();
   if (cmd.isEmpty && stdout.isEmpty && stderr.isEmpty) {
-    return [Text('no output', style: mono(11, color: AppColors.fg3))];
+    return [Text('No output', style: TS.meta())];
   }
-  return [_ShellPanel(command: cmd, stdout: stdout, stderr: stderr)];
+  return [
+    _ShellPanel(command: cmd, stdout: stdout, stderr: stderr, exitCode: exit)
+  ];
 }
 
 List<Widget> _grepView(Map? a, Map? d) {
   final out = <Widget>[];
   final results = _mapItems(d?['results']);
+  final query = (a?['query'] ?? a?['pattern'])?.toString() ?? '';
   if (results.isNotEmpty) {
-    out.add(_SearchHitList(children: [
-      for (final m in results)
-        _MatchRow(
-          path: m['path']?.toString() ?? '',
-          line: m['line_number']?.toString(),
-          text: m['content']?.toString() ?? '',
-          query: a?['query']?.toString() ?? '',
-        ),
-    ]));
+    out.add(_ToolPanel(
+      header: _PanelPath(query, icon: 'search'),
+      trailing: [
+        Tag('${results.length} ${results.length == 1 ? 'match' : 'matches'}',
+            mono: true),
+      ],
+      body: _SearchHitList(children: [
+        for (final m in results)
+          _MatchRow(
+            path: m['path']?.toString() ?? '',
+            line: (m['line_number'] ?? m['line'])?.toString(),
+            text: (m['content'] ?? m['text'])?.toString() ?? '',
+            query: query,
+          ),
+      ]),
+    ));
   } else if (d != null) {
-    out.add(const SizedBox(height: 10));
     out.add(_empty('No matches'));
   }
   if (d?['truncated'] == true && d?['hint'] != null) {
-    out.add(const SizedBox(height: 10));
+    out.add(const SizedBox(height: S.s8));
     out.add(_Hint(d?['hint']?.toString() ?? ''));
   }
   return out;
@@ -411,15 +475,23 @@ List<Widget> _grepView(Map? a, Map? d) {
 List<Widget> _findView(Map? a, Map? d) {
   final out = <Widget>[];
   final results = _mapItems(d?['results']);
+  final query = (a?['pattern'] ?? a?['query'] ?? a?['glob'])?.toString() ?? '';
   if (results.isNotEmpty) {
-    out.add(_Card(children: [
-      for (final f in results)
-        _FileRow(
-            icon: 'file',
-            name: f['path']?.toString() ?? f['name']?.toString() ?? ''),
-    ]));
+    out.add(_ToolPanel(
+      header: _PanelPath(query, icon: 'search'),
+      trailing: [
+        Tag('${results.length} ${results.length == 1 ? 'file' : 'files'}',
+            mono: true),
+      ],
+      padBody: false,
+      body: _Card(children: [
+        for (final f in results)
+          _FileRow(
+              icon: 'file',
+              name: f['path']?.toString() ?? f['name']?.toString() ?? ''),
+      ]),
+    ));
   } else if (d != null) {
-    out.add(const SizedBox(height: 10));
     out.add(_empty('No files found'));
   }
   return out;
@@ -435,16 +507,23 @@ List<Widget> _lsView(Map? a, Map? d) {
           .compareTo(y['name']?.toString() ?? '');
     });
   if (entries.isNotEmpty) {
-    out.add(_Card(children: [
-      for (final e in entries)
-        _FileRow(
-          icon: e['kind'] == 'dir' ? 'folder' : 'file',
-          name: e['name']?.toString() ?? '',
-          dir: e['kind'] == 'dir',
-        ),
-    ]));
+    out.add(_ToolPanel(
+      header: _PanelPath((a?['path'] ?? d?['path'])?.toString() ?? ''),
+      trailing: [
+        Tag('${entries.length} ${entries.length == 1 ? 'item' : 'items'}',
+            mono: true),
+      ],
+      padBody: false,
+      body: _Card(children: [
+        for (final e in entries)
+          _FileRow(
+            icon: e['kind'] == 'dir' ? 'folder' : 'file',
+            name: e['name']?.toString() ?? '',
+            dir: e['kind'] == 'dir',
+          ),
+      ]),
+    ));
   } else if (d != null) {
-    out.add(const SizedBox(height: 10));
     out.add(_empty('Empty directory'));
   }
   return out;
@@ -499,17 +578,25 @@ List<Widget> _codeMapView(Map? a, Map? d) {
 List<Widget> _webSearchView(Map? a, Map? d) {
   final results = _mapItems(d?['results']);
   if (results.isEmpty) return const [];
+  final query = a?['query']?.toString() ?? '';
   return [
-    _SearchHitList(children: [
-      for (final res in results)
-        _ResultCard(
-          title: res['title']?.toString() ?? '',
-          url: res['url']?.toString() ?? '',
-          date: res['published_date']?.toString(),
-          snippet: res['snippet']?.toString(),
-          query: a?['query']?.toString() ?? '',
-        ),
-    ]),
+    _ToolPanel(
+      header: _PanelPath(query, icon: 'globe'),
+      trailing: [
+        Tag('${results.length} ${results.length == 1 ? 'result' : 'results'}',
+            mono: true),
+      ],
+      body: _SearchHitList(children: [
+        for (final res in results)
+          _ResultCard(
+            title: res['title']?.toString() ?? '',
+            url: res['url']?.toString() ?? '',
+            date: res['published_date']?.toString(),
+            snippet: res['snippet']?.toString(),
+            query: query,
+          ),
+      ]),
+    ),
   ];
 }
 
@@ -517,8 +604,8 @@ List<Widget> _webReadView(Map? a, Map? d) {
   final out = <Widget>[];
   final title = d?['title']?.toString() ?? '';
   if (title.isNotEmpty) {
-    out.add(Text(title,
-        style: sans(14, weight: W.label, color: AppColors.fg1)));
+    out.add(
+        Text(title, style: sans(14, weight: W.label, color: AppColors.fg1)));
     out.add(const SizedBox(height: 4));
   }
   if (d?['published_date'] != null) {
@@ -539,8 +626,7 @@ List<Widget> _titleView(Map? a, Map? d) {
     return [Text('Cleared title', style: sans(13, color: AppColors.fg3))];
   }
   return [
-    Text(title,
-        style: sans(14, weight: W.label, color: AppColors.fg1)),
+    Text(title, style: sans(14, weight: W.label, color: AppColors.fg1)),
   ];
 }
 
@@ -549,8 +635,7 @@ List<Widget> _memoryView(String tool, Map? a, Map? d) {
   final id = (d?['id'] ?? a?['id'])?.toString() ?? '';
   final content = (d?['content'] ?? a?['content'])?.toString() ?? '';
   if (id.isNotEmpty) {
-    out.add(Text(id,
-        style: TS.label(AppColors.fg1)));
+    out.add(Text(id, style: TS.label(AppColors.fg1)));
   }
   if (content.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -568,8 +653,7 @@ List<Widget> _skillView(String tool, Map? a, Map? d) {
       (d?['content'] ?? d?['description'] ?? d?['text'])?.toString() ?? '';
   final out = <Widget>[];
   if (name.isNotEmpty) {
-    out.add(Text(name,
-        style: TS.label(AppColors.fg1)));
+    out.add(Text(name, style: TS.label(AppColors.fg1)));
   }
   if (text.trim().isNotEmpty) {
     if (out.isNotEmpty) out.add(const SizedBox(height: 6));
@@ -586,8 +670,7 @@ List<Widget> _monitorView(Map? a, Map? d) {
   final path = (a?['path'] ?? d?['path'])?.toString() ?? '';
   final filter = (a?['filter'] ?? d?['filter'])?.toString() ?? '';
   final out = <Widget>[
-    Text(action,
-        style: TS.label(AppColors.fg1)),
+    Text(action, style: TS.label(AppColors.fg1)),
   ];
   if (path.isNotEmpty) {
     out.add(const SizedBox(height: 4));
@@ -604,9 +687,7 @@ List<Widget> _presentView(Map? a, Map? d) {
   final path = (a?['path'] ?? d?['path'])?.toString() ?? '';
   final caption = (a?['caption'] ?? d?['caption'])?.toString() ?? '';
   return [
-    if (path.isNotEmpty)
-      Text(path,
-          style: TS.label(AppColors.fg1)),
+    if (path.isNotEmpty) Text(path, style: TS.label(AppColors.fg1)),
     if (caption.isNotEmpty) ...[
       const SizedBox(height: 4),
       Text(caption, style: sans(13, color: AppColors.fg3)),
@@ -685,8 +766,7 @@ Widget _done(String label) => Padding(
       child: _meta([_statusChip(true, label)]),
     );
 
-Widget _empty(String label) =>
-    Text(label, style: TS.meta());
+Widget _empty(String label) => Text(label, style: TS.meta());
 
 class _Card extends StatelessWidget {
   final List<Widget> children;
@@ -790,8 +870,7 @@ Widget _highlightedLine(String text, String query) {
     if (at > i) spans.add(TextSpan(text: text.substring(i, at)));
     spans.add(TextSpan(
       text: text.substring(at, at + needle.length),
-      style: mono(11,
-              height: 1.45, color: AppColors.accent, weight: W.label)
+      style: mono(11, height: 1.45, color: AppColors.accent, weight: W.label)
           .copyWith(backgroundColor: AppColors.accentBg),
     ));
     i = at + needle.length;
@@ -856,8 +935,7 @@ class _ResultCard extends StatelessWidget {
           Text(title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style:
-                  sans(13, weight: W.label, color: AppColors.accent)),
+              style: sans(13, weight: W.label, color: AppColors.accent)),
         if (url.isNotEmpty) ...[
           if (title.isNotEmpty) const SizedBox(height: 2),
           Text(url,
@@ -883,18 +961,18 @@ class _ErrorBox extends StatelessWidget {
   const _ErrorBox(this.message);
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+    return InsetPanel(
+      tone: Tone.danger,
+      padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
-            padding: EdgeInsets.only(top: 1),
+            padding: const EdgeInsets.only(top: S.s2),
             child:
                 AppIcon('alert-triangle', size: 14, color: AppColors.danger)),
-        const SizedBox(width: 9),
+        const SizedBox(width: S.s8),
         Expanded(
-            child: SelectableText(message,
-                style: mono(11, height: 1.45, color: AppColors.danger))),
+            child:
+                SelectableText(message, style: _panelCode(AppColors.danger))),
       ]),
     );
   }
@@ -920,19 +998,16 @@ class _Hint extends StatelessWidget {
   final String text;
   const _Hint(this.text);
   @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.sm),
-        border: Border(left: BorderSide(color: AppColors.accentLine, width: 3)),
-      ),
-      child: Text(text, style: sans(12, height: 1.45, color: AppColors.fg2)),
-    );
-  }
+  Widget build(BuildContext context) => InsetPanel(
+        padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+              padding: const EdgeInsets.only(top: S.s2),
+              child: AppIcon('alert-circle', size: 14, color: AppColors.fg3)),
+          const SizedBox(width: S.s8),
+          Expanded(child: Text(text, style: TS.meta(AppColors.fg2))),
+        ]),
+      );
 }
 
 // Tool previews may be JSON strings that were encoded once for the result
@@ -947,76 +1022,161 @@ class _ShellPanel extends StatelessWidget {
   final String command;
   final String stdout;
   final String stderr;
+  final int? exitCode;
+  final bool failed;
   const _ShellPanel(
-      {required this.command, required this.stdout, required this.stderr});
+      {required this.command,
+      required this.stdout,
+      required this.stderr,
+      this.exitCode,
+      this.failed = false});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final copyText = [
       if (command.isNotEmpty) command,
       if (stdout.isNotEmpty) stdout,
       if (stderr.isNotEmpty) stderr,
     ].join('\n');
-    return Stack(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(10, 8, 36, 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(R.sm),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (command.isNotEmpty)
-                _shellScroll(TextSpan(children: [
-                  TextSpan(
-                      text: '\$ ',
-                      style: mono(11, height: 1.45, color: AppColors.accent)),
-                  highlightedCodeSpan(command, language: 'bash'),
-                ])),
-              if (command.isNotEmpty &&
-                  (stdout.isNotEmpty || stderr.isNotEmpty))
-                const SizedBox(height: 8),
-              if (stdout.isNotEmpty)
-                _shellScroll(highlightedCodeSpan(stdout, language: 'bash')),
-              if (stdout.isNotEmpty && stderr.isNotEmpty)
-                const SizedBox(height: 6),
-              if (stderr.isNotEmpty)
-                _shellScroll(TextSpan(
-                  text: stderr,
-                  style: mono(11, height: 1.45, color: AppColors.danger),
-                )),
-            ],
-          ),
-        ),
-        if (copyText.isNotEmpty)
-          Positioned(
-            top: 0,
-            right: 0,
-            child: IconBtn(
-              'clipboard',
-              size: 28,
-              iconSize: 13,
-              tooltip: 'Copy',
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: copyText));
-                toast(context, 'Copied');
-              },
-            ),
-          ),
+    final multiLine = command.contains('\n');
+    final firstLine = command.split('\n').first;
+    final hasOutput = stdout.isNotEmpty || stderr.isNotEmpty || multiLine;
+    return _ToolPanel(
+      header: Text.rich(
+        TextSpan(children: [
+          TextSpan(text: '\$ ', style: _panelCode(AppColors.accent)),
+          TextSpan(
+              text: multiLine ? '$firstLine …' : firstLine,
+              style: _panelCode(AppColors.fg1)),
+        ]),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: [
+        if (exitCode != null)
+          Tag('exit $exitCode',
+              tone: exitCode == 0 ? Tone.ok : Tone.danger, mono: true)
+        else if (failed)
+          const Tag('Failed', tone: Tone.danger, dot: true),
       ],
+      copyText: copyText,
+      body: hasOutput
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (multiLine) ...[
+                  _PanelText(command, color: AppColors.fg1),
+                  if (stdout.isNotEmpty || stderr.isNotEmpty)
+                    const SizedBox(height: S.s8),
+                ],
+                if (stdout.isNotEmpty) _PanelText(stdout),
+                if (stdout.isNotEmpty && stderr.isNotEmpty)
+                  const SizedBox(height: S.s6),
+                if (stderr.isNotEmpty)
+                  _PanelText(stderr, color: AppColors.danger),
+              ],
+            )
+          : null,
     );
   }
+}
 
-  Widget _shellScroll(TextSpan span) {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (_) => true,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SelectableText.rich(span),
+TextStyle _panelCode([Color? color]) =>
+    mono(12, height: 1.5, color: color ?? AppColors.fg2);
+
+class _PanelText extends StatelessWidget {
+  const _PanelText(this.text, {this.color});
+
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollNotification>(
+        onNotification: (_) => true,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SelectableText(text, style: _panelCode(color)),
+        ),
+      );
+}
+
+class _PanelPath extends StatelessWidget {
+  const _PanelPath(this.text, {this.icon = 'file'});
+
+  final String text;
+  final String icon;
+
+  @override
+  Widget build(BuildContext context) {
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Row(children: [
+      AppIcon(icon, size: 14, color: AppColors.fg3),
+      const SizedBox(width: S.s6),
+      Flexible(
+        child: Text(text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _panelCode(AppColors.fg1)),
+      ),
+    ]);
+  }
+}
+
+class _ToolPanel extends StatelessWidget {
+  const _ToolPanel({
+    this.header,
+    this.trailing = const [],
+    this.body,
+    this.copyText,
+    this.padBody = true,
+  });
+
+  final Widget? header;
+  final List<Widget> trailing;
+  final Widget? body;
+  final String? copyText;
+  final bool padBody;
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = copyText;
+    return Container(
+      width: double.infinity,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(R.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            constraints: const BoxConstraints(minHeight: 36),
+            color: AppColors.overlay,
+            padding: const EdgeInsets.fromLTRB(S.s12, S.s4, S.s4, S.s4),
+            child: Row(children: [
+              Expanded(child: header ?? const SizedBox.shrink()),
+              for (final t in trailing) ...[const SizedBox(width: S.s6), t],
+              if (copy != null && copy.isNotEmpty)
+                IconBtn('copy', size: 28, iconSize: 14, tooltip: 'Copy',
+                    onTap: () {
+                  Clipboard.setData(ClipboardData(text: copy));
+                  toast(context, 'Copied');
+                })
+              else
+                const SizedBox(width: S.s8),
+            ]),
+          ),
+          if (body != null)
+            padBody
+                ? Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s12),
+                    child: body)
+                : body!,
+        ],
       ),
     );
   }
@@ -1025,43 +1185,15 @@ class _ShellPanel extends StatelessWidget {
 /// Plain monospace block (selectable). Optional add tint or sans font.
 class _CodeBox extends StatelessWidget {
   final String text;
-  final bool addTint;
   final bool useSans;
-  const _CodeBox(this.text, {this.addTint = false, this.useSans = false});
+  const _CodeBox(this.text, {this.useSans = false});
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final color = addTint ? AppColors.ok : AppColors.fg2;
-    final style = useSans
-        ? sans(12, height: 1.4, color: color)
-        : mono(11, height: 1.4, color: color);
-    return Stack(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 28),
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (_) => true,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SelectableText(text, style: style, maxLines: null),
-            ),
-          ),
-        ),
-        Positioned(
-          top: -4,
-          right: -6,
-          child: IconBtn(
-            'clipboard',
-            size: 28,
-            iconSize: 13,
-            tooltip: 'Copy',
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: text));
-              toast(context, 'Copied');
-            },
-          ),
-        ),
-      ],
+    return _ToolPanel(
+      copyText: text,
+      body: useSans
+          ? SelectableText(text, style: TS.ui(AppColors.fg2))
+          : _PanelText(text),
     );
   }
 }
@@ -1103,8 +1235,9 @@ class _HiCodeBlockState extends State<_HiCodeBlock> {
       child: CodeEditor(
         controller: _c,
         readOnly: true,
+        showCursorWhenReadOnly: false,
         wordWrap: false,
-        style: codeEditorStyle(widget.filename, background: AppColors.bg),
+        style: codeEditorStyle(widget.filename, background: AppColors.raised),
         indicatorBuilder:
             (context, editingController, chunkController, notifier) {
           return Row(children: [
@@ -1175,18 +1308,16 @@ List<_DLine> _diff(String aStr, String bStr) {
 }
 
 class _DiffBlock extends StatelessWidget {
-  final String before;
-  final String after;
-  const _DiffBlock(this.before, this.after);
+  final List<_DLine> diffLines;
+  const _DiffBlock.lines(this.diffLines);
   @override
   Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final lines = _diff(before, after);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final l in lines) _row(l),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [for (final l in diffLines) _row(l)],
+      ),
     );
   }
 
@@ -1194,19 +1325,16 @@ class _DiffBlock extends StatelessWidget {
     final (Color bg, Color fg, String sign) = switch (l.kind) {
       _DKind.add => (AppColors.diffAddBg, AppColors.diffAddFg, '+'),
       _DKind.del => (AppColors.diffDelBg, AppColors.diffDelFg, '-'),
-      _DKind.ctx => (AppColors.surface2, AppColors.fg3, ' '),
+      _DKind.ctx => (Colors.transparent, AppColors.fg3, ' '),
     };
     return Container(
       width: double.infinity,
       color: bg,
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 1.5),
+      padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: 1),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(
-            width: 12,
-            child: Text(sign, style: mono(11, height: 1.45, color: fg))),
+        SizedBox(width: 16, child: Text(sign, style: _panelCode(fg))),
         Expanded(
-            child: Text(l.text.isEmpty ? ' ' : l.text,
-                style: mono(11, height: 1.45, color: fg))),
+            child: Text(l.text.isEmpty ? ' ' : l.text, style: _panelCode(fg))),
       ]),
     );
   }

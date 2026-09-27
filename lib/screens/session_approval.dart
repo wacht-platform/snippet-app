@@ -83,8 +83,7 @@ class _QuestionRecord extends StatelessWidget {
           children: [
             Row(children: [
               Expanded(
-                child: Text('Question',
-                    style: TS.rowTitle()),
+                child: Text('Question', style: TS.rowTitle()),
               ),
               Tag(answers.isEmpty ? 'Asked' : 'Answered',
                   tone: answers.isEmpty ? Tone.accent : Tone.ok, dot: true),
@@ -98,8 +97,7 @@ class _QuestionRecord extends StatelessWidget {
               if (qs.length > 1)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('${i + 1} of ${qs.length}',
-                      style: TS.meta()),
+                  child: Text('${i + 1} of ${qs.length}', style: TS.meta()),
                 ),
               Text(qs[i]['text']?.toString() ?? '',
                   style: TS.ui(AppColors.fg1)),
@@ -154,69 +152,156 @@ class ApprovalBarState extends State<ApprovalBar> {
     return null;
   }
 
+  static final _vaultPrefix = RegExp(
+      r'^\s*⚠?\s*uses vault secret\(s\) \[([^\]]*)\]\s*[—-]\s*',
+      dotAll: true);
+
   @override
   Widget build(BuildContext context) {
     final req = _request;
     final tool = req?['tool_name']?.toString() ?? '';
-    final title = tool.isEmpty ? 'Approve this action?' : '${toolTitle(tool)}?';
-    final summary = (req?['summary']?.toString() ?? '').trim();
-    final fallback = toolArgSummary(tool, req?['arguments']);
-    final detail = summary.isNotEmpty ? summary : fallback;
+    var detail = (req?['summary']?.toString() ?? '').trim();
+    if (detail.isEmpty) detail = toolArgSummary(tool, req?['arguments']);
+    final vault = _vaultPrefix.firstMatch(detail);
+    final secrets = vault == null
+        ? const <String>[]
+        : vault
+            .group(1)!
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+    if (vault != null) detail = detail.substring(vault.end).trim();
+    final isVault = secrets.isNotEmpty;
     final index = (req?['index'] as num?)?.toInt() ?? 1;
     final total = (req?['total'] as num?)?.toInt() ?? 1;
+    final question = switch (tool) {
+      'bash' => 'Run this command?',
+      'edit_file' || 'replace_file_content' => 'Edit this file?',
+      'write_file' => 'Write this file?',
+      'append_file' => 'Append to this file?',
+      '' => 'Allow this action?',
+      _ => 'Allow ${toolTitle(tool).toLowerCase()}?',
+    };
+    final isShell = tool == 'bash';
+
+    final allow = Btn(_sent ? 'Sending' : 'Allow',
+        small: !kMobile,
+        full: kMobile,
+        icon: 'check',
+        disabled: _sent,
+        onTap: () => _decide({'kind': 'approve'}));
+    final reject = Btn('Reject',
+        small: !kMobile,
+        full: kMobile,
+        variant: BtnVariant.secondary,
+        disabled: _sent,
+        onTap: () => _decide({'kind': 'deny'}));
+    final canAlways = widget.showApproveAll && !isVault;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+      padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s8),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.all(S.s16),
         decoration: BoxDecoration(
           color: AppColors.raised,
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(R.lg),
+          border: Border.all(
+              color: (isVault ? AppColors.run : AppColors.accent)
+                  .withValues(alpha: 0.35)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(children: [
-              Expanded(
-                child: Text(_sent ? 'Sending…' : title,
-                    style: TS.rowTitle()),
-              ),
-              Tag(total > 1 ? '$index of $total' : 'Input required',
-                  tone: Tone.accent, live: true),
+              IconTile(isVault ? 'lock-key' : toolIcon(tool),
+                  tone: isVault ? Tone.run : Tone.accent),
+              const SizedBox(width: S.s12),
+              Expanded(child: Text(question, style: TS.rowTitle())),
+              if (total > 1) ...[
+                const SizedBox(width: S.s8),
+                Tag('$index of $total', mono: true),
+              ],
             ]),
-            if (detail.isNotEmpty)
+            if (detail.isNotEmpty) ...[
+              const SizedBox(height: S.s12),
               Flexible(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(detail,
-                        style: TS.ui(AppColors.fg3)),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  child: Container(
+                    width: double.infinity,
+                    padding:
+                        const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
+                    decoration: BoxDecoration(
+                      color: AppColors.canvas,
+                      borderRadius: BorderRadius.circular(R.sm + 2),
+                    ),
+                    child: SingleChildScrollView(
+                      child: SelectableText.rich(TextSpan(children: [
+                        if (isShell)
+                          TextSpan(
+                              text: '\$ ',
+                              style: mono(13,
+                                  height: 1.5, color: AppColors.accent)),
+                        TextSpan(
+                            text: detail,
+                            style: mono(13, height: 1.5, color: AppColors.fg1)),
+                      ])),
+                    ),
                   ),
                 ),
               ),
-            const SizedBox(height: 14),
-            Opacity(
-              opacity: _sent ? 0.5 : 1,
-              child: Row(children: [
-                Btn('Approve',
-                    small: true,
-                    onTap: _sent ? null : () => _decide({'kind': 'approve'})),
-                const SizedBox(width: 8),
-                if (widget.showApproveAll)
-                  Btn('Always allow',
-                      small: true,
-                      variant: BtnVariant.secondary,
+            ],
+            if (isVault) ...[
+              const SizedBox(height: S.s12),
+              InsetPanel(
+                tone: Tone.run,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Uses secrets from your vault',
+                        style: TS.label(AppColors.run)),
+                    const SizedBox(height: S.s8),
+                    Wrap(spacing: S.s6, runSpacing: S.s6, children: [
+                      for (final name in secrets)
+                        Tag(name, tone: Tone.run, icon: 'key', mono: true),
+                    ]),
+                    const SizedBox(height: S.s8),
+                    Text(
+                        'Values stay on the machine. Vault access is approved one call at a time.',
+                        style: TS.meta()),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: S.s16),
+            if (kMobile) ...[
+              Row(children: [
+                Expanded(child: reject),
+                const SizedBox(width: S.s8),
+                Expanded(child: allow),
+              ]),
+              if (canAlways)
+                Center(
+                  child: TextAction('Always allow in this session',
                       onTap: _sent
                           ? null
                           : () => _decide({'kind': 'approve_all'})),
-                if (widget.showApproveAll) const SizedBox(width: 8),
-                Btn('Reject',
-                    small: true,
-                    variant: BtnVariant.ghost,
-                    onTap: _sent ? null : () => _decide({'kind': 'deny'})),
+                ),
+            ] else
+              Row(children: [
+                if (canAlways)
+                  TextAction('Always allow',
+                      onTap: _sent
+                          ? null
+                          : () => _decide({'kind': 'approve_all'})),
+                const Spacer(),
+                reject,
+                const SizedBox(width: S.s8),
+                allow,
               ]),
-            ),
           ],
         ),
       ),
@@ -402,8 +487,7 @@ class QuestionBarState extends State<QuestionBar> {
       );
 
   Widget _chip(String label, bool sel, VoidCallback onTap) => Material(
-        color:
-            sel ? AppColors.accentBg : AppColors.hover,
+        color: sel ? AppColors.accentBg : AppColors.hover,
         shape: StadiumBorder(
           side: BorderSide(
             color: sel ? AppColors.accent : Colors.transparent,
@@ -424,8 +508,7 @@ class QuestionBarState extends State<QuestionBar> {
       );
 
   Widget _choiceRow(String label, bool sel, VoidCallback onTap) => Material(
-        color:
-            sel ? AppColors.accentBg : Colors.transparent,
+        color: sel ? AppColors.accentBg : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(R.md),
           side: BorderSide(
@@ -535,9 +618,7 @@ class QuestionBarState extends State<QuestionBar> {
                     children: [
                       if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
                         const SizedBox(height: 8),
-                        Text(ctx,
-                            style:
-                                TS.ui(AppColors.fg3)),
+                        Text(ctx, style: TS.ui(AppColors.fg3)),
                       ],
                       ...() {
                         final q = _currentQuestion;
@@ -545,8 +626,7 @@ class QuestionBarState extends State<QuestionBar> {
                         return <Widget>[
                           const SizedBox(height: 12),
                           Text(q['text']?.toString() ?? '',
-                              style:
-                                  TS.ui(AppColors.fg1)),
+                              style: TS.ui(AppColors.fg1)),
                           const SizedBox(height: 10),
                           ..._inputFor(q),
                         ];
@@ -662,8 +742,7 @@ class _SendBtn extends StatelessWidget {
           height: size,
           child: Center(
               child: AppIcon(running ? 'stop' : 'arrow-up',
-                  size: iconSize,
-                  color: ink)),
+                  size: iconSize, color: ink)),
         ),
       ),
     );
@@ -733,8 +812,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
-          child: Text(label.toUpperCase(),
-              style: caps(10, color: AppColors.fg3)),
+          child:
+              Text(label.toUpperCase(), style: caps(10, color: AppColors.fg3)),
         ),
         Container(
           decoration: BoxDecoration(

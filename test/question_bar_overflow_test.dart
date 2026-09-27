@@ -98,7 +98,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     // Approve/Reject are the decision; they must not be pushed off the edge.
-    expect(find.text('Approve'), findsOneWidget);
+    expect(find.text('Allow'), findsOneWidget);
     expect(find.text('Reject'), findsOneWidget);
     final reject = tester.getRect(find.text('Reject'));
     final pane = tester.getRect(find.byType(Scaffold));
