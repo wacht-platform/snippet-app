@@ -85,7 +85,7 @@ class _CoordinationAgentDirectoryState
     final body = RefreshIndicator(
       onRefresh: refresh,
       child: loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PageLoader()
           : error != null
               ? _MessageState(
                   title: 'Could not load agents',

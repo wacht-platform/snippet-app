@@ -28,14 +28,7 @@ class ActivityFeed extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.8,
-                  color: AppColors.fg3,
-                ),
-              ),
+              Spinner(size: 22, color: AppColors.fg3),
               const SizedBox(height: 14),
               Text('Connecting…', style: sans(13, color: AppColors.fg3)),
             ],

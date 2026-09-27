@@ -1,7 +1,6 @@
 // Transcript components: expandable mono tool rows (output inline, one tap — not
 // buried in sheets), first-class lane cards with ticking elapsed, and styled system
 // rows for watches, goals, and compaction.
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -47,35 +46,29 @@ class _DenseToolRowState extends State<DenseToolRow> {
           behavior: HitTestBehavior.opaque,
           onTap: canExpand ? () => setState(() => _open = !_open) : null,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
+            padding: const EdgeInsets.symmetric(vertical: S.s6),
             child: Row(children: [
-              // The state glyph carries the outcome: a failure turns it red and
-              // changes the mark, so a broken call is visible while scrolling
-              // rather than only after expanding it.
-              AppIcon(failed ? 'alert-triangle' : toolIcon(widget.tool),
-                  size: 15, color: failed ? AppColors.danger : AppColors.fg3),
-              const SizedBox(width: 8),
+              SizedBox(
+                width: 16,
+                child: Center(
+                  child: widget.result == null
+                      ? Spinner(size: 12, color: AppColors.run)
+                      : AppIcon(
+                          failed ? 'alert-triangle' : toolIcon(widget.tool),
+                          size: 16,
+                          color: failed ? AppColors.danger : AppColors.fg3),
+                ),
+              ),
+              const SizedBox(width: S.s8),
               Text(toolTitle(widget.tool),
                   style: TS.label(failed ? AppColors.danger : AppColors.fg2)),
               if (summary.isNotEmpty) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: S.s8),
                 Flexible(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(R.sm),
-                    ),
-                    child: Text(summary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        // The summary is the only place a command or path is
-                        // legible without expanding, so it reads at `fg2` — the
-                        // normal body tone — rather than one step below the
-                        // title beside it.
-                        style: mono(12, color: AppColors.fg2)),
-                  ),
+                  child: Text(summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TS.codeSmall()),
                 ),
               ],
               ..._metaWidgets(),
@@ -124,10 +117,10 @@ class _DenseToolRowState extends State<DenseToolRow> {
             ? 0
             : (a['old_string'] ?? '').toString().split('\n').length;
         return [
-          const SizedBox(width: 10),
-          Text('+$add', style: sans(12, color: AppColors.ok)),
-          const SizedBox(width: 6),
-          Text('-$del', style: sans(12, color: AppColors.danger)),
+          const SizedBox(width: S.s8),
+          Text('+$add', style: TS.meta(AppColors.ok)),
+          const SizedBox(width: S.s4),
+          Text('-$del', style: TS.meta(AppColors.danger)),
         ];
       }
     }
@@ -135,52 +128,12 @@ class _DenseToolRowState extends State<DenseToolRow> {
   }
 }
 
-/// Terminal-style running indicator: the classic braille spinner, mono + amber —
-/// on-theme for Terminal Ink where the Material ring felt foreign.
-class BrailleSpinner extends StatefulWidget {
+class BrailleSpinner extends StatelessWidget {
   final Color? color;
   const BrailleSpinner({super.key, this.color});
   @override
-  State<BrailleSpinner> createState() => _BrailleSpinnerState();
-}
-
-/// Shared braille animation timer: one Timer.periodic drives all visible
-/// spinners, avoiding N individual timers when many tool calls run at once.
-class _BrailleSpinnerState extends State<BrailleSpinner> {
-  static const _frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  static Timer? _sharedTimer;
-  static int _tick = 0;
-  static final Set<State<BrailleSpinner>> _listeners = {};
-
-  static void _onTick(_) {
-    _tick = (_tick + 1) % _frames.length;
-    for (final s in _listeners) {
-      if (s.mounted) s.setState(() {});
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _listeners.add(this);
-    if (_sharedTimer == null || !_sharedTimer!.isActive) {
-      _sharedTimer = Timer.periodic(const Duration(milliseconds: 150), _onTick);
-    }
-  }
-
-  @override
-  void dispose() {
-    _listeners.remove(this);
-    if (_listeners.isEmpty) {
-      _sharedTimer?.cancel();
-      _sharedTimer = null;
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Text(_frames[_tick],
-      style: mono(12, color: widget.color ?? AppColors.run));
+  Widget build(BuildContext context) =>
+      Spinner(size: 12, color: color ?? AppColors.run);
 }
 
 /// Consecutive tools as a BeUI group: one header row, details on expand.
@@ -212,15 +165,19 @@ class _ToolRunState extends State<ToolRun> {
           behavior: HitTestBehavior.opaque,
           onTap: _toggle,
           child: Row(children: [
-            if (widget.running)
-              const SizedBox(width: 16, child: Center(child: BrailleSpinner()))
-            else
-              AppIcon('check', size: 13, color: AppColors.fg4),
-            const SizedBox(width: 8),
-            Text(label, style: sans(13, color: AppColors.fg3)),
-            const SizedBox(width: 4),
+            SizedBox(
+              width: 16,
+              child: Center(
+                child: widget.running
+                    ? Spinner(size: 12, color: AppColors.run)
+                    : AppIcon('check', size: 14, color: AppColors.fg3),
+              ),
+            ),
+            const SizedBox(width: S.s8),
+            Text(label, style: TS.label(AppColors.fg3)),
+            const SizedBox(width: S.s4),
             AppIcon(widget.open ? 'chevron-down' : 'chevron-right',
-                size: 13, color: AppColors.fg4),
+                size: 14, color: AppColors.fg4),
           ]),
         ),
         if (widget.open) ...[
@@ -240,7 +197,7 @@ class _ToolRunState extends State<ToolRun> {
               padding: const EdgeInsets.only(left: 11),
               decoration: BoxDecoration(
                 border: Border(
-                  left: BorderSide(color: AppColors.border, width: 1),
+                  left: BorderSide(color: AppColors.line, width: 1),
                 ),
               ),
               child: Column(

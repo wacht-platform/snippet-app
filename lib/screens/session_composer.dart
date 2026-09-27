@@ -923,11 +923,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                 color: AppColors.scrim,
                 borderRadius: BorderRadius.circular(R.sm)),
             alignment: Alignment.center,
-            child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg2)),
+            child: Spinner(size: 16, color: AppColors.fg2),
           ),
         ),
       Positioned(

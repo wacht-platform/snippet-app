@@ -64,14 +64,7 @@ class MissionControlHeader extends StatelessWidget {
                   if (state.loading)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: SizedBox(
-                        width: 10,
-                        height: 10,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.4,
-                          color: AppColors.fg3,
-                        ),
-                      ),
+                      child: Spinner(size: 10, color: AppColors.fg3),
                     ),
                   Expanded(
                     child: Text(

@@ -327,6 +327,23 @@ class IconTile extends StatelessWidget {
   }
 }
 
+class Spinner extends StatelessWidget {
+  const Spinner({super.key, this.size = 16, this.color});
+
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+        dimension: size,
+        child: CircularProgressIndicator(
+          strokeWidth: size <= 14 ? 1.6 : 2,
+          strokeCap: StrokeCap.round,
+          color: color ?? AppColors.fg3,
+        ),
+      );
+}
+
 class DelayedSpinner extends StatefulWidget {
   const DelayedSpinner({super.key, this.size = 20, this.color});
 
@@ -356,19 +373,31 @@ class _DelayedSpinnerState extends State<DelayedSpinner> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: widget.size,
-      child: AnimatedOpacity(
+  Widget build(BuildContext context) => AnimatedOpacity(
         opacity: _visible ? 1 : 0,
         duration: Motion.quick,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: widget.color ?? AppColors.fg3,
+        child: Spinner(size: widget.size, color: widget.color),
+      );
+}
+
+class PageLoader extends StatelessWidget {
+  const PageLoader({super.key, this.label});
+
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Semantics(
+          label: label ?? 'Loading',
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const DelayedSpinner(),
+            if (label != null) ...[
+              const SizedBox(height: S.s12),
+              Text(label!, style: TS.meta()),
+            ],
+          ]),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class Skeleton extends StatelessWidget {

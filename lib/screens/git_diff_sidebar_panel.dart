@@ -195,11 +195,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+                child: Spinner(size: 18),
               ),
             )
           else if (_error != null)

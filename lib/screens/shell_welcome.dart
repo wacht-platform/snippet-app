@@ -136,14 +136,7 @@ class ShellRecentPlaceholder extends StatelessWidget {
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.fg3,
-                      ),
-                    ),
+                    child: Spinner(size: 20, color: AppColors.fg3),
                   ),
                 )
               else if (list.isEmpty)

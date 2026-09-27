@@ -112,14 +112,7 @@ class _MissionComposerState extends State<MissionComposer> {
                     height: 36,
                     child: Center(
                       child: sending
-                          ? SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.bg,
-                              ),
-                            )
+                          ? Spinner(size: 14, color: AppColors.bg)
                           : AppIcon('arrow-up',
                               size: 16,
                               color: _canSend ? AppColors.bg : AppColors.fg4),

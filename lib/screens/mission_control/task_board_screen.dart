@@ -264,10 +264,7 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
   /// plane, and duplicating it is how they drift.
   Widget _content() => loading
       ? const Center(
-          child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2)))
+          child: Spinner(size: 22))
       : error != null
           ? Center(
               child: Padding(

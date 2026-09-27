@@ -213,7 +213,7 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 28),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        child: PageLoader(),
       );
     }
     final workspace = widget.workspaceLabel?.trim() ?? '';
@@ -981,11 +981,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   Widget _body() {
     if (_loading) {
       return const Center(
-        child: SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
+        child: Spinner(size: 24),
       );
     }
     if (_error != null) {
@@ -1185,11 +1181,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                 color: AppColors.scrim,
                 borderRadius: BorderRadius.circular(R.sm)),
             alignment: Alignment.center,
-            child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg2)),
+            child: Spinner(size: 16, color: AppColors.fg2),
           ),
         ),
       Positioned(
@@ -1371,14 +1363,7 @@ class _SendBtn extends StatelessWidget {
           height: size,
           child: Center(
             child: sending
-                ? SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.8,
-                      color: AppColors.accentFg,
-                    ),
-                  )
+                ? Spinner(size: 14, color: AppColors.accentFg)
                 : AppIcon('arrow-up',
                     size: 16,
                     color: enabled ? AppColors.accentFg : AppColors.fg4),

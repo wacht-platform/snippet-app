@@ -231,11 +231,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                 ),
                 child: Row(children: [
                   if (_busy) ...[
-                    SizedBox(
-                        width: 13,
-                        height: 13,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 1.8, color: AppColors.fg3)),
+                    Spinner(size: 13, color: AppColors.fg3),
                     const SizedBox(width: 9),
                     Text('Connecting…', style: TS.meta()),
                   ] else
@@ -492,11 +488,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                       color: AppColors.accentFill, shape: BoxShape.circle),
-                  child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.accentFg)),
+                  child: Spinner(size: 16, color: AppColors.accentFg),
                 )
               else
                 PillBtn('Connect',

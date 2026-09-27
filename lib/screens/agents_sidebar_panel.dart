@@ -253,11 +253,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         alignment: Alignment.center,
         child: kMobile
             ? const AppLoading(label: 'Loading agents')
-            : SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-                strokeWidth: 2, color: AppColors.fg3)),
+            : Spinner(size: 20, color: AppColors.fg3),
       );
     }
     if (error != null && agents.isEmpty) {

@@ -450,11 +450,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             if (_loadingModels)
               const Padding(
                 padding: EdgeInsets.only(bottom: 8, right: 8),
-                child: SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+                child: Spinner(size: 26),
               )
             else
               IconBtn(_showModelBrowser ? 'x' : 'list',

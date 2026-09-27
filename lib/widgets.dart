@@ -19,46 +19,12 @@ export 'dialog_widgets.dart';
 export 'markdown_widgets.dart';
 export 'menu_widgets.dart';
 
-class AppLoading extends StatefulWidget {
+class AppLoading extends StatelessWidget {
   const AppLoading({super.key, this.label = 'Loading'});
   final String label;
 
   @override
-  State<AppLoading> createState() => _AppLoadingState();
-}
-
-class _AppLoadingState extends State<AppLoading>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: FadeTransition(
-        opacity: Tween<double>(begin: 0.35, end: 1).animate(
-          CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-        ),
-        child: Semantics(
-          label: widget.label,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.92, end: 1.0).animate(
-              CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-            ),
-            child: AppIcon('sparkles', size: 28, color: AppColors.fg1),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => PageLoader(label: label);
 }
 
 /// [onSelect] null disables the whole row (e.g. a locked field).

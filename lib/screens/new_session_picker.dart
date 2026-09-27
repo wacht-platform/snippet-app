@@ -299,10 +299,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
               Expanded(
                 child: _loading && _listing == null
                     ? const Center(
-                        child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2)))
+                        child: Spinner(size: 20))
                     : RefreshIndicator(
                         color: AppColors.accent,
                         backgroundColor: AppColors.surface3,
@@ -540,11 +537,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (_busy != null)
-                        SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 1.6, color: AppColors.accentFg))
+                        Spinner(size: 14, color: AppColors.accentFg)
                       else
                         // `chat-thread` is the app's ONE conversation glyph, used
                         // by every session row and tab. `corner-down-right`

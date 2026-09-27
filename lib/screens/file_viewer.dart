@@ -585,11 +585,7 @@ class _AudioViewState extends State<_AudioView> {
           if (!_ready && _error == null)
             // Not `const`: `AppColors.fg3` is a theme GETTER, not a compile-time
             // constant, so it cannot appear in a const expression.
-            SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg3))
+            Spinner(size: 22, color: AppColors.fg3)
           else
             IconBtn(_playing ? 'pause' : 'play',
                 size: 44,

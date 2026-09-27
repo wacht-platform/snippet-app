@@ -360,11 +360,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+                child: Spinner(size: 18),
               ),
             )
           else if (_error != null)
@@ -506,13 +502,7 @@ class _FileTreeRow extends StatelessWidget {
                 height: 16,
                 child: entry.isDir
                     ? (loading
-                        ? const Center(
-                            child: SizedBox.square(
-                              dimension: 11,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 1.5),
-                            ),
-                          )
+                        ? const Center(child: Spinner(size: 12))
                         : AppIcon(
                             expanded ? 'chevron-down' : 'chevron-right',
                             size: 12,
@@ -821,10 +811,7 @@ class _FileSearchState extends State<_FileSearch> {
             ),
           ),
           if (_crawling)
-            const SizedBox(
-                width: 12,
-                height: 12,
-                child: CircularProgressIndicator(strokeWidth: 1.5)),
+            Spinner(size: 12),
         ]),
       ),
       // A sub-pixel seam, not a drawn rule. The language separates by surface
