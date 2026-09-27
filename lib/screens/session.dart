@@ -434,7 +434,6 @@ class _SessionScreenState extends State<SessionScreen>
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   final Map<String, bool> _toolRunOpen = {};
   final Set<String> _openToolRows = {};
-  bool _activeToolRunOpen = false;
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
 

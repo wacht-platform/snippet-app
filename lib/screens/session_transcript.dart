@@ -83,13 +83,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       final isSessionRunning = _state?.status == 'running';
       final running =
           isSessionRunning && run.any((w) => w is DenseToolRow && w.pending);
-      final completedToolKey = 'transcript-tools-$start';
-      // A live batch grows as calls/results stream in. It must keep one fixed
-      // identity, otherwise a new first/pending event replaces the accordion
-      // and discards the user's expanded state mid-run.
-      final toolKey = running ? 'transcript-tools-live' : completedToolKey;
-      final open =
-          running ? _activeToolRunOpen : (_toolRunOpen[toolKey] ?? false);
+      final toolKey = 'transcript-tools-$start';
+      final open = _toolRunOpen[toolKey] ?? false;
       out.add(KeyedSubtree(
         key: ValueKey(toolKey),
         child: ToolRun(
@@ -99,15 +94,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           onOpenChanged: (nextOpen) {
             if (!mounted) return;
             _setState(() {
-              if (running) {
-                _activeToolRunOpen = nextOpen;
-                // The live row has a temporary key. Mirror the preference onto
-                // its final batch key so finishing a tool cannot replace an
-                // expanded running accordion with a closed completed one.
-                _toolRunOpen[completedToolKey] = nextOpen;
-              } else {
-                _toolRunOpen[toolKey] = nextOpen;
-              }
+              _toolRunOpen[toolKey] = nextOpen;
               // The transcript is normally cached between event updates. Rebuild
               // it now so ToolRun receives the new open value immediately.
               _transcriptDirty = true;
@@ -126,8 +113,10 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       return null;
     }
 
-    for (final e in events) {
+    for (var idx = 0; idx < events.length; idx++) {
+      final e = events[idx];
       final key = eventKey(e);
+      final abs = 'event-${_transcriptStart + idx}';
       final k = e['kind'] as String? ?? '';
       switch (k) {
         case 'tool_call':
@@ -137,12 +126,12 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           // lines so they don't double up.
           if (_isMetaTool(_s(e['tool_name']))) break;
           pending = e;
-          pendingKey = key;
+          pendingKey = abs;
         case 'tool_result':
           {
             final p = pending;
             if (p != null) {
-              final k = pendingKey ?? key;
+              final k = pendingKey ?? abs;
               addToolRow(
                   toolRow(k,
                       tool: _s(p['tool_name']),
@@ -154,7 +143,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             } else {
               final name = _s(e['tool_name']);
               if (_isMetaTool(name)) break;
-              addToolRow(toolRow(key, tool: name, result: e['result']), key);
+              addToolRow(toolRow(abs, tool: name, result: e['result']), abs);
             }
           }
         case 'user_input':

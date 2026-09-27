@@ -51,7 +51,15 @@ String toolArgSummary(String tool, dynamic args) {
     // bash call made the transcript unreadable: `cargo test`, `rm -rf build` and
     // `git push` all rendered identically, so a person watching the agent work
     // could not tell what it was doing without expanding every row.
-    'bash' => s('command'),
+    'bash' => s('label').isNotEmpty ? s('label') : s('command'),
+    'manage_process' => [
+        switch (s('action')) {
+          'kill' => 'Stop',
+          'log' => 'Read log of',
+          _ => 'List processes',
+        },
+        if (s('action') != 'list' && s('id').isNotEmpty) s('id'),
+      ].join(' '),
     'search_content' || 'web_search' => s('query'),
     'search_files' => s('pattern'),
     'web_read' => s('url'),
@@ -124,7 +132,10 @@ bool toolIsExpandable(String tool, dynamic args, dynamic result) {
       return arg('old_string').isNotEmpty || arg('new_string').isNotEmpty;
     case 'bash':
       final cmd = arg('command');
-      return cmd.split('\n').length > 1 || cmd.length > 80 || resultHasBody();
+      return arg('label').trim().isNotEmpty ||
+          cmd.split('\n').length > 1 ||
+          cmd.length > 80 ||
+          resultHasBody();
     case 'memory_write':
     case 'memory_rule':
     case 'memory_pattern':
@@ -433,11 +444,17 @@ List<Widget> _bashView(Map? a, Map? d) {
   final stderr =
       _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
   final exit = (d?['exit_code'] as num?)?.toInt();
+  final labelled = (a?['label']?.toString() ?? '').trim().isNotEmpty;
   if (cmd.isEmpty && stdout.isEmpty && stderr.isEmpty) {
     return [Text('No output', style: TS.meta())];
   }
   return [
-    _ShellPanel(command: cmd, stdout: stdout, stderr: stderr, exitCode: exit)
+    _ShellPanel(
+        command: cmd,
+        stdout: stdout,
+        stderr: stderr,
+        exitCode: exit,
+        showCommand: labelled)
   ];
 }
 
@@ -1024,12 +1041,14 @@ class _ShellPanel extends StatelessWidget {
   final String stderr;
   final int? exitCode;
   final bool failed;
+  final bool showCommand;
   const _ShellPanel(
       {required this.command,
       required this.stdout,
       required this.stderr,
       this.exitCode,
-      this.failed = false});
+      this.failed = false,
+      this.showCommand = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1040,7 +1059,8 @@ class _ShellPanel extends StatelessWidget {
     ].join('\n');
     final multiLine = command.contains('\n');
     final firstLine = command.split('\n').first;
-    final hasOutput = stdout.isNotEmpty || stderr.isNotEmpty || multiLine;
+    final withCommand = (showCommand || multiLine) && command.isNotEmpty;
+    final hasOutput = stdout.isNotEmpty || stderr.isNotEmpty || withCommand;
     return _ToolPanel(
       header: Text.rich(
         TextSpan(children: [
@@ -1064,8 +1084,8 @@ class _ShellPanel extends StatelessWidget {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (multiLine) ...[
-                  _PanelText(command, color: AppColors.fg1),
+                if (withCommand) ...[
+                  _PanelCommand(command),
                   if (stdout.isNotEmpty || stderr.isNotEmpty)
                     const SizedBox(height: S.s8),
                 ],
@@ -1083,6 +1103,25 @@ class _ShellPanel extends StatelessWidget {
 
 TextStyle _panelCode([Color? color]) =>
     mono(12, height: 1.4, color: color ?? AppColors.fg2);
+
+class _PanelCommand extends StatelessWidget {
+  const _PanelCommand(this.command);
+
+  final String command;
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollNotification>(
+        onNotification: (_) => true,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SelectableText.rich(TextSpan(children: [
+            TextSpan(text: '\$ ', style: _panelCode(AppColors.accent)),
+            TextSpan(text: command, style: _panelCode(AppColors.fg1)),
+          ])),
+        ),
+      );
+}
 
 class _PanelText extends StatelessWidget {
   const _PanelText(this.text, {this.color});
