@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'platform.dart';
 import 'theme.dart';
@@ -477,4 +478,109 @@ class SettingsNote extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(S.s4, S.s8, S.s4, 0),
         child: Text(text, style: TS.meta()),
       );
+}
+
+class SelectCheck extends StatelessWidget {
+  const SelectCheck(this.selected, {super.key, this.size = 18});
+
+  final bool selected;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+        duration: Motion.quick,
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: selected ? AppColors.accentFill : Colors.transparent,
+          border: Border.all(
+              color: selected ? AppColors.accentFill : AppColors.lineStrong,
+              width: 1.5),
+        ),
+        child: selected
+            ? AppIcon('check', size: size * 0.66, color: AppColors.accentFg)
+            : null,
+      );
+}
+
+class InlineEditField extends StatelessWidget {
+  const InlineEditField({
+    super.key,
+    required this.controller,
+    this.focusNode,
+    required this.onSubmit,
+    required this.onCancel,
+    this.hint,
+    this.dense = false,
+    this.showActions,
+    this.commitOnTapOutside = true,
+  });
+
+  final TextEditingController controller;
+  final FocusNode? focusNode;
+  final VoidCallback onSubmit;
+  final VoidCallback onCancel;
+  final String? hint;
+  final bool dense;
+  final bool? showActions;
+  final bool commitOnTapOutside;
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = showActions ?? !kMobile;
+    Widget action(String icon, String tip, VoidCallback onTap, Color color) =>
+        Tooltip(
+          message: tip,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(R.xs),
+            onTap: onTap,
+            child: SizedBox.square(
+              dimension: dense ? 24 : 28,
+              child: Center(child: AppIcon(icon, size: 14, color: color)),
+            ),
+          ),
+        );
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): onCancel,
+      },
+      child: Container(
+        height: dense ? 30 : (kMobile ? 40 : 34),
+        padding: EdgeInsets.fromLTRB(S.s8, 0, actions ? S.s2 : S.s8, 0),
+        decoration: BoxDecoration(
+          color: AppColors.overlay,
+          borderRadius: BorderRadius.circular(R.sm),
+          border: Border.all(color: AppColors.accent, width: 1.5),
+        ),
+        child: Row(children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              autofocus: true,
+              maxLines: 1,
+              style: dense
+                  ? TS.label(AppColors.fg1).copyWith(fontWeight: W.body)
+                  : TS.ui(AppColors.fg1),
+              cursorColor: AppColors.accent,
+              decoration: InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                hintText: hint,
+                hintStyle: TS.ui(AppColors.fg4),
+              ),
+              onSubmitted: (_) => onSubmit(),
+              onTapOutside: commitOnTapOutside ? (_) => onSubmit() : null,
+            ),
+          ),
+          if (actions) ...[
+            action('check', 'Save', onSubmit, AppColors.accent),
+            action('x', 'Cancel', onCancel, AppColors.fg3),
+          ],
+        ]),
+      ),
+    );
+  }
 }

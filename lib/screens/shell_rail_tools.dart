@@ -30,10 +30,12 @@ Future<void> showGoalPopover({
         top: origin.dy + box.size.height + 6,
         width: width,
         child: Material(
-          color: AppColors.surface3,
-          borderRadius: BorderRadius.circular(R.md),
-          elevation: 12,
-          shadowColor: AppColors.scrim,
+          color: AppColors.overlay,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(R.lg),
+              side: BorderSide(color: AppColors.line)),
+          elevation: 4,
+          shadowColor: Colors.black.withValues(alpha: 0.4),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: GoalPopover(
@@ -126,17 +128,15 @@ List<Widget> buildShellRailTools({
       'history',
       tooltip: 'Checkpoints',
       active: isRightPanelActive(RightPanel.checkpoints),
-      onTap: tab == null
-          ? null
-          : () => onToggleRightPanel(RightPanel.checkpoints),
+      onTap:
+          tab == null ? null : () => onToggleRightPanel(RightPanel.checkpoints),
     ),
     railTool(
       'scheduled',
       tooltip: 'Scheduled',
       active: isRightPanelActive(RightPanel.recurring),
-      onTap: tab == null
-          ? null
-          : () => onToggleRightPanel(RightPanel.recurring),
+      onTap:
+          tab == null ? null : () => onToggleRightPanel(RightPanel.recurring),
     ),
   ];
 }

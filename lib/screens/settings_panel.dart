@@ -927,42 +927,15 @@ class SettingsPanelState extends State<SettingsPanel> {
             const SizedBox(width: S.s12),
             if (isRenaming) ...[
               Expanded(
-                child: SizedBox(
-                  height: 30,
-                  child: TextField(
-                    controller: _renameController,
-                    autofocus: true,
-                    style: sans(13, color: AppColors.fg1),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 6),
-                      filled: true,
-                      fillColor: AppColors.surface2,
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(R.xs),
-                        borderSide: BorderSide(color: AppColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(R.xs),
-                        borderSide: BorderSide(color: AppColors.accent),
-                      ),
-                    ),
-                    onSubmitted: (_) => _commitRename(i),
-                  ),
+                child: InlineEditField(
+                  controller: _renameController,
+                  hint: 'Machine name',
+                  commitOnTapOutside: false,
+                  showActions: true,
+                  onSubmit: () => _commitRename(i),
+                  onCancel: () => setState(() => _renamingUrl = null),
                 ),
               ),
-              const SizedBox(width: 6),
-              IconBtn('check',
-                  size: 26,
-                  iconSize: 13,
-                  tooltip: 'Save name',
-                  onTap: () => _commitRename(i)),
-              IconBtn('x',
-                  size: 26,
-                  iconSize: 13,
-                  tooltip: 'Cancel',
-                  onTap: () => setState(() => _renamingUrl = null)),
             ] else ...[
               Expanded(
                 child: Column(

@@ -368,8 +368,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
           else if (entries.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-              child: Text('Empty directory',
-                  style: TS.meta()),
+              child: Text('Empty directory', style: TS.meta()),
             )
           else ...[
             const SizedBox(height: 4),
@@ -442,8 +441,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   Widget _rootError() => Padding(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_error!,
-              style: sans(12, color: AppColors.danger, height: 1.4)),
+          Text(_error!, style: sans(12, color: AppColors.danger, height: 1.4)),
           const SizedBox(height: 10),
           Btn('Retry', small: true, onTap: refresh),
         ]),
@@ -639,14 +637,14 @@ Future<void> showFileSearchDialog(
 }
 
 Widget _fileSearchFrame(Widget child) => Material(
-      color: AppColors.surface1,
-      borderRadius: BorderRadius.circular(R.card),
+      color: AppColors.overlay,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(R.lg),
+          side: BorderSide(color: AppColors.line)),
+      elevation: 4,
+      shadowColor: Colors.black.withValues(alpha: 0.4),
       clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.card)),
-        child: child,
-      ),
+      child: child,
     );
 
 class _FileSearch extends StatefulWidget {
@@ -810,8 +808,7 @@ class _FileSearchState extends State<_FileSearch> {
               ),
             ),
           ),
-          if (_crawling)
-            Spinner(size: 12),
+          if (_crawling) Spinner(size: 12),
         ]),
       ),
       // A sub-pixel seam, not a drawn rule. The language separates by surface
@@ -823,15 +820,14 @@ class _FileSearchState extends State<_FileSearch> {
             ? Padding(
                 padding: const EdgeInsets.all(12),
                 child: Center(
-                    child: Text('Type to search the workspace',
-                        style: TS.meta())),
+                    child:
+                        Text('Type to search the workspace', style: TS.meta())),
               )
             : (_hits.isEmpty && !_crawling
                 ? Padding(
                     padding: const EdgeInsets.all(12),
                     child: Center(
-                        child: Text('No matching files',
-                            style: TS.meta())),
+                        child: Text('No matching files', style: TS.meta())),
                   )
                 : ListView(
                     shrinkWrap: true,

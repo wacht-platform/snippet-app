@@ -58,10 +58,12 @@ Future<bool?> showCreateAgentDialog(
               top: top,
               width: width,
               child: Material(
-                color: AppColors.surface1,
-                borderRadius: BorderRadius.circular(R.md),
-                elevation: 12,
-                shadowColor: AppColors.scrim,
+                color: AppColors.overlay,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(R.lg),
+                    side: BorderSide(color: AppColors.line)),
+                elevation: 4,
+                shadowColor: Colors.black.withValues(alpha: 0.4),
                 child: CreateAgentForm(client: client),
               ),
             ),
@@ -179,9 +181,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   }
 
   List<AgentAssignedSession> _sessionsForAgent(CoordinationAgent a, String q) {
-    final all = a.assignedSessions
-        .where((s) => !isInboxSession(s.id))
-        .toList()
+    final all = a.assignedSessions.where((s) => !isInboxSession(s.id)).toList()
       ..sort((x, y) => y.lastActive.compareTo(x.lastActive));
     if (q.isEmpty) return all;
     final direct = _agentMatchesMetadata(a, q);
@@ -299,17 +299,20 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     );
 
     final q = effectiveQuery.toLowerCase();
-    final matchingAgents = q.isEmpty
-        ? agents
-        : agents.where((a) => _matchesAgent(a, q)).toList();
+    final matchingAgents =
+        q.isEmpty ? agents : agents.where((a) => _matchesAgent(a, q)).toList();
 
     final ordered = [...matchingAgents]..sort((a, b) {
         final aSessions = _sessionsForAgent(a, q);
         final bSessions = _sessionsForAgent(b, q);
-        final aLast = aSessions.fold<int>(0,
-            (latest, session) => session.lastActive > latest ? session.lastActive : latest);
-        final bLast = bSessions.fold<int>(0,
-            (latest, session) => session.lastActive > latest ? session.lastActive : latest);
+        final aLast = aSessions.fold<int>(
+            0,
+            (latest, session) =>
+                session.lastActive > latest ? session.lastActive : latest);
+        final bLast = bSessions.fold<int>(
+            0,
+            (latest, session) =>
+                session.lastActive > latest ? session.lastActive : latest);
         if (aLast != bLast) return bLast.compareTo(aLast);
         return a.displayName.compareTo(b.displayName);
       });
@@ -468,7 +471,6 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     );
   }
 
-
   Widget _agentHeader(CoordinationAgent agent, {int count = 0}) {
     final name =
         agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
@@ -486,6 +488,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         });
       }
     }
+
     void openAgent() {
       if (widget.onOpenAgent != null) {
         widget.onOpenAgent!(agent);
@@ -493,6 +496,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         toggle();
       }
     }
+
     final chevron = collapsed ? 'chevron-right' : 'chevron-down';
 
     final meta = [
@@ -567,8 +571,8 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         : (s.conversation.trim().isNotEmpty
             ? s.conversation.trim()
             : 'Session');
-    final isChat = s.conversation.trim().isNotEmpty ||
-        s.id.contains('/conversations/');
+    final isChat =
+        s.conversation.trim().isNotEmpty || s.id.contains('/conversations/');
     final icon = isChat ? 'chat-thread' : 'folder';
 
     return Material(
@@ -615,7 +619,8 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     );
   }
 
-  Widget _agentDesktopHeader(CoordinationAgent agent, {required bool first, int count = 0}) {
+  Widget _agentDesktopHeader(CoordinationAgent agent,
+      {required bool first, int count = 0}) {
     final name =
         agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
     final isSearching = effectiveQuery.isNotEmpty;
@@ -636,6 +641,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         });
       }
     }
+
     void openAgent() {
       if (widget.onOpenAgent != null) {
         widget.onOpenAgent!(agent);
@@ -643,6 +649,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         toggle();
       }
     }
+
     final chevron = collapsed ? 'chevron-right' : 'chevron-down';
 
     return Material(
@@ -665,7 +672,8 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                       onTap: toggle,
                       radius: 12,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 3, vertical: 4),
                         child: AppIcon(chevron, size: 12, color: AppColors.fg4),
                       ),
                     ),
@@ -711,8 +719,8 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         : (s.conversation.trim().isNotEmpty
             ? s.conversation.trim()
             : 'Session');
-    final isChat = s.conversation.trim().isNotEmpty ||
-        s.id.contains('/conversations/');
+    final isChat =
+        s.conversation.trim().isNotEmpty || s.id.contains('/conversations/');
     final icon = isChat ? 'chat-thread' : 'folder';
 
     return Material(
@@ -761,7 +769,8 @@ class _EmptySearch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.fromLTRB(kMobile ? 0 : 20, kMobile ? 8 : 24, kMobile ? 0 : 20, 20),
+        padding: EdgeInsets.fromLTRB(
+            kMobile ? 0 : 20, kMobile ? 8 : 24, kMobile ? 0 : 20, 20),
         child: Text(
           'No agents match the search.',
           style: sans(12, color: AppColors.fg3, height: 1.5),
@@ -772,7 +781,8 @@ class _EmptySearch extends StatelessWidget {
 class _EmptyTeam extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.fromLTRB(kMobile ? 0 : 20, kMobile ? 8 : 24, kMobile ? 0 : 20, 20),
+        padding: EdgeInsets.fromLTRB(
+            kMobile ? 0 : 20, kMobile ? 8 : 24, kMobile ? 0 : 20, 20),
         child: Text(
           'No agents yet.\n\nBuild one and it appears here, along with the '
           'sessions it is working in.',

@@ -601,10 +601,10 @@ ThemeData buildAppTheme() {
     hoverColor: c.surface3.withValues(alpha: 0.5),
     popupMenuTheme: PopupMenuThemeData(
       color: c.surface2,
-      elevation: 0,
-      shadowColor: Colors.transparent,
+      elevation: 4,
+      shadowColor: Colors.black.withValues(alpha: 0.4),
       surfaceTintColor: Colors.transparent,
-      menuPadding: const EdgeInsets.symmetric(vertical: 6),
+      menuPadding: const EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(R.lg),
           side: BorderSide(color: c.border)),

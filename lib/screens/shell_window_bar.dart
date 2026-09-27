@@ -353,16 +353,17 @@ Future<void> showTopMachinesPopover({
     transitionDuration: Motion.press,
     pageBuilder: (_, __, ___) => Stack(children: [
       Positioned(
-        right:
-            (MediaQuery.of(context).size.width - origin.dx - box.size.width)
-                .clamp(10.0, 500.0),
+        right: (MediaQuery.of(context).size.width - origin.dx - box.size.width)
+            .clamp(10.0, 500.0),
         top: origin.dy + box.size.height + 4,
         width: 260,
         child: Material(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.md),
-          elevation: 12,
-          shadowColor: AppColors.scrim,
+          color: AppColors.overlay,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(R.lg),
+              side: BorderSide(color: AppColors.line)),
+          elevation: 4,
+          shadowColor: Colors.black.withValues(alpha: 0.4),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(R.md),

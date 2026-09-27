@@ -108,7 +108,6 @@ class SidebarState extends State<Sidebar> {
   final TextEditingController _agentSearchCtl = TextEditingController();
   final FocusNode _agentSearchFocus = FocusNode();
 
-
   /// Desktop search in section headers.
   bool _desktopChatsSearchOpen = false;
   final TextEditingController _desktopChatsSearchCtl = TextEditingController();
@@ -131,10 +130,10 @@ class SidebarState extends State<Sidebar> {
       _targetPage = index;
       _pageController
           .animateToPage(
-            index,
-            duration: Motion.base,
-            curve: Motion.enter,
-          )
+        index,
+        duration: Motion.base,
+        curve: Motion.enter,
+      )
           .then((_) {
         if (mounted && _targetPage == index) {
           setState(() => _targetPage = null);
@@ -159,7 +158,8 @@ class SidebarState extends State<Sidebar> {
       if (oldWidget.mobileHome != MobileHome.settings) {
         _lastMainHome = oldWidget.mobileHome;
       }
-      if (_targetPage != widget.mobileHome.index && _pageController.hasClients) {
+      if (_targetPage != widget.mobileHome.index &&
+          _pageController.hasClients) {
         final current =
             _pageController.page?.round() ?? _pageController.initialPage;
         if (current != widget.mobileHome.index) {
@@ -168,8 +168,6 @@ class SidebarState extends State<Sidebar> {
       }
     }
   }
-
-
 
   String? _renamingId;
   String? _hoveredId;
@@ -190,20 +188,17 @@ class SidebarState extends State<Sidebar> {
     super.dispose();
   }
 
-
-
   List<SessionInfo>? get _sessions => widget.sessions;
   bool get _loading => widget.sessionsLoading;
-
-
-
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final hasClient = widget.client != null;
     return Container(
-      color: !kMobile ? AppColors.windowBg : AppColors.bg, // shell surface — darker than the chat canvas
+      color: !kMobile
+          ? AppColors.windowBg
+          : AppColors.bg, // shell surface — darker than the chat canvas
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (widget.topInset && kMacOS) SizedBox(height: kMacTitlebar + 6),
         if (kMobile) ...[
@@ -248,23 +243,8 @@ class SidebarState extends State<Sidebar> {
         if (!kMobile) ...[
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
-              child: Row(children: [
-                Text('${_selected.length} selected',
-                    style: TS.caption()),
-                const Spacer(),
-                _selectAllToggle(),
-                IconBtn('x',
-                    size: 28,
-                    iconSize: 15,
-                    tooltip: 'Cancel',
-                    onTap: _exitSelect),
-                IconBtn('trash',
-                    size: 28,
-                    iconSize: 14,
-                    tooltip: 'Delete selected',
-                    onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
-              ]),
+              padding: const EdgeInsets.fromLTRB(S.s4, S.s4, S.s8, S.s4),
+              child: _selectionBar(mobile: false),
             ),
           // Sectioned, collapsible sidebar — the reference's left column.
           Expanded(child: _sectionedSidebar()),
@@ -272,7 +252,6 @@ class SidebarState extends State<Sidebar> {
       ]),
     );
   }
-
 
   /// Full-surface placeholder for a phone destination with no machine.
   ///
@@ -309,8 +288,7 @@ class SidebarState extends State<Sidebar> {
                       child: Padding(
                           padding: const EdgeInsets.all(20),
                           child: Text('Add a machine to begin.',
-                              textAlign: TextAlign.center,
-                              style: TS.meta())))
+                              textAlign: TextAlign.center, style: TS.meta())))
                   : _sessionList(),
             ),
           ],
@@ -450,7 +428,6 @@ class SidebarState extends State<Sidebar> {
     }
   }
 
-
   Future<void> _openCreateAgent([BuildContext? anchorCtx]) async {
     final client = widget.client;
     if (client == null) return;
@@ -461,30 +438,13 @@ class SidebarState extends State<Sidebar> {
     }
   }
 
-
   /// The Chats header: the destination name on the left, icon buttons on
   /// the right for search, new chat, Mission Control and machine avatar.
   Widget _mobileChatsHeader(bool hasClient) {
     if (_selecting) {
       return Padding(
-        padding: EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 8),
-        child: Row(children: [
-          Text('${_selected.length} selected',
-              style:
-                  sans(M.sectionTitle, weight: W.label, color: AppColors.fg1)),
-          const Spacer(),
-          _selectAllToggle(),
-          IconBtn('x',
-              size: M.minTarget,
-              iconSize: 18,
-              tooltip: 'Cancel',
-              onTap: _exitSelect),
-          IconBtn('trash',
-              size: M.minTarget,
-              iconSize: 17,
-              tooltip: 'Delete selected',
-              onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
-        ]),
+        padding: const EdgeInsets.fromLTRB(S.s8, S.s8, M.gutter, S.s8),
+        child: _selectionBar(mobile: true),
       );
     }
     final mc = (_sessions ?? const <SessionInfo>[])
@@ -732,8 +692,7 @@ class SidebarState extends State<Sidebar> {
                     AppIcon('wifi-off', size: 20, color: AppColors.fg4),
                     const SizedBox(height: 10),
                     Text(widget.sessionsError!,
-                        textAlign: TextAlign.center,
-                        style: TS.meta()),
+                        textAlign: TextAlign.center, style: TS.meta()),
                     const SizedBox(height: 12),
                     TextButton(
                         onPressed: widget.onRefreshSessions,
@@ -749,15 +708,14 @@ class SidebarState extends State<Sidebar> {
             Padding(
                 padding: const EdgeInsets.all(20),
                 child: Text('No chats yet.',
-                    textAlign: TextAlign.center,
-                    style: TS.meta())),
+                    textAlign: TextAlign.center, style: TS.meta())),
           ]);
     }
     final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
     final list = _sortSessionsByRecency(all.where((s) =>
-            !isDedicatedMcSession(s.id) &&
-            !isInboxSessionRow(s) &&
-            _matchesQuery(s)));
+        !isDedicatedMcSession(s.id) &&
+        !isInboxSessionRow(s) &&
+        _matchesQuery(s)));
     // Phone chats are one flat, chronological surface.
     if (kMobile) {
       final allSorted = _sortSessionsByRecency(list);
@@ -798,16 +756,14 @@ class SidebarState extends State<Sidebar> {
             padding: const EdgeInsets.only(bottom: 2),
             child: _sessionCard(list[i])));
       } else {
-        children.add(
-            _desktopTreeRow(list[i], last: i == list.length - 1));
+        children.add(_desktopTreeRow(list[i], last: i == list.length - 1));
       }
     }
     if (list.isEmpty && mc.isEmpty) {
       children.add(Padding(
           padding: const EdgeInsets.all(20),
           child: Text('Nothing here.',
-              textAlign: TextAlign.center,
-              style: TS.meta())));
+              textAlign: TextAlign.center, style: TS.meta())));
     }
     final listView = ListView(
         padding: EdgeInsets.fromLTRB(
@@ -829,9 +785,9 @@ class SidebarState extends State<Sidebar> {
     final hasClient = widget.client != null;
     final all = _sessions ?? const <SessionInfo>[];
     final list = _sortSessionsByRecency(all.where((s) =>
-            !isDedicatedMcSession(s.id) &&
-            !isInboxSessionRow(s) &&
-            _matchesQuery(s)));
+        !isDedicatedMcSession(s.id) &&
+        !isInboxSessionRow(s) &&
+        _matchesQuery(s)));
 
     return ListView(
       // Top inset keeps the first section header clear of the navigation band,
@@ -895,7 +851,8 @@ class SidebarState extends State<Sidebar> {
                     ),
                   ),
                   if (_desktopChatsSearchCtl.text.isNotEmpty)
-                    IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear', onTap: () {
+                    IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear',
+                        onTap: () {
                       _desktopChatsSearchCtl.clear();
                       setState(() => _filterQuery = '');
                     }),
@@ -946,8 +903,6 @@ class SidebarState extends State<Sidebar> {
             ),
     );
   }
-
-
 
   Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
     return _sessionRow(s);
@@ -1011,8 +966,7 @@ class SidebarState extends State<Sidebar> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(children: [
               AppIcon('layers',
-                  size: 16,
-                  color: selected ? AppColors.fg1 : AppColors.fg3),
+                  size: 16, color: selected ? AppColors.fg1 : AppColors.fg3),
               const SizedBox(width: 8),
               Expanded(
                 child: Text('Mission Control',
@@ -1042,7 +996,9 @@ class SidebarState extends State<Sidebar> {
         if (_hoveredId == s.id) setState(() => _hoveredId = null);
       },
       child: Material(
-        color: selected || checked ? AppColors.surface2 : Colors.transparent,
+        color: _selecting && checked
+            ? AppColors.accentBg
+            : (selected ? AppColors.surface2 : Colors.transparent),
         borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           borderRadius: BorderRadius.circular(R.sm),
@@ -1073,10 +1029,8 @@ class SidebarState extends State<Sidebar> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(children: [
               if (_selecting) ...[
-                AppIcon(checked ? 'check' : 'plus',
-                    size: 15,
-                    color: checked ? AppColors.accent : AppColors.fg4),
-                const SizedBox(width: 6),
+                SelectCheck(checked, size: 16),
+                const SizedBox(width: S.s8),
               ] else ...[
                 // Always present, so titles share one left edge; the colour is
                 // what carries state.
@@ -1134,7 +1088,6 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-
   Widget _sessionCard(SessionInfo s) {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
@@ -1145,7 +1098,9 @@ class SidebarState extends State<Sidebar> {
     final trailingText =
         folderName.isNotEmpty ? folderName : relativeTime(s.lastActive);
     return Material(
-      color: selected || checked ? AppColors.surface2 : Colors.transparent,
+      color: _selecting && checked
+          ? AppColors.accentBg
+          : (selected ? AppColors.surface2 : Colors.transparent),
       borderRadius: BorderRadius.circular(R.sm),
       child: InkWell(
         borderRadius: BorderRadius.circular(R.sm),
@@ -1174,12 +1129,11 @@ class SidebarState extends State<Sidebar> {
           height: M.rowHeight,
           child: Padding(
             padding: EdgeInsets.zero,
-            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            child:
+                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               if (_selecting) ...[
-                AppIcon(checked ? 'check' : 'plus',
-                    size: 16,
-                    color: checked ? AppColors.accent : AppColors.fg4),
-                const SizedBox(width: 8),
+                SelectCheck(checked, size: 20),
+                const SizedBox(width: S.s12),
               ] else ...[
                 // The conversation glyph, tinted by run state (and pulsing while
                 // working).
@@ -1246,11 +1200,15 @@ class SidebarState extends State<Sidebar> {
         point: point,
         items: [
           appMenuItem(value: 'rename', icon: 'edit', label: 'Rename'),
+          appMenuItem(value: 'select', icon: 'check', label: 'Select'),
+          const PopupMenuDivider(height: 9),
           appMenuItem(
               value: 'delete', icon: 'trash', label: 'Delete', danger: true),
         ],
       );
-      if (selected == 'rename') {
+      if (selected == 'select') {
+        _enterSelect(seed: s.id);
+      } else if (selected == 'rename') {
         _beginRename(s);
       } else if (selected == 'delete') {
         await _confirmDeleteSessions([s]);
@@ -1263,7 +1221,7 @@ class SidebarState extends State<Sidebar> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _sessionActionTile('check-check', 'Select', onTap: () {
+            _sessionActionTile('check', 'Select', onTap: () {
               Navigator.pop(context);
               _enterSelect(seed: s.id);
             }),
@@ -1282,21 +1240,24 @@ class SidebarState extends State<Sidebar> {
   Widget _sessionActionTile(String icon, String label,
       {required VoidCallback onTap, bool danger = false}) {
     final color = danger ? AppColors.danger : AppColors.fg1;
-    return Pressable(
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 13),
-            child: Row(children: [
-              AppIcon(icon, size: 16, color: color),
-              const SizedBox(width: 12),
-              Text(label, style: sans(13, color: color)),
-            ]),
-          ),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(R.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.md),
+        onTap: onTap,
+        child: SizedBox(
+          height: 52,
+          child: Row(children: [
+            SizedBox(
+                width: 28,
+                child: Center(
+                    child: AppIcon(icon,
+                        size: 18,
+                        color: danger ? AppColors.danger : AppColors.fg3))),
+            const SizedBox(width: S.s12),
+            Text(label, style: TS.ui(color)),
+          ]),
         ),
       ),
     );
@@ -1364,21 +1325,31 @@ class SidebarState extends State<Sidebar> {
   /// next tap goes.
   Widget _selectAllToggle() {
     final all = _allVisibleSelected;
-    return InkWell(
-      borderRadius: BorderRadius.circular(R.sm),
-      onTap: _toggleSelectAllVisible,
-      child: SizedBox(
-        height: kMobile ? M.minTarget : 26,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(all ? 'Unselect all' : 'Select all',
-                style: sans(kMobile ? M.rowTitle : 11,
-                    weight: W.label, color: AppColors.fg3)),
-          ),
-        ),
-      ),
-    );
+    return TextAction(all ? 'Clear' : 'Select all',
+        onTap: _toggleSelectAllVisible);
+  }
+
+  Widget _selectionBar({required bool mobile}) {
+    final n = _selected.length;
+    return Row(children: [
+      IconBtn('x',
+          size: mobile ? M.minTarget : 28,
+          iconSize: mobile ? 18 : 15,
+          tooltip: 'Cancel',
+          onTap: _exitSelect),
+      const SizedBox(width: S.s4),
+      Text(n == 0 ? 'Select chats' : '$n selected',
+          style: mobile ? TS.sectionTitle() : TS.label(AppColors.fg1)),
+      const Spacer(),
+      _selectAllToggle(),
+      const SizedBox(width: S.s4),
+      Btn(n == 0 ? 'Delete' : 'Delete $n',
+          small: true,
+          icon: 'trash',
+          variant: BtnVariant.danger,
+          disabled: n == 0,
+          onTap: _confirmDeleteSelected),
+    ]);
   }
 
   void _beginRename(SessionInfo s) {
@@ -1397,20 +1368,13 @@ class SidebarState extends State<Sidebar> {
   }
 
   Widget _inlineRenameField(SessionInfo s, {required bool compact}) {
-    return TextField(
+    return InlineEditField(
       controller: _renameCtl,
       focusNode: _renameFocus,
-      autofocus: true,
-      maxLines: 1,
-      style: sans(compact ? 12 : 16, color: AppColors.fg1),
-      cursorColor: AppColors.fg1,
-      decoration: const InputDecoration(
-        isCollapsed: true,
-        border: InputBorder.none,
-        hintText: 'Session title',
-      ),
-      onSubmitted: (_) => _commitRename(s),
-      onTapOutside: (_) => _commitRename(s),
+      dense: compact,
+      hint: 'Chat title',
+      onSubmit: () => _commitRename(s),
+      onCancel: () => setState(() => _renamingId = null),
     );
   }
 
@@ -1489,4 +1453,3 @@ class SidebarState extends State<Sidebar> {
         onRemove: (inst) => widget.onRemoveInstance(inst),
       );
 }
-

@@ -9,8 +9,8 @@ OverlayEntry? _activeToast;
 Timer? _toastTimer;
 
 ShapeBorder get appMenuShape => RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(R.md),
-      side: BorderSide(color: AppColors.border),
+      borderRadius: BorderRadius.circular(R.lg),
+      side: BorderSide(color: AppColors.line),
     );
 
 PopupMenuItem<T> appMenuItem<T>({
@@ -20,26 +20,30 @@ PopupMenuItem<T> appMenuItem<T>({
   String? detail,
   bool danger = false,
   bool selected = false,
-  double height = 40,
+  double height = 36,
 }) {
-  final color =
-      danger ? AppColors.danger : (selected ? AppColors.accent : AppColors.fg1);
+  final color = danger ? AppColors.danger : AppColors.fg1;
   return PopupMenuItem<T>(
     value: value,
     height: height,
-    padding: const EdgeInsets.symmetric(horizontal: 12),
+    padding: const EdgeInsets.symmetric(horizontal: S.s12),
     child: Row(children: [
       if (icon != null) ...[
-        AppIcon(icon, size: 14, color: color),
-        const SizedBox(width: 10),
+        AppIcon(icon,
+            size: 16, color: danger ? AppColors.danger : AppColors.fg3),
+        const SizedBox(width: S.s12),
       ],
       Expanded(
         child: Text(label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: sans(13, color: color)),
+            style: (kMobile ? TS.ui(color) : sans(13, color: color))),
       ),
-      if (detail != null) Text(detail, style: TS.caption()),
+      if (detail != null) Text(detail, style: TS.meta()),
+      if (selected) ...[
+        const SizedBox(width: S.s8),
+        AppIcon('check', size: 14, color: AppColors.accent),
+      ],
     ]),
   );
 }
@@ -80,7 +84,7 @@ PopupMenuItem<T> appMenuRow<T>({
             borderRadius: BorderRadius.circular(R.sm),
           ),
           child: AppIcon(icon,
-              size: 14.5, color: selected ? AppColors.accent : AppColors.fg3),
+              size: 16, color: selected ? AppColors.accent : AppColors.fg3),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -126,7 +130,7 @@ PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
       // Upper case -> `caps()`, and a group heading is a label, not a
       // disabled control, so `fg3` rather than the `fg4` placeholder rung.
-      child: Text(label.toUpperCase(), style: caps(10, color: AppColors.fg3)),
+      child: Text(label.toUpperCase(), style: TS.overline()),
     );
 
 /// Present a menu in the shape the platform expects.
@@ -166,7 +170,7 @@ Future<T?> showAppMenu<T>(
   /// it belongs to.
   bool alignEnd = false,
 }) {
-  final bg = color ?? AppColors.surface1;
+  final bg = color ?? AppColors.overlay;
 
   if (kMobile) {
     return showModalBottomSheet<T>(
@@ -181,10 +185,9 @@ Future<T?> showAppMenu<T>(
           borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
           child: Container(
             decoration: BoxDecoration(
-              color: color ?? AppColors.surface1,
+              color: color ?? AppColors.overlay,
               borderRadius:
                   BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-              border: Border(top: BorderSide(color: AppColors.glassBorder)),
             ),
             child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -265,10 +268,11 @@ Future<T?> showAppMenu<T>(
     context: context,
     position: position,
     color: bg,
-    elevation: 0,
-    shadowColor: Colors.transparent,
+    elevation: 4,
+    shadowColor: Colors.black.withValues(alpha: 0.4),
     surfaceTintColor: Colors.transparent,
     shape: appMenuShape,
+    menuPadding: const EdgeInsets.symmetric(vertical: S.s4),
     constraints: BoxConstraints(minWidth: minWidth, maxWidth: maxWidth),
     items: items,
   );
@@ -281,7 +285,7 @@ Future<T?> showAppMenu<T>(
 /// defaults are not.
 Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
   if (entry is PopupMenuDivider) {
-    return Divider(height: 13, thickness: 1, color: AppColors.border);
+    return Divider(height: 13, thickness: 1, color: AppColors.line);
   }
   if (entry is! PopupMenuItem<T>) {
     return const SizedBox.shrink();
