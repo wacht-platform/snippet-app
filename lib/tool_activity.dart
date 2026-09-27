@@ -113,25 +113,28 @@ List<FileChange> fileChanges(Iterable<ToolStep> steps) {
 
 String activitySummary(List<ToolStep> steps) {
   if (steps.length == 1) return toolSentence(steps.first);
-  int count(ToolKind k) => steps.where((s) => toolKind(s.tool) == k).length;
-  final reads = count(ToolKind.read);
-  final edits = fileChanges(steps).length;
-  final runs = count(ToolKind.run);
-  final searches = count(ToolKind.search) + count(ToolKind.web);
   String plural(int n, String one, String many) => n == 1 ? one : many;
-  final parts = <String>[
-    if (reads > 0) 'read $reads ${plural(reads, 'file', 'files')}',
-    if (edits > 0) 'edited $edits ${plural(edits, 'file', 'files')}',
-    if (runs > 0) 'ran $runs ${plural(runs, 'command', 'commands')}',
-    if (searches > 0) 'searched $searches ${plural(searches, 'time', 'times')}',
+  int count(bool Function(ToolKind) test) =>
+      steps.where((s) => test(toolKind(s.tool))).length;
+  final reads = count((k) => k == ToolKind.read);
+  final editSteps = count((k) => k == ToolKind.edit);
+  final edited = fileChanges(steps).length;
+  final runs = count((k) => k == ToolKind.run);
+  final searches = count((k) => k == ToolKind.search || k == ToolKind.web);
+  final groups = <(int, String)>[
+    if (reads > 0) (reads, 'read $reads ${plural(reads, 'file', 'files')}'),
+    if (editSteps > 0)
+      (editSteps, 'edited $edited ${plural(edited, 'file', 'files')}'),
+    if (runs > 0) (runs, 'ran $runs ${plural(runs, 'command', 'commands')}'),
+    if (searches > 0)
+      (searches, '$searches ${plural(searches, 'search', 'searches')}'),
   ];
-  final covered = reads +
-      steps.where((s) => toolKind(s.tool) == ToolKind.edit).length +
-      runs +
-      searches;
-  final other = steps.length - covered;
-  if (parts.isEmpty) return '${steps.length} steps';
-  if (other > 0) parts.add('$other more');
-  final sentence = parts.join(', ');
+  if (groups.isEmpty) return '${steps.length} steps';
+  final shown = groups.take(3).toList();
+  final rest = steps.length - shown.fold<int>(0, (sum, g) => sum + g.$1);
+  final sentence = [
+    for (final g in shown) g.$2,
+    if (rest > 0) '$rest more',
+  ].join(', ');
   return '${sentence[0].toUpperCase()}${sentence.substring(1)}';
 }

@@ -212,27 +212,45 @@ class _ToolRunState extends State<ToolRun> {
               Text('$failures failed', style: TS.meta(AppColors.danger)),
             ],
             const SizedBox(width: S.s6),
-            AppIcon(widget.open ? 'chevron-down' : 'chevron-right',
-                size: 12, color: AppColors.fg4),
+            AnimatedRotation(
+              turns: widget.open ? 0.25 : 0,
+              duration: Motion.fast,
+              curve: Motion.enter,
+              child: AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+            ),
           ]),
         ),
-        if (changes.isNotEmpty) ...[
-          const SizedBox(height: S.s6),
-          Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: _ChangedFiles(changes: changes, onTap: _toggle),
-          ),
-        ],
-        if (widget.open) ...[
-          const SizedBox(height: S.s4),
-          Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: widget.rows,
+        AnimatedSize(
+          duration: Motion.open,
+          reverseDuration: Motion.close,
+          curve: Motion.enter,
+          alignment: Alignment.topCenter,
+          child: AnimatedSwitcher(
+            duration: Motion.fast,
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.topCenter,
+              children: [...previous, if (current != null) current],
             ),
+            child: widget.open
+                ? Padding(
+                    key: const ValueKey('steps'),
+                    padding: const EdgeInsets.only(left: 24, top: S.s4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: widget.rows,
+                    ),
+                  )
+                : changes.isNotEmpty
+                    ? Padding(
+                        key: const ValueKey('changes'),
+                        padding: const EdgeInsets.only(left: 24, top: S.s6),
+                        child: _ChangedFiles(changes: changes, onTap: _toggle),
+                      )
+                    : const SizedBox(key: ValueKey('none'), width: double.infinity),
           ),
-        ],
+        ),
       ]),
     );
   }
