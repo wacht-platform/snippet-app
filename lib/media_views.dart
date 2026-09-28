@@ -250,7 +250,7 @@ class ImageGallery extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (paths.length == 1) {
-      return _SingleImage(client: client, path: paths.first);
+      return SingleImage(client: client, path: paths.first);
     }
     const gap = 6.0;
     final columns = paths.length == 2 || paths.length == 4 ? 2 : 3;
@@ -274,16 +274,16 @@ class ImageGallery extends StatelessWidget {
 /// One image on its own, at its own aspect ratio: a fixed crop box chopped
 /// screenshots and tall photos alike. Sized to fit the bounds once the
 /// image's dimensions are known; a neutral box holds the space until then.
-class _SingleImage extends StatefulWidget {
+class SingleImage extends StatefulWidget {
   final DaemonClient client;
   final String path;
-  const _SingleImage({required this.client, required this.path});
+  const SingleImage({super.key, required this.client, required this.path});
 
   @override
-  State<_SingleImage> createState() => _SingleImageState();
+  State<SingleImage> createState() => _SingleImageState();
 }
 
-class _SingleImageState extends State<_SingleImage> {
+class _SingleImageState extends State<SingleImage> {
   static const _maxHeight = 320.0;
   static const _minSide = 72.0;
 
@@ -298,7 +298,7 @@ class _SingleImageState extends State<_SingleImage> {
   }
 
   @override
-  void didUpdateWidget(_SingleImage old) {
+  void didUpdateWidget(SingleImage old) {
     super.didUpdateWidget(old);
     if (old.path != widget.path || old.client != widget.client) {
       _size = null;

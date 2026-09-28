@@ -326,15 +326,22 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
   Widget _presentedFileCard(String path, String caption) {
     final name = path.split('/').last;
     if (mediaKindOf(path) == MediaKind.image) {
+      // Full width and left-aligned: a shrink-wrapped column was centred by
+      // its parent, so a long caption pushed the image off the text's edge.
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ImageThumb(client: widget.client, path: path, width: 300, height: 200),
-          if (caption.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(caption, style: sans(13, color: AppColors.fg2)),
-          ],
-        ]),
+        child: SizedBox(
+          width: double.infinity,
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SingleImage(client: widget.client, path: path),
+            if (caption.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(caption,
+                  style: sans(12, height: 1.4, color: AppColors.fg3)),
+            ],
+          ]),
+        ),
       );
     }
     return Padding(
