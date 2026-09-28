@@ -127,7 +127,8 @@ class _ToolBatchViewState extends State<ToolBatchView> {
     return ValueListenableBuilder<ToolBatch>(
       valueListenable: widget.batch,
       builder: (context, batch, _) {
-        final open = _open != null && _open! < batch.steps.length ? _open : null;
+        final open =
+            _open != null && _open! < batch.steps.length ? _open : null;
         return PopScope(
           canPop: open == null,
           onPopInvokedWithResult: (didPop, _) {
@@ -225,7 +226,8 @@ class _SheetHeader extends StatelessWidget {
             ),
           ),
           if (onClose != null)
-            IconBtn('x', size: 34, iconSize: 16, tooltip: 'Close', onTap: onClose),
+            IconBtn('x',
+                size: 34, iconSize: 16, tooltip: 'Close', onTap: onClose),
         ]),
       ),
       Container(height: 1, color: AppColors.border),
@@ -267,9 +269,12 @@ class _StepList extends StatelessWidget {
           controller: scroll,
           padding: const EdgeInsets.symmetric(vertical: 6),
           itemCount: steps.length,
-          separatorBuilder: (_, __) =>
-              Container(height: 1, margin: const EdgeInsets.only(left: 44), color: AppColors.border),
-          itemBuilder: (_, i) => _StepRow(step: steps[i], onTap: () => onOpen(i)),
+          separatorBuilder: (_, __) => Container(
+              height: 1,
+              margin: const EdgeInsets.only(left: 44),
+              color: AppColors.border),
+          itemBuilder: (_, i) =>
+              _StepRow(step: steps[i], onTap: () => onOpen(i)),
         ),
       ),
     ]);
@@ -284,7 +289,9 @@ class _StepRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (verb, object) = toolSentenceParts(step);
-    final changes = step.tool == 'change_files' ? fileChanges([step]) : const <FileChange>[];
+    final changes = step.tool == 'change_files'
+        ? fileChanges([step])
+        : const <FileChange>[];
     final added = changes.fold<int>(0, (sum, c) => sum + c.added);
     final removed = changes.fold<int>(0, (sum, c) => sum + c.removed);
     return InkWell(
@@ -297,7 +304,8 @@ class _StepRow extends StatelessWidget {
             child: Center(
               child: step.running
                   ? Spinner(size: 14, color: AppColors.run)
-                  : AppIcon(step.failed ? 'alert-triangle' : toolIcon(step.tool),
+                  : AppIcon(
+                      step.failed ? 'alert-triangle' : toolIcon(step.tool),
                       size: 15,
                       color: step.failed ? AppColors.danger : AppColors.fg3),
             ),
@@ -312,7 +320,8 @@ class _StepRow extends StatelessWidget {
                         weight: W.label,
                         color: step.failed ? AppColors.danger : AppColors.fg1)),
                 if (object.isNotEmpty)
-                  TextSpan(text: ' $object', style: sans(13, color: AppColors.fg3)),
+                  TextSpan(
+                      text: ' $object', style: sans(13, color: AppColors.fg3)),
               ]),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

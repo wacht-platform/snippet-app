@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -17,6 +18,7 @@ import '../shells.dart';
 import '../store.dart';
 import '../term.dart' show SessionTermView;
 import '../theme.dart';
+import '../tool_sheet.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
 import 'editor.dart';

@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
@@ -246,5 +245,6 @@ class RightTab {
     return a.displayName.trim().isEmpty ? a.id : a.displayName;
   }
 
-  String get icon => tools != null ? 'terminal' : (isAgent ? 'agent' : panel.icon);
+  String get icon =>
+      tools != null ? 'terminal' : (isAgent ? 'agent' : panel.icon);
 }

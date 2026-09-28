@@ -291,6 +291,7 @@ class SidebarState extends State<Sidebar> {
                               textAlign: TextAlign.center, style: TS.meta())))
                   : _sessionList(),
             ),
+            if (_selecting) _mobileSelectionActions(),
           ],
         );
 
@@ -442,9 +443,30 @@ class SidebarState extends State<Sidebar> {
   /// the right for search, new chat, Mission Control and machine avatar.
   Widget _mobileChatsHeader(bool hasClient) {
     if (_selecting) {
+      final n = _selected.length;
+      // Same footprint as the title row, so entering selection doesn't jump
+      // the list; Delete lives in the bottom bar.
       return Padding(
-        padding: const EdgeInsets.fromLTRB(S.s8, S.s8, M.gutter, S.s8),
-        child: _selectionBar(mobile: true),
+        padding: const EdgeInsets.fromLTRB(S.s4, 16, M.gutter, 6),
+        child: SizedBox(
+          height: M.minTarget,
+          child: Row(children: [
+            IconBtn('x',
+                size: M.minTarget,
+                iconSize: 20,
+                tooltip: 'Cancel',
+                onTap: _exitSelect),
+            const SizedBox(width: S.s4),
+            Expanded(
+              child: Text(n == 0 ? 'Select chats' : '$n selected',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(M.sectionTitle,
+                      weight: W.label, color: AppColors.fg1)),
+            ),
+            _selectAllToggle(),
+          ]),
+        ),
       );
     }
     final mc = (_sessions ?? const <SessionInfo>[])
@@ -1099,13 +1121,13 @@ class SidebarState extends State<Sidebar> {
         : lastPathSegment(s.folder, ifEmpty: s.folder);
     final trailingText =
         folderName.isNotEmpty ? folderName : relativeTime(s.lastActive);
-    return Material(
+    final card = Material(
       color: _selecting && checked
           ? AppColors.accentBg
           : (selected ? AppColors.surface2 : Colors.transparent),
-      borderRadius: BorderRadius.circular(R.sm),
+      borderRadius: BorderRadius.circular(R.md),
       child: InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
+        borderRadius: BorderRadius.circular(R.md),
         onTap: renaming
             ? null
             : () {
@@ -1129,8 +1151,12 @@ class SidebarState extends State<Sidebar> {
               },
         child: SizedBox(
           height: M.rowHeight,
-          child: Padding(
-            padding: EdgeInsets.zero,
+          child: AnimatedPadding(
+            duration: Motion.quick,
+            // While selecting, the tint is a surface: keep the check and the
+            // trailing text off its edges.
+            padding:
+                EdgeInsets.symmetric(horizontal: _selecting ? M.rowPadH : 0),
             child:
                 Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               if (_selecting) ...[
@@ -1187,6 +1213,13 @@ class SidebarState extends State<Sidebar> {
           ),
         ),
       ),
+    );
+    // A hairline gap while selecting, so adjacent checked rows read as
+    // separate chats rather than one block.
+    return AnimatedPadding(
+      duration: Motion.quick,
+      padding: EdgeInsets.only(bottom: _selecting ? 2 : 0),
+      child: card,
     );
   }
 
@@ -1322,6 +1355,24 @@ class SidebarState extends State<Sidebar> {
           disabled: n == 0,
           onTap: _confirmDeleteSelected),
     ]);
+  }
+
+  /// Phone selection's action bar, pinned under the list where the thumb is.
+  Widget _mobileSelectionActions() {
+    final n = _selected.length;
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      padding: const EdgeInsets.fromLTRB(M.gutter, S.s12, M.gutter, S.s12),
+      child: Btn(n == 0 ? 'Delete' : 'Delete $n',
+          full: true,
+          icon: 'trash',
+          variant: BtnVariant.danger,
+          disabled: n == 0,
+          onTap: _confirmDeleteSelected),
+    );
   }
 
   void _beginRename(SessionInfo s) {
