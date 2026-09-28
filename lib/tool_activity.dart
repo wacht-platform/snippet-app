@@ -83,6 +83,12 @@ String toolObject(ToolStep step) {
 (String, String) toolSentenceParts(ToolStep step, {bool? running}) {
   final isRunning = running ?? step.running;
   if (step.tool == 'change_files') return _changeParts(step, isRunning);
+  // A labelled command already reads as a sentence ("Run the network tests"),
+  // so it stands alone; "Ran" is only for a bare command line.
+  final label = step.tool == 'bash' && step.args is Map
+      ? ((step.args as Map)['label']?.toString().trim() ?? '')
+      : '';
+  if (label.isNotEmpty) return (label, '');
   return (toolVerb(step.tool, running: isRunning), toolObject(step));
 }
 

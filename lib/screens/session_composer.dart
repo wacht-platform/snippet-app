@@ -52,7 +52,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     // canSend, but keyboard submit bypassed it — guard here, the single choke point.
     if (_anyUploading) return;
     final t = _input.text.trim();
-    final ready = _attachments.where((a) => a.remotePath != null).toList();
+    final ready = _attachments.where((a) => a.ready).toList();
     if (t.isEmpty && ready.isEmpty) return;
 
     // A selected recipient turns this into a DIRECT MESSAGE to that agent: it
@@ -66,11 +66,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
 
     final running = _state?.status == 'running';
     // Reference each upload by its exact path so the agent reads it this turn.
-    final markers = ready
-        .map((a) => a.isImage
-            ? '[attached image — call view_image on this exact path to see it: ${a.remotePath}]'
-            : '[attached file — read it at this exact path: ${a.remotePath}]')
-        .join('\n');
+    final markers = ready.map((a) => a.marker).join('\n');
     final msg = markers.isEmpty ? t : (t.isEmpty ? markers : '$t\n\n$markers');
     final nonce = _nextNonce();
     _setState(() {
@@ -107,11 +103,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     List<_Attachment> ready,
   ) async {
     if (text.isEmpty && ready.isEmpty) return;
-    final markers = ready
-        .map((a) => a.isImage
-            ? '[attached image — call view_image on this exact path to see it: ${a.remotePath}]'
-            : '[attached file — read it at this exact path: ${a.remotePath}]')
-        .join('\n');
+    final markers = ready.map((a) => a.marker).join('\n');
     final body = markers.isEmpty ? text : (text.isEmpty ? markers : '$text\n\n$markers');
     final name = _recipientAgentName ?? agentId;
     _setState(() {
@@ -435,7 +427,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       (_isRecording ||
           _recordingPath != null ||
           _input.text.trim().isNotEmpty ||
-          _attachments.any((a) => a.remotePath != null)) &&
+          _attachments.any((a) => a.ready)) &&
       !_anyUploading &&
       !_sendingAudio;
 
@@ -870,16 +862,18 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     );
   }
 
-  // Composer attachment row: image thumbnails + file chips, each with its own ✕.
+  // Composer attachment row: image thumbnails and file cards, each with its
+  // own remove button and an upload overlay until the file reaches the daemon.
   Widget _attachmentBar() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: SizedBox(
-        height: 36,
+        height: 62,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(top: 6, right: 6),
           itemCount: _attachments.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 6),
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (_, i) => _attachmentTile(_attachments[i]),
         ),
       ),
@@ -887,67 +881,242 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   }
 
   Widget _attachmentTile(_Attachment a) {
-    final thumb = a.isImage && a.localPath != null;
-    final isAudio = a.isAudio;
-    final body = thumb
-        ? ClipRRect(
-            borderRadius: BorderRadius.circular(R.sm),
-            child: Image.file(File(a.localPath!),
-                width: 36,
-                height: 36,
-                fit: BoxFit.cover,
-                cacheWidth: 72,
-                cacheHeight: 72),
-          )
-        : Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+    const side = 56.0;
+    final kind = a.isAudio
+        ? MediaKind.audio
+        : (a.isImage ? MediaKind.image : mediaKindOf(a.name));
+    final Widget body;
+    final pasted = a.pastedText;
+    if (pasted != null) {
+      final lines = '\n'.allMatches(pasted.trimRight()).length + 1;
+      final firstLine = pasted.trim().split('\n').first.trim();
+      body = GestureDetector(
+        onTap: () => _editPasted(a),
+        child: Container(
+          height: side,
+          width: 176,
+          padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(children: [
+                AppIcon('file-text', size: 12, color: AppColors.fg3),
+                const SizedBox(width: 5),
+                Text('Pasted · $lines lines',
+                    style: sans(11, weight: W.label, color: AppColors.fg2)),
+              ]),
+              const SizedBox(height: 4),
+              Text(firstLine,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(11, color: AppColors.fg3)),
+            ],
+          ),
+        ),
+      );
+    } else if (a.isImage && a.localPath != null) {
+      body = Container(
+        width: side,
+        height: side,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(R.md),
+          border: Border.all(color: AppColors.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Image.file(File(a.localPath!),
+            fit: BoxFit.cover, cacheWidth: 168, cacheHeight: 168),
+      );
+    } else {
+      final ext = a.name.contains('.') ? a.name.split('.').last.toUpperCase() : 'FILE';
+      body = Container(
+        height: side,
+        constraints: const BoxConstraints(maxWidth: 190),
+        padding: const EdgeInsets.fromLTRB(8, 0, 12, 0),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.md),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: isAudio ? AppColors.accentBg : AppColors.surface2,
+              color: a.isAudio ? AppColors.accentBg : AppColors.surface3,
               borderRadius: BorderRadius.circular(R.sm),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(isAudio ? 'mic' : (a.isImage ? 'image' : 'file'),
-                  size: 12, color: isAudio ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 5),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 100),
-                child: Text(a.name,
+            child: AppIcon(
+                a.isAudio ? 'mic' : (kind == MediaKind.pdf ? 'pdf' : 'file'),
+                size: 16,
+                color: a.isAudio ? AppColors.accent : AppColors.fg2),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(a.isAudio ? 'Voice note' : a.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(11,
-                        color: isAudio ? AppColors.accent : AppColors.fg2)),
-              ),
-            ]),
-          );
-    return Stack(children: [
+                    style: sans(12, weight: W.label, color: AppColors.fg1)),
+                Text(a.isAudio ? 'Audio' : (ext.length > 6 ? 'FILE' : ext),
+                    style: mono(10, color: AppColors.fg3)),
+              ],
+            ),
+          ),
+        ]),
+      );
+    }
+    return Stack(clipBehavior: Clip.none, children: [
       body,
       if (a.uploading)
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
                 color: AppColors.scrim,
-                borderRadius: BorderRadius.circular(R.sm)),
+                borderRadius: BorderRadius.circular(R.md)),
             alignment: Alignment.center,
-            child: Spinner(size: 16, color: AppColors.fg2),
+            child: Spinner(size: 16, color: AppColors.fg1),
           ),
         ),
       Positioned(
-        top: 3,
-        right: 3,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: () => _setState(() => _attachments.remove(a)),
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: const BoxDecoration(
-                color: AppColors.scrim, shape: BoxShape.circle),
-            child: AppIcon('x', size: 11, color: AppColors.fg1),
+        top: -6,
+        right: -6,
+        child: Semantics(
+          button: true,
+          label: 'Remove ${a.name}',
+          child: GestureDetector(
+            onTap: () => _setState(() => _attachments.remove(a)),
+            child: Container(
+              width: 22,
+              height: 22,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface3,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.bg, width: 2),
+              ),
+              child: AppIcon('x', size: 10, color: AppColors.fg1),
+            ),
           ),
         ),
       ),
     ]);
   }
 
+  /// Open a pasted-text card to read or edit it, move it back into the message
+  /// as plain text, or drop it.
+  Future<void> _editPasted(_Attachment a) async {
+    final result = await presentScreen<(String, String)>(
+      context,
+      builder: (_, close) => _PastedEditor(text: a.pastedText ?? '', onClose: close),
+    );
+    if (!mounted || result == null) return;
+    final (action, text) = result;
+    _setState(() {
+      switch (action) {
+        case 'save':
+          if (text.trim().isEmpty) {
+            _attachments.remove(a);
+          } else {
+            a.pastedText = text;
+          }
+        case 'inline':
+          _attachments.remove(a);
+          final current = _input.text;
+          final joined = current.trim().isEmpty ? text : '$current\n$text';
+          _input.value = TextEditingValue(
+            text: joined,
+            selection: TextSelection.collapsed(offset: joined.length),
+          );
+        case 'remove':
+          _attachments.remove(a);
+      }
+    });
+  }
+
   // ---- event → widget (pairs tool_call with its tool_result) ----
+}
+
+/// Full view of a pasted-text card: edit it, put it back into the message as
+/// plain text, or remove it. Pops with (action, text).
+class _PastedEditor extends StatefulWidget {
+  final String text;
+  final VoidCallback onClose;
+  const _PastedEditor({required this.text, required this.onClose});
+
+  @override
+  State<_PastedEditor> createState() => _PastedEditorState();
+}
+
+class _PastedEditorState extends State<_PastedEditor> {
+  late final TextEditingController _text = TextEditingController(text: widget.text);
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _done(String action) => Navigator.of(context).pop((action, _text.text));
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = '\n'.allMatches(_text.text.trimRight()).length + 1;
+    return Scaffold(
+      backgroundColor: readingBg,
+      body: SafeArea(
+        child: Column(children: [
+          SnAppBar(
+            title: 'Pasted text',
+            subtitle: '$lines lines',
+            onBack: () => _done('save'),
+            actions: [
+              IconBtn('trash', tooltip: 'Remove', onTap: () => _done('remove')),
+            ],
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: TextField(
+                controller: _text,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                onChanged: (_) => setState(() {}),
+                style: mono(13, height: 1.45, color: AppColors.fg1),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  isCollapsed: true,
+                ),
+              ),
+            ),
+          ),
+          Container(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Row(children: [
+              TextButton(
+                onPressed: () => _done('inline'),
+                child: Text('Insert as text', style: sans(13, color: AppColors.fg2)),
+              ),
+              const Spacer(),
+              FilledButton(
+                onPressed: () => _done('save'),
+                child: Text('Done', style: sans(13, weight: W.label, color: AppColors.accentFg)),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
 }

@@ -1038,7 +1038,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     if (mine) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Bubble(mine: true, text: e.body),
+        child: Bubble(mine: true, text: e.body, client: widget.client),
       );
     }
     return Padding(

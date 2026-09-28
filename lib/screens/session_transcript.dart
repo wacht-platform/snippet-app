@@ -95,12 +95,21 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           isSessionRunning && run.any((w) => w is DenseToolRow && w.pending);
       final toolKey = 'transcript-tools-$start';
       final open = _toolRunOpen[toolKey] ?? false;
+      final batch = ToolBatch([
+        for (final r in run.whereType<DenseToolRow>())
+          ToolStep(tool: r.tool, args: r.args, result: r.result),
+      ], running: running);
+      final live = _toolBatches.putIfAbsent(toolKey, () => ValueNotifier(batch));
+      // An open sheet listens to this; update it after the frame so the sheet
+      // never rebuilds in the middle of the transcript's own build.
+      WidgetsBinding.instance.addPostFrameCallback((_) => live.value = batch);
       out.add(KeyedSubtree(
         key: ValueKey(toolKey),
         child: ToolRun(
           List.of(run),
           running: running,
           open: open,
+          batch: live,
           onOpenChanged: (nextOpen) {
             if (!mounted) return;
             _setState(() {
@@ -201,7 +210,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               KeyedSubtree(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 4, bottom: 20),
-                    child: Bubble(mine: true, text: text)),
+                    child: Bubble(mine: true, text: text, client: widget.client)),
               ));
         case 'assistant_text':
           endTools(key);
@@ -316,6 +325,18 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
   /// download to the device.
   Widget _presentedFileCard(String path, String caption) {
     final name = path.split('/').last;
+    if (mediaKindOf(path) == MediaKind.image) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ImageThumb(client: widget.client, path: path, width: 300, height: 200),
+          if (caption.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(caption, style: sans(13, color: AppColors.fg2)),
+          ],
+        ]),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: AppCard(

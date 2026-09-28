@@ -18,6 +18,7 @@ import '../models.dart';
 import '../notifications.dart';
 import '../panel.dart';
 import '../platform.dart';
+import '../media_views.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'editor.dart';
@@ -80,7 +81,11 @@ bool openFileForViewing(
   required String name,
 }) {
   if (!kMobile) return false;
-  pushFileViewerRoute(context, client: client, path: path, name: name);
+  if (mediaKindOf(path) == MediaKind.image) {
+    showImageViewer(context, client: client, path: path);
+  } else {
+    pushFileViewerRoute(context, client: client, path: path, name: name);
+  }
   return true;
 }
 
@@ -226,13 +231,15 @@ class _FileViewerState extends State<FileViewer> {
                 actions: actions),
           if (_isImage)
             Expanded(
-              child: ColoredBox(
-                color: Colors.black,
-                child: InteractiveViewer(
+              child: InteractiveViewer(
                   minScale: 1,
                   maxScale: 6,
                   child: Center(
-                    child: Image.network(
+                   child: Padding(
+                    padding: const EdgeInsets.all(S.s16),
+                    child: ClipRRect(
+                     borderRadius: BorderRadius.circular(R.md),
+                     child: Image.network(
                       widget.client.fileUrl(widget.path),
                       cacheWidth: (MediaQuery.sizeOf(context).width *
                               MediaQuery.devicePixelRatioOf(context))
@@ -252,6 +259,7 @@ class _FileViewerState extends State<FileViewer> {
                           title: "Can't load image",
                           body: '$e'),
                     ),
+                   ),
                   ),
                 ),
               ),

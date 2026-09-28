@@ -2,11 +2,13 @@
 // buried in sheets), first-class lane cards with ticking elapsed, and styled system
 // rows for watches, goals, and compaction.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
 import 'theme.dart';
 import 'tool_activity.dart';
+import 'tool_sheet.dart';
 import 'tool_views.dart';
 import 'widgets.dart';
 
@@ -69,12 +71,16 @@ class _DenseToolRowState extends State<DenseToolRow> {
               SizedBox(
                 width: 16,
                 child: Center(
-                  child: widget.result == null
-                      ? const BrailleSpinner()
-                      : AppIcon(
-                          failed ? 'alert-triangle' : toolIcon(widget.tool),
-                          size: 14,
-                          color: failed ? AppColors.danger : AppColors.fg4),
+                  // Pending calls don't spin: the transcript has one live
+                  // indicator (the status line at the bottom).
+                  child: AppIcon(
+                      failed ? 'alert-triangle' : toolIcon(widget.tool),
+                      size: 14,
+                      color: widget.result == null
+                          ? AppColors.run
+                          : failed
+                              ? AppColors.danger
+                              : AppColors.fg4),
                 ),
               ),
               const SizedBox(width: S.s8),
@@ -151,14 +157,30 @@ class ToolRun extends StatefulWidget {
   final bool running;
   final bool open;
   final ValueChanged<bool>? onOpenChanged;
+
+  /// When given, tapping the run opens it as a sheet (bottom sheet on phones,
+  /// side panel on desktop) that follows this live batch, instead of expanding
+  /// inline.
+  final ValueListenable<ToolBatch>? batch;
   const ToolRun(this.rows,
-      {super.key, this.running = false, this.open = false, this.onOpenChanged});
+      {super.key,
+      this.running = false,
+      this.open = false,
+      this.onOpenChanged,
+      this.batch});
   @override
   State<ToolRun> createState() => _ToolRunState();
 }
 
 class _ToolRunState extends State<ToolRun> {
-  void _toggle() => widget.onOpenChanged?.call(!widget.open);
+  void _toggle() {
+    final batch = widget.batch;
+    if (batch != null) {
+      showToolBatchSheet(context, batch: batch);
+      return;
+    }
+    widget.onOpenChanged?.call(!widget.open);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,7 +208,7 @@ class _ToolRunState extends State<ToolRun> {
               width: 16,
               child: Center(
                 child: running
-                    ? const BrailleSpinner()
+                    ? AppIcon(toolIcon(current.tool), size: 14, color: AppColors.run)
                     : AppIcon(failures > 0 ? 'alert-triangle' : 'check',
                         size: 14,
                         color: failures > 0 ? AppColors.danger : AppColors.fg4),
@@ -205,7 +227,7 @@ class _ToolRunState extends State<ToolRun> {
             ],
             const SizedBox(width: S.s6),
             AnimatedRotation(
-              turns: widget.open ? 0.25 : 0,
+              turns: widget.open && widget.batch == null ? 0.25 : 0,
               duration: Motion.fast,
               curve: Motion.enter,
               child: AppIcon('chevron-right', size: 12, color: AppColors.fg4),
@@ -225,7 +247,7 @@ class _ToolRunState extends State<ToolRun> {
               alignment: Alignment.topCenter,
               children: [...previous, if (current != null) current],
             ),
-            child: widget.open
+            child: widget.open && widget.batch == null
                 ? Padding(
                     key: const ValueKey('steps'),
                     padding: const EdgeInsets.only(left: 24, top: S.s4),

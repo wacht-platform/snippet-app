@@ -204,12 +204,29 @@ MissionEnvelope? parseMissionEnvelope(String text) {
     return match?.group(1)?.trim() ?? '';
   }
 
+  // A task's scope may sit on the lines after `scope:` (the current envelope)
+  // or on the same line (older ones); it runs until the closing instruction.
+  String scope() {
+    final inline = RegExp(r'^scope:[ \t]*(\S.*)$', multiLine: true)
+        .firstMatch(t)
+        ?.group(1)
+        ?.trim();
+    if (inline != null && inline.isNotEmpty) return inline;
+    final start = t.indexOf('\nscope:\n');
+    if (start < 0) return '';
+    final rest = t.substring(start + '\nscope:\n'.length);
+    final end = rest.indexOf('\n\nBegin now.');
+    final close = rest.indexOf('[/mission_control_task]');
+    final cut = end >= 0 ? end : (close >= 0 ? close : rest.length);
+    return rest.substring(0, cut).trim();
+  }
+
   return MissionEnvelope(
     isReport: isReport,
     taskId: field('task_id'),
     title: field('title'),
     status: isReport ? field('status') : 'pending',
-    summary: isReport ? field('summary') : field('scope'),
+    summary: isReport ? field('summary') : scope(),
   );
 }
 

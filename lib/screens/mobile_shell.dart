@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -99,27 +100,20 @@ class MobileShell extends StatelessWidget {
             ),
           ),
         ),
-        // When in an active session, an edge swipe from the left edge navigates
-        // back to the previous screen without trapping the user.
-        if (!chatsVisible && (onOpenChats != null || onPopRoute != null))
+        // iOS has no system back gesture for this in-app stack, so an edge
+        // swipe provides one. It fires once per gesture, after a deliberate
+        // travel or flick. Android already routes its back gesture through
+        // PopScope below; a second detector there made one swipe go back
+        // several screens.
+        if (!chatsVisible &&
+            defaultTargetPlatform == TargetPlatform.iOS &&
+            (onOpenChats != null || onPopRoute != null))
           Positioned(
             top: 0,
             bottom: 0,
             left: 0,
-            width: 24,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onHorizontalDragEnd: (details) {
-                if ((details.primaryVelocity ?? 0) > 100) {
-                  handleBack();
-                }
-              },
-              onHorizontalDragUpdate: (details) {
-                if (details.delta.dx > 10) {
-                  handleBack();
-                }
-              },
-            ),
+            width: 20,
+            child: _EdgeSwipeBack(onBack: handleBack),
           ),
       ]),
     );
@@ -146,6 +140,32 @@ class MobileShell extends StatelessWidget {
         }
       },
       child: shell,
+    );
+  }
+}
+
+class _EdgeSwipeBack extends StatefulWidget {
+  final VoidCallback onBack;
+  const _EdgeSwipeBack({required this.onBack});
+
+  @override
+  State<_EdgeSwipeBack> createState() => _EdgeSwipeBackState();
+}
+
+class _EdgeSwipeBackState extends State<_EdgeSwipeBack> {
+  double _travel = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) => _travel = 0,
+      onHorizontalDragUpdate: (d) => _travel += d.delta.dx,
+      onHorizontalDragEnd: (d) {
+        if (_travel > 60 || (d.primaryVelocity ?? 0) > 700) widget.onBack();
+        _travel = 0;
+      },
+      onHorizontalDragCancel: () => _travel = 0,
     );
   }
 }

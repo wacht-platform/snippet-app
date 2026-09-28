@@ -4,6 +4,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:re_editor/re_editor.dart';
 
 import 'highlight.dart';
+import 'media_views.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -235,7 +236,7 @@ List<Widget> _toolBody(
     case 'change_files':
       return _changeFilesView(a, d);
     case 'view_image':
-      return _imageView(a, d);
+      return _imageView(context, a, d);
     case 'bash':
       return _bashView(a, d);
     case 'web_search':
@@ -250,7 +251,7 @@ List<Widget> _toolBody(
     case 'monitor':
       return _monitorView(a, d);
     case 'present_file':
-      return _presentView(a, d);
+      return _presentView(context, a, d);
     default:
       return _simpleFallback(a, d);
   }
@@ -321,8 +322,22 @@ List<Widget> _changeFilesView(Map? a, Map? d) {
   return out;
 }
 
-List<Widget> _imageView(Map? a, Map? d) {
-  return const [];
+List<Widget> _imageView(BuildContext context, Map? a, Map? d) {
+  final path = (d?['path'] ?? a?['path'])?.toString() ?? '';
+  final client = DaemonScope.maybeOf(context);
+  if (path.isEmpty) return const [];
+  if (client == null) return [Text(path, style: TS.label(AppColors.fg2))];
+  return [
+    LayoutBuilder(
+      builder: (_, c) => ImageThumb(
+        client: client,
+        path: path,
+        width: c.maxWidth.clamp(0, 420),
+        height: 220,
+        fit: BoxFit.contain,
+      ),
+    ),
+  ];
 }
 
 String _previewLines(String text, {int maxLines = 6}) {
@@ -443,11 +458,15 @@ List<Widget> _monitorView(Map? a, Map? d) {
   return out;
 }
 
-List<Widget> _presentView(Map? a, Map? d) {
+List<Widget> _presentView(BuildContext context, Map? a, Map? d) {
   final path = (a?['path'] ?? d?['path'])?.toString() ?? '';
   final caption = (a?['caption'] ?? d?['caption'])?.toString() ?? '';
+  final client = DaemonScope.maybeOf(context);
   return [
-    if (path.isNotEmpty) Text(path, style: TS.label(AppColors.fg1)),
+    if (path.isNotEmpty)
+      client == null
+          ? Text(path, style: TS.label(AppColors.fg1))
+          : FileChip(client: client, path: path),
     if (caption.isNotEmpty) ...[
       const SizedBox(height: 4),
       Text(caption, style: sans(13, color: AppColors.fg3)),

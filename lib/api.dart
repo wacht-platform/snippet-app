@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/io.dart' as ws_io;
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -476,6 +477,9 @@ class DaemonClient {
   /// content-type and honors Range requests, so media streams/seeks.
   String fileUrl(String path) =>
       _uri('/fs/download', {'path': path}).toString();
+
+  /// The image at [path] on this daemon, for thumbnails and the image viewer.
+  ImageProvider imageProvider(String path) => NetworkImage(fileUrl(path));
 
   /// Stream a file to [output] without buffering the whole response in memory.
   /// [onProgress] receives bytes received and the optional content length.

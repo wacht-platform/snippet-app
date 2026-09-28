@@ -21,12 +21,15 @@ import '../models.dart';
 import '../notifications.dart';
 import '../platform.dart';
 import '../theme.dart';
+import '../tool_activity.dart';
+import '../tool_sheet.dart';
 import '../tool_views.dart';
 import '../transcript.dart';
 import '../term.dart';
 import '../panel.dart';
 import '../share_inbound.dart';
 import '../widgets.dart';
+import '../media_views.dart';
 import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';
 import 'editor.dart';
@@ -371,10 +374,12 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   // Big-paste interception: a paste arrives as ONE controller change, so an
-  // insertion this large can't be typing — pull it out of the field and attach
-  // it as a text file instead (through the same _ingest pipeline as any file).
-  static const _pasteAttachChars = 1000;
-  static const _pasteAttachLines = 15;
+  // insertion this large can't be typing. It leaves the field and becomes a
+  // pasted-text card, sent inline; only a paste too big for the agent's context
+  // is uploaded as a file instead.
+  static const _pasteCardChars = 600;
+  static const _pasteCardLines = 8;
+  static const _pasteFileChars = 30000;
   String _lastInput = '';
   bool _restoringInput = false;
   int _pasteN = 0;
@@ -383,7 +388,7 @@ class _SessionScreenState extends State<SessionScreen>
     if (_closed || _restoringInput) return;
     final prev = _lastInput;
     final now = _input.text;
-    if (now.length - prev.length < _pasteAttachChars) {
+    if (now.length - prev.length < _pasteCardChars) {
       // Also catch shorter-but-many-line pastes cheaply.
       if (now.length <= prev.length || !now.contains('\n')) {
         _lastInput = now;
@@ -403,7 +408,7 @@ class _SessionScreenState extends State<SessionScreen>
     }
     final inserted = now.substring(p, now.length - s);
     final lines = '\n'.allMatches(inserted).length + 1;
-    if (inserted.length < _pasteAttachChars && lines < _pasteAttachLines) {
+    if (inserted.length < _pasteCardChars && lines < _pasteCardLines) {
       _lastInput = now;
       return;
     }
@@ -415,6 +420,10 @@ class _SessionScreenState extends State<SessionScreen>
     );
     _restoringInput = false;
     _lastInput = prev;
+    if (inserted.length <= _pasteFileChars) {
+      setState(() => _attachments.add(_Attachment.pasted(inserted)));
+      return;
+    }
     final name = 'paste-${++_pasteN}.txt';
     _ingest([
       (
@@ -423,7 +432,7 @@ class _SessionScreenState extends State<SessionScreen>
         readBytes: () async => Uint8List.fromList(utf8.encode(inserted))
       )
     ]);
-    _toast('Pasted text attached ($lines lines)');
+    _toast('Long paste attached as a file ($lines lines)');
   }
 
   // Pending attachments (images + files, up to 5): each uploads to the daemon
@@ -432,6 +441,7 @@ class _SessionScreenState extends State<SessionScreen>
   int _attachmentGeneration = 0;
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   final Map<String, bool> _toolRunOpen = {};
+  final Map<String, ValueNotifier<ToolBatch>> _toolBatches = {};
   final Set<String> _openToolRows = {};
   bool _transcriptDirty = true;
   List<Widget>? _transcriptCache;
@@ -904,6 +914,9 @@ class _SessionScreenState extends State<SessionScreen>
     _agentEventsSub?.cancel();
     modelsRevision.removeListener(_loadModel);
     _input.removeListener(_interceptBigPaste);
+    for (final batch in _toolBatches.values) {
+      batch.dispose();
+    }
     _inputFocus.unfocus();
     _reconnectTimer?.cancel();
     _bannerTimer?.cancel();
@@ -1065,7 +1078,8 @@ class _SessionScreenState extends State<SessionScreen>
                                                     child: Bubble(
                                                         mine: true,
                                                         text: _pending[pi],
-                                                        selectable: false))),
+                                                        selectable: false,
+                                                        client: widget.client))),
                                           _LiveStreamRow(
                                             key: const ValueKey(
                                                 'live-stream-row'),
@@ -1220,7 +1234,7 @@ class _SessionScreenState extends State<SessionScreen>
         ]),
       ),
     );
-    final guardedScaffold = scaffold;
+    final guardedScaffold = DaemonScope(client: widget.client, child: scaffold);
     return kMacOS
         ? DropTarget(
             enable: widget.acceptDrops,

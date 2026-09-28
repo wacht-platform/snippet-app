@@ -706,11 +706,33 @@ class _Attachment {
   final String? localPath;
   String? remotePath;
   bool uploading = true;
+
+  /// Text pasted into the composer, kept as a card and sent inline.
+  String? pastedText;
   _Attachment(
       {required this.name,
       required this.isImage,
       required this.isAudio,
       this.localPath});
+
+  _Attachment.pasted(String text)
+      : name = 'Pasted text',
+        isImage = false,
+        isAudio = false,
+        localPath = null,
+        pastedText = text,
+        uploading = false;
+
+  bool get ready => remotePath != null || pastedText != null;
+
+  /// How this attachment is referenced in the outgoing message.
+  String get marker {
+    final pasted = pastedText;
+    if (pasted != null) return pastedTextBlock(pasted);
+    return isImage
+        ? '[attached image — call view_image on this exact path to see it: $remotePath]'
+        : '[attached file — read it at this exact path: $remotePath]';
+  }
 }
 
 class _SendBtn extends StatelessWidget {

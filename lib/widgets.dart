@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 
 import 'platform.dart';
+import 'api.dart';
+import 'media_views.dart';
 import 'theme.dart';
 import 'components.dart';
 import 'dialog_widgets.dart';
@@ -761,7 +763,7 @@ bool isAudioAttachmentPath(String value) {
 /// Remove internal attachment/transcription metadata from the message body while
 /// leaving the audio transcript available to the dedicated transcript card.
 String hideAttachmentMarkers(String raw) {
-  var shown = raw;
+  var shown = splitPastedBlocks(raw).$2;
   final headers = _audioTranscriptHeaderRe.allMatches(shown).toList();
   for (var i = headers.length - 1; i >= 0; i--) {
     final start = headers[i].start;
@@ -911,18 +913,31 @@ class Bubble extends StatelessWidget {
   /// Set this to false for streaming/optimistic content; durable transcript
   /// bubbles use the default per-message selection container.
   final bool selectable;
+
+  /// When given, a sent message's attachments render as real media (image
+  /// thumbnails, file cards, playable voice notes) instead of count pills.
+  final DaemonClient? client;
   const Bubble({
     super.key,
     required this.mine,
     required this.text,
     this.selectable = true,
+    this.client,
   });
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final matches = _attachMarkerRe.allMatches(text).toList();
-    final transcripts = audioTranscriptItems(text);
-    final shown = hideAttachmentMarkers(text);
+    final (pasted, body) = splitPastedBlocks(text);
+    final matches = _attachMarkerRe.allMatches(body).toList();
+    final transcripts = audioTranscriptItems(body);
+    final shown = hideAttachmentMarkers(body);
+    final pastedCards = [
+      for (final block in pasted)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: PastedTextCard(text: block),
+        ),
+    ];
     final audio =
         matches.where((m) => isAudioAttachmentPath(m.group(2) ?? '')).length;
     final images = matches.where((m) => m.group(1) == 'image').length;
@@ -950,6 +965,8 @@ class Bubble extends StatelessWidget {
       if (images > 0 || files > 0)
         AttachmentPill(audio: 0, images: images, files: files),
     ];
+    final media =
+        client == null ? null : _sentMedia(context, client!, transcripts);
     final mineText = textBody == null
         ? const SizedBox.shrink()
         : (selectable ? SelectionArea(child: textBody) : textBody);
@@ -998,46 +1015,129 @@ class Bubble extends StatelessWidget {
       );
     }
 
-    return Align(
-      alignment: Alignment.centerRight,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (shown.isNotEmpty || voice.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(R.card),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (shown.isNotEmpty) mineText,
-                      if (shown.isNotEmpty && voice.isNotEmpty)
-                        const SizedBox(height: 8),
-                      for (var i = 0; i < voice.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 6),
-                        voice[i],
-                      ],
-                    ],
-                  ),
+    if (media != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...media,
+            if (shown.isNotEmpty)
+              Container(
+                width: double.infinity,
+                margin: EdgeInsets.only(top: media.isEmpty ? 0 : 6),
+                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(R.card),
                 ),
-              for (final extra in extras) ...[
-                const SizedBox(height: 4),
-                extra,
-              ],
-            ],
-          ),
+                child: mineText,
+              ),
+            ...pastedCards,
+          ],
         ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (shown.isNotEmpty || voice.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(R.card),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (shown.isNotEmpty) mineText,
+                  if (shown.isNotEmpty && voice.isNotEmpty)
+                    const SizedBox(height: 8),
+                  for (var i = 0; i < voice.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 6),
+                    voice[i],
+                  ],
+                ],
+              ),
+            ),
+          for (final extra in extras) ...[
+            const SizedBox(height: 4),
+            extra,
+          ],
+          ...pastedCards,
+        ],
       ),
     );
+  }
+}
+
+extension on Bubble {
+  /// The attachments of a sent message as media, in the order images, files,
+  /// voice notes; empty when the message has none.
+  List<Widget> _sentMedia(BuildContext context, DaemonClient client,
+      List<AudioTranscriptItem> transcripts) {
+    final attachments = parseSentAttachments(text);
+    if (attachments.isEmpty) return const [];
+    final images = [
+      for (final a in attachments)
+        if (a.kind == MediaKind.image) a.path
+    ];
+    final audio = [
+      for (final a in attachments)
+        if (a.kind == MediaKind.audio) a.path
+    ];
+    final files = [
+      for (final a in attachments)
+        if (a.kind != MediaKind.image && a.kind != MediaKind.audio) a.path
+    ];
+    final maxWidth =
+        (MediaQuery.sizeOf(context).width - 32).clamp(160.0, 280.0);
+    Widget card(Widget child) => Container(
+          padding: const EdgeInsets.fromLTRB(10, 9, 12, 9),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(R.card),
+          ),
+          child: child,
+        );
+    final out = <Widget>[];
+    void add(Widget w) {
+      if (out.isNotEmpty) out.add(const SizedBox(height: 6));
+      out.add(w);
+    }
+
+    if (images.isNotEmpty) {
+      add(ImageGallery(client: client, paths: images, maxWidth: maxWidth));
+    }
+    if (files.isNotEmpty) {
+      add(SizedBox(
+        width: maxWidth,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < files.length; i++) ...[
+              if (i > 0) const SizedBox(height: 6),
+              FileChip(client: client, path: files[i]),
+            ],
+          ],
+        ),
+      ));
+    }
+    for (var i = 0; i < audio.length; i++) {
+      final transcript = i < transcripts.length
+          ? AudioTranscriptCard(items: [transcripts[i]])
+          : (transcripts.isEmpty
+              ? Text('Transcribing…', style: TS.meta())
+              : null);
+      add(card(
+          VoiceNote(client: client, path: audio[i], transcript: transcript)));
+    }
+    return out;
   }
 }
 
