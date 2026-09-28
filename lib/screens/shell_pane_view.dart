@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../media_views.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
+import '../tool_sheet.dart';
 import '../widgets.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'mission_control/task_board_screen.dart';
@@ -494,6 +496,8 @@ class RightTabBody extends StatelessWidget {
   final MacSessionControls? controls;
   final DaemonClient? client;
   final String? activeSessionId;
+  final VoidCallback? onClose;
+  final void Function(String path, String name)? onOpenFile;
 
   const RightTabBody({
     super.key,
@@ -502,10 +506,25 @@ class RightTabBody extends StatelessWidget {
     required this.controls,
     required this.client,
     required this.activeSessionId,
+    this.onClose,
+    this.onOpenFile,
   });
 
   @override
   Widget build(BuildContext context) {
+    final tools = tab.tools;
+    if (tools != null) {
+      final view = ToolBatchView(
+        key: ObjectKey(tools),
+        batch: tools,
+        onClose: onClose ?? () {},
+        docked: true,
+      );
+      final c = client;
+      return c == null
+          ? view
+          : DaemonScope(client: c, onOpenFile: onOpenFile, child: view);
+    }
     final agent = tab.agent;
     if (agent != null) {
       return CoordinationAgentDetail(

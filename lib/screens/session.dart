@@ -75,6 +75,9 @@ class SessionScreen extends StatefulWidget {
   /// instead of pushing an editor route.
   final void Function(String path, String name)? onOpenFileTab;
 
+  /// Shows a tool batch in the desktop shell's side pane.
+  final void Function(ValueListenable<ToolBatch> batch)? onOpenToolBatch;
+
   /// Open a forked conversation (new tab / replace). Shell provides this so
   /// fork can jump straight into the branch.
   final void Function(String id, String title, String? profile)? onOpenSession;
@@ -134,6 +137,7 @@ class SessionScreen extends StatefulWidget {
       this.embedded = false,
       this.onMenu,
       this.onOpenFileTab,
+      this.onOpenToolBatch,
       this.onOpenSession,
       this.onMacStatus,
       this.onMacControls,
@@ -1237,6 +1241,7 @@ class _SessionScreenState extends State<SessionScreen>
     final guardedScaffold = DaemonScope(
       client: widget.client,
       onOpenFile: widget.onOpenFileTab,
+      onOpenTools: widget.onOpenToolBatch,
       child: scaffold,
     );
     return kMacOS

@@ -1020,7 +1020,9 @@ class SidebarState extends State<Sidebar> {
                     _enterSelect(seed: s.id);
                   }
                 },
-          onSecondaryTapDown: (renaming || !kMobile)
+          // Right-click is the desktop way to reach a session's actions;
+          // phones use long-press (select) and the row's menu.
+          onSecondaryTapDown: (renaming || kMobile)
               ? null
               : (details) =>
                   _sessionActions(s, position: details.globalPosition),

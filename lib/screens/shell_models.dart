@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
 import '../share_inbound.dart';
+import '../tool_sheet.dart';
 import 'mission_control.dart';
 
 /// Which pane a tab lives in. Both panes are tab containers, so this is a
@@ -201,13 +203,23 @@ enum RightPanel {
 class RightTab {
   RightTab.panel(this.panel)
       : agent = null,
+        tools = null,
         pane = ShellPane.right;
   RightTab.agent(CoordinationAgent this.agent)
       : panel = RightPanel.none,
+        tools = null,
+        pane = ShellPane.right;
+
+  /// A tool batch's details, docked beside the conversation. There is one
+  /// Tools tab; opening another batch replaces what it shows.
+  RightTab.tools(ValueListenable<ToolBatch> this.tools)
+      : panel = RightPanel.none,
+        agent = null,
         pane = ShellPane.right;
 
   final RightPanel panel;
   final CoordinationAgent? agent;
+  final ValueListenable<ToolBatch>? tools;
 
   /// Which pane holds this readout.
   ///
@@ -221,13 +233,18 @@ class RightTab {
 
   /// Stable identity, so re-opening a panel focuses its tab instead of adding
   /// a duplicate.
-  String get key => isAgent ? 'agent|${agent!.id}' : 'panel|${panel.name}';
+  String get key => tools != null
+      ? 'tools'
+      : isAgent
+          ? 'agent|${agent!.id}'
+          : 'panel|${panel.name}';
 
   String get label {
+    if (tools != null) return 'Tools';
     final a = agent;
     if (a == null) return panel.label;
     return a.displayName.trim().isEmpty ? a.id : a.displayName;
   }
 
-  String get icon => isAgent ? 'agent' : panel.icon;
+  String get icon => tools != null ? 'terminal' : (isAgent ? 'agent' : panel.icon);
 }

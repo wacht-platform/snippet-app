@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -8,6 +9,7 @@ import 'api.dart';
 import 'platform.dart';
 import 'screens/file_viewer.dart';
 import 'theme.dart';
+import 'tool_sheet.dart';
 import 'widgets.dart';
 
 /// The daemon a subtree talks to, so media deep in the transcript (tool
@@ -18,10 +20,14 @@ class DaemonScope extends InheritedWidget {
 
   /// Opens a file in a tab (desktop), when the host has tabs.
   final void Function(String path, String name)? onOpenFile;
+
+  /// Shows a tool batch in the desktop side pane, when the host has one.
+  final void Function(ValueListenable<ToolBatch> batch)? onOpenTools;
   const DaemonScope({
     super.key,
     required this.client,
     this.onOpenFile,
+    this.onOpenTools,
     required super.child,
   });
 
@@ -33,7 +39,9 @@ class DaemonScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(DaemonScope old) =>
-      old.client != client || old.onOpenFile != onOpenFile;
+      old.client != client ||
+      old.onOpenFile != onOpenFile ||
+      old.onOpenTools != onOpenTools;
 }
 
 /// What a file is, for choosing its preview and icon.

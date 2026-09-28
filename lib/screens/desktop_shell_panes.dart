@@ -61,6 +61,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       onMenu: kMobile ? _showMobileChats : null,
       onOpenFileTab: (path, name) =>
           _openFileTab(t.client, t.instanceUrl, path, name),
+      onOpenToolBatch: !kMobile ? _openRightTools : null,
       onOpenSession: _openSession,
       onMacStatus: (state, running) =>
           _setMacSessionStatus(t.key, state, running),
@@ -375,6 +376,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         controls: controls,
         client: _client,
         activeSessionId: _activeTab?.sessionId,
+        onClose: () => _closeRightTab(t.key),
+        onOpenFile: _openFileFromRightPane,
       );
 
   Widget _mainPane({VoidCallback? onMenu}) => MainPaneView(

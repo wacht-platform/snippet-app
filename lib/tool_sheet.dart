@@ -24,6 +24,11 @@ Future<void> showToolBatchSheet(
   int? initialStep,
 }) {
   final scope = DaemonScope.scopeOf(context);
+  final openInPane = scope?.onOpenTools;
+  if (!kMobile && openInPane != null) {
+    openInPane(batch);
+    return Future.value();
+  }
   Widget body(VoidCallback close, {ScrollController? scroll}) {
     final view = ToolBatchView(
       batch: batch,
@@ -86,12 +91,16 @@ class ToolBatchView extends StatefulWidget {
   final VoidCallback onClose;
   final ScrollController? scroll;
   final int? initialStep;
+
+  /// Shown in the desktop side pane, whose tab strip already closes it.
+  final bool docked;
   const ToolBatchView({
     super.key,
     required this.batch,
     required this.onClose,
     this.scroll,
     this.initialStep,
+    this.docked = false,
   });
 
   @override
@@ -147,7 +156,7 @@ class _ToolBatchViewState extends State<ToolBatchView> {
                       key: const ValueKey(-1),
                       batch: batch,
                       scroll: widget.scroll,
-                      onClose: widget.onClose,
+                      onClose: widget.docked ? null : widget.onClose,
                       onOpen: _show,
                     )
                   : _StepDetail(
@@ -157,7 +166,7 @@ class _ToolBatchViewState extends State<ToolBatchView> {
                       total: batch.steps.length,
                       scroll: widget.scroll,
                       onBack: () => _show(null),
-                      onClose: widget.onClose,
+                      onClose: widget.docked ? null : widget.onClose,
                     ),
             ),
           ),
@@ -171,7 +180,7 @@ class _SheetHeader extends StatelessWidget {
   final Widget? leading;
   final String title;
   final String? subtitle;
-  final VoidCallback onClose;
+  final VoidCallback? onClose;
   const _SheetHeader({
     this.leading,
     required this.title,
@@ -215,7 +224,8 @@ class _SheetHeader extends StatelessWidget {
               ],
             ),
           ),
-          IconBtn('x', size: 34, iconSize: 16, tooltip: 'Close', onTap: onClose),
+          if (onClose != null)
+            IconBtn('x', size: 34, iconSize: 16, tooltip: 'Close', onTap: onClose),
         ]),
       ),
       Container(height: 1, color: AppColors.border),
@@ -226,7 +236,7 @@ class _SheetHeader extends StatelessWidget {
 class _StepList extends StatelessWidget {
   final ToolBatch batch;
   final ScrollController? scroll;
-  final VoidCallback onClose;
+  final VoidCallback? onClose;
   final ValueChanged<int> onOpen;
   const _StepList({
     super.key,
@@ -328,7 +338,7 @@ class _StepDetail extends StatelessWidget {
   final int total;
   final ScrollController? scroll;
   final VoidCallback onBack;
-  final VoidCallback onClose;
+  final VoidCallback? onClose;
   const _StepDetail({
     super.key,
     required this.step,
@@ -342,11 +352,15 @@ class _StepDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (verb, object) = toolSentenceParts(step);
+    // The command itself is in the body; the header carries its label only.
+    final title = step.tool == 'bash'
+        ? (object.isEmpty ? verb : 'Command')
+        : (object.isEmpty ? verb : '$verb $object');
     return Column(children: [
       _SheetHeader(
         leading: IconBtn('chevron-left',
             size: 34, iconSize: 18, tooltip: 'Back', onTap: onBack),
-        title: object.isEmpty ? verb : '$verb $object',
+        title: title,
         subtitle: '${toolTitle(step.tool)} · step ${index + 1} of $total',
         onClose: onClose,
       ),
