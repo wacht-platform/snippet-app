@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:re_editor/re_editor.dart';
 
+import 'coordination_tool_views.dart';
 import 'highlight.dart';
 import 'media_views.dart';
 import 'theme.dart';
@@ -253,7 +254,8 @@ List<Widget> _toolBody(
     case 'present_file':
       return _presentView(context, a, d);
     default:
-      return _simpleFallback(a, d);
+      return coordinationToolBody(context, tool, a, d) ??
+          _simpleFallback(a, d);
   }
 }
 

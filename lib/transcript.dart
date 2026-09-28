@@ -5,6 +5,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'coordination_tool_views.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'tool_activity.dart';
@@ -194,6 +195,9 @@ class _ToolRunState extends State<ToolRun> {
     final running = widget.running && steps.any((s) => s.running);
     final failures = steps.where((s) => s.failed).length;
     final changes = fileChanges(steps);
+    // A run of acknowledgements only (assign, archive, …) has nothing to open.
+    final openable =
+        steps.isEmpty || widget.running || steps.any(toolHasDetail);
     final headline = running
         ? toolSentence(current, running: true)
         : activitySummary(steps);
@@ -202,7 +206,7 @@ class _ToolRunState extends State<ToolRun> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: _toggle,
+          onTap: openable ? _toggle : null,
           child: Row(children: [
             SizedBox(
               width: 16,
@@ -225,13 +229,16 @@ class _ToolRunState extends State<ToolRun> {
               const SizedBox(width: S.s8),
               Text('$failures failed', style: TS.meta(AppColors.danger)),
             ],
-            const SizedBox(width: S.s6),
-            AnimatedRotation(
-              turns: widget.open && widget.batch == null ? 0.25 : 0,
-              duration: Motion.fast,
-              curve: Motion.enter,
-              child: AppIcon('chevron-right', size: 12, color: AppColors.fg4),
-            ),
+            if (openable) ...[
+              const SizedBox(width: S.s6),
+              AnimatedRotation(
+                turns: widget.open && widget.batch == null ? 0.25 : 0,
+                duration: Motion.fast,
+                curve: Motion.enter,
+                child:
+                    AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+              ),
+            ],
           ]),
         ),
         AnimatedSize(

@@ -9,23 +9,26 @@ import 'mission_control/mission_control_state.dart'
     show AssignmentEnvelope, BoardMessage, DirectMessage, MissionEnvelope;
 
 /// Work and messages that arrive from another thread (Mission Control, another
-/// agent, the coordination board) share one card: who or what it is, a status
-/// tag, and the body as markdown, collapsed to a few lines until expanded.
+/// agent, the coordination board) share one card, in the plan card's idiom: a
+/// quiet mono meta line (what it is, a reference, its status), an optional
+/// title, and the body as markdown, collapsed to a few lines until expanded.
 class _ThreadCard extends StatefulWidget {
   final String icon;
   final Tone tone;
-  final String title;
-  final String? subtitle;
-  final String tag;
+  final String kind;
+  final String? title;
+  final String status;
   final String body;
+  final String? reference;
   final String? footer;
   const _ThreadCard({
     required this.icon,
     required this.tone,
-    required this.title,
-    this.subtitle,
-    required this.tag,
+    required this.kind,
+    this.title,
+    required this.status,
     required this.body,
+    this.reference,
     this.footer,
   });
 
@@ -39,78 +42,86 @@ class _ThreadCardState extends State<_ThreadCard> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final (toneFg, _) = toneColors(widget.tone);
     final body = widget.body.trim();
+    final title = widget.title?.trim() ?? '';
+    final ref = widget.reference?.trim() ?? '';
+    final footer = widget.footer?.trim() ?? '';
     final long = body.length > 280 || '\n'.allMatches(body).length > 4;
+    final text = sans(13, height: 1.45, color: AppColors.fg2);
+    final base = markdownStyle(context);
+    final sheet = base.copyWith(
+      p: text,
+      listBullet: text,
+      strong: text.copyWith(color: AppColors.fg1, fontWeight: W.strong),
+      em: text.copyWith(fontStyle: FontStyle.italic),
+      a: text.copyWith(color: AppColors.accent),
+    );
+    final meta = mono(10, color: AppColors.fg3);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
         decoration: BoxDecoration(
-          color: AppColors.raised,
-          borderRadius: BorderRadius.circular(R.card),
+          color: AppColors.surface1,
           border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(R.md),
         ),
-        padding: const EdgeInsets.all(S.s12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              IconTile(widget.icon, tone: widget.tone, size: 26),
-              const SizedBox(width: S.s12),
+              AppIcon(widget.icon, size: 12, color: toneFg),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TS.rowTitle()),
-                    if (widget.subtitle != null && widget.subtitle!.isNotEmpty)
-                      Text(widget.subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TS.meta()),
-                  ],
+                child: Text(
+                  ref.isEmpty ? widget.kind : '${widget.kind} · $ref',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: meta,
                 ),
               ),
               const SizedBox(width: S.s8),
-              Tag(widget.tag, tone: widget.tone),
+              Text(widget.status, style: mono(10, color: toneFg)),
             ]),
+            if (title.isNotEmpty) ...[
+              const SizedBox(height: 5),
+              Text(title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, weight: W.label, color: AppColors.fg1)),
+            ],
             if (body.isNotEmpty) ...[
-              const SizedBox(height: S.s8),
-              Padding(
-                padding: const EdgeInsets.only(left: 38),
-                child: AnimatedSize(
-                  duration: Motion.fast,
-                  curve: Motion.enter,
-                  alignment: Alignment.topLeft,
-                  child: _open || !long
-                      ? MarkdownBody(
-                          data: body,
-                          selectable: true,
-                          styleSheet: markdownStyle(context),
-                          builders: {'pre': PreBlockBuilder()},
-                          onTapLink: (_, href, __) => openMarkdownLink(href),
-                        )
-                      : MarkdownPreview(data: body, maxLines: 4),
-                ),
-              ),
-              if (long)
-                Padding(
-                  padding: const EdgeInsets.only(left: 38, top: S.s6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextAction(_open ? 'Show less' : 'Show more',
-                        onTap: () => setState(() => _open = !_open)),
-                  ),
-                ),
-            ],
-            if (widget.footer != null && widget.footer!.isNotEmpty) ...[
-              const SizedBox(height: S.s6),
-              Padding(
-                padding: const EdgeInsets.only(left: 38),
-                child: Text(widget.footer!, style: TS.meta()),
+              SizedBox(height: title.isEmpty ? 5 : 3),
+              AnimatedSize(
+                duration: Motion.fast,
+                curve: Motion.enter,
+                alignment: Alignment.topLeft,
+                child: _open || !long
+                    ? MarkdownBody(
+                        data: body,
+                        selectable: true,
+                        styleSheet: sheet,
+                        builders: {'pre': PreBlockBuilder()},
+                        onTapLink: (_, href, __) => openMarkdownLink(href),
+                      )
+                    : MarkdownPreview(data: body, maxLines: 3, style: text),
               ),
             ],
+            if (footer.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(footer, style: sans(12, height: 1.4, color: AppColors.fg3)),
+            ],
+            if (long)
+              InkWell(
+                onTap: () => setState(() => _open = !_open),
+                borderRadius: BorderRadius.circular(R.xs),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 2),
+                  child: Text(_open ? 'Show less' : 'Show more', style: meta),
+                ),
+              ),
           ],
         ),
       ),
@@ -119,6 +130,13 @@ class _ThreadCardState extends State<_ThreadCard> {
 }
 
 String _short(String id) => id.length > 8 ? id.substring(0, 8) : id;
+
+/// A board thread id as a short reference: `task:<uuid>` reads `task eaa98084`.
+String _threadRef(String id) {
+  final i = id.indexOf(':');
+  if (i <= 0) return _short(id);
+  return '${id.substring(0, i)} ${_short(id.substring(i + 1))}';
+}
 
 class MissionEnvelopeCard extends StatelessWidget {
   const MissionEnvelopeCard({super.key, required this.envelope});
@@ -136,12 +154,11 @@ class MissionEnvelopeCard extends StatelessWidget {
     return _ThreadCard(
       icon: icon,
       tone: tone,
+      kind: envelope.isReport ? 'Task report' : 'Task from Mission Control',
+      reference: envelope.taskId.isEmpty ? null : _short(envelope.taskId),
       title: envelope.title.isEmpty ? 'Task' : envelope.title,
-      subtitle: envelope.isReport ? 'Task report' : 'Task from Mission Control',
-      tag: tag,
+      status: tag,
       body: envelope.summary,
-      footer:
-          envelope.taskId.isEmpty ? null : 'Task ${_short(envelope.taskId)}',
     );
   }
 }
@@ -156,11 +173,9 @@ class BoardMessageCard extends StatelessWidget {
     return _ThreadCard(
       icon: 'coordination',
       tone: Tone.neutral,
-      title: from,
-      subtitle: message.threadId.isEmpty
-          ? 'Coordination board'
-          : 'Board · ${message.threadId}',
-      tag: 'Board',
+      kind: 'Board · $from',
+      reference: message.threadId.isEmpty ? null : _threadRef(message.threadId),
+      status: 'Posted',
       body: message.body,
     );
   }
@@ -173,12 +188,12 @@ class DirectMessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final from = message.fromLabel;
+    final who = from == 'you' ? 'You' : from;
     return _ThreadCard(
       icon: message.isReply ? 'corner-down-right' : 'message',
       tone: Tone.accent,
-      title: from == 'you' ? 'You' : from,
-      subtitle: message.isReply ? 'Replied to this session' : 'Direct message',
-      tag: message.isReply ? 'Reply' : 'Message',
+      kind: message.isReply ? 'Reply from $who' : 'Message from $who',
+      status: message.isReply ? 'Reply' : 'Message',
       body: message.body,
     );
   }
@@ -200,10 +215,8 @@ class AgentMessageCard extends StatelessWidget {
   Widget build(BuildContext context) => _ThreadCard(
         icon: outbound ? 'send' : 'corner-down-right',
         tone: outbound ? Tone.neutral : Tone.accent,
-        title: outbound ? 'To $agentId' : agentId,
-        subtitle:
-            outbound ? 'Sent from this session' : 'Replied to this session',
-        tag: outbound ? 'Sent' : 'Reply',
+        kind: outbound ? 'Message to $agentId' : 'Reply from $agentId',
+        status: outbound ? 'Sent' : 'Reply',
         body: body,
       );
 }
@@ -219,9 +232,9 @@ class AssignmentCard extends StatelessWidget {
     return _ThreadCard(
       icon: 'agent',
       tone: Tone.run,
+      kind: 'Assignment',
       title: agent.isEmpty ? 'Work assigned here' : 'Assigned to $agent',
-      subtitle: 'Assignment',
-      tag: 'Assigned',
+      status: 'Assigned',
       body: assignment.scope,
       footer: done.isEmpty ? null : 'Done when: $done',
     );

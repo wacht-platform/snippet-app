@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'coordination_tool_views.dart';
 import 'media_views.dart';
 import 'panel.dart';
 import 'platform.dart';
@@ -294,8 +295,9 @@ class _StepRow extends StatelessWidget {
         : const <FileChange>[];
     final added = changes.fold<int>(0, (sum, c) => sum + c.added);
     final removed = changes.fold<int>(0, (sum, c) => sum + c.removed);
+    final openable = toolHasDetail(step);
     return InkWell(
-      onTap: onTap,
+      onTap: openable ? onTap : null,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 11, 12, 11),
         child: Row(children: [
@@ -333,8 +335,11 @@ class _StepRow extends StatelessWidget {
             const SizedBox(width: 4),
             Text('−$removed', style: TS.meta(AppColors.danger)),
           ],
-          const SizedBox(width: 8),
-          AppIcon('chevron-right', size: 13, color: AppColors.fg4),
+          if (openable) ...[
+            const SizedBox(width: 8),
+            AppIcon('chevron-right', size: 13, color: AppColors.fg4),
+          ] else
+            const SizedBox(width: 21),
         ]),
       ),
     );
