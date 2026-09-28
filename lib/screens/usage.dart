@@ -56,7 +56,8 @@ class _UsageScreenState extends State<UsageScreen> {
         client: widget.client,
         key: 'usage:${_period.name}',
         fetch: () => widget.client.getUsage(since: _period.since),
-        revalidateOn: (e) => const {'idle', 'done', 'error'}.contains(e['kind']),
+        revalidateOn: (e) =>
+            const {'idle', 'done', 'error'}.contains(e['kind']),
         onChange: () {
           if (mounted) setState(() {});
         },
@@ -83,48 +84,57 @@ class _UsageScreenState extends State<UsageScreen> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final body = Builder(
-      builder: (context) {
-        final data = _usage.data;
-        if (data == null && _usage.error == null) {
-          return const Center(child: DelayedSpinner(size: 22));
-        }
-        if (data == null) {
-          return Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('Unable to load usage',
-                  style: sans(13, color: AppColors.fg1)),
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text('${_usage.error}',
-                    textAlign: TextAlign.center,
-                    style: mono(10, color: AppColors.fg3)),
-              ),
-              const SizedBox(height: 10),
-              Btn('Retry', small: true, onTap: _refresh),
-            ]),
-          );
-        }
-        final summary = data;
-        return PageBody(children: [
-          _PeriodTabs(value: _period, onChanged: _setPeriod),
-          const SizedBox(height: S.s16),
-          if (summary.providers.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: S.s32),
-              child: Text('No model calls in this period.',
-                  textAlign: TextAlign.center, style: TS.meta()),
-            ),
-          for (var i = 0; i < summary.providers.length; i++) ...[
+    // The range tabs and the note stay put; only the range's own content
+    // loads, so switching range never blanks the screen.
+    final data = _usage.data;
+    final Widget content;
+    if (data == null && _usage.error == null) {
+      content = const _UsageSkeleton();
+    } else if (data == null) {
+      content = Padding(
+        padding: const EdgeInsets.symmetric(vertical: S.s24),
+        child: Column(children: [
+          Text('Unable to load usage', style: sans(13, color: AppColors.fg1)),
+          const SizedBox(height: 6),
+          Text('${_usage.error}',
+              textAlign: TextAlign.center,
+              style: mono(10, color: AppColors.fg3)),
+          const SizedBox(height: 10),
+          Btn('Retry', small: true, onTap: _refresh),
+        ]),
+      );
+    } else if (data.providers.isEmpty) {
+      content = Padding(
+        padding: const EdgeInsets.symmetric(vertical: S.s32),
+        child: Text('No model calls in this period.',
+            textAlign: TextAlign.center, style: TS.meta()),
+      );
+    } else {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < data.providers.length; i++) ...[
             if (i > 0) const SizedBox(height: S.s12),
-            _ProviderCard(provider: summary.providers[i]),
+            _ProviderCard(provider: data.providers[i]),
           ],
-          const SettingsNote(
-              'Every model call is recorded against the provider and model that served it. Input includes cached tokens; rate limits come from each provider\'s own reports.'),
-        ]);
-      },
-    );
+        ],
+      );
+    }
+    final body = PageBody(children: [
+      _PeriodTabs(value: _period, onChanged: _setPeriod),
+      const SizedBox(height: S.s16),
+      AnimatedSwitcher(
+        duration: Motion.quick,
+        child: KeyedSubtree(
+          key: ValueKey(data == null
+              ? (_usage.error == null ? 'loading' : 'error')
+              : 'data:${_period.name}'),
+          child: content,
+        ),
+      ),
+      const SettingsNote(
+          'Every model call is recorded against the provider and model that served it. Input includes cached tokens; rate limits come from each provider\'s own reports.'),
+    ]);
     if (widget.embedded) {
       // No back action → desktop dialog pane, where the host's section chip strip
       // is the navigation. Drawing a row anyway duplicates it.
@@ -246,6 +256,67 @@ class _ProviderCard extends StatelessWidget {
   }
 }
 
+/// Provider cards' shape while a range loads: the same skeleton blocks the
+/// other settings lists use.
+class _UsageSkeleton extends StatelessWidget {
+  const _UsageSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double w, double h) =>
+        Skeleton(width: w, height: h, color: AppColors.hover);
+    Widget card(int models) => AppCard(
+          padding: const EdgeInsets.all(S.s16),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              bar(96, 14),
+              const Spacer(),
+              Skeleton(
+                  width: 64, height: 20, radius: R.sm, color: AppColors.hover),
+            ]),
+            const SizedBox(height: S.s6),
+            bar(52, 10),
+            const SizedBox(height: S.s16),
+            Row(children: [
+              for (var i = 0; i < 4; i++)
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        bar(36, 10),
+                        const SizedBox(height: S.s6),
+                        bar(48, 16),
+                      ]),
+                ),
+            ]),
+            const SizedBox(height: S.s16),
+            for (var i = 0; i < models; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: S.s4),
+                child: Row(children: [
+                  bar(i.isEven ? 140 : 110, 10),
+                  const Spacer(),
+                  bar(56, 10),
+                ]),
+              ),
+            const SizedBox(height: S.s12),
+            bar(120, 10),
+            const SizedBox(height: S.s8),
+            Skeleton(height: 6, radius: 3, color: AppColors.hover),
+          ]),
+        );
+    return Semantics(
+      label: 'Loading',
+      child: Column(children: [
+        card(2),
+        const SizedBox(height: S.s12),
+        card(1),
+      ]),
+    );
+  }
+}
+
 class _Metric extends StatelessWidget {
   final String label;
   final String value;
@@ -330,8 +401,8 @@ class _PeriodTabs extends StatelessWidget {
                     borderRadius: BorderRadius.circular(R.md - S.s2),
                   ),
                   child: Text(p.label,
-                      style: TS.label(
-                          p == value ? AppColors.fg1 : AppColors.fg3)),
+                      style:
+                          TS.label(p == value ? AppColors.fg1 : AppColors.fg3)),
                 ),
               ),
             ),
