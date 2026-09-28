@@ -918,9 +918,8 @@ class _SessionScreenState extends State<SessionScreen>
     _agentEventsSub?.cancel();
     modelsRevision.removeListener(_loadModel);
     _input.removeListener(_interceptBigPaste);
-    for (final batch in _toolBatches.values) {
-      batch.dispose();
-    }
+    // Tool batches are not disposed: the desktop side pane can still be
+    // showing one after this screen goes, and they hold no resources.
     _inputFocus.unfocus();
     _reconnectTimer?.cancel();
     _bannerTimer?.cancel();
