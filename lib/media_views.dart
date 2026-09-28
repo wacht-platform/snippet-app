@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'api.dart';
+import 'platform.dart';
 import 'screens/file_viewer.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -14,13 +15,25 @@ import 'widgets.dart';
 /// through every row.
 class DaemonScope extends InheritedWidget {
   final DaemonClient client;
-  const DaemonScope({super.key, required this.client, required super.child});
+
+  /// Opens a file in a tab (desktop), when the host has tabs.
+  final void Function(String path, String name)? onOpenFile;
+  const DaemonScope({
+    super.key,
+    required this.client,
+    this.onOpenFile,
+    required super.child,
+  });
 
   static DaemonClient? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<DaemonScope>()?.client;
 
+  static DaemonScope? scopeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<DaemonScope>();
+
   @override
-  bool updateShouldNotify(DaemonScope old) => old.client != client;
+  bool updateShouldNotify(DaemonScope old) =>
+      old.client != client || old.onOpenFile != onOpenFile;
 }
 
 /// What a file is, for choosing its preview and icon.
@@ -126,9 +139,15 @@ List<SentAttachment> parseSentAttachments(String text) => [
         ),
     ];
 
-/// Open a file the way its kind wants: images in the lightbox, everything else
-/// in the file viewer.
+/// Open a file the way the platform wants: on desktop in a tab next to the
+/// session (like any other file), on phones images in the full-screen viewer
+/// and everything else in the file viewer.
 void openMedia(BuildContext context, DaemonClient client, String path) {
+  final openTab = DaemonScope.scopeOf(context)?.onOpenFile;
+  if (!kMobile && openTab != null) {
+    openTab(path, baseName(path));
+    return;
+  }
   if (mediaKindOf(path) == MediaKind.image) {
     showImageViewer(context, client: client, path: path);
     return;
@@ -166,7 +185,7 @@ class ImageThumb extends StatelessWidget {
       label: baseName(path),
       button: true,
       child: GestureDetector(
-        onTap: () => showImageViewer(context, client: client, path: path),
+        onTap: () => openMedia(context, client, path),
         child: Container(
           width: width,
           height: height,

@@ -1234,7 +1234,11 @@ class _SessionScreenState extends State<SessionScreen>
         ]),
       ),
     );
-    final guardedScaffold = DaemonScope(client: widget.client, child: scaffold);
+    final guardedScaffold = DaemonScope(
+      client: widget.client,
+      onOpenFile: widget.onOpenFileTab,
+      child: scaffold,
+    );
     return kMacOS
         ? DropTarget(
             enable: widget.acceptDrops,

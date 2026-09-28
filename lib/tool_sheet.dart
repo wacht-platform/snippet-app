@@ -23,7 +23,7 @@ Future<void> showToolBatchSheet(
   required ValueListenable<ToolBatch> batch,
   int? initialStep,
 }) {
-  final client = DaemonScope.maybeOf(context);
+  final scope = DaemonScope.scopeOf(context);
   Widget body(VoidCallback close, {ScrollController? scroll}) {
     final view = ToolBatchView(
       batch: batch,
@@ -31,7 +31,20 @@ Future<void> showToolBatchSheet(
       scroll: scroll,
       initialStep: initialStep,
     );
-    return client == null ? view : DaemonScope(client: client, child: view);
+    if (scope == null) return view;
+    final openTab = scope.onOpenFile;
+    return DaemonScope(
+      client: scope.client,
+      // A file opened from the side panel lands in a tab behind it, so the
+      // panel steps aside first.
+      onOpenFile: openTab == null
+          ? null
+          : (path, name) {
+              close();
+              openTab(path, name);
+            },
+      child: view,
+    );
   }
 
   if (!kMobile) {
