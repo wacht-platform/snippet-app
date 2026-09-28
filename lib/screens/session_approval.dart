@@ -294,51 +294,69 @@ class ApprovalBarState extends State<ApprovalBar> {
   }
 }
 
-class _NoteLine extends StatefulWidget {
-  final String text;
-  const _NoteLine(this.text);
-  @override
-  State<_NoteLine> createState() => _NoteLineState();
-}
-
-class _NoteLineState extends State<_NoteLine> {
-  bool _open = false;
+/// The agent's plan as a compact checklist: done steps recede, the step in
+/// progress is highlighted, and the optional explanation says why it changed.
+class _PlanCard extends StatelessWidget {
+  final List<Map> steps;
+  final String explanation;
+  const _PlanCard(this.steps, this.explanation);
 
   @override
   Widget build(BuildContext context) {
-    final text = widget.text;
-    final long = text.split('\n').length > 3 || text.length > 220;
+    final done = steps.where((s) => s['status'] == 'done').length;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(R.md),
-        child: InkWell(
-          onTap: long ? () => setState(() => _open = !_open) : null,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(R.md),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                MarkdownBody(
-                  data: text,
-                  selectable: false,
-                  styleSheet: markdownStyle(context),
-                  builders: {'pre': PreBlockBuilder()},
-                ),
-                if (long) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _open ? 'collapse' : 'expand',
-                    style: mono(10, color: AppColors.fg3),
-                  ),
-                ],
-              ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Plan · $done of ${steps.length} done',
+                style: mono(10, color: AppColors.fg3)),
+            if (explanation.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(explanation, style: sans(12, color: AppColors.fg2)),
+            ],
+            const SizedBox(height: 6),
+            for (final step in steps) _row(step),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _row(Map step) {
+    final status = step['status']?.toString() ?? 'pending';
+    final (icon, color) = switch (status) {
+      'done' => (Icons.check_circle, AppColors.ok),
+      'in_progress' => (Icons.radio_button_checked, AppColors.accent),
+      _ => (Icons.radio_button_unchecked, AppColors.fg4),
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 13, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              step['step']?.toString() ?? '',
+              style: sans(13,
+                  color: status == 'done' ? AppColors.fg3 : AppColors.fg1,
+                  weight: status == 'in_progress' ? W.label : W.body),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

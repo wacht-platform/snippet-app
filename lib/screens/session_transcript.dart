@@ -229,10 +229,12 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               key,
               NoteLine('invalid ${_s(e['tool_name'])}: ${_s(e['error'])}',
                   error: true));
-        case 'note':
+        case 'plan_updated':
           endTools(key);
-          final entry = _s(e['entry']);
-          addEvent(key, _NoteLine(entry));
+          final steps = (e['steps'] as List? ?? const []).whereType<Map>().toList();
+          if (steps.isNotEmpty) {
+            addEvent(key, _PlanCard(steps, _s(e['explanation'])));
+          }
         case 'system_decision':
           endTools(key);
           // Don't render "interrupted" decisions — just noise in the chat.
@@ -417,7 +419,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         case 'tool_call':
         case 'tool_result':
         case 'invalid_tool_call':
-        case 'note':
+        case 'plan_updated':
         case 'file_presented':
         case 'user_question':
         case 'approval_request':
@@ -433,7 +435,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
 
   // Meta-tools have dedicated event rendering, so their generic tool lines are skipped.
   bool _isMetaTool(String n) =>
-      n == 'note' ||
+      n == 'update_plan' ||
       n == 'ask_user' ||
       n == 'delegate_task' ||
       n == 'cancel_delegated_task' ||
