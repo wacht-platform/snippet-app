@@ -265,7 +265,11 @@ extension _SessionScreenSocketExt on _SessionScreenState {
           (next.events.isNotEmpty &&
               cur.events.isNotEmpty &&
               next.events.last != cur.events.last);
-      if (eventsChanged) _transcriptDirty = true;
+      // The open question moves between the answer bar and the transcript.
+      final questionFlipped = cur == null ||
+          (next.status == 'waiting_for_input' && next.pendingQuestion != null) !=
+              (cur.status == 'waiting_for_input' && cur.pendingQuestion != null);
+      if (eventsChanged || questionFlipped) _transcriptDirty = true;
       if (wire == 'snapshot') {
         final offset = (j['event_offset'] as num?)?.toInt();
         _transcriptStart = offset ?? 0;

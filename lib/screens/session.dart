@@ -448,6 +448,10 @@ class _SessionScreenState extends State<SessionScreen>
   final Map<String, ValueNotifier<ToolBatch>> _toolBatches = {};
   final Set<String> _openToolRows = {};
   bool _transcriptDirty = true;
+
+  /// A question is waiting in the answer bar, so the transcript leaves it out.
+  bool get _questionOpen =>
+      _state?.status == 'waiting_for_input' && _state?.pendingQuestion != null;
   List<Widget>? _transcriptCache;
 
   /// Coordination events concerning this session's agent, shown inline in the

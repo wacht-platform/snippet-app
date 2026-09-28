@@ -302,6 +302,12 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               }
             }
           }
+          // The open question is already the answer bar under the transcript;
+          // it joins the record once answered.
+          final laterQuestion = events
+              .skip(qi + 1)
+              .any((n) => n['kind'] == 'user_question');
+          if (answer == null && !laterQuestion && _questionOpen) break;
           addEvent(key, _QuestionRecord(e, answer: answer));
         case 'approval_request':
           break; // shown by the approval bar

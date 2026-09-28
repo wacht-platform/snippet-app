@@ -69,55 +69,64 @@ class _QuestionRecord extends StatelessWidget {
     final qs = _questions;
     final answers = _answers;
     final ctx = _context;
+    final answered = answers.isNotEmpty;
     Widget answer(String text) => Container(
           margin: const EdgeInsets.only(top: S.s6),
           padding: const EdgeInsets.only(left: S.s8),
           decoration: BoxDecoration(
             border: Border(left: BorderSide(color: AppColors.accent, width: 2)),
           ),
-          child: Text(text, style: TS.ui(AppColors.fg2)),
+          child: Text(text, style: sans(13, height: 1.45, color: AppColors.fg2)),
         );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s12),
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
         decoration: BoxDecoration(
-          color: AppColors.raised,
+          color: AppColors.surface1,
+          border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(R.md),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              AppIcon('message', size: 13, color: AppColors.fg3),
-              const SizedBox(width: S.s6),
-              Expanded(child: Text('Question', style: TS.meta(AppColors.fg3))),
-              Tag(answers.isEmpty ? 'Asked' : 'Answered',
-                  tone: answers.isEmpty ? Tone.accent : Tone.ok, dot: true),
+              AppIcon('message', size: 12, color: AppColors.fg3),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                    qs.length > 1 ? 'Questions · ${qs.length}' : 'Question',
+                    style: mono(10, color: AppColors.fg3)),
+              ),
+              Text(answered ? 'answered' : 'no answer',
+                  style: mono(10,
+                      color: answered ? AppColors.ok : AppColors.fg3)),
             ]),
             if (ctx != null) ...[
-              const SizedBox(height: S.s6),
+              const SizedBox(height: 5),
               Text(ctx,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: TS.meta(AppColors.fg3)),
+                  style: sans(12, height: 1.4, color: AppColors.fg3)),
             ],
             for (var i = 0; i < qs.length; i++) ...[
-              SizedBox(height: i == 0 ? S.s6 : S.s12),
+              SizedBox(height: i == 0 ? 5 : S.s12),
               Text(
                   qs.length > 1
                       ? '${i + 1}. ${qs[i]['text'] ?? ''}'
                       : qs[i]['text']?.toString() ?? '',
-                  style: TS.ui(AppColors.fg1)),
+                  style: sans(13,
+                      height: 1.45, weight: W.label, color: AppColors.fg1)),
               if (answers[qs[i]['id']?.toString() ?? ''] != null ||
                   answers['0'] != null)
                 answer(answers[qs[i]['id']?.toString()] ?? answers['0'] ?? ''),
             ],
             if (qs.isEmpty && (event['text'] != null)) ...[
-              const SizedBox(height: S.s6),
+              const SizedBox(height: 5),
               Text(event['text']?.toString() ?? '',
-                  style: TS.ui(AppColors.fg1)),
+                  style: sans(13,
+                      height: 1.45, weight: W.label, color: AppColors.fg1)),
             ],
           ],
         ),
@@ -592,9 +601,12 @@ class QuestionBarState extends State<QuestionBar> {
       padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(S.s12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        // Same card as the transcript's, outlined in accent: it is the one
+        // thing waiting on you.
         decoration: BoxDecoration(
-          color: AppColors.raised,
+          color: AppColors.surface1,
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.45)),
           borderRadius: BorderRadius.circular(R.md),
         ),
         child: Column(
@@ -602,15 +614,14 @@ class QuestionBarState extends State<QuestionBar> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
-                AppIcon('message', size: 15, color: AppColors.accent),
-                const SizedBox(width: S.s8),
+                AppIcon('message', size: 12, color: AppColors.accent),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(_sent ? 'Sending…' : 'Question',
-                      style: TS.ui(AppColors.fg1)
-                          .copyWith(fontWeight: FontWeight.w600)),
+                      style: mono(10, color: AppColors.fg3)),
                 ),
-                Tag(total > 1 ? '${_step + 1} of $total' : 'Input required',
-                    tone: Tone.accent, live: true),
+                Text(total > 1 ? '${_step + 1} of $total' : 'waiting on you',
+                    style: mono(10, color: AppColors.accent)),
               ]),
               Flexible(
                 child: SingleChildScrollView(
@@ -618,16 +629,21 @@ class QuestionBarState extends State<QuestionBar> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
-                        const SizedBox(height: S.s6),
-                        Text(ctx, style: TS.meta(AppColors.fg3)),
+                        const SizedBox(height: 6),
+                        Text(ctx,
+                            style: sans(kMobile ? 13 : 12,
+                                height: 1.4, color: AppColors.fg3)),
                       ],
                       ...() {
                         final q = _currentQuestion;
                         if (q == null) return <Widget>[];
                         return <Widget>[
-                          const SizedBox(height: S.s8),
+                          const SizedBox(height: 6),
                           Text(q['text']?.toString() ?? '',
-                              style: TS.ui(AppColors.fg1)),
+                              style: sans(kMobile ? 15 : 14,
+                                  height: 1.4,
+                                  weight: W.label,
+                                  color: AppColors.fg1)),
                           const SizedBox(height: S.s8),
                           ..._inputFor(q),
                         ];
