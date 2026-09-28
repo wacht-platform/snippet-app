@@ -204,7 +204,8 @@ class SheetHeader extends StatelessWidget {
                 child: Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TS.rowTitle(AppColors.fg1)
+                    style: TS
+                        .rowTitle(AppColors.fg1)
                         .copyWith(fontWeight: FontWeight.w600)),
               ),
               Tooltip(
@@ -285,6 +286,22 @@ class SheetActions extends StatelessWidget {
             ),
           ),
       ]);
+}
+
+/// A pane section's label: the quiet mono line the transcript's cards use.
+class PaneLabel extends StatelessWidget {
+  const PaneLabel(this.text, {super.key, this.color});
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s8),
+        child: Text(text,
+            style: kMobile
+                ? TS.label(color ?? AppColors.fg2)
+                : mono(10, color: color ?? AppColors.fg3)),
+      );
 }
 
 class ListGroup extends StatelessWidget {
@@ -529,7 +546,11 @@ class PageLoader extends StatelessWidget {
 
 class Skeleton extends StatelessWidget {
   const Skeleton(
-      {super.key, this.width, this.height = 12, this.radius = R.xs, this.color});
+      {super.key,
+      this.width,
+      this.height = 12,
+      this.radius = R.xs,
+      this.color});
 
   final double? width;
   final double height;
@@ -563,7 +584,8 @@ class ListSkeleton extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               for (var i = 0; i < rows; i++) ...[
-                if (i > 0) Divider(height: 1, thickness: 1, color: AppColors.line),
+                if (i > 0)
+                  Divider(height: 1, thickness: 1, color: AppColors.line),
                 ConstrainedBox(
                   constraints:
                       BoxConstraints(minHeight: kMobile ? M.rowHeight : 44),
@@ -571,7 +593,11 @@ class ListSkeleton extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: S.s12, vertical: S.s12),
                     child: Row(children: [
-                      Skeleton(width: 20, height: 20, radius: R.sm, color: AppColors.hover),
+                      Skeleton(
+                          width: 20,
+                          height: 20,
+                          radius: R.sm,
+                          color: AppColors.hover),
                       const SizedBox(width: S.s12),
                       Expanded(
                         child: Column(
@@ -580,13 +606,15 @@ class ListSkeleton extends StatelessWidget {
                           children: [
                             FractionallySizedBox(
                               widthFactor: i.isEven ? 0.55 : 0.4,
-                              child: Skeleton(height: 12, color: AppColors.hover),
+                              child:
+                                  Skeleton(height: 12, color: AppColors.hover),
                             ),
                             if (subtitle) ...[
                               const SizedBox(height: S.s6),
                               FractionallySizedBox(
                                 widthFactor: i.isEven ? 0.35 : 0.5,
-                                child: Skeleton(height: 10, color: AppColors.hover),
+                                child: Skeleton(
+                                    height: 10, color: AppColors.hover),
                               ),
                             ],
                           ],

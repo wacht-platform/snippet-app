@@ -135,8 +135,10 @@ class _ToolBatchViewState extends State<ToolBatchView> {
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _show(null);
           },
+          // The host paints the surface: the pane and drawer are the app's
+          // background, the phone sheet its own raised colour.
           child: Material(
-            color: AppColors.surface1,
+            type: MaterialType.transparency,
             child: AnimatedSwitcher(
               duration: Motion.base,
               switchInCurve: Motion.enter,

@@ -543,6 +543,7 @@ class RightTabBody extends StatelessWidget {
           : RecurringScreen(
               client: client!,
               embedded: true,
+              pane: true,
               sessionId: activeSessionId,
               workspace: state?.workspace,
             ),

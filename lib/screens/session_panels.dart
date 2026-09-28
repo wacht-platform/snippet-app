@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'lanes.dart' show laneSections;
@@ -75,43 +76,52 @@ class SessionCheckpointsPanel extends StatelessWidget {
     if (checkpoints.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(20),
-        child: Text('No checkpoints yet.',
-            style: TS.meta()),
+        child: Text('No checkpoints yet.', style: TS.meta()),
       );
     }
+    final dense = !kMobile;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      padding: EdgeInsets.fromLTRB(
+          dense ? S.s12 : M.gutter, S.s12, dense ? S.s12 : M.gutter, S.s24),
       children: [
-        for (final c in checkpoints)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppCard(
-              padding: const EdgeInsets.all(13),
+        PaneLabel('Checkpoints · ${checkpoints.length}'),
+        ListGroup(children: [
+          for (final c in checkpoints)
+            InkWell(
               onTap: () => onRewind(c),
-              child: Row(children: [
-                const IconTile('history', size: 36),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(c.label.isEmpty ? c.id : c.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TS.rowTitle()),
-                        const SizedBox(height: 3),
-                        Text(formatCheckpointDate(c.createdAt),
-                            style: TS.meta()),
-                      ]),
-                ),
-                IconBtn('git-branch',
-                    size: 32,
-                    iconSize: 16,
-                    tooltip: 'Fork from here',
-                    onTap: () => onFork(c)),
-              ]),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                    12, dense ? 8 : 10, dense ? 4 : 6, dense ? 8 : 10),
+                child: Row(children: [
+                  AppIcon('history',
+                      size: dense ? 13 : 16, color: AppColors.fg3),
+                  SizedBox(width: dense ? 10 : 12),
+                  Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(c.label.isEmpty ? 'Checkpoint' : c.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: dense
+                                  ? sans(13, color: AppColors.fg1)
+                                  : TS.rowTitle()),
+                          const SizedBox(height: 2),
+                          Text(formatCheckpointDate(c.createdAt),
+                              style: dense
+                                  ? mono(10, color: AppColors.fg3)
+                                  : TS.meta()),
+                        ]),
+                  ),
+                  IconBtn('git-branch',
+                      size: dense ? 26 : M.minTarget,
+                      iconSize: dense ? 13 : 17,
+                      tooltip: 'Fork from here',
+                      onTap: () => onFork(c)),
+                ]),
+              ),
             ),
-          ),
+        ]),
       ],
     );
   }
@@ -131,8 +141,9 @@ class SessionLanesPanel extends StatelessWidget {
           title: 'No delegated lanes',
           body: 'Parallel agent work will appear here when started.');
     }
+    final side = kMobile ? M.gutter : S.s12;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s24),
+      padding: EdgeInsets.fromLTRB(side, S.s12, side, S.s24),
       children: laneSections(lanes),
     );
   }

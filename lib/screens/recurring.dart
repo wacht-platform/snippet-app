@@ -38,6 +38,10 @@ class RecurringScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final ValueChanged<bool>? onAddingChanged;
 
+  /// Docked in the desktop side pane: compact insets and its own small header,
+  /// since the pane's tab strip carries only the name.
+  final bool pane;
+
   const RecurringScreen({
     super.key,
     required this.client,
@@ -48,6 +52,7 @@ class RecurringScreen extends StatefulWidget {
     this.embedded = false,
     this.onBack,
     this.onAddingChanged,
+    this.pane = false,
   });
   @override
   State<RecurringScreen> createState() => RecurringScreenState();
@@ -664,7 +669,25 @@ class RecurringScreenState extends State<RecurringScreen>
                 return j.sessionId == bound || j.sessionId.contains(bound);
               }).toList()
             : allJobs;
-        return PageBody(children: [
+        final children = [
+          if (widget.pane)
+            Row(children: [
+              Expanded(child: PaneLabel('Scheduled jobs · ${jobs.length}')),
+              if (_canAdd && !_adding)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: S.s8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(R.xs),
+                    onTap: _add,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: S.s4, vertical: 2),
+                      child: Text('+ New',
+                          style: mono(10, color: AppColors.accent)),
+                    ),
+                  ),
+                ),
+            ]),
           if (_adding) ...[_inlineAddCard(), const SizedBox(height: S.s12)],
           if (jobs.isEmpty && !_adding)
             EmptyState(
@@ -678,7 +701,12 @@ class RecurringScreenState extends State<RecurringScreen>
             )
           else if (jobs.isNotEmpty)
             ListGroup(children: [for (final j in jobs) _jobRow(j)]),
-        ]);
+        ];
+        if (!widget.pane) return PageBody(children: children);
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s24),
+          children: children,
+        );
       },
     );
     // Three cases, and the header differs for each:
@@ -773,11 +801,29 @@ class RecurringScreenState extends State<RecurringScreen>
     ];
     final sub = bits.where((s) => s.isNotEmpty).join(' · ');
     final error = job.lastError?.trim() ?? '';
+    final dense = !kMobile;
+    final btn = dense ? 26.0 : 32.0;
+    final ico = dense ? 13.0 : 16.0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.s12, S.s12, S.s4, S.s12),
+      padding: dense
+          ? const EdgeInsets.fromLTRB(12, 8, 4, 8)
+          : const EdgeInsets.fromLTRB(S.s12, S.s12, S.s4, S.s12),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        IconTile('repeat', tone: paused ? Tone.neutral : Tone.accent),
-        const SizedBox(width: S.s12),
+        if (dense)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, right: 10),
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                  color: paused ? AppColors.fg4 : AppColors.accent,
+                  shape: BoxShape.circle),
+            ),
+          )
+        else ...[
+          IconTile('repeat', tone: paused ? Tone.neutral : Tone.accent),
+          const SizedBox(width: S.s12),
+        ],
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -786,21 +832,27 @@ class RecurringScreenState extends State<RecurringScreen>
                 child: Text(job.title.isEmpty ? job.id : job.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TS.rowTitle(paused ? AppColors.fg3 : AppColors.fg1)),
+                    style: dense
+                        ? sans(13,
+                            color: paused ? AppColors.fg3 : AppColors.fg1)
+                        : TS.rowTitle(paused ? AppColors.fg3 : AppColors.fg1)),
               ),
-              if (paused) ...[
+              if (paused && !dense) ...[
                 const SizedBox(width: S.s8),
                 const Tag('Paused'),
               ],
             ]),
             const SizedBox(height: S.s2),
-            Text(sub, style: TS.meta()),
+            Text(sub,
+                style: dense ? mono(10, color: AppColors.fg3) : TS.meta()),
             if (error.isNotEmpty) ...[
               const SizedBox(height: S.s4),
               Text(error,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TS.meta(AppColors.danger)),
+                  style: dense
+                      ? sans(12, color: AppColors.danger)
+                      : TS.meta(AppColors.danger)),
             ],
           ]),
         ),
@@ -808,8 +860,8 @@ class RecurringScreenState extends State<RecurringScreen>
           button: true,
           label: paused ? 'Resume scheduled job' : 'Pause scheduled job',
           child: IconBtn(paused ? 'play' : 'pause',
-              size: 32,
-              iconSize: 16,
+              size: btn,
+              iconSize: ico,
               tooltip: paused ? 'Resume' : 'Pause',
               onTap: () => _toggle(job)),
         ),
@@ -817,8 +869,8 @@ class RecurringScreenState extends State<RecurringScreen>
           button: true,
           label: 'Delete scheduled job',
           child: IconBtn('trash',
-              size: 32,
-              iconSize: 16,
+              size: btn,
+              iconSize: ico,
               tooltip: 'Delete',
               onTap: () => _remove(job)),
         ),

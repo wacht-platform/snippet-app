@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -101,10 +102,7 @@ List<Widget> laneSections(List<LaneInfo> lanes) {
   void section(String label, List<LaneInfo> items, Tone tone) {
     if (items.isEmpty) return;
     if (out.isNotEmpty) out.add(const SizedBox(height: S.s20));
-    out.add(SectionHeader(label,
-        count: items.length,
-        tone: tone,
-        padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s8)));
+    out.add(PaneLabel('$label · ${items.length}'));
     for (var i = 0; i < items.length; i++) {
       if (i > 0) out.add(const SizedBox(height: S.s8));
       out.add(LaneDetailCard(key: ValueKey(items[i].id), lane: items[i]));
@@ -143,101 +141,94 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
             : cancelled
                 ? Tone.neutral
                 : Tone.ok;
-    final icon = lane.running
-        ? 'cpu'
-        : failed
-            ? 'alert-triangle'
-            : cancelled
-                ? 'x-circle'
-                : 'check-circle';
+    final (toneFg, _) = toneColors(tone);
     final status = lane.running
-        ? 'Running · ${_elapsed(lane.startedAt)}'
+        ? 'running · ${_elapsed(lane.startedAt)}'
         : failed
-            ? 'Failed'
+            ? 'failed'
             : cancelled
-                ? 'Cancelled'
-                : 'Completed';
+                ? 'cancelled'
+                : 'done';
     final activity = lane.activity?.trim();
     final summary = lane.summary?.trim();
     final error = lane.error?.trim();
+    final dense = !kMobile;
+    final meta = mono(10, color: AppColors.fg3);
+    final body = sans(dense ? 12 : 14, height: 1.45, color: AppColors.fg2);
+    // Everything under the header lines up with the title, past the dot.
+    Widget indented(Widget child, {double top = 6}) =>
+        Padding(padding: EdgeInsets.only(left: 16, top: top), child: child);
 
-    return Material(
-      color: AppColors.raised,
-      borderRadius: BorderRadius.circular(R.md),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(R.md),
+      ),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: hasDetails ? () => setState(() => _expanded = !_expanded) : null,
-        child: Padding(
-          padding: const EdgeInsets.all(S.s16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                IconTile(icon, tone: tone),
-                const SizedBox(width: S.s12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(lane.title,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap:
+              hasDetails ? () => setState(() => _expanded = !_expanded) : null,
+          child: Padding(
+            padding:
+                EdgeInsets.fromLTRB(12, dense ? 9 : 12, 12, dense ? 10 : 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Padding(
+                    padding: EdgeInsets.only(top: dense ? 6 : 8),
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration:
+                          BoxDecoration(color: toneFg, shape: BoxShape.circle),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(lane.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: dense
+                            ? sans(13, weight: W.label, color: AppColors.fg1)
+                            : TS.rowTitle()),
+                  ),
+                  const SizedBox(width: 10),
+                  Padding(
+                    padding: EdgeInsets.only(top: dense ? 3 : 4),
+                    child: Text(status, style: mono(10, color: toneFg)),
+                  ),
+                ]),
+                if (activity != null && activity.isNotEmpty && lane.running)
+                  indented(Row(children: [
+                    AppIcon('terminal', size: 11, color: AppColors.fg3),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(activity,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TS.rowTitle()),
-                      const SizedBox(height: S.s6),
-                      Tag(status, tone: tone, live: lane.running),
-                    ],
-                  ),
-                ),
-              ]),
-              if (activity != null && activity.isNotEmpty && lane.running) ...[
-                const SizedBox(height: S.s12),
-                _ActivityLine(text: activity),
+                          style: mono(11, color: AppColors.fg3)),
+                    ),
+                  ])),
+                if (summary != null && summary.isNotEmpty && !_expanded)
+                  indented(
+                      MarkdownPreview(data: summary, maxLines: 2, style: body)),
+                if (failed && error != null && error.isNotEmpty && !_expanded)
+                  indented(Text(error,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: body.copyWith(color: AppColors.danger))),
+                if (hasDetails)
+                  indented(
+                      Text(_expanded ? 'Hide details' : 'Show details',
+                          style: meta),
+                      top: 8),
+                if (_expanded) indented(_details(context), top: 12),
               ],
-              if (summary != null && summary.isNotEmpty && !_expanded) ...[
-                const SizedBox(height: S.s12),
-                InsetPanel(child: MarkdownPreview(data: summary, maxLines: 2)),
-              ],
-              if (failed &&
-                  error != null &&
-                  error.isNotEmpty &&
-                  !_expanded) ...[
-                const SizedBox(height: S.s12),
-                InsetPanel(
-                  tone: Tone.danger,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: S.s2),
-                        child: AppIcon('alert-triangle',
-                            size: 14, color: AppColors.danger),
-                      ),
-                      const SizedBox(width: S.s8),
-                      Expanded(
-                        child: Text(error,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: TS.ui(AppColors.danger)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              if (hasDetails) ...[
-                const SizedBox(height: S.s12),
-                Row(children: [
-                  Text(_expanded ? 'Hide details' : 'Show details',
-                      style: TS.label(AppColors.accent)),
-                  const SizedBox(width: S.s4),
-                  AppIcon(_expanded ? 'chevron-up' : 'chevron-down',
-                      size: 14, color: AppColors.accent),
-                ]),
-              ],
-              if (_expanded) ...[
-                const SizedBox(height: S.s16),
-                _details(context),
-              ],
-            ],
+            ),
           ),
         ),
       ),
@@ -250,33 +241,44 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     void addSection(String label, String? value,
         {required String icon, Tone tone = Tone.neutral}) {
       if (value == null || value.trim().isEmpty) return;
-      final (fg, _) = toneColors(tone);
+      final text = sans(kMobile ? 14 : 12, height: 1.45, color: AppColors.fg2);
       sections.add(Padding(
-        padding: const EdgeInsets.only(bottom: S.s16),
+        padding: const EdgeInsets.only(bottom: S.s12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              AppIcon(icon, size: 14, color: fg),
-              const SizedBox(width: S.s6),
               Text(label,
-                  style: TS.label(
-                      tone == Tone.danger ? AppColors.danger : AppColors.fg2)),
+                  style: mono(10,
+                      color: tone == Tone.danger
+                          ? AppColors.danger
+                          : AppColors.fg3)),
               const Spacer(),
-              TextAction('Copy', icon: 'copy', onTap: () {
-                Clipboard.setData(ClipboardData(text: value));
-                toast(context, 'Copied');
-              }),
-            ]),
-            const SizedBox(height: S.s6),
-            InsetPanel(
-              tone: tone == Tone.danger ? Tone.danger : null,
-              child: MarkdownBody(
-                data: value,
-                selectable: true,
-                styleSheet: markdownStyle(context),
-                builders: {'pre': PreBlockBuilder()},
+              InkWell(
+                borderRadius: BorderRadius.circular(R.xs),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: value));
+                  toast(context, 'Copied');
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Text('Copy', style: mono(10, color: AppColors.fg3)),
+                ),
               ),
+            ]),
+            const SizedBox(height: 4),
+            MarkdownBody(
+              data: value,
+              selectable: true,
+              styleSheet: markdownStyle(context).copyWith(
+                p: tone == Tone.danger
+                    ? text.copyWith(color: AppColors.danger)
+                    : text,
+                listBullet: text,
+                strong:
+                    text.copyWith(color: AppColors.fg1, fontWeight: W.strong),
+              ),
+              builders: {'pre': PreBlockBuilder()},
             ),
           ],
         ),
@@ -313,26 +315,6 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
   }
 }
 
-class _ActivityLine extends StatelessWidget {
-  final String text;
-  const _ActivityLine({required this.text});
-
-  @override
-  Widget build(BuildContext context) => InsetPanel(
-        padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s8),
-        child: Row(children: [
-          AppIcon('terminal', size: 14, color: AppColors.accent),
-          const SizedBox(width: S.s8),
-          Expanded(
-            child: Text(text,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TS.codeSmall(AppColors.fg2)),
-          ),
-        ]),
-      );
-}
-
 class _ActivityHistory extends StatelessWidget {
   final List<LaneActivity> entries;
   const _ActivityHistory({required this.entries});
@@ -343,24 +325,17 @@ class _ActivityHistory extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          AppIcon('activity', size: 14, color: AppColors.fg3),
-          const SizedBox(width: S.s6),
-          Text('Activity', style: TS.label()),
-          const SizedBox(width: S.s8),
-          CountBadge(entries.length),
-        ]),
+        Text('Activity · ${entries.length}',
+            style: mono(10, color: AppColors.fg3)),
         const SizedBox(height: S.s8),
-        InsetPanel(
-          child: Column(children: [
-            for (var i = 0; i < items.length; i++)
-              _TimelineEntryRow(
-                entry: items[i],
-                first: i == 0,
-                last: i == items.length - 1,
-              ),
-          ]),
-        ),
+        Column(children: [
+          for (var i = 0; i < items.length; i++)
+            _TimelineEntryRow(
+              entry: items[i],
+              first: i == 0,
+              last: i == items.length - 1,
+            ),
+        ]),
       ],
     );
   }
@@ -409,7 +384,8 @@ class _TimelineEntryRow extends StatelessWidget {
                         if (entry.kind.isNotEmpty) entry.kind,
                         if (entry.at.isNotEmpty) _formatTime(entry.at),
                       ].join(' · '),
-                      style: TS.meta(),
+                      style:
+                          kMobile ? TS.meta() : mono(10, color: AppColors.fg3),
                     ),
                   Text(entry.text, style: TS.codeSmall(AppColors.fg2)),
                 ],
