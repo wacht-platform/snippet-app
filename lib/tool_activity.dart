@@ -18,19 +18,12 @@ class ToolStep {
   }
 }
 
-enum ToolKind { change, run, web, memory, other }
+enum ToolKind { change, run, web, other }
 
 ToolKind toolKind(String tool) => switch (tool) {
       'change_files' => ToolKind.change,
       'bash' || 'manage_process' => ToolKind.run,
       'web_search' || 'web_read' => ToolKind.web,
-      'memory_read' ||
-      'memory_write' ||
-      'memory_index' ||
-      'memory_delete' ||
-      'memory_pattern' ||
-      'memory_rule' =>
-        ToolKind.memory,
       _ => ToolKind.other,
     };
 
@@ -44,11 +37,6 @@ String toolVerb(String tool, {required bool running}) {
     'skill' => ('Used skill', 'Using skill'),
     'web_search' => ('Searched the web for', 'Searching the web for'),
     'web_read' => ('Read', 'Reading'),
-    'memory_read' => ('Recalled', 'Recalling'),
-    'memory_write' => ('Remembered', 'Remembering'),
-    'memory_delete' => ('Forgot', 'Forgetting'),
-    'memory_index' || 'memory_pattern' || 'memory_rule' =>
-      ('Updated memory', 'Updating memory'),
     'monitor' => ('Watched', 'Watching'),
     'present_file' => ('Shared', 'Sharing'),
     'set_session_title' => ('Titled the chat', 'Titling the chat'),

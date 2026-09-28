@@ -23,13 +23,6 @@ String toolIcon(String tool) => switch (tool) {
       'bash' => 'terminal',
       'web_search' || 'web_read' => 'globe',
       'set_session_title' => 'edit',
-      'memory_read' ||
-      'memory_write' ||
-      'memory_index' ||
-      'memory_delete' ||
-      'memory_pattern' ||
-      'memory_rule' =>
-        'book',
       'search_skills' || 'skill' => 'zap',
       'monitor' => 'activity',
       'present_file' => 'file',
@@ -60,11 +53,6 @@ String toolArgSummary(String tool, dynamic args) {
     'change_files' => _changesSummary(args['changes']),
     'view_image' => s('path'),
     'set_session_title' => s('title'),
-    'memory_read' || 'memory_write' || 'memory_delete' => s('id'),
-    'memory_index' ||
-    'memory_pattern' ||
-    'memory_rule' =>
-      first(s('content').isNotEmpty ? s('content') : s('action')),
     'search_skills' => s('query'),
     'skill' => s('name'),
     'monitor' => s('path').isNotEmpty ? s('path') : s('action'),
@@ -120,11 +108,6 @@ bool toolIsExpandable(String tool, dynamic args, dynamic result) {
           cmd.split('\n').length > 1 ||
           cmd.length > 80 ||
           resultHasBody();
-    case 'memory_write':
-    case 'memory_rule':
-    case 'memory_pattern':
-    case 'memory_index':
-      return arg('content').trim().isNotEmpty;
     case 'web_search':
     case 'web_read':
       return resultHasBody();
@@ -142,12 +125,6 @@ String toolTitle(String tool) => switch (tool) {
       'web_search' => 'Search',
       'web_read' => 'Page',
       'set_session_title' => 'Title',
-      'memory_read' => 'Recall',
-      'memory_write' => 'Remember',
-      'memory_index' => 'Index',
-      'memory_delete' => 'Forget',
-      'memory_pattern' => 'Pattern',
-      'memory_rule' => 'Rule',
       'search_skills' => 'Skills',
       'skill' => 'Skill',
       'monitor' => 'Watch',
@@ -267,13 +244,6 @@ List<Widget> _toolBody(
       return _webReadView(a, d);
     case 'set_session_title':
       return _titleView(a, d);
-    case 'memory_read':
-    case 'memory_write':
-    case 'memory_index':
-    case 'memory_delete':
-    case 'memory_pattern':
-    case 'memory_rule':
-      return _memoryView(tool, a, d);
     case 'search_skills':
     case 'skill':
       return _skillView(tool, a, d);
@@ -435,23 +405,6 @@ List<Widget> _titleView(Map? a, Map? d) {
   return [
     Text(title, style: sans(14, weight: W.label, color: AppColors.fg1)),
   ];
-}
-
-List<Widget> _memoryView(String tool, Map? a, Map? d) {
-  final out = <Widget>[];
-  final id = (d?['id'] ?? a?['id'])?.toString() ?? '';
-  final content = (d?['content'] ?? a?['content'])?.toString() ?? '';
-  if (id.isNotEmpty) {
-    out.add(Text(id, style: TS.label(AppColors.fg1)));
-  }
-  if (content.trim().isNotEmpty) {
-    if (out.isNotEmpty) out.add(const SizedBox(height: 6));
-    out.add(_ToolMarkdown(_displayText(content).trimRight()));
-  }
-  if (out.isEmpty) {
-    out.add(Text(toolTitle(tool), style: sans(13, color: AppColors.fg3)));
-  }
-  return out;
 }
 
 List<Widget> _skillView(String tool, Map? a, Map? d) {
