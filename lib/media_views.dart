@@ -172,6 +172,9 @@ class ImageThumb extends StatelessWidget {
   final double width;
   final double height;
   final BoxFit fit;
+
+  /// Decode width in physical pixels; defaults to the displayed width.
+  final int? cacheWidth;
   const ImageThumb({
     super.key,
     required this.client,
@@ -179,6 +182,7 @@ class ImageThumb extends StatelessWidget {
     required this.width,
     required this.height,
     this.fit = BoxFit.cover,
+    this.cacheWidth,
   });
 
   @override
@@ -204,7 +208,7 @@ class ImageThumb extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: Image(
             image: ResizeImage.resizeIfNeeded(
-              (width * dpr).round(),
+              cacheWidth ?? (width * dpr).round(),
               null,
               client.imageProvider(path),
             ),
@@ -246,11 +250,7 @@ class ImageGallery extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (paths.length == 1) {
-      return ImageThumb(
-          client: client,
-          path: paths.first,
-          width: maxWidth.clamp(0, 260),
-          height: 180);
+      return _SingleImage(client: client, path: paths.first);
     }
     const gap = 6.0;
     final columns = paths.length == 2 || paths.length == 4 ? 2 : 3;
@@ -271,6 +271,102 @@ class ImageGallery extends StatelessWidget {
 }
 
 /// A file as a compact card: its kind, its name and a type label. Tapping opens it.
+/// One image on its own, at its own aspect ratio: a fixed crop box chopped
+/// screenshots and tall photos alike. Sized to fit the bounds once the
+/// image's dimensions are known; a neutral box holds the space until then.
+class _SingleImage extends StatefulWidget {
+  final DaemonClient client;
+  final String path;
+  const _SingleImage({required this.client, required this.path});
+
+  @override
+  State<_SingleImage> createState() => _SingleImageState();
+}
+
+class _SingleImageState extends State<_SingleImage> {
+  static const _maxHeight = 320.0;
+  static const _minSide = 72.0;
+
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  Size? _size;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(_SingleImage old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path || old.client != widget.client) {
+      _size = null;
+      _resolve();
+    }
+  }
+
+  double get _maxWidth =>
+      (MediaQuery.sizeOf(context).width - 32).clamp(160.0, 420.0);
+
+  // The same decode the thumb shows, so the image is fetched once.
+  int get _cacheWidth =>
+      (_maxWidth * MediaQuery.devicePixelRatioOf(context)).round();
+
+  void _resolve() {
+    final stream = ResizeImage.resizeIfNeeded(
+            _cacheWidth, null, widget.client.imageProvider(widget.path))
+        .resolve(createLocalImageConfiguration(context));
+    if (stream.key == _stream?.key) return;
+    _unlisten();
+    final listener = ImageStreamListener((info, _) {
+      final size =
+          Size(info.image.width.toDouble(), info.image.height.toDouble());
+      info.dispose();
+      if (mounted && size != _size) setState(() => _size = size);
+    }, onError: (_, __) {});
+    _stream = stream..addListener(listener);
+    _listener = listener;
+  }
+
+  void _unlisten() {
+    final l = _listener;
+    if (l != null) _stream?.removeListener(l);
+    _stream = null;
+    _listener = null;
+  }
+
+  @override
+  void dispose() {
+    _unlisten();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxWidth = _maxWidth;
+    final size = _size;
+    var w = 260.0.clamp(0.0, maxWidth);
+    var h = 180.0;
+    if (size != null && size.width > 0 && size.height > 0) {
+      final scale = [maxWidth / size.width, _maxHeight / size.height, 1.0]
+          .reduce((a, b) => a < b ? a : b);
+      w = (size.width * scale).clamp(_minSide, maxWidth);
+      h = (size.height * scale).clamp(_minSide, _maxHeight);
+    }
+    return AnimatedSize(
+      duration: Motion.quick,
+      alignment: Alignment.topLeft,
+      child: ImageThumb(
+          client: widget.client,
+          path: widget.path,
+          width: w,
+          height: h,
+          cacheWidth: _cacheWidth),
+    );
+  }
+}
+
 class FileChip extends StatelessWidget {
   final DaemonClient? client;
   final String path;
