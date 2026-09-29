@@ -1258,8 +1258,12 @@ class _SessionScreenState extends State<SessionScreen>
                                         ? M.gutter
                                         : (widget.embedded ? 0 : 20),
                                     0),
+                                // Keyed by the question set, so a new one
+                                // starts fresh (selection, step, review).
                                 child: QuestionBar(
-                                    question: s!.pendingQuestion!,
+                                    key: ValueKey(
+                                        jsonEncode(s!.pendingQuestion!)),
+                                    question: s.pendingQuestion!,
                                     onSend: _sendDecision),
                               ),
                             )),

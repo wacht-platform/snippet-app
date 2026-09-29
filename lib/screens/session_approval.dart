@@ -379,13 +379,54 @@ class QuestionBar extends StatefulWidget {
   State<QuestionBar> createState() => QuestionBarState();
 }
 
+/// One selectable answer to a question.
+class _QOption {
+  final String value;
+  final String label;
+  final String description;
+  final bool recommended;
+  const _QOption(this.value, this.label,
+      {this.description = '', this.recommended = false});
+
+  /// How the choice reads in the answer: the label, with the value alongside
+  /// when it says something the label doesn't ("android" for "Android" adds
+  /// nothing).
+  String get answer {
+    String norm(String x) => x.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    return value.isEmpty || norm(value) == norm(label) ? label : '$label ($value)';
+  }
+}
+
 class QuestionBarState extends State<QuestionBar> {
   final Map<String, TextEditingController> _text = {};
   final Map<String, String> _choice = {};
+  final Map<String, Set<String>> _multi = {};
   final Set<String> _skipped = {};
   final Set<String> _freeText = {};
+  final FocusNode _keys = FocusNode(debugLabel: 'question keys');
   bool _sent = false;
+  bool _review = false;
   int _step = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // The recommended option starts selected (ticked, for multi-choice).
+    for (final q in _questions) {
+      final id = q['id'].toString();
+      final rec = _options(q).where((o) => o.recommended).map((o) => o.value);
+      if (_kind(q) == 'multi_choice') {
+        _multi[id] = rec.toSet();
+      } else if (_kind(q) == 'single_choice' && rec.isNotEmpty) {
+        _choice[id] = rec.first;
+      }
+    }
+    if (!kMobile) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _keys.requestFocus();
+      });
+    }
+  }
 
   TextEditingController _controllerFor(String id) {
     return _text.putIfAbsent(id, () {
@@ -411,36 +452,105 @@ class QuestionBarState extends State<QuestionBar> {
       (q['answer_kind'] is Map ? q['answer_kind']['kind'] : null)?.toString() ??
       'free_text';
 
+  String _header(Map<String, dynamic> q, int i) {
+    final h = '${q['header'] ?? ''}'.trim();
+    return h.isEmpty ? 'Q${i + 1}' : h;
+  }
+
+  /// Options for a choice question, the recommended one first.
+  List<_QOption> _options(Map<String, dynamic> q) {
+    final ak = q['answer_kind'] is Map ? q['answer_kind'] as Map : const {};
+    String labelOr(String k, String fallback) {
+      final v = '${ak[k] ?? ''}'.trim();
+      return v.isEmpty ? fallback : v;
+    }
+
+    switch (_kind(q)) {
+      case 'yes_no':
+        return const [_QOption('yes', 'Yes'), _QOption('no', 'No')];
+      case 'confirm':
+        return [
+          _QOption('confirm', labelOr('confirm_label', 'Confirm')),
+          _QOption('cancel', labelOr('cancel_label', 'Cancel')),
+        ];
+      case 'single_choice':
+      case 'multi_choice':
+        final opts = <_QOption>[];
+        for (final e in (ak['choices'] as List?) ?? const []) {
+          if (e is Map) {
+            final label = '${e['label'] ?? ''}'.trim();
+            final value = '${e['value'] ?? ''}'.trim();
+            final v = value.isEmpty ? label : value;
+            opts.add(_QOption(v, label.isEmpty ? v : label,
+                description: '${e['description'] ?? ''}'.trim(),
+                recommended: e['recommended'] == true));
+          } else {
+            opts.add(_QOption('$e', '$e'));
+          }
+        }
+        // Stable: recommended first, the rest in the agent's order.
+        return [
+          ...opts.where((o) => o.recommended),
+          ...opts.where((o) => !o.recommended),
+        ];
+    }
+    return const [];
+  }
+
   @override
   void dispose() {
     for (final c in _text.values) {
       c.dispose();
     }
+    _keys.dispose();
     super.dispose();
   }
 
-  bool get _ready {
-    final q = _currentQuestion;
-    if (q == null) return false;
+  bool _answered(Map<String, dynamic> q) {
     final id = q['id'].toString();
     if (_skipped.contains(id)) return true;
-    final textMode = _kind(q) == 'free_text' || _freeText.contains(id);
-    return textMode
-        ? (_text[id]?.text.trim().isNotEmpty ?? false)
-        : (_choice[id]?.isNotEmpty ?? false);
+    final k = _kind(q);
+    if (k == 'free_text' || _freeText.contains(id)) {
+      return _text[id]?.text.trim().isNotEmpty ?? false;
+    }
+    if (k == 'multi_choice') return _multi[id]?.isNotEmpty ?? false;
+    return _choice[id]?.isNotEmpty ?? false;
+  }
+
+  bool get _ready {
+    if (_review) return true;
+    final q = _currentQuestion;
+    return q != null && _answered(q);
   }
 
   String _answerFor(Map<String, dynamic> q) {
     final id = q['id'].toString();
     if (_skipped.contains(id)) return 'user skipped the question';
-    final textMode = _kind(q) == 'free_text' || _freeText.contains(id);
-    return textMode ? (_text[id]?.text.trim() ?? '') : (_choice[id] ?? '');
+    final k = _kind(q);
+    if (k == 'free_text' || _freeText.contains(id)) {
+      return _text[id]?.text.trim() ?? '';
+    }
+    final opts = _options(q);
+    if (k == 'multi_choice') {
+      final picked = _multi[id] ?? const {};
+      return opts
+          .where((o) => picked.contains(o.value))
+          .map((o) => o.answer)
+          .join(', ');
+    }
+    final o = opts.where((o) => o.value == _choice[id]).firstOrNull;
+    return o?.answer ?? (_choice[id] ?? '');
   }
 
+  /// Next question, the review once all are answered, then send.
   void _submit() {
     if (_questions.isEmpty || !_ready || _sent) return;
-    if (_step < _questions.length - 1) {
+    if (!_review && _step < _questions.length - 1) {
       setState(() => _step++);
+      return;
+    }
+    if (!_review && _questions.length > 1) {
+      setState(() => _review = true);
       return;
     }
     setState(() => _sent = true);
@@ -449,17 +559,49 @@ class QuestionBarState extends State<QuestionBar> {
     widget.onSend({'kind': 'answer', 'value': parts.join('\n\n')});
   }
 
+  void _back() {
+    if (_sent) return;
+    setState(() {
+      if (_review) {
+        _review = false;
+      } else if (_step > 0) {
+        _step--;
+      }
+    });
+  }
+
+  /// Jump to a question from its tab or the review.
+  void _goTo(int i) {
+    if (_sent) return;
+    setState(() {
+      _review = false;
+      _step = i.clamp(0, _questions.length - 1);
+    });
+  }
+
   void _skip() {
     final q = _currentQuestion;
     if (q == null || _sent) return;
-    _skipped.add(q['id'].toString());
-    _freeText.remove(q['id'].toString());
-    _choice.remove(q['id'].toString());
-    if (_step < _questions.length - 1) {
-      setState(() => _step++);
-    } else {
-      _submit();
-    }
+    final id = q['id'].toString();
+    _skipped.add(id);
+    _freeText.remove(id);
+    _choice.remove(id);
+    _multi.remove(id);
+    _submit();
+  }
+
+  void _pick(Map<String, dynamic> q, _QOption o) {
+    final id = q['id'].toString();
+    setState(() {
+      _skipped.remove(id);
+      _freeText.remove(id);
+      if (_kind(q) == 'multi_choice') {
+        final set = _multi.putIfAbsent(id, () => <String>{});
+        set.contains(o.value) ? set.remove(o.value) : set.add(o.value);
+      } else {
+        _choice[id] = o.value;
+      }
+    });
   }
 
   void _toggleFreeText() {
@@ -470,6 +612,26 @@ class QuestionBarState extends State<QuestionBar> {
       _skipped.remove(id);
       _freeText.contains(id) ? _freeText.remove(id) : _freeText.add(id);
     });
+  }
+
+  /// Desktop keys: 1-9 pick (toggle for multi-choice), Enter moves on.
+  KeyEventResult _onKey(FocusNode _, KeyEvent e) {
+    if (e is! KeyDownEvent || _sent) return KeyEventResult.ignored;
+    if (e.logicalKey == LogicalKeyboardKey.enter ||
+        e.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _submit();
+      return KeyEventResult.handled;
+    }
+    final q = _currentQuestion;
+    final ch = e.character;
+    if (q == null || _review || ch == null) return KeyEventResult.ignored;
+    final n = int.tryParse(ch);
+    final opts = _options(q);
+    if (n != null && n >= 1 && n <= opts.length && n <= 9) {
+      _pick(q, opts[n - 1]);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Widget _freeTextToggle(String id) => InkWell(
@@ -490,14 +652,6 @@ class QuestionBarState extends State<QuestionBar> {
         ),
       );
 
-  Widget _skipButton() => TextButton(
-        onPressed: _sent ? null : _skip,
-        style: TextButton.styleFrom(
-            foregroundColor: AppColors.fg3,
-            padding: const EdgeInsets.symmetric(horizontal: 8)),
-        child: Text('Skip', style: TS.meta()),
-      );
-
   Widget _chip(String label, bool sel, VoidCallback onTap) => Material(
         color: sel ? AppColors.accentBg : AppColors.hover,
         shape: StadiumBorder(
@@ -510,79 +664,118 @@ class QuestionBarState extends State<QuestionBar> {
           onTap: onTap,
           customBorder: const StadiumBorder(),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s6),
+            padding:
+                const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s6),
             child: Text(label,
                 style: TS.label(sel ? AppColors.accent : AppColors.fg2)),
           ),
         ),
       );
 
-  Widget _choiceRow(String label, bool sel, VoidCallback onTap) => Material(
-        color: sel ? AppColors.accentBg : Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
-          side: BorderSide(
-            color: sel ? AppColors.accent : AppColors.border2,
-            width: sel ? 1.2 : 1,
-          ),
+  /// An option as a card: radio or checkbox, label, a Recommended badge, and
+  /// the one-line description of what it means.
+  Widget _optionCard(
+      _QOption o, int index, bool sel, bool multi, VoidCallback onTap) {
+    final mark = multi
+        ? Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              color: sel ? AppColors.accentFill : Colors.transparent,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                  color: sel ? AppColors.accentFill : AppColors.lineStrong,
+                  width: 1.5),
+            ),
+            child: sel
+                ? AppIcon('check', size: 11, color: AppColors.accentFg)
+                : null,
+          )
+        : SelectCheck(sel, size: 16);
+    return Material(
+      color: sel ? AppColors.accentBg : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(R.md),
+        side: BorderSide(
+          color: sel ? AppColors.accent : AppColors.border2,
+          width: sel ? 1.2 : 1,
         ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(R.md),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s8),
-            child: Row(children: [
-              Expanded(
-                  child: Text(label,
-                      style: TS.ui(sel ? AppColors.fg1 : AppColors.fg2))),
-              if (sel) ...[
-                const SizedBox(width: 10),
-                AppIcon('check', size: 16, color: AppColors.accent)
-              ],
-            ]),
-          ),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(R.md),
+        child: Padding(
+          padding:
+              EdgeInsets.fromLTRB(12, kMobile ? 11 : 9, 12, kMobile ? 11 : 9),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(padding: const EdgeInsets.only(top: 2), child: mark),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Text(o.label,
+                          style: sans(kMobile ? 15 : 13,
+                              weight: W.label,
+                              color: sel ? AppColors.fg1 : AppColors.fg2)),
+                      if (o.recommended)
+                        Text('Recommended',
+                            style: mono(10, color: AppColors.accent)),
+                    ],
+                  ),
+                  if (o.description.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(o.description,
+                        style: sans(kMobile ? 13 : 12,
+                            height: 1.4, color: AppColors.fg3)),
+                  ],
+                ],
+              ),
+            ),
+            if (!kMobile && index < 9) ...[
+              const SizedBox(width: 8),
+              Text('${index + 1}', style: mono(10, color: AppColors.fg4)),
+            ],
+          ]),
         ),
-      );
+      ),
+    );
+  }
 
   List<Widget> _inputFor(Map<String, dynamic> q) {
     final id = q['id'].toString();
     final k = _kind(q);
-    final opts =
-        k == 'confirm' ? const ['Confirm', 'Cancel'] : const ['Yes', 'No'];
-    final vals =
-        k == 'confirm' ? const ['confirm', 'cancel'] : const ['yes', 'no'];
-    final choices =
-        ((q['answer_kind']?['choices'] as List?) ?? const []).map((e) {
-      if (e is Map) {
-        final label = '${e['label'] ?? ''}'.trim();
-        final value = '${e['value'] ?? ''}'.trim();
-        final v = value.isEmpty ? label : value;
-        return (value: v, label: label.isEmpty ? v : label);
-      }
-      final s = '$e';
-      return (value: s, label: s);
-    }).toList();
+    final opts = _options(q);
     final controller = _controllerFor(id);
+    final isCards = k == 'single_choice' || k == 'multi_choice';
     return [
-      if (k == 'single_choice')
-        ...choices.map((c) => Padding(
-              padding: const EdgeInsets.only(bottom: S.s6),
-              child: _choiceRow(
-                  c.label,
-                  _choice[id] == c.value,
-                  () => setState(() {
-                        _choice[id] = c.value;
-                        _freeText.remove(id);
-                      })),
-            )),
+      if (isCards)
+        for (var i = 0; i < opts.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: S.s6),
+            child: _optionCard(
+              opts[i],
+              i,
+              k == 'multi_choice'
+                  ? (_multi[id]?.contains(opts[i].value) ?? false) &&
+                      !_freeText.contains(id)
+                  : _choice[id] == opts[i].value && !_freeText.contains(id),
+              k == 'multi_choice',
+              () => _pick(q, opts[i]),
+            ),
+          ),
       if (k == 'yes_no' || k == 'confirm')
         Wrap(spacing: 8, children: [
-          for (var i = 0; i < opts.length; i++)
-            _chip(opts[i], _choice[id] == vals[i],
-                () => setState(() => _choice[id] = vals[i])),
+          for (final o in opts)
+            _chip(o.label, _choice[id] == o.value && !_freeText.contains(id),
+                () => _pick(q, o)),
         ]),
-      if (k == 'single_choice' || k == 'yes_no' || k == 'confirm')
-        _freeTextToggle(id),
+      if (k != 'free_text') _freeTextToggle(id),
       if (k == 'free_text' || _freeText.contains(id))
         AppField(
             controller: controller,
@@ -593,85 +786,210 @@ class QuestionBarState extends State<QuestionBar> {
     ];
   }
 
+  /// One tab per question; answered ones ticked, tap to jump back.
+  Widget _tabs() {
+    final qs = _questions;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(children: [
+        for (var i = 0; i < qs.length; i++) ...[
+          if (i > 0) const SizedBox(width: 6),
+          _tab(
+            _header(qs[i], i),
+            current: !_review && i == _step,
+            done: _answered(qs[i]),
+            onTap: (i <= _step || _review || _answered(qs[i]))
+                ? () => _goTo(i)
+                : null,
+          ),
+        ],
+        const SizedBox(width: 6),
+        _tab('Review', current: _review, done: false, onTap: null),
+      ]),
+    );
+  }
+
+  Widget _tab(String label,
+      {required bool current, required bool done, VoidCallback? onTap}) {
+    final color = current
+        ? AppColors.accent
+        : done
+            ? AppColors.ok
+            : AppColors.fg3;
+    return InkWell(
+      onTap: _sent ? null : onTap,
+      borderRadius: BorderRadius.circular(R.pill),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: current ? AppColors.accentBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(R.pill),
+          border:
+              Border.all(color: current ? AppColors.accent : AppColors.border2),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (done && !current) ...[
+            AppIcon('check', size: 11, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(label, style: mono(10, color: color)),
+        ]),
+      ),
+    );
+  }
+
+  List<Widget> _reviewRows() => [
+        const SizedBox(height: 8),
+        Text('Check your answers',
+            style:
+                sans(kMobile ? 15 : 14, weight: W.label, color: AppColors.fg1)),
+        const SizedBox(height: 6),
+        for (var i = 0; i < _questions.length; i++)
+          InkWell(
+            onTap: _sent ? null : () => _goTo(i),
+            borderRadius: BorderRadius.circular(R.sm),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(
+                  width: 96,
+                  child: Text(_header(_questions[i], i),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(10, color: AppColors.fg3)),
+                ),
+                Expanded(
+                  child: Text(_answerFor(_questions[i]),
+                      style: sans(13, height: 1.4, color: AppColors.fg1)),
+                ),
+                const SizedBox(width: 8),
+                Text('Edit', style: mono(10, color: AppColors.accent)),
+              ]),
+            ),
+          ),
+      ];
+
   @override
   Widget build(BuildContext context) {
     final ctx = widget.question['context']?.toString();
     final total = _questions.length;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-        // Same card as the transcript's, outlined in accent: it is the one
-        // thing waiting on you.
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.45)),
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                AppIcon('message', size: 12, color: AppColors.accent),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(_sent ? 'Sending…' : 'Question',
-                      style: mono(10, color: AppColors.fg3)),
-                ),
-                Text(total > 1 ? '${_step + 1} of $total' : 'waiting on you',
-                    style: mono(10, color: AppColors.accent)),
-              ]),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
-                        const SizedBox(height: 6),
-                        Text(ctx,
-                            style: sans(kMobile ? 13 : 12,
-                                height: 1.4, color: AppColors.fg3)),
+    final last = _review || total <= 1;
+    final nextLabel = _sent
+        ? 'Sending…'
+        : _review || total <= 1
+            ? 'Submit'
+            : _step < total - 1
+                ? 'Next'
+                : 'Review';
+    return Focus(
+      focusNode: _keys,
+      onKeyEvent: _onKey,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          // Same card as the transcript's, outlined in accent: it is the one
+          // thing waiting on you.
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.45)),
+            borderRadius: BorderRadius.circular(R.md),
+          ),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  AppIcon('message', size: 12, color: AppColors.accent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                        _sent
+                            ? 'Sending…'
+                            : total > 1
+                                ? 'Questions'
+                                : 'Question',
+                        style: mono(10, color: AppColors.fg3)),
+                  ),
+                  Text(
+                      total > 1
+                          ? (_review ? 'review' : '${_step + 1} of $total')
+                          : 'waiting on you',
+                      style: mono(10, color: AppColors.accent)),
+                ]),
+                if (total > 1) ...[
+                  const SizedBox(height: 8),
+                  _tabs(),
+                ],
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_review)
+                          ..._reviewRows()
+                        else ...[
+                          if (ctx != null &&
+                              ctx.isNotEmpty &&
+                              ctx != 'null' &&
+                              _step == 0) ...[
+                            const SizedBox(height: 8),
+                            Text(ctx,
+                                style: sans(kMobile ? 13 : 12,
+                                    height: 1.4, color: AppColors.fg3)),
+                          ],
+                          ...() {
+                            final q = _currentQuestion;
+                            if (q == null) return <Widget>[];
+                            return <Widget>[
+                              const SizedBox(height: 8),
+                              Text(q['text']?.toString() ?? '',
+                                  style: sans(kMobile ? 15 : 14,
+                                      height: 1.4,
+                                      weight: W.label,
+                                      color: AppColors.fg1)),
+                              const SizedBox(height: 10),
+                              ..._inputFor(q),
+                            ];
+                          }(),
+                        ],
                       ],
-                      ...() {
-                        final q = _currentQuestion;
-                        if (q == null) return <Widget>[];
-                        return <Widget>[
-                          const SizedBox(height: 6),
-                          Text(q['text']?.toString() ?? '',
-                              style: sans(kMobile ? 15 : 14,
-                                  height: 1.4,
-                                  weight: W.label,
-                                  color: AppColors.fg1)),
-                          const SizedBox(height: S.s8),
-                          ..._inputFor(q),
-                        ];
-                      }(),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: S.s8),
-              Row(children: [
-                _skipButton(),
-                if (_step > 0) ...[
-                  const SizedBox(width: 4),
-                  Btn('Back',
+                const SizedBox(height: S.s8),
+                Row(children: [
+                  if (!_review)
+                    TextButton(
+                      onPressed: _sent ? null : _skip,
+                      style: TextButton.styleFrom(
+                          foregroundColor: AppColors.fg3,
+                          padding: const EdgeInsets.symmetric(horizontal: 8)),
+                      child: Text('Skip', style: TS.meta()),
+                    ),
+                  if (_step > 0 || _review) ...[
+                    const SizedBox(width: 4),
+                    Btn('Back',
+                        small: true,
+                        variant: BtnVariant.ghost,
+                        onTap: _sent ? null : _back),
+                  ],
+                  const Spacer(),
+                  if (!kMobile && !_sent)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(last ? 'Enter to submit' : 'Enter for next',
+                          style: mono(10, color: AppColors.fg4)),
+                    ),
+                  Btn(nextLabel,
                       small: true,
-                      variant: BtnVariant.ghost,
-                      onTap: _sent ? null : () => setState(() => _step--)),
-                ],
-                const Spacer(),
-                Btn(
-                    _sent
-                        ? 'Sending…'
-                        : (_step < total - 1 ? 'Continue' : 'Submit'),
-                    small: true,
-                    disabled: !_ready || _sent,
-                    onTap: (_ready && !_sent) ? _submit : null),
+                      disabled: !_ready || _sent,
+                      onTap: (_ready && !_sent) ? _submit : null),
+                ]),
               ]),
-            ]),
+        ),
       ),
     );
   }
