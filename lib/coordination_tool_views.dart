@@ -120,26 +120,17 @@ List<Widget>? coordinationToolBody(
               ? _s(x['id'])
               : _s(x['display_name']),
           status: (x) => _s(x['status']),
-          meta: (x) => _s(x['role']).isEmpty ? _s(x['id']) : _s(x['role']),
+          meta: (x) => _s(x['role']),
         ),
       ];
     case 'list_profiles':
-      final def = _s(d?['default']);
-      final raw = d?['profiles'];
-      final names = raw is List
-          ? [for (final p in raw) p is Map ? _s(p['name']) : _s(p)]
-          : raw is Map
-              ? [for (final k in raw.keys) k.toString()]
-              : const <String>[];
       return [
         _ItemList(
-          items: [
-            for (final n in names.where((n) => n.isNotEmpty)) {'name': n}
-          ],
+          items: _maps(d?['profiles']),
           empty: 'No profiles configured.',
           title: (p) => _s(p['name']),
-          status: (p) => _s(p['name']) == def ? 'default' : '',
-          meta: (_) => '',
+          status: (p) => p['default'] == true ? 'default' : '',
+          meta: (p) => '${_s(p['provider'])} · ${_s(p['model'])}',
         ),
       ];
     case 'read_coordination_board':
@@ -164,12 +155,9 @@ List<Widget>? coordinationToolBody(
         _ItemList(
           items: _maps(d?['threads']),
           empty: 'Inbox is empty.',
-          title: (t) =>
-              _s(t['peer']).isNotEmpty ? _s(t['peer']) : _s(t['thread_id']),
-          status: (t) => _s(t['unread']).isEmpty || _s(t['unread']) == '0'
-              ? ''
-              : '${_s(t['unread'])} unread',
-          meta: (t) => _s(t['last_body'] ?? t['preview']),
+          title: (t) => _s(t['title']).isEmpty ? _s(t['peer_id']) : _s(t['title']),
+          status: (t) => (t['unread'] as num? ?? 0) > 0 ? '${t['unread']} unread' : '',
+          meta: (t) => _s(t['peer_id']),
         ),
       ];
     case 'send_agent_message':
@@ -198,28 +186,15 @@ String _short(String id) => id.length > 8 ? id.substring(0, 8) : id;
 List<Map> _maps(dynamic v) =>
     v is List ? v.whereType<Map>().toList() : const <Map>[];
 
-Color _statusColor(String status) {
-  final s = status.toLowerCase();
-  if (const {'done', 'completed', 'complete', 'reported', 'default'}
-      .contains(s)) {
-    return AppColors.ok;
-  }
-  if (const {
-    'running',
-    'active',
-    'working',
-    'in_progress',
-    'dispatched',
-    'claimed'
-  }.contains(s)) {
-    return AppColors.run;
-  }
-  if (const {'failed', 'blocked', 'error', 'cancelled'}.contains(s)) {
-    return AppColors.danger;
-  }
-  if (s.contains('unread') || s == 'waiting_for_input') return AppColors.accent;
-  return AppColors.fg3;
-}
+/// Tone for the daemon's statuses: tasks, sessions, agents and board kinds.
+Color _statusColor(String status) => switch (status) {
+      'done' || 'reported' || 'default' || 'active' => AppColors.ok,
+      'in_progress' || 'running' || 'dispatched' || 'draining' => AppColors.run,
+      'failed' || 'blocked' || 'cancelled' => AppColors.danger,
+      'todo' || 'waiting_for_input' => AppColors.accent,
+      _ when status.endsWith('unread') => AppColors.accent,
+      _ => AppColors.fg3,
+    };
 
 String _statusLabel(String status) => status.replaceAll('_', ' ');
 
@@ -344,8 +319,7 @@ class _TaskSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final id = _s(task['id'] ?? task['task_id']);
     final result = task['result'];
-    final resultText =
-        result is Map ? _s(result['summary'] ?? result['text']) : _s(result);
+    final resultText = result is Map ? _s(result['summary']) : '';
     final paths = task['owned_paths'] is List
         ? [for (final p in task['owned_paths'] as List) _s(p)]
         : const <String>[];

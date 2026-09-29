@@ -28,15 +28,13 @@ void main() {
     expect(d.of(k)?.attachments.map((a) => a.name), ['shot.png', 'Pasted text']);
   });
 
-  test('drafts survive a restart, including older text-only ones', () async {
+  test('drafts survive a restart', () async {
     SharedPreferences.setMockInitialValues({
-      'draft:https://m1|s9': 'unsent',
       'draft:https://m1|s10':
           '{"text":"see this","attachments":[{"name":"a.pdf","remote":"/u/2"}]}',
       'other': 'x',
     });
     await Drafts.instance.init();
-    expect(Drafts.instance.of(Drafts.keyFor('https://m1', 's9'))?.text, 'unsent');
     final d = Drafts.instance.of(Drafts.keyFor('https://m1', 's10'))!;
     expect(d.text, 'see this');
     expect(d.attachments.single.remotePath, '/u/2');

@@ -393,7 +393,7 @@ class _QOption {
   /// nothing).
   String get answer {
     String norm(String x) => x.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    return value.isEmpty || norm(value) == norm(label) ? label : '$label ($value)';
+    return norm(value) == norm(label) ? label : '$label ($value)';
   }
 }
 
@@ -475,19 +475,12 @@ class QuestionBarState extends State<QuestionBar> {
         ];
       case 'single_choice':
       case 'multi_choice':
-        final opts = <_QOption>[];
-        for (final e in (ak['choices'] as List?) ?? const []) {
-          if (e is Map) {
-            final label = '${e['label'] ?? ''}'.trim();
-            final value = '${e['value'] ?? ''}'.trim();
-            final v = value.isEmpty ? label : value;
-            opts.add(_QOption(v, label.isEmpty ? v : label,
+        final opts = [
+          for (final e in ((ak['choices'] as List?) ?? const []).whereType<Map>())
+            _QOption('${e['value']}'.trim(), '${e['label']}'.trim(),
                 description: '${e['description'] ?? ''}'.trim(),
-                recommended: e['recommended'] == true));
-          } else {
-            opts.add(_QOption('$e', '$e'));
-          }
-        }
+                recommended: e['recommended'] == true),
+        ];
         // Stable: recommended first, the rest in the agent's order.
         return [
           ...opts.where((o) => o.recommended),
@@ -538,8 +531,7 @@ class QuestionBarState extends State<QuestionBar> {
           .map((o) => o.answer)
           .join(', ');
     }
-    final o = opts.where((o) => o.value == _choice[id]).firstOrNull;
-    return o?.answer ?? (_choice[id] ?? '');
+    return opts.where((o) => o.value == _choice[id]).firstOrNull?.answer ?? '';
   }
 
   /// Next question, the review once all are answered, then send.

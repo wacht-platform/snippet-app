@@ -82,10 +82,10 @@ String toolArgSummary(String tool, dynamic args) {
 
 /// Whether a step has anything behind its row — the one rule the transcript
 /// rows and the tool sheet share.
-bool toolHasDetail(ToolStep step) =>
-    toolIsExpandable(step.tool, step.args, step.result);
-
-bool toolIsExpandable(String tool, dynamic args, dynamic result) {
+bool toolHasDetail(ToolStep step) {
+  final tool = step.tool;
+  final args = step.args;
+  final result = step.result;
   String arg(String key) {
     if (args is! Map) return '';
     return (args[key] ?? '').toString();

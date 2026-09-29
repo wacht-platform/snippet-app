@@ -54,9 +54,9 @@ class _DenseToolRowState extends State<DenseToolRow> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final canExpand = toolIsExpandable(widget.tool, widget.args, widget.result);
     final step =
         ToolStep(tool: widget.tool, args: widget.args, result: widget.result);
+    final canExpand = toolHasDetail(step);
     final failed = step.failed;
     final (verb, object) = toolSentenceParts(step);
     return Column(

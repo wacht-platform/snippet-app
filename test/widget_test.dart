@@ -9,6 +9,7 @@ import 'package:snippet/api.dart';
 import 'package:snippet/android_reconciliation.dart';
 import 'package:snippet/notifications.dart';
 import 'package:snippet/models.dart';
+import 'package:snippet/tool_activity.dart';
 import 'package:snippet/screens/mission_control/mission_control_state.dart';
 import 'package:snippet/tool_views.dart';
 import 'package:snippet/theme.dart';
@@ -321,23 +322,27 @@ void main() {
   });
 
   test('tool rows expand only when they have content', () {
-    expect(toolIsExpandable('change_files', {'changes': []}, null), isFalse);
     expect(
-      toolIsExpandable('change_files', {
+        toolHasDetail(
+            const ToolStep(tool: 'change_files', args: {'changes': []})),
+        isFalse);
+    expect(
+      toolHasDetail(const ToolStep(tool: 'change_files', args: {
         'changes': [
           {'action': 'replace', 'path': 'a.dart', 'find': 'a', 'with': 'b'}
         ]
-      }, null),
+      })),
       isTrue,
     );
-    expect(toolIsExpandable('bash', {'command': 'ls'}, null), isFalse);
+    expect(toolHasDetail(const ToolStep(tool: 'bash', args: {'command': 'ls'})),
+        isFalse);
     expect(
-      toolIsExpandable('bash', {
+      toolHasDetail(const ToolStep(tool: 'bash', args: {
         'command': 'ls'
-      }, {
+      }, result: {
         'status': 'success',
         'data': {'stdout': 'ok'},
-      }),
+      })),
       isTrue,
     );
   });

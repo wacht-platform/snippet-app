@@ -86,19 +86,17 @@ class Drafts extends ChangeNotifier {
   static Draft? _decode(String? raw) {
     if (raw == null) return null;
     try {
-      final j = jsonDecode(raw);
-      if (j is Map<String, dynamic>) {
-        return Draft(
-          text: j['text'] as String? ?? '',
-          attachments: [
-            for (final a in (j['attachments'] as List? ?? const []))
-              if (a is Map<String, dynamic>) DraftAttachment.fromJson(a),
-          ],
-        );
-      }
-    } catch (_) {}
-    // Drafts saved before attachments were kept are the bare text.
-    return Draft(text: raw);
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      return Draft(
+        text: j['text'] as String? ?? '',
+        attachments: [
+          for (final a in (j['attachments'] as List? ?? const []))
+            DraftAttachment.fromJson(a as Map<String, dynamic>),
+        ],
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Draft? of(String key) => _drafts[key];
