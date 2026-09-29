@@ -905,6 +905,35 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
 /// One chat message — flat (no bubble/box). YOUR messages get a left accent bar
 /// + label; the agent's are plain full-width markdown under a dim label. The bar
 /// vs no-bar is the primary you/agent distinction.
+/// A reply's long-press sheet on phones: copy it whole, or open it to select.
+void _messageActions(BuildContext context, String text) {
+  showAppSheet(context,
+      title: 'Message',
+      child: SheetActions([
+        SheetAction('clipboard', 'Copy message', () {
+          Navigator.pop(context);
+          Clipboard.setData(ClipboardData(text: text));
+          toast(context, 'Copied');
+        }),
+        SheetAction('edit', 'Select text', () {
+          Navigator.pop(context);
+          showAppSheet(context,
+              title: 'Select text',
+              maxHeight: 640,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: S.s4),
+                child: SelectionArea(
+                  child: MarkdownBody(
+                    data: text,
+                    styleSheet: markdownStyle(context),
+                    builders: {'pre': PreBlockBuilder()},
+                  ),
+                ),
+              ));
+        }),
+      ]));
+}
+
 class Bubble extends StatelessWidget {
   final bool mine;
   final String text;
@@ -980,6 +1009,24 @@ class Bubble extends StatelessWidget {
 
     final agent =
         selectable ? SelectionArea(child: agentContent) : agentContent;
+
+    if (!mine && kMobile && selectable) {
+      // Phones: no Copy row under every reply. Long-press offers copying the
+      // whole message or selecting within it (a long-press can't do both).
+      return Padding(
+        padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: shown.isEmpty
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  _messageActions(context, shown);
+                },
+          child: agentContent,
+        ),
+      );
+    }
 
     if (!mine) {
       return Align(
@@ -1145,36 +1192,49 @@ extension on Bubble {
 class NoteLine extends StatelessWidget {
   final String text;
   final bool error;
-  const NoteLine(this.text, {super.key, this.error = false});
+
+  /// What went wrong, as the card's header (errors only).
+  final String? label;
+  const NoteLine(this.text, {super.key, this.error = false, this.label});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final c = error ? AppColors.danger : AppColors.fg3;
-    // Left-aligned in both cases. These sit in a stacked transcript directly
-    // under a tool line, and centring the quiet ones made them float to the
-    // middle of the pane while the failed ones snapped to the left edge — the
-    // same element shifting position based on tone.
+    if (!error) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Text(text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: sans(12, height: 1.4, color: AppColors.fg3)),
+      );
+    }
+    // An error reads as the transcript's other cards: a mono header in the
+    // danger tone, then the message itself, selectable so it can be copied.
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (error) ...[
-            Padding(
-                padding: EdgeInsets.only(top: 1),
-                child: AppIcon('alert-triangle',
-                    size: 12, color: AppColors.danger)),
-            const SizedBox(width: 7),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
+          borderRadius: BorderRadius.circular(R.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              AppIcon('alert-triangle', size: 12, color: AppColors.danger),
+              const SizedBox(width: 6),
+              Text(label ?? 'Error', style: mono(10, color: AppColors.danger)),
+            ]),
+            const SizedBox(height: 5),
+            SelectableText(text,
+                minLines: 1,
+                maxLines: 6,
+                style: sans(13, height: 1.45, color: AppColors.fg2)),
           ],
-          Flexible(
-            child: Text(text,
-                textAlign: error ? TextAlign.left : TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: mono(11, height: 1.35, color: c)),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1317,6 +1377,22 @@ class EmptyState extends StatelessWidget {
 }
 
 /// Custom app bar matching the handoff (back + title/mono-subtitle + right + ⋯).
+/// A page header's primary action: a labelled button on desktop, an icon
+/// button on phones, where a filled text button crowded the title.
+class HeaderAction extends StatelessWidget {
+  final String label;
+  final String icon;
+  final VoidCallback? onTap;
+  const HeaderAction(this.label,
+      {super.key, this.icon = 'plus', required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => kMobile
+      ? IconBtn(icon,
+          size: M.minTarget, iconSize: 20, tooltip: label, onTap: onTap)
+      : Btn(label, icon: icon, small: true, onTap: onTap);
+}
+
 class SnAppBar extends StatelessWidget {
   final String title;
   final String? subtitle;

@@ -537,7 +537,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             NavBackRow(title: 'Machines', onBack: back, trailing: [
-              Btn('Add machine', icon: 'plus', small: true, onTap: _addMachine),
+              HeaderAction('Add machine', onTap: _addMachine),
             ]),
             Expanded(child: _generalPage(includeNotifications: false)),
           ],
@@ -666,25 +666,16 @@ class SettingsPanelState extends State<SettingsPanel> {
   Widget? _pageAction(SettingsPage page) => switch (page) {
         SettingsPage.general => _addingMachine
             ? null
-            : Btn('Add machine', icon: 'plus', small: true, onTap: _addMachine),
+            : HeaderAction('Add machine', onTap: _addMachine),
         SettingsPage.models => _modelsEditing
             ? null
-            : Btn('Add profile',
-                icon: 'plus',
-                small: true,
-                onTap: () => _modelsKey.currentState?.addProfile()),
+            : HeaderAction('Add profile', onTap: () => _modelsKey.currentState?.addProfile()),
         SettingsPage.vault => _vaultAdding
             ? null
-            : Btn('Add secret',
-                icon: 'plus',
-                small: true,
-                onTap: () => _vaultKey.currentState?.add()),
+            : HeaderAction('Add secret', onTap: () => _vaultKey.currentState?.add()),
         SettingsPage.scheduled => _recurringAdding
             ? null
-            : Btn('New job',
-                icon: 'plus',
-                small: true,
-                onTap: () => _recurringKey.currentState?.add()),
+            : HeaderAction('New job', onTap: () => _recurringKey.currentState?.add()),
         _ => null,
       };
 
@@ -805,7 +796,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           title: 'No saved machines',
           body: 'Connect to a machine running snippet serve.',
           action:
-              Btn('Add machine', icon: 'plus', small: true, onTap: _addMachine),
+              HeaderAction('Add machine', onTap: _addMachine),
         )
       else
         ListGroup(children: [for (final i in _instances) _instanceRow(i)]),

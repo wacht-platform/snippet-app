@@ -23,17 +23,9 @@ class ActivityFeed extends StatelessWidget {
   Widget build(BuildContext context) {
     final feed = state.feed;
     if (feed.isEmpty) {
+      // The header already says "Connecting…"; the feed shows its shape.
       if (state.loading && state.fatalError == null) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Spinner(size: 22, color: AppColors.fg3),
-              const SizedBox(height: 14),
-              Text('Connecting…', style: sans(13, color: AppColors.fg3)),
-            ],
-          ),
-        );
+        return const _FeedSkeleton();
       }
       final err = state.fatalError;
       return Center(
@@ -223,6 +215,51 @@ class _QuestionRow extends StatelessWidget {
             Text('Reply', style: sans(13, color: AppColors.accent)),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+/// A conversation's shape while the feed connects: a message, a reply, a card.
+class _FeedSkeleton extends StatelessWidget {
+  const _FeedSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double factor, double h) => FractionallySizedBox(
+          widthFactor: factor,
+          alignment: Alignment.centerLeft,
+          child: Skeleton(height: h, color: AppColors.hover),
+        );
+    Widget exchange(double a, double b) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Skeleton(height: 44, radius: R.card, color: AppColors.surface1),
+            const SizedBox(height: S.s16),
+            bar(a, 12),
+            const SizedBox(height: S.s8),
+            bar(b, 12),
+            const SizedBox(height: S.s16),
+            Container(
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(R.md),
+              ),
+            ),
+          ],
+        );
+    return Semantics(
+      label: 'Loading',
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(M.gutter, S.s16, M.gutter, S.s16),
+        children: [
+          exchange(0.9, 0.6),
+          const SizedBox(height: S.s24),
+          exchange(0.75, 0.45),
+        ],
       ),
     );
   }

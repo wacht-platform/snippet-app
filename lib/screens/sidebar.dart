@@ -257,13 +257,12 @@ class SidebarState extends State<Sidebar> {
   ///
   /// Local to the sidebar rather than reusing the shell's `_sidebarUnavailable`:
   /// that one is a `_DesktopShellState` method and is not in scope here.
-  Widget _mobileUnavailable(String message) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(message,
-              textAlign: TextAlign.center,
-              style: sans(12, color: AppColors.fg3, height: 1.5)),
-        ),
+  Widget _mobileUnavailable(String message) => EmptyState(
+        icon: 'server',
+        title: 'No machine yet',
+        body: message,
+        action: Btn('Add machine',
+            icon: 'plus', small: true, onTap: widget.onAddInstance),
       );
 
   /// The phone home body for the destination the bar currently selects.
@@ -284,11 +283,7 @@ class SidebarState extends State<Sidebar> {
             _mobileChatsHeader(hasClient),
             Expanded(
               child: !hasClient
-                  ? Center(
-                      child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Text('Add a machine to begin.',
-                              textAlign: TextAlign.center, style: TS.meta())))
+                  ? _mobileUnavailable('Add a machine to begin.')
                   : _sessionList(),
             ),
             if (_selecting) _mobileSelectionActions(),

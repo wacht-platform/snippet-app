@@ -192,7 +192,7 @@ class VaultScreenState extends State<VaultScreen> {
         children: [
           NavBackRow(title: 'Vault', onBack: widget.onBack!, trailing: [
             if (!_adding)
-              Btn('Add secret', icon: 'plus', small: true, onTap: _add),
+              HeaderAction('Add secret', onTap: _add),
           ]),
           Expanded(child: body),
         ],
@@ -208,7 +208,7 @@ class VaultScreenState extends State<VaultScreen> {
               onBack: widget.onClose ?? () => Navigator.pop(context),
               actions: [
                 if (!_adding)
-                  Btn('Add secret', icon: 'plus', small: true, onTap: _add),
+                  HeaderAction('Add secret', onTap: _add),
               ]),
           Expanded(child: body),
         ]),

@@ -813,21 +813,11 @@ class _Row extends StatelessWidget {
                 _checkbox(selected),
                 const SizedBox(width: 11)
               ],
-              if (kMobile)
-                Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: isFolder ? AppColors.accentBg : AppColors.raised,
-                    borderRadius: BorderRadius.circular(R.sm + 2),
-                  ),
-                  child: AppIcon(icon,
-                      size: 17,
-                      color: isFolder ? AppColors.accent : AppColors.fg3),
-                )
-              else
-                AppIcon(icon, size: 16, color: iconColor),
+              // A plain glyph, as on desktop: the filled tiles made every row
+              // a card and halved how many fit on a phone screen.
+              AppIcon(icon,
+                  size: kMobile ? 19 : 16,
+                  color: isFolder && kMobile ? AppColors.accent : iconColor),
               SizedBox(width: kMobile ? S.s12 : 10),
               Expanded(
                   child: Text(name,

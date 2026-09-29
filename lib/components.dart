@@ -340,6 +340,7 @@ class ListRow extends StatelessWidget {
     this.leading,
     this.trailing,
     this.onTap,
+    this.onLongPress,
     this.selected = false,
     this.titleWidget,
   });
@@ -349,6 +350,7 @@ class ListRow extends StatelessWidget {
   final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final bool selected;
   final Widget? titleWidget;
 
@@ -358,6 +360,7 @@ class ListRow extends StatelessWidget {
       color: selected ? AppColors.accentBg : Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: kMobile ? M.rowHeight : 36),
           child: Padding(

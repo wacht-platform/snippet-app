@@ -209,8 +209,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
               title: 'Inference profiles',
               onBack: widget.onBack!,
               trailing: [
-                Btn('Add profile',
-                    icon: 'plus', small: true, onTap: () => _edit(null)),
+                HeaderAction('Add profile', onTap: () => _edit(null)),
               ]),
           Expanded(child: body),
         ],
@@ -225,8 +224,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
               compact: true,
               onBack: widget.onClose ?? () => Navigator.pop(context),
               actions: [
-                Btn('Add profile',
-                    icon: 'plus', small: true, onTap: () => _edit(null)),
+                HeaderAction('Add profile', onTap: () => _edit(null)),
               ]),
           Expanded(child: body),
         ]),
@@ -262,7 +260,9 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         ],
       ]),
       subtitle: '${p.provider} · ${p.model}',
-      trailing: _deleteProfileButton(p),
+      // Phones keep destructive actions off the row: long-press for them.
+      onLongPress: kMobile ? () => _profileActions(p) : null,
+      trailing: kMobile ? null : _deleteProfileButton(p),
     );
   }
 
@@ -271,6 +271,28 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         size: 32,
         iconSize: 16,
         tooltip: 'Delete profile',
-        onTap: () => _run(() => widget.client.deleteProfile(p.name), 'delete'),
+        onTap: () => _confirmDelete(p),
       );
+
+  void _profileActions(InferenceProfile p) => showAppSheet(context,
+      title: p.name,
+      child: SheetActions([
+        SheetAction('edit', 'Edit', () {
+          Navigator.pop(context);
+          _edit(p);
+        }),
+        SheetAction('trash', 'Delete', () {
+          Navigator.pop(context);
+          _confirmDelete(p);
+        }, danger: true),
+      ]));
+
+  Future<void> _confirmDelete(InferenceProfile p) async {
+    final ok = await confirmAction(context,
+        title: 'Delete ${p.name}?',
+        body: p.active
+            ? 'This is the active profile. New chats will need another one.'
+            : 'Chats already using it keep their history.');
+    if (ok) await _run(() => widget.client.deleteProfile(p.name), 'delete');
+  }
 }

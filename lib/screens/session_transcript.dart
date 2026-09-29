@@ -231,13 +231,15 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               ));
         case 'model_error':
           endTools(key);
-          addEvent(key, NoteLine(_s(e['message']), error: true));
+          addEvent(key,
+              NoteLine(_s(e['message']), error: true, label: 'Model error'));
         case 'invalid_tool_call':
           endTools(key);
           addEvent(
               key,
-              NoteLine('invalid ${_s(e['tool_name'])}: ${_s(e['error'])}',
-                  error: true));
+              NoteLine(_s(e['error']),
+                  error: true,
+                  label: 'Invalid call · ${_s(e['tool_name'])}'));
         case 'plan_updated':
           endTools(key);
           final steps = (e['steps'] as List? ?? const []).whereType<Map>().toList();

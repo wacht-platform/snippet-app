@@ -298,8 +298,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
               _breadcrumbs(),
               Expanded(
                 child: _loading && _listing == null
-                    ? const Center(
-                        child: Spinner(size: 20))
+                    ? const Center(child: Spinner(size: 20))
                     : RefreshIndicator(
                         color: AppColors.accent,
                         backgroundColor: AppColors.surface3,
@@ -438,10 +437,10 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   Widget _fileRow(FsEntry e) {
     return Container(
       height: kMobile ? 40 : 32,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: S.s8),
       child: Row(children: [
         SizedBox(
-            width: 34,
+            width: 22,
             child:
                 Center(child: AppIcon('file', size: 16, color: AppColors.fg4))),
         const SizedBox(width: S.s12),
@@ -470,16 +469,11 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
             height: kMobile ? M.rowHeight : 40,
             padding: const EdgeInsets.symmetric(horizontal: S.s8),
             child: Row(children: [
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.accentBg,
-                  borderRadius: BorderRadius.circular(R.sm + 2),
-                ),
-                child: AppIcon('folder', size: 17, color: AppColors.accent),
-              ),
+              SizedBox(
+                  width: 22,
+                  child: Center(
+                      child: AppIcon('folder',
+                          size: 18, color: AppColors.accent))),
               const SizedBox(width: S.s12),
               Expanded(
                 child: Text(e.name,
@@ -495,6 +489,23 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
     );
   }
 
+  void _addMenu() => showAppSheet(context,
+      title: 'Add to $_hereName',
+      child: SheetActions([
+        SheetAction('folder-plus', 'New folder', () {
+          Navigator.pop(context);
+          _newFolder();
+        }),
+        SheetAction('file-plus', 'New file', () {
+          Navigator.pop(context);
+          _newFile();
+        }),
+        SheetAction('upload', 'Upload files', () {
+          Navigator.pop(context);
+          _upload();
+        }),
+      ]));
+
   /// The single highlighted action, pinned so it never scrolls out of reach.
   ///
   /// Deliberately under the full touch height: as a pinned bar it is always
@@ -505,23 +516,33 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
             kMobile ? M.gutter : 16, 8, kMobile ? M.gutter : 16, 10),
         color: AppColors.base,
         child: Row(children: [
-          IconBtn('folder-plus',
-              size: kMobile ? 40 : 34,
-              iconSize: kMobile ? 17 : 15,
-              tooltip: 'New folder here',
-              onTap: (_listing == null || _busy != null) ? null : _newFolder),
-          const SizedBox(width: 2),
-          IconBtn('file-plus',
-              size: kMobile ? 40 : 34,
-              iconSize: kMobile ? 17 : 15,
-              tooltip: 'New file here',
-              onTap: (_listing == null || _busy != null) ? null : _newFile),
-          const SizedBox(width: 2),
-          IconBtn('upload',
-              size: kMobile ? 40 : 34,
-              iconSize: kMobile ? 17 : 15,
-              tooltip: 'Upload files into this folder',
-              onTap: (_listing == null || _busy != null) ? null : _upload),
+          // Phones get one labelled "+" menu: tooltips don't exist on touch,
+          // so three bare glyphs left you guessing.
+          if (kMobile)
+            IconBtn('plus',
+                size: 40,
+                iconSize: 18,
+                tooltip: 'Add here',
+                onTap: (_listing == null || _busy != null) ? null : _addMenu)
+          else ...[
+            IconBtn('folder-plus',
+                size: kMobile ? 40 : 34,
+                iconSize: kMobile ? 17 : 15,
+                tooltip: 'New folder here',
+                onTap: (_listing == null || _busy != null) ? null : _newFolder),
+            const SizedBox(width: 2),
+            IconBtn('file-plus',
+                size: kMobile ? 40 : 34,
+                iconSize: kMobile ? 17 : 15,
+                tooltip: 'New file here',
+                onTap: (_listing == null || _busy != null) ? null : _newFile),
+            const SizedBox(width: 2),
+            IconBtn('upload',
+                size: kMobile ? 40 : 34,
+                iconSize: kMobile ? 17 : 15,
+                tooltip: 'Upload files into this folder',
+                onTap: (_listing == null || _busy != null) ? null : _upload),
+          ],
           const SizedBox(width: 8),
           Expanded(
             child: Material(

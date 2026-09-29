@@ -696,7 +696,7 @@ class RecurringScreenState extends State<RecurringScreen>
               body:
                   'Run a prompt on a schedule, like a morning triage or a nightly audit.',
               action: _canAdd
-                  ? Btn('New job', icon: 'plus', small: true, onTap: _add)
+                  ? HeaderAction('New job', onTap: _add)
                   : null,
             )
           else if (jobs.isNotEmpty)
@@ -726,7 +726,7 @@ class RecurringScreenState extends State<RecurringScreen>
                 onBack: widget.onClose ?? () => Navigator.pop(context),
                 actions: [
                   if (_canAdd && !_adding)
-                    Btn('New job', icon: 'plus', small: true, onTap: _add),
+                    HeaderAction('New job', onTap: _add),
                 ]),
             Expanded(child: body),
           ]),
@@ -742,7 +742,7 @@ class RecurringScreenState extends State<RecurringScreen>
       children: [
         NavBackRow(title: 'Scheduled jobs', onBack: widget.onBack!, trailing: [
           if (_canAdd && !_adding)
-            Btn('New job', icon: 'plus', small: true, onTap: _add),
+            HeaderAction('New job', onTap: _add),
         ]),
         Expanded(child: body),
       ],
