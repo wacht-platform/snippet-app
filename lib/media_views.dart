@@ -525,67 +525,70 @@ class _VoiceNoteState extends State<VoiceNote> {
         ? 'Voice note'
         : '${_clock(_position)} / ${_clock(_duration)}';
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 300),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Semantics(
-              button: true,
-              label: _playing ? 'Pause voice note' : 'Play voice note',
-              child: InkWell(
-                onTap: _error == null ? _toggle : null,
-                customBorder: const CircleBorder(),
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    shape: BoxShape.circle,
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Semantics(
+                button: true,
+                label: _playing ? 'Pause voice note' : 'Play voice note',
+                child: InkWell(
+                  onTap: _error == null ? _toggle : null,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: _loading
+                        ? Spinner(size: 14, color: AppColors.accentFg)
+                        : AppIcon(_playing ? 'pause' : 'play',
+                            size: 15, color: AppColors.accentFg),
                   ),
-                  child: _loading
-                      ? Spinner(size: 14, color: AppColors.accentFg)
-                      : AppIcon(_playing ? 'pause' : 'play',
-                          size: 15, color: AppColors.accentFg),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 180,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(R.pill),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 4,
-                        backgroundColor: AppColors.surface3,
-                        valueColor: AlwaysStoppedAnimation(AppColors.accent),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(R.pill),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 4,
+                          backgroundColor: AppColors.surface3,
+                          valueColor: AlwaysStoppedAnimation(AppColors.accent),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(_error ?? time,
-                      style: sans(11,
-                          tabular: true,
-                          color: _error == null
-                              ? AppColors.fg3
-                              : AppColors.danger)),
-                ],
+                    const SizedBox(height: 5),
+                    Text(_error ?? time,
+                        style: sans(11,
+                            tabular: true,
+                            color: _error == null
+                                ? AppColors.fg3
+                                : AppColors.danger)),
+                  ],
+                ),
               ),
-            ),
-          ]),
-          if (widget.transcript != null) ...[
-            const SizedBox(height: 6),
-            widget.transcript!,
+            ]),
+            if (widget.transcript != null) ...[
+              const SizedBox(height: 6),
+              widget.transcript!,
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

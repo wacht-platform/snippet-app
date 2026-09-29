@@ -1189,7 +1189,15 @@ class _SessionScreenState extends State<SessionScreen>
                                                 key: child.key ??
                                                     ValueKey('timeline-$index'),
                                                 child: _centerWide(
-                                                  RepaintBoundary(child: child),
+                                                  Align(
+                                                    alignment:
+                                                        Alignment.centerLeft,
+                                                    child: SizedBox(
+                                                      width: double.infinity,
+                                                      child: RepaintBoundary(
+                                                          child: child),
+                                                    ),
+                                                  ),
                                                 ),
                                               );
                                             },
