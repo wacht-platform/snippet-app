@@ -271,9 +271,11 @@ class _StepList extends StatelessWidget {
           controller: scroll,
           padding: const EdgeInsets.symmetric(vertical: 6),
           itemCount: steps.length,
+          // Dividers span the same 16px margins as the header and the icons,
+          // rather than starting at the label and running off the right edge.
           separatorBuilder: (_, __) => Container(
               height: 1,
-              margin: const EdgeInsets.only(left: 44),
+              margin: const EdgeInsets.symmetric(horizontal: 16),
               color: AppColors.border),
           itemBuilder: (_, i) =>
               _StepRow(step: steps[i], onTap: () => onOpen(i)),
@@ -300,7 +302,8 @@ class _StepRow extends StatelessWidget {
     return InkWell(
       onTap: openable ? onTap : null,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 11, 12, 11),
+        // Right inset centres the chevron under the header's close button.
+        padding: const EdgeInsets.fromLTRB(16, 11, 23, 11),
         child: Row(children: [
           SizedBox(
             width: 18,
