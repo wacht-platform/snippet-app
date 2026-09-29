@@ -26,6 +26,9 @@ class OpenTabDescriptor {
   final String? termSessionKey;
   final String? termId;
 
+  /// Set for the Kanban task board.
+  final bool board;
+
   const OpenTabDescriptor({
     required this.instanceUrl,
     this.sessionId,
@@ -39,6 +42,7 @@ class OpenTabDescriptor {
     this.groupSessionKey,
     this.termSessionKey,
     this.termId,
+    this.board = false,
   });
 
   factory OpenTabDescriptor.fromJson(Map<String, dynamic> j) =>
@@ -55,6 +59,7 @@ class OpenTabDescriptor {
         groupSessionKey: j['group_session_key'] as String?,
         termSessionKey: j['term_session_key'] as String?,
         termId: j['term_id'] as String?,
+        board: j['board'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -70,6 +75,7 @@ class OpenTabDescriptor {
         if (groupSessionKey != null) 'group_session_key': groupSessionKey,
         if (termSessionKey != null) 'term_session_key': termSessionKey,
         if (termId != null) 'term_id': termId,
+        if (board) 'board': true,
       };
 
   bool get isFile => filePath != null;

@@ -32,6 +32,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
                   groupSessionKey: t.groupSessionKey,
                   termSessionKey: t.termSessionKey,
                   termId: t.termId,
+                  board: t.isBoard,
                 ))
             .toList(),
         _activeIndex,
@@ -52,6 +53,13 @@ extension _DesktopShellTabsExt on _DesktopShellState {
           descriptor.pane == _Pane.right.name ? _Pane.right : _Pane.left;
       if (descriptor.isTerminal) {
         continue;
+      } else if (descriptor.board) {
+        restored.add(_ShellTab.board(
+          client: client,
+          instanceUrl: inst.url,
+          pane: pane,
+          groupSessionKey: descriptor.groupSessionKey,
+        ));
       } else if (descriptor.isDiff) {
         restored.add(_ShellTab.diff(
           client: client,
@@ -441,6 +449,46 @@ extension _DesktopShellTabsExt on _DesktopShellState {
           instanceUrl: url,
           filePath: path,
           title: name,
+          pane: pane,
+          groupSessionKey: group,
+        ));
+        _dockAux(pane, _tabs.last.key);
+      }
+    });
+    _persistTabs();
+    _syncPage();
+  }
+
+  /// Open the Kanban board in the focused pane's tab group, or as a drawer
+  /// when there is no group to join yet.
+  void _openBoardTab() {
+    final client = _client;
+    final inst = _active;
+    if (client == null || inst == null) return;
+    final pane = _focusedPane;
+    final group = _activeGroupKeyFor(pane);
+    if (group == null) {
+      presentScreen(
+        context,
+        style: PanelStyle.drawer,
+        maxWidth: 820,
+        maxHeight: 760,
+        builder: (_, close) => TasksScreen(client: client),
+      );
+      return;
+    }
+    final existing =
+        _tabs.indexWhere((t) => t.isBoard && t.instanceUrl == inst.url);
+    _setState(() {
+      if (existing >= 0) {
+        _tabs[existing]
+          ..pane = pane
+          ..groupSessionKey = group;
+        _dockAux(pane, _tabs[existing].key);
+      } else {
+        _tabs.add(_ShellTab.board(
+          client: client,
+          instanceUrl: inst.url,
           pane: pane,
           groupSessionKey: group,
         ));

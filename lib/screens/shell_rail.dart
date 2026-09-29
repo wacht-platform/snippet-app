@@ -7,10 +7,11 @@ import '../widgets.dart';
 /// over this column, and the panel below uses it exactly.
 const double kSidebarWidth = 300;
 
-/// The five sidebar work areas. The strip selects which panel the sidebar
+/// The sidebar work areas. The strip selects which panel the sidebar
 /// shows; it never changes the conversation in the main pane.
 enum ShellSection {
   sessions('Chat', 'message-text'),
+  tasks('Tasks', 'task'),
   terminal('Terminal', 'terminal'),
   git('Git Diff', 'git-branch'),
   files('File Tree', 'file'),

@@ -14,6 +14,7 @@ import 'settings_panel.dart' show SettingsPage;
 import 'shell_models.dart';
 import 'shell_rail.dart' show ShellSection;
 import 'sidebar.dart';
+import 'tasks/tasks_panel.dart';
 import 'terminals_sidebar_panel.dart';
 
 /// Routes between sidebar panels depending on the active [ShellSection] and state.
@@ -36,6 +37,7 @@ class ShellSidebarHost extends StatelessWidget {
     required this.onOpenSession,
     required this.onOpenDiff,
     required this.onOpenFile,
+    required this.onOpenBoard,
     required this.instances,
     required this.selectedSessionId,
     required this.sessions,
@@ -79,6 +81,7 @@ class ShellSidebarHost extends StatelessWidget {
   final void Function(String id, String title, String? profile) onOpenSession;
   final ValueChanged<GitFile> onOpenDiff;
   final void Function(String path, String name) onOpenFile;
+  final VoidCallback onOpenBoard;
 
   // Sidebar props:
   final bool topInset;
@@ -129,6 +132,13 @@ class ShellSidebarHost extends StatelessWidget {
         },
         onCloseTerminal: onCloseTerminal,
       );
+    }
+
+    if (effectiveSection == ShellSection.tasks) {
+      final c = client;
+      return c == null
+          ? const SidebarUnavailable(message: 'Add a machine to see its tasks.')
+          : TasksPanel(client: c, onOpenBoard: onOpenBoard);
     }
 
     if (effectiveSection == ShellSection.agents) {

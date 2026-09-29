@@ -44,6 +44,9 @@ class _AgentsClient extends DaemonClient {
   }
 }
 
+final _agentSearch = find.byWidgetPredicate(
+    (w) => w is TextField && w.decoration?.hintText == 'Search agents');
+
 void main() {
   for (final width in [390.0, 320.0]) {
     testWidgets('mobile Agents screen at $width', (tester) async {
@@ -83,7 +86,7 @@ void main() {
         await expectGolden(tester, find.byType(Scaffold).first,
             'goldens/mobile_agents_${width.toInt()}.png');
 
-        await tester.tap(find.byTooltip('New'));
+        await tester.tap(find.byTooltip('New agent'));
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.byType(CreateAgentForm), findsOneWidget);
         Navigator.of(tester.element(find.byType(CreateAgentForm))).pop();
@@ -98,17 +101,15 @@ void main() {
         await tester.tap(collapse);
         await tester.pump();
         expect(find.text('Review authentication flow'), findsNothing);
-        await tester.tap(find.byTooltip('Search'));
-        await tester.pump(const Duration(milliseconds: 400));
-        await tester.enterText(find.byType(TextField), 'authentication');
+        await tester.enterText(_agentSearch, 'authentication');
         await tester.pump();
         expect(find.text('Review authentication flow'), findsOneWidget);
         expect(find.text('Add regression coverage'), findsNothing);
         expect(find.text('Builder'), findsNothing);
-        await tester.enterText(find.byType(TextField), 'no match');
+        await tester.enterText(_agentSearch, 'no match');
         await tester.pump();
         expect(find.text('Ada'), findsNothing);
-        await tester.enterText(find.byType(TextField), '');
+        await tester.enterText(_agentSearch, '');
         await tester.pump();
         expect(find.text('Review authentication flow'), findsNothing);
         await tester.tap(find.byTooltip('Expand sessions for Ada'));

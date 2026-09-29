@@ -21,7 +21,18 @@ class _FakeTestClient extends DaemonClient {
 
   @override
   Future<List<CoordinationAgent>> coordinationAgents() async => _agents;
+
+  @override
+  Future<List<TaskItem>> tasks(
+          {String? status, String? agentId, int limit = 200}) async =>
+      [];
 }
+
+Finder _field(String hint) => find.byWidgetPredicate(
+    (w) => w is TextField && w.decoration?.hintText == hint);
+
+Finder _tab(String label) => find.descendant(
+    of: find.byType(SidebarMobileBar), matching: find.text(label));
 
 void main() {
   test('agent icon maps to strokeRoundedBot', () {
@@ -30,7 +41,7 @@ void main() {
   });
 
   testWidgets(
-      'top headers have no search/add buttons, and bottom bar handles search and add for chats and agents',
+      'four tabs, a filter under each header, and a floating New that follows the tab',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
@@ -119,108 +130,69 @@ void main() {
         );
       }
 
-      // 1. On Chats Screen:
+      // 1. Chats: the four tabs, Mission Control in the header, and a New that
+      // starts a chat.
       await tester.pumpWidget(buildTestWidget(home: MobileHome.chats));
       await tester.pumpAndSettle();
 
-      expect(find.text('Chats'), findsWidgets);
-      // Mission Control button is present in Chats header
+      for (final label in ['Chats', 'Tasks', 'Agents', 'Settings']) {
+        expect(_tab(label), findsOneWidget);
+      }
       expect(find.byTooltip('Mission Control'), findsOneWidget);
-      // Top header has NO search or new chat buttons
-      expect(find.byTooltip('Search chats'), findsNothing);
-      expect(find.byTooltip('New chat'), findsNothing);
-
-      // Bottom bar has Search and New actions
-      expect(find.byTooltip('Search'), findsOneWidget);
-      expect(find.byTooltip('New'), findsOneWidget);
-
-      // Tap bottom bar New action -> calls onNewSession
-      await tester.tap(find.byTooltip('New'));
+      await tester.tap(find.byTooltip('New chat'));
       await tester.pumpAndSettle();
       expect(newSessionCalled, isTrue);
 
-      // Tap bottom bar Search action -> expands search row with 'Search chats'
-      await tester.tap(find.byTooltip('Search'));
-      await tester.pumpAndSettle();
-      expect(find.text('Search chats'), findsOneWidget);
-
-      // Filter chats
-      await tester.enterText(find.byType(TextField), 'Nonexistent');
+      // The filter sits under the header, always visible.
+      await tester.enterText(_field('Search chats'), 'Nonexistent');
       await tester.pumpAndSettle();
       expect(find.text('No chats match the search.'), findsOneWidget);
-
-      // Close bottom search
-      await tester.tap(find.byTooltip('Close search'));
+      await tester.tap(find.byTooltip('Clear').first);
       await tester.pumpAndSettle();
       expect(find.text('Feature Setup'), findsOneWidget);
 
-      // 2. Switch to Agents Screen:
-      await tester.tap(find.text('Agents').first);
+      // 2. Tasks is a tab of its own, with its own New.
+      await tester.tap(_tab('Tasks'));
       await tester.pumpAndSettle();
+      expect(currentHome, MobileHome.tasks);
+      expect(find.text('No tasks yet'), findsOneWidget);
+      expect(find.byTooltip('New task'), findsOneWidget);
 
-      expect(find.text('Snippet'), findsOneWidget);
+      // 3. Agents: filtering narrows sessions under an agent.
+      await tester.tap(_tab('Agents'));
+      await tester.pumpAndSettle();
       expect(find.text('defenseclaw investigation'), findsOneWidget);
       expect(find.text('Unrelated project work'), findsOneWidget);
-
-      // Mission Control button is present in Agents header as well
-      expect(find.byTooltip('Mission Control'), findsOneWidget);
       await tester.tap(find.byTooltip('Mission Control'));
       await tester.pumpAndSettle();
       expect(mcCalled, isTrue);
 
-      // Top header has NO search or create agent buttons
-      expect(find.byTooltip('Search agents'), findsNothing);
-      expect(find.byTooltip('Create agent'), findsNothing);
-
-      // 3. Bottom bar search on agents:
-      await tester.tap(find.byTooltip('Search'));
+      await tester.enterText(_field('Search agents'), 'defenseclaw');
       await tester.pumpAndSettle();
-      expect(find.text('Search agents'), findsOneWidget);
-      expect(currentHome, MobileHome.agents);
-
-      // Searching for 'defenseclaw' should filter sessions under the agent
-      // to only the matching session!
-      await tester.enterText(find.byType(TextField), 'defenseclaw');
-      await tester.pumpAndSettle();
-
-      expect(find.text('Snippet'), findsOneWidget);
       expect(find.text('defenseclaw investigation'), findsOneWidget);
-      // Non-matching session under Snippet should be filtered out:
       expect(find.text('Unrelated project work'), findsNothing);
-
-      // Searching for nonexistent query shows empty search message
-      await tester.enterText(find.byType(TextField), 'nonexistentquery');
+      await tester.enterText(_field('Search agents'), 'nonexistentquery');
       await tester.pumpAndSettle();
       expect(find.text('No agents match the search.'), findsOneWidget);
-      expect(find.text('defenseclaw investigation'), findsNothing);
-
-      // 4. Close search and tap bottom bar New on agents opens CreateAgentForm:
-      await tester.tap(find.byTooltip('Close search'));
+      await tester.enterText(_field('Search agents'), '');
       await tester.pumpAndSettle();
 
       expect(find.byType(CreateAgentForm), findsNothing);
-      await tester.tap(find.byTooltip('New'));
+      await tester.tap(find.byTooltip('New agent'));
       await tester.pumpAndSettle();
       expect(find.byType(CreateAgentForm), findsOneWidget);
-
-      // Close create agent form sheet
       await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
 
-      // 5. Switch to Settings destination:
-      await tester.tap(find.text('Settings'));
+      // 4. Settings keeps the tabs but has nothing to create.
+      await tester.tap(_tab('Settings'));
       await tester.pumpAndSettle();
-
-      // Top header has Settings title, no Back button, and machine avatar button
-      expect(find.text('Settings'), findsOneWidget);
       expect(find.byTooltip('Back'), findsNothing);
       expect(find.byTooltip('Add machine'), findsOneWidget);
-
-      // Bottom bar is hidden on settings screen
-      expect(find.byTooltip('Search'), findsNothing);
-      expect(find.byTooltip('New'), findsNothing);
-
-      // Workspace machine picker section is removed from settings screen body
+      expect(_tab('Chats'), findsOneWidget);
+      for (final tip in ['New chat', 'New task', 'New agent']) {
+        expect(find.byTooltip(tip), findsNothing);
+      }
       expect(find.text('WORKSPACE'), findsNothing);
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -300,20 +272,16 @@ void main() {
       expect(find.text('Session Title 1'), findsOneWidget);
       expect(find.text('Session Title 2'), findsOneWidget);
 
-      // Now search for an older session: search searches across all matching chats
-      await tester.tap(find.byTooltip('Search'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Title 13');
+      // Search reaches past the visible rows to every matching chat.
+      await tester.enterText(_field('Search chats'), 'Title 13');
       await tester.pumpAndSettle();
       expect(find.text('Session Title 13'), findsOneWidget);
 
       // Search for nonexistent chat
-      await tester.enterText(find.byType(TextField), 'Session Title 99');
+      await tester.enterText(_field('Search chats'), 'Session Title 99');
       await tester.pumpAndSettle();
       expect(find.text('No chats match the search.'), findsOneWidget);
-
-      // Close search
-      await tester.tap(find.byTooltip('Close search'));
+      await tester.enterText(_field('Search chats'), '');
       await tester.pumpAndSettle();
 
       // When all sessions are older than 12 hours, Recent header is absent but folder shows them

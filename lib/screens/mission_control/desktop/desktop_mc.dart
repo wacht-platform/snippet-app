@@ -9,7 +9,7 @@ import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../../../panel.dart';
 import '../coordination_agent_directory.dart';
-import '../task_board_screen.dart';
+import '../../tasks/tasks_screen.dart';
 import '../mission_control_screen.dart' show ChangeNotifierProvider;
 import '../mission_control_state.dart';
 import '../widgets/mission_control_header.dart';
@@ -164,7 +164,7 @@ class _LeftRail extends StatelessWidget {
                     onTap: () => presentScreen(
                           context,
                           style: PanelStyle.drawer,
-                          builder: (_, close) => TaskBoardScreen(
+                          builder: (_, close) => TasksScreen(
                             client: state.client,
                           ),
                         )),

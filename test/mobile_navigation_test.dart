@@ -11,63 +11,63 @@ import 'package:snippet/theme.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+const _chats = 'Add a machine to begin.';
+const _tasks = 'Add a machine to see its tasks.';
+const _agents = 'Add a machine to see its agents.';
+const _settings = 'Add a machine to configure it.';
+
+Finder _tab(String label) => find.descendant(
+    of: find.byType(SidebarMobileBar), matching: find.text(label));
+
+Future<void> _pumpShell(WidgetTester tester) async {
+  tester.view.devicePixelRatio = 2.0;
+  tester.view.physicalSize = const Size(390, 844) * 2.0;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: buildAppTheme(),
+    home: const DesktopShell(),
+  ));
+  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+void _only(String shown) {
+  for (final text in [_chats, _tasks, _agents, _settings]) {
+    expect(find.text(text), text == shown ? findsOneWidget : findsNothing,
+        reason: 'expected only "$shown" to be showing');
+  }
+}
+
 void main() {
-  testWidgets('mobile shell starts on Agents and tabs switch to the correct destinations',
+  testWidgets('the phone starts on Chats and each tab opens its destination',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       SharedPreferences.setMockInitialValues({});
+      await _pumpShell(tester);
+      _only(_chats);
 
-      tester.view.devicePixelRatio = 2.0;
-      tester.view.physicalSize = const Size(390, 844) * 2.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        home: const DesktopShell(),
-      ));
-
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump(const Duration(milliseconds: 400));
-
-      // 1. Initial destination is Agents (index 0)
-      expect(find.text('Add a machine to see its agents.'), findsOneWidget);
-      expect(find.text('Add a machine to begin.'), findsNothing);
-
-      // 2. Tap Chats tab (index 1)
-      await tester.tap(find.text('Chats'));
+      await tester.tap(_tab('Tasks'));
       await tester.pumpAndSettle();
+      _only(_tasks);
 
-      expect(find.text('Add a machine to begin.'), findsOneWidget);
-      expect(find.text('Add a machine to see its agents.'), findsNothing);
-
-      // 3. Tap Agents tab again (index 0)
-      await tester.tap(find.text('Agents'));
+      await tester.tap(_tab('Agents'));
       await tester.pumpAndSettle();
+      _only(_agents);
 
-      expect(find.text('Add a machine to see its agents.'), findsOneWidget);
-      expect(find.text('Add a machine to begin.'), findsNothing);
-
-      // 4. Tap Settings tab (index 2)
-      await tester.tap(find.text('Settings'));
+      // Settings keeps the tab bar; with no machine there is nothing to create.
+      await tester.tap(_tab('Settings'));
       await tester.pumpAndSettle();
-
-      expect(find.text('Add a machine to configure it.'), findsOneWidget);
-
-      // 5. In Settings: machine picker is in header, bottom bar is hidden
+      _only(_settings);
       expect(find.byTooltip('Add machine'), findsOneWidget);
-      expect(find.byTooltip('Search'), findsNothing);
-      expect(find.byTooltip('New'), findsNothing);
+      expect(_tab('Chats'), findsOneWidget);
 
-      // 6. System back in Settings returns to Agents and restores bottom bar
+      // Back returns to the previous tab.
       expect(find.byTooltip('Back'), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-
-      expect(find.text('Add a machine to see its agents.'), findsOneWidget);
-      expect(find.byTooltip('Search'), findsOneWidget);
-      expect(find.byTooltip('New'), findsOneWidget);
+      _only(_agents);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
@@ -76,60 +76,32 @@ void main() {
     }
   });
 
-  testWidgets(
-      'swiping left and right navigates across agents, chats, and settings',
+  testWidgets('swiping walks the tabs in order and stops at either end',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       SharedPreferences.setMockInitialValues({});
+      await _pumpShell(tester);
+      Future<void> swipe(double dx) async {
+        await tester.fling(find.byType(PageView), Offset(dx, 0), 1000);
+        await tester.pumpAndSettle();
+      }
 
-      tester.view.devicePixelRatio = 2.0;
-      tester.view.physicalSize = const Size(390, 844) * 2.0;
-      addTearDown(tester.view.reset);
+      _only(_chats);
+      await swipe(300);
+      _only(_chats);
+      for (final next in [_tasks, _agents, _settings]) {
+        await swipe(-300);
+        _only(next);
+      }
+      await swipe(-300);
+      _only(_settings);
+      for (final back in [_agents, _tasks, _chats]) {
+        await swipe(300);
+        _only(back);
+      }
 
-      await tester.pumpWidget(MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        home: const DesktopShell(),
-      ));
-
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump(const Duration(milliseconds: 400));
-
-      // 1. Starts on Agents
-      expect(find.text('Add a machine to see its agents.'), findsOneWidget);
-
-      // Swiping right when at index 0 does nothing (clamped)
-      await tester.fling(find.byType(PageView), const Offset(300, 0), 1000);
-      await tester.pumpAndSettle();
-      expect(find.text('Add a machine to see its agents.'), findsOneWidget);
-
-      // 2. Swipe left from Agents -> navigates to Chats
-      await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
-      await tester.pumpAndSettle();
-      expect(find.text('Add a machine to begin.'), findsOneWidget);
-
-      // 3. Swipe left from Chats -> navigates to Settings
-      await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
-      await tester.pumpAndSettle();
-      expect(find.text('Add a machine to configure it.'), findsOneWidget);
-
-      // Swiping left when at index 2 does nothing (clamped)
-      await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
-      await tester.pumpAndSettle();
-      expect(find.text('Add a machine to configure it.'), findsOneWidget);
-
-      // 4. Swipe right from Settings -> navigates back to Chats
-      await tester.fling(find.byType(PageView), const Offset(300, 0), 1000);
-      await tester.pumpAndSettle();
-      expect(find.text('Add a machine to begin.'), findsOneWidget);
-
-      // 5. Swipe right from Chats -> navigates back to Agents
-      await tester.fling(find.byType(PageView), const Offset(300, 0), 1000);
-      await tester.pumpAndSettle();
-      expect(find.text('Add a machine to see its agents.'), findsOneWidget);
-
-      // 6. System back on Agents triggers app close/minimize without blocking
+      // Back on the first tab leaves the app without blocking.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
@@ -140,49 +112,25 @@ void main() {
     }
   });
 
-  testWidgets(
-      'routing history: switching to settings from chats and back pressing returns to chats',
-      (tester) async {
+  testWidgets('back unwinds tab history one step at a time', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       SharedPreferences.setMockInitialValues({});
+      await _pumpShell(tester);
 
-      tester.view.devicePixelRatio = 2.0;
-      tester.view.physicalSize = const Size(390, 844) * 2.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        home: const DesktopShell(),
-      ));
-
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump(const Duration(milliseconds: 400));
-
-      // Starts on Agents
-      expect(find.text('Add a machine to see its agents.'), findsOneWidget);
-
-      // Switch to Chats
-      await tester.tap(find.text('Chats'));
+      await tester.tap(_tab('Tasks'));
       await tester.pumpAndSettle();
-      expect(find.text('Add a machine to begin.'), findsOneWidget);
-
-      // Switch to Settings from Chats
-      await tester.tap(find.text('Settings'));
+      await tester.tap(_tab('Settings'));
       await tester.pumpAndSettle();
-      expect(find.text('Add a machine to configure it.'), findsOneWidget);
+      _only(_settings);
 
-      // Back press from Settings should return to Chats (not jump to Agents)
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Add a machine to begin.'), findsOneWidget);
-      expect(find.text('Add a machine to see its agents.'), findsNothing);
+      _only(_tasks);
 
-      // Back press from Chats should return to Agents
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Add a machine to see its agents.'), findsOneWidget);
+      _only(_chats);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
@@ -191,8 +139,7 @@ void main() {
     }
   });
 
-  testWidgets(
-      'routing history: opening a session from agent and back pressing returns to agent',
+  testWidgets('back from a session opened on Agents returns to Agents',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     DaemonClient.wsConnector = (uri, {connectTimeout, pingInterval}) =>
@@ -203,47 +150,25 @@ void main() {
         'instances':
             '[{"name":"Local","url":"http://127.0.0.1:9090","token":"tok"}]',
       });
+      await _pumpShell(tester);
 
-      tester.view.devicePixelRatio = 2.0;
-      tester.view.physicalSize = const Size(390, 844) * 2.0;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        home: const DesktopShell(),
-      ));
-
+      await tester.tap(_tab('Agents'));
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump(const Duration(milliseconds: 400));
-
-      // 1. Starts on Agents
       expect(find.byType(AgentsSidebarPanel), findsOneWidget);
 
-      // Find Sidebar and simulate onOpenSession from agent screen
-      final sidebarFinder = find.byType(Sidebar);
-      expect(sidebarFinder, findsOneWidget);
-      final sidebar = tester.widget<Sidebar>(sidebarFinder);
+      final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
       sidebar.onOpenSession('test-session-1', 'Agent Task Session', null);
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump(const Duration(milliseconds: 400));
-
-      // Session is now open
       expect(find.text('Agent Task Session'), findsWidgets);
 
-      // 2. Back press from session should return directly to Agents (last screen), not jump to Chats
       await tester.binding.handlePopRoute();
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump(const Duration(milliseconds: 400));
-
-      // Sidebar is restored and user is back on Agents (not Chats)
       final mobileShell = tester.widget<MobileShell>(find.byType(MobileShell));
       expect(mobileShell.chatsOpen, isTrue);
       expect(mobileShell.mobileHome, MobileHome.agents);
-
-      // 3. Back press from Agents triggers app close/minimize
-      await tester.binding.handlePopRoute();
-      await tester.pump(const Duration(milliseconds: 400));
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();

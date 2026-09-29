@@ -10,6 +10,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'agents_sidebar_panel.dart';
+import 'list_search_field.dart';
 import 'mission_control.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'settings_panel.dart';
@@ -17,6 +18,7 @@ import 'shell_components.dart';
 import 'shell_models.dart';
 import 'shell_nav.dart';
 import 'sidebar_mobile.dart';
+import 'tasks/tasks_panel.dart';
 export 'sidebar_mobile.dart';
 
 class Sidebar extends StatefulWidget {
@@ -94,6 +96,7 @@ class SidebarState extends State<Sidebar> {
   String _filterQuery = '';
   String _agentFilterQuery = '';
   final _machineKey = GlobalKey(); // anchors the desktop machine popover
+  final GlobalKey<TasksPanelState> _tasksPanelKey = GlobalKey<TasksPanelState>();
   final GlobalKey<SettingsPanelState> _mobileSettingsKey =
       GlobalKey<SettingsPanelState>();
   final GlobalKey<AgentsSidebarPanelState> _agentsPanelKey =
@@ -101,9 +104,7 @@ class SidebarState extends State<Sidebar> {
   bool _selecting = false;
   final Set<String> _selected = {};
 
-  /// Phone search. The bar's search action flips this and the pill expands into a
-  /// full-width field, so searching never costs permanent vertical space.
-  bool _mobileSearchOpen = false;
+  /// Phone search: a filter field at the top of each tab.
   final TextEditingController _searchCtl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   final TextEditingController _agentSearchCtl = TextEditingController();
@@ -122,7 +123,7 @@ class SidebarState extends State<Sidebar> {
   bool get _mobileDrilledDown =>
       widget.settingsSection != null || widget.agent != null;
 
-  MobileHome _lastMainHome = MobileHome.agents;
+  MobileHome _lastMainHome = MobileHome.chats;
   late final PageController _pageController;
   int? _targetPage;
 
@@ -224,9 +225,10 @@ class SidebarState extends State<Sidebar> {
           // PageView gives smooth swiping left and right across sessions,
           // settings, and agents, with slide transitions when navigating.
           Expanded(
-            child: PageView(
+            child: Stack(children: [
+              PageView(
               controller: _pageController,
-              physics: (_mobileDrilledDown || _mobileSearchOpen)
+              physics: _mobileDrilledDown
                   ? const NeverScrollableScrollPhysics()
                   : const ClampingScrollPhysics(),
               onPageChanged: (index) {
@@ -247,13 +249,31 @@ class SidebarState extends State<Sidebar> {
                   ),
               ],
             ),
+              if (_showNewButton(hasClient))
+                Positioned(
+                  right: M.gutter,
+                  bottom: 12,
+                  child: MobileNewButton(
+                    tooltip: _newLabel,
+                    onTap: _handleMobileNew,
+                  ),
+                ),
+            ]),
           ),
           // The bar names the app's TOP LEVEL, so it hides inside a nested
-          // screen. Leaving it up would give that screen a second exit that
-          // skips the level you are in — and make the bar look like part of the
-          // sub-screen rather than the shell.
-          if (!_mobileDrilledDown && widget.mobileHome != MobileHome.settings)
-            _mobileBar(hasClient),
+          // screen, where it would be a second exit that skips the level you
+          // are in. It also steps aside while the keyboard is up, so a search
+          // keeps the whole screen for its results.
+          if (!_mobileDrilledDown && !_keyboardUp)
+            SidebarMobileBar(
+              activeHome: widget.mobileHome,
+              onMobileHome: (h) {
+                if (widget.mobileHome != h) {
+                  _goToPage(h.index);
+                  widget.onMobileHome(h);
+                }
+              },
+            ),
         ],
         if (!kMobile) ...[
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
@@ -296,6 +316,9 @@ class SidebarState extends State<Sidebar> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _mobileChatsHeader(hasClient),
+            if (hasClient && !_selecting)
+              _mobileSearch(_searchCtl, 'Search chats',
+                  (v) => setState(() => _filterQuery = v)),
             Expanded(
               child: !hasClient
                   ? _mobileUnavailable('Add a machine to begin.')
@@ -303,6 +326,17 @@ class SidebarState extends State<Sidebar> {
             ),
             if (_selecting) _mobileSelectionActions(),
           ],
+        );
+
+      case MobileHome.tasks:
+        final client = widget.client;
+        if (client == null) {
+          return _mobileUnavailable('Add a machine to see its tasks.');
+        }
+        return TasksPanel(
+          key: _tasksPanelKey,
+          client: client,
+          trailing: _headerTrailing(hasClient),
         );
 
       case MobileHome.agents:
@@ -344,6 +378,8 @@ class SidebarState extends State<Sidebar> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _mobileAgentsHeader(hasClient),
+                    _mobileSearch(_agentSearchCtl, 'Search agents',
+                        (v) => setState(() => _agentFilterQuery = v)),
                     Expanded(
                       child: AgentsSidebarPanel(
                         key: _agentsPanelKey,
@@ -479,50 +515,55 @@ class SidebarState extends State<Sidebar> {
         ),
       );
     }
-    final mc = (_sessions ?? const <SessionInfo>[])
-        .where((s) => isDedicatedMcSession(s.id))
-        .toList();
-    final mcActive = mc.isNotEmpty && mc.first.id == widget.selectedSessionId;
     return Padding(
       padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
       child: Row(children: [
         Text('Chats',
             style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
         const Spacer(),
-        if (hasClient && mc.isNotEmpty)
-          IconBtn('layers',
-              size: M.minTarget,
-              iconSize: 19,
-              active: mcActive,
-              tooltip: 'Mission Control',
-              onTap: widget.onOpenMissionControl),
-        _machineAvatarButton(),
+        ..._headerTrailing(hasClient),
       ]),
     );
   }
 
   Widget _mobileAgentsHeader(bool hasClient) {
-    final mc = (_sessions ?? const <SessionInfo>[])
-        .where((s) => isDedicatedMcSession(s.id))
-        .toList();
-    final mcActive = mc.isNotEmpty && mc.first.id == widget.selectedSessionId;
     return Padding(
       padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
       child: Row(children: [
         Text('Agents',
             style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
         const Spacer(),
-        if (hasClient && mc.isNotEmpty)
-          IconBtn('layers',
-              size: M.minTarget,
-              iconSize: 19,
-              active: mcActive,
-              tooltip: 'Mission Control',
-              onTap: widget.onOpenMissionControl),
-        _machineAvatarButton(),
+        ..._headerTrailing(hasClient),
       ]),
     );
   }
+
+  /// The controls at the right of every phone page header: Mission Control
+  /// (when this machine has it) and the machine switcher.
+  List<Widget> _headerTrailing(bool hasClient) {
+    final mc = (_sessions ?? const <SessionInfo>[])
+        .where((s) => isDedicatedMcSession(s.id))
+        .toList();
+    return [
+      if (hasClient && mc.isNotEmpty)
+        IconBtn('layers',
+            size: M.minTarget,
+            iconSize: 19,
+            active: mc.first.id == widget.selectedSessionId,
+            tooltip: 'Mission Control',
+            onTap: widget.onOpenMissionControl),
+      _machineAvatarButton(),
+    ];
+  }
+
+  /// The filter field under a phone page header.
+  Widget _mobileSearch(TextEditingController controller, String hint,
+          ValueChanged<String> onChanged) =>
+      Padding(
+        padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 6),
+        child: ListSearchField(
+            controller: controller, hint: hint, onChanged: onChanged),
+      );
 
   Widget _mobileSettingsHeader() {
     return Padding(
@@ -594,102 +635,34 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  /// The floating action bar: destinations left, quick actions right.
-  ///
-  /// Destinations are the phone's translation of the desktop sidebar rail — on
-  /// a phone those five panels had NO entry point at all, which is the real
-  /// reason this exists (the reclaimed vertical space is a side effect).
-  ///
-  /// Rendered as a sibling of the body by the caller, never an overlay, so it
-  /// cannot hide the last row of a list.
-  /// The floating action bar.
-  ///
-  /// Deliberately COMPACT: icon-only destinations in a pill that hugs its
-  /// content and centres, rather than a full-width strip. The bar is an
-  /// affordance you reach occasionally, so it should not reserve a third of the
-  /// screen's width for three glyphs.
-  ///
-  /// Tapping search expands the SAME pill into a full-width field — the control
-  /// grows in place instead of a second search surface appearing.
-  ///
-  /// Rendered as a sibling of the body by the caller, never an overlay, so it
-  /// cannot hide the last row of a list.
-  Widget _mobileBar(bool hasClient) {
-    final isAgents = widget.mobileHome == MobileHome.agents;
-    return SidebarMobileBar(
-      hasClient: hasClient,
-      mobileSearchOpen: _mobileSearchOpen,
-      activeHome: widget.mobileHome,
-      onMobileHome: (h) {
-        if (widget.mobileHome != h) {
-          _goToPage(h.index);
-          widget.onMobileHome(h);
-        }
-      },
-      onToggleMobileSearch: _toggleMobileSearch,
-      onHandleMobileNew: _handleMobileNew,
-      searchCtl: isAgents ? _agentSearchCtl : _searchCtl,
-      searchFocus: isAgents ? _agentSearchFocus : _searchFocus,
-      filterQuery: isAgents ? _agentFilterQuery : _filterQuery,
-      searchHint: isAgents ? 'Search agents' : 'Search chats',
-      onSearchChanged: (v) {
-        setState(() {
-          if (isAgents) {
-            _agentFilterQuery = v;
-          } else {
-            _filterQuery = v;
-          }
-        });
-      },
-      onClearSearch: () {
-        final ctl = isAgents ? _agentSearchCtl : _searchCtl;
-        ctl.clear();
-        setState(() {
-          if (isAgents) {
-            _agentFilterQuery = '';
-          } else {
-            _filterQuery = '';
-          }
-        });
-      },
-    );
-  }
+  bool get _keyboardUp => MediaQuery.viewInsetsOf(context).bottom > 0;
+
+  /// The floating New button: on the tabs that make things, at the top level,
+  /// and out of the way while selecting chats or typing.
+  bool _showNewButton(bool hasClient) =>
+      hasClient &&
+      !_mobileDrilledDown &&
+      !_selecting &&
+      !_keyboardUp &&
+      widget.mobileHome != MobileHome.settings;
+
+  String get _newLabel => switch (widget.mobileHome) {
+        MobileHome.chats => 'New chat',
+        MobileHome.tasks => 'New task',
+        MobileHome.agents => 'New agent',
+        MobileHome.settings => '',
+      };
 
   void _handleMobileNew() {
-    if (widget.mobileHome == MobileHome.agents) {
-      _openCreateAgent();
-    } else if (widget.mobileHome == MobileHome.chats) {
-      widget.onNewSession();
-    } else {
-      widget.onMobileHome(MobileHome.chats);
-      widget.onNewSession();
-    }
-  }
-
-  void _toggleMobileSearch() {
-    final open = !_mobileSearchOpen;
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (open && widget.mobileHome == MobileHome.settings) {
-      widget.onMobileHome(MobileHome.chats);
-    }
-    setState(() {
-      _mobileSearchOpen = open;
-      if (!open) {
-        _searchCtl.clear();
-        _agentSearchCtl.clear();
-        _filterQuery = '';
-        _agentFilterQuery = '';
-      }
-    });
-    if (open) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (widget.mobileHome == MobileHome.agents) {
-          _agentSearchFocus.requestFocus();
-        } else {
-          _searchFocus.requestFocus();
-        }
-      });
+    switch (widget.mobileHome) {
+      case MobileHome.chats:
+        widget.onNewSession();
+      case MobileHome.tasks:
+        _tasksPanelKey.currentState?.create();
+      case MobileHome.agents:
+        _openCreateAgent();
+      case MobileHome.settings:
+        break;
     }
   }
 
@@ -771,7 +744,8 @@ class SidebarState extends State<Sidebar> {
         backgroundColor: AppColors.surface3,
         onRefresh: () async => widget.onRefreshSessions(),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 28),
+          // Room at the bottom so the floating New never covers the last row.
+          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 88),
           children: mobileChildren,
         ),
       );

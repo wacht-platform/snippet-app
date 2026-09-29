@@ -14,8 +14,9 @@ enum ShellPane { left, right }
 /// Which top-level place the phone home is showing. The floating action bar
 /// switches this; desktop keeps its sidebar rail instead, so this is phone-only.
 enum MobileHome {
-  agents('Agents', 'agent'),
   chats('Chats', 'chat-thread'),
+  tasks('Tasks', 'task'),
+  agents('Agents', 'agent'),
   settings('Settings', 'settings');
 
   const MobileHome(this.label, this.icon);
@@ -23,11 +24,10 @@ enum MobileHome {
   final String icon;
 }
 
-/// Floating action bar geometry. Kept local: it is the only floating surface in
-/// the app, so it has not earned a shared token — but the radius is deliberately
-/// larger than `R.card` so it reads as a float rather than another card.
-const double kMobileBarHeight = 58;
-const double kMobileBarRadius = 18;
+/// Floating tab bar geometry. The radius is deliberately larger than `R.card`
+/// so the bar reads as a float rather than another card.
+const double kMobileBarHeight = 60;
+const double kMobileBarRadius = 20;
 
 /// One open tab in the shell — a live chat session, an opened file, a single git
 /// change, or a terminal, on a given instance.
@@ -68,6 +68,9 @@ class ShellTab {
   final String? termId;
   final String? termSessionKey;
 
+  /// The Kanban task board for the machine.
+  final bool isBoard;
+
   ShellTab.session({
     required this.client,
     required this.instanceUrl,
@@ -82,7 +85,8 @@ class ShellTab {
         diffStaged = false,
         diffUntracked = false,
         termId = null,
-        termSessionKey = null;
+        termSessionKey = null,
+        isBoard = false;
 
   ShellTab.file({
     required this.client,
@@ -97,7 +101,8 @@ class ShellTab {
         diffStaged = false,
         diffUntracked = false,
         termId = null,
-        termSessionKey = null;
+        termSessionKey = null,
+        isBoard = false;
 
   ShellTab.diff({
     required this.client,
@@ -112,7 +117,8 @@ class ShellTab {
   })  : filePath = null,
         profile = null,
         termId = null,
-        termSessionKey = null;
+        termSessionKey = null,
+        isBoard = false;
 
   ShellTab.terminal({
     required this.client,
@@ -127,17 +133,37 @@ class ShellTab {
         profile = null,
         diffPath = null,
         diffStaged = false,
-        diffUntracked = false;
+        diffUntracked = false,
+        isBoard = false;
+
+  ShellTab.board({
+    required this.client,
+    required this.instanceUrl,
+    this.pane = ShellPane.left,
+    this.groupSessionKey,
+  })  : title = 'Tasks',
+        sessionId = null,
+        filePath = null,
+        profile = null,
+        diffPath = null,
+        diffStaged = false,
+        diffUntracked = false,
+        termId = null,
+        termSessionKey = null,
+        isBoard = true;
 
   bool get isFile => filePath != null;
   bool get isDiff => diffPath != null;
   bool get isTerminal => termId != null;
   bool get isMissionControl =>
+      !isBoard &&
       !isFile &&
       !isDiff &&
       !isTerminal &&
       isMissionControlTab(sessionId: sessionId, title: title);
-  String get key => isTerminal
+  String get key => isBoard
+      ? '$instanceUrl|tasks-board'
+      : isTerminal
       ? '$instanceUrl|term|${termSessionKey ?? 'global'}|$termId'
       : isDiff
           ? '$instanceUrl|diff|$diffPath|$diffStaged'
@@ -150,15 +176,17 @@ class ShellTab {
 
 /// Icon for a tab, by kind. One helper so the four call sites that render a
 /// tab (top bar, desktop strip, split header, tab menu) cannot drift.
-String tabIconKind(ShellTab t) => t.isMissionControl
-    ? 'layers'
-    : t.isTerminal
-        ? 'terminal'
-        : t.isDiff
-            ? 'git-branch'
-            : t.isFile
-                ? 'file'
-                : 'chat-thread';
+String tabIconKind(ShellTab t) => t.isBoard
+    ? 'kanban'
+    : t.isMissionControl
+        ? 'layers'
+        : t.isTerminal
+            ? 'terminal'
+            : t.isDiff
+                ? 'git-branch'
+                : t.isFile
+                    ? 'file'
+                    : 'chat-thread';
 
 class MacSessionStatus {
   final HarnessState? state;
@@ -184,7 +212,6 @@ class MacSessionControls {
 enum RightPanel {
   none('', ''),
   lanes('Lanes', 'layers'),
-  tasks('Tasks', 'layers'),
   recurring('Scheduled', 'scheduled'),
   checkpoints('Checkpoints', 'history');
 

@@ -561,7 +561,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       style: PanelStyle.drawer,
       maxWidth: 820,
       maxHeight: 760,
-      builder: (_, close) => TaskBoardScreen(client: widget.client),
+      builder: (_, close) => TasksScreen(client: widget.client),
     );
   }
 

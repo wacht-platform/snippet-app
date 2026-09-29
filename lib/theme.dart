@@ -831,6 +831,10 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedMaps;
     case 'list':
       return HugeIcons.strokeRoundedMenuSquare;
+    case 'task':
+      return HugeIcons.strokeRoundedCheckList;
+    case 'kanban':
+      return HugeIcons.strokeRoundedKanban;
     case 'file-plus':
       return HugeIcons.strokeRoundedFileAdd;
     case 'corner-down-right':

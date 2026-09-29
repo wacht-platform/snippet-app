@@ -86,7 +86,7 @@ void showTabContextMenu({
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
           child: Row(children: [
-            AppIcon(tab.isFile ? 'file' : 'terminal',
+            AppIcon(tabIconKind(tab),
                 size: 15, color: AppColors.fg3),
             const SizedBox(width: 10),
             Expanded(

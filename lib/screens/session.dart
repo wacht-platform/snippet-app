@@ -49,7 +49,7 @@ import 'mission_control/mission_control_state.dart'
         parseDirectMessage,
         parseCoordinationReply,
         parseAssignmentEnvelope;
-import 'mission_control/task_board_screen.dart';
+import 'tasks/tasks_screen.dart';
 
 part 'session_socket.dart';
 part 'session_appbar.dart';

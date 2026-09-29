@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
 import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
-import 'package:snippet/screens/mission_control/task_board_screen.dart';
+import 'package:snippet/screens/tasks/tasks_screen.dart';
 
 /// The Tasks board's filter + refresh behaviour.
 ///
@@ -38,7 +38,7 @@ Map<String, dynamic> _task(String id, String title, String status) => {
     };
 
 Future<void> _pump(WidgetTester tester, _FakeDaemon client) async {
-  await tester.pumpWidget(MaterialApp(home: TaskBoardScreen(client: client)));
+  await tester.pumpWidget(MaterialApp(home: TasksScreen(client: client)));
   await tester.pumpAndSettle();
 }
 

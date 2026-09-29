@@ -85,12 +85,6 @@ List<Widget> buildShellRailTools({
     final enabled = tab != null;
     return [
       railTool(
-        'layers',
-        tooltip: 'Tasks',
-        active: isRightPanelActive(RightPanel.tasks),
-        onTap: enabled ? () => onToggleRightPanel(RightPanel.tasks) : null,
-      ),
-      railTool(
         'minimize',
         tooltip: 'Compact history',
         onTap: enabled ? () => onSessionAction('compact') : null,

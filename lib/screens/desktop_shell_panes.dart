@@ -2,6 +2,9 @@ part of 'desktop_shell.dart';
 
 extension _DesktopShellPanesExt on _DesktopShellState {
   Widget _tabBody(_ShellTab t, {required bool primary}) {
+    if (t.isBoard) {
+      return TaskKanban(key: ValueKey('body-${t.key}'), client: t.client);
+    }
     if (t.isTerminal) {
       if (t.termSessionKey == null) {
         final s = _shells.byId(t.termId!);
@@ -76,7 +79,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     );
   }
 
-  bool _isAuxiliary(_ShellTab t) => t.isTerminal || t.isFile || t.isDiff;
+  bool _isAuxiliary(_ShellTab t) =>
+      t.isTerminal || t.isFile || t.isDiff || t.isBoard;
 
   List<_ShellTab> get _mainTabs => [
         for (final t in _tabs)

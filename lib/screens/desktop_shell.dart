@@ -26,6 +26,8 @@ import 'files.dart';
 import 'git.dart';
 import 'inbound_share_picker.dart';
 import 'mission_control.dart';
+import 'tasks/task_kanban.dart';
+import 'tasks/tasks_screen.dart';
 import 'mobile_shell.dart';
 import 'new_session_picker.dart';
 import 'session.dart';
@@ -152,7 +154,7 @@ class _DesktopShellState extends State<DesktopShell>
   /// Owned by the SHELL, not the sidebar: `_mobileShell`'s back handler must see
   /// it, or pressing back from Settings would exit the app instead of returning
   /// to Chats. Desktop navigates with the sidebar rail, so this is phone-only.
-  _MobileHome _mobileHome = _MobileHome.agents;
+  _MobileHome _mobileHome = _MobileHome.chats;
 
   /// Phone drill-down: which settings section is open, and which agent's detail.
   ///
@@ -163,7 +165,7 @@ class _DesktopShellState extends State<DesktopShell>
   CoordinationAgent? _mobileAgent;
 
   final List<_MobileRoute> _mobileRouteHistory = [
-    const _MobileRoute(home: MobileHome.agents),
+    const _MobileRoute(home: MobileHome.chats),
   ];
 
   // url → reachable, from a short /health ping (drives the machine status dots).
@@ -899,6 +901,21 @@ class _DesktopShellState extends State<DesktopShell>
           }),
         ),
         PaletteCommand(
+          'task',
+          'Open Tasks',
+          '',
+          () => setState(() {
+            _section = ShellSection.tasks;
+            _leftCollapsed = false;
+          }),
+        ),
+        PaletteCommand(
+          'kanban',
+          'Open Task Board',
+          '',
+          _openBoardTab,
+        ),
+        PaletteCommand(
           'agent',
           'Open Agents',
           '',
@@ -1262,6 +1279,7 @@ class _DesktopShellState extends State<DesktopShell>
             _openDiffTab(c, _active?.url ?? '', _activeTab?.sessionId ?? '', f);
           }
         },
+        onOpenBoard: _openBoardTab,
         onOpenFile: (path, name) {
           final c = _client;
           if (c != null) {

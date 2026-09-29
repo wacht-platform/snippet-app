@@ -7,7 +7,7 @@ import '../../coordination/coordination_thread_state.dart';
 import '../../models.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
-import 'task_board_screen.dart' show statusColor;
+import 'task_common.dart' show statusColor;
 
 /// One task: its state, its roster, its links, and its own message room.
 ///

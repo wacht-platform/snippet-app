@@ -8,7 +8,6 @@ import '../theme.dart';
 import '../tool_sheet.dart';
 import '../widgets.dart';
 import 'mission_control/coordination_agent_detail.dart';
-import 'mission_control/task_board_screen.dart';
 import 'recurring.dart';
 import 'session_panels.dart';
 import 'shell_models.dart';
@@ -535,9 +534,6 @@ class RightTabBody extends StatelessWidget {
     }
     return switch (tab.panel) {
       RightPanel.lanes => SessionLanesPanel(lanes: state?.lanes ?? const []),
-      RightPanel.tasks => client == null
-          ? const EmptyPaneHint()
-          : TaskBoardScreen(client: client!, embedded: true),
       RightPanel.recurring => client == null
           ? const EmptyPaneHint()
           : RecurringScreen(

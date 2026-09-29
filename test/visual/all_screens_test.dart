@@ -9,7 +9,7 @@ import 'package:snippet/screens/file_tree_sidebar_panel.dart';
 import 'package:snippet/screens/files.dart';
 import 'package:snippet/screens/git_diff_sidebar_panel.dart';
 import 'package:snippet/screens/mission_control/coordination_agent_detail.dart';
-import 'package:snippet/screens/mission_control/task_detail_screen.dart';
+import 'package:snippet/screens/tasks/task_detail_screen.dart';
 import 'package:snippet/screens/new_session_picker.dart';
 import 'package:snippet/screens/session.dart' show TerminalInfo;
 import 'package:snippet/screens/terminals_sidebar_panel.dart';

@@ -41,7 +41,7 @@ class MobileShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final chatsVisible = chatsOpen || !hasActiveTab;
     final canPop = canPopRoute ??
-        (!chatsVisible || drilledDown || mobileHome != MobileHome.agents);
+        (!chatsVisible || drilledDown || mobileHome != MobileHome.chats);
 
     void handleBack() {
       if (onPopRoute != null) {
@@ -56,8 +56,8 @@ class MobileShell extends StatelessWidget {
         }
       } else if (drilledDown) {
         onClearDrillDown();
-      } else if (mobileHome != MobileHome.agents) {
-        onMobileHome(MobileHome.agents);
+      } else if (mobileHome != MobileHome.chats) {
+        onMobileHome(MobileHome.chats);
       }
     }
 

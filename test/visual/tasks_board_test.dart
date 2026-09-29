@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
 import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
-import 'package:snippet/screens/mission_control/task_board_screen.dart';
+import 'package:snippet/screens/tasks/tasks_screen.dart';
 import 'package:snippet/theme.dart';
 import 'golden.dart';
 
@@ -73,7 +73,7 @@ void main() {
         await tester.pumpWidget(MaterialApp(
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
-          home: TaskBoardScreen(client: client),
+          home: TasksScreen(client: client),
         ));
         // Fixed pump, not pumpAndSettle: the board runs a periodic refresh
         // timer, so the tree never goes fully quiet.

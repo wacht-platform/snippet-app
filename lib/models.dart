@@ -1269,6 +1269,9 @@ class TaskItem {
   final String? completedAt;
   final String threadId;
 
+  /// The session the task is routed to.
+  final String sessionId;
+
   TaskItem.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         title = j['title'] as String? ?? '',
@@ -1281,7 +1284,27 @@ class TaskItem {
         createdAt = j['created_at'] as String? ?? '',
         updatedAt = j['updated_at'] as String? ?? '',
         completedAt = j['completed_at'] as String?,
-        threadId = j['thread_id'] as String? ?? '';
+        threadId = j['thread_id'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '';
+
+  /// This task in another column, for showing a move before the daemon
+  /// confirms it.
+  TaskItem movedTo(TaskStatus to) => TaskItem._moved(this, to);
+
+  TaskItem._moved(TaskItem t, TaskStatus to)
+      : id = t.id,
+        title = t.title,
+        description = t.description,
+        plan = t.plan,
+        status = to,
+        priority = t.priority,
+        createdByKind = t.createdByKind,
+        createdById = t.createdById,
+        createdAt = t.createdAt,
+        updatedAt = t.updatedAt,
+        completedAt = t.completedAt,
+        threadId = t.threadId,
+        sessionId = t.sessionId;
 }
 
 /// A task's links plus its resolved blockers.
