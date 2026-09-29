@@ -36,8 +36,9 @@ class NewSessionPicker extends StatefulWidget {
   /// Which machine these folders live on — identity, not a switcher.
   final String machineLabel;
 
-  /// Start a conversation rooted at the given folder.
-  final Future<void> Function(String folder) onOpenFolder;
+  /// Start a conversation in `folder`, working where `workspace` says.
+  final Future<void> Function(String folder, WorkspaceMode workspace)
+      onOpenFolder;
 
   /// Where to open. Null means the server's home directory, which is the sane
   /// default: this screen must not depend on a session already being open, and
@@ -60,6 +61,14 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
 
   bool _loading = true;
   String? _error;
+
+  /// The repository the current folder is in, when it is in one. A new chat
+  /// there works in a new worktree, the folder, or an existing worktree.
+  RepoWorktrees? _repo;
+  WorkspaceMode _mode = WorkspaceMode.worktree;
+
+  /// Set when an existing worktree is chosen; the chat starts there.
+  Worktree? _existing;
   String? _busy;
   int _run = 0;
 
@@ -97,6 +106,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         if (path == null || _homePath == null) _homePath = res.path;
         _loading = false;
       });
+      _loadRepo(res.path, id);
       // After the crumbs rebuild, park the view at the deep end.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _crumbScroll.hasClients) {
@@ -110,6 +120,46 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         _loading = false;
       });
     }
+  }
+
+  /// Whether the current folder is in a git repository, and its worktrees.
+  Future<void> _loadRepo(String path, int run) async {
+    RepoWorktrees? repo;
+    try {
+      repo = await widget.client.worktrees(path);
+    } catch (_) {}
+    if (!mounted || run != _run) return;
+    setState(() {
+      _repo = repo?.repo == null ? null : repo;
+      _mode = WorkspaceMode.worktree;
+      _existing = null;
+    });
+  }
+
+  Future<void> _pickExisting(BuildContext anchor) async {
+    final worktrees = _repo?.worktrees ?? const <Worktree>[];
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 260,
+      maxWidth: 380,
+      items: [
+        appMenuHeading<String>('Existing worktrees'),
+        for (final w in worktrees)
+          appMenuRow<String>(
+            value: w.path,
+            icon: 'git-branch',
+            label: w.branch ?? lastPathSegment(w.path, ifEmpty: w.path),
+            description: w.path,
+            selected: _existing?.path == w.path,
+          ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _existing = worktrees.firstWhere((w) => w.path == picked);
+      _mode = WorkspaceMode.folder;
+    });
   }
 
   /// Folders first (tappable), then files (inert), each alphabetical.
@@ -165,11 +215,14 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   }
 
   Future<void> _open() async {
-    final path = _here;
+    final existing = _existing;
+    final path = existing?.path ?? _here;
     if (path.isEmpty) return;
+    // Outside a repository there is no worktree to make.
+    final mode = _repo == null ? WorkspaceMode.folder : _mode;
     setState(() => _busy = 'Starting…');
     try {
-      await widget.onOpenFolder(path);
+      await widget.onOpenFolder(path, mode);
     } catch (e) {
       if (mounted) {
         setState(() => _busy = null);
@@ -306,6 +359,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                         child: _folderList(),
                       ),
               ),
+              if (_repo != null) _workspaceChoice(),
               _actionBar(),
             ],
           ],
@@ -569,7 +623,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          _busy ?? 'Start chat in $_hereName',
+                          _busy ?? _startLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TS.label(AppColors.accentFg),
@@ -583,6 +637,110 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           ),
         ]),
       );
+
+  String get _startLabel {
+    final existing = _existing;
+    if (existing != null) {
+      return 'Start chat in ${existing.branch ?? lastPathSegment(existing.path, ifEmpty: existing.path)}';
+    }
+    if (_repo != null && _mode == WorkspaceMode.worktree) {
+      return 'Start chat in a new worktree';
+    }
+    return 'Start chat in $_hereName';
+  }
+
+  /// Where a chat in a repository works: a new worktree, the folder itself, or
+  /// a worktree that already exists. Shown only inside a git repository.
+  Widget _workspaceChoice() {
+    final worktrees = _repo?.worktrees ?? const <Worktree>[];
+    Widget option(String icon, String label, bool selected, VoidCallback? onTap,
+            {String? tooltip}) =>
+        Expanded(
+          child: Tooltip(
+            message: tooltip ?? '',
+            child: Material(
+              color: selected ? AppColors.surface3 : Colors.transparent,
+              borderRadius: BorderRadius.circular(R.sm),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(R.sm),
+                onTap: _busy != null ? null : onTap,
+                child: SizedBox(
+                  height: kMobile ? 38 : 30,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AppIcon(icon,
+                          size: 14,
+                          color: onTap == null
+                              ? AppColors.fg4
+                              : (selected ? AppColors.fg1 : AppColors.fg3)),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TS.label(onTap == null
+                                ? AppColors.fg4
+                                : (selected ? AppColors.fg1 : AppColors.fg3))),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+    return Container(
+      color: AppColors.base,
+      padding: EdgeInsets.fromLTRB(
+          kMobile ? M.gutter : 16, 10, kMobile ? M.gutter : 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Works in', style: TS.caption()),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(R.md),
+            ),
+            child: Row(children: [
+              option('git-branch', 'New worktree',
+                  _existing == null && _mode == WorkspaceMode.worktree,
+                  () => setState(() {
+                        _mode = WorkspaceMode.worktree;
+                        _existing = null;
+                      }),
+                  tooltip: 'Its own branch and checkout'),
+              option('folder', 'This folder',
+                  _existing == null && _mode == WorkspaceMode.folder,
+                  () => setState(() {
+                        _mode = WorkspaceMode.folder;
+                        _existing = null;
+                      }),
+                  tooltip: 'Work directly in $_hereName'),
+              Builder(
+                builder: (ctx) => option(
+                  'layers',
+                  _existing == null
+                      ? 'Existing${worktrees.isEmpty ? '' : ' (${worktrees.length})'}'
+                      : (_existing!.branch ??
+                          lastPathSegment(_existing!.path,
+                              ifEmpty: _existing!.path)),
+                  _existing != null,
+                  worktrees.isEmpty ? null : () => _pickExisting(ctx),
+                  tooltip: worktrees.isEmpty
+                      ? 'No other worktrees'
+                      : 'A worktree that already exists',
+                ),
+              ),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _errorState() => Center(
         child: Padding(

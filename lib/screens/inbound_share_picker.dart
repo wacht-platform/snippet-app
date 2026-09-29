@@ -61,9 +61,12 @@ Future<String?> showInboundSharePicker({
                 overflow: TextOverflow.ellipsis,
                 style: sans(16, color: AppColors.fg1)),
             subtitle: Text(
-                s.displayAgentId == null || s.displayAgentId!.trim().isEmpty
-                    ? (s.folder.trim().isEmpty ? 'session' : s.folder)
-                    : '${s.folder.trim().isEmpty ? 'session' : s.folder} · ${s.displayAgentId}',
+                [
+                  s.projectFolder.trim().isEmpty ? 'session' : s.projectFolder,
+                  if (s.inWorktree) s.branch ?? 'worktree',
+                  if (s.displayAgentId?.trim().isNotEmpty ?? false)
+                    s.displayAgentId!,
+                ].join(' · '),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TS.meta()),

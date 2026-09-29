@@ -798,8 +798,12 @@ class _DesktopShellState extends State<DesktopShell>
         }
       }
     }
-    return lastPathSegment(session?.folder ?? '',
+    final project = lastPathSegment(session?.projectFolder ?? '',
         ifEmpty: _active?.label ?? 'Workspace');
+    final branch = session?.branch;
+    return session?.inWorktree == true && branch != null
+        ? '$project · $branch'
+        : project;
   }
 
   /// The active tab's workspace folder, or null when it cannot be resolved
@@ -1092,9 +1096,10 @@ class _DesktopShellState extends State<DesktopShell>
         // answer with its home directory, which is the sane default.
         startPath: null,
         onClose: close,
-        onOpenFolder: (folder) async {
+        onOpenFolder: (folder, workspace) async {
           try {
-            final id = await c.openSession(folder, newConversation: true);
+            final id = await c.openSession(folder,
+                workspace: workspace, newConversation: true);
             _openSession(id, 'New session', null);
             _loadSessions();
           } catch (e) {

@@ -69,7 +69,11 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
             value: s.id,
             icon: 'chat',
             label: s.title.trim().isEmpty ? s.id : s.title,
-            description: s.folder.trim().isEmpty ? s.id : s.folder,
+            description: s.projectFolder.trim().isEmpty
+                ? s.id
+                : s.inWorktree
+                    ? '${s.projectFolder} · ${s.branch ?? 'worktree'}'
+                    : s.projectFolder,
             selected: s.id == _sessionId,
           ),
       ],

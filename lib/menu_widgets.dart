@@ -312,9 +312,10 @@ Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
       // nearly edge-to-edge. Impose the sheet's own gutter here and let the row's
       // fill sit inside it.
       padding: const EdgeInsets.symmetric(horizontal: S.s4),
-      child: SizedBox(
-        height: 44,
-        child: entry.child,
+      // At least a touch target, and taller when a row carries a description.
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Align(alignment: Alignment.centerLeft, child: entry.child),
       ),
     ),
   );

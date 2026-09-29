@@ -122,7 +122,8 @@ class _PaletteState extends State<_Palette> {
         .where((s) =>
             _q.isEmpty ||
             s.title.toLowerCase().contains(_q) ||
-            s.folder.toLowerCase().contains(_q))
+            s.projectFolder.toLowerCase().contains(_q) ||
+            (s.branch?.toLowerCase().contains(_q) ?? false))
         .take(12)
         .toList();
     final cmds = widget.commands
@@ -160,7 +161,9 @@ class _PaletteState extends State<_Palette> {
               _label('Chats'),
               ...chats.map((s) => _row(
                     title: s.title.isEmpty ? '(untitled)' : s.title,
-                    hint: _proj(s.folder),
+                    hint: s.inWorktree
+                        ? '${_proj(s.projectFolder)} · ${s.branch ?? 'worktree'}'
+                        : _proj(s.projectFolder),
                     onTap: () {
                       Navigator.pop(context);
                       widget.onOpenChat(s);

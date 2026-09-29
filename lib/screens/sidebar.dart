@@ -670,7 +670,8 @@ class SidebarState extends State<Sidebar> {
     final q = _filterQuery.trim().toLowerCase();
     if (q.isEmpty) return true;
     return s.title.toLowerCase().contains(q) ||
-        s.folder.toLowerCase().contains(q);
+        s.projectFolder.toLowerCase().contains(q) ||
+        (s.branch?.toLowerCase().contains(q) ?? false);
   }
 
   List<SessionInfo> _sortSessionsByRecency(Iterable<SessionInfo> sessions) {
@@ -1123,9 +1124,10 @@ class SidebarState extends State<Sidebar> {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
     final selected = !kMobile && s.id == widget.selectedSessionId;
-    final folderName = s.folder.trim().isEmpty
+    // The project, not the generated worktree directory.
+    final folderName = s.projectFolder.trim().isEmpty
         ? ''
-        : lastPathSegment(s.folder, ifEmpty: s.folder);
+        : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
     final trailingText =
         folderName.isNotEmpty ? folderName : relativeTime(s.lastActive);
     final card = Material(
@@ -1212,6 +1214,13 @@ class SidebarState extends State<Sidebar> {
                     style: sans(M.meta, weight: W.label, color: AppColors.accent)),
               ] else if (!renaming && trailingText.isNotEmpty) ...[
                 const SizedBox(width: 10),
+                if (s.inWorktree) ...[
+                  Tooltip(
+                    message: 'Worktree · ${s.branch ?? s.folder}',
+                    child: AppIcon('git-branch', size: 12, color: AppColors.fg3),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 130),
                   child: Text(trailingText,

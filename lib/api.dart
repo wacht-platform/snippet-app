@@ -119,17 +119,31 @@ class DaemonClient {
     return (jsonDecode(r.body) as Map<String, dynamic>)['path'] as String;
   }
 
+  /// POST /sessions. `workspace` decides where a new session works.
   Future<String> openSession(String folder,
-      {bool resume = true,
+      {required WorkspaceMode workspace,
+      bool resume = true,
       String? profile,
       bool newConversation = false}) async {
-    final body = <String, dynamic>{'folder': folder, 'resume': resume};
+    final body = <String, dynamic>{
+      'folder': folder,
+      'resume': resume,
+      'workspace': workspace.wire,
+    };
     if (newConversation) body['new_conversation'] = true;
     if (profile != null && profile.isNotEmpty) body['profile'] = profile;
     final r = await http.post(_uri('/sessions'),
         headers: _json, body: jsonEncode(body));
     if (r.statusCode != 200) throw _err('open session', r);
     return (jsonDecode(r.body) as Map<String, dynamic>)['id'] as String;
+  }
+
+  /// GET /git/worktrees — the repository `folder` belongs to and its
+  /// worktrees, for offering where a new session works.
+  Future<RepoWorktrees> worktrees(String folder) async {
+    final r = await http.get(_uri('/git/worktrees', {'folder': folder}));
+    if (r.statusCode != 200) throw _err('list worktrees', r);
+    return RepoWorktrees.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
   WebSocketChannel attach(String sessionId) {

@@ -776,8 +776,8 @@ class RecurringScreenState extends State<RecurringScreen>
     final match = _sessions
         ?.where((s) => s.id == job.sessionId || job.sessionId.contains(s.id))
         .firstOrNull;
-    if (match != null && match.folder.isNotEmpty) {
-      return lastPathSegment(match.folder, ifEmpty: match.title);
+    if (match != null && match.projectFolder.isNotEmpty) {
+      return lastPathSegment(match.projectFolder, ifEmpty: match.title);
     }
     final clean = job.sessionId.replaceAll('.json', '');
     if (clean.contains('/conversations/')) {

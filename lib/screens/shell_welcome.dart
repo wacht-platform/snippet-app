@@ -167,7 +167,8 @@ class ShellRecentPlaceholder extends StatelessWidget {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                lastPathSegment(s.folder, ifEmpty: s.folder),
+                                lastPathSegment(s.projectFolder,
+                                    ifEmpty: s.projectFolder),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: mono(10, color: AppColors.fg3),

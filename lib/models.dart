@@ -129,6 +129,17 @@ class SessionInfo {
   /// rule is stated once rather than repeated at each call site.
   String? get displayAgentId => workerAgentId ?? agentId;
 
+  /// For a session in a git worktree: the folder in the main checkout it was
+  /// made from, and the worktree's branch.
+  final String? originFolder;
+  final String? branch;
+
+  /// The folder a person knows this session by: the project, not the
+  /// generated worktree directory.
+  String get projectFolder => originFolder ?? folder;
+
+  bool get inWorktree => originFolder != null;
+
   SessionInfo.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         folder = j['folder'] as String? ?? '',
@@ -139,7 +150,9 @@ class SessionInfo {
         running = j['running'] == true,
         profile = j['profile'] as String?,
         agentId = j['agent_id'] as String?,
-        workerAgentId = j['worker_agent_id'] as String?;
+        workerAgentId = j['worker_agent_id'] as String?,
+        originFolder = j['origin_folder'] as String?,
+        branch = j['branch'] as String?;
 
   SessionInfo withTitle(String title) => SessionInfo._(
         id: id,
@@ -152,6 +165,8 @@ class SessionInfo {
         profile: profile,
         agentId: agentId,
         workerAgentId: workerAgentId,
+        originFolder: originFolder,
+        branch: branch,
       );
 
   SessionInfo withStatus(String status) => SessionInfo._(
@@ -165,6 +180,8 @@ class SessionInfo {
         profile: profile,
         agentId: agentId,
         workerAgentId: workerAgentId,
+        originFolder: originFolder,
+        branch: branch,
       );
 
   const SessionInfo._({
@@ -178,7 +195,41 @@ class SessionInfo {
     required this.profile,
     this.agentId,
     this.workerAgentId,
+    this.originFolder,
+    this.branch,
   });
+}
+
+/// Where a new session works: a new git worktree of the folder, or the folder.
+enum WorkspaceMode {
+  worktree('worktree'),
+  folder('folder');
+
+  const WorkspaceMode(this.wire);
+  final String wire;
+}
+
+/// A repository's main checkout and its linked worktrees.
+class RepoWorktrees {
+  /// Null outside a git repository.
+  final String? repo;
+  final List<Worktree> worktrees;
+
+  RepoWorktrees.fromJson(Map<String, dynamic> j)
+      : repo = j['repo'] as String?,
+        worktrees = [
+          for (final w in (j['worktrees'] as List? ?? const []))
+            Worktree.fromJson(w as Map<String, dynamic>),
+        ];
+}
+
+class Worktree {
+  final String path;
+  final String? branch;
+
+  Worktree.fromJson(Map<String, dynamic> j)
+      : path = j['path'] as String? ?? '',
+        branch = j['branch'] as String?;
 }
 
 class FsEntry {
