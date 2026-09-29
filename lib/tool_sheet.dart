@@ -161,6 +161,7 @@ class _ToolBatchViewState extends State<ToolBatchView> {
                       scroll: widget.scroll,
                       onClose: widget.docked ? null : widget.onClose,
                       onOpen: _show,
+                      header: !widget.docked,
                     )
                   : _StepDetail(
                       key: ValueKey(open),
@@ -242,12 +243,16 @@ class _StepList extends StatelessWidget {
   final ScrollController? scroll;
   final VoidCallback? onClose;
   final ValueChanged<int> onOpen;
+
+  /// Docked in the desktop pane, the tab already names the list.
+  final bool header;
   const _StepList({
     super.key,
     required this.batch,
     required this.scroll,
     required this.onClose,
     required this.onOpen,
+    this.header = true,
   });
 
   @override
@@ -258,11 +263,12 @@ class _StepList extends StatelessWidget {
     // the header only says when it is still going.
     final subtitle = running ? 'running' : '';
     return Column(children: [
-      _SheetHeader(
-        title: 'Activity',
-        subtitle: subtitle,
-        onClose: onClose,
-      ),
+      if (header)
+        _SheetHeader(
+          title: 'Activity',
+          subtitle: subtitle,
+          onClose: onClose,
+        ),
       Expanded(
         child: ListView.separated(
           controller: scroll,

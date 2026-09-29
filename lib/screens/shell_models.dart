@@ -210,7 +210,7 @@ class RightTab {
         pane = ShellPane.right;
 
   /// A tool batch's details, docked beside the conversation. There is one
-  /// Tools tab; opening another batch replaces what it shows.
+  /// Activity tab; opening another batch replaces what it shows.
   RightTab.tools(ValueListenable<ToolBatch> this.tools)
       : panel = RightPanel.none,
         agent = null,
@@ -239,7 +239,7 @@ class RightTab {
           : 'panel|${panel.name}';
 
   String get label {
-    if (tools != null) return 'Tools';
+    if (tools != null) return 'Activity';
     final a = agent;
     if (a == null) return panel.label;
     return a.displayName.trim().isEmpty ? a.id : a.displayName;
