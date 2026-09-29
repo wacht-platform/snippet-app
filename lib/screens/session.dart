@@ -393,20 +393,51 @@ class _SessionScreenState extends State<SessionScreen>
   String get _draftKey => Drafts.keyFor(widget.client.baseUrl, widget.sessionId);
   bool _switchingSession = false;
 
+  /// What this composer would lose on leaving: its text and whatever is
+  /// ready to send (uploads still in flight follow on their own).
+  Draft _currentDraft() => Draft(
+        text: _input.text,
+        attachments: [
+          for (final a in _attachments)
+            if (a.ready) a.toDraft()
+        ],
+      );
+
   void _saveDraft() {
     if (_closed || _switchingSession) return;
-    Drafts.instance.save(_draftKey, _input.text);
+    Drafts.instance.save(_draftKey, _currentDraft());
+  }
+
+  /// Attachments change in many places; after each rebuild, save when the set
+  /// that is ready to send differs from what was last saved.
+  String _savedAttachmentIds = '';
+  void _syncDraftAttachments() {
+    final ids =
+        _attachments.where((a) => a.ready).map((a) => a.toDraft().id).join('|');
+    if (ids == _savedAttachmentIds) return;
+    _savedAttachmentIds = ids;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _saveDraft());
   }
 
   void _restoreDraft() {
     final draft = Drafts.instance.of(_draftKey);
-    if (draft == null || _input.text.isNotEmpty) return;
-    // Guarded like a paste restore, so a long draft is not re-read as a paste.
-    _restoringInput = true;
-    _input.value = TextEditingValue(
-        text: draft, selection: TextSelection.collapsed(offset: draft.length));
-    _restoringInput = false;
-    _lastInput = draft;
+    if (draft == null) return;
+    if (_input.text.isEmpty && draft.text.isNotEmpty) {
+      // Guarded like a paste restore, so a long draft is not re-read as a paste.
+      _restoringInput = true;
+      _input.value = TextEditingValue(
+          text: draft.text,
+          selection: TextSelection.collapsed(offset: draft.text.length));
+      _restoringInput = false;
+      _lastInput = draft.text;
+    }
+    if (_attachments.isEmpty && draft.attachments.isNotEmpty) {
+      _attachments.addAll(draft.attachments.map(_Attachment.fromDraft));
+    }
+    _savedAttachmentIds = _attachments
+        .where((a) => a.ready)
+        .map((a) => a.toDraft().id)
+        .join('|');
   }
 
   void _interceptBigPaste() {
@@ -745,6 +776,12 @@ class _SessionScreenState extends State<SessionScreen>
       _unpark();
     }
     if (!sameSession) {
+      // Keep what was typed and attached as the previous session's draft,
+      // before anything below clears it.
+      Drafts.instance.save(
+          Drafts.keyFor(oldWidget.client.baseUrl, oldWidget.sessionId),
+          _currentDraft(),
+          now: true);
       _parked = !widget.acceptDrops;
       _title = _isMissionControl ? 'Mission Control' : widget.title;
       // PageView normally keys each session, but a parent may reuse this State
@@ -759,12 +796,7 @@ class _SessionScreenState extends State<SessionScreen>
       _optimisticQueued.clear();
       _queueHidden.clear();
       _clearPendingAll();
-      // Keep what was typed as the previous session's draft, then pick up
-      // this session's own.
-      Drafts.instance.save(
-          Drafts.keyFor(oldWidget.client.baseUrl, oldWidget.sessionId),
-          _input.text,
-          now: true);
+      // The previous session's draft was saved above; pick up this one's.
       _switchingSession = true;
       _input.clear();
       _switchingSession = false;
@@ -955,7 +987,7 @@ class _SessionScreenState extends State<SessionScreen>
     modelsRevision.removeListener(_loadModel);
     _input.removeListener(_interceptBigPaste);
     _input.removeListener(_saveDraft);
-    Drafts.instance.save(_draftKey, _input.text, now: true);
+    Drafts.instance.save(_draftKey, _currentDraft(), now: true);
     // Tool batches are not disposed: the desktop side pane can still be
     // showing one after this screen goes, and they hold no resources.
     _inputFocus.unfocus();
@@ -1019,6 +1051,7 @@ class _SessionScreenState extends State<SessionScreen>
   Widget build(BuildContext context) {
     // Depend on Theme so this rebuilds when the user switches palettes.
     Theme.of(context);
+    _syncDraftAttachments();
     final s = _state;
     final status = s?.status ?? 'connecting';
     final running = status == 'running';

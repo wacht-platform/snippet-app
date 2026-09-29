@@ -920,7 +920,12 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           ),
         ),
       );
-    } else if (a.isImage && a.localPath != null) {
+    } else if (a.isImage &&
+        ((a.localPath != null && File(a.localPath!).existsSync()) ||
+            a.remotePath != null)) {
+      // A restored draft may have lost its local file (phones clear picker
+      // caches); the uploaded copy on the daemon stands in.
+      final local = a.localPath != null && File(a.localPath!).existsSync();
       body = Container(
         width: side,
         height: side,
@@ -929,8 +934,20 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           border: Border.all(color: AppColors.border),
         ),
         clipBehavior: Clip.antiAlias,
-        child: Image.file(File(a.localPath!),
-            fit: BoxFit.cover, cacheWidth: 168, cacheHeight: 168),
+        child: local
+            ? Image.file(File(a.localPath!),
+                fit: BoxFit.cover, cacheWidth: 168, cacheHeight: 168)
+            : Image(
+                image: ResizeImage(
+                    widget.client.imageProvider(a.remotePath!),
+                    width: 168,
+                    height: 168),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => ColoredBox(
+                    color: AppColors.surface2,
+                    child: Center(
+                        child: AppIcon('image',
+                            size: 16, color: AppColors.fg4)))),
       );
     } else {
       final ext = a.name.contains('.') ? a.name.split('.').last.toUpperCase() : 'FILE';

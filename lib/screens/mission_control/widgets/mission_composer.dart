@@ -27,12 +27,13 @@ class _MissionComposerState extends State<MissionComposer> {
   String get _draftKey =>
       Drafts.keyFor(widget.state.client.baseUrl, 'mission-control');
 
-  void _saveDraft() => Drafts.instance.save(_draftKey, _controller.text);
+  void _saveDraft() =>
+      Drafts.instance.save(_draftKey, Draft(text: _controller.text));
 
   @override
   void initState() {
     super.initState();
-    _controller.text = Drafts.instance.of(_draftKey) ?? '';
+    _controller.text = Drafts.instance.of(_draftKey)?.text ?? '';
     _controller.addListener(_saveDraft);
   }
 
@@ -46,7 +47,7 @@ class _MissionComposerState extends State<MissionComposer> {
   void dispose() {
     _focus.unfocus();
     _controller.removeListener(_saveDraft);
-    Drafts.instance.save(_draftKey, _controller.text, now: true);
+    Drafts.instance.save(_draftKey, Draft(text: _controller.text), now: true);
     _controller.dispose();
     _focus.dispose();
     super.dispose();

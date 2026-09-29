@@ -739,6 +739,25 @@ class _Attachment {
         pastedText = text,
         uploading = false;
 
+  /// Brought back from a saved draft: already uploaded (or pasted), so ready.
+  _Attachment.fromDraft(DraftAttachment d)
+      : name = d.name,
+        isImage = d.isImage,
+        isAudio = d.isAudio,
+        localPath = d.localPath,
+        remotePath = d.remotePath,
+        pastedText = d.pastedText,
+        uploading = false;
+
+  DraftAttachment toDraft() => DraftAttachment(
+        name: name,
+        isImage: isImage,
+        isAudio: isAudio,
+        localPath: localPath,
+        remotePath: remotePath,
+        pastedText: pastedText,
+      );
+
   bool get ready => remotePath != null || pastedText != null;
 
   /// How this attachment is referenced in the outgoing message.

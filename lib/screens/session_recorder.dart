@@ -420,13 +420,21 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
     if (entries.isEmpty) return;
     _setState(() => _attachments.addAll(entries));
     final generation = _attachmentGeneration;
+    final draftKey = _draftKey;
     for (var i = 0; i < entries.length; i++) {
       final p = items[i];
       final a = entries[i];
       try {
         final bytes = await p.readBytes();
         final path = await widget.client.uploadFile(bytes, name: p.name);
-        if (!mounted || generation != _attachmentGeneration) return;
+        if (!mounted || generation != _attachmentGeneration) {
+          // The composer moved on mid-upload: the file still belongs to the
+          // session it was attached in, as part of that session's draft.
+          a.remotePath = path;
+          a.uploading = false;
+          Drafts.instance.addAttachment(draftKey, a.toDraft());
+          continue;
+        }
         _setState(() {
           a.remotePath = path;
           a.uploading = false;
