@@ -322,20 +322,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               _Description(markdown: t.description),
               const SizedBox(height: S.s12),
             ],
-            // Column picker. Every state is offered, including the current one,
-            // so the row reads as the task's position rather than a menu.
+            // Column picker. The current state is always shown, so the row
+            // reads as the task's position; In progress is never offered, as
+            // only a dispatch starts work.
             SizedBox(
               height: 32,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
                   for (final s in TaskStatus.values)
+                    if (s != TaskStatus.inProgress || s == t.status)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          onTap: busy ? null : () => _setStatus(s),
+                          onTap: busy || s == t.status
+                              ? null
+                              : () => _setStatus(s),
                           borderRadius: BorderRadius.circular(R.chip),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10),

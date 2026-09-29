@@ -1187,6 +1187,7 @@ enum TaskStatus {
   inProgress('in_progress', 'In progress'),
   blocked('blocked', 'Blocked'),
   done('done', 'Done'),
+  failed('failed', 'Failed'),
   cancelled('cancelled', 'Cancelled');
 
   const TaskStatus(this.wire, this.label);

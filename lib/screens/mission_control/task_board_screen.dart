@@ -441,6 +441,7 @@ Color statusColor(TaskStatus status) => switch (status) {
       TaskStatus.inProgress => AppColors.run,
       TaskStatus.blocked => AppColors.danger,
       TaskStatus.done => AppColors.ok,
+      TaskStatus.failed => AppColors.danger,
       TaskStatus.cancelled => AppColors.fg4,
     };
 
