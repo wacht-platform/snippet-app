@@ -255,14 +255,14 @@ class _StepList extends StatelessWidget {
     final steps = batch.steps;
     final failed = steps.where((s) => s.failed).length;
     final running = batch.running && steps.any((s) => s.running);
-    // The title already counts what ran; the subtitle only flags state.
+    // The list itself shows what ran; the header names it and flags state.
     final subtitle = [
       if (failed > 0) '$failed failed',
       if (running) 'running',
     ].join(' · ');
     return Column(children: [
       _SheetHeader(
-        title: steps.isEmpty ? 'Tools' : activitySummary(steps),
+        title: 'Activity',
         subtitle: subtitle,
         onClose: onClose,
       ),
@@ -376,7 +376,7 @@ class _StepDetail extends StatelessWidget {
         leading: IconBtn('chevron-left',
             size: 34, iconSize: 18, tooltip: 'Back', onTap: onBack),
         title: title,
-        subtitle: toolTitle(step.tool),
+        subtitle: null,
         onClose: onClose,
       ),
       Expanded(
