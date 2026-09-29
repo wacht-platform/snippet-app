@@ -60,9 +60,10 @@ class InferenceProfile {
         xSearch = j['x_search'] == true;
 
   /// Whether this profile is ready to use. Most providers need an API key, but
-  /// ChatGPT authenticates via an OAuth login (no key), so a keyless chatgpt
-  /// profile is still usable — don't gate it on [hasKey].
-  bool get usable => hasKey || provider == 'chatgpt';
+  /// the subscription providers sign in instead — ChatGPT via OAuth, Grok via a
+  /// device code — so a keyless one is still usable; don't gate it on [hasKey].
+  bool get usable =>
+      hasKey || const {'chatgpt', 'xai', 'grok'}.contains(provider);
 }
 
 class ServerConfig {
