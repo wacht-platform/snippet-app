@@ -24,7 +24,11 @@ class TaskKanban extends StatefulWidget {
   State<TaskKanban> createState() => _TaskKanbanState();
 }
 
-const double _columnWidth = 284;
+/// Column widths: expanded columns share the pane between these bounds, and a
+/// folded column is a slim strip.
+const double _minColumn = 248;
+const double _maxColumn = 360;
+const double _foldedColumn = 48;
 
 class _TaskKanbanState extends State<TaskKanban> {
   late TaskFeed _feed = TaskFeed(widget.client, onChange: _sync);
@@ -34,6 +38,11 @@ class _TaskKanbanState extends State<TaskKanban> {
 
   /// The card being dragged, so columns can say whether they take it.
   TaskItem? _dragging;
+
+  /// Failed and cancelled work is kept but folded away, the way modern boards
+  /// treat finished columns; a click opens one.
+  final Set<TaskStatus> _folded = {TaskStatus.failed, TaskStatus.cancelled};
+  double _columnWidth = _minColumn;
 
   @override
   void didUpdateWidget(covariant TaskKanban oldWidget) {
@@ -137,18 +146,26 @@ class _TaskKanbanState extends State<TaskKanban> {
     }
     final visible =
         _feed.tasks.where((t) => taskMatches(t, _query)).toList();
-    return Scrollbar(
-      controller: _scroll,
-      child: ListView(
+    return LayoutBuilder(builder: (context, constraints) {
+      // Open columns fill the pane when they fit, so a board with room never
+      // scrolls sideways; a narrow pane scrolls at the minimum width.
+      final open = TaskStatus.values.length - _folded.length;
+      final room = constraints.maxWidth - 32 - _folded.length * (_foldedColumn + 8);
+      _columnWidth = (room / open - 8).clamp(_minColumn, _maxColumn);
+      return Scrollbar(
         controller: _scroll,
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        children: [
-          for (final status in TaskStatus.values)
-            _column(status, visible.where((t) => t.status == status).toList()),
-        ],
-      ),
-    );
+        child: ListView(
+          controller: _scroll,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: [
+            for (final status in TaskStatus.values)
+              _column(
+                  status, visible.where((t) => t.status == status).toList()),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _column(TaskStatus status, List<TaskItem> items) {
@@ -161,6 +178,9 @@ class _TaskKanbanState extends State<TaskKanban> {
         final refuses = dragging != null &&
             dragging.status != status &&
             !_accepts(status, dragging);
+        if (_folded.contains(status)) {
+          return _foldedStrip(status, items.length, hovering);
+        }
         return AnimatedContainer(
           duration: Motion.fast,
           width: _columnWidth,
@@ -192,8 +212,47 @@ class _TaskKanbanState extends State<TaskKanban> {
     );
   }
 
+  void _toggleFold(TaskStatus status) => setState(() {
+        if (!_folded.remove(status)) _folded.add(status);
+      });
+
+  /// A folded column: its dot, count and name on end. Still a drop target, so
+  /// a card can be dropped on it without opening it.
+  Widget _foldedStrip(TaskStatus status, int count, bool hovering) => Tooltip(
+        message: 'Show ${status.label}',
+        child: InkWell(
+          onTap: () => _toggleFold(status),
+          borderRadius: BorderRadius.circular(R.lg),
+          child: AnimatedContainer(
+            duration: Motion.fast,
+            width: _foldedColumn,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.only(top: 14),
+            decoration: BoxDecoration(
+              color: hovering ? AppColors.surface2 : AppColors.bg,
+              borderRadius: BorderRadius.circular(R.lg),
+            ),
+            child: Column(children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                    color: statusColor(status), shape: BoxShape.circle),
+              ),
+              const SizedBox(height: 10),
+              Text('$count', style: TS.meta()),
+              const SizedBox(height: 12),
+              RotatedBox(
+                quarterTurns: 1,
+                child: Text(status.label, style: TS.label()),
+              ),
+            ]),
+          ),
+        ),
+      );
+
   Widget _columnHeader(TaskStatus status, int count) => Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+        padding: const EdgeInsets.fromLTRB(14, 12, 6, 10),
         child: Row(children: [
           Container(
             width: 8,
@@ -205,6 +264,12 @@ class _TaskKanbanState extends State<TaskKanban> {
           Text(status.label, style: TS.label(AppColors.fg1)),
           const SizedBox(width: 8),
           Text('$count', style: TS.meta()),
+          const Spacer(),
+          IconBtn('minimize',
+              size: 24,
+              iconSize: 14,
+              tooltip: 'Fold ${status.label}',
+              onTap: () => _toggleFold(status)),
         ]),
       );
 

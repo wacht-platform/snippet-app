@@ -106,6 +106,28 @@ void main() {
         reason: 'the card must return to its column after a refusal');
   });
 
+  testWidgets('finished columns fold away yet still take drops',
+      (tester) async {
+    final client = _FakeDaemon([_task('1', 'Write the docs', 'todo')]);
+    await _pumpBoard(tester, client);
+
+    expect(find.byTooltip('Show Cancelled'), findsOneWidget);
+    final strip = tester.getCenter(find.byTooltip('Show Cancelled'));
+    final gesture =
+        await tester.startGesture(tester.getCenter(find.text('Write the docs')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.moveTo(strip);
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(client.moves['1'], TaskStatus.cancelled);
+
+    await tester.tap(find.byTooltip('Show Cancelled'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Fold Cancelled'), findsOneWidget);
+    expect(find.text('Write the docs'), findsOneWidget);
+  });
+
   testWidgets('the search narrows the tasks panel', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
