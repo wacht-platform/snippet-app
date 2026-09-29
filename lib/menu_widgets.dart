@@ -329,13 +329,8 @@ void toast(BuildContext context, String message, {bool danger = false}) {
   _activeToast?.remove();
   _toastTimer?.cancel();
   final entry = OverlayEntry(
-    builder: (ctx) => Positioned(
-      left: 0,
-      right: 0,
-      bottom: MediaQuery.of(ctx).padding.bottom + (kMobile ? 16 : 22),
-      child: IgnorePointer(
-          child: Center(child: _ToastCard(message: message, danger: danger))),
-    ),
+    builder: (ctx) => _toastSlot(ctx,
+        IgnorePointer(child: _ToastCard(message: message, danger: danger))),
   );
   _activeToast = entry;
   overlay.insert(entry);
@@ -368,11 +363,9 @@ void actionToast(BuildContext context, String message,
   }
 
   entry = OverlayEntry(
-    builder: (ctx) => Positioned(
-      left: 0,
-      right: 0,
-      bottom: MediaQuery.of(ctx).padding.bottom + (kMobile ? 16 : 22),
-      child: Center(
+    builder: (ctx) => _toastSlot(
+      ctx,
+      Center(
         child: _ToastCard(
           message: message,
           danger: false,
@@ -395,6 +388,19 @@ void actionToast(BuildContext context, String message,
   _activeToast = entry;
   overlay.insert(entry);
   _toastTimer = Timer(const Duration(milliseconds: 6000), dismiss);
+}
+
+/// Where toasts sit: under the status bar on phones, so they never cover the
+/// composer or the bottom bar; bottom-centre on desktop.
+Widget _toastSlot(BuildContext ctx, Widget card) {
+  final pad = MediaQuery.of(ctx).padding;
+  return Positioned(
+    left: 0,
+    right: 0,
+    top: kMobile ? pad.top + S.s12 : null,
+    bottom: kMobile ? null : pad.bottom + 24,
+    child: Center(child: card),
+  );
 }
 
 class _ToastCard extends StatefulWidget {
@@ -430,7 +436,8 @@ class _ToastCardState extends State<_ToastCard>
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final curve = CurvedAnimation(parent: _c, curve: Motion.enter);
-    final fg = widget.danger ? AppColors.danger : AppColors.fg1;
+    // Only the icon carries the tone; the message stays readable.
+    final tone = widget.danger ? AppColors.danger : AppColors.ok;
     // Material ancestor: without it, text floating in the root Overlay falls back
     // to the debug default style (the yellow underline). It also gives clean ink.
     return Material(
@@ -438,23 +445,28 @@ class _ToastCardState extends State<_ToastCard>
       child: FadeTransition(
         opacity: curve,
         child: SlideTransition(
-          position: Tween(begin: const Offset(0, 0.12), end: Offset.zero)
-              .animate(curve),
+          position:
+              Tween(begin: Offset(0, kMobile ? -0.25 : 0.25), end: Offset.zero)
+                  .animate(curve),
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 360),
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.fromLTRB(16, 9, 16, 9),
+            constraints: const BoxConstraints(maxWidth: 420),
+            margin: const EdgeInsets.symmetric(horizontal: M.gutter),
+            padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
             decoration: BoxDecoration(
-              color: AppColors.surface1,
-              borderRadius: BorderRadius.circular(R.md),
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(R.card),
+              border: Border.all(color: AppColors.lineStrong),
+              boxShadow: overlayShadow,
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(widget.danger ? 'alert-triangle' : 'check',
-                  size: 13, color: fg),
-              const SizedBox(width: 8),
+              AppIcon(widget.danger ? 'alert-triangle' : 'check-circle',
+                  size: 15, color: tone),
+              const SizedBox(width: 10),
               Flexible(
                 child: Text(widget.message,
-                    style: sans(12, height: 1.3, color: fg)
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, height: 1.4, color: AppColors.fg1)
                         .copyWith(decoration: TextDecoration.none)),
               ),
               for (final a in widget.actions) ...[
@@ -467,7 +479,7 @@ class _ToastCardState extends State<_ToastCard>
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(a.label,
                         style:
-                            sans(12, weight: W.label, color: AppColors.accent)
+                            sans(13, weight: W.label, color: AppColors.accent)
                                 .copyWith(decoration: TextDecoration.none)),
                   ),
                 ),

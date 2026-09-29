@@ -118,10 +118,129 @@ class _AppFieldState extends State<AppField> {
   }
 }
 
-/// Bottom sheet matching the handoff (drag handle, title + close, scroll body).
-/// A bottom-sheet single-field text prompt (rename, etc.). Returns the trimmed
-/// text on save, or null if cancelled.
-/// Compact confirm — no oversized desktop sheet chrome.
+/// The desktop dialog every modal shares: one surface, border, radius, title
+/// and inset, so confirms, prompts and pickers read as one family. Phones use
+/// bottom sheets instead (see [showAppSheet]).
+class _DialogFrame extends StatelessWidget {
+  const _DialogFrame({
+    required this.title,
+    required this.child,
+    this.icon,
+    this.iconColor,
+    this.onClose,
+    this.maxWidth = 400,
+    this.maxHeight,
+  });
+
+  final String title;
+  final Widget child;
+  final String? icon;
+  final Color? iconColor;
+  final VoidCallback? onClose;
+  final double maxWidth;
+  final double? maxHeight;
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+        child: Container(
+          constraints: BoxConstraints(
+              maxWidth: maxWidth, maxHeight: maxHeight ?? double.infinity),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.card),
+            border: Border.all(color: AppColors.border),
+            boxShadow: overlayShadow,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Padding(
+              padding:
+                  EdgeInsets.fromLTRB(20, 16, onClose == null ? 20 : 12, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    if (icon != null) ...[
+                      AppIcon(icon!,
+                          size: 16, color: iconColor ?? AppColors.fg2),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              sans(15, weight: W.label, color: AppColors.fg1)),
+                    ),
+                    if (onClose != null)
+                      IconBtn('x',
+                          size: 28,
+                          iconSize: 14,
+                          tooltip: 'Close',
+                          onTap: onClose),
+                  ]),
+                  const SizedBox(height: 10),
+                  Flexible(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: onClose == null ? 0 : 8),
+                      child: child,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+/// Cancel and confirm, laid out for the platform: right-aligned and compact on
+/// desktop, two full-width buttons within thumb reach on phones.
+class _DialogActions extends StatelessWidget {
+  const _DialogActions({
+    required this.confirmLabel,
+    required this.onConfirm,
+    required this.onCancel,
+    this.danger = false,
+  });
+
+  final String confirmLabel;
+  final VoidCallback onConfirm;
+  final VoidCallback onCancel;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final variant = danger ? BtnVariant.danger : BtnVariant.primary;
+    if (kMobile) {
+      return Row(children: [
+        Expanded(
+          child: Btn('Cancel',
+              full: true, variant: BtnVariant.secondary, onTap: onCancel),
+        ),
+        const SizedBox(width: S.s8),
+        Expanded(
+          child:
+              Btn(confirmLabel, full: true, variant: variant, onTap: onConfirm),
+        ),
+      ]);
+    }
+    return Row(children: [
+      const Spacer(),
+      Btn('Cancel', variant: BtnVariant.ghost, small: true, onTap: onCancel),
+      const SizedBox(width: 8),
+      Btn(confirmLabel, variant: variant, small: true, onTap: onConfirm),
+    ]);
+  }
+}
+
+/// Ask before doing something; true when confirmed. A dialog on desktop, a
+/// bottom sheet on phones.
 Future<bool> confirmAction(
   BuildContext context, {
   required String title,
@@ -129,89 +248,46 @@ Future<bool> confirmAction(
   String confirmLabel = 'Delete',
   bool danger = true,
 }) async {
-  final accent = danger ? AppColors.danger : AppColors.accent;
-  final result = await showDialog<bool>(
-    context: context,
-    barrierColor: AppColors.scrim,
-    builder: (ctx) {
-      return Dialog(
-        backgroundColor: AppColors.glassSurface,
-        elevation: 0,
-        insetPadding:
-            EdgeInsets.symmetric(horizontal: kMobile ? 24 : 40, vertical: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.card),
-          side: BorderSide(color: AppColors.glassBorder),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(R.card),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    // Tinted badge: a destructive confirm should look
-                    // destructive before you read a word of it.
-                    Container(
-                      width: 32,
-                      height: 32,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: AppIcon(danger ? 'alert-triangle' : 'alert-circle',
-                          size: 16, color: accent),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 5),
-                        child: Text(title,
-                            style: sans(14,
-                                weight: W.label, color: AppColors.fg1)),
-                      ),
-                    ),
-                  ]),
-                  const SizedBox(height: 10),
-                  // The body gets its OWN line, aligned under the title rather
-                  // than beside it. Sharing one Row made the body wrap into a
-                  // narrow column next to a one-line title, so the dialog read
-                  // as two unrelated fragments.
-                  Padding(
-                    padding: const EdgeInsets.only(left: 44),
-                    child: Text(body,
-                        style: TS.meta()),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(children: [
-                    const Spacer(),
-                    Btn('Cancel',
-                        variant: BtnVariant.ghost,
-                        small: true,
-                        onTap: () => Navigator.pop(ctx, false)),
-                    const SizedBox(width: 8),
-                    Btn(confirmLabel,
-                        variant:
-                            danger ? BtnVariant.danger : BtnVariant.primary,
-                        small: true,
-                        onTap: () => Navigator.pop(ctx, true)),
-                  ]),
-                ],
-              ),
-            ),
+  Widget content(BuildContext ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: kMobile ? S.s4 : 0),
+            child: Text(body,
+                style:
+                    sans(kMobile ? 14 : 13, height: 1.5, color: AppColors.fg2)),
           ),
-        ),
+          SizedBox(height: kMobile ? S.s20 : 18),
+          _DialogActions(
+            confirmLabel: confirmLabel,
+            danger: danger,
+            onCancel: () => Navigator.pop(ctx, false),
+            onConfirm: () => Navigator.pop(ctx, true),
+          ),
+        ],
       );
-    },
-  );
+  final bool? result;
+  if (kMobile) {
+    result = await showAppSheet<bool>(context,
+        title: title, child: Builder(builder: content));
+  } else {
+    result = await showDialog<bool>(
+      context: context,
+      barrierColor: AppColors.scrim,
+      builder: (ctx) => _DialogFrame(
+        title: title,
+        icon: danger ? 'alert-triangle' : null,
+        iconColor: AppColors.danger,
+        child: content(ctx),
+      ),
+    );
+  }
   return result == true;
 }
 
+/// A single-field text prompt (rename, etc.): a dialog on desktop, a bottom
+/// sheet on phones. Returns the trimmed text on save, or null if cancelled.
 Future<String?> promptText(BuildContext context,
     {required String title,
     String initial = '',
@@ -219,56 +295,20 @@ Future<String?> promptText(BuildContext context,
     String saveLabel = 'Save',
     int minLines = 1,
     int maxLines = 1}) {
+  final field = _TextPromptSheet(
+      initial: initial,
+      hint: hint,
+      saveLabel: saveLabel,
+      minLines: minLines,
+      maxLines: maxLines);
   if (!kMobile) {
     return showDialog<String>(
       context: context,
       barrierColor: AppColors.scrim,
-      builder: (ctx) {
-        return Dialog(
-          backgroundColor: AppColors.glassSurface,
-          elevation: 0,
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.md),
-            side: BorderSide(color: AppColors.glassBorder),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(R.md),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 320),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(title,
-                        style: TS.label(AppColors.fg1)),
-                    const SizedBox(height: 10),
-                    _TextPromptSheet(
-                        initial: initial,
-                        hint: hint,
-                        saveLabel: saveLabel,
-                        minLines: minLines,
-                        maxLines: maxLines),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (_) => _DialogFrame(title: title, maxWidth: 380, child: field),
     );
   }
-  return showAppSheet<String>(context,
-      title: title,
-      child: _TextPromptSheet(
-          initial: initial,
-          hint: hint,
-          saveLabel: saveLabel,
-          minLines: minLines,
-          maxLines: maxLines));
+  return showAppSheet<String>(context, title: title, child: field);
 }
 
 class _TextPromptSheet extends StatefulWidget {
@@ -314,16 +354,12 @@ class _TextPromptSheetState extends State<_TextPromptSheet> {
               minLines: widget.minLines,
               maxLines: widget.maxLines,
               onSubmitted: (_) => _done()),
-          const SizedBox(height: 10),
-          Row(children: [
-            const Spacer(),
-            Btn('Cancel',
-                variant: BtnVariant.ghost,
-                small: true,
-                onTap: () => Navigator.pop(context)),
-            const SizedBox(width: 6),
-            Btn(widget.saveLabel, small: true, onTap: _done),
-          ]),
+          SizedBox(height: kMobile ? S.s16 : 14),
+          _DialogActions(
+            confirmLabel: widget.saveLabel,
+            onConfirm: _done,
+            onCancel: () => Navigator.pop(context),
+          ),
         ]);
   }
 }
@@ -339,49 +375,16 @@ Future<T?> showAppSheet<T>(BuildContext context,
     return showDialog<T>(
       context: context,
       barrierColor: AppColors.scrim,
-      builder: (ctx) {
-        return Dialog(
-          backgroundColor: AppColors.glassSurface,
-          elevation: 0,
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.md),
-            side: BorderSide(color: AppColors.glassBorder),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(R.md),
-            child: ConstrainedBox(
-              constraints:
-                  BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(children: [
-                      Expanded(child: Text(title, style: TS.rowTitle())),
-                      IconBtn('x',
-                          size: 28,
-                          iconSize: 14,
-                          tooltip: 'Close',
-                          onTap: () => Navigator.pop(ctx)),
-                    ]),
-                    const SizedBox(height: 6),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
-                        child: child,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (ctx) => _DialogFrame(
+        title: title,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+        onClose: () => Navigator.pop(ctx),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: child,
+        ),
+      ),
     );
   }
   return showModalBottomSheet<T>(
@@ -419,13 +422,13 @@ Future<T?> showAppSheet<T>(BuildContext context,
                 constraints: BoxConstraints(maxHeight: limit),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   SheetHeader(
-                      title: title,
-                      onClose: () => Navigator.pop(sheetContext)),
+                      title: title, onClose: () => Navigator.pop(sheetContext)),
                   Flexible(
                     child: SingleChildScrollView(
                       padding: EdgeInsets.fromLTRB(
                           S.s12, S.s6, S.s12, S.s12 + media.padding.bottom),
-                      child: SurfaceScope(group: AppColors.overlay, child: child),
+                      child:
+                          SurfaceScope(group: AppColors.overlay, child: child),
                     ),
                   ),
                 ]),
