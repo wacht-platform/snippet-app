@@ -253,13 +253,10 @@ class _StepList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final steps = batch.steps;
-    final failed = steps.where((s) => s.failed).length;
     final running = batch.running && steps.any((s) => s.running);
-    // The list itself shows what ran; the header names it and flags state.
-    final subtitle = [
-      if (failed > 0) '$failed failed',
-      if (running) 'running',
-    ].join(' · ');
+    // The list itself shows what ran and which failed (their rows turn red);
+    // the header only says when it is still going.
+    final subtitle = running ? 'running' : '';
     return Column(children: [
       _SheetHeader(
         title: 'Activity',
