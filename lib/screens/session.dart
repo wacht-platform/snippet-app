@@ -17,6 +17,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
 import '../desktop_pick.dart';
+import '../drafts.dart';
 import '../models.dart';
 import '../notifications.dart';
 import '../platform.dart';
@@ -388,6 +389,26 @@ class _SessionScreenState extends State<SessionScreen>
   bool _restoringInput = false;
   int _pasteN = 0;
 
+  /// This session's unsent text survives switching away and back.
+  String get _draftKey => Drafts.keyFor(widget.client.baseUrl, widget.sessionId);
+  bool _switchingSession = false;
+
+  void _saveDraft() {
+    if (_closed || _switchingSession) return;
+    Drafts.instance.save(_draftKey, _input.text);
+  }
+
+  void _restoreDraft() {
+    final draft = Drafts.instance.of(_draftKey);
+    if (draft == null || _input.text.isNotEmpty) return;
+    // Guarded like a paste restore, so a long draft is not re-read as a paste.
+    _restoringInput = true;
+    _input.value = TextEditingValue(
+        text: draft, selection: TextSelection.collapsed(offset: draft.length));
+    _restoringInput = false;
+    _lastInput = draft;
+  }
+
   void _interceptBigPaste() {
     if (_closed || _restoringInput) return;
     final prev = _lastInput;
@@ -560,6 +581,8 @@ class _SessionScreenState extends State<SessionScreen>
     _title = _isMissionControl ? 'Mission Control' : widget.title;
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
+    _restoreDraft();
+    _input.addListener(_saveDraft);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -736,8 +759,17 @@ class _SessionScreenState extends State<SessionScreen>
       _optimisticQueued.clear();
       _queueHidden.clear();
       _clearPendingAll();
+      // Keep what was typed as the previous session's draft, then pick up
+      // this session's own.
+      Drafts.instance.save(
+          Drafts.keyFor(oldWidget.client.baseUrl, oldWidget.sessionId),
+          _input.text,
+          now: true);
+      _switchingSession = true;
       _input.clear();
+      _switchingSession = false;
       _lastInput = '';
+      _restoreDraft();
       _consumedShare = null;
       _state = null;
       _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
@@ -922,6 +954,8 @@ class _SessionScreenState extends State<SessionScreen>
     _agentEventsSub?.cancel();
     modelsRevision.removeListener(_loadModel);
     _input.removeListener(_interceptBigPaste);
+    _input.removeListener(_saveDraft);
+    Drafts.instance.save(_draftKey, _input.text, now: true);
     // Tool batches are not disposed: the desktop side pane can still be
     // showing one after this screen goes, and they hold no resources.
     _inputFocus.unfocus();

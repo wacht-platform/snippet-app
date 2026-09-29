@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../drafts.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
@@ -145,6 +146,7 @@ class SidebarState extends State<Sidebar> {
   @override
   void initState() {
     super.initState();
+    Drafts.instance.addListener(_onDrafts);
     _pageController = PageController(initialPage: widget.mobileHome.index);
     if (widget.mobileHome != MobileHome.settings) {
       _lastMainHome = widget.mobileHome;
@@ -174,8 +176,21 @@ class SidebarState extends State<Sidebar> {
   final TextEditingController _renameCtl = TextEditingController();
   final FocusNode _renameFocus = FocusNode();
 
+  void _onDrafts() {
+    if (mounted) setState(() {});
+  }
+
+  /// Whether a chat you are not looking at has unsent text waiting.
+  bool _hasDraft(SessionInfo s) {
+    final c = widget.client;
+    return c != null &&
+        s.id != widget.selectedSessionId &&
+        Drafts.instance.has(Drafts.keyFor(c.baseUrl, s.id));
+  }
+
   @override
   void dispose() {
+    Drafts.instance.removeListener(_onDrafts);
     _pageController.dispose();
     _renameCtl.dispose();
     _renameFocus.dispose();
@@ -1092,6 +1107,9 @@ class SidebarState extends State<Sidebar> {
                       ),
                     ),
                   ),
+                ] else if (_hasDraft(s)) ...[
+                  const SizedBox(width: 8),
+                  Text('draft', style: mono(10, color: AppColors.accent)),
                 ] else ...[
                   const SizedBox(width: 8),
                   Text(relativeTime(s.lastActive),
@@ -1194,7 +1212,11 @@ class SidebarState extends State<Sidebar> {
               // The gap is REQUIRED, not cosmetic: the title is `Expanded`, so a
               // long one fills the full width and butts straight against the
               // folder — the two run together with no separation.
-              if (!renaming && trailingText.isNotEmpty) ...[
+              if (!renaming && _hasDraft(s)) ...[
+                const SizedBox(width: 10),
+                Text('Draft',
+                    style: sans(M.meta, weight: W.label, color: AppColors.accent)),
+              ] else if (!renaming && trailingText.isNotEmpty) ...[
                 const SizedBox(width: 10),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 130),

@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../drafts.dart';
 import '../../../platform.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
@@ -22,6 +23,19 @@ class _MissionComposerState extends State<MissionComposer> {
   final _controller = TextEditingController();
   final _focus = FocusNode();
 
+  // Unsent text survives leaving Mission Control, like a session's draft.
+  String get _draftKey =>
+      Drafts.keyFor(widget.state.client.baseUrl, 'mission-control');
+
+  void _saveDraft() => Drafts.instance.save(_draftKey, _controller.text);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.text = Drafts.instance.of(_draftKey) ?? '';
+    _controller.addListener(_saveDraft);
+  }
+
   @override
   void deactivate() {
     _focus.unfocus();
@@ -31,6 +45,8 @@ class _MissionComposerState extends State<MissionComposer> {
   @override
   void dispose() {
     _focus.unfocus();
+    _controller.removeListener(_saveDraft);
+    Drafts.instance.save(_draftKey, _controller.text, now: true);
     _controller.dispose();
     _focus.dispose();
     super.dispose();

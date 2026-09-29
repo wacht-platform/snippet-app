@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'drafts.dart';
 import 'notifications.dart';
 import 'android_reconciliation.dart';
 import 'platform.dart';
@@ -45,6 +46,7 @@ void main() async {
   try {
     await ThemeManager.instance.init();
   } catch (_) {}
+  await Drafts.instance.init();
   if (kCanNotify) {
     try {
       await initNotifications();
