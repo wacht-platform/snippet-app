@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:snippet/api.dart';
 import 'package:snippet/models.dart';
@@ -40,6 +41,7 @@ Map<String, dynamic> _task(String id, String title, String status) =>
     {'id': id, 'title': title, 'status': status, 'priority': 0};
 
 Future<void> _pumpBoard(WidgetTester tester, _FakeDaemon client) async {
+  SharedPreferences.setMockInitialValues({});
   tester.view.devicePixelRatio = 1.0;
   tester.view.physicalSize = const Size(1900, 900);
   addTearDown(tester.view.reset);
@@ -126,6 +128,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byTooltip('Fold Cancelled'), findsOneWidget);
     expect(find.text('Write the docs'), findsOneWidget);
+  });
+
+  testWidgets('folded columns are remembered', (tester) async {
+    final client = _FakeDaemon([_task('1', 'Write the docs', 'todo')]);
+    await _pumpBoard(tester, client);
+    await tester.tap(find.byTooltip('Fold Done'));
+    await tester.pumpAndSettle();
+
+    // A fresh board reads the choice back.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(MaterialApp(
+      theme: buildAppTheme(),
+      home: Scaffold(body: TaskKanban(client: client)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Show Done'), findsOneWidget);
+    expect(find.byTooltip('Show Cancelled'), findsOneWidget);
   });
 
   testWidgets('the search narrows the tasks panel', (tester) async {

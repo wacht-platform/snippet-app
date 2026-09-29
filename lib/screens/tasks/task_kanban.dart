@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api.dart';
 import '../../models.dart';
@@ -40,8 +41,33 @@ class _TaskKanbanState extends State<TaskKanban> {
   TaskItem? _dragging;
 
   /// Failed and cancelled work is kept but folded away, the way modern boards
-  /// treat finished columns; a click opens one.
+  /// treat finished columns; a click opens one. Remembered on this device.
   final Set<TaskStatus> _folded = {TaskStatus.failed, TaskStatus.cancelled};
+  static const _foldedKey = 'tasks_board_folded';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFolded();
+  }
+
+  Future<void> _loadFolded() async {
+    try {
+      final saved = (await SharedPreferences.getInstance())
+          .getStringList(_foldedKey);
+      if (saved == null || !mounted) return;
+      setState(() => _folded
+        ..clear()
+        ..addAll(TaskStatus.values.where((s) => saved.contains(s.wire))));
+    } catch (_) {}
+  }
+
+  Future<void> _saveFolded() async {
+    try {
+      await (await SharedPreferences.getInstance())
+          .setStringList(_foldedKey, [for (final s in _folded) s.wire]);
+    } catch (_) {}
+  }
   double _columnWidth = _minColumn;
 
   @override
@@ -212,9 +238,12 @@ class _TaskKanbanState extends State<TaskKanban> {
     );
   }
 
-  void _toggleFold(TaskStatus status) => setState(() {
-        if (!_folded.remove(status)) _folded.add(status);
-      });
+  void _toggleFold(TaskStatus status) {
+    setState(() {
+      if (!_folded.remove(status)) _folded.add(status);
+    });
+    _saveFolded();
+  }
 
   /// A folded column: its dot, count and name on end. Still a drop target, so
   /// a card can be dropped on it without opening it.
