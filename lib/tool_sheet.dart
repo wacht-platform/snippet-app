@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'coordination_tool_views.dart';
 import 'media_views.dart';
 import 'panel.dart';
 import 'platform.dart';
@@ -256,8 +255,8 @@ class _StepList extends StatelessWidget {
     final steps = batch.steps;
     final failed = steps.where((s) => s.failed).length;
     final running = batch.running && steps.any((s) => s.running);
+    // The title already counts what ran; the subtitle only flags state.
     final subtitle = [
-      '${steps.length} ${steps.length == 1 ? 'step' : 'steps'}',
       if (failed > 0) '$failed failed',
       if (running) 'running',
     ].join(' · ');
@@ -377,14 +376,16 @@ class _StepDetail extends StatelessWidget {
         leading: IconBtn('chevron-left',
             size: 34, iconSize: 18, tooltip: 'Back', onTap: onBack),
         title: title,
-        subtitle: '${toolTitle(step.tool)} · step ${index + 1} of $total',
+        subtitle: toolTitle(step.tool),
         onClose: onClose,
       ),
       Expanded(
         child: SingleChildScrollView(
           controller: scroll,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          child: step.running
+          // A running step shows what it already carries (a diff, a long
+          // command); only an empty one says it is running.
+          child: step.running && !toolHasDetail(step)
               ? Row(children: [
                   Spinner(size: 14, color: AppColors.run),
                   const SizedBox(width: 8),

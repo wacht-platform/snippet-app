@@ -7,6 +7,7 @@ import 'coordination_tool_views.dart';
 import 'highlight.dart';
 import 'media_views.dart';
 import 'theme.dart';
+import 'tool_activity.dart';
 import 'widgets.dart';
 
 // The daemon can evolve independently of the client. Keep malformed or newer
@@ -79,6 +80,11 @@ String toolArgSummary(String tool, dynamic args) {
   return '';
 }
 
+/// Whether a step has anything behind its row — the one rule the transcript
+/// rows and the tool sheet share.
+bool toolHasDetail(ToolStep step) =>
+    toolIsExpandable(step.tool, step.args, step.result);
+
 bool toolIsExpandable(String tool, dynamic args, dynamic result) {
   String arg(String key) {
     if (args is! Map) return '';
@@ -100,10 +106,28 @@ bool toolIsExpandable(String tool, dynamic args, dynamic result) {
     return false;
   }
 
+  // A failure always has something to show: the error.
+  if (result is Map && (result['status'] ?? '').toString() == 'error') {
+    return true;
+  }
+  // A running step can still have content in its arguments (a diff, a long
+  // command); each check below looks only where its content lives.
+  if (ackTools.contains(tool)) return false;
+  final data = result is Map && result['data'] is Map
+      ? result['data'] as Map
+      : (result is Map ? result : null);
+  final coordination =
+      coordinationHasDetail(tool, args is Map ? args : null, data);
+  if (coordination != null) return coordination;
+
   switch (tool) {
     case 'change_files':
       final changes = args is Map ? args['changes'] : null;
       return changes is List && changes.isNotEmpty;
+    case 'view_image':
+    case 'present_file':
+      return arg('path').trim().isNotEmpty ||
+          (data?['path'] ?? '').toString().trim().isNotEmpty;
     case 'bash':
       final cmd = arg('command');
       return arg('label').trim().isNotEmpty ||
@@ -692,20 +716,22 @@ class _ShellPanel extends StatelessWidget {
       if (stderr.isNotEmpty) stderr,
     ].join('\n');
     final multiLine = command.contains('\n');
-    final firstLine = command.split('\n').first;
-    final withCommand = (showCommand || multiLine) && command.isNotEmpty;
+    // The command appears once: in the body when it would not fit the header
+    // (labelled, multi-line or long), otherwise in the header alone.
+    final withCommand =
+        (showCommand || multiLine || command.length > 60) && command.isNotEmpty;
     final hasOutput = stdout.isNotEmpty || stderr.isNotEmpty || withCommand;
     return _ToolPanel(
-      header: Text.rich(
-        TextSpan(children: [
-          TextSpan(text: '\$ ', style: _panelCode(AppColors.accent)),
-          TextSpan(
-              text: multiLine ? '$firstLine …' : firstLine,
-              style: _panelCode(AppColors.fg1)),
-        ]),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      header: withCommand
+          ? Text('shell', style: _panelCode(AppColors.fg3))
+          : Text.rich(
+              TextSpan(children: [
+                TextSpan(text: '\$ ', style: _panelCode(AppColors.accent)),
+                TextSpan(text: command, style: _panelCode(AppColors.fg1)),
+              ]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
       trailing: [
         if (exitCode != null)
           Tag('exit $exitCode',

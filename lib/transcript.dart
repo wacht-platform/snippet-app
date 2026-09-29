@@ -5,7 +5,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'coordination_tool_views.dart';
 import 'models.dart';
 import 'theme.dart';
 import 'tool_activity.dart';

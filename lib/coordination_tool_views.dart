@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
-import 'tool_activity.dart';
 import 'widgets.dart';
 
-/// Coordination tools whose result is only an acknowledgement: the row's
-/// sentence already says everything, so there is nothing to open.
-const _ackTools = {
+/// Tools whose result is only an acknowledgement: the row's sentence already
+/// says everything, so there is nothing to open.
+const ackTools = {
   'assign_task_agent',
   'transfer_mission_task_lease',
   'transfer_task_session_lease',
@@ -17,10 +16,50 @@ const _ackTools = {
   'set_session_title',
 };
 
-/// Whether a step has anything behind its row. Failures always do: the error
-/// is the detail.
-bool toolHasDetail(ToolStep step) =>
-    step.failed || !_ackTools.contains(step.tool);
+/// Whether a coordination tool's detail would show anything, or null when
+/// [tool] is not one of them. Empty lists and blank messages count as nothing.
+bool? coordinationHasDetail(String tool, Map? a, Map? d) {
+  bool text(dynamic v) => v != null && v.toString().trim().isNotEmpty;
+  bool list(dynamic v) => v is List ? v.isNotEmpty : v is Map && v.isNotEmpty;
+  switch (tool) {
+    case 'list_mission_tasks':
+      return list(d?['tasks']);
+    case 'list_sessions':
+      return list(d?['sessions']);
+    case 'list_coordination_agents':
+      return list(d?['agents']);
+    case 'list_profiles':
+      return list(d?['profiles']);
+    case 'read_coordination_board':
+      return list(d?['outstanding']) || list(d?['entries']);
+    case 'read_coordination_thread':
+    case 'read_agent_thread':
+      return list(d?['messages']);
+    case 'read_agent_inbox':
+      return list(d?['threads']);
+    case 'create_mission_task':
+    case 'update_mission_task':
+    case 'retry_mission_task':
+    case 'cancel_mission_task':
+      return d?['task'] is Map;
+    case 'report_mission_task':
+      return d?['task'] is Map || text(a?['summary']);
+    case 'inspect_task':
+    case 'inspect_session':
+      return d != null && d.isNotEmpty;
+    case 'send_agent_message':
+    case 'post_coordination_message':
+    case 'post_task_coordination':
+      return text(a?['body']);
+    case 'message_mission_control':
+      return text(a?['message']);
+    case 'record_coordination_note':
+      return text(a?['summary']);
+    case 'create_recurring_job':
+      return text(a?['prompt']) || text(a?['schedule']);
+  }
+  return null;
+}
 
 /// The detail body for Mission Control and coordination tools, or null when
 /// [tool] is not one of them.
