@@ -402,6 +402,7 @@ class ShellNavRow extends StatelessWidget {
     this.selected = false,
     this.indent = kNavRowInset,
     this.onTap,
+    this.onSecondaryTapDown,
     this.trailing,
     this.leading,
   });
@@ -413,6 +414,9 @@ class ShellNavRow extends StatelessWidget {
   final bool selected;
   final double indent;
   final VoidCallback? onTap;
+
+  /// Right-click, for the row's context menu.
+  final GestureTapDownCallback? onSecondaryTapDown;
   final Widget? trailing;
 
   /// Replaces the default [AppIcon] in the icon column.
@@ -438,6 +442,7 @@ class ShellNavRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(R.md),
         child: InkWell(
           onTap: onTap,
+          onSecondaryTapDown: onSecondaryTapDown,
           borderRadius: BorderRadius.circular(R.md),
           child: Container(
             height: kNavRowHeight,

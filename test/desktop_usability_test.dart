@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -307,5 +308,77 @@ void main() {
         debugDefaultTargetPlatformOverride = null;
       }
     });
+  });
+
+  testWidgets('right-clicking a session on desktop opens its actions',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      final client = _FakeDaemonClient();
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 300,
+            height: 900,
+            child: Sidebar(
+              client: client,
+              active: null,
+              instances: const [],
+              health: const {},
+              sessions: [
+                SessionInfo.fromJson({
+                  'id': 'sess-x',
+                  'title': 'Fix the TUI hang',
+                  'folder': '/workspace/repo',
+                  'last_active': 1000,
+                }),
+              ],
+              sessionsLoading: false,
+              onRefreshSessions: () async {},
+              selectedSessionId: null,
+              onOpenSession: (_, __, ___) {},
+              onNewSession: () {},
+              onSelectInstance: (_) {},
+              onAddInstance: () {},
+              onRenameInstance: (_, __) {},
+              onRemoveInstance: (_) {},
+              onSessionDeleted: (_) {},
+              onRefreshHealth: () {},
+              onOpenMissionControl: () {},
+              topInset: false,
+              mobileHome: MobileHome.chats,
+              onMobileHome: (_) {},
+              settingsSection: null,
+              onSettingsSection: (_) {},
+              agent: null,
+              onAgent: (_) {},
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fix the TUI hang'),
+          buttons: kSecondaryMouseButton, kind: PointerDeviceKind.mouse);
+      await tester.pumpAndSettle();
+      expect(find.text('Rename'), findsOneWidget);
+      expect(find.text('Delete'), findsOneWidget);
+
+      // Rename edits the row in place.
+      await tester.tap(find.text('Rename'));
+      await tester.pumpAndSettle();
+      expect(find.byType(EditableText), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      // Select turns the rows into checkboxes with the selection bar.
+      await tester.tap(find.text('Fix the TUI hang'),
+          buttons: kSecondaryMouseButton, kind: PointerDeviceKind.mouse);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Select'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 selected'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

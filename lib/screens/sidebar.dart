@@ -911,28 +911,48 @@ class SidebarState extends State<Sidebar> {
   /// recency determines the list order.
   Widget _sidebarSessionRow(SessionInfo s) {
     final selected = s.id == widget.selectedSessionId;
+    // Rename edits in place, at the row's own inset.
+    if (_renamingId == s.id) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(
+            kNavRowInset, 2, kSidebarContentInset, 2),
+        child: _inlineRenameField(s, compact: true),
+      );
+    }
+    final checked = _selected.contains(s.id);
+    final hasAgent =
+        s.displayAgentId != null && s.displayAgentId!.trim().isNotEmpty;
+    final draft = _hasDraft(s);
     return ShellNavRow(
       id: s.id,
       label: s.title.trim().isEmpty ? '(untitled)' : s.title,
       icon: 'chat-thread',
       tone: ShellTone.chat,
-      selected: selected,
-      onTap: () => widget.onOpenSession(s.id, s.title, s.profile),
-      // The icon now carries run state, so the trailing dot would be a second
-      // indicator for one fact. Colour is the state channel — see
-      // `sessionStateColor`: amber busy, accent needs-you, neutral idle.
-      leading: SessionStateIcon(status: s.status, size: kNavIcon),
-      // Who is working here, inline. Same treatment as the phone card: an agent
-      // working in this chat is shown on the row itself, so "which session is an
-      // agent working in" is answerable from the list without opening anything.
-      // `working` tints it by run state, so a chat an agent merely owns reads
-      // differently from one it is mid-turn in.
-      trailing: s.displayAgentId == null || s.displayAgentId!.trim().isEmpty
+      selected: _selecting ? checked : selected,
+      onTap: _selecting
+          ? () => _toggleSelected(s.id)
+          : () => widget.onOpenSession(s.id, s.title, s.profile),
+      // Right-click: rename, select or delete, as long-press does on phones.
+      onSecondaryTapDown: _selecting
           ? null
-          : AgentBadge(
-              agentId: s.displayAgentId!,
-              working: sessionIsActive(s.status),
-            ),
+          : (d) => _sessionActions(s, position: d.globalPosition),
+      // The icon carries run state (see `sessionStateColor`); while selecting
+      // it becomes the checkbox.
+      leading: _selecting
+          ? SelectCheck(checked, size: 14)
+          : SessionStateIcon(status: s.status, size: kNavIcon),
+      // Who is working here, and whether unsent text is waiting.
+      trailing: !hasAgent && !draft
+          ? null
+          : Row(mainAxisSize: MainAxisSize.min, children: [
+              if (draft) Text('draft', style: mono(10, color: AppColors.accent)),
+              if (draft && hasAgent) const SizedBox(width: 6),
+              if (hasAgent)
+                AgentBadge(
+                  agentId: s.displayAgentId!,
+                  working: sessionIsActive(s.status),
+                ),
+            ]),
     );
   }
 
