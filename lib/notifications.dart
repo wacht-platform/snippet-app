@@ -397,7 +397,6 @@ void reportForeground(bool fg) {
       _foregroundHeartbeat = Timer.periodic(const Duration(seconds: 20),
           (_) => _writeForegroundLease());
     }
-    if (fg) unawaited(syncSavedNotifications().catchError((Object _) {}));
-    return;
   }
+  if (fg) unawaited(syncSavedNotifications().catchError((Object _) {}));
 }

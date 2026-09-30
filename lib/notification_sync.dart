@@ -10,6 +10,7 @@ import 'models.dart';
 import 'notification_inbox.dart';
 import 'notifications.dart';
 import 'store.dart';
+import 'platform.dart';
 
 class ForegroundNotificationQueue {
   final _controller =
@@ -93,6 +94,7 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
     }
     return;
   }
+  if (!kMobile) return;
   final prefs = await SharedPreferences.getInstance();
   await prefs.reload();
   final enabled = prefs.getBool('notif_enabled') ?? false;

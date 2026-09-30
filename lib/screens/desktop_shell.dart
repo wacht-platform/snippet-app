@@ -452,6 +452,7 @@ class _DesktopShellState extends State<DesktopShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final fg = state == AppLifecycleState.resumed;
     _appForeground = fg;
+    reportForeground(fg);
     if (mounted) setState(() {});
     if (fg) {
       _startSessionsTicker();
@@ -696,7 +697,7 @@ class _DesktopShellState extends State<DesktopShell>
     final generation = _eventsGeneration;
     try {
       final ch = c.events();
-      if (kMobile && _active != null) {
+      if (_active != null) {
         unawaited(syncNotificationInstance(_active!).catchError((Object _) {}));
       }
       _eventsChannel = ch;
@@ -709,7 +710,7 @@ class _DesktopShellState extends State<DesktopShell>
           final event = DeviceEvent.decode(msg);
           if (event == null) return;
           final kind = event.kind;
-          if (kind == 'notification' && kMobile && _active != null) {
+          if (kind == 'notification' && _active != null) {
             unawaited(receiveLiveNotification(_active!, msg)
                 .catchError((Object _) {}));
           }

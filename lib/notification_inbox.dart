@@ -1,6 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class NotificationCursor implements Comparable<NotificationCursor> {
   const NotificationCursor(this.createdAt, this.eventId);
@@ -25,8 +26,16 @@ class NotificationInbox {
   static Future<NotificationInbox>? _opening;
   static Future<NotificationInbox> open() => _opening ??= _open();
   static Future<NotificationInbox> _open() async {
-    final db = await openDatabase(
-        '${await getDatabasesPath()}/notification_inbox.db',
+    final DatabaseFactory factory;
+    if (Platform.isWindows || Platform.isLinux) {
+      sqfliteFfiInit();
+      factory = databaseFactoryFfi;
+    } else {
+      factory = databaseFactory;
+    }
+    final db = await factory.openDatabase(
+        '${await factory.getDatabasesPath()}/notification_inbox.db',
+        options: OpenDatabaseOptions(
         version: 3, onCreate: (db, _) async {
       await db.execute(
           'CREATE TABLE cursors (instance TEXT PRIMARY KEY, cursor INTEGER NOT NULL, created_at INTEGER NOT NULL DEFAULT 0)');
@@ -36,7 +45,7 @@ class NotificationInbox {
     }, onUpgrade: (db, oldVersion, _) async {
       if (oldVersion < 2) await createAlertIds(db);
       if (oldVersion < 3) await migrateTimeCursor(db);
-    });
+    }));
     return NotificationInbox(db);
   }
 
