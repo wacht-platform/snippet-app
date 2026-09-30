@@ -190,10 +190,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                         },
                         child: Dismissible(
                           key: ObjectKey(payload),
-                          direction:
-                              Directionality.of(context) == TextDirection.rtl
-                                  ? DismissDirection.startToEnd
-                                  : DismissDirection.endToStart,
+                          direction: DismissDirection.horizontal,
                           movementDuration: reducedMotion
                               ? Duration.zero
                               : const Duration(milliseconds: 160),

@@ -14,23 +14,18 @@ import 'task_list.dart';
 ///
 /// Owns the live feed, the search and the status filter. On a phone the host
 /// supplies the page header's trailing controls and triggers [create] from its
-/// floating button; on desktop the panel draws its own section header, with
-/// the board one click away.
+/// floating button; on desktop the panel draws its own section header.
 class TasksPanel extends StatefulWidget {
   const TasksPanel({
     super.key,
     required this.client,
     this.trailing = const [],
-    this.onOpenBoard,
   });
 
   final DaemonClient client;
 
   /// Phone header controls beside the title (machine switcher).
   final List<Widget> trailing;
-
-  /// Desktop: open the Kanban board.
-  final VoidCallback? onOpenBoard;
 
   @override
   State<TasksPanel> createState() => TasksPanelState();
@@ -144,9 +139,6 @@ class TasksPanelState extends State<TasksPanel> {
               tooltip: _filterTooltip,
               active: _filter.isNotEmpty,
               onTap: _pickFilter),
-          if (widget.onOpenBoard != null)
-            ShellSectionAction(
-                icon: 'kanban', tooltip: 'Open board', onTap: widget.onOpenBoard),
           ShellSectionAction(icon: 'plus', tooltip: 'New task', onTap: create),
         ],
       );

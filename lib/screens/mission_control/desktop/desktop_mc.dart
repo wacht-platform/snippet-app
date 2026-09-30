@@ -9,7 +9,6 @@ import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../../../panel.dart';
 import '../coordination_agent_directory.dart';
-import '../../tasks/tasks_screen.dart';
 import '../mission_control_screen.dart' show ChangeNotifierProvider;
 import '../mission_control_state.dart';
 import '../widgets/mission_control_header.dart';
@@ -136,9 +135,6 @@ class _LeftRail extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
         children: [
-          // These buttons open OTHER surfaces (the agent directory, the task
-          // board) — they are not active tasks. The label above them both said
-          // the wrong thing and repeated the section below it verbatim.
           const SectionLabel('Browse'),
           const SizedBox(height: 8),
           Row(
@@ -154,21 +150,6 @@ class _LeftRail extends StatelessWidget {
                           purpose: ShellPanelPurpose.agents, originClient: state.client,
                           builder: (_, close) =>
                               CoordinationAgentDirectory(client: state.client),
-                        )),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Btn('Tasks',
-                    small: true,
-                    icon: 'layers',
-                    full: true,
-                    onTap: () => presentScreen(
-                          context,
-                          style: PanelStyle.drawer,
-                          purpose: ShellPanelPurpose.tasks, originClient: state.client,
-                          builder: (_, close) => TasksScreen(
-                            client: state.client,
-                          ),
                         )),
               ),
             ],

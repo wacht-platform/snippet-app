@@ -11,7 +11,9 @@ extension _DesktopShellPanesExt on _DesktopShellState {
 
   Widget _originTabBody(_ShellTab t, {required bool primary}) {
     if (t.isBoard) {
-      return TaskKanban(key: ValueKey('body-${t.key}'), client: t.client);
+      return kMobile
+          ? TaskKanban(key: ValueKey('body-${t.key}'), client: t.client)
+          : TasksPanel(key: ValueKey('body-${t.key}'), client: t.client);
     }
     if (t.isTerminal) {
       if (t.termSessionKey == null) {

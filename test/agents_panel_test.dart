@@ -23,8 +23,17 @@ import 'package:snippet/widgets.dart';
 class _FakeAgentsClient extends DaemonClient {
   _FakeAgentsClient() : super('https://daemon.invalid', 'test-token');
 
+  final _deviceEvents = DeviceEventHub.local();
+
   @override
-  late final DeviceEventHub deviceEvents = DeviceEventHub.local();
+  DeviceEventHub get deviceEvents => _deviceEvents;
+
+  String? builtPrompt;
+
+  @override
+  Future<void> buildCoordinationAgent(String prompt) async {
+    builtPrompt = prompt;
+  }
 
   @override
   Future<List<CoordinationAgent>> coordinationAgents() async => [
@@ -35,6 +44,14 @@ class _FakeAgentsClient extends DaemonClient {
           'role': 'reviewer',
           'status': 'active',
         }),
+        if (builtPrompt != null)
+          CoordinationAgent.fromJson({
+            'id': 'a2',
+            'display_name': 'New agent',
+            'handle': 'new-agent',
+            'role': 'reviewer',
+            'status': 'active',
+          }),
       ];
 
 }
@@ -102,6 +119,74 @@ void main() {
       expect(find.text('Build agent'), findsOneWidget);
     });
   });
+
+  for (final scenario in [
+    (size: const Size(1000, 700), scale: 1.0, offset: const Offset(700, 600)),
+    (size: const Size(300, 600), scale: 2.0, offset: const Offset(0, 250)),
+  ]) {
+    testWidgets('create popover fits ${scenario.size} at ${scenario.scale}x',
+        (tester) async {
+      await asDesktop(() async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final client = _FakeAgentsClient();
+        await tester.pumpWidget(MaterialApp(
+          theme: ThemeData.dark(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.fromLTRB(18, 24, 18, 20),
+              textScaler: TextScaler.linear(scenario.scale),
+            ),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Stack(children: [
+              Positioned(
+                left: scenario.offset.dx,
+                top: scenario.offset.dy,
+                width: 280,
+                height: 100,
+                child: AgentsSidebarPanel(client: client),
+              ),
+            ]),
+          ),
+        ));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Create agent'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final popup = tester.getRect(
+            find.byKey(const ValueKey('create-agent-popover')));
+        expect(popup.left, greaterThanOrEqualTo(18));
+        expect(popup.top, greaterThanOrEqualTo(24));
+        expect(popup.right, lessThanOrEqualTo(scenario.size.width - 18));
+        expect(popup.bottom, lessThanOrEqualTo(scenario.size.height - 20));
+        expect(popup.width, lessThanOrEqualTo(340));
+        final header = tester.getRect(find.text('Create agent'));
+        final field = tester.getRect(find.byType(TextField));
+        final button = tester.getRect(find.byType(Btn));
+        expect(popup.contains(header.topLeft), isTrue);
+        expect(popup.contains(button.bottomRight), isTrue);
+        expect(header.bottom, lessThan(field.top));
+        expect(field.bottom, lessThan(button.top));
+        expect(tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+            isTrue);
+        await tester.tap(find.text('Build agent'));
+        await tester.pumpAndSettle();
+        expect(find.text('Describe the agent you want it to become.'), findsOneWidget);
+        await tester.enterText(find.byType(TextField), '  Review security issues in repos  ');
+        await tester.tap(find.text('Build agent'));
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 5));
+        expect(client.builtPrompt, 'Review security issues in repos');
+        expect(find.byType(CreateAgentForm), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    });
+  }
 
   testWidgets('rows land on the same left inset as every sibling panel',
       (tester) async {

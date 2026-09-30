@@ -50,8 +50,7 @@ class _LanesScreenState extends State<LanesScreen> {
     Theme.of(context);
     final lanes = widget.liveLanes();
     _shown = lanes;
-    final running = lanes.where((lane) => lane.running).length;
-    final failed = lanes.where((lane) => lane.status == 'failed').length;
+
 
     return Scaffold(
       body: SafeArea(
@@ -61,7 +60,6 @@ class _LanesScreenState extends State<LanesScreen> {
             title: 'Delegated lanes',
             titleSize: 14,
             compact: true,
-            subtitle: _subtitle(lanes, running, failed),
             onBack: widget.onClose ?? () => Navigator.pop(context),
           ),
           Expanded(
@@ -73,7 +71,7 @@ class _LanesScreenState extends State<LanesScreen> {
                 : ListView(
                     padding:
                         const EdgeInsets.fromLTRB(S.s16, S.s16, S.s16, S.s32),
-                    children: laneSections(lanes),
+                    children: laneSections(lanes, liveLanes: widget.liveLanes),
                   ),
           ),
         ]),
@@ -81,16 +79,10 @@ class _LanesScreenState extends State<LanesScreen> {
     );
   }
 
-  String _subtitle(List<LaneInfo> lanes, int running, int failed) {
-    if (lanes.isEmpty) return 'No parallel work';
-    final total = '${lanes.length} ${lanes.length == 1 ? 'lane' : 'lanes'}';
-    if (running > 0) return '$total · $running running';
-    if (failed > 0) return '$total · $failed failed';
-    return '$total · complete';
-  }
 }
 
-List<Widget> laneSections(List<LaneInfo> lanes) {
+List<Widget> laneSections(List<LaneInfo> lanes,
+    {List<LaneInfo> Function()? liveLanes}) {
   final running = lanes.where((l) => l.running).toList();
   final failed = lanes.where((l) => l.status == 'failed').toList();
   final cancelled = lanes.where((l) => l.status == 'cancelled').toList();
@@ -102,10 +94,11 @@ List<Widget> laneSections(List<LaneInfo> lanes) {
   void section(String label, List<LaneInfo> items, Tone tone) {
     if (items.isEmpty) return;
     if (out.isNotEmpty) out.add(const SizedBox(height: S.s20));
-    out.add(PaneLabel('$label · ${items.length}'));
+    out.add(PaneLabel(label));
     for (var i = 0; i < items.length; i++) {
       if (i > 0) out.add(const SizedBox(height: S.s8));
-      out.add(LaneDetailCard(key: ValueKey(items[i].id), lane: items[i]));
+      out.add(LaneDetailCard(
+          key: ValueKey(items[i].id), lane: items[i], liveLanes: liveLanes));
     }
   }
 
@@ -118,20 +111,23 @@ List<Widget> laneSections(List<LaneInfo> lanes) {
 
 class LaneDetailCard extends StatefulWidget {
   final LaneInfo lane;
-  const LaneDetailCard({super.key, required this.lane});
+  final List<LaneInfo> Function()? liveLanes;
+  final bool detail;
+  const LaneDetailCard({super.key, required this.lane, this.liveLanes,
+    this.detail = false});
 
   @override
   State<LaneDetailCard> createState() => _LaneDetailCardState();
 }
 
 class _LaneDetailCardState extends State<LaneDetailCard> {
-  bool _expanded = false;
+  bool get _expanded => widget.detail;
 
   LaneInfo get lane => widget.lane;
 
   @override
   Widget build(BuildContext context) {
-    final hasDetails = _hasDetails(lane);
+
     final failed = lane.status == 'failed';
     final cancelled = lane.status == 'cancelled';
     final tone = lane.running
@@ -169,8 +165,12 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          onTap:
-              hasDetails ? () => setState(() => _expanded = !_expanded) : null,
+          onTap: widget.detail ? null : () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => LaneDetailScreen(
+              laneId: lane.id,
+              liveLanes: widget.liveLanes ?? () => [widget.lane],
+            )),
+          ),
           child: Padding(
             padding:
                 EdgeInsets.fromLTRB(12, dense ? 9 : 12, 12, dense ? 10 : 12),
@@ -221,11 +221,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: body.copyWith(color: AppColors.danger))),
-                if (hasDetails)
-                  indented(
-                      Text(_expanded ? 'Hide details' : 'Show details',
-                          style: meta),
-                      top: 8),
+                if (!_expanded)
+                  indented(Text('View details', style: meta), top: 8),
                 if (_expanded) indented(_details(context), top: 12),
               ],
             ),
@@ -285,6 +282,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
       ));
     }
 
+    addSection('Activity', lane.activity, icon: 'terminal');
+    addSection('Summary', lane.summary, icon: 'file-text');
     addSection('Handoff', lane.handoff,
         icon: 'corner-down-right', tone: Tone.accent);
     addSection('Report', lane.report, icon: 'file-text', tone: Tone.ok);
@@ -300,11 +299,6 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     );
   }
 
-  bool _hasDetails(LaneInfo value) =>
-      [value.activity, value.handoff, value.summary, value.report, value.error]
-          .any((text) => text != null && text.trim().isNotEmpty) ||
-      value.activityLog.isNotEmpty;
-
   String _elapsed(String startedAt) {
     final time = DateTime.tryParse(startedAt);
     if (time == null) return '';
@@ -315,13 +309,59 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
   }
 }
 
+class LaneDetailScreen extends StatefulWidget {
+  final String laneId;
+  final List<LaneInfo> Function() liveLanes;
+  const LaneDetailScreen({super.key, required this.laneId,
+    required this.liveLanes});
+
+  @override
+  State<LaneDetailScreen> createState() => _LaneDetailScreenState();
+}
+
+class _LaneDetailScreenState extends State<LaneDetailScreen> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lane = widget.liveLanes()
+        .where((lane) => lane.id == widget.laneId).firstOrNull;
+    return Scaffold(
+      body: SafeArea(bottom: false, child: Column(children: [
+        SnAppBar(title: lane?.title ?? 'Lane details', titleSize: 14,
+          compact: true, onBack: () => Navigator.of(context).pop()),
+        Expanded(child: lane == null
+          ? const EmptyState(icon: 'layers', title: 'Lane unavailable',
+              body: 'This delegated lane is no longer available.')
+          : ListView(padding: const EdgeInsets.all(S.s16), children: [
+              LaneDetailCard(lane: lane, detail: true),
+            ])),
+      ])),
+    );
+  }
+}
+
 class _ActivityHistory extends StatelessWidget {
   final List<LaneActivity> entries;
   const _ActivityHistory({required this.entries});
 
   @override
   Widget build(BuildContext context) {
-    final items = entries.reversed.take(24).toList();
+    final items = entries.reversed.toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

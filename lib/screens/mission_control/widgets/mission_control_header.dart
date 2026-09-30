@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../../mission_control/coordination_agent_directory.dart';
-import '../../tasks/tasks_screen.dart';
 import '../mission_control_state.dart';
 import '../mobile/mobile_mc.dart'
     show showMissionControlPanel, showNotificationInbox;
@@ -87,16 +86,6 @@ class MissionControlHeader extends StatelessWidget {
           onTap: () => showMissionControlPanel(
             context,
             CoordinationAgentDirectory(client: state.client),
-          ),
-        ),
-        IconBtn(
-          'layers',
-          size: 40,
-          iconSize: 18,
-          tooltip: 'Tasks',
-          onTap: () => showMissionControlPanel(
-            context,
-            TasksScreen(client: state.client),
           ),
         ),
         Stack(clipBehavior: Clip.none, children: [

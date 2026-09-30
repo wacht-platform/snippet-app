@@ -63,6 +63,7 @@ class _CreateAgentFormState extends State<CreateAgentForm> {
 
   @override
   Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppField(

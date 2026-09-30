@@ -167,7 +167,8 @@ void main() {
   });
 
   for (final direction in TextDirection.values) {
-    testWidgets('only physical left dismisses in $direction', (tester) async {
+    testWidgets('both horizontal directions dismiss in $direction',
+        (tester) async {
       final opened = <Map<String, dynamic>>[];
       onNotifTap = opened.add;
       foregroundNotifications.add({'title': 'Swipe'});
@@ -179,12 +180,17 @@ void main() {
       expect(haptics, isEmpty);
       await tester.drag(find.byType(Dismissible), const Offset(500, 0));
       await tester.pumpAndSettle();
-      expect(find.text('Swipe'), findsOneWidget);
+      expect(find.text('Swipe'), findsNothing);
+      foregroundNotifications.add({'title': 'Swipe'});
+      await tester.pumpAndSettle();
       await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
       await tester.pumpAndSettle();
       expect(find.text('Swipe'), findsNothing);
       expect(opened, isEmpty);
-      expect(haptics, ['HapticFeedbackType.lightImpact']);
+      expect(haptics, [
+        'HapticFeedbackType.lightImpact',
+        'HapticFeedbackType.lightImpact',
+      ]);
     });
   }
 

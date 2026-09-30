@@ -33,7 +33,7 @@ import 'git.dart';
 import 'inbound_share_picker.dart';
 import 'mission_control.dart';
 import 'tasks/task_kanban.dart';
-import 'tasks/tasks_screen.dart';
+import 'tasks/tasks_panel.dart';
 import 'mobile_shell.dart';
 import 'new_session_picker.dart';
 import 'session.dart';
@@ -937,12 +937,6 @@ class _DesktopShellState extends State<DesktopShell>
           }),
         ),
         PaletteCommand(
-          'kanban',
-          'Open Task Board',
-          '',
-          _openBoardTab,
-        ),
-        PaletteCommand(
           'agent',
           'Open Agents',
           '',
@@ -1337,7 +1331,6 @@ class _DesktopShellState extends State<DesktopShell>
             _openDiffTab(c, _active?.url ?? '', _activeTab?.sessionId ?? '', f);
           }
         },
-        onOpenBoard: _openBoardTab,
         onOpenFile: (path, name) {
           final c = _client;
           if (c != null) {

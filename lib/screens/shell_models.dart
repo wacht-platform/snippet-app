@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../api.dart';
+import '../store.dart';
 import '../shell_panel.dart';
 import '../models.dart';
 import '../share_inbound.dart';
@@ -11,6 +12,9 @@ import 'mission_control.dart';
 /// property OF a tab, not of the shell — dragging a tab across the divider is
 /// what moves it.
 enum ShellPane { left, right }
+
+bool shouldRestoreShellTab(OpenTabDescriptor tab, {required bool mobile}) =>
+    !tab.isTerminal && (mobile || !tab.board);
 
 /// Which top-level place the phone home is showing. The floating action bar
 /// switches this; desktop keeps its sidebar rail instead, so this is phone-only.

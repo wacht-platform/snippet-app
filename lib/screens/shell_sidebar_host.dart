@@ -37,7 +37,6 @@ class ShellSidebarHost extends StatelessWidget {
     required this.onOpenSession,
     required this.onOpenDiff,
     required this.onOpenFile,
-    required this.onOpenBoard,
     required this.instances,
     required this.selectedSessionId,
     required this.sessions,
@@ -81,7 +80,6 @@ class ShellSidebarHost extends StatelessWidget {
   final void Function(String id, String title, String? profile) onOpenSession;
   final ValueChanged<GitFile> onOpenDiff;
   final void Function(String path, String name) onOpenFile;
-  final VoidCallback onOpenBoard;
 
   // Sidebar props:
   final bool topInset;
@@ -138,7 +136,7 @@ class ShellSidebarHost extends StatelessWidget {
       final c = client;
       return c == null
           ? const SidebarUnavailable(message: 'Add a machine to see its tasks.')
-          : TasksPanel(client: c, onOpenBoard: onOpenBoard);
+          : TasksPanel(client: c);
     }
 
     if (effectiveSection == ShellSection.agents) {
