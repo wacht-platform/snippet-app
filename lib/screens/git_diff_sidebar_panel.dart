@@ -89,7 +89,8 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   }
 
   bool _touchesRepo(DeviceEventFrame e) =>
-      const {'activity', 'idle', 'done', 'error'}.contains(e['kind']) &&
+      const {DeviceEventHub.attachedToolResult, 'idle', 'done', 'error'}
+          .contains(e['kind']) &&
       ((widget.sessionId != null && e['session'] == widget.sessionId) ||
           e['workspace'] == widget.workspacePath);
 
@@ -144,8 +145,8 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     if (_branchBusy) return;
     setState(() => _branchBusy = true);
     try {
-      final result = await widget.client
-          .gitCheckout(_repo, name, create: create);
+      final result =
+          await widget.client.gitCheckout(_repo, name, create: create);
       if (!mounted) return;
       if (result['ok'] != true) {
         final error = (result['stderr'] as String?)?.trim();
@@ -274,8 +275,8 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   }
 
   Widget _cleanState() => Padding(
-        padding: const EdgeInsets.fromLTRB(kSidebarContentInset, 10,
-            kSidebarContentInset, 8),
+        padding: const EdgeInsets.fromLTRB(
+            kSidebarContentInset, 10, kSidebarContentInset, 8),
         child: AppCard(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -293,8 +294,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Working tree clean',
-                      style: TS.label(AppColors.fg1)),
+                  Text('Working tree clean', style: TS.label(AppColors.fg1)),
                   const SizedBox(height: 3),
                   Text('No local changes · ${_timeAgo(_lastUpdated)}',
                       style: TS.caption()),
@@ -314,8 +314,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   Widget _errorState() => Padding(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_error!,
-              style: sans(12, color: AppColors.danger, height: 1.4)),
+          Text(_error!, style: sans(12, color: AppColors.danger, height: 1.4)),
           const SizedBox(height: 10),
           Btn('Retry', small: true, onTap: refresh),
         ]),

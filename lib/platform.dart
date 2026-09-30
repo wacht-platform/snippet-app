@@ -9,8 +9,7 @@ bool get kMobile =>
     (defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS);
 
-/// Desktop platforms where we watch /events in-process and raise native local
-/// notifications (no foreground service — the app stays running). macOS + Linux.
+/// Desktop platforms with native notification plugin support.
 bool get kDesktopNotify =>
     !kIsWeb &&
     (defaultTargetPlatform == TargetPlatform.macOS ||

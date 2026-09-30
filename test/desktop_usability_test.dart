@@ -154,7 +154,7 @@ void main() {
         'git': false,
       });
 
-      fake.deviceEvents.add({'kind': 'activity', 'workspace': '/workspace'});
+      fake.deviceEvents.add({'kind': DeviceEventHub.attachedToolResult, 'workspace': '/workspace'});
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -199,7 +199,7 @@ void main() {
       fake.gitFiles.clear();
 
       fake.deviceEvents
-          .add({'kind': 'activity', 'session': 'sess-1', 'workspace': '/workspace'});
+          .add({'kind': DeviceEventHub.attachedToolResult, 'session': 'sess-1', 'workspace': '/workspace'});
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pump(const Duration(milliseconds: 50));
 

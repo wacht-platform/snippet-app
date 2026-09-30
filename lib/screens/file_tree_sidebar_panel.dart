@@ -64,7 +64,8 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   Revalidator _watch() => Revalidator(
         client: widget.client,
         on: (e) =>
-            const {'activity', 'idle'}.contains(e['kind']) &&
+            const {DeviceEventHub.attachedToolResult, 'idle'}
+                .contains(e['kind']) &&
             e['workspace'] == widget.workspacePath,
         onRevalidate: ({required bool force}) {
           if (!mounted || _uploading || _revalidating) return;

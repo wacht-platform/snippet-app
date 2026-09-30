@@ -267,8 +267,10 @@ extension _SessionScreenSocketExt on _SessionScreenState {
               next.events.last != cur.events.last);
       // The open question moves between the answer bar and the transcript.
       final questionFlipped = cur == null ||
-          (next.status == 'waiting_for_input' && next.pendingQuestion != null) !=
-              (cur.status == 'waiting_for_input' && cur.pendingQuestion != null);
+          (next.status == 'waiting_for_input' &&
+                  next.pendingQuestion != null) !=
+              (cur.status == 'waiting_for_input' &&
+                  cur.pendingQuestion != null);
       if (eventsChanged || questionFlipped) _transcriptDirty = true;
       if (wire == 'snapshot') {
         final offset = (j['event_offset'] as num?)?.toInt();
@@ -300,6 +302,13 @@ extension _SessionScreenSocketExt on _SessionScreenState {
         }
       });
       widget.onMacStatus?.call(next, next.status == 'running');
+      if (wire == 'delta') {
+        widget.client.deviceEvents.addAttachedToolResults(
+          j,
+          session: widget.sessionId,
+          workspace: next.workspace,
+        );
+      }
       widget.onMacControls
           ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
       // Re-arm (or cancel) the ack watchdog against the new _pending state.

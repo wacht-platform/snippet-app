@@ -19,7 +19,6 @@ import '../api.dart';
 import '../desktop_pick.dart';
 import '../drafts.dart';
 import '../models.dart';
-import '../notifications.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../tool_activity.dart';
@@ -189,7 +188,6 @@ class _SessionActionPanel extends StatelessWidget {
   }
 }
 
-String _registeredOpenKey = '';
 const int _maxAttachments = 5;
 
 int _userEchoCount(List<Map<String, dynamic>> events) => events
@@ -219,7 +217,6 @@ class _SessionScreenState extends State<SessionScreen>
   Timer? _bannerTimer;
   bool _confirmingRecording = false;
   SharedInbound? _consumedShare;
-  late final String _openKey;
   HarnessState? _state;
   String _liveText = '';
   String _liveThinking = '';
@@ -647,9 +644,6 @@ class _SessionScreenState extends State<SessionScreen>
     _loadModel();
     modelsRevision.addListener(_loadModel);
     unawaited(widget.client.getConfig());
-    _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
-    _registeredOpenKey = _openKey;
-    reportOpenSession(_openKey);
     if (widget.inboundShare != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _consumeInboundShare(widget.inboundShare!);
@@ -804,9 +798,6 @@ class _SessionScreenState extends State<SessionScreen>
       _restoreDraft();
       _consumedShare = null;
       _state = null;
-      _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
-      _registeredOpenKey = _openKey;
-      reportOpenSession(_openKey);
       unawaited(_startSession());
     }
     if (widget.inboundShare != null &&
@@ -832,8 +823,6 @@ class _SessionScreenState extends State<SessionScreen>
         _unpark();
         _loadModel();
       }
-      _registeredOpenKey = _openKey;
-      reportOpenSession(_openKey);
     }
   }
 
@@ -1004,10 +993,6 @@ class _SessionScreenState extends State<SessionScreen>
     // Only clear the suppression key if this screen still owns it — on a session
     // switch the NEW screen registers before this dispose runs, and clobbering
     // its key made notifications fire for the session being viewed.
-    if (_registeredOpenKey == _openKey) {
-      _registeredOpenKey = '';
-      reportOpenSession('');
-    }
     // Held messages already live on the daemon. Flush only the reconnect outbox.
     final ch = _channel;
     if (_outbox.isNotEmpty && ch != null) {

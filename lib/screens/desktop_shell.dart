@@ -7,10 +7,15 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
 import '../swr.dart';
+import '../session_status_updates.dart';
 import '../command_palette.dart';
 import '../device_events.dart';
 import '../models.dart';
 import '../notifications.dart';
+import '../notification_sync.dart';
+import '../notification_inbox.dart';
+import '../notification_conversation.dart';
+import 'tasks/task_common.dart';
 import '../panel.dart';
 import '../platform.dart';
 import '../share_inbound.dart';
@@ -126,7 +131,7 @@ class _DesktopShellState extends State<DesktopShell>
   String? _statusForTab(_ShellTab t) {
     final live = _macSessionStatuses[t.key];
     if (live != null) {
-      return live.state?.status ?? (live.running ? 'running' : 'idle');
+      return sessionDisplayStatus(live.state, live.running);
     }
     for (final s in _sessions ?? const <SessionInfo>[]) {
       if (s.id == t.sessionId) return s.status;
@@ -195,9 +200,7 @@ class _DesktopShellState extends State<DesktopShell>
   StreamSubscription? _eventsSub;
   Timer? _eventsReconnect;
   int _eventsGeneration = 0;
-  // Live status from /events (and open-tab callbacks). Survives a slow
-  // /sessions refetch so the list doesn't flicker back to stale.
-  final Map<String, String> _liveStatus = {};
+  final _liveStatus = SessionStatusUpdates();
 
   /// Which agents are working in each session, as display initials.
   ///
@@ -206,7 +209,6 @@ class _DesktopShellState extends State<DesktopShell>
   /// answerable without opening anything. Kept separate from [_sessions] so a
   /// coordination failure can never take the session list down with it.
   bool _sidebarGit = false;
-
 
   /// Secondary-pane width, dragged by its handle. Width-driven rather than a
   /// flex ratio because a flex ratio cannot be dragged and has no natural size.
@@ -394,9 +396,8 @@ class _DesktopShellState extends State<DesktopShell>
 
   List<Widget> _railTools() => buildShellRailTools(
         activeTab: _activeTab,
-        macSessionStatus: _activeTab == null
-            ? null
-            : _macSessionStatuses[_activeTab!.key],
+        macSessionStatus:
+            _activeTab == null ? null : _macSessionStatuses[_activeTab!.key],
         isRightPanelActive: _rightPanelActive,
         onToggleRightPanel: _toggleRightPanel,
         onSessionAction: _dispatchSessionAction,
@@ -499,7 +500,7 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _setMacSessionStatus(String key, HarnessState? state, bool running) {
     _macSessionStatuses[key] = _MacSessionStatus(state, running);
-    final status = state?.status ?? (running ? 'running' : 'idle');
+    final status = sessionDisplayStatus(state, running);
     String? sessionId;
     for (final t in _tabs) {
       if (t.key == key) {
@@ -652,7 +653,7 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _patchSessionStatus(String sessionId, String status) {
     if (sessionId.isEmpty || status.isEmpty) return;
-    _liveStatus[sessionId] = status;
+    _liveStatus.record(sessionId, status);
     final sessions = _sessions;
     if (sessions == null) return;
     final i = sessions.indexWhere((s) => s.id == sessionId);
@@ -661,16 +662,6 @@ class _DesktopShellState extends State<DesktopShell>
       for (var n = 0; n < sessions.length; n++)
         n == i ? sessions[n].withStatus(status) : sessions[n],
     ];
-  }
-
-  void _applyLiveStatus(List<SessionInfo> sessions) {
-    if (_liveStatus.isEmpty) return;
-    for (var i = 0; i < sessions.length; i++) {
-      final live = _liveStatus[sessions[i].id];
-      if (live != null && live.isNotEmpty && sessions[i].status != live) {
-        sessions[i] = sessions[i].withStatus(live);
-      }
-    }
   }
 
   void _stopEventsWatch() {
@@ -703,15 +694,23 @@ class _DesktopShellState extends State<DesktopShell>
     final generation = _eventsGeneration;
     try {
       final ch = c.events();
+      if (kMobile && _active != null) {
+        unawaited(syncNotificationInstance(_active!).catchError((Object _) {}));
+      }
       _eventsChannel = ch;
       _eventsSub = ch.stream.listen(
         (msg) {
-          if (generation != _eventsGeneration || !identical(ch, _eventsChannel)) {
+          if (generation != _eventsGeneration ||
+              !identical(ch, _eventsChannel)) {
             return;
           }
           final event = DeviceEvent.decode(msg);
           if (event == null) return;
           final kind = event.kind;
+          if (kind == 'notification' && kMobile && _active != null) {
+            unawaited(receiveLiveNotification(_active!, msg)
+                .catchError((Object _) {}));
+          }
           if (kind == 'models' || kind == 'config') {
             c.invalidateConfig();
             modelsRevision.value++;
@@ -736,7 +735,10 @@ class _DesktopShellState extends State<DesktopShell>
     if (!mounted || !_appForeground || _client == null) return;
     _eventsReconnect?.cancel();
     _eventsReconnect = Timer(const Duration(seconds: 3), () {
-      if (mounted && _appForeground) _connectEventsWatch();
+      if (mounted && _appForeground) {
+        _connectEventsWatch();
+        if (!_sessionsLoading) _loadSessions();
+      }
     });
   }
 
@@ -820,7 +822,6 @@ class _DesktopShellState extends State<DesktopShell>
     }
     return null;
   }
-
 
   Timer? _persistTabsDebounce;
 
@@ -959,7 +960,7 @@ class _DesktopShellState extends State<DesktopShell>
     if (!mounted) return;
     final url = '${m['url']}';
     final sid = '${m['session'] ?? ''}';
-    if (url.isEmpty || sid.isEmpty) return;
+    if (url.isEmpty) return;
     // Cold-start taps can race _loadInstances — make sure the list is in before
     // resolving, then resolve the instance (and its token) from the STORE, not
     // the payload. An unknown/removed instance is ignored gracefully instead of
@@ -992,7 +993,28 @@ class _DesktopShellState extends State<DesktopShell>
     // throws. Global shells are per-machine, so they reconnect here.
     _shells.setClient(_client);
     _connectEventsWatch();
-    _openSession(sid, '${m['title'] ?? 'session'}', null);
+    final notificationId = m['notification_id'] as String?;
+    if (notificationId != null)
+      await (await NotificationInbox.open()).markRead(notificationId);
+    if (!mounted) return;
+    final destination = m['destination'];
+    if (destination is Map && destination['type'] == 'task') {
+      await openTaskDetail(context, _client!, '${destination['id']}');
+    } else if (destination is Map && destination['type'] == 'conversation') {
+      try {
+        final opened = await openNotificationConversation(
+            context, _client!, '${destination['id']}');
+        if (!opened && mounted)
+          toast(
+              context, 'This conversation is not available in the human inbox.',
+              danger: true);
+      } catch (_) {
+        if (mounted)
+          toast(context, 'Could not resolve this conversation.', danger: true);
+      }
+    } else if (sid.isNotEmpty) {
+      _openSession(sid, '${m['title'] ?? 'session'}', null);
+    }
     _loadSessions();
   }
 
@@ -1002,8 +1024,10 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() {
       _instances = items;
       _active ??= items.isNotEmpty ? items.first : null;
-      _client =
-          _active != null ? DaemonClient(_active!.url, _active!.token) : null;
+      if (_client?.baseUrl != _active?.url) {
+        _client =
+            _active != null ? DaemonClient(_active!.url, _active!.token) : null;
+      }
       _loading = false;
     });
     // Wire the daemon-wide shell socket on COLD START too. `_selectInstance` and
@@ -1031,6 +1055,7 @@ class _DesktopShellState extends State<DesktopShell>
       setState(() => _sessions = <SessionInfo>[]);
       return;
     }
+    final statusRevision = _liveStatus.revision;
     setState(() => _sessionsLoading = true);
     try {
       final s = await c.sessions(limit: 60);
@@ -1049,7 +1074,7 @@ class _DesktopShellState extends State<DesktopShell>
         if (am != bm) return am ? -1 : 1;
         return b.lastActive.compareTo(a.lastActive);
       });
-      _applyLiveStatus(s);
+      _liveStatus.merge(s, since: statusRevision);
       if (mounted) {
         setState(() {
           _sessions = s;
@@ -1070,7 +1095,6 @@ class _DesktopShellState extends State<DesktopShell>
       }
     }
   }
-
 
   // Start a chat by picking a folder using NewSessionPicker on both desktop and mobile.
   Future<void> _newSessionFlow() async {
@@ -1257,8 +1281,6 @@ class _DesktopShellState extends State<DesktopShell>
         share: share);
   }
 
-
-
   Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) =>
       ShellSidebarHost(
         effectiveSection: _effectiveSection,
@@ -1323,8 +1345,8 @@ class _DesktopShellState extends State<DesktopShell>
           } else {
             setState(() {
               _mobileSettingsSection = s;
-              _pushMobileRoute(_MobileRoute(
-                  home: _MobileHome.settings, settingsSection: s));
+              _pushMobileRoute(
+                  _MobileRoute(home: _MobileHome.settings, settingsSection: s));
             });
           }
         },
@@ -1360,7 +1382,6 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   final _topMachineKey = GlobalKey();
-
 
   @override
   Widget build(BuildContext context) {
@@ -1459,10 +1480,8 @@ class _DesktopShellState extends State<DesktopShell>
       );
     });
   }
-
 }
 
 typedef _MachineList = MachineList;
 typedef _SettingsPanel = SettingsPanel;
 typedef _SettingsPage = SettingsPage;
-

@@ -31,6 +31,20 @@ class DeviceEventHub {
 
   void add(DeviceEventFrame event) => _controller.add(event);
 
+  void addAttachedToolResults(DeviceEventFrame frame,
+      {required String session, required String workspace}) {
+    final events = frame['new_events'];
+    if (frame['wire'] != 'delta' || events is! List) return;
+    if (!events.any((e) => e is Map && e['kind'] == 'tool_result')) return;
+    add({
+      'kind': attachedToolResult,
+      'session': session,
+      'workspace': workspace
+    });
+  }
+
+  static const attachedToolResult = '_attached_tool_result';
+
   void _connect() {
     final open = _open;
     if (open == null) return;

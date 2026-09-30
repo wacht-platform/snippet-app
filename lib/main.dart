@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'drafts.dart';
 import 'notifications.dart';
+import 'notification_popovers.dart';
 import 'android_reconciliation.dart';
 import 'platform.dart';
 import 'screens/adaptive_home.dart';
@@ -22,12 +23,10 @@ Widget _buildErrorWidget(FlutterErrorDetails details) {
             AppIcon('alert-triangle', size: 28, color: AppColors.danger),
             const SizedBox(height: 12),
             Text('This panel could not be displayed',
-                textAlign: TextAlign.center,
-                style: TS.sectionTitle()),
+                textAlign: TextAlign.center, style: TS.sectionTitle()),
             const SizedBox(height: 6),
             Text('Close it and try again.',
-                textAlign: TextAlign.center,
-                style: TS.meta()),
+                textAlign: TextAlign.center, style: TS.meta()),
           ],
         ),
       ),
@@ -90,7 +89,6 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
     if (!kCanNotify) return;
     final fg = state == AppLifecycleState.resumed;
     reportForeground(fg);
-    if (!fg) reportOpenSession('');
   }
 
   @override
@@ -107,6 +105,8 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
       // back event entirely — so back from a session backgrounded the app
       // instead of returning to the chat list. The shell now owns back
       // explicitly and reproduces the minimize-at-root behaviour itself.
+      builder: (context, child) =>
+          NotificationPopovers(child: child ?? const SizedBox.shrink()),
       home: const AdaptiveHome(),
     );
   }

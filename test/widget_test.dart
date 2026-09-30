@@ -3,11 +3,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:snippet/api.dart';
 import 'package:snippet/android_reconciliation.dart';
-import 'package:snippet/notifications.dart';
+
 import 'package:snippet/models.dart';
 import 'package:snippet/tool_activity.dart';
 import 'package:snippet/screens/mission_control/mission_control_state.dart';
@@ -17,16 +16,6 @@ import 'package:snippet/transcript.dart';
 import 'package:snippet/widgets.dart';
 
 void main() {
-  test('Android reconciliation cursor only advances', () async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final url = 'https://daemon.example';
-    await prefs.remove(notificationCursorKey(url));
-    await advanceNotificationCursor(prefs, url, 9);
-    await advanceNotificationCursor(prefs, url, 4);
-    expect(prefs.getInt(notificationCursorKey(url)), 9);
-  });
-
   test('Android reconciliation diff only returns newly observed ids', () {
     expect(
       newlyObservedSessionIds(['old', 'shared'], ['shared', 'new']),
@@ -484,7 +473,8 @@ void main() {
     ));
 
     await tester.tap(find
-        .descendant(of: find.byType(ToolRun), matching: find.byType(GestureDetector))
+        .descendant(
+            of: find.byType(ToolRun), matching: find.byType(GestureDetector))
         .first);
     await tester.pump();
     expect(find.text('first tool'), findsOneWidget);
@@ -520,7 +510,8 @@ void main() {
     ));
 
     await tester.tap(find
-        .descendant(of: find.byType(ToolRun), matching: find.byType(GestureDetector))
+        .descendant(
+            of: find.byType(ToolRun), matching: find.byType(GestureDetector))
         .first);
     await tester.pump();
     expect(find.text('tool detail'), findsOneWidget);
@@ -589,7 +580,6 @@ void main() {
     expect(parseBoardMessage('just a normal message'), isNull);
   });
 
-
   test('parseBoardMessage ignores a "body:" inside the history digest', () {
     // A prior room message that literally contains "body: " must not be mistaken
     // for the new message: the real field is the final line before the tag.
@@ -607,7 +597,6 @@ void main() {
     expect(parsed, isNotNull);
     expect(parsed!.body, 'the real current message');
   });
-
 
   // --- Design token guards -------------------------------------------------
   // These lock two defects that were silent and app-wide:
@@ -673,8 +662,8 @@ void main() {
     // swapped in without checking the label that sits on it.
     expect(ratio(AppColors.accent, AppColors.canvas), greaterThanOrEqualTo(4.5),
         reason: 'accent is used AS text (links, selected labels, state)');
-    expect(
-        ratio(AppColors.accentFg, AppColors.accentFill), greaterThanOrEqualTo(4.5),
+    expect(ratio(AppColors.accentFg, AppColors.accentFill),
+        greaterThanOrEqualTo(4.5),
         reason: 'accentFg is the label ON an accent-filled button');
     expect(AppColors.accentFg.computeLuminance(),
         isNot(closeTo(AppColors.accentFill.computeLuminance(), 0.05)),

@@ -181,14 +181,10 @@ class DaemonClient {
     );
   }
 
-  Future<List<Map<String, dynamic>>> notificationReplay({int since = 0}) async {
-    final r =
-        await http.get(_uri('/notifications/replay', {'since': '$since'}));
-    if (r.statusCode != 200) throw _err('notification replay', r);
-    final raw = (jsonDecode(r.body) as Map<String, dynamic>)['events'];
-    return raw is List
-        ? raw.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList()
-        : const <Map<String, dynamic>>[];
+  Future<Map<String, dynamic>> notificationsPage({int since = 0, int limit = 500}) async {
+    final r = await http.get(_uri('/notifications', {'since': '$since', 'limit': '${limit.clamp(1, 500)}'}));
+    if (r.statusCode != 200) throw _err('notifications', r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   /// Device-wide `/events` firehose (status + terminal bells). Independent of

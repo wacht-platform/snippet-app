@@ -186,7 +186,7 @@ void main() {
             body: NewSessionPicker(
           client: client,
           machineLabel: 'dev',
-          onOpenFolder: (_) async {},
+          onOpenFolder: (_, __) async {},
         ))));
         await tester.pump(const Duration(milliseconds: 120));
         await expectGolden(tester, find.byType(MaterialApp), 'goldens/new_session_picker_$density.png');

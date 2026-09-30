@@ -82,6 +82,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       }
       _attachments.clear();
     });
+    if (!running) widget.onMacStatus?.call(_state, true);
     _input.clear();
     _armAckWatchdog(); // recover if this send silently dies on a dead socket
     // Sending is an explicit action — re-pin and jump to the bottom.
@@ -104,7 +105,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   ) async {
     if (text.isEmpty && ready.isEmpty) return;
     final markers = ready.map((a) => a.marker).join('\n');
-    final body = markers.isEmpty ? text : (text.isEmpty ? markers : '$text\n\n$markers');
+    final body =
+        markers.isEmpty ? text : (text.isEmpty ? markers : '$text\n\n$markers');
     final name = _recipientAgentName ?? agentId;
     _setState(() {
       _recipientAgentId = null;
@@ -261,7 +263,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           onTap: onTap,
           behavior: HitTestBehavior.opaque,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: S.s6, vertical: S.s4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: S.s6, vertical: S.s4),
             child: Text(label, style: TS.label(color)),
           ),
         );
@@ -325,7 +328,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             onTap: onTap,
             child: SizedBox.square(
               dimension: kMobile ? 34 : 26,
-              child: Center(child: AppIcon(icon, size: 14, color: AppColors.fg3)),
+              child:
+                  Center(child: AppIcon(icon, size: 14, color: AppColors.fg3)),
             ),
           ),
         );
@@ -463,9 +467,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   ///
   /// The daemon models exactly two modes (`auto` / `manual`), so the pill names
   /// those rather than inventing a third the backend cannot honor.
-  String get _approvalLabel => (_state?.approvalMode ?? 'auto') == 'manual'
-      ? 'Ask'
-      : 'Auto';
+  String get _approvalLabel =>
+      (_state?.approvalMode ?? 'auto') == 'manual' ? 'Ask' : 'Auto';
 
   /// Context still free, as a whole percent of the model's window. Null until
   /// the daemon has reported both a window size and a prompt size.
@@ -513,10 +516,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                         color: selected ? AppColors.accent : AppColors.fg2)),
                 if (onClear != null)
                   IconBtn('x',
-                      size: 22,
-                      iconSize: 12,
-                      tooltip: 'Clear',
-                      onTap: onClear)
+                      size: 22, iconSize: 12, tooltip: 'Clear', onTap: onClear)
                 else ...[
                   const SizedBox(width: 5),
                   AppIcon('chevron-down',
@@ -776,47 +776,52 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                               child: SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                  // Sending to an agent remains a composer action: it
-                                  // changes the destination of this message without
-                                  // adding another control to the session list.
-                                  Builder(
-                                    builder: (ctx) => _recipientAgentId == null
-                                        ? _composerChip(
-                                            icon: 'agent',
-                                            label: 'Send to',
-                                            onTap: () => _pickRecipient(ctx),
-                                          )
-                                        : _composerChip(
-                                            icon: 'agent',
-                                            label: _recipientAgentName ??
-                                                _recipientAgentId!,
-                                            selected: true,
-                                            onTap: () => _pickRecipient(ctx),
-                                            onClear: _clearRecipient,
-                                          ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  // Approval mode lives here instead of the tool
-                                  // band, so the setting sits next to what it
-                                  // governs.
-                                  Builder(
-                                    builder: (ctx) => _composerChip(
-                                      icon: 'shield',
-                                      label: _approvalLabel,
-                                      onTap: () => _switchApproval(ctx),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Builder(builder: (chipCtx) {
-                                    return _composerChip(
-                                      icon: 'sparkles',
-                                      label: _modelLabel ?? 'Auto',
-                                      onTap: () => _switchModel(chipCtx),
-                                    );
-                                  }),
-                                ]),
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      // Sending to an agent remains a composer action: it
+                                      // changes the destination of this message without
+                                      // adding another control to the session list.
+                                      Builder(
+                                        builder: (ctx) =>
+                                            _recipientAgentId == null
+                                                ? _composerChip(
+                                                    icon: 'agent',
+                                                    label: 'Send to',
+                                                    onTap: () =>
+                                                        _pickRecipient(ctx),
+                                                  )
+                                                : _composerChip(
+                                                    icon: 'agent',
+                                                    label:
+                                                        _recipientAgentName ??
+                                                            _recipientAgentId!,
+                                                    selected: true,
+                                                    onTap: () =>
+                                                        _pickRecipient(ctx),
+                                                    onClear: _clearRecipient,
+                                                  ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      // Approval mode lives here instead of the tool
+                                      // band, so the setting sits next to what it
+                                      // governs.
+                                      Builder(
+                                        builder: (ctx) => _composerChip(
+                                          icon: 'shield',
+                                          label: _approvalLabel,
+                                          onTap: () => _switchApproval(ctx),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Builder(builder: (chipCtx) {
+                                        return _composerChip(
+                                          icon: 'sparkles',
+                                          label: _modelLabel ?? 'Auto',
+                                          onTap: () => _switchModel(chipCtx),
+                                        );
+                                      }),
+                                    ]),
                               ),
                             ),
                             const SizedBox(width: 6),
@@ -938,19 +943,18 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             ? Image.file(File(a.localPath!),
                 fit: BoxFit.cover, cacheWidth: 168, cacheHeight: 168)
             : Image(
-                image: ResizeImage(
-                    widget.client.imageProvider(a.remotePath!),
-                    width: 168,
-                    height: 168),
+                image: ResizeImage(widget.client.imageProvider(a.remotePath!),
+                    width: 168, height: 168),
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => ColoredBox(
                     color: AppColors.surface2,
                     child: Center(
-                        child: AppIcon('image',
-                            size: 16, color: AppColors.fg4)))),
+                        child:
+                            AppIcon('image', size: 16, color: AppColors.fg4)))),
       );
     } else {
-      final ext = a.name.contains('.') ? a.name.split('.').last.toUpperCase() : 'FILE';
+      final ext =
+          a.name.contains('.') ? a.name.split('.').last.toUpperCase() : 'FILE';
       body = Container(
         height: side,
         constraints: const BoxConstraints(maxWidth: 190),
@@ -1034,7 +1038,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   Future<void> _editPasted(_Attachment a) async {
     final result = await presentScreen<(String, String)>(
       context,
-      builder: (_, close) => _PastedEditor(text: a.pastedText ?? '', onClose: close),
+      builder: (_, close) =>
+          _PastedEditor(text: a.pastedText ?? '', onClose: close),
     );
     if (!mounted || result == null) return;
     final (action, text) = result;
@@ -1075,7 +1080,8 @@ class _PastedEditor extends StatefulWidget {
 }
 
 class _PastedEditorState extends State<_PastedEditor> {
-  late final TextEditingController _text = TextEditingController(text: widget.text);
+  late final TextEditingController _text =
+      TextEditingController(text: widget.text);
 
   @override
   void dispose() {
@@ -1123,12 +1129,15 @@ class _PastedEditorState extends State<_PastedEditor> {
             child: Row(children: [
               TextButton(
                 onPressed: () => _done('inline'),
-                child: Text('Insert as text', style: sans(13, color: AppColors.fg2)),
+                child: Text('Insert as text',
+                    style: sans(13, color: AppColors.fg2)),
               ),
               const Spacer(),
               FilledButton(
                 onPressed: () => _done('save'),
-                child: Text('Done', style: sans(13, weight: W.label, color: AppColors.accentFg)),
+                child: Text('Done',
+                    style:
+                        sans(13, weight: W.label, color: AppColors.accentFg)),
               ),
             ]),
           ),
