@@ -200,14 +200,16 @@ void main() {
     expect(
         tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration,
         Duration.zero);
-    final gesture =
-        await tester.startGesture(tester.getCenter(find.text('Held')));
+    final gesture = await tester.startGesture(
+        tester.getTopLeft(find.byType(Dismissible)) + const Offset(1, 1));
     await tester.pump(const Duration(seconds: 6));
     expect(find.text('Held'), findsOneWidget);
     await gesture.cancel();
+    expect(notificationAppForeground, isTrue);
+    expect(suppressVisibleNotification({'url': 'u', 'session': 's'}), isFalse);
     visibleNotificationSession.value = notificationSessionKey('u', 's');
-    await tester.pump();
-    await tester.pump();
+    expect(suppressVisibleNotification({'url': 'u', 'session': 's'}), isTrue);
+    await tester.pumpAndSettle();
     expect(find.text('Held'), findsNothing);
     expect(find.text('Needs your input'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
@@ -251,7 +253,7 @@ void main() {
           expect(rect.right, closeTo(width - 12 - 30, .01));
         }
         expect(rect.left, greaterThanOrEqualTo(32));
-        expect(rect.height, lessThanOrEqualTo(40));
+        expect(rect.height, lessThanOrEqualTo(mobile ? 40 : 44));
         expect(find.text('Tap to open'), findsNothing);
         final dismiss = tester.getSize(find.byType(IconButton));
         expect(dismiss.width, greaterThanOrEqualTo(44));

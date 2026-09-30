@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../api.dart';
+import '../shell_panel.dart';
 import '../models.dart';
 import '../share_inbound.dart';
 import '../tool_sheet.dart';
@@ -164,14 +165,14 @@ class ShellTab {
   String get key => isBoard
       ? '$instanceUrl|tasks-board'
       : isTerminal
-      ? '$instanceUrl|term|${termSessionKey ?? 'global'}|$termId'
-      : isDiff
-          ? '$instanceUrl|diff|$diffPath|$diffStaged'
-          : isFile
-              ? '$instanceUrl|file|$filePath'
-              : isMissionControl
-                  ? '$instanceUrl|mission-control'
-                  : '$instanceUrl|$sessionId';
+          ? '$instanceUrl|term|${termSessionKey ?? 'global'}|$termId'
+          : isDiff
+              ? '$instanceUrl|diff|$diffPath|$diffStaged'
+              : isFile
+                  ? '$instanceUrl|file|$filePath'
+                  : isMissionControl
+                      ? '$instanceUrl|mission-control'
+                      : '$instanceUrl|$sessionId';
 }
 
 /// Icon for a tab, by kind. One helper so the four call sites that render a
@@ -227,6 +228,12 @@ enum RightPanel {
 /// keeping one meant closing one to open another, which is why they are tabs
 /// here rather than one exclusive mode.
 class RightTab {
+  ShellPanelRequest? request;
+  RightTab.request(ShellPanelRequest this.request)
+      : panel = RightPanel.none,
+        agent = null,
+        tools = null,
+        pane = ShellPane.right;
   RightTab.panel(this.panel)
       : agent = null,
         tools = null,
@@ -259,19 +266,25 @@ class RightTab {
 
   /// Stable identity, so re-opening a panel focuses its tab instead of adding
   /// a duplicate.
-  String get key => tools != null
-      ? 'tools'
-      : isAgent
-          ? 'agent|${agent!.id}'
-          : 'panel|${panel.name}';
+  String get key => request != null
+      ? request!.key
+      : tools != null
+          ? 'tools'
+          : isAgent
+              ? 'agent|${agent!.id}'
+              : 'panel|${panel.name}';
 
   String get label {
+    if (request != null) return request!.label;
     if (tools != null) return 'Activity';
     final a = agent;
     if (a == null) return panel.label;
     return a.displayName.trim().isEmpty ? a.id : a.displayName;
   }
 
-  String get icon =>
-      tools != null ? 'terminal' : (isAgent ? 'agent' : panel.icon);
+  String get icon => request != null
+      ? 'layers'
+      : tools != null
+          ? 'terminal'
+          : (isAgent ? 'agent' : panel.icon);
 }

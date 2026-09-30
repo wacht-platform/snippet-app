@@ -199,7 +199,7 @@ class _SheetHeader extends StatelessWidget {
     return Column(mainAxisSize: MainAxisSize.min, children: [
       if (kMobile)
         Padding(
-          padding: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.only(top: 4),
           child: Container(
             width: 36,
             height: 4,
@@ -210,7 +210,7 @@ class _SheetHeader extends StatelessWidget {
           ),
         ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: kMobile ? 0 : 8),
         child: Row(children: [
           leading ?? const SizedBox(width: 8),
           Expanded(

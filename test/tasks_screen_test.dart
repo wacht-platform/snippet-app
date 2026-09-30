@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -5,6 +6,8 @@ import 'package:snippet/api.dart';
 import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/tasks/tasks_screen.dart';
+import 'package:snippet/screens/sidebar.dart';
+import 'package:snippet/screens/shell_models.dart';
 
 /// The Tasks board's filter + refresh behaviour.
 ///
@@ -43,6 +46,59 @@ Future<void> _pump(WidgetTester tester, _FakeDaemon client) async {
 }
 
 void main() {
+  testWidgets('Tasks header keeps filter and machine but not Mission Control',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+    final client = _FakeDaemon();
+    var openedMissionControl = false;
+    Widget sidebar(MobileHome home) => MaterialApp(
+          home: Scaffold(
+            body: Sidebar(
+              instances: const [],
+              active: null,
+              client: client,
+              selectedSessionId: null,
+              sessions: [SessionInfo.fromJson({'id': 'mission-control'})],
+              sessionsLoading: false,
+              onRefreshSessions: () {},
+              onNewSession: () {},
+              onSelectInstance: (_) {},
+              onOpenMissionControl: () => openedMissionControl = true,
+              onOpenSession: (_, __, ___) {},
+              onAddInstance: () {},
+              onRenameInstance: (_, __) {},
+              onRemoveInstance: (_) {},
+              onSessionDeleted: (_) {},
+              health: const {},
+              onRefreshHealth: () {},
+              topInset: false,
+              mobileHome: home,
+              onMobileHome: (_) {},
+              settingsSection: null,
+              onSettingsSection: (_) {},
+              agent: null,
+              onAgent: (_) {},
+            ),
+          ),
+        );
+    await tester.pumpWidget(sidebar(MobileHome.tasks));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Mission Control'), findsNothing);
+    expect(find.byTooltip('Filter'), findsOneWidget);
+    expect(find.byTooltip('Add machine'), findsOneWidget);
+
+    await tester.pumpWidget(sidebar(MobileHome.chats));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Mission Control'), findsOneWidget);
+    await tester.tap(find.byTooltip('Mission Control'));
+    expect(openedMissionControl, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('a background revalidation updates silently — no spinner, no error state',
       (tester) async {
     final client = _FakeDaemon()

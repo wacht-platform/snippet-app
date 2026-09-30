@@ -1414,6 +1414,8 @@ void openAgentThread(
   presentScreen(
     context,
     style: PanelStyle.drawer,
+    purpose: ShellPanelPurpose.conversation, panelId: agentId,
+    originClient: client,
     maxWidth: 720,
     maxHeight: 720,
     builder: (_, close) => AgentThreadScreen(

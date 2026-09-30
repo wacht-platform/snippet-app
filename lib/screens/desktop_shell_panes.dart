@@ -1,7 +1,15 @@
 part of 'desktop_shell.dart';
 
 extension _DesktopShellPanesExt on _DesktopShellState {
-  Widget _tabBody(_ShellTab t, {required bool primary}) {
+  Widget _tabBody(_ShellTab t, {required bool primary}) => kMobile
+    ? _originTabBody(t, primary: primary)
+    : ShellPanelScope(
+    key: ValueKey('body-${t.key}'),
+    open: _openShellPanel, client: t.client, sessionId: t.sessionId,
+    child: _originTabBody(t, primary: primary),
+  );
+
+  Widget _originTabBody(_ShellTab t, {required bool primary}) {
     if (t.isBoard) {
       return TaskKanban(key: ValueKey('body-${t.key}'), client: t.client);
     }

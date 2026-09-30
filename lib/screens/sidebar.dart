@@ -336,7 +336,7 @@ class SidebarState extends State<Sidebar> {
         return TasksPanel(
           key: _tasksPanelKey,
           client: client,
-          trailing: _headerTrailing(hasClient),
+          trailing: [_machineAvatarButton()],
         );
 
       case MobileHome.agents:

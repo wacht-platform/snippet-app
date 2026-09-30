@@ -125,7 +125,12 @@ class _ShellSplitViewState extends State<ShellSplitView> {
               t == shownTab && widget.focusedPane == p,
             ),
           ),
-        if (shownReadout != null) widget.readoutBodyBuilder(shownReadout),
+        for (final readout in readouts)
+          Offstage(
+            key: ValueKey(readout.key),
+            offstage: readout != shownReadout,
+            child: widget.readoutBodyBuilder(readout),
+          ),
       ]);
     }
 

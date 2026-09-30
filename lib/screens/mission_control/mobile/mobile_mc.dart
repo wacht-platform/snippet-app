@@ -8,6 +8,8 @@ import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../mission_control_screen.dart' show ChangeNotifierProvider;
 import '../mission_control_state.dart';
+import '../coordination_agent_directory.dart';
+import '../../tasks/tasks_screen.dart';
 import '../widgets/mission_control_header.dart';
 import '../widgets/activity_feed.dart';
 import '../widgets/mission_composer.dart';
@@ -22,6 +24,12 @@ Future<void> showMissionControlPanel(
     return presentScreen<void>(
       context,
       style: PanelStyle.drawer,
+      purpose: child is CoordinationAgentDirectory ? ShellPanelPurpose.agents
+          : child is TasksScreen ? ShellPanelPurpose.tasks : ShellPanelPurpose.generic,
+      panelId: child is CoordinationAgentDirectory || child is TasksScreen
+          ? '' : child.runtimeType.toString(),
+      originClient: child is CoordinationAgentDirectory ? child.client
+          : child is TasksScreen ? child.client : null,
       builder: (_, close) => child,
     );
   }
@@ -108,6 +116,7 @@ class MobileMissionControl extends StatelessWidget {
       await presentScreen<void>(
         context,
         style: PanelStyle.drawer,
+        purpose: ShellPanelPurpose.task, panelId: task.id, originClient: state.client,
         builder: (_, close) => TaskDetailSheet(task: task, state: state),
       );
       state.refresh(silent: true);
@@ -207,6 +216,7 @@ Future<void> showNotificationInbox(
     return presentScreen<void>(
       context,
       style: PanelStyle.drawer,
+      purpose: ShellPanelPurpose.inbox, originClient: state.client,
       builder: (_, close) => NotificationInbox(state: state),
     );
   }

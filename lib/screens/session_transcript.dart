@@ -530,6 +530,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
     presentScreen(
       context,
       style: PanelStyle.drawer,
+      purpose: ShellPanelPurpose.lanes,
+      originClient: widget.client, originSessionId: widget.sessionId,
       builder: (_, close) => LanesScreen(
         liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
         onClose: close,
@@ -559,6 +561,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
     presentScreen(
       context,
       style: PanelStyle.drawer,
+      purpose: ShellPanelPurpose.tasks, originClient: widget.client,
       maxWidth: 820,
       maxHeight: 760,
       builder: (_, close) => TasksScreen(client: widget.client),
@@ -609,6 +612,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
     } else {
       presentScreen(context,
           style: PanelStyle.drawer,
+          purpose: ShellPanelPurpose.checkpoints,
+          originClient: widget.client, originSessionId: widget.sessionId,
           builder: (_, close) => _SessionActionPanel(
               title: 'Checkpoints', onClose: close, child: content));
     }

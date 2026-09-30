@@ -624,12 +624,14 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     // itself, so it asks. Null on mobile, where there are no panes and the
     // drawer is the right shape for a phone.
     final toPane = widget.onOpenScheduled;
-    if (toPane != null) {
+    if (toPane != null && ShellPanelScope.maybeOf(context) == null) {
       toPane();
       return;
     }
     presentScreen(context,
         style: PanelStyle.drawer,
+        purpose: ShellPanelPurpose.recurring,
+        originClient: widget.client, originSessionId: widget.sessionId,
         builder: (_, close) => RecurringScreen(
             client: widget.client,
             onClose: close,
@@ -681,6 +683,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
             style: PanelStyle.drawer,
+            purpose: ShellPanelPurpose.files,
+            originClient: widget.client, originSessionId: widget.sessionId,
             maxWidth: 1060,
             maxHeight: 760,
             builder: (_, close) => FileExplorer(
@@ -716,6 +720,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       case 'processes':
         presentScreen(context,
             style: PanelStyle.drawer,
+            purpose: ShellPanelPurpose.processes,
+            originClient: widget.client, originSessionId: widget.sessionId,
             builder: (_, close) => ProcessesScreen(
                 client: widget.client,
                 sessionId: widget.sessionId,
@@ -779,6 +785,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
             style: PanelStyle.drawer,
+            purpose: ShellPanelPurpose.files,
+            originClient: widget.client, originSessionId: widget.sessionId,
             maxWidth: 1060,
             maxHeight: 760,
             builder: (_, close) => FileExplorer(
@@ -815,7 +823,9 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   /// The action list, shared by the mobile end-drawer and the pull-up sheet so
   /// the two hosts cannot offer different actions. [run] dismisses the host,
   /// then performs the action.
-  Widget _actionsPanel(HarnessState? s, void Function(VoidCallback) run) {
+  Widget _actionsPanel(HarnessState? s, void Function(VoidCallback) run,
+      {void Function(VoidCallback)? navigate}) {
+    navigate ??= run;
     final ws = s?.workspace ?? '';
     return _SessionActionsPanel(
       session: s,
@@ -828,17 +838,17 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       },
       onCancelGoal: _cancelGoal,
       onResumeGoal: _resumeGoal,
-      onLanes: () => run(_showLanes),
+      onLanes: () => navigate!(_showLanes),
       onTasks: _isMissionControl ? () => run(_showTasks) : null,
       onGiveWork: _giveWork,
       hideShell: _isMissionControl,
       onTerm: () => run(_openTerm),
-      onGit: () => run(() => presentScreen(context,
+      onGit: () => navigate!(() => presentScreen(context,
           builder: (_, close) => GitScreen(
               client: widget.client,
               sessionId: widget.sessionId,
               onClose: close))),
-      onFiles: () => run(() {
+      onFiles: () => navigate!(() {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
             maxWidth: 1060,
@@ -850,15 +860,17 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                 onClose: close,
                 onOpenFile: widget.onOpenFileTab));
       }),
-      onProcesses: () => run(() => presentScreen(context,
+      onProcesses: () => navigate!(() => presentScreen(context,
           style: PanelStyle.drawer,
+          purpose: ShellPanelPurpose.processes,
+          originClient: widget.client, originSessionId: widget.sessionId,
           builder: (_, close) => ProcessesScreen(
               client: widget.client,
               sessionId: widget.sessionId,
               onClose: close))),
       onRecurring: () => run(_openRecurring),
       onCompact: () => run(_confirmCompact),
-      onCheckpoints: () => run(_showCheckpoints),
+      onCheckpoints: () => navigate!(_showCheckpoints),
     );
   }
 
@@ -1024,7 +1036,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter,
                     28 + MediaQuery.paddingOf(context).bottom),
-                child: _actionsPanel(s, run),
+                child: _actionsPanel(s, run, navigate: (action) => action()),
               ),
             ),
           ],

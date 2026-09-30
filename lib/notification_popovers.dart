@@ -123,6 +123,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
         setState(() => _pending.removeWhere(suppressVisibleNotification));
       }
     });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
@@ -225,8 +226,11 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                   _remove(payload, open: true, feedback: true);
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsetsDirectional.fromSTEB(
-                                      S.s8, S.s2, 0, S.s2),
+                                  padding: EdgeInsetsDirectional.fromSTEB(
+                                      S.s8,
+                                      kMobile ? S.s2 : S.s4,
+                                      0,
+                                      kMobile ? S.s2 : S.s4),
                                   child: Row(children: [
                                     AppIcon(
                                       switch ((payload['destination']

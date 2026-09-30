@@ -120,6 +120,7 @@ Future<void> openTaskDetail(
   return presentScreen<void>(
     context,
     style: PanelStyle.drawer,
+    purpose: ShellPanelPurpose.task, panelId: taskId, originClient: client,
     maxWidth: 720,
     maxHeight: 820,
     builder: (_, close) =>

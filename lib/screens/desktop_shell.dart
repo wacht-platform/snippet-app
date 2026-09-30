@@ -17,6 +17,7 @@ import '../notification_inbox.dart';
 import '../notification_conversation.dart';
 import 'tasks/task_common.dart';
 import '../panel.dart';
+import '../shell_panel.dart';
 import '../platform.dart';
 import '../share_inbound.dart';
 import '../shells.dart';
@@ -339,9 +340,24 @@ class _DesktopShellState extends State<DesktopShell>
 
   /// Close ONE readout tab. Does not collapse the pane — other tabs may remain,
   /// and even an empty pane stays open so the next rail tap lands somewhere.
+  Future<Object?> _openShellPanel(ShellPanelRequest request) {
+    final existing = _rightTabs.where((t) => t.key == request.key).firstOrNull;
+    final tab = existing ?? _RightTab.request(request);
+    setState(() {
+      if (existing == null) _rightTabs.add(tab);
+      _rightCollapsed = false;
+      _activePane = tab.pane;
+      _activeKey[tab.pane] = tab.key;
+    });
+    return tab.request!.dismissed.future;
+  }
+
   void _closeRightTab(String key) {
     if (!mounted) return;
     setState(() {
+      for (final tab in _rightTabs.where((t) => t.key == key)) {
+        tab.request?.complete();
+      }
       _rightTabs.removeWhere((t) => t.key == key);
       for (final pane in _Pane.values) {
         if (_activeKey[pane] != key) continue;
@@ -429,6 +445,9 @@ class _DesktopShellState extends State<DesktopShell>
 
   @override
   void dispose() {
+    for (final tab in _rightTabs) {
+      tab.request?.complete();
+    }
     reportVisibleNotificationSession(null, null);
     WidgetsBinding.instance.removeObserver(this);
     if (!kMobile) {
@@ -1405,7 +1424,9 @@ class _DesktopShellState extends State<DesktopShell>
       );
     }
     if (kMobile) return _mobileShell();
-    return LayoutBuilder(builder: (context, c) {
+    return ShellPanelScope(open: _openShellPanel, client: _client,
+      sessionId: _activeTab?.sessionId,
+      child: LayoutBuilder(builder: (context, c) {
       _ShellTab? visibleTab;
       if (c.maxWidth < kShellCompact) {
         if (_activeIndex >= 0 && _activeIndex < _tabs.length) {
@@ -1509,7 +1530,7 @@ class _DesktopShellState extends State<DesktopShell>
           ]),
         ),
       );
-    });
+    }));
   }
 }
 

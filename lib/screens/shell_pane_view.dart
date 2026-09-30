@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../shell_panel.dart';
 import '../media_views.dart';
 import '../models.dart';
 import '../platform.dart';
@@ -511,6 +512,13 @@ class RightTabBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final request = tab.request;
+    if (request != null) {
+      return ShellPanelBody(
+          key: ValueKey(request.key),
+          request: request,
+          onClose: onClose ?? () {});
+    }
     final tools = tab.tools;
     if (tools != null) {
       final view = ToolBatchView(

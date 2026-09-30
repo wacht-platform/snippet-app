@@ -26,7 +26,7 @@ class TasksPanel extends StatefulWidget {
 
   final DaemonClient client;
 
-  /// Phone header controls beside the title (Mission Control, machine).
+  /// Phone header controls beside the title (machine switcher).
   final List<Widget> trailing;
 
   /// Desktop: open the Kanban board.

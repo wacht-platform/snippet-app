@@ -43,6 +43,11 @@ class MobileShell extends StatelessWidget {
         (!chatsVisible || drilledDown || mobileHome != MobileHome.chats);
 
     void handleBack() {
+      final route = ModalRoute.of(context);
+      if (route?.willHandlePopInternally ?? false) {
+        Navigator.of(context).pop();
+        return;
+      }
       if (onPopRoute != null) {
         onPopRoute!();
         return;
@@ -132,6 +137,10 @@ class MobileShell extends StatelessWidget {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        if (ModalRoute.of(context)?.willHandlePopInternally ?? false) {
+          Navigator.of(context).pop();
+          return;
+        }
         SystemNavigator.pop();
       },
       child: shell,

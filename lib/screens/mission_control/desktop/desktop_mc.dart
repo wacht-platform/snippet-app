@@ -151,6 +151,7 @@ class _LeftRail extends StatelessWidget {
                     onTap: () => presentScreen(
                           context,
                           style: PanelStyle.drawer,
+                          purpose: ShellPanelPurpose.agents, originClient: state.client,
                           builder: (_, close) =>
                               CoordinationAgentDirectory(client: state.client),
                         )),
@@ -164,6 +165,7 @@ class _LeftRail extends StatelessWidget {
                     onTap: () => presentScreen(
                           context,
                           style: PanelStyle.drawer,
+                          purpose: ShellPanelPurpose.tasks, originClient: state.client,
                           builder: (_, close) => TasksScreen(
                             client: state.client,
                           ),

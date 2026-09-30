@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'platform.dart';
+import 'shell_panel.dart';
+import 'api.dart';
+import 'media_views.dart';
 import 'theme.dart';
+
+export 'shell_panel.dart' show ShellPanelPurpose, ShellPanelScope;
 
 enum PanelStyle { drawer, dialog }
 
@@ -17,7 +22,26 @@ Future<T?> presentScreen<T>(
   bool dismissible = true,
   double maxWidth = 720,
   double maxHeight = 640,
+  ShellPanelPurpose? purpose,
+  String panelId = '',
+  DaemonClient? originClient,
+  String? originSessionId,
 }) {
+  final host = ShellPanelScope.maybeOf(context);
+  if (!kMobile &&
+      style == PanelStyle.drawer &&
+      purpose != null &&
+      host != null) {
+    return host
+        .open(ShellPanelRequest(
+          purpose: purpose,
+          id: panelId,
+          client: originClient ?? DaemonScope.maybeOf(context) ?? host.client,
+          sessionId: originSessionId ?? host.sessionId,
+          builder: builder,
+        ))
+        .then((value) => value as T?);
+  }
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: dismissible,
@@ -81,11 +105,15 @@ Future<T?> presentAdaptivePanel<T>(
   PanelStyle style = PanelStyle.drawer,
   double maxWidth = 720,
   double maxHeight = 820,
+  ShellPanelPurpose purpose = ShellPanelPurpose.generic,
+  String? panelId,
 }) {
   if (!kMobile) {
     return presentScreen<T>(
       context,
       style: style,
+      purpose: purpose,
+      panelId: panelId ?? child.runtimeType.toString(),
       maxWidth: maxWidth,
       maxHeight: maxHeight,
       builder: (_, __) => child,

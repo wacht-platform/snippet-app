@@ -385,6 +385,11 @@ extension _DesktopShellTabsExt on _DesktopShellState {
       }
       final (shownTab, shownReadout) = _shownItemInPane(p);
       if (shownReadout != null) {
+        final navigator = shownReadout.request?.navigatorKey.currentState;
+        if (navigator != null && navigator.canPop()) {
+          navigator.pop();
+          return true;
+        }
         _closeRightTab(shownReadout.key);
         return true;
       }
@@ -468,13 +473,10 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     final pane = _focusedPane;
     final group = _activeGroupKeyFor(pane);
     if (group == null) {
-      presentScreen(
-        context,
-        style: PanelStyle.drawer,
-        maxWidth: 820,
-        maxHeight: 760,
+      _openShellPanel(ShellPanelRequest(
+        purpose: ShellPanelPurpose.tasks, id: '', client: client,
         builder: (_, close) => TasksScreen(client: client),
-      );
+      ));
       return;
     }
     final existing =

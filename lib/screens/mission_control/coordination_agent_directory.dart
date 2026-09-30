@@ -160,6 +160,7 @@ class _AgentCard extends StatelessWidget {
         onTap: () => presentScreen(
           context,
           style: PanelStyle.drawer,
+          purpose: ShellPanelPurpose.agent, panelId: agent.id, originClient: client,
           builder: (_, __) =>
               CoordinationAgentDetail(agent: agent, client: client),
         ),
