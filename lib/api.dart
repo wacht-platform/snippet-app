@@ -181,8 +181,8 @@ class DaemonClient {
     );
   }
 
-  Future<Map<String, dynamic>> notificationsPage({int since = 0, int limit = 500}) async {
-    final r = await http.get(_uri('/notifications', {'since': '$since', 'limit': '${limit.clamp(1, 500)}'}));
+  Future<Map<String, dynamic>> notificationsPage({required int sinceCreatedAt, required int sinceEventId, int limit = 500}) async {
+    final r = await http.get(_uri('/notifications', {'since_created_at': '$sinceCreatedAt', 'since_event_id': '$sinceEventId', 'limit': '${limit.clamp(1, 500)}'}));
     if (r.statusCode != 200) throw _err('notifications', r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }

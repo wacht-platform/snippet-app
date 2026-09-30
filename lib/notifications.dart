@@ -370,19 +370,33 @@ Future<void> resumeWatchingIfEnabled() async {
 Timer? _foregroundHeartbeat;
 Future<void> _foregroundWrites = Future<void>.value();
 
+void _writeForegroundLease() {
+  final fg = notificationAppForeground;
+  final key = fg ? visibleNotificationSession.value : null;
+  _foregroundWrites = _foregroundWrites.catchError((Object _) {}).then(
+      (_) async => (await NotificationInbox.open()).setForeground(fg, visibleKey: key));
+  unawaited(_foregroundWrites.catchError((Object _) {}));
+}
+
+void reportVisibleNotificationSession(String? instance, String? session) {
+  final key = notificationAppForeground && instance != null && session != null
+      ? notificationSessionKey(instance, session)
+      : null;
+  if (visibleNotificationSession.value == key) return;
+  visibleNotificationSession.value = key;
+  if (kMobile) _writeForegroundLease();
+}
+
 void reportForeground(bool fg) {
+  notificationAppForeground = fg;
+  if (!fg) visibleNotificationSession.value = null;
   if (kMobile) {
-    notificationAppForeground = fg;
     _foregroundHeartbeat?.cancel();
-    Future<void> update() {
-      _foregroundWrites = _foregroundWrites.catchError((Object _) {}).then(
-          (_) async => (await NotificationInbox.open()).setForeground(fg));
-      return _foregroundWrites;
-    }
-    unawaited(update().catchError((Object _) {}));
-    if (fg)
+    _writeForegroundLease();
+    if (fg) {
       _foregroundHeartbeat = Timer.periodic(const Duration(seconds: 20),
-          (_) => unawaited(update().catchError((Object _) {})));
+          (_) => _writeForegroundLease());
+    }
     if (fg) unawaited(syncSavedNotifications().catchError((Object _) {}));
     return;
   }

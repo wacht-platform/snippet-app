@@ -18,11 +18,14 @@ void main() {
     sqfliteFfiInit();
     db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);
     await db.execute(
-        'CREATE TABLE cursors (instance TEXT PRIMARY KEY, cursor INTEGER NOT NULL)');
+        'CREATE TABLE cursors (instance TEXT PRIMARY KEY, cursor INTEGER NOT NULL, created_at INTEGER NOT NULL DEFAULT 0)');
     await db.execute(
         'CREATE TABLE inbox (id TEXT PRIMARY KEY, instance TEXT NOT NULL, event TEXT NOT NULL, created INTEGER NOT NULL, read INTEGER NOT NULL DEFAULT 0)');
     await NotificationInbox.createAlertIds(db);
     inbox = NotificationInbox(db);
+    notificationAppForeground = true;
+    visibleNotificationSession.value = null;
+    foregroundNotifications.drain();
   });
   tearDown(() async {
     await db.close();
@@ -40,7 +43,10 @@ void main() {
         'destination': {'type': 'session', 'id': 'worker'}
       };
   Map<String, dynamic> page(int next, List<Map<String, dynamic>> events) =>
-      {'next_cursor': next, 'events': events, 'has_more': false};
+      {'next_cursor': {'created_at': 100, 'event_id': next}, 'events': events, 'has_more': false};
+  Future<int> cursor(String instance) async => (await inbox.cursor(instance)).eventId;
+  Future<List<Map<String, dynamic>>> ingest(String instance, int since, Map<String, dynamic> page, {int? now}) =>
+      inbox.ingest(instance, NotificationCursor(since == 0 ? 0 : 100, since), page, now: now);
 
   Map<String, dynamic> liveEvent(int seq) => {
         ...event(seq, '12345678-1234-1234-1234-123456789abc'),
@@ -58,22 +64,75 @@ void main() {
     await receiveLiveNotification(instance,
         jsonEncode({'kind': 'notification', 'notification': liveEvent(9)}),
         inbox: inbox, now: 200);
-    expect(await inbox.cursor('a'), 0);
+    expect(await cursor('a'), 9);
     expect(await inbox.entries(), hasLength(1));
     expect(displayed, hasLength(1));
     expect(displayed.single['session'], 'worker');
     await receiveLiveNotification(
         instance, {'kind': 'notification', 'notification': liveEvent(9)},
         inbox: inbox, now: 200);
-    final recovered = await inbox
-        .ingest('a', 0, page(9, [event(3, 'earlier'), liveEvent(9)]), now: 200);
+    final recovered = await ingest('a', 0, page(9, [event(3, 'earlier'), liveEvent(9)]), now: 200);
     expect(recovered.map((e) => e['notification_id']), [uuid('earlier')]);
     await presentNotifications(instance, inbox, recovered);
     expect(displayed, hasLength(2));
     expect(await inbox.entries(), hasLength(2));
-    expect(await inbox.cursor('a'), 9);
+    expect(await cursor('a'), 9);
     expect(await inbox.ingestLive('other', liveEvent(20), now: 200), isEmpty);
-    expect(await inbox.cursor('other'), 0);
+    expect(await cursor('other'), 20);
+  });
+
+  test('visible session suppresses live and replay but preserves receipt', () async {
+    const instance = Instance(name: 'a', url: 'a', token: 'unused');
+    final displayed = <Map<String, dynamic>>[];
+    final sub = foregroundNotifications.stream.listen(displayed.add);
+    addTearDown(sub.cancel);
+    visibleNotificationSession.value = notificationSessionKey('a', 'worker');
+    await receiveLiveNotification(instance,
+        {'kind': 'notification', 'notification': liveEvent(9)},
+        inbox: inbox, now: 200);
+    final recovered = await ingest('a', 0,
+        page(9, [event(3, 'earlier'), liveEvent(9)]), now: 200);
+    await presentNotifications(instance, inbox, recovered);
+    expect(displayed, isEmpty);
+    expect(await inbox.entries(), hasLength(2));
+    expect(await cursor('a'), 9);
+    expect(await inbox.ingestLive('a', liveEvent(9), now: 200), isEmpty);
+    await presentNotifications(instance, inbox, [
+      {...event(10, 'other'), 'destination': {'type': 'session', 'id': 'other'}}
+    ]);
+    expect(displayed, hasLength(1));
+    await presentNotifications(
+        const Instance(name: 'b', url: 'b', token: 'unused'), inbox, [event(11, 'instance')]);
+    expect(displayed, hasLength(2));
+    visibleNotificationSession.value = null;
+    await presentNotifications(instance, inbox, [event(12, 'chats')]);
+    expect(displayed, hasLength(3));
+  });
+
+  test('background never suppresses merely last-open session', () async {
+    visibleNotificationSession.value = notificationSessionKey('a', 'worker');
+    notificationAppForeground = false;
+    expect(suppressVisibleNotification({'url': 'a', 'session': 'worker'}), false);
+    await inbox.setForeground(true, visibleKey: notificationSessionKey('a', 'worker'));
+    expect((await db.query('app_state')).single['visible_key'], notificationSessionKey('a', 'worker'));
+    await inbox.setForeground(false, visibleKey: notificationSessionKey('a', 'worker'));
+    expect(await inbox.foregroundActive(), false);
+    expect((await db.query('app_state')).single['visible_key'], isNull);
+  });
+
+  testWidgets('queued popover rechecks visible session and instance', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: NotificationPopovers(child: Scaffold())));
+    foregroundNotifications.add({'title': 'First', 'url': 'a', 'session': 'other'});
+    foregroundNotifications.add({'title': 'Queued', 'url': 'a', 'session': 'worker'});
+    foregroundNotifications.add({'title': 'Other instance', 'url': 'b', 'session': 'worker'});
+    await tester.pump();
+    visibleNotificationSession.value = notificationSessionKey('a', 'worker');
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.pump();
+    expect(find.text('Queued'), findsNothing);
+    expect(find.text('Other instance'), findsOneWidget);
   });
 
   test('live rejects malformed events and ignores expired receipts', () async {
@@ -96,7 +155,7 @@ void main() {
             now: 200),
         isEmpty);
     expect(await inbox.entries(), isEmpty);
-    expect(await inbox.cursor('a'), 0);
+    expect(await cursor('a'), 0);
   });
 
   test('live and replay share validation and replay rolls back all writes', () async {
@@ -111,8 +170,8 @@ void main() {
     ]) {
       final invalid = {...event(2, 'bad'), ...patch};
       await expectLater(inbox.ingestLive('a', invalid, now: 200), throwsFormatException);
-      await expectLater(inbox.ingest('a', 0, page(2, [event(1, 'good'), invalid]), now: 200), throwsFormatException);
-      expect(await inbox.cursor('a'), 0);
+      await expectLater(ingest('a', 0, page(2, [event(1, 'good'), invalid]), now: 200), throwsFormatException);
+      expect(await cursor('a'), 0);
       expect(await inbox.entries(), isEmpty);
       expect(await db.query('alert_ids'), isEmpty);
     }
@@ -121,7 +180,7 @@ void main() {
   test('alert IDs are unique and stable across replay and reopened wrappers', () async {
     await inbox.ingestLive('a', event(2, 'two'), now: 200);
     final first = await inbox.alertId(uuid('two'));
-    await inbox.ingest('a', 0, page(2, [event(1, 'one'), event(2, 'two')]), now: 200);
+    await ingest('a', 0, page(2, [event(1, 'one'), event(2, 'two')]), now: 200);
     final reopened = NotificationInbox(db);
     expect(await reopened.alertId(uuid('two')), first);
     expect(await reopened.alertId(uuid('one')), isNot(first));
@@ -149,28 +208,28 @@ void main() {
       await receiveLiveNotification(instance, message, inbox: inbox, now: 200);
     }
     expect(await inbox.entries(), isEmpty);
-    expect(await inbox.cursor('a'), 0);
+    expect(await cursor('a'), 0);
   });
 
   test('gaps and empty filtered pages advance only fetched cursor', () async {
-    await inbox.ingest('a', 0, page(9, [event(3, 'uuid')]), now: 200);
-    expect(await inbox.cursor('a'), 9);
-    await inbox.ingest('a', 9, page(15, []), now: 200);
-    expect(await inbox.cursor('a'), 15);
-    await inbox.ingest('a', 0, page(20, [event(20, 'stale')]), now: 200);
-    expect(await inbox.cursor('a'), 15);
-    expect(await inbox.entries(), hasLength(1));
+    await ingest('a', 0, page(9, [event(3, 'uuid')]), now: 200);
+    expect(await cursor('a'), 9);
+    await ingest('a', 9, page(15, []), now: 200);
+    expect(await cursor('a'), 15);
+    await ingest('a', 0, page(20, [event(20, 'stale')]), now: 200);
+    expect(await cursor('a'), 20);
+    expect(await inbox.entries(), hasLength(2));
   });
   test('empty raw500 page with has_more advances and malformed pages roll back',
       () async {
-    await inbox.ingest(
-        'a', 0, {'next_cursor': 500, 'events': [], 'has_more': true},
+    await ingest(
+        'a', 0, {'next_cursor': {'created_at': 100, 'event_id': 500}, 'events': [], 'has_more': true},
         now: 200);
-    expect(await inbox.cursor('a'), 500);
+    expect(await cursor('a'), 500);
     for (final invalid in <Map<String, dynamic>>[
-      {'next_cursor': 500, 'events': [], 'has_more': true},
-      {'next_cursor': 501.5, 'events': [], 'has_more': false},
-      {'next_cursor': 501, 'events': [], 'has_more': 'yes'},
+      {'next_cursor': {'created_at': 100, 'event_id': 500}, 'events': [], 'has_more': true},
+      {'next_cursor': {'created_at': 100, 'event_id': 501.5}, 'events': [], 'has_more': false},
+      {'next_cursor': {'created_at': 100, 'event_id': 501}, 'events': [], 'has_more': 'yes'},
       page(501, [
         {...event(501, 'bad'), 'event_id': 501.5}
       ]),
@@ -179,30 +238,86 @@ void main() {
       ]),
     ]) {
       await expectLater(
-          inbox.ingest('a', 500, invalid, now: 200), throwsFormatException);
-      expect(await inbox.cursor('a'), 500);
+          ingest('a', 500, invalid, now: 200), throwsFormatException);
+      expect(await cursor('a'), 500);
       expect(await inbox.entries(), isEmpty);
     }
-    await inbox.ingest('a', 500, page(501, [event(501, 'valid')]), now: 200);
-    expect(await inbox.cursor('a'), 501);
+    await ingest('a', 500, page(501, [event(501, 'valid')]), now: 200);
+    expect(await cursor('a'), 501);
   });
 
   test('global UUID dedup and durable read distinct from receipt', () async {
-    await inbox.ingest('a', 0, page(1, [event(1, 'uuid')]), now: 200);
+    await ingest('a', 0, page(1, [event(1, 'uuid')]), now: 200);
     await inbox.markRead(uuid('uuid'));
-    await inbox.ingest('b', 0, page(7, [event(7, 'uuid')]), now: 200);
+    await ingest('b', 0, page(7, [event(7, 'uuid')]), now: 200);
     expect(await inbox.entries(), hasLength(1));
     expect((await inbox.entries()).single['read'], 1);
-    expect(await inbox.cursor('b'), 7);
+    expect(await cursor('b'), 7);
   });
   test('unordered page rolls back inbox and cursor', () async {
     await expectLater(
-        inbox.ingest('a', 0, page(8, [event(7, 'one'), event(3, 'two')]),
+        ingest('a', 0, page(8, [event(7, 'one'), event(3, 'two')]),
             now: 200),
         throwsFormatException);
-    expect(await inbox.cursor('a'), 0);
+    expect(await cursor('a'), 0);
     expect(await inbox.entries(), isEmpty);
   });
+  test('time overlap, stale live, source dedup and alert IDs survive pruning', () async {
+    Map<String, dynamic> timed(int seq, String id, int time) => {
+      ...event(seq, id), 'created_at': time, 'expires_at': 200000
+    };
+    await inbox.ingestLive('a', timed(1, 'old', 100), now: 200);
+    final oldId = await inbox.alertId(uuid('old'));
+    await inbox.ingestLive('a', timed(2, 'edge', 1000), now: 200);
+    final edgeId = await inbox.alertId(uuid('edge'));
+    await inbox.ingestLive('a', timed(3, 'ahead', 11800), now: 200);
+    expect((await inbox.cursor('a')).overlap.createdAt, 1000);
+    expect(await inbox.ingestLive('a', timed(4, 'stale', 999), now: 200), isEmpty);
+    expect(await db.query('alert_ids', where: 'notification_id = ?', whereArgs: [uuid('old')]), isEmpty);
+    expect(await inbox.alertId(uuid('edge')), edgeId);
+    expect(await inbox.ingestLive('a', timed(3, 'alias', 11800), now: 200), isEmpty);
+    await inbox.ingestLive('a', timed(5, 'tie', 11800), now: 200);
+    expect((await inbox.cursor('a')).eventId, 5);
+    expect(await inbox.alertId(uuid('tie')), greaterThan(oldId));
+    expect((await NotificationInbox(db).cursor('a')).eventId, 5);
+  });
+
+  test('offline recovery uses saved time not wall clock and accepts stale scan', () async {
+    Map<String, dynamic> timed(int seq, String id, int time) => {
+      ...event(seq, id), 'created_at': time, 'expires_at': 200000
+    };
+    await inbox.ingestLive('a', timed(1, 'saved', 10000), now: 10001);
+    final scan = (await inbox.cursor('a')).overlap;
+    await inbox.ingestLive('a', timed(9, 'aheadws', 96000), now: 96001);
+    final recovered = await inbox.ingest('a', scan, {
+      'next_cursor': {'created_at': 20000, 'event_id': 2},
+      'events': [timed(2, 'missed', 20000)], 'has_more': true
+    }, now: 96001);
+    expect(recovered, hasLength(1));
+    expect((await inbox.cursor('a')).createdAt, 96000);
+    await inbox.ingest('a', const NotificationCursor(20000, 2), {
+      'next_cursor': {'created_at': 30000, 'event_id': 4},
+      'events': [], 'has_more': true
+    }, now: 96001);
+    expect((await inbox.cursor('a')).eventId, 9);
+    await inbox.prune('a');
+    expect((await inbox.entries()).map((e) => e['id']), [uuid('aheadws')]);
+  });
+
+  test('legacy migration resets safely without changing existing alert IDs', () async {
+    await inbox.ingestLive('a', event(9, 'saved'), now: 200);
+    final id = await inbox.alertId(uuid('saved'));
+    await db.execute('DROP TABLE cursors');
+    await db.execute('CREATE TABLE cursors (instance TEXT PRIMARY KEY, cursor INTEGER NOT NULL)');
+    await db.insert('cursors', {'instance': 'a', 'cursor': 999});
+    await NotificationInbox.migrateTimeCursor(db);
+    final reopened = NotificationInbox(db);
+    expect((await reopened.cursor('a')).createdAt, 0);
+    expect((await reopened.cursor('a')).eventId, 0);
+    expect(await reopened.alertId(uuid('saved')), id);
+    expect(await ingest('a', 0, page(9, [event(9, 'saved')]), now: 200), isEmpty);
+  });
+
   test('disabled background polling does not initialize native notifications',
       () async {
     SharedPreferences.setMockInitialValues({'notif_enabled': false});
@@ -221,75 +336,8 @@ void main() {
         const MaterialApp(home: NotificationPopovers(child: Scaffold())));
     expect(find.text('Queued at startup'), findsOneWidget);
     await tester.tap(find.byTooltip('Dismiss'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Queued at startup'), findsNothing);
-  });
-  testWidgets('mounted inbox refreshes and tap pops back to destination',
-      (tester) async {
-    Map<String, dynamic>? opened;
-    await tester.pumpWidget(MaterialApp(
-        home: Builder(
-            builder: (context) => Scaffold(
-                  body: TextButton(
-                      onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                              builder: (_) => NotificationInboxScreen(
-                                  inbox: inbox,
-                                  onOpen: (payload) => opened = payload))),
-                      child: const Text('Inbox')),
-                ))));
-    await tester.tap(find.text('Inbox'));
-    await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
-    await tester.runAsync(() => inbox.ingest(
-        'a',
-        0,
-        page(1, [
-          {
-            ...event(1, 'live'),
-            'title': 'Arrived live',
-            'destination': {'type': 'session', 'id': 'actual'}
-          }
-        ]),
-        now: 200));
-    await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
-    expect(find.text('Arrived live'), findsOneWidget);
-    await tester.tap(find.text('Arrived live'));
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
-    expect(find.text('Inbox'), findsOneWidget);
-    expect(opened?['session'], 'actual');
-    final rows = await tester.runAsync(() => inbox.entries());
-    expect(rows!.single['read'], 1);
-  });
-  testWidgets('unread badge responds to receipt and read', (tester) async {
-    await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: NotificationUnreadBadge(inbox: inbox))));
-    await tester.runAsync(
-        () => inbox.ingest('a', 0, page(1, [event(1, 'badge')]), now: 200));
-    await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
-    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, true);
-    await tester.runAsync(() => inbox.markRead(uuid('badge')));
-    await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    });
-    await tester.pumpAndSettle();
-    expect(tester.widget<Badge>(find.byType(Badge)).isLabelVisible, false);
   });
   for (final type in ['session', 'task', 'conversation']) {
     testWidgets('foreground popover taps $type destination', (tester) async {

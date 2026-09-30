@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:snippet/api.dart';
+import 'package:snippet/notifications.dart';
 import 'package:snippet/screens/agents_sidebar_panel.dart';
 import 'package:snippet/screens/desktop_shell.dart';
 import 'package:snippet/theme.dart';
@@ -132,6 +133,67 @@ void main() {
       await tester.pumpAndSettle();
       _only(_chats);
 
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('notification session replaces chat history and reuses its tab',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    DaemonClient.wsConnector = (uri, {connectTimeout, pingInterval}) =>
+        _FakeWebSocketChannel();
+    addTearDown(() => DaemonClient.wsConnector = null);
+    try {
+      SharedPreferences.setMockInitialValues({
+        'instances':
+            '[{"name":"Local","url":"http://127.0.0.1:9090","token":"tok"},{"name":"Other","url":"http://127.0.0.1:9091","token":"other"}]',
+      });
+      await _pumpShell(tester);
+      Future<void> pump() async {
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+
+      final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+      sidebar.onOpenSession('old', 'Old session', null);
+      await pump();
+      sidebar.onOpenSession('target', 'Target session', null);
+      await pump();
+      final before = tester.widget<MobileShell>(find.byType(MobileShell));
+      final targetBody = before.activeTabBody;
+      sidebar.onOpenSession('old', 'Old session', null);
+      await pump();
+
+      void notify(String url) => onNotifTap!({
+            'url': url,
+            'session': 'target',
+            'title': 'Target session',
+          });
+      notify('http://127.0.0.1:9090');
+      await pump();
+      expect(tester.widget<MobileShell>(find.byType(MobileShell)).activeTabBody?.key,
+          targetBody?.key);
+      notify('http://127.0.0.1:9090');
+      await pump();
+      await tester.binding.handlePopRoute();
+      await pump();
+      var shell = tester.widget<MobileShell>(find.byType(MobileShell));
+      expect(shell.chatsOpen, isTrue);
+      expect(shell.mobileHome, MobileHome.chats);
+      expect(shell.canPopRoute, isFalse);
+
+      notify('http://127.0.0.1:9091');
+      await pump();
+      shell = tester.widget<MobileShell>(find.byType(MobileShell));
+      expect(shell.chatsOpen, isFalse);
+      expect(shell.activeTabBody?.key, isNot(targetBody?.key));
+      await tester.binding.handlePopRoute();
+      await pump();
+      expect(tester.widget<MobileShell>(find.byType(MobileShell)).chatsOpen, isTrue);
+      expect(tester.widget<MobileShell>(find.byType(MobileShell)).canPopRoute, isFalse);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
     } finally {

@@ -33,6 +33,17 @@ class ForegroundNotificationQueue {
 
 final foregroundNotifications = ForegroundNotificationQueue();
 bool notificationAppForeground = true;
+final visibleNotificationSession = ValueNotifier<String?>(null);
+
+String notificationSessionKey(String instance, String session) =>
+    jsonEncode([instance, session]);
+
+bool suppressVisibleNotification(Map<String, dynamic> payload) =>
+    notificationAppForeground &&
+    payload['url'] is String &&
+    payload['session'] is String &&
+    visibleNotificationSession.value ==
+        notificationSessionKey(payload['url'] as String, payload['session'] as String);
 final Map<String, Future<void>> _fetches = {};
 
 Future<void> syncNotificationInstance(Instance instance,
@@ -43,16 +54,17 @@ Future<void> syncNotificationInstance(Instance instance,
       .then((_) async {
     final inbox = await NotificationInbox.open();
     final client = DaemonClient(instance.url, instance.token);
+    var since = (await inbox.cursor(key)).overlap;
     while (true) {
-      final since = await inbox.cursor(key);
-      final page = await client.notificationsPage(since: since);
+      final page = await client.notificationsPage(
+          sinceCreatedAt: since.createdAt, sinceEventId: since.eventId);
       final received = await inbox.ingest(key, since, page);
       await presentNotifications(instance, inbox, received,
           background: background);
       if (page['has_more'] != true) break;
-      if ((page['next_cursor'] as num).toInt() <= since)
-        throw const FormatException('Notification paging made no progress');
+      since = NotificationCursor.parse(page['next_cursor']);
     }
+    await inbox.prune(key);
   });
   _fetches[key] = next;
   return next;
@@ -74,7 +86,10 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
   if (received.isEmpty) return;
   if (!background && notificationAppForeground) {
     for (final event in received) {
-      foregroundNotifications.add(notificationDestination(instance.url, event));
+      final payload = notificationDestination(instance.url, event);
+      if (!suppressVisibleNotification(payload)) {
+        foregroundNotifications.add(payload);
+      }
     }
     return;
   }
@@ -87,6 +102,7 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
     if (!(prefs.getBool('notif_enabled') ?? false) ||
         (background && await inbox.foregroundActive())) return;
     final payload = notificationDestination(instance.url, event);
+    if (suppressVisibleNotification(payload)) continue;
     final content = notificationContent(instance, event);
     try {
       await notifySessionEvent(

@@ -417,7 +417,7 @@ class _DesktopShellState extends State<DesktopShell>
     _loadInstances();
     // Tapping a session notification opens it in-place (consistent with the app),
     // not a separate full-screen route.
-    if (kCanNotify) onNotifTap = _onNotif;
+    onNotifTap = _onNotif;
     _startSessionsTicker();
     if (!kMobile) HardwareKeyboard.instance.addHandler(_handleGlobalShortcuts);
     if (kMobile) ShareInbound.listen(_onInboundShare);
@@ -429,6 +429,7 @@ class _DesktopShellState extends State<DesktopShell>
 
   @override
   void dispose() {
+    reportVisibleNotificationSession(null, null);
     WidgetsBinding.instance.removeObserver(this);
     if (!kMobile) {
       HardwareKeyboard.instance.removeHandler(_handleGlobalShortcuts);
@@ -451,6 +452,7 @@ class _DesktopShellState extends State<DesktopShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final fg = state == AppLifecycleState.resumed;
     _appForeground = fg;
+    if (mounted) setState(() {});
     if (fg) {
       _startSessionsTicker();
       _connectEventsWatch();
@@ -1013,7 +1015,8 @@ class _DesktopShellState extends State<DesktopShell>
           toast(context, 'Could not resolve this conversation.', danger: true);
       }
     } else if (sid.isNotEmpty) {
-      _openSession(sid, '${m['title'] ?? 'session'}', null);
+      _openSession(sid, '${m['title'] ?? 'session'}', null,
+          fromNotification: true);
     }
     _loadSessions();
   }
@@ -1153,7 +1156,7 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _openSession(String id, String title, String? profile,
-      {SharedInbound? share}) {
+      {SharedInbound? share, bool fromNotification = false}) {
     if (isMissionControlTab(sessionId: id, title: title)) {
       _openMissionControlTab();
       _attachShareToActive(share);
@@ -1184,6 +1187,14 @@ class _DesktopShellState extends State<DesktopShell>
       _groupRootKey[root.pane] = root.key;
       _activeKey[root.pane] = root.key;
       if (kMobile) {
+        if (fromNotification) {
+          _mobileHome = MobileHome.chats;
+          _mobileAgent = null;
+          _mobileSettingsSection = null;
+          _mobileRouteHistory
+            ..clear()
+            ..add(const _MobileRoute(home: MobileHome.chats));
+        }
         _mobileChatsOpen = false;
         _pushMobileRoute(_MobileRoute(
           home: _mobileHome,
@@ -1394,6 +1405,25 @@ class _DesktopShellState extends State<DesktopShell>
     }
     if (kMobile) return _mobileShell();
     return LayoutBuilder(builder: (context, c) {
+      _ShellTab? visibleTab;
+      if (c.maxWidth < kShellCompact) {
+        if (_activeIndex >= 0 && _activeIndex < _tabs.length) {
+          visibleTab = _tabs[_activeIndex];
+        }
+      } else {
+        final pane = _focusedPane;
+        final tabs = _tabsIn(pane);
+        final key = _activeKey[pane];
+        final selected = tabs.where((t) => t.key == key).firstOrNull;
+        final readoutSelected = _rightTabs.any((r) => r.pane == pane && r.key == key);
+        visibleTab = selected ??
+            (!readoutSelected && tabs.isNotEmpty ? tabs.first : null);
+      }
+      final visible = _appForeground && visibleTab != null &&
+          !_isAuxiliary(visibleTab) && !visibleTab.isMissionControl;
+      reportVisibleNotificationSession(
+          visible ? visibleTab.instanceUrl : null,
+          visible ? visibleTab.sessionId : null);
       // Narrow window → keep the native shell but collapse the sidebar to a drawer.
       if (c.maxWidth < kShellCompact) {
         // Full-width drawer on phones; a capped one on a shrunk desktop window.

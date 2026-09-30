@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../notifications.dart';
-import '../notification_inbox.dart';
 import '../theme.dart';
 import 'shell_models.dart';
 
@@ -64,13 +62,6 @@ class MobileShell extends StatelessWidget {
 
     final shell = Scaffold(
       backgroundColor: AppColors.bg,
-      floatingActionButton: FloatingActionButton.small(
-        tooltip: 'Notification inbox',
-        onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-            builder: (_) => NotificationInboxScreen(
-                onOpen: (payload) => onNotifTap?.call(payload)))),
-        child: const NotificationUnreadBadge(),
-      ),
       body: Stack(children: [
         if (activeTabBody != null)
           Positioned.fill(

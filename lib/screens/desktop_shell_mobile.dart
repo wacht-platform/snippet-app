@@ -56,6 +56,11 @@ extension _DesktopShellMobileExt on _DesktopShellState {
 
   Widget _mobileShell() {
     final tab = _activeTab;
+    final visible = _appForeground && !_mobileChatsOpen &&
+        _mobileHome == _MobileHome.chats &&
+        tab != null && !tab.isBoard && !tab.isFile && !tab.isDiff && !tab.isTerminal;
+    reportVisibleNotificationSession(
+        visible ? tab.instanceUrl : null, visible ? tab.sessionId : null);
     return MobileShell(
       activeTabBody: tab != null ? _tabBody(tab, primary: true) : null,
       sidebar: _sidebar(

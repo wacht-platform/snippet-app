@@ -72,7 +72,7 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ThemeManager.instance.addListener(_onThemeChange);
-    if (kCanNotify) reportForeground(true);
+    reportForeground(true);
   }
 
   @override
@@ -86,7 +86,6 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!kCanNotify) return;
     final fg = state == AppLifecycleState.resumed;
     reportForeground(fg);
   }

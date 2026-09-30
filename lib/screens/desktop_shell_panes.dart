@@ -59,7 +59,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
           ? null
           : () => _setState(() => t.inboundShare = null),
       acceptDrops: primary,
-      mobileActive: !kMobile || !_mobileChatsOpen,
+      mobileActive: !kMobile ||
+          (_appForeground && !_mobileChatsOpen && _mobileHome == _MobileHome.chats),
       onTitle: (title) => _onSessionTitle(t.sessionId!, title),
       onMenu: kMobile ? _showMobileChats : null,
       onOpenFileTab: (path, name) =>
