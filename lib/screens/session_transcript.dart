@@ -556,18 +556,6 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
     }
   }
 
-  void _showTasks() {
-    if (!_isMissionControl) return;
-    presentScreen(
-      context,
-      style: PanelStyle.drawer,
-      purpose: ShellPanelPurpose.tasks, originClient: widget.client,
-      maxWidth: 820,
-      maxHeight: 760,
-      builder: (_, close) => TasksScreen(client: widget.client),
-    );
-  }
-
   void _showCheckpoints() {
     final s = _state;
     if (s == null) return;

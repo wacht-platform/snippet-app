@@ -1123,7 +1123,6 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onCancelGoal;
   final VoidCallback onResumeGoal;
   final VoidCallback onLanes;
-  final VoidCallback? onTasks;
   final VoidCallback? onGiveWork;
   final bool hideShell;
   final VoidCallback onTerm;
@@ -1142,7 +1141,6 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onCancelGoal,
     required this.onResumeGoal,
     required this.onLanes,
-    this.onTasks,
     this.onGiveWork,
     this.hideShell = false,
     required this.onTerm,
@@ -1318,12 +1316,6 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Lanes',
             detail: 'Background work running in parallel',
             onTap: widget.onLanes),
-      if (widget.onTasks != null)
-        _row(
-            icon: 'layers',
-            label: 'Tasks',
-            detail: 'Plan and progress for this run',
-            onTap: widget.onTasks),
       if (widget.onGiveWork != null)
         _row(
             icon: 'send',

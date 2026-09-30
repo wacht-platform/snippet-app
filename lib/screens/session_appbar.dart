@@ -55,8 +55,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   }
 
   void _openTerm({bool fresh = false}) {
-    // Mission Control orchestrates; it has no working tree to shell into. Its
-    // rail slot carries the TASK BOARD toggle instead.
+    // Mission Control has no working tree to shell into.
     if (_isMissionControl) return;
     // Second click on Shell hides the drawer — keep the pty so reopening is instant.
     if (!fresh && _termOpen && _terms.isNotEmpty) {
@@ -324,17 +323,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         ),
         if (s != null && s.lanes.any((l) => l.running))
           _runningLanesBadge(s, const EdgeInsets.only(right: 6)),
-        // Mission Control orchestrates other sessions' work and has no working
-        // tree of its own, so it gets no shell. Its slot carries the TASK BOARD
-        // instead — the thing you keep returning to from here — mirroring the
-        // desktop rail, which swaps its whole cluster for the board and agents.
-        if (_isMissionControl)
-          IconBtn('layers',
-              size: M.minTarget,
-              iconSize: 19,
-              tooltip: 'Tasks',
-              onTap: _showTasks)
-        else
+        if (!_isMissionControl)
           IconBtn('terminal',
               size: M.minTarget,
               iconSize: 19,
@@ -559,10 +548,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           if (!_isMissionControl)
             IconBtn('terminal',
                 size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
-          // Mission Control's controls are ALL in the rail above, in the open.
-          // A second copy behind a "⋯" here was the menu to remove, and a Tasks
-          // button would have been a third door to the board the rail already
-          // toggles. Ordinary sessions keep their own actions menu.
           if (!_isMissionControl) _menu(s),
         ],
       ]),
@@ -839,7 +824,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       onCancelGoal: _cancelGoal,
       onResumeGoal: _resumeGoal,
       onLanes: () => navigate!(_showLanes),
-      onTasks: _isMissionControl ? () => run(_showTasks) : null,
       onGiveWork: _giveWork,
       hideShell: _isMissionControl,
       onTerm: () => run(_openTerm),

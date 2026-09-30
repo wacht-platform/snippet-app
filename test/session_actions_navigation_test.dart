@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:snippet/api.dart';
 import 'package:snippet/screens/desktop_shell.dart';
 import 'package:snippet/screens/processes.dart';
+import 'package:snippet/screens/session.dart';
 import 'package:snippet/theme.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -46,6 +47,50 @@ void _sessionUnchanged(WidgetTester tester) {
 }
 
 void main() {
+  for (final desktop in [false, true]) {
+    for (final sessionId in ['mission-control', 'mission-control/session.json']) {
+      testWidgets('MC chat $sessionId has no Tasks entry (${desktop ? 'desktop' : 'mobile'})',
+          (tester) async {
+        debugDefaultTargetPlatformOverride =
+            desktop ? TargetPlatform.linux : TargetPlatform.android;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        DaemonClient.wsConnector =
+            (uri, {connectTimeout, pingInterval}) => _Socket();
+        addTearDown(() => DaemonClient.wsConnector = null);
+        SharedPreferences.setMockInitialValues({});
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize =
+            desktop ? const Size(1440, 900) : const Size(390, 844);
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(MaterialApp(
+          theme: buildAppTheme(),
+          home: SessionScreen(
+            client: DaemonClient('http://127.0.0.1:9090', 'tok'),
+            sessionId: sessionId,
+            title: 'Mission Control',
+            onMenu: () {},
+          ),
+        ));
+        await _pump(tester);
+        expect(find.byType(SessionScreen), findsOneWidget);
+        expect(find.byTooltip('Tasks'), findsNothing);
+        expect(find.text('Tasks'), findsNothing);
+        expect(find.byTooltip('Shell'), findsNothing);
+        if (!desktop) {
+          await tester.tap(find.text('Mission Control').first);
+          await _pump(tester);
+          expect(find.text('Actions'), findsOneWidget);
+          expect(find.text('Scheduled'), findsOneWidget);
+          expect(find.text('Tasks'), findsNothing);
+          expect(find.byTooltip('Tasks'), findsNothing);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+        debugDefaultTargetPlatformOverride = null;
+      });
+    }
+  }
+
   testWidgets('Android back closes root actions without consuming session history', (tester) async {
     await _openActions(tester, TargetPlatform.android);
     await tester.binding.handlePopRoute();
