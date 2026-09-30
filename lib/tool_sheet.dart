@@ -184,11 +184,13 @@ class _SheetHeader extends StatelessWidget {
   final Widget? leading;
   final String title;
   final String? subtitle;
+  final bool compact;
   final VoidCallback? onClose;
   const _SheetHeader({
     this.leading,
     required this.title,
     this.subtitle,
+    this.compact = false,
     required this.onClose,
   });
 
@@ -219,7 +221,8 @@ class _SheetHeader extends StatelessWidget {
                 Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(15, weight: W.label, color: AppColors.fg1)),
+                    style: sans(compact ? 13 : 15,
+                        weight: W.label, color: AppColors.fg1)),
                 if (subtitle != null && subtitle!.isNotEmpty)
                   Text(subtitle!,
                       maxLines: 1,
@@ -383,6 +386,7 @@ class _StepDetail extends StatelessWidget {
             size: 34, iconSize: 18, tooltip: 'Back', onTap: onBack),
         title: title,
         subtitle: null,
+        compact: true,
         onClose: onClose,
       ),
       Expanded(
