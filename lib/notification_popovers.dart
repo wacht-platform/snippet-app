@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'notification_sync.dart';
 import 'notifications.dart';
 import 'theme.dart';
+import 'platform.dart';
 import 'widgets.dart';
 
 class NotificationPopovers extends StatefulWidget {
@@ -63,11 +64,11 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
       _ => switch ((payload['destination'] as Map?)?['type']) {
           'task' => 'Task update',
           'conversation' => 'New message',
-          _ => 'Tap to open',
+          _ => '',
         },
     };
     final body = payload['body']?.toString().trim() ?? '';
-    return body.isEmpty ? label : '$label · $body';
+    return body.isEmpty ? label : (label.isEmpty ? body : '$label · $body');
   }
 
   @override
@@ -118,7 +119,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
           right: S.s12,
           child: SafeArea(
               child: Align(
-            alignment: Alignment.topCenter,
+            alignment: kMobile ? Alignment.topCenter : Alignment.topRight,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: AnimatedSwitcher(
@@ -163,75 +164,90 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                           resizeDuration: null,
                           onDismissed: (_) => _remove(payload, feedback: true),
                           child: TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0, end: 1),
-                              duration: reducedMotion ? Duration.zero : const Duration(milliseconds: 180),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, value, child) => Opacity(
-                                opacity: value,
-                                child: FractionalTranslation(
-                                  translation: Offset(0, -.08 * (1 - value)),
-                                  child: child,
+                            tween: Tween(begin: 0, end: 1),
+                            duration: reducedMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 180),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) => Opacity(
+                              opacity: value,
+                              child: FractionalTranslation(
+                                translation: Offset(0, -.08 * (1 - value)),
+                                child: child,
+                              ),
+                            ),
+                            child: Material(
+                              color: AppColors.surface2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(R.sm),
+                                side: BorderSide(color: AppColors.line),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                onTap: () {
+                                  _remove(payload, open: true, feedback: true);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.fromSTEB(
+                                      S.s8, S.s2, 0, S.s2),
+                                  child: Row(children: [
+                                    AppIcon(
+                                      switch ((payload['destination']
+                                          as Map?)?['type']) {
+                                        'session' => 'terminal',
+                                        'task' => 'check-circle',
+                                        'conversation' => 'message-circle',
+                                        _ => 'info',
+                                      },
+                                      size: 16,
+                                      color: AppColors.fg3,
+                                    ),
+                                    const SizedBox(width: S.s8),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            payload['title']?.toString() ??
+                                                'New notification',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: sans(13,
+                                                height: 16 / 13,
+                                                color: AppColors.fg1),
+                                          ),
+                                          if (_contextLabel(payload)
+                                              .isNotEmpty) ...[
+                                            const SizedBox(height: S.s2),
+                                            Text(_contextLabel(payload),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TS.caption()),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Dismiss',
+                                      style: const ButtonStyle(
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      padding: EdgeInsets.zero,
+                                      constraints:
+                                          const BoxConstraints.tightFor(
+                                              width: 44, height: 36),
+                                      icon: AppIcon('x',
+                                          size: 14, color: AppColors.fg3),
+                                      onPressed: () =>
+                                          _remove(payload, feedback: true),
+                                    ),
+                                  ]),
                                 ),
                               ),
-                              child: Material(
-                              color: AppColors.surface2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(R.card),
-                              side: BorderSide(color: AppColors.lineStrong),
                             ),
-                            clipBehavior: Clip.antiAlias,
-                            child: InkWell(
-                              onTap: () {
-                                _remove(payload, open: true, feedback: true);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
-                                    S.s12, S.s8, S.s4, S.s8),
-                                child: Row(children: [
-                                  AppIcon(
-                                    switch ((payload['destination']
-                                        as Map?)?['type']) {
-                                      'session' => 'terminal',
-                                      'task' => 'check-circle',
-                                      'conversation' => 'message-circle',
-                                      _ => 'info',
-                                    },
-                                    size: 18,
-                                    color: AppColors.fg3,
-                                  ),
-                                  const SizedBox(width: S.s12),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          payload['title']?.toString() ??
-                                              'New notification',
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TS.label(AppColors.fg1),
-                                        ),
-                                        const SizedBox(height: S.s2),
-                                        Text(_contextLabel(payload),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TS.caption()),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Dismiss',
-                                    icon: AppIcon('x',
-                                        size: 16, color: AppColors.fg3),
-                                    onPressed: () =>
-                                        _remove(payload, feedback: true),
-                                  ),
-                                ]),
-                              ),
-                            ),
-                          ),
                           ),
                         ),
                       ),

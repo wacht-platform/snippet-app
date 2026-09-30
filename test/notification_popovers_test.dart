@@ -22,7 +22,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(onNotifTap, isNotNull);
     foregroundNotifications.add({
-      'title': 'Desktop alert', 'url': 'missing-machine', 'session': 'chat',
+      'title': 'Desktop alert',
+      'url': 'missing-machine',
+      'session': 'chat',
     });
     await tester.pumpAndSettle();
     await tester.tap(find.text('Desktop alert'));
@@ -43,7 +45,8 @@ void main() {
     reportVisibleNotificationSession('u', 's');
     expect(notificationAppForeground, isTrue);
     expect(suppressVisibleNotification({'url': 'u', 'session': 's'}), isTrue);
-    expect(suppressVisibleNotification({'url': 'u', 'session': 'other'}), isFalse);
+    expect(
+        suppressVisibleNotification({'url': 'u', 'session': 'other'}), isFalse);
     reportForeground(false);
     expect(notificationAppForeground, isFalse);
     expect(visibleNotificationSession.value, isNull);
@@ -219,6 +222,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final platform in [TargetPlatform.linux, TargetPlatform.android]) {
+    for (final width in [1000.0, 240.0]) {
+      testWidgets('$platform toast geometry at $width', (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        tester.view.physicalSize = Size(width, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        foregroundNotifications.add({'title': 'Compact alert'});
+        await tester.pumpWidget(const MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(padding: EdgeInsets.fromLTRB(20, 24, 30, 0)),
+            child: NotificationPopovers(child: Scaffold()),
+          ),
+        ));
+        await tester.pumpAndSettle();
+        final rect = tester.getRect(find.byType(Dismissible));
+        final mobile = platform == TargetPlatform.android;
+        final available = width - 24 - 20 - 30;
+        const cap = 420.0;
+        expect(rect.width, closeTo(available < cap ? available : cap, .01));
+        expect(rect.top, closeTo(32, .01));
+        if (mobile) {
+          expect(rect.center.dx, closeTo((width + 20 - 30) / 2, .01));
+        } else {
+          expect(rect.right, closeTo(width - 12 - 30, .01));
+        }
+        expect(rect.left, greaterThanOrEqualTo(32));
+        expect(rect.height, lessThanOrEqualTo(40));
+        expect(find.text('Tap to open'), findsNothing);
+        final dismiss = tester.getSize(find.byType(IconButton));
+        expect(dismiss.width, greaterThanOrEqualTo(44));
+        expect(dismiss.height, greaterThanOrEqualTo(36));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        debugDefaultTargetPlatformOverride = null;
+      });
+    }
+  }
+
   testWidgets('narrow card handles long title and enlarged text',
       (tester) async {
     tester.view.physicalSize = const Size(240, 640);
@@ -266,7 +310,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(opened, hasLength(1));
     expect(find.text('Third'), findsOneWidget);
-    await tester.tap(find.text('Tap to open'));
+    await tester.tap(find.text('Third'));
     await tester.pumpAndSettle();
     expect(opened.last['title'], 'Third');
     expect(find.byTooltip('Dismiss'), findsNothing);
