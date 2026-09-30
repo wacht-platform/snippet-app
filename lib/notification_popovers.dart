@@ -53,6 +53,41 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     if (open) onNotifTap?.call(payload);
   }
 
+  void _clearAll(Map<String, dynamic> payload) {
+    if (!identical(_pending.firstOrNull, payload)) return;
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _pending.clear();
+      _syncExpiry();
+    });
+  }
+
+  Widget _stackedCard({required Widget child}) {
+    final layers = (_pending.length - 1).clamp(0, 2);
+    return Stack(children: [
+      for (var layer = layers; layer > 0; layer--)
+        Positioned.fill(
+          top: layer * 5.0,
+          left: layer * 5.0,
+          right: layer * 5.0,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              key: ValueKey('notification-backing-$layer'),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(R.sm),
+                border: Border.all(color: AppColors.line),
+              ),
+            ),
+          ),
+        ),
+      Padding(
+        padding: EdgeInsets.only(bottom: layers * 5.0),
+        child: child,
+      ),
+    ]);
+  }
+
   String _contextLabel(Map<String, dynamic> payload) {
     final kind = payload['kind']?.toString().split('.').last;
     final label = switch (kind) {
@@ -176,7 +211,8 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                 child: child,
                               ),
                             ),
-                            child: Material(
+                            child: _stackedCard(
+                                child: Material(
                               color: AppColors.surface2,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(R.sm),
@@ -184,6 +220,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
+                                onLongPress: () => _clearAll(payload),
                                 onTap: () {
                                   _remove(payload, open: true, feedback: true);
                                 },
@@ -218,6 +255,25 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                                 height: 16 / 13,
                                                 color: AppColors.fg1),
                                           ),
+                                          if (_pending.length > 1)
+                                            Tooltip(
+                                              message:
+                                                  'Long press to clear all notifications',
+                                              child: Semantics(
+                                                label:
+                                                    '${_pending.length} notifications. Long press to clear all',
+                                                onLongPress: () =>
+                                                    _clearAll(payload),
+                                                excludeSemantics: true,
+                                                child: Text(
+                                                  '${_pending.length} · Hold to clear all',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TS.caption(),
+                                                ),
+                                              ),
+                                            ),
                                           if (_contextLabel(payload)
                                               .isNotEmpty) ...[
                                             const SizedBox(height: S.s2),
@@ -247,7 +303,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                   ]),
                                 ),
                               ),
-                            ),
+                            )),
                           ),
                         ),
                       ),
