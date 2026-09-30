@@ -19,6 +19,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
   Timer? _expiry;
   Map<String, dynamic>? _timedPayload;
   bool _pressed = false;
+  late final OverlayEntry _contentEntry;
 
   void _syncExpiry() {
     final payload = _pending.firstOrNull;
@@ -72,6 +73,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
   @override
   void initState() {
     super.initState();
+    _contentEntry = OverlayEntry(builder: _buildContent);
     _pending.addAll(foregroundNotifications.drain());
     visibleNotificationSession.addListener(_visibilityChanged);
     _subscription = foregroundNotifications.stream.listen((payload) {
@@ -92,11 +94,18 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     visibleNotificationSession.removeListener(_visibilityChanged);
     _subscription?.cancel();
     _expiry?.cancel();
+    _contentEntry.remove();
+    _contentEntry.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    _contentEntry.markNeedsBuild();
+    return Overlay(initialEntries: [_contentEntry]);
+  }
+
+  Widget _buildContent(BuildContext context) {
     _pending.removeWhere(suppressVisibleNotification);
     _syncExpiry();
     final payload = _pending.firstOrNull;

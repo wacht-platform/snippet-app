@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,8 +15,9 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MaterialApp(
-      home: NotificationPopovers(child: DesktopShell()),
+    await tester.pumpWidget(MaterialApp(
+      builder: (_, child) => NotificationPopovers(child: child!),
+      home: const DesktopShell(),
     ));
     await tester.pumpAndSettle();
     expect(onNotifTap, isNotNull);
@@ -72,6 +74,57 @@ void main() {
     visibleNotificationSession.value = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, null);
+  });
+
+  testWidgets('builder overlay supports tooltip, updates, and routing',
+      (tester) async {
+    final navigator = GlobalKey<NavigatorState>();
+    final revision = ValueNotifier<int>(0);
+    addTearDown(revision.dispose);
+    onNotifTap = (payload) => navigator.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) => Scaffold(body: Text(payload['title'] as String)),
+          ),
+        );
+    await tester.pumpWidget(ValueListenableBuilder<int>(
+      valueListenable: revision,
+      builder: (_, value, __) => MaterialApp(
+        navigatorKey: navigator,
+        builder: (_, child) => NotificationPopovers(child: child!),
+        home: Scaffold(body: Text('Home $value')),
+      ),
+    ));
+    foregroundNotifications.add({'title': 'Dismiss me'});
+    await tester.pumpAndSettle();
+    expect(find.text('Dismiss me'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(find.byTooltip('Dismiss')));
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Dismiss'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await mouse.moveTo(Offset.zero);
+    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dismiss me'), findsNothing);
+    await mouse.removePointer();
+    revision.value = 1;
+    await tester.pumpAndSettle();
+    expect(find.text('Home 1'), findsOneWidget);
+    foregroundNotifications.add({'title': 'Destination'});
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Destination'));
+    await tester.pumpAndSettle();
+    expect(find.text('Destination'), findsOneWidget);
+    expect(find.byTooltip('Dismiss'), findsNothing);
+    navigator.currentState!.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Home 1'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 10));
+    expect(tester.takeException(), isNull);
   });
 
   test('destination preserves brief context', () {
