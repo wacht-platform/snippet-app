@@ -331,7 +331,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 scrollDirection: Axis.horizontal,
                 children: [
                   for (final s in TaskStatus.values)
-                    if (s != TaskStatus.inProgress || s == t.status)
+                    if (s == t.status ||
+                        (s != TaskStatus.inProgress &&
+                            (s == TaskStatus.todo ||
+                                !{
+                                  TaskStatus.done,
+                                  TaskStatus.failed,
+                                  TaskStatus.cancelled
+                                }.contains(t.status))))
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: Material(

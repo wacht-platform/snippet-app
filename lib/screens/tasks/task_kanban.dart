@@ -101,7 +101,9 @@ class _TaskKanbanState extends State<TaskKanban> {
   }
 
   static bool _accepts(TaskStatus column, TaskItem task) =>
-      column != TaskStatus.inProgress && column != task.status;
+      column != TaskStatus.inProgress &&
+      column != task.status &&
+      (!_finished(task.status) || column == TaskStatus.todo);
 
   Future<void> _move(TaskItem task, TaskStatus to) async {
     HapticFeedback.selectionClick();
