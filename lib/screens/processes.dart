@@ -163,10 +163,10 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
     // A finished process previously wore one grey dot and one grey label
     // whatever the outcome, so `exited (101)` looked exactly like `exited (ok)`
     // — the same "failure is invisible" defect the tool rows had. Colour now
-    // summarises the outcome: green live, danger for non-zero/killed, grey for
+    // summarises the outcome: amber live, danger for non-zero/killed, grey for
     // a clean exit.
     final tone = running
-        ? Tone.ok
+        ? Tone.run
         : failed
             ? Tone.danger
             : Tone.neutral;

@@ -297,10 +297,10 @@ class PaneLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s8),
-        child: Text(text,
+        child: Text(kMobile ? text : text.toUpperCase(),
             style: kMobile
                 ? TS.label(color ?? AppColors.fg2)
-                : mono(10, color: color ?? AppColors.fg3)),
+                : TS.overline(color)),
       );
 }
 

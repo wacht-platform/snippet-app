@@ -359,12 +359,24 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                   : AppColors.surface3,
                               borderRadius: BorderRadius.circular(R.chip),
                             ),
-                            child: Text(s.label,
-                                style: sans(12,
-                                    weight: s == t.status ? W.label : W.body,
-                                    color: s == t.status
-                                        ? AppColors.fg1
-                                        : statusColor(s))),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              if (s == t.status) ...[
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                      color: statusColor(s),
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: S.s6),
+                              ],
+                              Text(s.label,
+                                  style: sans(12,
+                                      weight: s == t.status ? W.label : W.body,
+                                      color: s == t.status
+                                          ? AppColors.fg1
+                                          : AppColors.fg3)),
+                            ]),
                           ),
                         ),
                       ),

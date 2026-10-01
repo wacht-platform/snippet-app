@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hugeicons/hugeicons.dart';
 
 import 'package:snippet/api.dart';
 import 'package:snippet/swr.dart';
@@ -202,37 +201,6 @@ void main() {
       final avatar = tester.getTopLeft(find.byType(AgentStateIcon)).dx;
       expect(avatar, closeTo(expected, 0.5),
           reason: 'row content must share the same x as the header above it');
-    });
-  });
-
-  testWidgets('the refresh glyph is scaled down to match its neighbours',
-      (tester) async {
-    await asDesktop(() async {
-      await pumpPanel(tester);
-
-      // The glyphs do not share a fill: at size 16 the circular arrow inks about
-      // 40% more than a plus, so it read as oversized beside it. Measure the
-      // actual ink (`HugeIcon.size`), not the widget's declared size — the
-      // correction is deliberately applied to the ink so layout is unaffected.
-      double inkOf(String name) {
-        final huge = find.descendant(
-          of: find.byWidgetPredicate((w) => w is AppIcon && w.name == name),
-          matching: find.byType(HugeIcon),
-        );
-        return tester.widget<HugeIcon>(huge.first).size!;
-      }
-
-      final refreshInk = inkOf('refresh');
-      final plusInk = inkOf('plus');
-
-      expect(refreshInk, lessThan(plusInk),
-          reason: 'the heavier glyph must be scaled down, not the other up');
-      // Both keep the same BOX, so the row's layout cannot shift.
-      final plusBox = tester.getSize(
-          find.byWidgetPredicate((w) => w is AppIcon && w.name == 'plus'));
-      final refreshBox = tester.getSize(
-          find.byWidgetPredicate((w) => w is AppIcon && w.name == 'refresh'));
-      expect(refreshBox, plusBox);
     });
   });
 

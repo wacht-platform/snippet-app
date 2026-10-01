@@ -238,7 +238,12 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                         _ => 'info',
                                       },
                                       size: 16,
-                                      color: AppColors.fg3,
+                                      color: switch (payload['kind']) {
+                                        'waiting' => AppColors.fg1,
+                                        'done' => AppColors.ok,
+                                        'error' => AppColors.danger,
+                                        _ => AppColors.fg3,
+                                      },
                                     ),
                                     const SizedBox(width: S.s8),
                                     Expanded(
@@ -247,34 +252,23 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            payload['title']?.toString() ??
-                                                'New notification',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: sans(13,
-                                                height: 16 / 13,
-                                                color: AppColors.fg1),
-                                          ),
-                                          if (_pending.length > 1)
-                                            Tooltip(
-                                              message:
-                                                  'Long press to clear all notifications',
-                                              child: Semantics(
-                                                label:
-                                                    '${_pending.length} notifications. Long press to clear all',
-                                                onLongPress: () =>
-                                                    _clearAll(payload),
-                                                excludeSemantics: true,
-                                                child: Text(
-                                                  '${_pending.length} · Hold to clear all',
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TS.caption(),
-                                                ),
-                                              ),
+                                          Semantics(
+                                            label: _pending.length > 1
+                                                ? '${_pending.length} notifications. Long press to clear all'
+                                                : null,
+                                            onLongPress: _pending.length > 1
+                                                ? () => _clearAll(payload)
+                                                : null,
+                                            child: Text(
+                                              payload['title']?.toString() ??
+                                                  'New notification',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: sans(13,
+                                                  height: 16 / 13,
+                                                  color: AppColors.fg1),
                                             ),
+                                          ),
                                           if (_contextLabel(payload)
                                               .isNotEmpty) ...[
                                             const SizedBox(height: S.s2),

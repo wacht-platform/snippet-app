@@ -50,13 +50,13 @@ void main() {
       enqueue(title);
     }
     await tester.pump();
-    expect(find.text('3 · Hold to clear all'), findsOneWidget);
+    expect(find.textContaining('Hold to clear all'), findsNothing);
     expect(
         find.byKey(const ValueKey('notification-backing-1')), findsOneWidget);
     expect(
         find.byKey(const ValueKey('notification-backing-2')), findsOneWidget);
     final semantics = tester.ensureSemantics();
-    expect(find.bySemanticsLabel('3 notifications. Long press to clear all'),
+    expect(find.bySemanticsLabel(RegExp(r'^3 notifications\. Long press to clear all')),
         findsOneWidget);
     semantics.dispose();
     await tester.pump(const Duration(milliseconds: 4800));
@@ -90,7 +90,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('First'), findsNothing);
     expect(find.text('Second'), findsOneWidget);
-    expect(find.text('2 · Hold to clear all'), findsOneWidget);
+    expect(find.textContaining('Hold to clear all'), findsNothing);
     await tester.pump(const Duration(seconds: 5));
     await tester.pump();
     expect(find.text('Third'), findsOneWidget);

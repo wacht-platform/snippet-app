@@ -716,8 +716,7 @@ class QuestionBarState extends State<QuestionBar> {
                               weight: W.label,
                               color: sel ? AppColors.fg1 : AppColors.fg2)),
                       if (o.recommended)
-                        Text('Recommended',
-                            style: mono(10, color: AppColors.accent)),
+                        const Tag('Recommended', tone: Tone.accent),
                     ],
                   ),
                   if (o.description.isNotEmpty) ...[
@@ -814,17 +813,15 @@ class QuestionBarState extends State<QuestionBar> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
-          color: current ? AppColors.accentBg : Colors.transparent,
+          color: current ? AppColors.accentBg : AppColors.raised,
           borderRadius: BorderRadius.circular(R.pill),
-          border:
-              Border.all(color: current ? AppColors.accent : AppColors.border2),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (done && !current) ...[
             AppIcon('check', size: 11, color: color),
             const SizedBox(width: 4),
           ],
-          Text(label, style: mono(10, color: color)),
+          Text(label, style: TS.meta(color).copyWith(fontWeight: W.label)),
         ]),
       ),
     );
@@ -849,7 +846,7 @@ class QuestionBarState extends State<QuestionBar> {
                   child: Text(_header(_questions[i], i),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(10, color: AppColors.fg3)),
+                      style: TS.meta()),
                 ),
                 Expanded(
                   child: Text(_answerFor(_questions[i]),
@@ -973,7 +970,7 @@ class QuestionBarState extends State<QuestionBar> {
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: Text(last ? 'Enter to submit' : 'Enter for next',
-                          style: mono(10, color: AppColors.fg4)),
+                          style: TS.caption(AppColors.fg4)),
                     ),
                   Btn(nextLabel,
                       small: true,

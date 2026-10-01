@@ -102,7 +102,7 @@ List<Widget> laneSections(List<LaneInfo> lanes,
     }
   }
 
-  section('In progress', running, Tone.accent);
+  section('In progress', running, Tone.run);
   section('Failed', failed, Tone.danger);
   section('Completed', completed, Tone.ok);
   section('Cancelled', cancelled, Tone.neutral);
@@ -131,7 +131,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     final failed = lane.status == 'failed';
     final cancelled = lane.status == 'cancelled';
     final tone = lane.running
-        ? Tone.accent
+        ? Tone.run
         : failed
             ? Tone.danger
             : cancelled

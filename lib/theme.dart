@@ -730,7 +730,7 @@ List<List<dynamic>> hugeIconFor(String name) {
     case 'wifi-off':
       return HugeIcons.strokeRoundedWifiOff01;
     case 'refresh':
-      return HugeIcons.strokeRoundedRefresh;
+      return HugeIcons.strokeRoundedRefresh04;
     case 'alert-triangle':
       return HugeIcons.strokeRoundedAlert02;
     case 'check':
@@ -868,24 +868,6 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedCircle;
   }
 }
-
-/// Optical ink correction for a glyph that over- or under-fills its box.
-///
-/// Glyphs are NOT drawn to a common fill. Measured in the app's own header at
-/// the 16px spec: `plus` inks ~10px while `refresh` inks ~14px — so a circular
-/// arrow reads ~40% heavier standing beside a plus, though both are nominally
-/// the same size. That is a property of the GLYPH, not of the panel it lands
-/// in, so the correction lives beside `hugeIconFor` and is applied by `AppIcon`
-/// for every call site on both platforms. A per-call parameter is exactly how
-/// one header drifts from the next.
-///
-/// Layout is unaffected: `AppIcon` keeps its nominal `SizedBox.square`, so only
-/// the INK scales.
-double glyphInkScale(String name) => switch (name) {
-      // 10/14 — brings the circular arrow down to the plus's ink.
-      'refresh' => 0.72,
-      _ => 1.0,
-    };
 
 /// Route transition: a short slide with a fade, settling on [Motion.enter].
 /// The outgoing page drifts a little the other way so the two read as one move.

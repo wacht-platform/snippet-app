@@ -56,7 +56,7 @@ void main() {
       }));
       await tester.pumpAndSettle();
       expect(find.text('Delegated lanes'), findsOneWidget);
-      expect(find.text('In progress'), findsOneWidget);
+      expect(find.textContaining(RegExp('^in progress\$', caseSensitive: false)), findsOneWidget);
       expect(find.text('In progress · 1'), findsNothing);
       expect(find.text('Handoff'), findsNothing);
       await tester.tap(find.text('View details'));
@@ -89,7 +89,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Delegated lanes'), findsOneWidget);
       expect(find.byType(LaneDetailScreen), findsNothing);
-      expect(find.text('Completed'), findsOneWidget);
+      expect(find.textContaining(RegExp('^completed\$', caseSensitive: false)), findsOneWidget);
       expect(find.text('done'), findsOneWidget);
       expect(closed, isFalse);
       if (mode != 'mobile') expect(nested.currentState!.canPop(), isFalse);
