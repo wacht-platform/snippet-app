@@ -45,6 +45,20 @@ class InferenceProfile {
   final bool? supportsImages; // null on daemons that don't report it yet
   final bool xSearch; // xAI server-side X search
 
+  InferenceProfile withActive(bool value) => InferenceProfile.fromJson({
+        'name': name,
+        'provider': provider,
+        'base_url': baseUrl,
+        'model': model,
+        'has_key': hasKey,
+        'active': value,
+        'context_window': contextWindow,
+        'reasoning_effort': reasoningEffort,
+        'stream': stream,
+        'supports_images': supportsImages,
+        'x_search': xSearch,
+      });
+
   InferenceProfile.fromJson(Map<String, dynamic> j)
       : name = j['name'] as String? ?? '',
         provider = j['provider'] as String? ?? '',

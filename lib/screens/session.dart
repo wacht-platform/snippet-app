@@ -562,6 +562,7 @@ class _SessionScreenState extends State<SessionScreen>
   // resend it on reconnect and force a resync if it doesn't resolve.
   Map<String, dynamic>? _pendingDecision;
   Timer? _decisionTimer;
+  Timer? _decisionGiveUp;
 
   // Force a fresh snapshot when an optimistic message hasn't been echoed in time —
   // the reconnect path then resends whatever the server truly never received.
@@ -587,7 +588,14 @@ class _SessionScreenState extends State<SessionScreen>
       // Decisions can be retried across reconnects too; give the retry the same
       // idempotency key instead of sending an untracked frame.
       outbound['nonce'] ??= _nextNonce();
-      _pendingDecision = outbound;
+      setState(() => _pendingDecision = outbound);
+      _decisionGiveUp?.cancel();
+      _decisionGiveUp = Timer(const Duration(seconds: 15), () {
+        if (!mounted || _closed || _pendingDecision == null) return;
+        if (_state?.status != 'waiting_for_input') return;
+        setState(() => _pendingDecision = null);
+        toast(context, "That didn't reach the session. Try again.", danger: true);
+      });
       _decisionTimer?.cancel();
       _decisionTimer = Timer(const Duration(seconds: 6), () {
         if (!mounted || _closed || _pendingDecision == null) return;
@@ -984,6 +992,7 @@ class _SessionScreenState extends State<SessionScreen>
     _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
+    _decisionGiveUp?.cancel();
     _streamFlushTimer?.cancel();
     _liveFrame.dispose();
     _recorderTick.dispose();
@@ -1037,7 +1046,10 @@ class _SessionScreenState extends State<SessionScreen>
     Theme.of(context);
     _syncDraftAttachments();
     final s = _state;
-    final status = s?.status ?? 'connecting';
+    final reported = s?.status ?? 'connecting';
+    final status = reported == 'waiting_for_input' && _pendingDecision != null
+        ? 'running'
+        : reported;
     final running = status == 'running';
     final waiting = status == 'waiting_for_input';
     final allEvents = s?.events ?? const [];

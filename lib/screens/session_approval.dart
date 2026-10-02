@@ -1228,7 +1228,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(label,
-                          style: sans(M.rowTitle,
+                          style: sans(kMobile ? M.rowTitle : 13,
                               weight: W.label, color: AppColors.fg1)),
                       if (detail != null) ...[
                         const SizedBox(height: 2),

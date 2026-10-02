@@ -41,7 +41,39 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   InferenceProfile? _editProfile;
   String? _delegate;
 
+  final Map<String, InferenceProfile> _saving = {};
+
   void addProfile() => _edit(null);
+
+  void _submitted(InferenceProfile draft, Future<void> save) {
+    setState(() => _saving[draft.name] = draft);
+    save.then((_) {
+      if (!mounted) return;
+      widget.client.invalidateConfig();
+      setState(() {
+        _saving.remove(draft.name);
+        _load(force: true);
+      });
+    }, onError: (Object e) {
+      if (!mounted) return;
+      setState(() => _saving.remove(draft.name));
+      toast(context, "Couldn't save ${draft.name}: $e", danger: true);
+    });
+  }
+
+  List<InferenceProfile> _withSaving(List<InferenceProfile> profiles) {
+    if (_saving.isEmpty) return profiles;
+    final activating = _saving.values.any((p) => p.active);
+    final out = [
+      for (final p in profiles)
+        _saving[p.name] ??
+            (activating && p.active ? p.withActive(false) : p),
+    ];
+    for (final d in _saving.values) {
+      if (!out.any((p) => p.name == d.name)) out.add(d);
+    }
+    return out;
+  }
   bool get inEditor => _inEditor;
 
   @override
@@ -110,6 +142,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
             delegateName: delegate,
             onClose: () => Navigator.pop(context),
             onSaved: () => Navigator.pop(context, true),
+            onSubmit: _submitted,
           ),
         ),
       );
@@ -146,6 +179,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         embedded: widget.embedded,
         onClose: () => _closeEditor(),
         onSaved: () => _closeEditor(saved: true),
+        onSubmit: _submitted,
       );
       if (!widget.embedded) return editor;
       // The editor brings NO header of its own when embedded — THIS level owns
@@ -177,7 +211,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
           return const ListSkeleton();
         }
         final cfg = snap.data;
-        final profiles = cfg?.profiles ?? const [];
+        final profiles = _withSaving(cfg?.profiles ?? const []);
         return PageBody(children: [
           if (profiles.isEmpty)
             EmptyState(

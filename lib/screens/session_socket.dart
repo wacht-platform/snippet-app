@@ -208,6 +208,7 @@ extension _SessionScreenSocketExt on _SessionScreenState {
       if (next.status != 'waiting_for_input' && _pendingDecision != null) {
         _pendingDecision = null;
         _decisionTimer?.cancel();
+        _decisionGiveUp?.cancel();
       }
       // Retire optimistic bubbles once the daemon has echoed them:
       // 1) FIFO by echo-count delta (prev→next) when we have prior state

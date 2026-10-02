@@ -92,7 +92,7 @@ MarkdownStyleSheet? _cachedMarkdownStyle;
 int? _cachedMarkdownThemeIndex;
 
 MarkdownStyleSheet markdownStyle(BuildContext context) {
-  final themeIndex = ThemeManager.instance.index;
+  final themeIndex = ThemeManager.instance.index * 2 + (kMobile ? 1 : 0);
   if (_cachedMarkdownStyle != null && _cachedMarkdownThemeIndex == themeIndex) {
     return _cachedMarkdownStyle!;
   }
@@ -1394,7 +1394,7 @@ class SnAppBar extends StatelessWidget {
   final VoidCallback? onBack;
   final Widget? leading;
   final List<Widget> actions;
-  final double titleSize;
+  final double? titleSize;
   final bool compact;
 
   /// Which surface the bar sits on. Defaults to the ambient scaffold colour,
@@ -1417,7 +1417,7 @@ class SnAppBar extends StatelessWidget {
       this.onBack,
       this.leading,
       this.actions = const [],
-      this.titleSize = 17,
+      this.titleSize,
       this.compact = false,
       this.background,
       this.bordered = true});
@@ -1454,7 +1454,7 @@ class SnAppBar extends StatelessWidget {
                 Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: display(titleSize)),
+                    style: display(titleSize ?? (kMobile ? 17 : 15))),
                 if (subtitle != null)
                   Text(subtitle!,
                       maxLines: 1,

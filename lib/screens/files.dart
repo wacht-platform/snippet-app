@@ -469,7 +469,7 @@ class _FileExplorerState extends State<FileExplorer> {
                     // string appeared twice within ~40dp and the header read as
                     // broken. The path describes the LIST, so it belongs in that
                     // row (with the item count); this bar names the screen.
-                    titleSize: M.sectionTitle,
+                    titleSize: kMobile ? M.sectionTitle : 15,
                     compact: true,
                     onBack: _selecting
                         ? _exitSelect

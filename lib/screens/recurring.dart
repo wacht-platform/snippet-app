@@ -389,12 +389,21 @@ class RecurringScreenState extends State<RecurringScreen>
     return 'every $n$unit';
   }
 
+  final Map<String, bool> _enabledOverride = {};
+
+  bool _enabled(RecurringJob job) => _enabledOverride[job.id] ?? job.enabled;
+
   Future<void> _toggle(RecurringJob job) async {
+    final next = !_enabled(job);
+    setState(() => _enabledOverride[job.id] = next);
     try {
-      await widget.client.updateRecurring(job.id, enabled: !job.enabled);
+      await widget.client.updateRecurring(job.id, enabled: next);
       _refresh();
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+      if (mounted) {
+        setState(() => _enabledOverride.remove(job.id));
+        toast(context, '$e', danger: true);
+      }
     }
   }
 
@@ -750,7 +759,7 @@ class RecurringScreenState extends State<RecurringScreen>
   }
 
   String _nextIn(RecurringJob job) {
-    if (!job.enabled) return 'paused';
+    if (!_enabled(job)) return 'paused';
     if (job.queued) return 'queued — next after current goal';
     if (job.nextRunAt <= 0) return '';
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -790,7 +799,7 @@ class RecurringScreenState extends State<RecurringScreen>
   }
 
   Widget _jobRow(RecurringJob job) {
-    final paused = !job.enabled;
+    final paused = !_enabled(job);
     final target = _targetLabel(job);
     final bits = <String>[
       if (!job.delivery) 'message',

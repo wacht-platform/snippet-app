@@ -531,18 +531,23 @@ String get monoFamily => kMonoFamily;
 
 /// Type roles from docs/design-language.md. Screens use these, not raw sizes.
 class TS {
-  static TextStyle pageTitle([Color? c]) =>
-      sans(22, weight: W.strong, height: 28 / 22, color: c ?? AppColors.fg1);
-  static TextStyle sectionTitle([Color? c]) =>
-      sans(17, weight: W.strong, height: 24 / 17, color: c ?? AppColors.fg1);
-  static TextStyle rowTitle([Color? c]) =>
-      sans(15, weight: W.label, height: 20 / 15, color: c ?? AppColors.fg1);
-  static TextStyle body([Color? c]) => sans(kMobile ? 16 : 15,
-      height: kMobile ? 24 / 16 : 22 / 15, color: c ?? AppColors.fg2);
-  static TextStyle ui([Color? c]) =>
-      sans(14, height: 20 / 14, color: c ?? AppColors.fg2);
-  static TextStyle label([Color? c]) =>
-      sans(13, weight: W.label, height: 18 / 13, color: c ?? AppColors.fg2);
+  static TextStyle pageTitle([Color? c]) => kMobile
+      ? sans(22, weight: W.strong, height: 28 / 22, color: c ?? AppColors.fg1)
+      : sans(18, weight: W.strong, height: 24 / 18, color: c ?? AppColors.fg1);
+  static TextStyle sectionTitle([Color? c]) => kMobile
+      ? sans(17, weight: W.strong, height: 24 / 17, color: c ?? AppColors.fg1)
+      : sans(15, weight: W.strong, height: 20 / 15, color: c ?? AppColors.fg1);
+  static TextStyle rowTitle([Color? c]) => kMobile
+      ? sans(15, weight: W.label, height: 20 / 15, color: c ?? AppColors.fg1)
+      : sans(13, weight: W.label, height: 18 / 13, color: c ?? AppColors.fg1);
+  static TextStyle body([Color? c]) => sans(kMobile ? 16 : 14,
+      height: kMobile ? 24 / 16 : 22 / 14, color: c ?? AppColors.fg2);
+  static TextStyle ui([Color? c]) => kMobile
+      ? sans(14, height: 20 / 14, color: c ?? AppColors.fg2)
+      : sans(13, height: 18 / 13, color: c ?? AppColors.fg2);
+  static TextStyle label([Color? c]) => kMobile
+      ? sans(13, weight: W.label, height: 18 / 13, color: c ?? AppColors.fg2)
+      : sans(12, weight: W.label, height: 16 / 12, color: c ?? AppColors.fg2);
   static TextStyle meta([Color? c]) =>
       sans(12, height: 16 / 12, color: c ?? AppColors.fg3, tabular: true);
   static TextStyle caption([Color? c]) =>

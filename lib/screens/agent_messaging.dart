@@ -937,7 +937,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      sans(M.sectionTitle, weight: W.label, color: AppColors.fg1),
+                      sans(kMobile ? M.sectionTitle : 15, weight: W.label, color: AppColors.fg1),
                 ),
                 if (!kMobile && subtitle.isNotEmpty) ...[
                   const SizedBox(height: 2),

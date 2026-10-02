@@ -512,15 +512,16 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       ],
     );
     if (picked == null || picked == current) return;
+    final before = _currentProfile;
+    _setState(() => _currentProfile = picked);
     try {
       await widget.client.setSessionModel(widget.sessionId, picked);
-      _toast('Switched to $picked');
       if (mounted) {
-        _currentProfile = picked;
         _loadModel();
         _connect();
       }
     } catch (e) {
+      if (mounted) _setState(() => _currentProfile = before);
       _toast('$e');
     }
   }

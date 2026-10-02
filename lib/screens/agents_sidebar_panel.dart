@@ -638,7 +638,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(M.rowTitle, color: AppColors.fg2),
+                    style: sans(kMobile ? M.rowTitle : 13, color: AppColors.fg2),
                   ),
                 ),
                 if (s.lastActive > 0) ...[

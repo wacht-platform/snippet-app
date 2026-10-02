@@ -243,15 +243,17 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         hint: 'New title',
         saveLabel: 'Rename');
     if (title == null) return;
+    final before = _title;
+    _setState(() => _publishTitle(title));
     try {
       await widget.client.renameSession(widget.sessionId, title);
-      if (mounted) {
-        _setState(() => _publishTitle(title));
-      } else {
-        _publishTitle(title);
-      }
     } catch (e) {
-      if (mounted) _toast('$e');
+      if (mounted) {
+        _setState(() => _publishTitle(before));
+        _toast('$e');
+      } else {
+        _publishTitle(before);
+      }
     }
   }
 
@@ -316,7 +318,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style:
-                    sans(M.sectionTitle, weight: W.label, color: AppColors.fg1),
+                    sans(kMobile ? M.sectionTitle : 15, weight: W.label, color: AppColors.fg1),
               ),
             ),
           ),

@@ -50,6 +50,8 @@ class InferenceProfileEditor extends StatefulWidget {
 
   /// Called after a successful save, before [onClose].
   final VoidCallback? onSaved;
+
+  final void Function(InferenceProfile draft, Future<void> save)? onSubmit;
   const InferenceProfileEditor(
       {super.key,
       required this.client,
@@ -57,7 +59,8 @@ class InferenceProfileEditor extends StatefulWidget {
       this.delegateName,
       this.embedded = false,
       this.onClose,
-      this.onSaved});
+      this.onSaved,
+      this.onSubmit});
   @override
   State<InferenceProfileEditor> createState() => _InferenceProfileEditorState();
 }
@@ -266,8 +269,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                 ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Center(
-                      child: Text('No matching models',
-                          style: TS.meta()),
+                      child: Text('No matching models', style: TS.meta()),
                     ),
                   )
                 : ListView.separated(
@@ -308,8 +310,8 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                                         m.displayName != m.id) ...[
                                       const SizedBox(height: 1),
                                       Text(m.displayName!,
-                                          style: sans(11,
-                                              color: AppColors.fg3)),
+                                          style:
+                                              sans(11, color: AppColors.fg3)),
                                     ],
                                   ],
                                 ),
@@ -352,35 +354,40 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       _busy = true;
       _error = null;
     });
-    try {
-      if (_model.text.trim().isEmpty) throw 'Model is required.';
-      await widget.client.putProfile(
-        name: _isEdit
-            ? widget.existing!.name
-            : (_name.text.trim().isEmpty ? null : _name.text.trim()),
-        provider: _provider,
-        baseUrl: _needsBaseUrl(_provider) ? _baseUrl.text.trim() : null,
-        model: _model.text.trim(),
-        apiKey: _key.text.trim().isEmpty ? null : _key.text.trim(),
-        // Always send it: '' explicitly clears back to provider default (an
-        // omitted field means "keep", so Default could never un-set an effort).
-        reasoningEffort: _effort,
-        supportsImages: _images,
-        contextWindow: int.tryParse(_ctx.text.trim()),
-        stream: _stream,
-        xSearch: _isXai ? _xSearch : null,
-        setActive: _active,
-      );
+    if (_model.text.trim().isEmpty) {
+      setState(() {
+        _error = 'Model is required.';
+        _busy = false;
+      });
+      return;
+    }
+    final submit = widget.onSubmit;
+    if (submit != null) {
       final savedName = _isEdit
           ? widget.existing!.name
           : (_name.text.trim().isEmpty
               ? _model.text.trim()
               : _name.text.trim());
-      if (_delegate) {
-        await widget.client.setDelegateProfile(savedName);
-      } else if (widget.delegateName == savedName) {
-        await widget.client.setDelegateProfile(null);
-      }
+      final draft = InferenceProfile.fromJson({
+        'name': savedName,
+        'provider': _provider,
+        'base_url': _needsBaseUrl(_provider) ? _baseUrl.text.trim() : '',
+        'model': _model.text.trim(),
+        'has_key':
+            _key.text.trim().isNotEmpty || (widget.existing?.hasKey ?? false),
+        'active': _active || (widget.existing?.active ?? false),
+        'context_window': int.tryParse(_ctx.text.trim()) ?? 0,
+        'reasoning_effort': _effort,
+        'stream': _stream,
+        'supports_images': _images,
+        'x_search': _isXai && _xSearch,
+      });
+      submit(draft, _persist());
+      _dismiss();
+      return;
+    }
+    try {
+      await _persist();
       if (mounted) _dismiss(saved: true);
     } catch (e) {
       if (mounted) {
@@ -389,6 +396,34 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           _busy = false;
         });
       }
+    }
+  }
+
+  Future<void> _persist() async {
+    await widget.client.putProfile(
+      name: _isEdit
+          ? widget.existing!.name
+          : (_name.text.trim().isEmpty ? null : _name.text.trim()),
+      provider: _provider,
+      baseUrl: _needsBaseUrl(_provider) ? _baseUrl.text.trim() : null,
+      model: _model.text.trim(),
+      apiKey: _key.text.trim().isEmpty ? null : _key.text.trim(),
+      // Always send it: '' explicitly clears back to provider default (an
+      // omitted field means "keep", so Default could never un-set an effort).
+      reasoningEffort: _effort,
+      supportsImages: _images,
+      contextWindow: int.tryParse(_ctx.text.trim()),
+      stream: _stream,
+      xSearch: _isXai ? _xSearch : null,
+      setActive: _active,
+    );
+    final savedName = _isEdit
+        ? widget.existing!.name
+        : (_name.text.trim().isEmpty ? _model.text.trim() : _name.text.trim());
+    if (_delegate) {
+      await widget.client.setDelegateProfile(savedName);
+    } else if (widget.delegateName == savedName) {
+      await widget.client.setDelegateProfile(null);
     }
   }
 
@@ -537,8 +572,8 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                 onTap: () => setState(() => _showKey = !_showKey),
                 child: Padding(
                     padding: EdgeInsets.all(4),
-                    child: Text(_showKey ? 'Hide' : 'Show',
-                        style: TS.caption())),
+                    child:
+                        Text(_showKey ? 'Hide' : 'Show', style: TS.caption())),
               ),
             ),
           const SizedBox(height: 16),
@@ -585,10 +620,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       ),
     );
     final footer = Container(
-      padding: EdgeInsets.fromLTRB(
-          16,
-          6,
-          16,
+      padding: EdgeInsets.fromLTRB(16, 6, 16,
           widget.embedded ? 8 : 8 + MediaQuery.of(context).padding.bottom),
       decoration: const BoxDecoration(),
       child: Row(
@@ -685,8 +717,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
               child: Row(children: [
                 AppIcon('cpu', size: 16, color: AppColors.fg2),
                 const SizedBox(width: 9),
-                Text('Inference profiles',
-                    style: TS.sectionTitle()),
+                Text('Inference profiles', style: TS.sectionTitle()),
                 const SizedBox(width: 8),
                 Container(
                   padding:
@@ -724,8 +755,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
                         AppIcon('search', size: 18, color: AppColors.fg4),
                         const SizedBox(height: 9),
                         Text('No profile matches “${_query.text.trim()}”',
-                            textAlign: TextAlign.center,
-                            style: TS.meta()),
+                            textAlign: TextAlign.center, style: TS.meta()),
                       ]),
                     )
                   : ListView.builder(
@@ -904,8 +934,7 @@ class _SubSignInState extends State<_SubSignIn> {
         Text(widget.signedInLabel, style: sans(13, color: AppColors.fg2)),
         const Spacer(),
         GestureDetector(
-            onTap: _signOut,
-            child: Text('Sign out', style: TS.meta())),
+            onTap: _signOut, child: Text('Sign out', style: TS.meta())),
       ]);
     }
     if (_code != null) {
@@ -916,8 +945,7 @@ class _SubSignInState extends State<_SubSignIn> {
         SelectableText(_url ?? '', style: mono(12, color: AppColors.accent)),
         const SizedBox(height: 8),
         Row(children: [
-          Text(_code!,
-              style: mono(18, weight: W.label, color: AppColors.fg1)),
+          Text(_code!, style: mono(18, weight: W.label, color: AppColors.fg1)),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () => Clipboard.setData(ClipboardData(text: _code!)),

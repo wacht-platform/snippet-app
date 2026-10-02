@@ -62,7 +62,7 @@ class _TasksScreenState extends State<TasksScreen> {
         child: Column(children: [
           SnAppBar(
             title: 'Tasks',
-            titleSize: M.pageTitle,
+            titleSize: kMobile ? M.pageTitle : 18,
             background: AppColors.bg,
             bordered: false,
             actions: [
