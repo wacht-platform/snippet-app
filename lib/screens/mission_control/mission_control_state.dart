@@ -185,10 +185,13 @@ class MissionEnvelope {
     if (!isReport) return 'queued';
     return switch (status) {
       'done' || 'completed' => 'done',
-      'failed' || 'cancelled' => 'failed',
+      'failed' => 'failed',
+      'cancelled' => 'cancelled',
       'blocked' => 'blocked',
+      'stalled' => 'stalled',
       'in_progress' || 'working' => 'working',
-      _ => 'done',
+      'message' => 'message',
+      _ => 'update',
     };
   }
 }

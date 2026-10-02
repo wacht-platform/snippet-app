@@ -149,6 +149,10 @@ class MissionEnvelopeCard extends StatelessWidget {
       'done' => (Tone.ok, 'check', 'Done'),
       'blocked' => (Tone.danger, 'alert-triangle', 'Blocked'),
       'failed' => (Tone.danger, 'x-circle', 'Failed'),
+      'stalled' => (Tone.run, 'alert-triangle', 'Stalled'),
+      'cancelled' => (Tone.neutral, 'x-circle', 'Cancelled'),
+      'message' => (Tone.neutral, 'message', 'Message'),
+      'update' => (Tone.neutral, 'info', 'Update'),
       _ => (Tone.accent, 'inbox', 'New task'),
     };
     return _ThreadCard(

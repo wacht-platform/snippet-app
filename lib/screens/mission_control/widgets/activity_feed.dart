@@ -101,7 +101,7 @@ class _TaskEventRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (item.kind) {
-      'working' => AppColors.run,
+      'working' || 'stalled' => AppColors.run,
       'done' => AppColors.ok,
       'blocked' || 'failed' => AppColors.danger,
       _ => AppColors.fg3,
