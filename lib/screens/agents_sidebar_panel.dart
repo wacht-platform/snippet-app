@@ -64,7 +64,7 @@ Future<bool?> showCreateAgentDialog(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text('Create agent',
-                              style: sans(14, weight: W.label, color: AppColors.fg1)),
+                              style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
                           const SizedBox(height: 12),
                           CreateAgentForm(client: client),
                         ],

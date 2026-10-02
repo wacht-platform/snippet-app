@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 import 'widgets.dart';
+import 'platform.dart';
 
 /// Tools whose result is only an acknowledgement: the row's sentence already
 /// says everything, so there is nothing to open.
@@ -292,7 +293,7 @@ class _Header extends StatelessWidget {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               child: Text(title,
-                  style: sans(14, weight: W.label, color: AppColors.fg1)),
+                  style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
             ),
             if (status.isNotEmpty) ...[
               const SizedBox(width: 10),

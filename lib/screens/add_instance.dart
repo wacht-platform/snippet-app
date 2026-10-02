@@ -138,7 +138,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Connect a machine', style: display(16)),
+                          Text('Connect a machine', style: display(kMobile ? 16 : 14)),
                           const SizedBox(height: 2),
                           Text('Control another machine from here',
                               style: TS.caption()),

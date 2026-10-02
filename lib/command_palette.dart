@@ -145,7 +145,7 @@ class _PaletteState extends State<_Palette> {
                 isCollapsed: true,
                 border: InputBorder.none,
                 hintText: 'Search chats or run a command',
-                hintStyle: sans(14, color: AppColors.fg4),
+                hintStyle: sans(kMobile ? 14 : 13, color: AppColors.fg4),
               ),
             ),
           ),

@@ -4,6 +4,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_models.dart';
+import '../platform.dart';
 
 /// Modal bottom sheet allowing the user to select which session or Mission Control receives incoming shared content.
 Future<String?> showInboundSharePicker({
@@ -30,7 +31,7 @@ Future<String?> showInboundSharePicker({
                     : (t.title.trim().isEmpty ? '(untitled)' : t.title),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(16,
+                style: sans(kMobile ? 16 : 14,
                     weight: t.isMissionControl
                         ? W.label
                         : W.body,
@@ -59,7 +60,7 @@ Future<String?> showInboundSharePicker({
             title: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(16, color: AppColors.fg1)),
+                style: sans(kMobile ? 16 : 14, color: AppColors.fg1)),
             subtitle: Text(
                 [
                   s.projectFolder.trim().isEmpty ? 'session' : s.projectFolder,

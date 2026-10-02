@@ -221,7 +221,7 @@ class RecurringScreenState extends State<RecurringScreen>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text('Schedule a goal or message',
-                        style: sans(14, weight: W.label, color: AppColors.fg1)),
+                        style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     Text(
                       'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',

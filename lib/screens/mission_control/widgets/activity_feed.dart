@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../mission_control_state.dart';
+import '../../../platform.dart';
 
 class ActivityFeed extends StatelessWidget {
   const ActivityFeed({
@@ -208,7 +209,7 @@ class _QuestionRow extends StatelessWidget {
                 children: [
                   Text('Needs input', style: TS.meta()),
                   const SizedBox(height: 4),
-                  Text(item.question, style: sans(16, color: AppColors.fg1)),
+                  Text(item.question, style: sans(kMobile ? 16 : 14, color: AppColors.fg1)),
                 ],
               ),
             ),

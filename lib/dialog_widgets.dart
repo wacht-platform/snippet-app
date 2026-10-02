@@ -175,7 +175,7 @@ class _DialogFrame extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style:
-                              sans(15, weight: W.label, color: AppColors.fg1)),
+                              sans(kMobile ? 15 : 14, weight: W.label, color: AppColors.fg1)),
                     ),
                     if (onClose != null)
                       IconBtn('x',

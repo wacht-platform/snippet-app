@@ -445,7 +445,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           const SizedBox(height: 7),
           if (_isEdit)
             Text(_providerLabel(_provider),
-                style: sans(16, color: AppColors.fg1))
+                style: sans(kMobile ? 16 : 14, color: AppColors.fg1))
           else
             Pills<String>(
               items: pills,

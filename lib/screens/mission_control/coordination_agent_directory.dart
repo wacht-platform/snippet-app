@@ -8,6 +8,7 @@ import '../../widgets.dart';
 
 import '../create_agent_form.dart';
 import 'coordination_agent_detail.dart';
+import '../../platform.dart';
 
 class CoordinationAgentDirectory extends StatefulWidget {
   const CoordinationAgentDirectory({
@@ -253,7 +254,7 @@ class _MessageState extends StatelessWidget {
           const SizedBox(height: 18),
           Text(title,
               textAlign: TextAlign.center,
-              style: sans(20, weight: W.label, color: AppColors.fg1)),
+              style: sans(kMobile ? 20 : 17, weight: W.label, color: AppColors.fg1)),
           const SizedBox(height: 8),
           Text(message,
               textAlign: TextAlign.center,

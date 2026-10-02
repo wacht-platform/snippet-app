@@ -451,16 +451,19 @@ class Avatar extends StatelessWidget {
 }
 
 class IconTile extends StatelessWidget {
-  const IconTile(this.icon,
-      {super.key, this.tone = Tone.neutral, this.size = 36});
+  const IconTile(this.icon, {super.key, this.tone = Tone.neutral, double? size})
+      : _size = size;
 
   final String icon;
   final Tone tone;
-  final double size;
+  final double? _size;
+
+  double get size => _size ?? (kMobile ? 36 : 28);
 
   @override
   Widget build(BuildContext context) {
     final (fg, bg) = toneColors(tone);
+    final size = this.size;
     return Container(
       width: size,
       height: size,

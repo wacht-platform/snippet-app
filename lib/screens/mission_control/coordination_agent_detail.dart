@@ -5,6 +5,7 @@ import '../../models.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import '../agent_messaging.dart';
+import '../../platform.dart';
 
 /// One coordination agent — shown as its CONVERSATION.
 ///
@@ -73,7 +74,7 @@ class _NoConnection extends StatelessWidget {
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(16, weight: W.title, color: AppColors.fg1)),
+                    style: sans(kMobile ? 16 : 14, weight: W.title, color: AppColors.fg1)),
               ),
               if (onClose != null)
                 IconBtn('x',

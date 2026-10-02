@@ -64,7 +64,7 @@ class ShellWelcomeView extends StatelessWidget {
               Text(
                 'No instance connected',
                 textAlign: TextAlign.center,
-                style: sans(16, color: AppColors.fg1),
+                style: sans(kMobile ? 16 : 14, color: AppColors.fg1),
               ),
               const SizedBox(height: 8),
               Text.rich(
@@ -125,7 +125,7 @@ class ShellRecentPlaceholder extends StatelessWidget {
             shrinkWrap: true,
             padding: const EdgeInsets.symmetric(vertical: 24),
             children: [
-              Text('Recent sessions', style: display(24)),
+              Text('Recent sessions', style: display(kMobile ? 24 : 20)),
               const SizedBox(height: 6),
               Text(
                 'Pick up where you left off, or start a new chat from Browse.',

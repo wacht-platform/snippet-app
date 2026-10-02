@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../mission_control_state.dart';
+import '../../../platform.dart';
 
 class TaskDetailSheet extends StatelessWidget {
   const TaskDetailSheet({super.key, required this.task, required this.state});
@@ -70,7 +71,7 @@ class TaskDetailSheet extends StatelessWidget {
                 child: Text(title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(18, weight: W.label, color: AppColors.fg1)),
+                    style: sans(kMobile ? 18 : 16, weight: W.label, color: AppColors.fg1)),
               ),
               IconBtn('x',
                   size: 36,

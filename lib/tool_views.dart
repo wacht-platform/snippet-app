@@ -9,6 +9,7 @@ import 'media_views.dart';
 import 'theme.dart';
 import 'tool_activity.dart';
 import 'widgets.dart';
+import 'platform.dart';
 
 // The daemon can evolve independently of the client. Keep malformed or newer
 // result items visible only as far as they can be safely rendered; one bad item
@@ -423,7 +424,7 @@ List<Widget> _webReadView(Map? a, Map? d) {
   final title = d?['title']?.toString() ?? '';
   if (title.isNotEmpty) {
     out.add(
-        Text(title, style: sans(14, weight: W.label, color: AppColors.fg1)));
+        Text(title, style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)));
     out.add(const SizedBox(height: 4));
   }
   if (d?['published_date'] != null) {
@@ -444,7 +445,7 @@ List<Widget> _titleView(Map? a, Map? d) {
     return [Text('Cleared title', style: sans(13, color: AppColors.fg3))];
   }
   return [
-    Text(title, style: sans(14, weight: W.label, color: AppColors.fg1)),
+    Text(title, style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
   ];
 }
 

@@ -550,7 +550,7 @@ class _AudioViewState extends State<_AudioView> {
               maxLines: 2,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              style: sans(14, weight: W.label, color: AppColors.fg1)),
+              style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
           const SizedBox(height: 18),
           // Scrubber. Seek is only offered once a duration is known, so an
           // unseekable source cannot produce a dead control.

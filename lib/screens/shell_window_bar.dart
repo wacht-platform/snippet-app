@@ -86,7 +86,7 @@ class TopWorkspaceTabChip extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(14,
+                style: sans(kMobile ? 14 : 13,
                     weight: isActive ? W.label : W.body,
                     color: isActive ? AppColors.fg1 : AppColors.fg3),
               ),
