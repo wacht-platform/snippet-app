@@ -70,10 +70,7 @@ class SidebarMobileBar extends StatelessWidget {
             child: Row(children: [
               for (final (i, h) in MobileHome.values.indexed) ...[
                 if (i == MobileHome.values.length ~/ 2 && onNew != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: S.s4),
-                    child: _newButton(onNew!),
-                  ),
+                  Expanded(child: Center(child: _newButton(onNew!))),
                 Expanded(child: _tab(h, activeHome == h)),
               ],
             ]),

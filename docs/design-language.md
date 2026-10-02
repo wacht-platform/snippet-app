@@ -28,13 +28,13 @@ the finger, motion is short and interruptible, and nothing stutters.
 
 | Token | Hex | Use |
 | --- | --- | --- |
-| `canvas` | `#0F0F10` | Reading planes: chat, editor, file viewer, diff |
-| `base` | `#151516` | App shell, sidebar, secondary panes, page backgrounds |
-| `raised` | `#1C1C1E` | Cards, list groups, composer, selected row |
-| `overlay` | `#232325` | Menus, sheets, dialogs, popovers, inputs |
-| `hover` | `#2A2A2D` | Hover and pressed fill on any of the above |
-| `line` | `#2A2A2D` | Input outline, in-card dividers |
-| `lineStrong` | `#36363A` | Focused-but-not-primary outline, table rules |
+| `canvas` | `#0B0B0D` | Reading planes: chat, editor, file viewer, diff |
+| `base` | `#101012` | App shell, sidebar, secondary panes, page backgrounds |
+| `raised` | `#17171A` | Cards, list groups, composer, selected row |
+| `overlay` | `#1E1E22` | Menus, sheets, dialogs, popovers, inputs |
+| `hover` | `#26262B` | Hover and pressed fill on any of the above |
+| `line` | `#26262B` | Input outline, in-card dividers |
+| `lineStrong` | `#323238` | Focused-but-not-primary outline, table rules |
 
 Adjacent steps are 6–7 RGB points apart, which reads as a boundary without a
 line. Tokens from the old ladder map onto these (see `theme.dart`) until each
@@ -44,42 +44,41 @@ screen is migrated.
 
 | Token | Hex | On canvas | Use |
 | --- | --- | --- | --- |
-| `fg1` | `#EDEDEF` | 16.5:1 | Titles, active row, user's own message |
-| `fg2` | `#C8C8CC` | 11.8:1 | **Default body text** |
-| `fg3` | `#9A9AA2` | 7.1:1 | Secondary text, metadata, icons at rest |
-| `fg4` | `#6E6E76` | 3.9:1 | Placeholder, disabled only — never content |
+| `fg1` | `#EEEEF1` | 17.0:1 | Titles, active row, user's own message |
+| `fg2` | `#C4C4CC` | 11.3:1 | **Default body text** |
+| `fg3` | `#8F8F9B` | 6.2:1 | Secondary text, metadata, icons at rest |
+| `fg4` | `#62626D` | 3.3:1 | Placeholder, disabled only — never content |
 
-### Accent — mascot blue
+### Accent — indigo
 
-The accent is the mascot's blue (`#3B7DF7`), split into two roles because no
-single blue works as both a button fill with a white label and as text on
-near-black.
+One indigo, split into two roles because no single shade works as both a
+button fill with a white label and as text on near-black.
 
 | Token | Hex | Contrast | Use |
 | --- | --- | --- | --- |
-| `accentFill` | `#2F6FEB` | white label 4.6:1 | Primary buttons, switches on, send |
-| `accentFillHover` | `#2A63D6` | white label 5.4:1 | Hover/pressed primary |
-| `accent` | `#6EA2FF` | 7.6:1 on canvas | Links, selected icons, focus ring, active tab |
+| `accentFill` | `#5E6AD2` | white label 4.7:1 | Primary buttons, switches on, send |
+| `accentFillHover` | `#5560C2` | white label 5.5:1 | Hover/pressed primary |
+| `accent` | `#8B8DFF` | 6.9:1 on canvas | Links, selected icons, focus ring, active tab |
 | `accentBg` | accent @ 14% | — | Selected row tint, active chip |
 
-Why blue: it is the brand's own colour; it is the established "interactive"
-hue in the tools snippet sits beside (VS Code, GitHub, Geist, Zed), so it
-needs no learning; and it is the hue farthest from all three status colours.
+Why indigo: it reads as interactive without borrowing the blue every tool
+uses, sits on the cool graphite neutrals without vibrating, and stays far
+from the green, amber and red that carry state.
 
 ### Status
 
 | Token | Hex | Use |
 | --- | --- | --- |
-| `ok` | `#39C57E` | Online, completed, added (mascot green) |
-| `run` | `#D4982F` | Running, busy, modified |
-| `danger` | `#F06464` | Failed, destructive, deleted |
+| `ok` | `#4CC38A` | Online, completed, added (mascot green) |
+| `run` | `#D99E45` | Running, busy, modified |
+| `danger` | `#EB5757` | Failed, destructive, deleted |
 
 Each has a `…Bg` at 13% for tinted badges. Status colour always pairs with a
 label or glyph; colour is never the only channel.
 
 ## Typography
 
-Geist for UI, JetBrains Mono for code, paths and identifiers. Both bundled —
+Manrope for UI, Geist Mono for code, paths and identifiers. Both bundled —
 never fetched at runtime.
 
 | Role | Size / line | Weight | Use |

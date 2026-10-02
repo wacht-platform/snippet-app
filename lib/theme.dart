@@ -110,12 +110,12 @@ ThemePreset _dark({
   required Color danger,
   required Color warn,
 }) {
-  const canvas = Color(0xFF0F0F10);
-  const bg = Color(0xFF151516);
-  const floor = Color(0xFF151516);
-  const surface1 = Color(0xFF1C1C1E);
-  const surface2 = Color(0xFF232325);
-  const surface3 = Color(0xFF2A2A2D);
+  const canvas = Color(0xFF0B0B0D);
+  const bg = Color(0xFF101012);
+  const floor = Color(0xFF101012);
+  const surface1 = Color(0xFF17171A);
+  const surface2 = Color(0xFF1E1E22);
+  const surface3 = Color(0xFF26262B);
 
   return ThemePreset(
     name: name,
@@ -130,8 +130,8 @@ ThemePreset _dark({
     fg2: inkMuted,
     fg3: inkSubtle,
     fg4: inkFaint,
-    border: const Color(0xFF2A2A2D),
-    border2: const Color(0xFF36363A),
+    border: const Color(0xFF26262B),
+    border2: const Color(0xFF323238),
     accent: accent,
     accentHover: _lighten(accent, 0.06),
     accentFg: const Color(0xFFFFFFFF),
@@ -150,24 +150,24 @@ ThemePreset _dark({
     diffDelBg: _withAlpha(danger, 0.10),
     diffAddFg: _lighten(success, 0.14),
     diffDelFg: _lighten(danger, 0.14),
-    diffGutter: const Color(0xFF36363A),
+    diffGutter: const Color(0xFF323238),
   );
 }
 
 // The only client theme. Values and rationale: docs/design-language.md.
 final _amoled = _dark(
   name: 'amoled',
-  label: 'Dark',
-  accent: const Color(0xFF6EA2FF),
-  accentFill: const Color(0xFF2F6FEB),
-  accentFillHover: const Color(0xFF2A63D6),
-  ink: const Color(0xFFEDEDEF),
-  inkMuted: const Color(0xFFC8C8CC),
-  inkSubtle: const Color(0xFF9A9AA2),
-  inkFaint: const Color(0xFF6E6E76),
-  success: const Color(0xFF39C57E),
-  danger: const Color(0xFFF06464),
-  warn: const Color(0xFFD4982F),
+  label: 'Graphite',
+  accent: const Color(0xFF8B8DFF),
+  accentFill: const Color(0xFF5E6AD2),
+  accentFillHover: const Color(0xFF5560C2),
+  ink: const Color(0xFFEEEEF1),
+  inkMuted: const Color(0xFFC4C4CC),
+  inkSubtle: const Color(0xFF8F8F9B),
+  inkFaint: const Color(0xFF62626D),
+  success: const Color(0xFF4CC38A),
+  danger: const Color(0xFFEB5757),
+  warn: const Color(0xFFD99E45),
 );
 
 final List<ThemePreset> allPresets = [_amoled];
@@ -437,7 +437,7 @@ class M {
 const double kComposerGutter = 16;
 
 // ---------------------------------------------------------------------------
-// Typography — Geist for UI, JetBrains Mono for code.
+// Typography — Manrope for UI, Geist Mono for code.
 //
 // The ceiling is 500. `600` exists as `strong` only for the single large page
 // title; everything else is 400 with 500 reserved for controls and row titles,
@@ -477,7 +477,7 @@ TextStyle sans(double size,
       letterSpacing: spacing ?? _tracking(size),
       color: color ?? AppColors.fg2,
       // Proportional digits have different widths, so a ticking timer or a
-      // counter shimmers and reflows as it updates. Geist ships `tnum`
+      // counter shimmers and reflows as it updates. Manrope ships `tnum`
       // (verified in the font's GSUB table), so this is a real substitution.
       fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
     );
@@ -524,8 +524,8 @@ TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-const kSansFamily = 'Geist';
-const kMonoFamily = 'JetBrainsMono';
+const kSansFamily = 'Manrope';
+const kMonoFamily = 'GeistMono';
 
 String get monoFamily => kMonoFamily;
 
@@ -614,7 +614,7 @@ ThemeData buildAppTheme() {
           borderRadius: BorderRadius.circular(R.lg),
           side: BorderSide(color: c.border)),
     ),
-    // Geist, not Inter. Inter was a second near-identical sans-serif: at UI
+    // One UI family everywhere. A second near-identical sans-serif: at UI
     // sizes the two are almost indistinguishable, so every Material widget
     // (menus, tooltips, dialogs, text fields) rendered in a different family
     // than the app's own text around it — which reads as a mistake rather than

@@ -11,7 +11,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
 }
 
 Future<void> _loadBundledFonts() async {
-  const families = {'Geist': 'Geist', 'JetBrainsMono': 'JetBrainsMono'};
+  const families = {'Manrope': 'Manrope', 'GeistMono': 'GeistMono'};
   for (final entry in families.entries) {
     final loader = FontLoader(entry.key);
     for (final weight in const [400, 500, 600, 700]) {
