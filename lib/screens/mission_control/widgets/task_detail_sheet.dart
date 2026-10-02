@@ -33,13 +33,13 @@ class TaskDetailSheet extends StatelessWidget {
         confirmLabel: 'Archive task',
       );
       if (!confirm || !context.mounted) return;
+      final root = Navigator.of(context, rootNavigator: true).context;
+      Navigator.of(context).pop();
       try {
         await state.client.mcArchiveTask(t.id as String);
-        if (!context.mounted) return;
-        Navigator.of(context).pop();
         await state.refresh(silent: true);
       } catch (e) {
-        if (context.mounted) toast(context, 'Archive failed: $e', danger: true);
+        if (root.mounted) toast(root, 'Archive failed: $e', danger: true);
       }
     }
 

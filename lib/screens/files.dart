@@ -53,6 +53,7 @@ class FileExplorer extends StatefulWidget {
 
 class _FileExplorerState extends State<FileExplorer> {
   FsListing? _listing;
+  final Set<String> _deleting = {};
   bool _dirLoading = true;
   String? _dirError;
   final Map<String, FsListing> _cache = {};
@@ -140,22 +141,24 @@ class _FileExplorerState extends State<FileExplorer> {
           'Permanently deletes the selected item${n == 1 ? '' : 's'} from the machine. Folders are removed with their contents.',
       confirmLabel: 'Delete',
     );
-    if (!ok) return;
-    if (mounted)
-      setState(() => _busy = 'Deleting $n item${n == 1 ? '' : 's'}…');
-    var failed = 0;
-    for (final p in _selected.toList()) {
-      try {
-        await widget.client.deletePath(p);
-      } catch (_) {
-        failed++;
-      }
-    }
+    if (!ok || !mounted) return;
+    final paths = _selected.toList();
+    setState(() {
+      _deleting.addAll(paths);
+      _selecting = false;
+      _selected.clear();
+    });
+    final results = await Future.wait(paths.map((p) => widget.client
+        .deletePath(p)
+        .then((_) => true, onError: (Object _) => false)));
     if (!mounted) return;
-    setState(() => _busy = null);
-    if (failed > 0)
-      toast(context, 'Failed to delete $failed item(s)', danger: true);
-    _go(cwd); // refresh + clears selection
+    final failed = results.where((ok) => !ok).length;
+    setState(() => _deleting.removeAll(paths));
+    if (failed > 0) {
+      toast(context, "Couldn't delete $failed item${failed == 1 ? '' : 's'}",
+          danger: true);
+    }
+    _go(cwd);
   }
 
   Future<void> _newFolder(String cwd) async {
@@ -263,7 +266,9 @@ class _FileExplorerState extends State<FileExplorer> {
     final query = _filter.trim().toLowerCase();
     final entries = [
       for (final entry in listing.entries)
-        if (query.isEmpty || entry.name.toLowerCase().contains(query)) entry,
+        if (!_deleting.contains(entry.path) &&
+            (query.isEmpty || entry.name.toLowerCase().contains(query)))
+          entry,
     ];
     entries.sort((a, b) {
       if (a.isDir != b.isDir) return a.isDir ? -1 : 1;

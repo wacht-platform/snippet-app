@@ -407,12 +407,18 @@ class RecurringScreenState extends State<RecurringScreen>
     }
   }
 
+  final Set<String> _removing = {};
+
   Future<void> _remove(RecurringJob job) async {
+    setState(() => _removing.add(job.id));
     try {
       await widget.client.deleteRecurring(job.id);
       _refresh();
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+      if (mounted) {
+        setState(() => _removing.remove(job.id));
+        toast(context, '$e', danger: true);
+      }
     }
   }
 
@@ -464,7 +470,8 @@ class RecurringScreenState extends State<RecurringScreen>
       }
       return;
     }
-    setState(() => _submitting = true);
+    setState(() => _adding = false);
+    widget.onAddingChanged?.call(false);
     try {
       await widget.client.createRecurring(
         title: t,
@@ -474,19 +481,9 @@ class RecurringScreenState extends State<RecurringScreen>
         schedule: sched,
         goal: true,
       );
-      if (mounted) {
-        setState(() {
-          _adding = false;
-          _submitting = false;
-        });
-        widget.onAddingChanged?.call(false);
-        _refresh();
-      }
+      _refresh();
     } catch (e) {
-      if (mounted) {
-        setState(() => _submitting = false);
-        toast(context, '$e', danger: true);
-      }
+      if (mounted) toast(context, "Couldn't create $t: $e", danger: true);
     }
   }
 
@@ -667,7 +664,10 @@ class RecurringScreenState extends State<RecurringScreen>
                 style: sans(13, height: 1.4, color: AppColors.danger)),
           );
         }
-        final allJobs = snap.data ?? const [];
+        final allJobs = [
+          for (final j in snap.data ?? const <RecurringJob>[])
+            if (!_removing.contains(j.id)) j
+        ];
         final bound = widget.sessionId?.trim();
         final jobs = (bound != null && bound.isNotEmpty)
             ? allJobs.where((j) {

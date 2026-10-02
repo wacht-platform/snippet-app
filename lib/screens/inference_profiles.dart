@@ -42,6 +42,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   String? _delegate;
 
   final Map<String, InferenceProfile> _saving = {};
+  final Set<String> _deletingProfiles = {};
 
   void addProfile() => _edit(null);
 
@@ -61,7 +62,10 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     });
   }
 
-  List<InferenceProfile> _withSaving(List<InferenceProfile> profiles) {
+  List<InferenceProfile> _withSaving(List<InferenceProfile> all) {
+    final profiles = _deletingProfiles.isEmpty
+        ? all
+        : [for (final p in all) if (!_deletingProfiles.contains(p.name)) p];
     if (_saving.isEmpty) return profiles;
     final activating = _saving.values.any((p) => p.active);
     final out = [
@@ -327,6 +331,20 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         body: p.active
             ? 'This is the active profile. New chats will need another one.'
             : 'Chats already using it keep their history.');
-    if (ok) await _run(() => widget.client.deleteProfile(p.name), 'delete');
+    if (!ok || !mounted) return;
+    setState(() => _deletingProfiles.add(p.name));
+    try {
+      await widget.client.deleteProfile(p.name);
+      if (!mounted) return;
+      widget.client.invalidateConfig();
+      setState(() {
+        _deletingProfiles.remove(p.name);
+        _load(force: true);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deletingProfiles.remove(p.name));
+      toast(context, "Couldn't delete ${p.name}: $e", danger: true);
+    }
   }
 }

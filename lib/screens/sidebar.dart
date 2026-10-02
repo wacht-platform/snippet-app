@@ -205,7 +205,11 @@ class SidebarState extends State<Sidebar> {
     super.dispose();
   }
 
-  List<SessionInfo>? get _sessions => widget.sessions;
+  final Set<String> _deleting = {};
+
+  List<SessionInfo>? get _sessions => _deleting.isEmpty
+      ? widget.sessions
+      : widget.sessions?.where((s) => !_deleting.contains(s.id)).toList();
   bool get _loading => widget.sessionsLoading;
 
   @override
@@ -1491,17 +1495,26 @@ class SidebarState extends State<Sidebar> {
       body: body,
       confirmLabel: n == 1 ? 'Delete' : 'Delete $n',
     );
-    if (!ok) return;
-    try {
-      for (final s in sessions) {
-        await c.deleteSession(s.id);
-        widget.onSessionDeleted(s.id);
-      }
-      if (mounted) _exitSelect();
-      widget.onRefreshSessions();
-    } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+    if (!ok || !mounted) return;
+    final ids = [for (final s in sessions) s.id];
+    setState(() => _deleting.addAll(ids));
+    _exitSelect();
+    final failed = <String>[];
+    Object? lastError;
+    await Future.wait(ids.map((id) => c.deleteSession(id).then(
+          (_) => widget.onSessionDeleted(id),
+          onError: (Object e) {
+            failed.add(id);
+            lastError = e;
+          },
+        )));
+    if (!mounted) return;
+    setState(() => _deleting.removeAll(failed));
+    if (failed.isNotEmpty) {
+      toast(context, "Couldn't delete ${failed.length == 1 ? 'a session' : '${failed.length} sessions'}: $lastError",
+          danger: true);
     }
+    widget.onRefreshSessions();
   }
 
   // ---- machines ----

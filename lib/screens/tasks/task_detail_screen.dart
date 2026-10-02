@@ -87,16 +87,29 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
   }
 
+  void _publish(TaskItem t) {
+    final feed = widget.client.swr.entry<List<TaskItem>>('coordination:tasks');
+    final data = feed.data;
+    if (data == null) return;
+    feed.mutate([for (final x in data) x.id == t.id ? t : x]);
+  }
+
   Future<void> _setStatus(TaskStatus status) async {
-    if (busy) return;
-    setState(() => busy = true);
+    final before = task;
+    if (before == null) return;
+    final moved = before.movedTo(status);
+    setState(() => task = moved);
+    _publish(moved);
     try {
       final updated = await widget.client.setTaskStatus(widget.taskId, status);
-      if (mounted) setState(() => task = updated);
+      if (!mounted) return;
+      setState(() => task = updated);
+      _publish(updated);
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
-    } finally {
-      if (mounted) setState(() => busy = false);
+      if (!mounted) return;
+      setState(() => task = before);
+      _publish(before);
+      toast(context, '$e', danger: true);
     }
   }
 
@@ -144,15 +157,26 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       ),
     );
     if (picked == null || !mounted) return;
+    final before = roster;
+    setState(() => roster = [
+          ...roster,
+          TaskAgent.fromJson({
+            'task_id': widget.taskId,
+            'agent_id': picked,
+            'role': 'implementer',
+            'status': roster.any((r) => r.active) ? 'waiting' : 'active',
+            'added_at': DateTime.now().toUtc().toIso8601String(),
+          }),
+        ]);
     try {
       await widget.client.addTaskAgent(widget.taskId, picked);
-      // Fetched OUTSIDE setState: its callback is not async, so awaiting in it
-      // does not compile.
       final updated = await widget.client.taskAgents(widget.taskId);
       if (!mounted) return;
       setState(() => roster = updated);
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+      if (!mounted) return;
+      setState(() => roster = before);
+      toast(context, '$e', danger: true);
     }
   }
 
@@ -194,6 +218,25 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       ),
     );
     if (confirm != true || !mounted) return;
+    final before = roster;
+    TaskAgent withStatus(TaskAgent a, String status) => TaskAgent.fromJson({
+          'task_id': a.taskId,
+          'agent_id': a.agentId,
+          'role': a.role,
+          'work_session_id': a.workSessionId,
+          'scope': a.scope,
+          'status': status,
+          'added_at': a.addedAt,
+          'removed_at': a.removedAt,
+        });
+    setState(() => roster = [
+          for (final a in roster)
+            a.agentId == target.agentId
+                ? withStatus(a, 'active')
+                : a.agentId == currentActive.agentId
+                    ? withStatus(a, 'waiting')
+                    : a
+        ]);
     try {
       await widget.client.transferTaskLease(
         widget.taskId,
@@ -202,14 +245,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       );
       final updated = await widget.client.taskAgents(widget.taskId);
       if (mounted) setState(() => roster = updated);
-      if (mounted) toast(context, 'Lease transferred to ${target.agentId}');
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+      if (!mounted) return;
+      setState(() => roster = before);
+      toast(context, '$e', danger: true);
     }
   }
 
   Future<void> _linkTask() async {
-    final all = await widget.client.tasks();
+    final cached =
+        widget.client.swr.entry<List<TaskItem>>('coordination:tasks').data;
+    final all = cached ?? await widget.client.tasks();
     if (!mounted) return;
     final other = all.where((t) => t.id != widget.taskId).toList();
     if (other.isEmpty) {

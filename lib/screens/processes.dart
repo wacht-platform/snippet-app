@@ -66,14 +66,17 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
     });
   }
 
+  final Set<String> _stopping = {};
+
   Future<void> _kill(String id) async {
+    setState(() => _stopping.add(id));
     try {
       await widget.client.bgKill(widget.sessionId, id);
-      if (mounted) toast(context, 'Stopped');
     } catch (e) {
       if (mounted) toast(context, '$e', danger: true);
     }
     await _load(silent: true);
+    if (mounted) setState(() => _stopping.remove(id));
   }
 
   Future<void> _toggleLog(String id) async {
@@ -149,7 +152,7 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
     final id = '${p['id'] ?? ''}';
     final cmd = '${p['command'] ?? ''}'.replaceAll('\n', ' ');
     final pid = p['pid'] ?? 0;
-    final running = p['running'] == true;
+    final running = p['running'] == true && !_stopping.contains('${p['id']}');
     final status = p['status'] as String?;
     final failed = !running && status != null && status != '0';
     final statusLabel = running

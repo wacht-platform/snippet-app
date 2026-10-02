@@ -73,6 +73,7 @@ String taskAge(TaskItem task) {
 /// Open a task's detail: a sheet on a phone, a drawer on desktop.
 Future<void> openTaskDetail(
     BuildContext context, DaemonClient client, String taskId) {
+  if (taskId.startsWith('pending-')) return Future.value();
   if (kMobile) {
     return showModalBottomSheet<void>(
       sheetAnimationStyle: sheetMotion,

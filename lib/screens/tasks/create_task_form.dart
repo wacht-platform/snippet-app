@@ -111,23 +111,41 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
       setState(() => _error = 'Choose the session that should do this.');
       return;
     }
-    setState(() {
-      _busy = true;
-      _error = null;
+    final description = _description.text.trim();
+    final now = DateTime.now().toUtc().toIso8601String();
+    final pendingId = 'pending-${DateTime.now().microsecondsSinceEpoch}';
+    final pending = TaskItem.fromJson({
+      'id': pendingId,
+      'title': title,
+      'description': description,
+      'status': 'todo',
+      'created_by_kind': 'human',
+      'created_at': now,
+      'updated_at': now,
+      'session_id': sessionId,
     });
+    final client = widget.client;
+    final feed = client.swr.entry<List<TaskItem>>('coordination:tasks');
+    feed.mutate([...?feed.data, pending]);
+    final root = Navigator.of(context, rootNavigator: true).context;
+    Navigator.of(context).pop(false);
     try {
-      await widget.client.createTask(
+      final created = await client.createTask(
         title: title,
         sessionId: sessionId,
-        description: _description.text.trim(),
+        description: description,
       );
-      if (mounted) Navigator.of(context).pop(true);
+      feed.mutate([
+        for (final t in feed.data ?? const <TaskItem>[])
+          t.id == pendingId ? created : t
+      ]);
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = '$e';
-        });
+      feed.mutate([
+        for (final t in feed.data ?? const <TaskItem>[])
+          if (t.id != pendingId) t
+      ]);
+      if (root.mounted) {
+        toast(root, "Couldn't create “$title”: $e", danger: true);
       }
     }
   }

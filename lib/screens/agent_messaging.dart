@@ -857,23 +857,38 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       body = body.isEmpty ? markers.join('\n\n') : '$body\n\n${markers.join('\n\n')}';
     }
     if (body.isEmpty) return;
-    setState(() => _sending = true);
+    final typed = _input.text;
+    final key = 'local-${DateTime.now().microsecondsSinceEpoch}';
+    final pending = CoordinationEvent.fromJson({
+      'event_id': key,
+      'event_type': 'direct_message.sent',
+      'actor_kind': 'human',
+      'actor_id': 'local',
+      'payload': {'body': body},
+      'idempotency_key': key,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    _input.clear();
+    _attachmentGeneration++;
+    _attachments.clear();
+    _discardRecording();
+    setState(() => _events = [..._events, pending]);
+    _jumpToBottom(animated: true);
     try {
       await widget.client.sendAgentMessage(
         toAgentId: widget.agentId,
         body: body,
+        idempotencyKey: key,
       );
       if (!mounted) return;
-      _input.clear();
-      _attachmentGeneration++;
-      _attachments.clear();
-      _discardRecording();
-      setState(() => _sending = false);
       await _load(silent: true);
-      _jumpToBottom(animated: true);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _sending = false);
+      setState(() => _events = [
+            for (final ev in _events)
+              if (ev.eventId != key) ev
+          ]);
+      if (_input.text.isEmpty) _input.text = typed;
       toast(context, '$e', danger: true);
     }
   }
