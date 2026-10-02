@@ -41,7 +41,7 @@ void main() {
   });
 
   testWidgets(
-      'four tabs, a filter under each header, and a floating New that follows the tab',
+      'four tabs, a filter under each header, and a New in the bar that follows the tab',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
@@ -184,7 +184,7 @@ void main() {
       await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
 
-      // 4. Settings keeps the tabs but has nothing to create.
+      // 4. Settings keeps the tabs, and its New offers what Settings makes.
       await tester.tap(_tab('Settings'));
       await tester.pumpAndSettle();
       expect(find.byTooltip('Back'), findsNothing);
@@ -193,6 +193,13 @@ void main() {
       for (final tip in ['New chat', 'New task', 'New agent']) {
         expect(find.byTooltip(tip), findsNothing);
       }
+      await tester.tap(find.byTooltip('Create'));
+      await tester.pumpAndSettle();
+      for (final item in ['Connect another computer running snippet', 'Inference profile', 'Vault secret', 'Scheduled job']) {
+        expect(find.text(item), findsOneWidget);
+      }
+      await tester.tapAt(const Offset(195, 40));
+      await tester.pumpAndSettle();
       expect(find.text('WORKSPACE'), findsNothing);
     } finally {
       debugDefaultTargetPlatformOverride = null;

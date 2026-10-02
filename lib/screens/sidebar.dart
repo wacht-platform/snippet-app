@@ -99,6 +99,7 @@ class SidebarState extends State<Sidebar> {
   final GlobalKey<TasksPanelState> _tasksPanelKey = GlobalKey<TasksPanelState>();
   final GlobalKey<SettingsPanelState> _mobileSettingsKey =
       GlobalKey<SettingsPanelState>();
+  SettingsPage? _pendingSettingsCreate;
   final GlobalKey<AgentsSidebarPanelState> _agentsPanelKey =
       GlobalKey<AgentsSidebarPanelState>();
   bool _selecting = false;
@@ -249,15 +250,6 @@ class SidebarState extends State<Sidebar> {
                   ),
               ],
             ),
-              if (_showNewButton(hasClient))
-                Positioned(
-                  right: M.gutter,
-                  bottom: 12,
-                  child: MobileNewButton(
-                    tooltip: _newLabel,
-                    onTap: _handleMobileNew,
-                  ),
-                ),
             ]),
           ),
           // The bar names the app's TOP LEVEL, so it hides inside a nested
@@ -267,6 +259,8 @@ class SidebarState extends State<Sidebar> {
           if (!_mobileDrilledDown && !_keyboardUp)
             SidebarMobileBar(
               activeHome: widget.mobileHome,
+              newLabel: _newLabel,
+              onNew: _showNewButton(hasClient) ? _handleMobileNew : null,
               onMobileHome: (h) {
                 if (widget.mobileHome != h) {
                   _goToPage(h.index);
@@ -444,6 +438,10 @@ class SidebarState extends State<Sidebar> {
                   onSection: widget.onSettingsSection,
                   onClose: () => widget.onSettingsSection(null),
                   embedded: true,
+                  createOnOpen:
+                      _pendingSettingsCreate == section ? section : null,
+                  onCreateHandled: () =>
+                      setState(() => _pendingSettingsCreate = null),
                 )
               : Column(
                   key: const ValueKey('settings-root'),
@@ -637,20 +635,18 @@ class SidebarState extends State<Sidebar> {
 
   bool get _keyboardUp => MediaQuery.viewInsetsOf(context).bottom > 0;
 
-  /// The floating New button: on the tabs that make things, at the top level,
-  /// and out of the way while selecting chats or typing.
+  /// The bar's New button: at the top level, out of the way while selecting
+  /// chats. Settings can always add a machine, so it needs no connection.
   bool _showNewButton(bool hasClient) =>
-      hasClient &&
+      (hasClient || widget.mobileHome == MobileHome.settings) &&
       !_mobileDrilledDown &&
-      !_selecting &&
-      !_keyboardUp &&
-      widget.mobileHome != MobileHome.settings;
+      !_selecting;
 
   String get _newLabel => switch (widget.mobileHome) {
         MobileHome.chats => 'New chat',
         MobileHome.tasks => 'New task',
         MobileHome.agents => 'New agent',
-        MobileHome.settings => '',
+        MobileHome.settings => 'Create',
       };
 
   void _handleMobileNew() {
@@ -662,8 +658,44 @@ class SidebarState extends State<Sidebar> {
       case MobileHome.agents:
         _openCreateAgent();
       case MobileHome.settings:
-        break;
+        _openSettingsCreate();
     }
+  }
+
+  Future<void> _openSettingsCreate() async {
+    if (widget.client == null) {
+      widget.onAddInstance();
+      return;
+    }
+    const items = [
+      (SettingsPage.general, 'server', 'Machine',
+          'Connect another computer running snippet'),
+      (SettingsPage.models, 'ai-chip', 'Inference profile',
+          'A model and provider chats can run on'),
+      (SettingsPage.vault, 'lock-key', 'Vault secret',
+          'A key or token your agents can use'),
+      (SettingsPage.scheduled, 'repeat', 'Scheduled job',
+          'A prompt that runs on a schedule'),
+    ];
+    final picked = await showAppSheet<SettingsPage>(
+      context,
+      title: 'Create',
+      child: Builder(
+        builder: (sheetContext) => ListGroup(children: [
+          for (final (page, icon, title, subtitle) in items)
+            ListRow(
+              leading: IconTile(icon),
+              title: title,
+              subtitle: subtitle,
+              trailing: AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+              onTap: () => Navigator.of(sheetContext).pop(page),
+            ),
+        ]),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _pendingSettingsCreate = picked);
+    widget.onSettingsSection(picked);
   }
 
   bool _matchesQuery(SessionInfo s) {
@@ -745,8 +777,7 @@ class SidebarState extends State<Sidebar> {
         backgroundColor: AppColors.surface3,
         onRefresh: () async => widget.onRefreshSessions(),
         child: ListView(
-          // Room at the bottom so the floating New never covers the last row.
-          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 88),
+          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 16),
           children: mobileChildren,
         ),
       );

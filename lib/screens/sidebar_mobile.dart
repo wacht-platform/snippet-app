@@ -21,19 +21,24 @@ class SidebarEmpty extends StatelessWidget {
       );
 }
 
-/// The phone's tab bar: the four top-level places, in a raised pill.
+/// The phone's tab bar: the four top-level places, in a raised pill, with the
+/// New button in the middle. What New makes depends on the tab, which
+/// [newLabel] names; on Settings it offers everything Settings can create.
 ///
 /// The selected tab gets a surface step behind its icon rather than a colour,
-/// so selection reads at a glance without spending the accent, which is kept
-/// for state.
+/// so selection reads at a glance; the accent is kept for New, the one action.
 class SidebarMobileBar extends StatelessWidget {
   final MobileHome activeHome;
   final ValueChanged<MobileHome> onMobileHome;
+  final String newLabel;
+  final VoidCallback? onNew;
 
   const SidebarMobileBar({
     super.key,
     required this.activeHome,
     required this.onMobileHome,
+    this.newLabel = 'New',
+    this.onNew,
   });
 
   @override
@@ -63,14 +68,45 @@ class SidebarMobileBar extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Row(children: [
-              for (final h in MobileHome.values)
+              for (final (i, h) in MobileHome.values.indexed) ...[
+                if (i == MobileHome.values.length ~/ 2 && onNew != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: S.s4),
+                    child: _newButton(onNew!),
+                  ),
                 Expanded(child: _tab(h, activeHome == h)),
+              ],
             ]),
           ),
         ),
       ),
     );
   }
+
+  Widget _newButton(VoidCallback onTap) => Tooltip(
+        message: newLabel,
+        child: Semantics(
+          button: true,
+          label: newLabel,
+          child: Material(
+            color: AppColors.accentFill,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onTap();
+              },
+              child: SizedBox.square(
+                dimension: 44,
+                child: Center(
+                  child: AppIcon('plus', size: 22, color: AppColors.accentFg),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
 
   Widget _tab(MobileHome h, bool active) {
     final ink = active ? AppColors.fg1 : AppColors.fg3;
@@ -105,52 +141,6 @@ class SidebarMobileBar extends StatelessWidget {
                 style: sans(11,
                     weight: active ? W.label : W.body, color: ink)),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The floating New button above the tab bar. What it makes depends on the tab
-/// (a chat, a task, an agent), which [tooltip] names.
-class MobileNewButton extends StatelessWidget {
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const MobileNewButton({super.key, required this.tooltip, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Container(
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x66000000),
-              blurRadius: 14,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Material(
-          color: AppColors.accentFill,
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              onTap();
-            },
-            child: SizedBox(
-              width: 54,
-              height: 54,
-              child: Center(
-                child: AppIcon('plus', size: 24, color: AppColors.accentFg),
-              ),
-            ),
-          ),
         ),
       ),
     );

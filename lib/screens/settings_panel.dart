@@ -176,6 +176,9 @@ class SettingsPanel extends StatefulWidget {
   final SettingsPage? section;
   final ValueChanged<SettingsPage?>? onSection;
 
+  final SettingsPage? createOnOpen;
+  final VoidCallback? onCreateHandled;
+
   const SettingsPanel({
     super.key,
     required this.client,
@@ -189,6 +192,8 @@ class SettingsPanel extends StatefulWidget {
     this.embedded = false,
     this.section,
     this.onSection,
+    this.createOnOpen,
+    this.onCreateHandled,
   });
 
   @override
@@ -241,6 +246,28 @@ class SettingsPanelState extends State<SettingsPanel> {
     final before = oldWidget.section?.index ?? -1;
     final after = widget.section?.index ?? -1;
     if (before != after) _sectionForward = after > before;
+    if (widget.createOnOpen != oldWidget.createOnOpen) _scheduleCreate();
+  }
+
+  void _scheduleCreate() {
+    final page = widget.createOnOpen;
+    if (page == null) return;
+    Future.delayed(Motion.base, () {
+      if (!mounted || widget.createOnOpen != page) return;
+      widget.onCreateHandled?.call();
+      switch (page) {
+        case SettingsPage.general:
+          _addMachine();
+        case SettingsPage.models:
+          _modelsKey.currentState?.addProfile();
+        case SettingsPage.vault:
+          _vaultKey.currentState?.add();
+        case SettingsPage.scheduled:
+          _recurringKey.currentState?.add();
+        case SettingsPage.usage:
+          break;
+      }
+    });
   }
 
   static const _nav = [
@@ -258,6 +285,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     notificationsEnabled().then((v) {
       if (mounted) setState(() => _notif = v);
     });
+    _scheduleCreate();
   }
 
   @override

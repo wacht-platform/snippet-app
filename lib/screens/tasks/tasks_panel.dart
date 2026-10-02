@@ -172,9 +172,8 @@ class TasksPanelState extends State<TasksPanel> {
       filter: _filter,
       onOpen: _open,
       onRefresh: _feed.refresh,
-      // Room at the bottom so the floating New never covers the last row.
       padding: kMobile
-          ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 88)
+          ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 16)
           : null,
     );
   }
