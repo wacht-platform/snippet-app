@@ -388,6 +388,16 @@ class DaemonClient {
     return (jsonDecode(r.body) as Map<String, dynamic>)['signed_in'] == true;
   }
 
+  Future<Map<String, dynamic>> reasoningSpec(
+      String provider, String model) async {
+    final r = await http
+        .get(_uri('/reasoning', {'provider': provider, 'model': model}));
+    if (r.statusCode != 200) {
+      throw Exception(r.body.isEmpty ? 'HTTP ${r.statusCode}' : r.body);
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> cliAgentStatus(String provider) async {
     final r = await http.get(_uri('/cli-agent/status', {'provider': provider}));
     if (r.statusCode != 200) {

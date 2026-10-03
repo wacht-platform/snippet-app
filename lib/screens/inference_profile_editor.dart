@@ -86,6 +86,9 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   bool _stream = false;
   bool _xSearch = false;
   String _effort = ''; // '' = provider default
+  Map<String, dynamic>? _reasoning;
+  Timer? _reasoningDebounce;
+  int _reasoningSeq = 0;
   bool _busy = false;
   String? _error;
 
@@ -127,8 +130,62 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     // The Save button's enabled state depends on this field; without a listener
     // typing never rebuilt, leaving Save stuck disabled on desktop.
     _model.addListener(() => setState(() {}));
+    _model.addListener(_scheduleReasoning);
     _modelSearch.addListener(() => setState(() {}));
+    _loadReasoning();
   }
+
+  String _reasoningKey = '';
+
+  void _scheduleReasoning() {
+    if ('$_provider|${_model.text.trim()}' == _reasoningKey) return;
+    _reasoningDebounce?.cancel();
+    _reasoningDebounce =
+        Timer(const Duration(milliseconds: 350), _loadReasoning);
+  }
+
+  Future<void> _loadReasoning() async {
+    final key = '$_provider|${_model.text.trim()}';
+    _reasoningKey = key;
+    final seq = ++_reasoningSeq;
+    try {
+      final spec =
+          await widget.client.reasoningSpec(_provider, _model.text.trim());
+      if (!mounted || seq != _reasoningSeq) return;
+      setState(() => _reasoning = spec);
+    } catch (_) {
+      if (mounted && seq == _reasoningSeq) setState(() => _reasoning = null);
+    }
+  }
+
+  List<(String, String)> get _effortItems {
+    const labels = {
+      'off': 'Off',
+      'low': 'Low',
+      'medium': 'Medium',
+      'high': 'High',
+      'xhigh': 'X-High',
+      'max': 'Max',
+    };
+    final spec = _reasoning;
+    if (spec == null) {
+      return [('', 'Default'), ...labels.entries.map((e) => (e.key, e.value))];
+    }
+    final options = (spec['options'] as List? ?? const []).cast<String>();
+    return [
+      ('', 'Default'),
+      if (spec['can_disable'] == true) ('off', 'Off'),
+      for (final o in options) (o, labels[o] ?? o),
+    ];
+  }
+
+  String get _effortToSave =>
+      _effortAdjustable && _effortItems.any((i) => i.$1 == _effort)
+          ? _effort
+          : '';
+
+  bool get _effortAdjustable =>
+      _reasoning == null || _reasoning!['control'] == 'effort';
 
   @override
   void dispose() {
@@ -138,6 +195,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     _ctx.dispose();
     _key.dispose();
     _modelSearch.dispose();
+    _reasoningDebounce?.cancel();
     super.dispose();
   }
 
@@ -386,7 +444,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             _key.text.trim().isNotEmpty || (widget.existing?.hasKey ?? false),
         'active': _active || (widget.existing?.active ?? false),
         'context_window': int.tryParse(_ctx.text.trim()) ?? 0,
-        'reasoning_effort': _effort,
+        'reasoning_effort': _effortToSave,
         'stream': _stream,
         'supports_images': _images,
         'x_search': _isXai && _xSearch,
@@ -419,7 +477,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       apiKey: _key.text.trim().isEmpty ? null : _key.text.trim(),
       // Always send it: '' explicitly clears back to provider default (an
       // omitted field means "keep", so Default could never un-set an effort).
-      reasoningEffort: _effort,
+      reasoningEffort: _effortToSave,
       supportsImages: _images,
       contextWindow: int.tryParse(_ctx.text.trim()),
       stream: _stream,
@@ -465,6 +523,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                 _catalogModels = null;
                 _showModelBrowser = false;
                 _modelSearch.clear();
+                _scheduleReasoning();
               }),
             ),
           const SizedBox(height: 16),
@@ -528,25 +587,25 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                 'Sets the % context gauge and the point where the agent compacts history.',
           ),
           const SizedBox(height: 16),
-          Text('Reasoning effort',
+          Text('${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort',
               style: sans(12, weight: W.label, color: AppColors.fg2)),
           const SizedBox(height: 7),
-          Pills<String>(
-            items: const [
-              ('', 'Default'),
-              ('off', 'Off'),
-              ('low', 'Low'),
-              ('medium', 'Medium'),
-              ('high', 'High'),
-              ('xhigh', 'X-High'),
-              ('max', 'Max')
-            ],
-            selected: _effort,
-            onSelect: (val) => setState(() => _effort = val),
-          ),
+          if (_effortAdjustable)
+            Pills<String>(
+              items: _effortItems,
+              selected: _effortItems.any((i) => i.$1 == _effort) ? _effort : '',
+              onSelect: (val) => setState(() => _effort = val),
+            )
+          else
+            Text(
+                _reasoning!['control'] == 'model'
+                    ? 'Set by the model you pick'
+                    : 'Not adjustable for this model',
+                style: sans(13, color: AppColors.fg2)),
           const SizedBox(height: 6),
           Text(
-              "Higher means more thinking — better on hard problems, more tokens. Default uses the provider's own; Off disables reasoning. X-High/Max are the top tiers (gpt-5.1-codex-max, gpt-5.6, Claude). If a model rejects a tier, snippet steps down automatically instead of failing.",
+              (_reasoning?['note'] as String?) ??
+                  "Higher means more thinking: better on hard problems, more tokens. Default uses the provider's own. If a model rejects a tier, snippet steps down automatically.",
               style: sans(11, height: 1.4, color: AppColors.fg3)),
           const SizedBox(height: 16),
           if (_isChatgpt)
