@@ -14,20 +14,23 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../api.dart';
 import '../desktop_pick.dart';
+import '../drafts.dart';
 import '../models.dart';
-import '../notifications.dart';
 import '../platform.dart';
 import '../theme.dart';
+import '../tool_activity.dart';
+import '../tool_sheet.dart';
 import '../tool_views.dart';
 import '../transcript.dart';
 import '../term.dart';
 import '../panel.dart';
 import '../share_inbound.dart';
 import '../widgets.dart';
+import '../media_views.dart';
+import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';
 import 'editor.dart';
 import 'files.dart';
@@ -35,48 +38,24 @@ import 'processes.dart';
 import 'git.dart';
 import 'lanes.dart';
 import 'recurring.dart';
+import 'session_panels.dart';
+import 'session_coordination_cards.dart';
 import 'mission_control/mission_control_state.dart'
-    show isDedicatedMcSession, parseMissionEnvelope, MissionEnvelope;
-import 'mission_control/widgets/mission_control_tasks.dart';
+    show
+        isDedicatedMcSession,
+        parseMissionEnvelope,
+        parseBoardMessage,
+        parseDirectMessage,
+        parseCoordinationReply,
+        parseAssignmentEnvelope;
 
-String formatCheckpointDate(String raw) {
-  final parsed = DateTime.tryParse(raw)?.toLocal();
-  if (parsed == null) return raw;
-
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final day = DateTime(parsed.year, parsed.month, parsed.day);
-  final daysAgo = today.difference(day).inDays;
-  final hour = parsed.hour == 0
-      ? 12
-      : (parsed.hour > 12 ? parsed.hour - 12 : parsed.hour);
-  final minute = parsed.minute.toString().padLeft(2, '0');
-  final meridiem = parsed.hour >= 12 ? 'PM' : 'AM';
-  final time = '$hour:$minute $meridiem';
-
-  if (daysAgo == 0) return 'Today · $time';
-  if (daysAgo == 1) return 'Yesterday · $time';
-  if (daysAgo >= 0 && daysAgo < 7) {
-    const weekdays = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return '${weekdays[parsed.weekday - 1]} · $time';
-  }
-  const months = <String>[
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  final date = '${months[parsed.month - 1]} ${parsed.day}, ${parsed.year}';
-  return '$date · $time';
-}
+part 'session_socket.dart';
+part 'session_appbar.dart';
+part 'session_recorder.dart';
+part 'session_composer.dart';
+part 'session_transcript.dart';
+part 'session_term.dart';
+part 'session_approval.dart';
 
 class SessionScreen extends StatefulWidget {
   final DaemonClient client;
@@ -95,6 +74,9 @@ class SessionScreen extends StatefulWidget {
   /// instead of pushing an editor route.
   final void Function(String path, String name)? onOpenFileTab;
 
+  /// Shows a tool batch in the desktop shell's side pane.
+  final void Function(ValueListenable<ToolBatch> batch)? onOpenToolBatch;
+
   /// Open a forked conversation (new tab / replace). Shell provides this so
   /// fork can jump straight into the branch.
   final void Function(String id, String title, String? profile)? onOpenSession;
@@ -107,6 +89,21 @@ class SessionScreen extends StatefulWidget {
   final void Function(VoidCallback stop,
           void Function(String action, [String? extra]) performAction)?
       onMacControls;
+
+  /// Publishes this session's terminals to the shell as a render host. Called
+  /// only when the terminal set or focus changes, never on output.
+  ///
+  /// The shell owns WHERE a terminal renders; the session owns its lifecycle
+  /// (it is the only side holding the pty). See [TerminalHost].
+  final void Function(TerminalHost host, bool open)? onTerminalHost;
+
+  /// Desktop: open Scheduled as a right-pane READOUT instead of the drawer.
+  ///
+  /// The shell owns the panes, so a session cannot open one itself. Scheduled
+  /// is a property of the conversation it governs, so it belongs beside the
+  /// chat — the same treatment Tasks, Lanes and Checkpoints get. Null on mobile,
+  /// where there are no panes and the drawer is the right shape for a phone.
+  final VoidCallback? onOpenScheduled;
 
   /// Desktop PageView keeps every tab mounted. Only the visible session should
   /// accept file drops — otherwise every keep-alive DropTarget ingests the same
@@ -125,6 +122,11 @@ class SessionScreen extends StatefulWidget {
   /// tabs, the session list, and the status bar in sync.
   final void Function(String title)? onTitle;
 
+  /// True only while this mobile session is the visible phone surface. The shell
+  /// keeps its session mounted behind Chats for the return animation, but an
+  /// inactive session must never intercept Android back from the Chats home.
+  final bool mobileActive;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -134,12 +136,16 @@ class SessionScreen extends StatefulWidget {
       this.embedded = false,
       this.onMenu,
       this.onOpenFileTab,
+      this.onOpenToolBatch,
       this.onOpenSession,
       this.onMacStatus,
       this.onMacControls,
+      this.onTerminalHost,
+      this.onOpenScheduled,
       this.acceptDrops = true,
       this.inboundShare,
       this.onShareConsumed,
+      this.mobileActive = true,
       this.onTitle});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
@@ -163,8 +169,7 @@ class _SessionActionPanel extends StatelessWidget {
             child: Row(children: [
               Expanded(
                   child: Text(title,
-                      style: sans(16,
-                          weight: FontWeight.w600, color: AppColors.fg1))),
+                      style: TS.sectionTitle())),
               IconBtn('x',
                   size: 34, iconSize: 18, tooltip: 'Close', onTap: onClose),
             ]),
@@ -182,21 +187,36 @@ class _SessionActionPanel extends StatelessWidget {
   }
 }
 
+const int _maxAttachments = 5;
+
+int _userEchoCount(List<Map<String, dynamic>> events) => events
+    .where((e) => e['kind'] == 'user_input' || e['kind'] == 'steer')
+    .length;
+
+String _normEchoText(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+String? _inboxAgentId(String sessionId) {
+  const prefix = 'inbox-';
+  if (!sessionId.startsWith(prefix)) {
+    return null;
+  }
+  final id = sessionId.substring(prefix.length);
+  return id.isEmpty ? null : id;
+}
+
 class _SessionScreenState extends State<SessionScreen>
     with WidgetsBindingObserver {
+  void _setState(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
+
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
-  // Outbound payloads queued while the socket is down; flushed in order on the
-  // next healthy frame (silently dropping sends lost user messages/approvals).
   final List<String> _outbox = [];
-  // The open-session suppression key THIS screen registered. Session switches
-  // mount the new screen before disposing the old one, so dispose must only
-  // clear the registration if it still owns it.
-  static String _registeredOpenKey = '';
-  late final String _openKey;
+  Timer? _bannerTimer;
+  bool _confirmingRecording = false;
+  SharedInbound? _consumedShare;
   HarnessState? _state;
-  // Live token/thinking stream from attach `wire: stream` frames — NOT part of
-  // HarnessState. Must never be applied via fromJson (that wiped events empty).
   String _liveText = '';
   String _liveThinking = '';
   bool _liveTextVisible = false;
@@ -204,16 +224,35 @@ class _SessionScreenState extends State<SessionScreen>
       ValueNotifier(const _LiveFrame());
   String? _connError;
   bool _termOpen = false;
+  bool _draggingFiles = false;
   final List<_LiveTerm> _terms = [];
   int _termFocus = 0;
   int _termSeq = 0;
-  double _termHeight = 280;
+
+  /// Width of the desktop terminal split pane. Height is not tracked: the pane
+  /// is full-height beside the chat.
+  double _termWidth = 420;
   int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _currentProfile;
+
+  /// When set, the composer sends a DIRECT MESSAGE to this agent instead of a
+  /// turn in the current session. Null means ordinary chat input.
+  String? _recipientAgentId;
+  String? _recipientAgentName;
+
+  /// Agent ids pinned to THIS session from the directory, so the composer shows
+  /// who can be reached here without re-reading the whole directory.
+  final Set<String> _sessionAgentIds = {};
+
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
+
+  /// Owns the mobile end-drawer so the actions panel can close it directly.
+  /// `Navigator.pop` does NOT close a drawer, so the closer must be this key.
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _composerCardKey = GlobalKey();
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   StreamSubscription<Amplitude>? _amplitudeSub;
@@ -228,6 +267,7 @@ class _SessionScreenState extends State<SessionScreen>
   String? _recordingPath;
   Uint8List? _recordingBytes;
   Duration _recordingElapsed = Duration.zero;
+  final ValueNotifier<int> _recorderTick = ValueNotifier(0);
   Duration _playbackPosition = Duration.zero;
   Duration _playbackDuration = Duration.zero;
   final List<double> _waveform = [];
@@ -237,6 +277,7 @@ class _SessionScreenState extends State<SessionScreen>
   final List<QueuedInput> _optimisticQueued = [];
   // Queue IDs hidden after a local cancel/steer until the daemon confirms them.
   final Set<String> _queueHidden = {};
+  int? _hoveredQueuedIndex;
   // Messages sent to the daemon but not yet echoed back as events — shown
   // optimistically (faint) so they don't vanish during the round-trip.
   final List<String> _pending = [];
@@ -253,14 +294,6 @@ class _SessionScreenState extends State<SessionScreen>
       '${++_nonceCounter}-${DateTime.now().microsecondsSinceEpoch}';
 
   // How many user turns (typed or steered) the daemon has echoed into the event
-  // log — the FIFO baseline for retiring optimistic bubbles (see the socket
-  // handler; count-based, not text-based, so daemon-side trimming can't strand one).
-  static int _userEchoCount(List<Map<String, dynamic>> events) => events
-      .where((e) => e['kind'] == 'user_input' || e['kind'] == 'steer')
-      .length;
-
-  static String _normEchoText(String s) =>
-      s.trim().replaceAll(RegExp(r'\s+'), ' ');
 
   void _trackPending(String msg, String nonce) {
     _pending.add(msg);
@@ -295,17 +328,35 @@ class _SessionScreenState extends State<SessionScreen>
   /// (e.g. late snapshot after a missed delta, or reconnect race).
   void _retirePendingAlreadyEchoed(List<Map<String, dynamic>> events) {
     if (_pending.isEmpty) return;
+    Iterable<String> attachmentPaths(String text) => RegExp(
+          r'\[attached (?:image|file) —[^\]]*exact path(?: to view it)?: ([^\]]+)\]',
+        )
+            .allMatches(text)
+            .map((m) => m.group(1)?.trim() ?? '')
+            .where((path) => path.isNotEmpty);
     final echoed = <String>{};
+    final echoedAttachments = <String>{};
     for (final e in events) {
       final kind = e['kind'];
       if (kind != 'user_input' && kind != 'steer') continue;
       final t = e['text'];
-      if (t is String && t.trim().isNotEmpty) echoed.add(_normEchoText(t));
+      if (t is String && t.trim().isNotEmpty) {
+        echoed.add(_normEchoText(t));
+        for (final path in attachmentPaths(t)) {
+          echoedAttachments.add(path);
+        }
+      }
     }
     if (echoed.isEmpty) return;
+    bool attachmentEchoed(String pending) {
+      final paths = attachmentPaths(pending).toList();
+      return paths.isNotEmpty && paths.every(echoedAttachments.contains);
+    }
+
     var i = 0;
     while (i < _pending.length) {
-      if (echoed.contains(_normEchoText(_pending[i]))) {
+      if (echoed.contains(_normEchoText(_pending[i])) ||
+          attachmentEchoed(_pending[i])) {
         _removePendingAt(i);
       } else {
         i++;
@@ -324,19 +375,72 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   // Big-paste interception: a paste arrives as ONE controller change, so an
-  // insertion this large can't be typing — pull it out of the field and attach
-  // it as a text file instead (through the same _ingest pipeline as any file).
-  static const _pasteAttachChars = 1000;
-  static const _pasteAttachLines = 15;
+  // insertion this large can't be typing. It leaves the field and becomes a
+  // pasted-text card, sent inline; only a paste too big for the agent's context
+  // is uploaded as a file instead.
+  static const _pasteCardChars = 600;
+  static const _pasteCardLines = 8;
+  static const _pasteFileChars = 30000;
   String _lastInput = '';
   bool _restoringInput = false;
   int _pasteN = 0;
+
+  /// This session's unsent text survives switching away and back.
+  String get _draftKey => Drafts.keyFor(widget.client.baseUrl, widget.sessionId);
+  bool _switchingSession = false;
+
+  /// What this composer would lose on leaving: its text and whatever is
+  /// ready to send (uploads still in flight follow on their own).
+  Draft _currentDraft() => Draft(
+        text: _input.text,
+        attachments: [
+          for (final a in _attachments)
+            if (a.ready) a.toDraft()
+        ],
+      );
+
+  void _saveDraft() {
+    if (_closed || _switchingSession) return;
+    Drafts.instance.save(_draftKey, _currentDraft());
+  }
+
+  /// Attachments change in many places; after each rebuild, save when the set
+  /// that is ready to send differs from what was last saved.
+  String _savedAttachmentIds = '';
+  void _syncDraftAttachments() {
+    final ids =
+        _attachments.where((a) => a.ready).map((a) => a.toDraft().id).join('|');
+    if (ids == _savedAttachmentIds) return;
+    _savedAttachmentIds = ids;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _saveDraft());
+  }
+
+  void _restoreDraft() {
+    final draft = Drafts.instance.of(_draftKey);
+    if (draft == null) return;
+    if (_input.text.isEmpty && draft.text.isNotEmpty) {
+      // Guarded like a paste restore, so a long draft is not re-read as a paste.
+      _restoringInput = true;
+      _input.value = TextEditingValue(
+          text: draft.text,
+          selection: TextSelection.collapsed(offset: draft.text.length));
+      _restoringInput = false;
+      _lastInput = draft.text;
+    }
+    if (_attachments.isEmpty && draft.attachments.isNotEmpty) {
+      _attachments.addAll(draft.attachments.map(_Attachment.fromDraft));
+    }
+    _savedAttachmentIds = _attachments
+        .where((a) => a.ready)
+        .map((a) => a.toDraft().id)
+        .join('|');
+  }
 
   void _interceptBigPaste() {
     if (_closed || _restoringInput) return;
     final prev = _lastInput;
     final now = _input.text;
-    if (now.length - prev.length < _pasteAttachChars) {
+    if (now.length - prev.length < _pasteCardChars) {
       // Also catch shorter-but-many-line pastes cheaply.
       if (now.length <= prev.length || !now.contains('\n')) {
         _lastInput = now;
@@ -356,7 +460,7 @@ class _SessionScreenState extends State<SessionScreen>
     }
     final inserted = now.substring(p, now.length - s);
     final lines = '\n'.allMatches(inserted).length + 1;
-    if (inserted.length < _pasteAttachChars && lines < _pasteAttachLines) {
+    if (inserted.length < _pasteCardChars && lines < _pasteCardLines) {
       _lastInput = now;
       return;
     }
@@ -368,6 +472,10 @@ class _SessionScreenState extends State<SessionScreen>
     );
     _restoringInput = false;
     _lastInput = prev;
+    if (inserted.length <= _pasteFileChars) {
+      setState(() => _attachments.add(_Attachment.pasted(inserted)));
+      return;
+    }
     final name = 'paste-${++_pasteN}.txt';
     _ingest([
       (
@@ -376,35 +484,40 @@ class _SessionScreenState extends State<SessionScreen>
         readBytes: () async => Uint8List.fromList(utf8.encode(inserted))
       )
     ]);
-    _toast('Pasted text attached ($lines lines)');
+    _toast('Long paste attached as a file ($lines lines)');
   }
 
   // Pending attachments (images + files, up to 5): each uploads to the daemon
-  // and is referenced in the next message. Images → read_image, files → read.
+  // and is referenced in the next message. Images → view_image, files → bash.
   final List<_Attachment> _attachments = [];
   int _attachmentGeneration = 0;
-  bool _draggingFiles = false;
   bool get _anyUploading => _attachments.any((a) => a.uploading);
-  static const int _maxAttachments = 5;
   final Map<String, bool> _toolRunOpen = {};
-  bool _activeToolRunOpen = false;
+  final Map<String, ValueNotifier<ToolBatch>> _toolBatches = {};
+  final Set<String> _openToolRows = {};
   bool _transcriptDirty = true;
+
+  /// A question is waiting in the answer bar, so the transcript leaves it out.
+  bool get _questionOpen =>
+      _state?.status == 'waiting_for_input' && _state?.pendingQuestion != null;
   List<Widget>? _transcriptCache;
-  static const _transcriptPageSize = 160;
+
+  /// Coordination events concerning this session's agent, shown inline in the
+  /// conversation: a direct message arriving for it, or work dispatched out of
+  /// it. Kept separate from `_state.events` because these are DEVICE events —
+  /// they belong to the agent and the coordination plane, not to this session's
+  /// transcript, and folding them in would put them in the model's history.
+  final List<Map<String, dynamic>> _agentEvents = [];
+  StreamSubscription<dynamic>? _agentEventsSub;
   int _transcriptStart = 0;
   bool _loadingOlderTranscript = false;
-  Timer? _historyPrefetchTimer;
+  final Set<int> _requestedFullEvents = {};
 
-  void _scheduleHistoryPrefetch() {
-    _historyPrefetchTimer?.cancel();
-    if (_closed || _loadingOlderTranscript || _transcriptStart == 0) return;
-    _historyPrefetchTimer = Timer(const Duration(milliseconds: 700), () {
-      if (!_closed &&
-          mounted &&
-          !_loadingOlderTranscript &&
-          _transcriptStart > 0) {
-        _loadOlderTranscript();
-      }
+  void _requestFullEvent(int index) {
+    if (!_requestedFullEvents.add(index)) return;
+    scheduleMicrotask(() {
+      if (_closed || !mounted) return;
+      _send({'kind': 'event', 'index': index});
     });
   }
 
@@ -412,11 +525,10 @@ class _SessionScreenState extends State<SessionScreen>
     if (_state == null || _transcriptStart == 0 || _loadingOlderTranscript) {
       return;
     }
-    _loadingOlderTranscript = true;
+    setState(() => _loadingOlderTranscript = true);
     _send({
       'kind': 'history',
       'before': _transcriptStart,
-      'limit': _transcriptPageSize,
     });
   }
 
@@ -426,6 +538,7 @@ class _SessionScreenState extends State<SessionScreen>
   String _pendingLiveThinking = '';
   bool _pendingLiveTextVisible = false;
   Timer? _streamFlushTimer;
+  Future<void>? _decodeQueue;
   // Auto-reconnect: backoff timer + attempt counter; _closed stops retries on leave.
   Timer? _reconnectTimer;
   Timer? _connectionWatchdog;
@@ -449,6 +562,7 @@ class _SessionScreenState extends State<SessionScreen>
   // resend it on reconnect and force a resync if it doesn't resolve.
   Map<String, dynamic>? _pendingDecision;
   Timer? _decisionTimer;
+  Timer? _decisionGiveUp;
 
   // Force a fresh snapshot when an optimistic message hasn't been echoed in time —
   // the reconnect path then resends whatever the server truly never received.
@@ -474,7 +588,14 @@ class _SessionScreenState extends State<SessionScreen>
       // Decisions can be retried across reconnects too; give the retry the same
       // idempotency key instead of sending an untracked frame.
       outbound['nonce'] ??= _nextNonce();
-      _pendingDecision = outbound;
+      setState(() => _pendingDecision = outbound);
+      _decisionGiveUp?.cancel();
+      _decisionGiveUp = Timer(const Duration(seconds: 15), () {
+        if (!mounted || _closed || _pendingDecision == null) return;
+        if (_state?.status != 'waiting_for_input') return;
+        setState(() => _pendingDecision = null);
+        toast(context, "That didn't reach the session. Try again.", danger: true);
+      });
       _decisionTimer?.cancel();
       _decisionTimer = Timer(const Duration(seconds: 6), () {
         if (!mounted || _closed || _pendingDecision == null) return;
@@ -495,6 +616,8 @@ class _SessionScreenState extends State<SessionScreen>
     _title = _isMissionControl ? 'Mission Control' : widget.title;
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
+    _restoreDraft();
+    _input.addListener(_saveDraft);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -513,19 +636,21 @@ class _SessionScreenState extends State<SessionScreen>
       });
     });
     _positionSub = _audioPlayer.onPositionChanged.listen((position) {
-      if (mounted) setState(() => _playbackPosition = position);
+      if (!mounted) return;
+      _playbackPosition = position;
+      _recorderTick.value++;
     });
     _durationSub = _audioPlayer.onDurationChanged.listen((duration) {
-      if (mounted) setState(() => _playbackDuration = duration);
+      if (!mounted) return;
+      _playbackDuration = duration;
+      _recorderTick.value++;
     });
     if (!widget.acceptDrops && _state != null) _parked = true;
     _startSession();
+    _startAgentEvents();
     _loadModel();
     modelsRevision.addListener(_loadModel);
     unawaited(widget.client.getConfig());
-    _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
-    _registeredOpenKey = _openKey;
-    reportOpenSession(_openKey);
     if (widget.inboundShare != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _consumeInboundShare(widget.inboundShare!);
@@ -534,6 +659,94 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   bool get _isMissionControl => isDedicatedMcSession(widget.sessionId);
+
+  /// Watch the device event stream for coordination activity about THIS session:
+  /// work dispatched into it, and — when this session is an agent's inbox —
+  /// messages arriving for that agent.
+  ///
+  /// These are DEVICE events, not transcript events, so they are kept out of
+  /// `_state.events`: folding them in would put coordination chatter into the
+  /// model's history, which is not what happened in the conversation.
+  void _startAgentEvents() {
+    _agentEventsSub?.cancel();
+    _agentEventsSub = widget.client.events().stream.listen((raw) {
+      if (!mounted || _closed) return;
+      final Map<String, dynamic> frame;
+      try {
+        final decoded = jsonDecode(raw as String);
+        if (decoded is! Map) return;
+        frame = decoded.cast<String, dynamic>();
+      } catch (_) {
+        return;
+      }
+      final entry = _agentEventFor(frame);
+      if (entry == null) return;
+      setState(() {
+        _agentEvents.add(entry);
+        _transcriptDirty = true;
+      });
+    }, onError: (_) {});
+  }
+
+  /// Map one coordination frame to an inline row, or null when it does not
+  /// concern this session.
+  Map<String, dynamic>? _agentEventFor(Map<String, dynamic> frame) {
+    final kind = frame['kind']?.toString() ?? '';
+    if (kind == 'dispatch') {
+      // Dispatches name their target session, so this is an exact match.
+      if (frame['session']?.toString() != widget.sessionId) return null;
+      return {
+        'event': 'dispatch',
+        'agent': frame['agent']?.toString() ?? '',
+        'assignment': frame['assignment']?.toString() ?? '',
+        'profile': frame['profile']?.toString(),
+      };
+    }
+    if (kind == 'direct_message') {
+      // A message concerns this session only when this session IS that agent's
+      // inbox. The binding is in the session id, so it needs no round trip.
+      final agent = _inboxAgentId(widget.sessionId);
+      if (agent == null) return null;
+      if (frame['to']?.toString() != 'agent:$agent') return null;
+      return {
+        'event': 'direct_message',
+        'from': frame['from']?.toString() ?? '',
+        'thread': frame['thread_id']?.toString() ?? '',
+      };
+    }
+    return null;
+  }
+
+  /// One inline coordination row.
+  Widget _agentEventRow(Map<String, dynamic> e, int index) {
+    final kind = e['event']?.toString() ?? '';
+    if (kind == 'dispatch') {
+      final agent = e['agent']?.toString() ?? '';
+      final profile = e['profile']?.toString();
+      return KeyedSubtree(
+        key: ValueKey('agent-dispatch-$index-${e['assignment']}'),
+        child: AgentEventRow(
+          icon: 'send',
+          label: agent.isEmpty
+              ? 'Work dispatched here'
+              : 'Work dispatched to $agent',
+          detail: profile == null || profile.isEmpty
+              ? 'from Mission Control'
+              : 'from Mission Control · profile $profile',
+        ),
+      );
+    }
+    final from = e['from']?.toString() ?? '';
+    return KeyedSubtree(
+      key: ValueKey('agent-message-$index-${e['thread']}'),
+      child: AgentEventRow(
+        icon: 'message',
+        label: 'Message from ${from.isEmpty ? 'an agent' : from}',
+        detail: 'Direct message — open the agent to read and reply',
+        accent: true,
+      ),
+    );
+  }
 
   Future<void> _startSession() async {
     if (_isMissionControl) {
@@ -564,6 +777,12 @@ class _SessionScreenState extends State<SessionScreen>
       _unpark();
     }
     if (!sameSession) {
+      // Keep what was typed and attached as the previous session's draft,
+      // before anything below clears it.
+      Drafts.instance.save(
+          Drafts.keyFor(oldWidget.client.baseUrl, oldWidget.sessionId),
+          _currentDraft(),
+          now: true);
       _parked = !widget.acceptDrops;
       _title = _isMissionControl ? 'Mission Control' : widget.title;
       // PageView normally keys each session, but a parent may reuse this State
@@ -578,13 +797,14 @@ class _SessionScreenState extends State<SessionScreen>
       _optimisticQueued.clear();
       _queueHidden.clear();
       _clearPendingAll();
+      // The previous session's draft was saved above; pick up this one's.
+      _switchingSession = true;
       _input.clear();
+      _switchingSession = false;
       _lastInput = '';
+      _restoreDraft();
       _consumedShare = null;
       _state = null;
-      _openKey = '${widget.client.baseUrl}|${widget.sessionId}';
-      _registeredOpenKey = _openKey;
-      reportOpenSession(_openKey);
       unawaited(_startSession());
     }
     if (widget.inboundShare != null &&
@@ -610,8 +830,6 @@ class _SessionScreenState extends State<SessionScreen>
         _unpark();
         _loadModel();
       }
-      _registeredOpenKey = _openKey;
-      reportOpenSession(_openKey);
     }
   }
 
@@ -649,7 +867,7 @@ class _SessionScreenState extends State<SessionScreen>
         }
       }
 
-      ModelProfile? p;
+      InferenceProfile? p;
       if (wanted != null) {
         for (final m in cfg.profiles) {
           if (m.name == wanted) {
@@ -709,379 +927,6 @@ class _SessionScreenState extends State<SessionScreen>
     _connect();
   }
 
-  void _connect() {
-    if (_closed || _parked) return;
-    _reconnectTimer?.cancel();
-    _bannerTimer
-        ?.cancel(); // suppress "Reconnecting…" if we reconnect before 60s
-    // Fully detach the old socket first: cancel its subscription so its onDone
-    // can't fire _scheduleReconnect against the NEW channel — that cascade
-    // orphaned healthy sockets and double-applied every delta.
-    _sub?.cancel();
-    _sub = null;
-    _connectionWatchdog?.cancel();
-    _channel?.sink.close();
-    if (mounted) setState(() => _connError = null);
-    _freshConn = true;
-    final ch = widget.client.attach(widget.sessionId);
-    _channel = ch;
-    _connectionWatchdog?.cancel();
-    _connectionWatchdog = Timer(Duration(seconds: _state == null ? 4 : 12), () {
-      if (!_closed && identical(ch, _channel)) {
-        _resync(ch);
-      }
-    });
-    _sub = ch.stream.listen(
-      (msg) {
-        if (!identical(ch, _channel)) return; // stale socket — ignore
-        _connectionWatchdog?.cancel();
-        _connectionWatchdog = null;
-        // Any frame means a healthy socket — reset backoff + clear the banner.
-        if (_reconnectAttempt != 0 || _connError != null) {
-          _reconnectAttempt = 0;
-          if (mounted) setState(() => _connError = null);
-        }
-        // Flush sends queued while the socket was down, in order.
-        if (_outbox.isNotEmpty) {
-          for (final p in _outbox) {
-            ch.sink.add(p);
-          }
-          _outbox.clear();
-        }
-        try {
-          // web_socket_channel can deliver either a String or binary bytes for
-          // the same text frame depending on platform/proxy. Casting only to
-          // String throws, the catch resyncs forever, and the canvas stays empty.
-          final raw = switch (msg) {
-            final String s => s,
-            final Uint8List b => utf8.decode(b, allowMalformed: true),
-            final List<int> b => utf8.decode(b, allowMalformed: true),
-            _ => '',
-          };
-          if (raw.isEmpty) return;
-          final decoded = jsonDecode(raw);
-          if (decoded is! Map) return;
-          final j = decoded.cast<String, dynamic>();
-          if (!mounted) return;
-          // Only snapshot/delta carry HarnessState. Stream frames are live
-          // token/thinking updates with no events — applying them via
-          // fromJson wiped the transcript to empty until the next real state
-          // frame (often only after a TUI-side persist).
-          final wire = j['wire'] as String? ?? 'snapshot';
-          if (wire == 'history') {
-            final rawEvents = j['events'];
-            final older = rawEvents is List
-                ? rawEvents
-                    .whereType<Map>()
-                    .map((e) => e.cast<String, dynamic>())
-                    .toList()
-                : const <Map<String, dynamic>>[];
-            if (older.isNotEmpty) {
-              setState(() {
-                _state = _state?.prependEvents(older);
-                _transcriptStart = (j['start'] as num?)?.toInt() ?? 0;
-                _transcriptDirty = true;
-              });
-            } else {
-              _transcriptStart = 0;
-            }
-            _loadingOlderTranscript = false;
-            if (_transcriptStart > 0) _scheduleHistoryPrefetch();
-            return;
-          }
-          if (wire == 'term') {
-            _applyTermFrame(j);
-            return;
-          }
-          if (wire == 'stream') {
-            final text = (j['text'] as String?) ?? '';
-            final thinking = (j['thinking'] as String?) ?? '';
-            final visible = j['text_visible'] == true;
-            if (!mounted) return;
-            // Ignore non-empty stream while the run is idle/stopped — a late
-            // frame after commit would re-show thinking/answer next to the
-            // durable AssistantText (duplicate bubble + sticky reasoning).
-            final status = _state?.status;
-            final liveOk = status == null ||
-                status == 'running' ||
-                status == 'waiting_for_input' ||
-                (text.isEmpty && thinking.isEmpty);
-            if (!liveOk) {
-              if (_liveText.isNotEmpty ||
-                  _liveThinking.isNotEmpty ||
-                  _liveTextVisible) {
-                setState(() {
-                  _liveText = '';
-                  _liveThinking = '';
-                  _liveTextVisible = false;
-                });
-              }
-              return;
-            }
-            // Throttle stream frames: store latest payload and flush at most
-            // every 50ms to avoid rebuilding the full widget tree on every token.
-            _pendingLiveText = text;
-            _pendingLiveThinking = thinking;
-            _pendingLiveTextVisible = visible;
-            if (_streamFlushTimer?.isActive ?? false) return;
-            _streamFlushTimer =
-                Timer(const Duration(milliseconds: 50), _flushStreamFrame);
-            return;
-          }
-          if (wire != 'snapshot' && wire != 'delta') return;
-          final cur = _state;
-          // Reject duplicate/out-of-order attach frames before applying them.
-          // Replayed equal revisions are harmless and should not churn a healthy
-          // socket; only a non-consecutive newer revision requires resync.
-          final revision = j['revision'];
-          if (revision is int) {
-            if (wire == 'snapshot') {
-              _lastAttachRevision = revision;
-            } else if (_lastAttachRevision != 0 &&
-                revision == _lastAttachRevision) {
-              return;
-            } else if (_lastAttachRevision != 0 &&
-                revision != _lastAttachRevision + 1) {
-              _resync(ch);
-              return;
-            } else {
-              _lastAttachRevision = revision;
-            }
-          }
-          final next = (wire == 'delta' && cur != null)
-              ? cur.applyDelta(j)
-              : HarnessState.fromJson(j);
-          // Drift check: our event log must line up with the server's count — a
-          // mismatch (dropped/bad frame) resyncs via reconnect, since a fresh
-          // socket's first frame is always a full snapshot.
-          final ec = j['event_count'];
-          if (wire == 'delta' && ec is int && next.events.length != ec) {
-            _resync(ch);
-            return;
-          }
-          // A reversed transcript is anchored at offset 0 (latest). No initial
-          // jump is needed; preserve whether the user has scrolled into history.
-          final follow = _stickToBottom;
-          _syncOptimisticQueue(next.queuedInputs);
-          _queueHidden.removeWhere((id) =>
-              !next.queuedInputs.any((item) => item.id == id) &&
-              !_optimisticQueued.any((item) => item.id == id));
-          // Held messages live on the daemon (`queued_inputs`) and flush there
-          // when the run lands on idle. Clients only display / enqueue / cancel.
-          // A pending approval/answer is acknowledged the moment the run leaves
-          // waiting_for_input — clear it so its watchdog can't fire a needless
-          // resync (and so a resent decision isn't double-applied).
-          if (next.status != 'waiting_for_input' && _pendingDecision != null) {
-            _pendingDecision = null;
-            _decisionTimer?.cancel();
-          }
-          // Retire optimistic bubbles once the daemon has echoed them:
-          // 1) FIFO by echo-count delta (prev→next) when we have prior state
-          // 2) by per-item baseline (covers missed delta / same-count snapshot)
-          // 3) by normalized text match against the authoritative event log
-          //    (every frame — not only snapshots — so stuck faint bubbles clear)
-          final prevEchoes = cur == null ? null : _userEchoCount(cur.events);
-          final nextEchoes = _userEchoCount(next.events);
-          if (prevEchoes != null) {
-            var retired = (nextEchoes - prevEchoes).clamp(0, _pending.length);
-            while (retired-- > 0) {
-              _popPendingFront();
-            }
-          } else if (wire != 'delta') {
-            // first-ever snapshot: nothing optimistic predates it
-            _clearPendingAll();
-          }
-          if (_pending.isNotEmpty) {
-            _retirePendingByBaseline(nextEchoes);
-            _retirePendingAlreadyEchoed(next.events);
-          }
-          // First full snapshot after a (re)connect is authoritative: anything
-          // still in _pending was never received by the server — resend it with
-          // the same nonce so the server deduplicates if it DID land.
-          if (_freshConn && wire != 'delta') {
-            _freshConn = false;
-            for (var i = 0; i < _pending.length; i++) {
-              final m = _pending[i];
-              final nonce = i < _pendingNonce.length ? _pendingNonce[i] : null;
-              final msg = nonce != null
-                  ? {'kind': 'user_message', 'value': m, 'nonce': nonce}
-                  : {'kind': 'user_message', 'value': m};
-              try {
-                ch.sink.add(jsonEncode(msg));
-              } catch (_) {
-                _outbox.add(jsonEncode(msg));
-              }
-            }
-            // A decision still pending while the snapshot STILL shows the run
-            // waiting means it never landed — resend it. (If it had landed, the
-            // status/clear above already dropped it, so no double-approve.)
-            if (_pendingDecision != null &&
-                next.status == 'waiting_for_input') {
-              final payload = jsonEncode(_pendingDecision);
-              try {
-                ch.sink.add(payload);
-              } catch (_) {
-                _outbox.add(payload);
-              }
-            }
-          }
-          // Only rebuild the transcript widget list when events actually
-          // changed — status-only deltas waste a full transcript rebuild.
-          final eventsChanged = cur == null ||
-              next.events.length != cur.events.length ||
-              (next.events.isNotEmpty &&
-                  cur.events.isNotEmpty &&
-                  next.events.last != cur.events.last);
-          if (eventsChanged) _transcriptDirty = true;
-          if (wire == 'snapshot') {
-            final offset = (j['event_offset'] as num?)?.toInt();
-            _transcriptStart = offset ??
-                (next.events.length > _transcriptPageSize
-                    ? next.events.length - _transcriptPageSize
-                    : 0);
-          }
-          setState(() {
-            _state = next;
-            if (!_isMissionControl) {
-              final nextTitle = next.title ?? widget.title;
-              if (nextTitle != _title && nextTitle.isNotEmpty) {
-                _title = nextTitle;
-                widget.onTitle?.call(nextTitle);
-              }
-            }
-            // Snapshot/delta commit durable events; drop the live answer so it
-            // doesn't double-render against AssistantText once it lands.
-            if (wire == 'snapshot' || wire == 'delta') {
-              _liveText = '';
-              _liveTextVisible = false;
-              // Thought process is live-only until the first tool/action of
-              // this turn. After that the UI should show the action, not
-              // leftover reasoning.
-              if (next.status != 'running' ||
-                  _turnHasVisibleAction(next.events)) {
-                _liveThinking = '';
-                _pendingLiveThinking = '';
-                _streamFlushTimer?.cancel();
-                _streamFlushTimer = null;
-              }
-            }
-          });
-          if (wire == 'snapshot' && _transcriptStart > 0) {
-            _scheduleHistoryPrefetch();
-          }
-          widget.onMacStatus?.call(next, next.status == 'running');
-          widget.onMacControls
-              ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);
-          // Re-arm (or cancel) the ack watchdog against the new _pending state.
-          _armAckWatchdog();
-          if (follow) _scheduleBottom();
-        } catch (_) {
-          // A frame we couldn't apply would silently corrupt the transcript —
-          // resync instead of swallowing it.
-          _resync(ch);
-        }
-      },
-      onError: (_) => _scheduleReconnect(ch),
-      onDone: () => _scheduleReconnect(ch),
-      cancelOnError: true,
-    );
-  }
-
-  // Tear down this socket and rejoin — the fresh connection opens with a full
-  // snapshot, which reconciles any local drift.
-  void _resync(WebSocketChannel ch) {
-    if (!identical(ch, _channel)) return;
-    ch.sink.close();
-    _scheduleReconnect(ch);
-  }
-
-  // Reconnect with exponential backoff (1,2,4,8,15,30s). Deduped so onError+onDone
-  // don't double-schedule; reset to 0 on any healthy frame or app-resume. Only the
-  // CURRENT channel may schedule — a detached socket's late onDone is ignored.
-  // The "Reconnecting…" banner is delayed briefly so a transient handoff does
-  // not flash, while a real outage becomes visible quickly.
-  Timer? _bannerTimer;
-  void _scheduleReconnect(WebSocketChannel ch) {
-    if (_closed || _parked) return;
-    if (!identical(ch, _channel)) return; // stale socket
-    if (_reconnectTimer?.isActive ?? false) return; // already pending
-    _channel = null;
-    const steps = [1, 2, 4, 8, 15, 30];
-    final delay = steps[_reconnectAttempt.clamp(0, steps.length - 1)];
-    _reconnectAttempt++;
-    // Delay the banner briefly so transient handoffs do not flash a warning.
-    _bannerTimer?.cancel();
-    _bannerTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && !_closed && _channel == null) {
-        setState(() => _connError = 'Reconnecting…');
-      }
-    });
-    _reconnectTimer = Timer(Duration(seconds: delay), () {
-      if (!_closed) _connect();
-    });
-  }
-
-  // Stream frames may be a full buffer or a tailed snippet (`…\\n\\n` + last
-  // N chars). Never shrink what we already show while the run is live.
-  String _mergeLiveThinking(String prev, String next) {
-    var incoming = next;
-    if (incoming.startsWith('…')) {
-      incoming = incoming.replaceFirst(RegExp(r'^…+\s*'), '');
-    }
-    if (incoming.isEmpty) return prev;
-    if (prev.isEmpty) return incoming;
-    if (incoming == prev) return prev;
-    if (incoming.startsWith(prev)) return incoming;
-    if (prev.startsWith(incoming)) return prev;
-    if (incoming.contains(prev) && incoming.length >= prev.length) {
-      return incoming;
-    }
-    if (prev.endsWith(incoming) || prev.contains(incoming)) return prev;
-    // Overlapping tail/head (tailed snapshots) — grow instead of mash.
-    final maxOverlap =
-        prev.length < incoming.length ? prev.length : incoming.length;
-    for (var n = maxOverlap; n >= 24; n--) {
-      if (prev.endsWith(incoming.substring(0, n))) {
-        return prev + incoming.substring(n);
-      }
-    }
-    // New thought signature: replace the previous snapshot instead of appending.
-    return incoming;
-  }
-
-  String? _latestCompactionDetail(List<Map<String, dynamic>> events) {
-    for (var i = events.length - 1; i >= 0; i--) {
-      final e = events[i];
-      if (e['type'] != 'system_decision') continue;
-      final step = e['step']?.toString() ?? '';
-      if (step == 'history_compaction_pass' ||
-          step == 'history_compaction_skipped') {
-        final r = e['reasoning']?.toString().trim() ?? '';
-        return r.isEmpty ? null : r;
-      }
-    }
-    return null;
-  }
-
-  // Throttled stream frame flush — called by the 50ms timer.
-  void _flushStreamFrame() {
-    if (_closed || !mounted) return;
-    final hideThought = _turnHasVisibleAction(_state?.events ?? const []);
-    final text = _pendingLiveText;
-    final thinking = hideThought
-        ? ''
-        : _mergeLiveThinking(_liveThinking, _pendingLiveThinking);
-    final visible = _pendingLiveTextVisible;
-    _liveFrame.value = _LiveFrame(
-      text: text,
-      thinking: thinking,
-      visible: visible,
-    );
-    if (_stickToBottom && (text.isNotEmpty || thinking.isNotEmpty)) {
-      _scheduleBottom();
-    }
-  }
-
   // Whether to keep pinning to the latest message. Only the USER's own scrolling
   // flips this (see the NotificationListener) — content growth never does, so a
   // streaming reply keeps reaching the true bottom instead of falling behind.
@@ -1113,8 +958,7 @@ class _SessionScreenState extends State<SessionScreen>
   void _scheduleBottom({bool settle = false, bool smooth = false}) {
     if (!_scroll.hasClients) return;
     if (smooth) {
-      _scroll.animateTo(0,
-          duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+      _scroll.animateTo(0, duration: Motion.base, curve: Motion.enter);
     } else if (_scroll.offset != 0) {
       _scroll.jumpTo(0);
     }
@@ -1123,810 +967,6 @@ class _SessionScreenState extends State<SessionScreen>
   // Send now, or queue for the reconnect flush — never silently drop.
   // For user messages (tracked in _pending), do NOT also add to _outbox:
   // _freshConn resend handles recovery, so adding to both would double-send.
-  void _applyTermFrame(Map<String, dynamic> j) {
-    final seq = (j['seq'] as num?)?.toInt() ?? 0;
-    if (seq != 0 && seq == _termSeq) return;
-    if (seq != 0) _termSeq = seq;
-    final id = (j['id'] as String?) ?? '0';
-    final op = (j['op'] as String?) ?? '';
-    final cols = (j['cols'] as num?)?.toInt();
-    final rows = (j['rows'] as num?)?.toInt();
-    final raw = j['data'] as String?;
-    final bytes = (raw == null || raw.isEmpty)
-        ? Uint8List(0)
-        : Uint8List.fromList(base64Decode(raw));
-    if (!mounted) return;
-    setState(() {
-      final pane = _ensureTerm(id);
-      pane.alive = j['alive'] == true;
-      if (op == 'snapshot') return;
-      if (bytes.isNotEmpty)
-        pane.terminal.write(utf8.decode(bytes, allowMalformed: true));
-      if (cols != null) pane.cols = cols;
-      if (rows != null) pane.rows = rows;
-      if (op == 'out') pane.live = true;
-    });
-    if (op == 'out' && j['alive'] == false) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _closeTerm(id);
-      });
-    }
-  }
-
-  String _nextTermTitle() {
-    var n = _terms.length + 1;
-    final used = _terms.map((t) => t.title).toSet();
-    while (used.contains('shell $n')) {
-      n++;
-    }
-    return 'shell $n';
-  }
-
-  _LiveTerm _ensureTerm(String id) {
-    for (final t in _terms) {
-      if (t.id == id) return t;
-    }
-    final t = _LiveTerm(id, title: _nextTermTitle());
-    _terms.add(t);
-    return t;
-  }
-
-  void _openTerm({bool fresh = false}) {
-    if (_isMissionControl) return;
-    // Second click on Shell hides the drawer — keep the pty so reopening is instant.
-    if (!fresh && _termOpen && _terms.isNotEmpty) {
-      setState(() => _termOpen = false);
-      return;
-    }
-    if (!fresh && _terms.isNotEmpty) {
-      setState(() => _termOpen = true);
-      final t = _terms[_termFocus.clamp(0, _terms.length - 1)];
-      _send({
-        'wire': 'term',
-        'op': 'open',
-        'id': t.id,
-        'cols': t.cols,
-        'rows': t.rows,
-      });
-      return;
-    }
-    final used = _terms.map((t) => int.tryParse(t.id) ?? 0).fold(0, math.max);
-    final id = _terms.isEmpty ? '0' : '${used + 1}';
-    setState(() {
-      _termOpen = true;
-      _ensureTerm(id);
-      _termFocus = _terms.length - 1;
-    });
-    _send({
-      'wire': 'term',
-      'op': fresh ? 'new' : 'open',
-      'id': id,
-      'cols': 80,
-      'rows': 24,
-    });
-  }
-
-  void _closeTerm(String id) {
-    _send({'wire': 'term', 'op': 'close', 'id': id});
-    setState(() {
-      _terms.removeWhere((t) => t.id == id);
-      if (_terms.isEmpty) {
-        _termOpen = false;
-        _termFocus = 0;
-      } else {
-        _termFocus = _termFocus.clamp(0, _terms.length - 1);
-      }
-    });
-  }
-
-  void _termIn(Uint8List bytes) {
-    if (_terms.isEmpty) return;
-    final t = _terms[_termFocus.clamp(0, _terms.length - 1)];
-    _send({
-      'wire': 'term',
-      'op': 'in',
-      'id': t.id,
-      'data': base64Encode(bytes),
-      'cols': t.cols,
-      'rows': t.rows,
-    });
-  }
-
-  void _termResize(int cols, int rows) {
-    if (_terms.isEmpty) return;
-    final t = _terms[_termFocus.clamp(0, _terms.length - 1)];
-    t.cols = cols;
-    t.rows = rows;
-    _send({
-      'wire': 'term',
-      'op': 'resize',
-      'id': t.id,
-      'cols': cols,
-      'rows': rows,
-    });
-  }
-
-  void _send(Map<String, dynamic> m, {bool tracked = false}) {
-    final payload = jsonEncode(m);
-    final ch = _channel;
-    if (ch == null) {
-      if (!tracked) _outbox.add(payload); // untracked messages use outbox
-      return;
-    }
-    try {
-      ch.sink.add(payload);
-    } catch (_) {
-      if (!tracked) _outbox.add(payload);
-      _scheduleReconnect(ch);
-    }
-  }
-
-  Future<void> _sendMessage() async {
-    // The composer can be triggered by both the send button and keyboard submit;
-    // serialize the entire async path so a rapid double tap cannot create two
-    // distinct nonces and two server turns.
-    if (_sendingMessage) return;
-    _sendingMessage = true;
-    try {
-      await _sendMessageOnce();
-    } finally {
-      _sendingMessage = false;
-    }
-  }
-
-  Future<void> _sendMessageOnce() async {
-    // Audio can be sent directly from the composer: stop the live take, upload
-    // it through the normal attachment path, then continue with the same send.
-    if (_sendingAudio) return;
-    if (_isRecording || _recordingPath != null) {
-      _sendingAudio = true;
-      if (mounted) setState(() {});
-      try {
-        if (_isRecording) await _stopRecording();
-        if (_recordingPath != null && !await _confirmRecording()) return;
-      } finally {
-        _sendingAudio = false;
-        if (mounted) setState(() {});
-      }
-    }
-    // An upload still in flight would be silently DROPPED (only remotePath'd
-    // attachments ship, then the list is cleared). The send button disables via
-    // canSend, but keyboard submit bypassed it — guard here, the single choke point.
-    if (_anyUploading) return;
-    final t = _input.text.trim();
-    final ready = _attachments.where((a) => a.remotePath != null).toList();
-    if (t.isEmpty && ready.isEmpty) return;
-    final running = _state?.status == 'running';
-    // Reference each upload by its exact path so the agent reads it this turn.
-    final markers = ready
-        .map((a) => a.isImage
-            ? '[attached image — call read_image on this exact path to view it: ${a.remotePath}]'
-            : '[attached file — read it at this exact path: ${a.remotePath}]')
-        .join('\n');
-    final msg = markers.isEmpty ? t : (t.isEmpty ? markers : '$t\n\n$markers');
-    final nonce = _nextNonce();
-    setState(() {
-      if (running) {
-        // Hold on the daemon so TUI/app/desktop all see the same queue.
-        final item = QueuedInput(id: _nextNonce(), text: msg);
-        _optimisticQueued.add(item);
-        _send({'kind': 'queue', 'value': item, 'nonce': nonce});
-      } else {
-        _send({'kind': 'user_message', 'value': msg, 'nonce': nonce},
-            tracked: true);
-        _trackPending(msg, nonce); // faint bubble until daemon echoes it
-      }
-      _attachments.clear();
-    });
-    _input.clear();
-    _armAckWatchdog(); // recover if this send silently dies on a dead socket
-    // Sending is an explicit action — re-pin and jump to the bottom.
-    _stickToBottom = true;
-    _scheduleBottom();
-  }
-
-  bool _isImageName(String n) {
-    final l = n.toLowerCase();
-    return const [
-      '.png',
-      '.jpg',
-      '.jpeg',
-      '.gif',
-      '.webp',
-      '.bmp',
-      '.heic',
-      '.heif'
-    ].any(l.endsWith);
-  }
-
-  // `+` tapped: desktop opens a file picker directly; mobile shows a small
-  // Camera / Photos / Files sheet.
-  Future<void> _onAttachTap() async {
-    if (_maxAttachments - _attachments.length <= 0) {
-      _toast('Up to $_maxAttachments attachments.');
-      return;
-    }
-    if (!kMobile) {
-      _pickFiles();
-      return;
-    }
-    final choice = await showAppSheet<String>(context,
-        title: 'Add context',
-        child: Row(children: [
-          _ctxOption('camera', 'Camera', 'camera'),
-          const SizedBox(width: 10),
-          _ctxOption('image', 'Photos', 'photos'),
-          const SizedBox(width: 10),
-          _ctxOption('file', 'Files', 'files'),
-        ]));
-    if (choice == 'camera') {
-      _pickCamera();
-    } else if (choice == 'photos') {
-      _pickPhotos();
-    } else if (choice == 'files') {
-      _pickFiles();
-    }
-  }
-
-  Future<void> _onMicTap() async {
-    if (_isRecording) {
-      await _stopRecording();
-    } else {
-      await _startRecording();
-    }
-  }
-
-  static const _maxRecordingDuration = Duration(minutes: 3);
-
-  Future<void> _startRecording() async {
-    if (!kCanRecord) return;
-    // Flip the UI first so the tap feels instant; permission + encoder
-    // setup still happen before audio is captured.
-    if (mounted) {
-      setState(() {
-        _isRecording = true;
-        _recordingElapsed = Duration.zero;
-        _waveform
-          ..clear()
-          ..add(0.08);
-      });
-    }
-    final granted = kMobile
-        ? (await Permission.microphone.request()).isGranted
-        : await _recorder.hasPermission();
-    if (!granted) {
-      if (mounted) setState(() => _isRecording = false);
-      _toast(kMobile
-          ? 'Microphone permission is required.'
-          : 'Microphone permission is required by macOS.');
-      if (kMobile) {
-        final status = await Permission.microphone.status;
-        if (status.isPermanentlyDenied) await openAppSettings();
-      }
-      return;
-    }
-    try {
-      // Starting a new take replaces an unconfirmed take only after the user
-      // explicitly chose to record again.
-      if (_recordingPath != null || _recordingBytes != null) {
-        await _discardRecording();
-      }
-      final tempDir = await getTemporaryDirectory();
-      final path =
-          '${tempDir.path}/snippet-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
-      await _recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 96000,
-          sampleRate: 16000,
-          numChannels: 1,
-        ),
-        path: path,
-      );
-      if (!await _recorder.isRecording()) {
-        if (mounted) setState(() => _isRecording = false);
-        _toast('Could not start recording.');
-        return;
-      }
-      _amplitudeSub?.cancel();
-      _amplitudeSub = _recorder
-          .onAmplitudeChanged(const Duration(milliseconds: 120))
-          .listen((a) {
-        final level = ((a.current + 60) / 60).clamp(0.04, 1.0).toDouble();
-        if (!mounted) return;
-        setState(() {
-          _waveform.add(level);
-          // Keep a denser rolling waveform so the bars stay close together
-          // when the strip spans the full composer width.
-          if (_waveform.length > 180) _waveform.removeAt(0);
-        });
-      });
-      _recordingTimer?.cancel();
-      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!mounted) return;
-        final next = _recordingElapsed + const Duration(seconds: 1);
-        if (next >= _maxRecordingDuration) {
-          setState(() => _recordingElapsed = _maxRecordingDuration);
-          unawaited(_stopRecording());
-          _toast('Recording stopped at the 3-minute limit.');
-        } else {
-          setState(() => _recordingElapsed = next);
-        }
-      });
-      if (mounted) setState(() => _recordingPath = path);
-    } catch (e) {
-      if (mounted) setState(() => _isRecording = false);
-      _toast('Could not start recording: $e');
-    }
-  }
-
-  Future<void> _stopRecording() async {
-    if (!_isRecording) return;
-    if (mounted) setState(() => _isRecording = false);
-    _amplitudeSub?.cancel();
-    _amplitudeSub = null;
-    _recordingTimer?.cancel();
-    _recordingTimer = null;
-    try {
-      final stoppedPath = await _recorder.stop();
-      final path = stoppedPath ?? _recordingPath;
-      if (path == null) {
-        _toast('No recording was captured.');
-        return;
-      }
-      // macOS AVFoundation finishes the .m4a after stop() returns — wait
-      // for the file instead of racing PathNotFoundException on attach.
-      final bytes = await _waitForRecordingFile(path);
-      if (bytes == null || bytes.isEmpty) {
-        await _discardRecording();
-        _toast('The recording was empty.');
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _recordingPath = path;
-          _recordingBytes = bytes;
-        });
-      } else {
-        _recordingPath = path;
-        _recordingBytes = bytes;
-      }
-    } catch (e) {
-      _toast('Could not finish recording: $e');
-    }
-  }
-
-  /// Wait until [path] exists and is non-empty. AVCaptureAudioFileOutput on
-  /// macOS writes the container asynchronously after stopRecording().
-  Future<Uint8List?> _waitForRecordingFile(String path) async {
-    final file = File(path);
-    const attempts = 40; // ~2s
-    for (var i = 0; i < attempts; i++) {
-      try {
-        if (await file.exists()) {
-          final bytes = await file.readAsBytes();
-          if (bytes.isNotEmpty) return bytes;
-        }
-      } catch (_) {}
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    }
-    return null;
-  }
-
-  Future<void> _toggleRecordingPlayback() async {
-    final path = _recordingPath;
-    if (path == null || _isRecording) return;
-    try {
-      if (_isPlayingRecording) {
-        await _audioPlayer.pause();
-      } else if (_audioPlayer.state == PlayerState.paused) {
-        await _audioPlayer.resume();
-      } else {
-        await _audioPlayer.play(DeviceFileSource(path));
-      }
-    } catch (e) {
-      _toast('Could not play recording: $e');
-    }
-  }
-
-  bool _confirmingRecording = false;
-  Future<bool> _confirmRecording() async {
-    final path = _recordingPath;
-    var bytes = _recordingBytes;
-    if ((path == null && bytes == null) ||
-        _isRecording ||
-        _confirmingRecording) {
-      return false;
-    }
-    _confirmingRecording = true;
-    // Clear immediately so a second confirm tap cannot race the first.
-    _recordingPath = null;
-    _recordingBytes = null;
-    try {
-      if (bytes == null || bytes.isEmpty) {
-        if (path != null) bytes = await _waitForRecordingFile(path);
-      }
-      if (bytes == null || bytes.isEmpty) {
-        await _discardRecording();
-        _toast('The recording was empty.');
-        return false;
-      }
-      await _ingest([
-        (
-          name: 'voice-${DateTime.now().microsecondsSinceEpoch}.m4a',
-          localPath: null,
-          readBytes: () async => bytes!,
-        )
-      ]);
-      await _audioPlayer.stop();
-      if (path != null) {
-        try {
-          final file = File(path);
-          if (await file.exists()) await file.delete();
-        } catch (_) {}
-      }
-      if (mounted)
-        setState(() {
-          _waveform.clear();
-          _playbackPosition = Duration.zero;
-          _playbackDuration = Duration.zero;
-          _isPlayingRecording = false;
-        });
-      return true;
-    } catch (e) {
-      // Put the take back so a failed upload can be retried.
-      _recordingPath = path;
-      _recordingBytes = bytes;
-      _toast('Could not attach recording: $e');
-      return false;
-    } finally {
-      _confirmingRecording = false;
-    }
-  }
-
-  Future<void> _discardRecording() async {
-    final path = _recordingPath;
-    _amplitudeSub?.cancel();
-    _amplitudeSub = null;
-    _recordingTimer?.cancel();
-    _recordingTimer = null;
-    try {
-      await _audioPlayer.stop();
-    } catch (_) {}
-    if (path != null) {
-      try {
-        final file = File(path);
-        if (await file.exists()) await file.delete();
-      } catch (_) {}
-    }
-    if (mounted) {
-      setState(() {
-        _isRecording = false;
-        _recordingPath = null;
-        _recordingBytes = null;
-        _recordingElapsed = Duration.zero;
-        _playbackPosition = Duration.zero;
-        _playbackDuration = Duration.zero;
-        _waveform.clear();
-        _isPlayingRecording = false;
-      });
-    }
-  }
-
-  String _audioTime(Duration d) {
-    final seconds = d.inSeconds.clamp(0, 5999);
-    final minutes = seconds ~/ 60;
-    final remainder = seconds % 60;
-    return '$minutes:${remainder.toString().padLeft(2, '0')}';
-  }
-
-  Widget _recordingPanel() {
-    final reviewing = !_isRecording && _recordingPath != null;
-    final position = reviewing ? _playbackPosition : _recordingElapsed;
-    final samples = List<double>.of(_waveform);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-      ),
-      child: Row(children: [
-        InkWell(
-          onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
-          borderRadius: BorderRadius.circular(99),
-          child: SizedBox(
-            width: 32,
-            height: 32,
-            child: Center(
-              child: AppIcon(
-                _isRecording
-                    ? 'stop'
-                    : (_isPlayingRecording ? 'pause' : 'play'),
-                size: 16,
-                color: _isRecording ? AppColors.accent : AppColors.fg1,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(_audioTime(position),
-            style: mono(11,
-                color: _isRecording ? AppColors.accent : AppColors.fg3)),
-        const SizedBox(width: 8),
-        Expanded(
-          child: SizedBox(
-            height: 22,
-            child: CustomPaint(painter: _WaveformPainter(samples)),
-          ),
-        ),
-        if (reviewing) ...[
-          IconBtn('x',
-              size: 28,
-              iconSize: 14,
-              tooltip: 'Discard',
-              onTap: _discardRecording),
-          IconBtn('check',
-              size: 28,
-              iconSize: 14,
-              tooltip: 'Use recording',
-              onTap: () => unawaited(_confirmRecording())),
-        ],
-      ]),
-    );
-  }
-
-  Widget _ctxOption(String icon, String label, String value) {
-    return Expanded(
-      child: Material(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.md),
-          onTap: () => Navigator.pop(context, value),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(children: [
-              AppIcon(icon, size: 22, color: AppColors.fg2),
-              const SizedBox(height: 8),
-              Text(label, style: sans(12, color: AppColors.fg1)),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickFiles() async {
-    List<PickedLocalFile> files;
-    try {
-      files = await pickLocalFiles();
-    } catch (e) {
-      _toast('$e');
-      return;
-    }
-    if (files.isEmpty) return;
-    await _ingest(files
-        .map((f) => (
-              name: f.name,
-              localPath: f.path,
-              readBytes: f.readAsBytes,
-            ))
-        .toList());
-  }
-
-  Future<void> _pickPhotos() async {
-    final xs =
-        await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 2200);
-    if (xs.isEmpty) return;
-    await _ingest(xs
-        .map((x) => (name: x.name, localPath: x.path, readBytes: x.readAsBytes))
-        .toList());
-  }
-
-  Future<void> _pickCamera() async {
-    final x = await ImagePicker().pickImage(
-        source: ImageSource.camera, imageQuality: 85, maxWidth: 2200);
-    if (x == null) return;
-    await _ingest(
-        [(name: x.name, localPath: x.path, readBytes: x.readAsBytes)]);
-  }
-
-  // Create attachment chips for the picked items (capped to 10 total) and upload each.
-  Future<void> _ingest(
-      List<
-              ({
-                String name,
-                String? localPath,
-                Future<Uint8List> Function() readBytes
-              })>
-          picked) async {
-    final remaining = _maxAttachments - _attachments.length;
-    if (remaining <= 0) return;
-    var items = picked;
-    if (items.length > remaining) {
-      items = items.take(remaining).toList();
-      _toast('Added $remaining (max $_maxAttachments).');
-    }
-    final entries = items
-        .map((p) => _Attachment(
-            name: p.name,
-            isImage: _isImageName(p.name),
-            isAudio: isAudioAttachmentPath(p.name),
-            localPath: p.localPath))
-        .toList();
-    if (entries.isEmpty) return;
-    setState(() => _attachments.addAll(entries));
-    final generation = _attachmentGeneration;
-    for (var i = 0; i < entries.length; i++) {
-      final p = items[i];
-      final a = entries[i];
-      try {
-        final bytes = await p.readBytes();
-        final path = await widget.client.uploadFile(bytes, name: p.name);
-        if (!mounted || generation != _attachmentGeneration) return;
-        setState(() {
-          a.remotePath = path;
-          a.uploading = false;
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _attachments.remove(a));
-        _toast('upload failed: ${p.name}');
-      }
-    }
-  }
-
-  SharedInbound? _consumedShare;
-
-  Future<void> _consumeInboundShare(SharedInbound share) async {
-    if (_consumedShare == share || share.isEmpty) return;
-    _consumedShare = share;
-    // Drop it at the source immediately: mobile destroys non-active session
-    // states, and a fresh state re-runs initState → consume → resend.
-    widget.onShareConsumed?.call();
-    // Stage the share in the composer — text pre-filled, attachments attached
-    // — but never auto-send. The user writes their message around it and sends
-    // like they normally would.
-    if (share.text.trim().isNotEmpty) {
-      final existing = _input.text;
-      _input.text = existing.isEmpty
-          ? share.text.trim()
-          : '${existing.trim()}\n\n${share.text.trim()}';
-      _input.selection = TextSelection.collapsed(offset: _input.text.length);
-    }
-    if (share.paths.isNotEmpty) {
-      await _ingest([
-        for (var i = 0; i < share.paths.length; i++)
-          (
-            name: i < share.names.length && share.names[i].isNotEmpty
-                ? share.names[i]
-                : share.paths[i].split('/').last,
-            localPath: share.paths[i],
-            readBytes: () => File(share.paths[i]).readAsBytes(),
-          ),
-      ]);
-    }
-  }
-
-  Future<void> _confirmCompact() async {
-    if (_state?.compacting == true) {
-      _toast('Already compacting');
-      return;
-    }
-    final ok = await confirmAction(
-      context,
-      title: 'Compact history?',
-      body:
-          'Older conversation history will be summarized into a context table. Recent messages stay. This cannot be undone.',
-      confirmLabel: 'Compact',
-      danger: false,
-    );
-    if (!ok || !mounted) return;
-    _send({'kind': 'compact'});
-    _toast('Compacting history');
-  }
-
-  List<QueuedInput> get _heldQueue {
-    final live = _state?.queuedInputs ?? const <QueuedInput>[];
-    final extra = <QueuedInput>[];
-    for (final item in _optimisticQueued) {
-      if (!live.any((liveItem) => liveItem.id == item.id)) extra.add(item);
-    }
-    final all = extra.isEmpty ? live : [...live, ...extra];
-    return _queueHidden.isEmpty
-        ? all
-        : all.where((item) => !_queueHidden.contains(item.id)).toList();
-  }
-
-  void _syncOptimisticQueue(List<QueuedInput> live) {
-    _optimisticQueued
-        .removeWhere((item) => live.any((liveItem) => liveItem.id == item.id));
-  }
-
-  void _hideQueuedAt(int visible) {
-    final held = _heldQueue;
-    if (visible >= 0 && visible < held.length) {
-      _queueHidden.add(held[visible].id);
-    }
-  }
-
-  void _cancelQueuedAt(int visible) {
-    if (visible < 0 || visible >= _heldQueue.length) return;
-    final item = _heldQueue[visible];
-    setState(() => _hideQueuedAt(visible));
-    _send({'kind': 'unqueue', 'value': item.id, 'nonce': _nextNonce()});
-  }
-
-  void _steerAllQueued() {
-    final items = List<QueuedInput>.from(_heldQueue);
-    for (final item in items) {
-      final nonce = _nextNonce();
-      setState(() {
-        _queueHidden.add(item.id);
-        _optimisticQueued.removeWhere((queued) => queued.id == item.id);
-        _trackPending(item.text, nonce);
-      });
-      _send({'kind': 'steer_queued', 'value': item.id, 'nonce': nonce});
-    }
-    if (items.isNotEmpty) _armAckWatchdog();
-  }
-
-  void _cancelAllQueued() {
-    setState(() => _queueHidden.addAll(_heldQueue.map((item) => item.id)));
-    _send({'kind': 'drop_queued'});
-  }
-
-  void _steerQueuedAt(int visible) {
-    final held = _heldQueue;
-    if (visible < 0 || visible >= held.length) return;
-    final item = held[visible];
-    final nonce = _nextNonce();
-    setState(() {
-      _queueHidden.add(item.id);
-      _optimisticQueued.removeWhere((queued) => queued.id == item.id);
-      _trackPending(item.text, nonce);
-    });
-    _send({'kind': 'steer_queued', 'value': item.id, 'nonce': nonce});
-    _armAckWatchdog();
-  }
-
-  // Clean text for a held/pending message (markers stripped). Attachments
-  // surface as AttachmentPill beside the text — same as a real Bubble.
-  String _queuedText(String m) => hideAttachmentMarkers(m);
-
-  (int audio, int images, int files) _queuedAttachCounts(String m) {
-    final matches =
-        RegExp(r'\[attached (image|file) —([^\]]*)\]').allMatches(m);
-    final audio =
-        matches.where((x) => isAudioAttachmentPath(x.group(2) ?? '')).length;
-    final images = matches.where((x) => x.group(1) == 'image').length;
-    return (audio, images, matches.length - images - audio);
-  }
-
-  void _toast(String m) {
-    if (mounted) toast(context, m);
-  }
-
-  Future<void> _disposeRecorder() async {
-    try {
-      if (_isRecording) await _recorder.cancel();
-    } catch (_) {}
-    final pendingPath = _recordingPath;
-    _recordingBytes = null;
-    if (pendingPath != null) {
-      try {
-        final file = File(pendingPath);
-        if (await file.exists()) await file.delete();
-      } catch (_) {}
-    }
-    try {
-      if (kCanRecord) {
-        await _recorder.dispose();
-      }
-    } catch (_) {}
-  }
-
   @override
   void deactivate() {
     // Close IME while the TextField is still mounted. Parent dispose() runs
@@ -1939,25 +979,28 @@ class _SessionScreenState extends State<SessionScreen>
   @override
   void dispose() {
     _closed = true;
+    _agentEventsSub?.cancel();
     modelsRevision.removeListener(_loadModel);
     _input.removeListener(_interceptBigPaste);
+    _input.removeListener(_saveDraft);
+    Drafts.instance.save(_draftKey, _currentDraft(), now: true);
+    // Tool batches are not disposed: the desktop side pane can still be
+    // showing one after this screen goes, and they hold no resources.
     _inputFocus.unfocus();
     _reconnectTimer?.cancel();
+    _bannerTimer?.cancel();
     _connectionWatchdog?.cancel();
     _ackTimer?.cancel();
     _decisionTimer?.cancel();
-    _historyPrefetchTimer?.cancel();
+    _decisionGiveUp?.cancel();
     _streamFlushTimer?.cancel();
     _liveFrame.dispose();
+    _recorderTick.dispose();
     _sub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     // Only clear the suppression key if this screen still owns it — on a session
     // switch the NEW screen registers before this dispose runs, and clobbering
     // its key made notifications fire for the session being viewed.
-    if (_registeredOpenKey == _openKey) {
-      _registeredOpenKey = '';
-      reportOpenSession('');
-    }
     // Held messages already live on the daemon. Flush only the reconnect outbox.
     final ch = _channel;
     if (_outbox.isNotEmpty && ch != null) {
@@ -2001,8 +1044,12 @@ class _SessionScreenState extends State<SessionScreen>
   Widget build(BuildContext context) {
     // Depend on Theme so this rebuilds when the user switches palettes.
     Theme.of(context);
+    _syncDraftAttachments();
     final s = _state;
-    final status = s?.status ?? 'connecting';
+    final reported = s?.status ?? 'connecting';
+    final status = reported == 'waiting_for_input' && _pendingDecision != null
+        ? 'running'
+        : reported;
     final running = status == 'running';
     final waiting = status == 'waiting_for_input';
     final allEvents = s?.events ?? const [];
@@ -2012,181 +1059,268 @@ class _SessionScreenState extends State<SessionScreen>
       _transcriptDirty = false;
     }
     final items = _transcriptCache!;
+    // The mobile end-drawer is the ONLY host for the action list on a phone, so
+    // the scaffold needs a key (Navigator.pop cannot close a drawer) and the
+    // drawer itself. Desktop keeps the pull-up sheet.
+    final useDrawer = kMobile && widget.onMenu != null;
     final scaffold = Scaffold(
+      key: useDrawer ? _scaffoldKey : null,
+      endDrawer: useDrawer ? _actionsDrawer(s) : null,
+      // Tap-only: the default edge drag competes with transcript gestures.
+      endDrawerEnableOpenDragGesture: false,
       backgroundColor: readingBg,
       resizeToAvoidBottomInset: false,
       body: SafeArea(
         bottom: false,
         child: Stack(children: [
           Positioned.fill(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (kMobile)
-                    _mobileHeader(s, running, waiting)
-                  else if (!kMacOS)
-                    _desktopBar(s, running),
-                  // Desktop keeps the detailed chip strip.
-                  if (!kMobile && !kMacOS) _statusStrip(s, running),
-                  if (_connError != null) _disconnectedBanner(),
-                  Expanded(
-                    child: Stack(children: [
-                      s == null
-                          ? Center(
-                              child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.fg3)))
-                          : NotificationListener<ScrollNotification>(
-                              onNotification: _onScroll,
-                              child: Builder(builder: (context) {
-                                final timeline = <Widget>[
-                                  if (items.isEmpty && !running)
-                                    const EmptyState(
-                                        icon: 'terminal',
-                                        title: 'Session ready',
-                                        body: 'Send a task to get started.'),
-                                  ...items,
-                                  // Optimistic bubbles for messages sent but not yet echoed.
-                                  for (var pi = 0; pi < _pending.length; pi++)
-                                    Opacity(
-                                        key: ValueKey(
-                                            'pending-$pi-${_pending[pi].hashCode}'),
-                                        opacity: 0.5,
-                                        child: Padding(
-                                            padding: const EdgeInsets.only(
-                                                bottom: 12),
-                                            child: Bubble(
-                                                mine: true,
-                                                text: _pending[pi],
-                                                selectable: false))),
-                                  if (_heldQueue.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    _QueuedSection(
-                                      count: _heldQueue.length,
-                                      showBulkActions:
-                                          !kMobile || _heldQueue.length > 1,
-                                      onSendAll: _steerAllQueued,
-                                      onCancelAll: _cancelAllQueued,
-                                      children: [
-                                        for (var qi = 0;
-                                            qi < _heldQueue.length;
-                                            qi++)
-                                          KeyedSubtree(
-                                            key: ValueKey(
-                                                'queued-$qi-${_heldQueue[qi].id}'),
-                                            child: _QueuedBubble(
-                                              text: _queuedText(
-                                                  _heldQueue[qi].text),
-                                              audio: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$1,
-                                              images: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$2,
-                                              files: _queuedAttachCounts(
-                                                      _heldQueue[qi].text)
-                                                  .$3,
-                                              onCancel: () =>
-                                                  _cancelQueuedAt(qi),
-                                              onSteer: () => _steerQueuedAt(qi),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  // The bottom chrome is NON-FLEX, so Flutter lays it out at its
+                  // natural height BEFORE the transcript's Expanded claims what
+                  // is left. A question or approval card carrying a long
+                  // agent-authored body could therefore exceed the pane outright
+                  // and push its own actions off the bottom edge — which is why a
+                  // big question was impossible to answer. Measuring the pane
+                  // here is what lets the cards be capped and scroll instead.
+                  child: LayoutBuilder(builder: (context, pane) {
+                    final barsCap = pane.maxHeight * 0.6;
+                    return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (kMobile)
+                            _mobileHeader(s)
+                          else if (!kMacOS)
+                            _desktopBar(s, running),
+                          // Desktop keeps the detailed chip strip.
+                          if (!kMobile && !kMacOS) _statusStrip(s, running),
+                          if (_connError != null) _disconnectedBanner(),
+                          Expanded(
+                            child: Stack(children: [
+                              s == null
+                                  ? Center(child: DelayedSpinner(size: 22))
+                                  : NotificationListener<ScrollNotification>(
+                                      onNotification: _onScroll,
+                                      child: Builder(builder: (context) {
+                                        final timeline = <Widget>[
+                                          if (items.isEmpty && !running)
+                                            const EmptyState(
+                                                icon: 'terminal',
+                                                title: 'Session ready',
+                                                body:
+                                                    'Send a task to get started.'),
+                                          if (_transcriptStart > 0 &&
+                                              items.isNotEmpty)
+                                            Padding(
+                                              key: const ValueKey(
+                                                  'load-earlier'),
+                                              padding: const EdgeInsets.only(
+                                                  bottom: S.s12),
+                                              child: Center(
+                                                child: _loadingOlderTranscript
+                                                    ? const SizedBox(
+                                                        height: 28,
+                                                        child: Center(
+                                                            child: Spinner(
+                                                                size: 14)))
+                                                    : TextAction(
+                                                        'Show earlier messages',
+                                                        icon: 'history',
+                                                        onTap:
+                                                            _loadOlderTranscript),
+                                              ),
                                             ),
+                                          ...items,
+                                          // Optimistic bubbles for messages sent but not yet echoed.
+                                          for (var pi = 0;
+                                              pi < _pending.length;
+                                              pi++)
+                                            Opacity(
+                                                key: ValueKey(
+                                                    'pending-$pi-${_pending[pi].hashCode}'),
+                                                opacity: 0.5,
+                                                child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            bottom: 12),
+                                                    child: Bubble(
+                                                        mine: true,
+                                                        text: _pending[pi],
+                                                        selectable: false,
+                                                        client: widget.client))),
+                                          _LiveStreamRow(
+                                            key: const ValueKey(
+                                                'live-stream-row'),
+                                            frame: _liveFrame,
+                                            running: running,
+                                            compacting: s.compacting,
+                                            startedAt: s.turnStartedAt,
+                                            hasVisibleAction:
+                                                _turnHasVisibleAction(events),
+                                            compactionDetail:
+                                                _latestCompactionDetail(events),
                                           ),
-                                      ],
+                                        ];
+                                        return ScrollConfiguration(
+                                          behavior:
+                                              ScrollConfiguration.of(context)
+                                                  .copyWith(scrollbars: false),
+                                          child: ListView.builder(
+                                            controller: _scroll,
+                                            reverse: true,
+                                            scrollCacheExtent:
+                                                ScrollCacheExtent.pixels(400),
+                                            padding: EdgeInsets.fromLTRB(
+                                                kMobile ? M.gutter : 20,
+                                                16,
+                                                kMobile ? M.gutter : 20,
+                                                24),
+                                            itemCount: timeline.length,
+                                            itemBuilder: (context, index) {
+                                              final child = timeline[
+                                                  timeline.length - 1 - index];
+                                              return KeyedSubtree(
+                                                key: child.key ??
+                                                    ValueKey('timeline-$index'),
+                                                child: _centerWide(
+                                                  Align(
+                                                    alignment:
+                                                        Alignment.centerLeft,
+                                                    child: SizedBox(
+                                                      width: double.infinity,
+                                                      child: RepaintBoundary(
+                                                          child: child),
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      })),
+                              if (!_stickToBottom && s != null)
+                                Positioned(
+                                  right: 16,
+                                  bottom: 12,
+                                  child: Material(
+                                    color: AppColors.surface1,
+                                    shape: const CircleBorder(),
+                                    elevation: 0,
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () {
+                                        _stickToBottom = true;
+                                        setState(() {});
+                                        _scheduleBottom(
+                                            settle: true, smooth: true);
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: AppIcon('chevron-down',
+                                            size: 16, color: AppColors.fg3),
+                                      ),
                                     ),
-                                  ],
-                                  _LiveStreamRow(
-                                    key: const ValueKey('live-stream-row'),
-                                    frame: _liveFrame,
-                                    running: running,
-                                    compacting: s.compacting,
-                                    startedAt: s.turnStartedAt,
-                                    hasVisibleAction:
-                                        _turnHasVisibleAction(events),
-                                    compactionDetail:
-                                        _latestCompactionDetail(events),
                                   ),
-                                ];
-                                return ScrollConfiguration(
-                                  behavior: ScrollConfiguration.of(context)
-                                      .copyWith(scrollbars: false),
-                                  child: ListView.builder(
-                                    controller: _scroll,
-                                    reverse: true,
-                                    scrollCacheExtent:
-                                        ScrollCacheExtent.pixels(400),
-                                    padding: const EdgeInsets.fromLTRB(
-                                        20, 16, 20, 24),
-                                    itemCount: timeline.length,
-                                    itemBuilder: (context, index) {
-                                      final child =
-                                          timeline[timeline.length - 1 - index];
-                                      return KeyedSubtree(
-                                        key: child.key ??
-                                            ValueKey('timeline-$index'),
-                                        child: _centerWide(
-                                          RepaintBoundary(child: child),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                );
-                              })),
-                      if (!_stickToBottom && s != null)
-                        Positioned(
-                          right: 16,
-                          bottom: 12,
-                          child: Material(
-                            color: AppColors.surface1,
-                            shape: const CircleBorder(),
-                            elevation: 0,
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: () {
-                                _stickToBottom = true;
-                                setState(() {});
-                                _scheduleBottom(settle: true, smooth: true);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: AppIcon('chevron-down',
-                                    size: 16, color: AppColors.fg3),
-                              ),
-                            ),
+                                ),
+                            ]),
                           ),
-                        ),
-                    ]),
-                  ),
-                  // The question/approval bars are PINNED here (not inside the scroll
-                  // list) so a "needs input" request is always visible — buried at the
-                  // bottom of a scrolled-up transcript it read as "the agent is stuck".
-                  if (waiting && _pendingApproval(events))
-                    _centerWide(Padding(
-                      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 6,
-                          widget.embedded ? 0 : 20, 0),
-                      child: _ApprovalBar(
-                          events: events,
-                          onSend: _sendDecision,
-                          showApproveAll: _pendingApprovalTotal(events) > 1),
-                    )),
-                  if (waiting && s?.pendingQuestion != null)
-                    _centerWide(Padding(
-                      padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : 20, 6,
-                          widget.embedded ? 0 : 20, 0),
-                      child: _QuestionBar(
-                          question: s!.pendingQuestion!, onSend: _sendDecision),
-                    )),
-                  if (!(waiting && s?.pendingQuestion != null))
-                    _centerWide(_inputBar(running)),
-                  if (_termOpen && _terms.isNotEmpty && !kMobile)
-                    _desktopTermDrawer(),
-                ]),
+                          // The question/approval bars are PINNED here (not inside the scroll
+                          // list) so a "needs input" request is always visible — buried at the
+                          // bottom of a scrolled-up transcript it read as "the agent is stuck".
+                          if (waiting && _pendingApproval(events))
+                            _centerWide(ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: barsCap),
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    6,
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    0),
+                                child: ApprovalBar(
+                                    events: events,
+                                    onSend: _sendDecision,
+                                    showApproveAll:
+                                        _pendingApprovalTotal(events) > 1),
+                              ),
+                            )),
+                          if (waiting && s?.pendingQuestion != null)
+                            _centerWide(ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: barsCap),
+                              child: Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    6,
+                                    kMobile
+                                        ? M.gutter
+                                        : (widget.embedded ? 0 : 20),
+                                    0),
+                                // Keyed by the question set, so a new one
+                                // starts fresh (selection, step, review).
+                                child: QuestionBar(
+                                    key: ValueKey(
+                                        jsonEncode(s!.pendingQuestion!)),
+                                    question: s.pendingQuestion!,
+                                    onSend: _sendDecision),
+                              ),
+                            )),
+                          if (!(waiting && s?.pendingQuestion != null))
+                            _centerWide(_inputBar(running)),
+                        ]);
+                  }),
+                ),
+                // Desktop, standalone: the terminal is a second pane BESIDE the
+                // chat. When embedded, the SHELL owns this pane instead — a
+                // terminal must survive switching sessions, which a session-local
+                // pane cannot do, so the session only renders it when it is the
+                // outermost desktop surface.
+                if (_termOpen &&
+                    _terms.isNotEmpty &&
+                    !kMobile &&
+                    !widget.embedded)
+                  _desktopTermPane(),
+              ],
+            ),
           ),
-          if (kMobile && _termOpen && _terms.isNotEmpty)
-            Positioned.fill(child: _mobileTermTab()),
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: Motion.fast,
+              reverseDuration: Motion.quick,
+              switchInCurve: Motion.enter,
+              switchOutCurve: Motion.exit,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.025, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: kMobile && _termOpen && _terms.isNotEmpty
+                  ? KeyedSubtree(
+                      key: const ValueKey('mobile-terminal'),
+                      child: _mobileTermTab(),
+                    )
+                  : const SizedBox(key: ValueKey('mobile-chat')),
+            ),
+          ),
         ]),
       ),
+    );
+    final guardedScaffold = DaemonScope(
+      client: widget.client,
+      onOpenFile: widget.onOpenFileTab,
+      onOpenTools: widget.onOpenToolBatch,
+      child: scaffold,
     );
     return kMacOS
         ? DropTarget(
@@ -2200,3275 +1334,8 @@ class _SessionScreenState extends State<SessionScreen>
               setState(() => _draggingFiles = false);
             },
             onDragDone: _ingestDroppedFiles,
-            child: scaffold,
+            child: guardedScaffold,
           )
-        : scaffold;
-  }
-
-  Future<void> _renameCurrent() async {
-    if (_isMissionControl) return;
-    final title = await promptText(context,
-        title: 'Rename session',
-        initial: _title,
-        hint: 'New title',
-        saveLabel: 'Rename');
-    if (title == null) return;
-    try {
-      await widget.client.renameSession(widget.sessionId, title);
-      if (mounted) {
-        setState(() => _publishTitle(title));
-      } else {
-        _publishTitle(title);
-      }
-    } catch (e) {
-      if (mounted) _toast('$e');
-    }
-  }
-
-  // On desktop, keep chat content to a comfortable reading width (centered),
-  // rather than stretching across the whole pane.
-  Widget _centerWide(Widget child) => widget.embedded
-      ? Center(
-          child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 820), child: child))
-      : child;
-
-  // Mobile chat header: a back button that returns to the session list, the
-  // title with a live status dot, and a compact subtitle folding in the key
-  // facts (status · model · context · approval) — so there's no separate,
-  // cramped desktop toolbar + scrolling chip strip on a phone.
-  Widget _mobileHeader(HarnessState? s, bool running, bool waiting) {
-    final compacting = s?.compacting ?? false;
-    final statusWord = compacting
-        ? 'Compacting history…'
-        : (waiting ? 'Needs input' : (running ? 'Running' : 'Idle'));
-    // Keep the model selector in the composer, where it is always visible.
-    final facts = <String>[statusWord];
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
-      decoration: BoxDecoration(color: readingBg),
-      child: Row(children: [
-        Expanded(
-          child: InkWell(
-            onTap: () => _openActions(s),
-            borderRadius: BorderRadius.circular(R.sm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_title.isEmpty ? 'session' : _title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(17,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(height: 3),
-                    Text(facts.join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(12, color: AppColors.fg3)),
-                  ]),
-            ),
-          ),
-        ),
-        if (running)
-          IconBtn('stop',
-              tooltip: 'Stop', onTap: () => _send({'kind': 'interrupt'})),
-        if (_isMissionControl)
-          IconBtn('layers', tooltip: 'Tasks', onTap: _showTasks),
-        if (!_isMissionControl)
-          IconBtn('terminal', tooltip: 'Shell', onTap: _openTerm),
-      ]),
-    );
-  }
-
-  Widget _desktopTermDrawer() {
-    final i = _termFocus.clamp(0, _terms.length - 1);
-    final t = _terms[i];
-    return ColoredBox(
-      color: const Color(0xff0a0a0a),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onVerticalDragUpdate: (d) {
-              final maxH = MediaQuery.sizeOf(context).height * 0.72;
-              setState(() {
-                _termHeight = (_termHeight - d.delta.dy).clamp(140.0, maxH);
-              });
-            },
-            child: MouseRegion(
-              cursor: SystemMouseCursors.resizeRow,
-              child: SizedBox(
-                height: 18,
-                child: Center(
-                  child: Container(
-                    width: 36,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: AppColors.border2,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          _termTabStrip(i, compact: true),
-          SizedBox(
-            height: _termHeight,
-            child: SessionTermView(
-              alive: t.alive,
-              terminal: t.terminal,
-              onInput: _termIn,
-              onResize: _termResize,
-              onClose: () => _closeTerm(t.id),
-              mobileKeys: false,
-              showChrome: false,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mobileTermTab() {
-    final i = _termFocus.clamp(0, _terms.length - 1);
-    final t = _terms[i];
-    return Material(
-      color: const Color(0xff000000),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-          child: Row(children: [
-            IconBtn('chevron-left',
-                size: 36,
-                iconSize: 18,
-                tooltip: 'Back to chat',
-                onTap: () => setState(() => _termOpen = false)),
-            Expanded(child: _termTabStrip(i, compact: false)),
-          ]),
-        ),
-        Expanded(
-          child: SessionTermView(
-            alive: t.alive,
-            terminal: t.terminal,
-            onInput: _termIn,
-            onResize: _termResize,
-            onClose: () => _closeTerm(t.id),
-            mobileKeys: true,
-            showChrome: false,
-          ),
-        ),
-      ]),
-    );
-  }
-
-  Widget _termTabStrip(int focus, {required bool compact}) {
-    return SizedBox(
-      height: compact ? 30 : 36,
-      child: Row(children: [
-        Expanded(
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.fromLTRB(compact ? 8 : 4, 0, 4, 0),
-            itemCount: _terms.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 4),
-            itemBuilder: (_, n) {
-              final on = n == focus;
-              final pane = _terms[n];
-              return Material(
-                color: on ? AppColors.surface2 : Colors.transparent,
-                borderRadius: BorderRadius.circular(R.xs),
-                child: InkWell(
-                  onTap: () => setState(() => _termFocus = n),
-                  borderRadius: BorderRadius.circular(R.xs),
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 6, 4, 6),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Text(
-                        pane.title,
-                        style: sans(compact ? 12 : 13,
-                            weight: on ? FontWeight.w600 : FontWeight.w400,
-                            color: on ? AppColors.fg1 : AppColors.fg3),
-                      ),
-                      const SizedBox(width: 2),
-                      GestureDetector(
-                        onTap: () => _closeTerm(pane.id),
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.all(3),
-                          child: AppIcon('x',
-                              size: compact ? 10 : 12, color: AppColors.fg4),
-                        ),
-                      ),
-                    ]),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        IconBtn('plus',
-            size: compact ? 28 : 32,
-            iconSize: compact ? 13 : 16,
-            tooltip: 'New shell',
-            onTap: () => _openTerm(fresh: true)),
-      ]),
-    );
-  }
-
-  // macOS keeps this row focused on the active session title. Workspace
-  // context and Git actions live in the clickable repository bar above.
-  Widget _desktopBar(HarnessState? s, bool running) {
-    final mac = kMacOS;
-    final title = _title.isEmpty ? 'session' : _title;
-    return Container(
-      height: mac ? 42 : 50,
-      padding: EdgeInsets.symmetric(horizontal: mac ? 16 : 8),
-      decoration: BoxDecoration(
-        color: mac ? AppColors.surface1 : readingBg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(children: [
-        if (!mac && widget.onMenu != null) ...[
-          IconBtn('sidebar',
-              size: 30, iconSize: 16, tooltip: 'Sidebar', onTap: widget.onMenu),
-          const SizedBox(width: 4),
-        ] else if (!mac)
-          const SizedBox(width: 2),
-        Expanded(
-          child: Text(title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: sans(mac ? 13.5 : 16.5,
-                  weight: FontWeight.w500, color: AppColors.fg1)),
-        ),
-        if (mac && running)
-          IconBtn('stop',
-              size: 30,
-              iconSize: 15,
-              tooltip: 'Stop',
-              onTap: () => _send({'kind': 'interrupt'})),
-        if (mac && _isMissionControl)
-          IconBtn('layers',
-              size: 30, iconSize: 15, tooltip: 'Tasks', onTap: _showTasks),
-        if (mac && !_isMissionControl)
-          IconBtn('terminal',
-              size: 30, iconSize: 15, tooltip: 'Shell', onTap: _openTerm),
-        if (mac)
-          IconBtn('more-horizontal',
-              size: 30,
-              iconSize: 17,
-              tooltip: 'More',
-              onTap: () => _openActions(s)),
-        if (!mac && running)
-          IconBtn('stop',
-              size: 32,
-              iconSize: 16,
-              tooltip: 'Stop',
-              onTap: () => _send({'kind': 'interrupt'})),
-        if (!mac) ...[
-          if (_isMissionControl)
-            IconBtn('layers',
-                size: 32, iconSize: 16, tooltip: 'Tasks', onTap: _showTasks),
-          if (!_isMissionControl)
-            IconBtn('terminal',
-                size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
-          _menu(s),
-        ],
-      ]),
-    );
-  }
-
-  Widget _menu(HarnessState? s) {
-    final view = View.of(context);
-    final desktop =
-        view.physicalSize.width / view.devicePixelRatio >= kDesktopBreakpoint;
-    if (!desktop) {
-      return IconBtn('more-vertical',
-          tooltip: 'Actions', onTap: () => _openActions(s));
-    }
-    return PopupMenuButton<VoidCallback>(
-      color: AppColors.surface1,
-      elevation: 0,
-      surfaceTintColor: Colors.transparent,
-      shadowColor: Colors.transparent,
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 260),
-      menuPadding: const EdgeInsets.symmetric(vertical: 6),
-      shape: appMenuShape,
-      icon: AppIcon('more-vertical', color: AppColors.fg2),
-      tooltip: 'Actions',
-      onSelected: (fn) => fn(),
-      itemBuilder: (_) => _actionItems(s),
-    );
-  }
-
-  // Set an autonomous /goal: the agent drives toward it on its own until it's
-  // done, you cancel, or it's rate-limited. Sent as a LoopInput over the socket.
-  Future<void> _setGoal() async {
-    final text = await promptText(context,
-        title: 'Set goal',
-        hint: 'What should the agent work toward?',
-        saveLabel: 'Set goal',
-        minLines: 2,
-        maxLines: 4);
-    final t = text?.trim();
-    if (t == null || t.isEmpty) return;
-    _toast('Submitting goal…');
-    _send({'kind': 'set_goal', 'value': t});
-    _toast('Goal set — the agent will drive toward it');
-  }
-
-  void _cancelGoal() {
-    _send({'kind': 'cancel_goal'});
-    _toast('Cancelling the goal');
-  }
-
-  void _openRecurring() {
-    presentScreen(context,
-        style: PanelStyle.drawer,
-        builder: (_, close) => RecurringScreen(
-            client: widget.client,
-            onClose: close,
-            sessionId: widget.sessionId,
-            workspace: _state?.workspace));
-  }
-
-  void _setApproval(bool manual) {
-    final mode = manual ? 'manual' : 'auto';
-    final s = _state;
-    if (s != null) {
-      setState(() => _state = s.withApprovalMode(mode));
-    }
-    _send({'kind': 'set_mode', 'value': mode});
-    _toast(manual ? 'Approval: ask' : 'Approval: auto');
-  }
-
-  void _performMacAction(String action, [String? extra]) {
-    final s = _state;
-    switch (action) {
-      case 'rename':
-        _renameCurrent();
-        return;
-      case 'model':
-        _switchModel(context);
-        return;
-      case 'approval':
-        final manual = (s?.approvalMode ?? 'auto') == 'manual';
-        _setApproval(!manual);
-        return;
-      case 'approval_ask':
-        _setApproval(true);
-        return;
-      case 'approval_auto':
-        _setApproval(false);
-        return;
-      case 'goal':
-        final text = extra?.trim();
-        if (text != null && text.isNotEmpty) {
-          _send({'kind': 'set_goal', 'value': text});
-          _toast('Goal set — the agent will drive toward it');
-        } else if (s?.goal?.ongoing ?? false) {
-          _cancelGoal();
-        } else {
-          _setGoal();
-        }
-        return;
-      case 'lanes':
-        _showLanes();
-        return;
-      case 'files':
-        final ws = s?.workspace ?? '';
-        final name = lastPathSegment(ws, ifEmpty: 'Files');
-        presentScreen(context,
-            style: PanelStyle.drawer,
-            maxWidth: 1060,
-            maxHeight: 760,
-            builder: (_, close) => FileExplorer(
-                client: widget.client,
-                title: name,
-                start: ws.isEmpty ? null : ws,
-                onClose: close,
-                onOpenFile: widget.onOpenFileTab));
-        return;
-      case 'shell':
-        if (!_isMissionControl) _openTerm();
-        return;
-      case 'processes':
-        presentScreen(context,
-            style: PanelStyle.drawer,
-            builder: (_, close) => ProcessesScreen(
-                client: widget.client,
-                sessionId: widget.sessionId,
-                onClose: close));
-        return;
-      case 'recurring':
-        _openRecurring();
-        return;
-      case 'compact':
-        _confirmCompact();
-        return;
-      case 'checkpoints':
-        _showCheckpoints();
-        return;
-      case 'usage':
-        _showUsage();
-        return;
-    }
-  }
-
-  List<PopupMenuEntry<VoidCallback>> _actionItems(HarnessState? s) {
-    final manual = (s?.approvalMode ?? 'auto') == 'manual';
-    final ws = s?.workspace ?? '';
-    PopupMenuItem<VoidCallback> item(String icon, String label, VoidCallback fn,
-            {String? value}) =>
-        appMenuItem(
-          value: fn,
-          icon: icon,
-          label: label,
-          detail: value,
-        );
-    if (_isMissionControl) {
-      return [
-        item('layers', 'Tasks', _showTasks),
-        item('scheduled', 'Scheduled', _openRecurring),
-        item('shield', 'Approval: Auto', () => _setApproval(false),
-            value: manual ? null : 'on'),
-        item('shield', 'Approval: Ask', () => _setApproval(true),
-            value: manual ? 'on' : null),
-        item('minimize', 'Compact history', _confirmCompact),
-        item('activity', 'Usage', _showUsage),
-      ];
-    }
-    return [
-      item('edit', 'Rename session', _renameCurrent),
-      item('shield', 'Approval: Auto', () => _setApproval(false),
-          value: manual ? null : 'on'),
-      item('shield', 'Approval: Ask', () => _setApproval(true),
-          value: manual ? 'on' : null),
-      (s?.goal?.ongoing ?? false)
-          ? item('zap', 'Cancel goal', _cancelGoal,
-              value: s!.goal!.paused ? 'paused' : 'running')
-          : item('zap', 'Set goal', _setGoal),
-      if ((s?.lanes.isNotEmpty ?? false))
-        item('layers', 'Lanes', _showLanes,
-            value: '${s!.lanes.where((l) => l.running).length} running'),
-      const PopupMenuDivider(),
-      item('terminal', 'Session shell', _openTerm),
-      item(
-          'git-branch',
-          'Git',
-          () => presentScreen(context,
-              builder: (_, close) => GitScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-      item('folder', 'Browse', () {
-        final name = lastPathSegment(ws, ifEmpty: 'Files');
-        presentScreen(context,
-            style: PanelStyle.drawer,
-            maxWidth: 1060,
-            maxHeight: 760,
-            builder: (_, close) => FileExplorer(
-                client: widget.client,
-                title: name,
-                start: ws.isEmpty ? null : ws,
-                onClose: close,
-                onOpenFile: widget.onOpenFileTab));
-      }),
-      item(
-          'list',
-          'Processes',
-          () => presentScreen(context,
-              builder: (_, close) => ProcessesScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-      item('scheduled', 'Scheduled', _openRecurring),
-      const PopupMenuDivider(),
-      item('minimize', 'Compact history', _confirmCompact),
-      item('history', 'Checkpoints', _showCheckpoints),
-      item('activity', 'Usage', _showUsage),
-    ];
-  }
-
-  void _openActions(HarnessState? s) {
-    final ws = s?.workspace ?? '';
-    void run(VoidCallback f) {
-      Navigator.pop(context);
-      f();
-    }
-
-    showAppSheet(context,
-        title: 'Actions',
-        child: _SessionActionsPanel(
-          session: s,
-          title: _title,
-          hideRename: _isMissionControl,
-          hideWorkspace: _isMissionControl,
-          hideGoal: _isMissionControl,
-          hideCheckpoints: _isMissionControl,
-          onRename: (name) async {
-            if (_isMissionControl) return;
-            try {
-              await widget.client.renameSession(widget.sessionId, name);
-              if (mounted) {
-                setState(() => _publishTitle(name));
-              } else {
-                _publishTitle(name);
-              }
-            } catch (e) {
-              if (mounted) _toast('$e');
-            }
-          },
-          onApproval: _setApproval,
-          onSetGoal: (text) {
-            _send({'kind': 'set_goal', 'value': text});
-            _toast('Goal set — the agent will drive toward it');
-          },
-          onCancelGoal: _cancelGoal,
-          onLanes: () => run(_showLanes),
-          onTasks: _isMissionControl ? () => run(_showTasks) : null,
-          onTerm: () => run(_openTerm),
-          hideShell: _isMissionControl,
-          onGit: () => run(() => presentScreen(context,
-              builder: (_, close) => GitScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-          onFiles: () => run(() {
-            final name = lastPathSegment(ws, ifEmpty: 'Files');
-            presentScreen(context,
-                maxWidth: 1060,
-                maxHeight: 760,
-                builder: (_, close) => FileExplorer(
-                    client: widget.client,
-                    title: name,
-                    start: ws.isEmpty ? null : ws,
-                    onClose: close,
-                    onOpenFile: widget.onOpenFileTab));
-          }),
-          onProcesses: () => run(() => presentScreen(context,
-              style: PanelStyle.drawer,
-              builder: (_, close) => ProcessesScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-          onRecurring: () => run(_openRecurring),
-          onCompact: () => run(_confirmCompact),
-          onCheckpoints: () => run(_showCheckpoints),
-          onUsage: () => run(_showUsage),
-        ));
-  }
-
-  List<Widget> _statusChips(HarnessState? s, bool running) {
-    final chips = <Widget>[
-      Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-                color: running ? AppColors.run : AppColors.fg2,
-                shape: BoxShape.circle)),
-        const SizedBox(width: 7),
-        Text(
-            s?.compacting == true
-                ? 'Compacting'
-                : (running ? 'Running' : 'Idle'),
-            style: sans(12.5,
-                weight: FontWeight.w600,
-                color: s?.compacting == true
-                    ? AppColors.accent
-                    : (running ? AppColors.run : AppColors.fg2))),
-      ]),
-    ];
-    if (s != null && s.workspace.isNotEmpty) {
-      chips.add(_StatMeta(
-          icon: 'folder',
-          label: lastPathSegment(s.workspace, ifEmpty: s.workspace)));
-    }
-    if (s != null) {
-      if (s.contextWindow > 0 && s.lastPromptTokens > 0) {
-        chips.add(_StatMeta(
-            icon: 'activity',
-            label:
-                '${(s.lastPromptTokens / s.contextWindow * 100).clamp(0, 999).round()}% ctx'));
-      }
-      if (s.totalTokens > 0) {
-        chips.add(_StatMeta(icon: 'zap', label: '${fmtSi(s.totalTokens)} tok'));
-      }
-      chips.add(_StatMeta(
-          icon: 'shield',
-          label: s.approvalMode == 'auto' ? 'Auto-approve' : 'Ask',
-          tone: s.approvalMode == 'auto' ? 'accent' : 'default'));
-      // Show for any provider that reported limits.
-      final rp = s.ratePrimary;
-      if (rp != null) {
-        chips.add(_StatMeta(
-            icon: 'clipboard',
-            label:
-                '${rateWindowLabel(rp.windowMinutes)} · ${rp.leftPercent.round()}%',
-            tone: 'run'));
-      }
-    }
-    return chips;
-  }
-
-  Widget _statusStrip(HarnessState? s, bool running) {
-    final chips = _statusChips(s, running);
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-          color: AppColors.surface1,
-          border: Border(bottom: BorderSide(color: AppColors.border))),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(children: [
-          for (var i = 0; i < chips.length; i++) ...[
-            if (i > 0) const SizedBox(width: 12),
-            chips[i]
-          ],
-        ]),
-      ),
-    );
-  }
-
-  Widget _disconnectedBanner() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-          color: AppColors.dangerBg,
-          border: Border(
-              bottom:
-                  BorderSide(color: AppColors.danger.withValues(alpha: 0.25)))),
-      child: Row(children: [
-        AppIcon('wifi-off', size: 15, color: AppColors.danger),
-        const SizedBox(width: 9),
-        Expanded(
-            child: Text(
-                _outbox.isEmpty
-                    ? (_connError ?? 'Disconnected')
-                    : '${_connError ?? 'Disconnected'} · ${_outbox.length} message${_outbox.length == 1 ? '' : 's'} will send on reconnect',
-                style: sans(12, height: 1.3, color: AppColors.fg1))),
-        GestureDetector(
-          onTap: () {
-            _reconnectAttempt = 0;
-            _connect();
-          },
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon('refresh', size: 13, color: AppColors.danger),
-            const SizedBox(width: 5),
-            Text('Retry now',
-                style:
-                    sans(12, weight: FontWeight.w600, color: AppColors.danger)),
-          ]),
-        ),
-      ]),
-    );
-  }
-
-  // Live send-enabled check — read at tap/submit time and inside the
-  // ValueListenableBuilder below, so typing never has to setState the screen.
-  bool get _canSend =>
-      (_isRecording ||
-          _recordingPath != null ||
-          _input.text.trim().isNotEmpty ||
-          _attachments.any((a) => a.remotePath != null)) &&
-      !_anyUploading &&
-      !_sendingAudio;
-
-  Future<void> _ingestDroppedFiles(DropDoneDetails details) async {
-    if (!kMacOS || !widget.acceptDrops) return;
-    setState(() => _draggingFiles = false);
-    final files = details.files.whereType<DropItemFile>().map((item) {
-      final bookmark = item.extraAppleBookmark;
-      return (
-        name: item.name,
-        localPath: item.path,
-        readBytes: () async {
-          var accessed = false;
-          try {
-            if (bookmark != null && bookmark.isNotEmpty) {
-              accessed = await DesktopDrop.instance
-                  .startAccessingSecurityScopedResource(bookmark: bookmark);
-            }
-            return await item.readAsBytes();
-          } finally {
-            if (accessed) {
-              await DesktopDrop.instance
-                  .stopAccessingSecurityScopedResource(bookmark: bookmark!);
-            }
-          }
-        },
-      );
-    }).toList();
-    await _ingest(files);
-  }
-
-  Widget _inputBar(bool running) {
-    final mq = MediaQuery.of(context);
-    final keyboard = mq.viewInsets.bottom;
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      padding: EdgeInsets.only(bottom: keyboard),
-      child: Container(
-        padding: EdgeInsets.fromLTRB(
-            widget.embedded ? 0 : 20,
-            8,
-            widget.embedded ? 0 : 20,
-            10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
-        child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_attachments.isNotEmpty) _attachmentBar(),
-              if (_isRecording || _recordingPath != null) _recordingPanel(),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.bg,
-                  borderRadius: BorderRadius.circular(R.md),
-                  border: Border.all(color: AppColors.border),
-                ),
-                padding: const EdgeInsets.fromLTRB(12, 10, 10, 8),
-                child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_state?.goal?.ongoing == true) ...[
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface2,
-                            borderRadius: BorderRadius.circular(R.sm),
-                          ),
-                          child: Row(children: [
-                            AppIcon('goal', size: 14, color: AppColors.accent),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(_state!.goal!.text,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: sans(12, color: AppColors.fg2)),
-                            ),
-                            Text(_state!.goal!.paused ? 'paused' : 'active',
-                                style: mono(9.5, color: AppColors.accent)),
-                            const SizedBox(width: 5),
-                            IconBtn('x',
-                                size: 26,
-                                iconSize: 13,
-                                tooltip: 'Cancel goal',
-                                onTap: _cancelGoal),
-                          ]),
-                        ),
-                      ],
-                      CallbackShortcuts(
-                        bindings: {
-                          const SingleActivator(LogicalKeyboardKey.enter): () {
-                            if (!kMobile && _canSend) _sendMessage();
-                          },
-                          const SingleActivator(LogicalKeyboardKey.enter,
-                              meta: true): () {
-                            if (_canSend) _sendMessage();
-                          },
-                          const SingleActivator(LogicalKeyboardKey.enter,
-                              control: true): () {
-                            if (_canSend) _sendMessage();
-                          },
-                        },
-                        child: TextField(
-                          controller: _input,
-                          focusNode: _inputFocus,
-                          minLines: 1,
-                          maxLines: 8,
-                          cursorColor: AppColors.fg1,
-                          onSubmitted: (_) => _sendMessage(),
-                          style: sans(15.5, height: 1.45, color: AppColors.fg1),
-                          decoration: InputDecoration(
-                            isCollapsed: true,
-                            contentPadding:
-                                const EdgeInsets.fromLTRB(2, 2, 8, 14),
-                            border: InputBorder.none,
-                            hintText: 'Ask anything',
-                            hintStyle:
-                                sans(15.5, height: 1.45, color: AppColors.fg4),
-                          ),
-                        ),
-                      ),
-                      Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(R.sm),
-                              child: InkWell(
-                                onTap: _onAttachTap,
-                                borderRadius: BorderRadius.circular(R.sm),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: AppIcon('plus',
-                                      size: 18, color: AppColors.fg3),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Builder(builder: (chipCtx) {
-                              return Material(
-                                color: AppColors.surface2,
-                                borderRadius: BorderRadius.circular(R.sm),
-                                child: InkWell(
-                                  onTap: () => _switchModel(chipCtx),
-                                  borderRadius: BorderRadius.circular(R.sm),
-                                  child: Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(8, 5, 7, 5),
-                                    child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          AppIcon('sparkles',
-                                              size: 11, color: AppColors.fg2),
-                                          const SizedBox(width: 5),
-                                          Text(_modelLabel ?? 'Auto',
-                                              style: sans(11.5,
-                                                  weight: FontWeight.w500,
-                                                  color: AppColors.fg2)),
-                                          const SizedBox(width: 3),
-                                          AppIcon('chevron-down',
-                                              size: 10, color: AppColors.fg4),
-                                        ]),
-                                  ),
-                                ),
-                              );
-                            }),
-                            const Spacer(),
-                            if (kCanRecord) ...[
-                              Material(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(R.sm),
-                                child: InkWell(
-                                  onTap: _onMicTap,
-                                  borderRadius: BorderRadius.circular(R.sm),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(6),
-                                    child: AppIcon(
-                                        _isRecording ? 'mic-off' : 'mic',
-                                        size: 18,
-                                        color: _isRecording
-                                            ? AppColors.danger
-                                            : AppColors.fg3),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                            ],
-                            ValueListenableBuilder<TextEditingValue>(
-                              valueListenable: _input,
-                              builder: (_, __, ___) {
-                                final queue = running && _canSend;
-                                final stop = running && !queue;
-                                return _SendBtn(
-                                    enabled: stop || _canSend,
-                                    running: stop,
-                                    onTap: stop
-                                        ? () => _send({'kind': 'interrupt'})
-                                        : (_canSend ? _sendMessage : null));
-                              },
-                            ),
-                          ]),
-                    ]),
-              ),
-            ]),
-      ),
-    );
-  }
-
-  // Composer attachment row: image thumbnails + file chips, each with its own ✕.
-  Widget _attachmentBar() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: SizedBox(
-        height: 36,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: _attachments.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 6),
-          itemBuilder: (_, i) => _attachmentTile(_attachments[i]),
-        ),
-      ),
-    );
-  }
-
-  Widget _attachmentTile(_Attachment a) {
-    final thumb = a.isImage && a.localPath != null;
-    final isAudio = a.isAudio;
-    final body = thumb
-        ? ClipRRect(
-            borderRadius: BorderRadius.circular(R.sm),
-            child: Image.file(File(a.localPath!),
-                width: 36,
-                height: 36,
-                fit: BoxFit.cover,
-                cacheWidth: 72,
-                cacheHeight: 72),
-          )
-        : Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: isAudio ? AppColors.accentBg : AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.sm),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(isAudio ? 'mic' : (a.isImage ? 'image' : 'file'),
-                  size: 12, color: isAudio ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 5),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 100),
-                child: Text(a.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(10,
-                        color: isAudio ? AppColors.accent : AppColors.fg2)),
-              ),
-            ]),
-          );
-    return Stack(children: [
-      body,
-      if (a.uploading)
-        Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-                color: Colors.black45,
-                borderRadius: BorderRadius.circular(R.sm)),
-            alignment: Alignment.center,
-            child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg2)),
-          ),
-        ),
-      Positioned(
-        top: 3,
-        right: 3,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: () => setState(() => _attachments.remove(a)),
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: const BoxDecoration(
-                color: Colors.black87, shape: BoxShape.circle),
-            child: AppIcon('x', size: 11, color: AppColors.fg1),
-          ),
-        ),
-      ),
-    ]);
-  }
-
-  // ---- event → widget (pairs tool_call with its tool_result) ----
-  List<Widget> _transcript(List<Map<String, dynamic>> events) {
-    final out = <Widget>[];
-    Map<String, dynamic>? pending;
-    final run = <Widget>[]; // consecutive dense tool rows
-    String? runStartKey;
-    String? pendingKey;
-    final eventOccurrences = <String, int>{};
-    final laneRowsShown = <String>{}; // spawn cards already emitted (by id)
-
-    String eventKey(Map<String, dynamic> event) {
-      // Use the stable fields that identify a transcript event instead of
-      // JSON-serializing the entire historical event on every delta. The old
-      // fingerprint became O(history) work for each new tool event and made
-      // a burst of tool calls wait behind repeated full-list rebuilds.
-      final fingerprint = Object.hash(
-        event['kind'],
-        event['tool_name'],
-        event['text'],
-        event['id'],
-        event['path'],
-        event['step'],
-        event['created_at'],
-      ).toString();
-      final occurrence = eventOccurrences.update(
-        fingerprint,
-        (count) => count + 1,
-        ifAbsent: () => 0,
-      );
-      return 'transcript-event-${fingerprint.hashCode}-$occurrence';
-    }
-
-    void addEvent(String key, Widget child) {
-      out.add(KeyedSubtree(
-        key: ValueKey(key),
-        child: child,
-      ));
-    }
-
-    void addToolRow(Widget child, String key) {
-      runStartKey ??= key;
-      run.add(child);
-    }
-
-    void flushPending(String fallbackKey) {
-      final p = pending;
-      if (p != null) {
-        final name = _s(p['tool_name']);
-        addToolRow(DenseToolRow(tool: name, args: p['arguments']),
-            pendingKey ?? fallbackKey);
-        pending = null;
-        pendingKey = null;
-      }
-    }
-
-    void endTools(String fallbackKey) {
-      flushPending(fallbackKey);
-      if (run.isEmpty) return;
-      final start = runStartKey ?? fallbackKey;
-      final running = run.any((w) => w is DenseToolRow && w.pending);
-      final completedToolKey = 'transcript-tools-$start';
-      // A live batch grows as calls/results stream in. It must keep one fixed
-      // identity, otherwise a new first/pending event replaces the accordion
-      // and discards the user's expanded state mid-run.
-      final toolKey = running ? 'transcript-tools-live' : completedToolKey;
-      final open =
-          running ? _activeToolRunOpen : (_toolRunOpen[toolKey] ?? false);
-      out.add(KeyedSubtree(
-        key: ValueKey(toolKey),
-        child: ToolRun(
-          List.of(run),
-          running: running,
-          open: open,
-          onOpenChanged: (nextOpen) {
-            if (!mounted) return;
-            setState(() {
-              if (running) {
-                _activeToolRunOpen = nextOpen;
-                // The live row has a temporary key. Mirror the preference onto
-                // its final batch key so finishing a tool cannot replace an
-                // expanded running accordion with a closed completed one.
-                _toolRunOpen[completedToolKey] = nextOpen;
-              } else {
-                _toolRunOpen[toolKey] = nextOpen;
-              }
-              // The transcript is normally cached between event updates. Rebuild
-              // it now so ToolRun receives the new open value immediately.
-              _transcriptDirty = true;
-            });
-          },
-        ),
-      ));
-      run.clear();
-      runStartKey = null;
-    }
-
-    LaneInfo? liveLane(String id) {
-      for (final l in _state?.lanes ?? const <LaneInfo>[]) {
-        if (l.id == id) return l;
-      }
-      return null;
-    }
-
-    for (final e in events) {
-      final key = eventKey(e);
-      final k = e['kind'] as String? ?? '';
-      switch (k) {
-        case 'tool_call':
-          flushPending(key);
-          // Meta-tools render via their own events (note → note, ask_user →
-          // user_question, delegate_task → lane_spawned). Skip their generic tool
-          // lines so they don't double up.
-          if (_isMetaTool(_s(e['tool_name']))) break;
-          pending = e;
-          pendingKey = key;
-        case 'tool_result':
-          {
-            final p = pending;
-            if (p != null) {
-              addToolRow(
-                  DenseToolRow(
-                      tool: _s(p['tool_name']),
-                      args: p['arguments'],
-                      result: e['result']),
-                  pendingKey ?? key);
-              pending = null;
-              pendingKey = null;
-            } else {
-              final name = _s(e['tool_name']);
-              if (_isMetaTool(name)) break;
-              addToolRow(DenseToolRow(tool: name, result: e['result']), key);
-            }
-          }
-        case 'user_input':
-        case 'steer':
-          endTools(key);
-          final text = _s(e['text']);
-          // Answers are already shown on the question card — don't also
-          // render them as a user bubble.
-          if (_looksLikeQuestionAnswer(text)) break;
-          final envelope = parseMissionEnvelope(text);
-          if (envelope != null) {
-            addEvent(key, _MissionEnvelopeCard(envelope: envelope));
-            break;
-          }
-          addEvent(
-              key,
-              KeyedSubtree(
-                child: Padding(
-                    padding: const EdgeInsets.only(top: 4, bottom: 20),
-                    child: Bubble(mine: true, text: text)),
-              ));
-        case 'assistant_text':
-          endTools(key);
-          final reply = _s(e['text']);
-          addEvent(
-              key,
-              Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 4),
-                  child: Bubble(mine: false, text: reply)));
-        case 'model_error':
-          endTools(key);
-          addEvent(key, NoteLine(_s(e['message']), error: true));
-        case 'invalid_tool_call':
-          endTools(key);
-          addEvent(
-              key,
-              NoteLine('invalid ${_s(e['tool_name'])}: ${_s(e['error'])}',
-                  error: true));
-        case 'note':
-          endTools(key);
-          final entry = _s(e['entry']);
-          addEvent(key, _NoteLine(entry));
-        case 'system_decision':
-          endTools(key);
-          // Don't render "interrupted" decisions — just noise in the chat.
-          if (_s(e['step']) == 'interrupted') break;
-          addEvent(key,
-              SystemRow(step: _s(e['step']), reasoning: _s(e['reasoning'])));
-        case 'file_presented':
-          endTools(key);
-          addEvent(key, _presentedFileCard(_s(e['path']), _s(e['caption'])));
-        case 'lane_spawned':
-          endTools(key);
-          final id = _s(e['id']);
-          final title = _s(e['title']);
-          // Dedup by ID AND title — the same lane can be spawned with
-          // different IDs on reconnect (resume), producing visual duplicates.
-          if (!laneRowsShown.contains(id) &&
-              !laneRowsShown.contains('t:$title')) {
-            laneRowsShown.add(id);
-            laneRowsShown.add('t:$title');
-            addEvent(
-                key,
-                LaneNotice(
-                  title: title,
-                  live: () => liveLane(id),
-                  onOpen: _showLanes,
-                ));
-          }
-        case 'lane_cancelled':
-        case 'lane_completed':
-          endTools(key);
-          final id = _s(e['id']);
-          // The spawn card already tracks this lane live — only render a card
-          // here if the spawn row is gone (e.g. compacted away).
-          if (!laneRowsShown.contains(id)) {
-            addEvent(
-                key,
-                LaneNotice(
-                  title: _s(e['title']),
-                  live: () => liveLane(id),
-                  onOpen: _showLanes,
-                  summary: _s(e['summary']),
-                ));
-          }
-        case 'user_question':
-          endTools(key);
-          String? answer;
-          final qi = events.indexOf(e);
-          for (var j = qi + 1; j < events.length; j++) {
-            final n = events[j];
-            if (n['kind'] == 'user_question') break;
-            if (n['kind'] == 'user_input' || n['kind'] == 'steer') {
-              final t = _s(n['text']);
-              if (t.trim().isNotEmpty) {
-                answer = t;
-                break;
-              }
-            }
-          }
-          addEvent(key, _QuestionRecord(e, answer: answer));
-        case 'approval_request':
-          break; // shown by the approval bar
-        default:
-          break;
-      }
-    }
-    // Trailing tool_call/tool_result events stay in `run` until a later
-    // user/assistant message would flush them. Without this, live tools
-    // remain invisible until the next chat message.
-    endTools('transcript-tools-tail');
-    return out;
-  }
-
-  /// A file the agent handed over (`present_file`): open in the editor, or
-  /// download to the device.
-  Widget _presentedFileCard(String path, String caption) {
-    final name = path.split('/').last;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: AppCard(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-                color: AppColors.accentBg,
-                borderRadius: BorderRadius.circular(R.sm)),
-            child: AppIcon('file', size: 16, color: AppColors.accent),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                if (widget.onOpenFileTab != null) {
-                  widget.onOpenFileTab!(path, name);
-                } else {
-                  presentScreen(
-                    context,
-                    builder: (_, close) => EditorScreen(
-                        client: widget.client,
-                        path: path,
-                        name: name,
-                        onClose: close),
-                  );
-                }
-              },
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: mono(13, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text(caption.isNotEmpty ? caption : path,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11.5, color: AppColors.fg3)),
-                  ]),
-            ),
-          ),
-          const SizedBox(width: 6),
-          TextButton(
-            onPressed: () async {
-              try {
-                toast(context, 'Downloading $name…');
-                final msg = await downloadRemoteFileWithCancel(
-                    context, widget.client,
-                    path: path, name: name);
-                if (msg != null && mounted) toast(context, msg);
-              } catch (e) {
-                if (mounted) toast(context, '$e', danger: true);
-              }
-            },
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, 0),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              foregroundColor: AppColors.accentFg,
-              backgroundColor: AppColors.accent,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4)),
-            ),
-            child: Text('Download',
-                style: sans(12,
-                    weight: FontWeight.w600, color: AppColors.accentFg)),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  String _s(dynamic v) => v?.toString() ?? '';
-
-  /// Live thought stays until this turn produces a tool/action the user can see.
-  bool _turnHasVisibleAction(List<Map<String, dynamic>> events) {
-    for (var i = events.length - 1; i >= 0; i--) {
-      switch (events[i]['kind'] as String? ?? '') {
-        case 'user_input':
-        case 'steer':
-          return false;
-        case 'tool_call':
-        case 'tool_result':
-        case 'invalid_tool_call':
-        case 'note':
-        case 'file_presented':
-        case 'user_question':
-        case 'approval_request':
-        case 'lane_spawned':
-        case 'lane_cancelled':
-        case 'lane_completed':
-        case 'assistant_text':
-          return true;
-      }
-    }
-    return false;
-  }
-
-  // Meta-tools have dedicated event rendering, so their generic tool lines are skipped.
-  bool _isMetaTool(String n) =>
-      n == 'note' ||
-      n == 'ask_user' ||
-      n == 'delegate_task' ||
-      n == 'cancel_delegated_task' ||
-      n == 'complete_goal' ||
-      n == 'monitor' ||
-      n == 'present_file';
-
-  Future<void> _switchModel([BuildContext? anchor]) async {
-    ServerConfig cfg;
-    try {
-      cfg = await widget.client.getConfig();
-    } catch (e) {
-      _toast('$e');
-      return;
-    }
-    if (!mounted) return;
-    if (cfg.profiles.isEmpty) {
-      _toast('No model profiles');
-      return;
-    }
-    final box = (anchor ?? context).findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    RelativeRect position;
-    if (box != null && overlay != null) {
-      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      final menuW = math.min(280.0, overlay.size.width - 24);
-      final left = origin.dx.clamp(12.0, overlay.size.width - menuW - 12);
-      // Sit just above the chip. A tiny top inset (16) used to pin the menu
-      // to the status bar on phones.
-      position = RelativeRect.fromLTRB(
-        left,
-        origin.dy - 8,
-        overlay.size.width - left - menuW,
-        overlay.size.height - origin.dy + 8,
-      );
-    } else {
-      position = const RelativeRect.fromLTRB(16, 80, 16, 80);
-    }
-    final current = _modelLabel;
-    final picked = await showMenu<String>(
-      context: context,
-      position: position,
-      color: AppColors.surface1,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(R.sm),
-      ),
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
-      items: [
-        for (final p in cfg.profiles)
-          PopupMenuItem<String>(
-            value: p.name,
-            height: 48,
-            child: Row(children: [
-              AppIcon('sparkles',
-                  size: 14,
-                  color: p.name == current ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(p.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13,
-                            weight: FontWeight.w500,
-                            color: p.name == current
-                                ? AppColors.accent
-                                : AppColors.fg1)),
-                    Text('${p.provider} · ${p.model}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11, color: AppColors.fg4)),
-                  ],
-                ),
-              ),
-            ]),
-          ),
-      ],
-    );
-    if (picked == null || picked == current) return;
-    try {
-      await widget.client.setSessionModel(widget.sessionId, picked);
-      _toast('Switched to $picked');
-      if (mounted) {
-        _currentProfile = picked;
-        _loadModel();
-        _connect();
-      }
-    } catch (e) {
-      _toast('$e');
-    }
-  }
-
-  void _showLanes() {
-    if ((_state?.lanes ?? const <LaneInfo>[]).isEmpty) return;
-    presentScreen(
-      context,
-      style: PanelStyle.drawer,
-      builder: (_, close) => LanesScreen(
-        liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
-        onClose: close,
-      ),
-    );
-  }
-
-  void _showTasks() {
-    if (!_isMissionControl) return;
-    presentScreen(
-      context,
-      builder: (_, close) => MissionControlTasksScreen(
-        client: widget.client,
-        onClose: close,
-        onAskTask: (task) {
-          final title = task.title.isEmpty ? task.id : task.title;
-          _input.text =
-              'Tell me about task "$title" — what\'s the current status?';
-          _input.selection =
-              TextSelection.collapsed(offset: _input.text.length);
-          _sendMessage();
-        },
-      ),
-    );
-  }
-
-  Widget _usageBody(HarnessState s) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (s.contextWindow > 0) ...[
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Context window',
-              style: sans(12.5, weight: FontWeight.w500, color: AppColors.fg2)),
-          Text('${fmtSi(s.lastPromptTokens)} / ${fmtSi(s.contextWindow)}',
-              style: mono(11.5, color: AppColors.fg3)),
-        ]),
-        const SizedBox(height: 9),
-        Progress(pct: s.lastPromptTokens / s.contextWindow * 100, height: 9),
-        const SizedBox(height: 7),
-        Text('${(s.lastPromptTokens / s.contextWindow * 100).round()}% used',
-            style: mono(11, color: AppColors.accent)),
-        const SizedBox(height: 18),
-      ],
-      const SectionLabel('Tokens'),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(
-            child: StatTile(label: '↑ Input', value: fmtSi(s.promptTokens))),
-        const SizedBox(width: 8),
-        Expanded(
-            child:
-                StatTile(label: '↓ Output', value: fmtSi(s.completionTokens))),
-      ]),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(
-            child:
-                StatTile(label: '↻ Cached', value: fmtSi(s.cacheReadTokens))),
-        const SizedBox(width: 8),
-        Expanded(
-            child: StatTile(
-                label: 'Total', value: fmtSi(s.totalTokens), accent: true)),
-      ]),
-      if (s.ratePrimary != null || s.rateSecondary != null) ...[
-        const SizedBox(height: 18),
-        const SectionLabel('Rate limits · remaining'),
-        const SizedBox(height: 8),
-        for (final w in [s.ratePrimary, s.rateSecondary])
-          if (w != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 11),
-              child: Builder(builder: (_) {
-                final rem = w.leftPercent;
-                final color = rem < 20
-                    ? AppColors.danger
-                    : rem < 50
-                        ? AppColors.run
-                        : AppColors.ok;
-                final reset = rateResetLabel(w.resetsAt);
-                return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(rateWindowLabel(w.windowMinutes),
-                                style: sans(12, color: AppColors.fg2)),
-                            Text('${rem.round()}% left',
-                                style: mono(11, color: color)),
-                          ]),
-                      const SizedBox(height: 6),
-                      Progress(pct: rem, color: color, height: 6),
-                      if (reset != null) ...[
-                        const SizedBox(height: 5),
-                        Text(reset, style: mono(10.5, color: AppColors.fg4)),
-                      ],
-                    ]);
-              }),
-            ),
-      ],
-    ]);
-  }
-
-  void _showUsage() {
-    final s = _state;
-    if (s == null) return;
-    final body = _usageBody(s);
-    if (kMobile) {
-      showAppSheet(context, title: 'Usage', child: body);
-    } else {
-      presentScreen(context,
-          style: PanelStyle.drawer,
-          builder: (_, close) =>
-              _SessionActionPanel(title: 'Usage', onClose: close, child: body));
-    }
-  }
-
-  void _showCheckpoints() {
-    final s = _state;
-    if (s == null) return;
-    final cps = s.checkpoints.reversed.toList();
-    final content = Column(children: [
-      if (cps.isEmpty)
-        Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text('No checkpoints yet.',
-                style: sans(12.5, color: AppColors.fg3))),
-      ...cps.map((c) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppCard(
-              padding: const EdgeInsets.all(13),
-              onTap: () => _confirmRewind(c),
-              child: Row(children: [
-                Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(R.md)),
-                    child: AppIcon('history', size: 17, color: AppColors.fg3)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(c.label.isEmpty ? c.id : c.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(13,
-                                weight: FontWeight.w500,
-                                height: 1.2,
-                                color: AppColors.fg1)),
-                        const SizedBox(height: 3),
-                        Text(formatCheckpointDate(c.createdAt),
-                            style: mono(11, color: AppColors.fg3)),
-                      ]),
-                ),
-                IconBtn('git-branch',
-                    size: 32,
-                    iconSize: 16,
-                    tooltip: 'Fork from here',
-                    onTap: () => _confirmFork(c)),
-              ]),
-            ),
-          )),
-    ]);
-    if (kMobile) {
-      showAppSheet(context, title: 'Checkpoints', child: content);
-    } else {
-      presentScreen(context,
-          style: PanelStyle.drawer,
-          builder: (_, close) => _SessionActionPanel(
-              title: 'Checkpoints', onClose: close, child: content));
-    }
-  }
-
-  Future<void> _confirmRewind(Checkpoint c) async {
-    final ok = await confirmAction(
-      context,
-      title: 'Restore workspace?',
-      body:
-          'This rolls the workspace back to “${c.label.isEmpty ? c.id : c.label}”. Changes after this point are discarded.',
-      confirmLabel: 'Restore',
-      danger: false,
-    );
-    if (!ok) return;
-    if (mounted) Navigator.pop(context); // close the sheet
-    try {
-      await widget.client.rewind(widget.sessionId, c.id);
-      _toast('Workspace restored');
-    } catch (e) {
-      _toast('$e');
-    }
-  }
-
-  // Kept temporarily for compatibility with any in-flight route callbacks; the
-  // user-facing fork entry now lives only inside Checkpoints.
-  // ignore: unused_element
-  void _showForkPoints() {
-    final s = _state;
-    if (s == null) return;
-    final cps = s.checkpoints.reversed.toList();
-    showAppSheet(context,
-        title: 'Fork conversation',
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-            child: Text(
-              'Creates a new session with history up to the point you pick. '
-              'This chat is left unchanged. Workspace files are shared.',
-              style: sans(12.5, height: 1.45, color: AppColors.fg3),
-            ),
-          ),
-          if (cps.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                      'No checkpoints yet — you can still fork the full history.',
-                      style: sans(12.5, color: AppColors.fg3)),
-                  const SizedBox(height: 12),
-                  Btn('Fork full history', onTap: () => _confirmFork(null)),
-                ],
-              ),
-            )
-          else ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: AppCard(
-                padding: const EdgeInsets.all(13),
-                onTap: () => _confirmFork(null),
-                child: Row(children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(R.md),
-                    ),
-                    child: AppIcon('git-branch',
-                        size: 17, color: AppColors.accent),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Full history',
-                            style: sans(13,
-                                weight: FontWeight.w500, color: AppColors.fg1)),
-                        const SizedBox(height: 3),
-                        Text('Branch everything so far',
-                            style: mono(11, color: AppColors.fg3)),
-                      ],
-                    ),
-                  ),
-                  AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-                ]),
-              ),
-            ),
-            ...cps.map((c) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: AppCard(
-                    padding: const EdgeInsets.all(13),
-                    onTap: () => _confirmFork(c),
-                    child: Row(children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(R.md),
-                        ),
-                        child: AppIcon('git-branch',
-                            size: 17, color: AppColors.fg3),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(c.label.isEmpty ? c.id : c.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(13,
-                                    weight: FontWeight.w500,
-                                    height: 1.2,
-                                    color: AppColors.fg1)),
-                            const SizedBox(height: 3),
-                            Text(formatCheckpointDate(c.createdAt),
-                                style: mono(11, color: AppColors.fg3)),
-                          ],
-                        ),
-                      ),
-                      AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-                    ]),
-                  ),
-                )),
-          ],
-        ]));
-  }
-
-  Future<void> _confirmFork(Checkpoint? c) async {
-    final label =
-        c == null ? 'full history' : (c.label.isEmpty ? c.id : c.label);
-    final ok = await confirmAction(
-      context,
-      title: 'Fork conversation?',
-      body:
-          'Opens a new session branched at “$label”. This chat stays as-is. Files on disk are shared.',
-      confirmLabel: 'Fork',
-      danger: false,
-    );
-    if (!ok) return;
-    if (mounted) Navigator.pop(context); // close the sheet
-    try {
-      final result = await widget.client.forkSession(
-        widget.sessionId,
-        checkpoint: c?.id,
-        eventIndex: c == null && (_state?.events.isNotEmpty ?? false)
-            ? _state!.events.length - 1
-            : null,
-      );
-      final id = result['id']?.toString() ?? '';
-      final title = result['title']?.toString() ?? 'fork';
-      if (id.isEmpty) {
-        _toast('Fork created but no session id returned');
-        return;
-      }
-      final open = widget.onOpenSession;
-      if (open != null) {
-        open(id, title, widget.profile);
-      } else {
-        _toast('Forked → $title');
-      }
-    } catch (e) {
-      _toast('$e');
-    }
-  }
-}
-
-class _StatMeta extends StatelessWidget {
-  final String icon, label, tone;
-  const _StatMeta(
-      {required this.icon, required this.label, this.tone = 'default'});
-  @override
-  Widget build(BuildContext context) {
-    final c = tone == 'accent'
-        ? AppColors.accent
-        : tone == 'run'
-            ? AppColors.run
-            : AppColors.fg2;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      AppIcon(icon, size: 14, color: tone == 'default' ? AppColors.fg4 : c),
-      const SizedBox(width: 6),
-      Text(label, style: mono(12.5, color: c)),
-    ]);
-  }
-}
-
-String _activityElapsed(String? startedAt, DateTime fallback) {
-  final parsed = DateTime.tryParse(startedAt ?? '');
-  final start = parsed?.toLocal() ?? fallback;
-  final d = DateTime.now().difference(start);
-  final secs = d.inSeconds.clamp(0, 24 * 3600);
-  final m = secs ~/ 60;
-  final s = secs % 60;
-  return m > 0 ? '${m}m ${s}s' : '${s}s';
-}
-
-class _CompactingStatus extends StatefulWidget {
-  final String? startedAt;
-  final String? detail;
-  const _CompactingStatus({this.startedAt, this.detail});
-  @override
-  State<_CompactingStatus> createState() => _CompactingStatusState();
-}
-
-class _CompactingStatusState extends State<_CompactingStatus> {
-  late final DateTime _mountedAt = DateTime.now();
-  Timer? _tick;
-
-  @override
-  void initState() {
-    super.initState();
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _tick?.cancel();
-    super.dispose();
-  }
-
-  String get _elapsed => _activityElapsed(widget.startedAt, _mountedAt);
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final detail = widget.detail?.trim() ?? '';
-    return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            SizedBox(
-                width: 16,
-                child: Center(child: BrailleSpinner(color: AppColors.accent))),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text.rich(TextSpan(children: [
-                TextSpan(
-                    text: 'Compacting',
-                    style: sans(13,
-                        weight: FontWeight.w600, color: AppColors.accent)),
-                TextSpan(
-                    text: ' $_elapsed',
-                    style: sans(13,
-                        color: AppColors.accent.withValues(alpha: 0.72))),
-              ])),
-            ),
-          ]),
-          if (detail.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(detail,
-                  style: sans(13, height: 1.4, color: AppColors.fg3)),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChurningStatus extends StatefulWidget {
-  final String? startedAt;
-  final String thinking;
-  const _ChurningStatus({this.startedAt, this.thinking = ''});
-  @override
-  State<_ChurningStatus> createState() => _ChurningStatusState();
-}
-
-class _ChurningStatusState extends State<_ChurningStatus> {
-  static const _verbs = [
-    'Churning',
-    'Pondering',
-    'Rummaging',
-    'Noodling',
-    'Tinkering',
-    'Scheming',
-    'Weaving',
-    'Sifting',
-    'Puttering',
-    'Brewing',
-    'Fiddling',
-    'Mulling',
-    'Foraging',
-    'Juggling',
-    'Unraveling',
-    'Conjuring',
-    'Whittling',
-    'Riffling',
-    'Plotting',
-    'Kneading',
-  ];
-
-  late final DateTime _mountedAt = DateTime.now();
-  late final math.Random _rng = math.Random();
-  Timer? _tick;
-  Timer? _swap;
-  late String _verb = _verbs[_rng.nextInt(_verbs.length)];
-  bool _open = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
-    _scheduleSwap();
-  }
-
-  void _scheduleSwap() {
-    final wait = Duration(milliseconds: 2800 + _rng.nextInt(4200));
-    _swap?.cancel();
-    _swap = Timer(wait, () {
-      if (!mounted) return;
-      String next;
-      do {
-        next = _verbs[_rng.nextInt(_verbs.length)];
-      } while (next == _verb && _verbs.length > 1);
-      setState(() => _verb = next);
-      _scheduleSwap();
-    });
-  }
-
-  @override
-  void dispose() {
-    _tick?.cancel();
-    _swap?.cancel();
-    super.dispose();
-  }
-
-  String get _elapsed => _activityElapsed(widget.startedAt, _mountedAt);
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final thought = widget.thinking.trim();
-    return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap:
-                thought.isEmpty ? null : () => setState(() => _open = !_open),
-            child: Row(
-              children: [
-                SizedBox(
-                    width: 16,
-                    child:
-                        Center(child: BrailleSpinner(color: AppColors.accent))),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(_verb,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(13,
-                          weight: FontWeight.w600, color: AppColors.accent)),
-                ),
-                const SizedBox(width: 8),
-                Text(_elapsed,
-                    style: mono(11.5,
-                        color: AppColors.accent.withValues(alpha: 0.72))),
-                if (thought.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  AppIcon(_open ? 'chevron-down' : 'chevron-right',
-                      size: 13, color: AppColors.accent.withValues(alpha: 0.7)),
-                ],
-              ],
-            ),
-          ),
-          if (_open && thought.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: ThinkingMarkdown(data: thought),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A message sent mid-run, shown right-aligned + dimmed with a cancel (✕) until
-/// the daemon applies it (then it's replaced by the real bubble).
-/// A run of consecutive tool calls, grouped under a left rule. The "N steps"
-/// header toggles the group collapsed/expanded.
-
-class _ClearScrollTerminal extends Terminal {
-  _ClearScrollTerminal() : super(maxLines: 5000);
-
-  @override
-  void eraseDisplay() {
-    // CSI 2J only blanks the viewport. Fish `clear` then CUP 1;1 and
-    // reprints the prompt — if we leave the last history line sitting
-    // on row 0, that leftover stays glued to the new prompt. Push the
-    // current screen into scrollback first, like gnome-terminal / iTerm.
-    if (!buffer.isAltBuffer) {
-      final n = viewHeight;
-      for (var i = 0; i < n; i++) {
-        buffer.index();
-      }
-    }
-    buffer.eraseDisplay();
-    buffer.setCursor(0, 0);
-  }
-}
-
-class _LiveStreamRow extends StatelessWidget {
-  final ValueListenable<_LiveFrame> frame;
-  final bool running;
-  final bool compacting;
-  final String? startedAt;
-  final bool hasVisibleAction;
-  final String? compactionDetail;
-
-  const _LiveStreamRow({
-    super.key,
-    required this.frame,
-    required this.running,
-    required this.compacting,
-    required this.startedAt,
-    required this.hasVisibleAction,
-    required this.compactionDetail,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<_LiveFrame>(
-      valueListenable: frame,
-      builder: (context, value, _) {
-        final children = <Widget>[];
-        if (value.visible && value.text.trim().isNotEmpty) {
-          children.add(Padding(
-            key: const ValueKey('live-text'),
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Bubble(
-              mine: false,
-              text: value.text.trim(),
-              selectable: false,
-            ),
-          ));
-        }
-        if (compacting) {
-          children.addAll([
-            const SizedBox(height: 10),
-            _CompactingStatus(
-              startedAt: startedAt,
-              detail: compactionDetail,
-            ),
-          ]);
-        } else if (running) {
-          children.addAll([
-            const SizedBox(height: 10),
-            _ChurningStatus(
-              startedAt: startedAt,
-              thinking: hasVisibleAction ? '' : value.thinking,
-            ),
-          ]);
-        }
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        );
-      },
-    );
-  }
-}
-
-class _LiveFrame {
-  final String text;
-  final String thinking;
-  final bool visible;
-  const _LiveFrame({this.text = '', this.thinking = '', this.visible = false});
-}
-
-class _LiveTerm {
-  _LiveTerm(this.id, {required this.title}) : terminal = _ClearScrollTerminal();
-  final String id;
-  final String title;
-  final Terminal terminal;
-  int cols = 80;
-  int rows = 24;
-  bool alive = false;
-  bool live = false;
-}
-
-class _QueuedBubble extends StatelessWidget {
-  final String text;
-  final int audio, images, files;
-  final VoidCallback onCancel;
-  final VoidCallback? onSteer;
-  const _QueuedBubble({
-    required this.text,
-    required this.audio,
-    required this.images,
-    required this.files,
-    required this.onCancel,
-    this.onSteer,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(left: 48, top: 4, bottom: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.card),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (text.isNotEmpty)
-                      Text(text,
-                          style: sans(15.5, height: 1.5, color: AppColors.fg1)),
-                    if (images + files + audio > 0) ...[
-                      if (text.isNotEmpty) const SizedBox(height: 6),
-                      AttachmentPill(
-                          audio: audio, images: images, files: files),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(right: 2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Queued',
-                        style:
-                            sans(kMobile ? 11.5 : 10.5, color: AppColors.fg4)),
-                    const SizedBox(width: 10),
-                    if (onSteer != null) ...[
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: onSteer,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 3),
-                          child: Text('Send now',
-                              style: sans(kMobile ? 12 : 10.5,
-                                  weight: FontWeight.w600,
-                                  color: AppColors.accent)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onCancel,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                        child: Text('Cancel',
-                            style: sans(kMobile ? 12 : 10.5,
-                                color: AppColors.fg4)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QueuedSection extends StatelessWidget {
-  final int count;
-  final bool showBulkActions;
-  final VoidCallback onSendAll;
-  final VoidCallback onCancelAll;
-  final List<Widget> children;
-  const _QueuedSection({
-    required this.count,
-    required this.showBulkActions,
-    required this.onSendAll,
-    required this.onCancelAll,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final showBulk = showBulkActions && count > 1;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 2, 4, 6),
-            child: Row(children: [
-              Text('QUEUED ($count)',
-                  style: sans(10.5,
-                      weight: FontWeight.w600,
-                      spacing: 0.6,
-                      color: AppColors.fg4)),
-              const Spacer(),
-              if (showBulk) ...[
-                Material(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.xs),
-                  child: InkWell(
-                    onTap: onSendAll,
-                    borderRadius: BorderRadius.circular(R.xs),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      child: Text('Send all',
-                          style: sans(10.5,
-                              weight: FontWeight.w600,
-                              color: AppColors.accent)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(R.xs),
-                  child: InkWell(
-                    onTap: onCancelAll,
-                    borderRadius: BorderRadius.circular(R.xs),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 3),
-                      child: Text('Cancel all',
-                          style: sans(10.5, color: AppColors.fg4)),
-                    ),
-                  ),
-                ),
-              ],
-            ]),
-          ),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-
-class _GoalCard extends StatelessWidget {
-  final GoalInfo goal;
-  final VoidCallback onCancel;
-  const _GoalCard({required this.goal, required this.onCancel});
-
-  @override
-  Widget build(BuildContext context) {
-    final paused = goal.paused;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: paused ? AppColors.surface3 : AppColors.accentBg,
-            borderRadius: BorderRadius.circular(R.sm),
-          ),
-          child: AppIcon('goal',
-              size: 15, color: paused ? AppColors.fg3 : AppColors.accent),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text(paused ? 'Goal paused' : 'Working toward goal',
-                  style: sans(12.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
-            ]),
-            if (goal.text.trim().isNotEmpty) ...[
-              const SizedBox(height: 3),
-              Text(goal.text,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(11.5, height: 1.35, color: AppColors.fg3)),
-            ],
-          ]),
-        ),
-        IconBtn('x',
-            size: 30, iconSize: 14, tooltip: 'Cancel goal', onTap: onCancel),
-      ]),
-    );
-  }
-}
-
-bool _looksLikeQuestionAnswer(String text) {
-  final t = text.trim();
-  if (t.isEmpty) return false;
-  if (t == 'user skipped the question') return true;
-  return t.contains('\n→ ') || t.startsWith('→ ');
-}
-
-class _MissionEnvelopeCard extends StatelessWidget {
-  const _MissionEnvelopeCard({required this.envelope});
-  final MissionEnvelope envelope;
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final kind = envelope.eventKind;
-    final color = switch (kind) {
-      'working' => AppColors.run,
-      'done' => AppColors.ok,
-      'blocked' || 'failed' => AppColors.danger,
-      _ => AppColors.fg3,
-    };
-    final label = envelope.isReport
-        ? (envelope.status.isEmpty ? kind : envelope.status)
-        : 'queued';
-    final title = envelope.title.isEmpty ? 'Task' : envelope.title;
-    final summary = envelope.summary.trim();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Expanded(
-                    child: Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13.5, color: AppColors.fg1)),
-                  ),
-                  Text(label, style: sans(12, color: AppColors.fg4)),
-                ]),
-                if (summary.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(summary,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(12.5, height: 1.35, color: AppColors.fg3)),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Transcript card for a past `ask_user` turn: the prompt plus the user's
-/// answer (parsed from the following `user_input` that `_QuestionBar` sent).
-class _QuestionRecord extends StatelessWidget {
-  final Map<String, dynamic> event;
-  final String? answer;
-  const _QuestionRecord(this.event, {this.answer});
-
-  List<Map<String, dynamic>> get _questions {
-    final qd = event['questions'];
-    final raw = qd is Map ? qd['questions'] : event['questions'];
-    if (raw is! List) return const [];
-    return raw
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-  }
-
-  String? get _context {
-    final qd = event['questions'];
-    final ctx = qd is Map ? qd['context'] : event['context'];
-    final s = ctx?.toString() ?? '';
-    if (s.isEmpty || s == 'null') return null;
-    return s;
-  }
-
-  Map<String, String> get _answers {
-    final out = <String, String>{};
-    final src = (answer ?? event['answer'] ?? event['value'] ?? '').toString();
-    if (src.trim().isEmpty) return out;
-    final qs = _questions;
-    if (qs.length <= 1) {
-      final text = qs.isEmpty ? '' : (qs.first['text']?.toString() ?? '');
-      var body = src.trim();
-      if (text.isNotEmpty && body.startsWith(text)) {
-        body = body.substring(text.length).trim();
-        if (body.startsWith('→')) body = body.substring(1).trim();
-      } else if (body.contains('\n→ ')) {
-        body = body.split('\n→ ').skip(1).join('\n→ ').trim();
-      }
-      out[qs.isEmpty ? '0' : qs.first['id']?.toString() ?? '0'] = body;
-      return out;
-    }
-    final parts = src.split(RegExp(r'\n\n+'));
-    for (final part in parts) {
-      final idx = part.indexOf('\n→ ');
-      if (idx < 0) continue;
-      final qText = part.substring(0, idx).trim();
-      final a = part.substring(idx + 3).trim();
-      for (final q in qs) {
-        if ((q['text']?.toString() ?? '').trim() == qText) {
-          out[q['id']?.toString() ?? qText] = a;
-          break;
-        }
-      }
-    }
-    return out;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final qs = _questions;
-    final answers = _answers;
-    final ctx = _context;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Expanded(
-                child: Text('Question',
-                    style: sans(15.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-              ),
-              Text(answers.isEmpty ? 'Asked' : 'Answered',
-                  style: sans(12, color: AppColors.accent)),
-            ]),
-            if (ctx != null) ...[
-              const SizedBox(height: 8),
-              Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg3)),
-            ],
-            for (var i = 0; i < qs.length; i++) ...[
-              const SizedBox(height: 12),
-              if (qs.length > 1)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('${i + 1} of ${qs.length}',
-                      style: sans(12, color: AppColors.fg4)),
-                ),
-              Text(qs[i]['text']?.toString() ?? '',
-                  style: sans(14, height: 1.45, color: AppColors.fg1)),
-              if (answers[qs[i]['id']?.toString() ?? ''] != null ||
-                  answers['0'] != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  answers[qs[i]['id']?.toString()] ?? answers['0'] ?? '',
-                  style: sans(13.5, height: 1.45, color: AppColors.fg2),
-                ),
-              ],
-            ],
-            if (qs.isEmpty && (event['text'] != null)) ...[
-              const SizedBox(height: 8),
-              Text(event['text']?.toString() ?? '',
-                  style: sans(14, height: 1.45, color: AppColors.fg1)),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ApprovalBar extends StatefulWidget {
-  final List<Map<String, dynamic>> events;
-  final void Function(Map<String, dynamic>) onSend;
-  final bool showApproveAll; // only when >1 tool is pending this batch
-  const _ApprovalBar(
-      {required this.events,
-      required this.onSend,
-      this.showApproveAll = false});
-  @override
-  State<_ApprovalBar> createState() => _ApprovalBarState();
-}
-
-class _ApprovalBarState extends State<_ApprovalBar> {
-  // Disable after the first tap — the bar stays on screen until the next frame
-  // flips status, so an impatient double-tap fired the decision twice.
-  bool _sent = false;
-
-  void _decide(Map<String, dynamic> m) {
-    if (_sent) return;
-    setState(() => _sent = true);
-    widget.onSend(m);
-  }
-
-  Map<String, dynamic>? get _request {
-    for (var i = widget.events.length - 1; i >= 0; i--) {
-      final e = widget.events[i];
-      if (e['kind'] == 'approval_request') return e;
-    }
-    return null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final req = _request;
-    final tool = req?['tool_name']?.toString() ?? '';
-    final title = tool.isEmpty ? 'Approve this action?' : '${toolTitle(tool)}?';
-    final summary = (req?['summary']?.toString() ?? '').trim();
-    final fallback = toolArgSummary(tool, req?['arguments']);
-    final detail = summary.isNotEmpty ? summary : fallback;
-    final index = (req?['index'] as num?)?.toInt() ?? 1;
-    final total = (req?['total'] as num?)?.toInt() ?? 1;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Expanded(
-                child: Text(_sent ? 'Sending…' : title,
-                    style: sans(15.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
-              ),
-              Text(total > 1 ? '$index of $total' : 'Input required',
-                  style: sans(12, color: AppColors.accent)),
-            ]),
-            if (detail.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(detail, style: sans(13, height: 1.45, color: AppColors.fg3)),
-            ],
-            const SizedBox(height: 14),
-            Opacity(
-              opacity: _sent ? 0.5 : 1,
-              child: Row(children: [
-                Btn('Approve',
-                    small: true,
-                    onTap: _sent ? null : () => _decide({'kind': 'approve'})),
-                const SizedBox(width: 8),
-                if (widget.showApproveAll)
-                  Btn('Always allow',
-                      small: true,
-                      variant: BtnVariant.secondary,
-                      onTap: _sent
-                          ? null
-                          : () => _decide({'kind': 'approve_all'})),
-                if (widget.showApproveAll) const SizedBox(width: 8),
-                Btn('Reject',
-                    small: true,
-                    variant: BtnVariant.ghost,
-                    onTap: _sent ? null : () => _decide({'kind': 'deny'})),
-              ]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NoteLine extends StatefulWidget {
-  final String text;
-  const _NoteLine(this.text);
-  @override
-  State<_NoteLine> createState() => _NoteLineState();
-}
-
-class _NoteLineState extends State<_NoteLine> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = widget.text;
-    final long = text.split('\n').length > 3 || text.length > 220;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(R.md),
-        child: InkWell(
-          onTap: long ? () => setState(() => _open = !_open) : null,
-          borderRadius: BorderRadius.circular(R.md),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                MarkdownBody(
-                  data: text,
-                  selectable: false,
-                  styleSheet: markdownStyle(context),
-                  builders: {'pre': PreBlockBuilder()},
-                ),
-                if (long) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _open ? 'collapse' : 'expand',
-                    style: mono(10.5, color: AppColors.fg4),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Renders an `ask_user` pending question (status waiting_for_input) and sends the
-/// answer back as a LoopInput::Answer. Handles free_text / single_choice / yes_no /
-/// confirm answer kinds.
-class _QuestionBar extends StatefulWidget {
-  final Map<String, dynamic> question; // {questions:[...], context}
-  final void Function(Map<String, dynamic>) onSend;
-  const _QuestionBar({required this.question, required this.onSend});
-  @override
-  State<_QuestionBar> createState() => _QuestionBarState();
-}
-
-class _QuestionBarState extends State<_QuestionBar> {
-  final Map<String, TextEditingController> _text = {};
-  final Map<String, String> _choice = {};
-  final Set<String> _skipped = {};
-  final Set<String> _freeText = {};
-  // One answer per ask — the bar lingers until the next frame flips status,
-  // so an eager second tap double-submitted the answer.
-  bool _sent = false;
-  int _step = 0;
-
-  TextEditingController _controllerFor(String id) {
-    return _text.putIfAbsent(id, () {
-      final c = TextEditingController();
-      c.addListener(_onAnswerChanged);
-      return c;
-    });
-  }
-
-  void _onAnswerChanged() {
-    if (mounted) setState(() {});
-  }
-
-  Map<String, dynamic>? get _currentQuestion => _questions.isEmpty
-      ? null
-      : _questions[_step.clamp(0, _questions.length - 1)];
-
-  List<Map<String, dynamic>> get _questions =>
-      ((widget.question['questions'] as List?) ?? const [])
-          .cast<Map<String, dynamic>>();
-
-  String _kind(Map<String, dynamic> q) =>
-      (q['answer_kind'] is Map ? q['answer_kind']['kind'] : null)?.toString() ??
-      'free_text';
-
-  @override
-  void dispose() {
-    for (final c in _text.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  bool get _ready {
-    final q = _currentQuestion;
-    if (q == null) return false;
-    final id = q['id'].toString();
-    if (_skipped.contains(id)) return true;
-    final textMode = _kind(q) == 'free_text' || _freeText.contains(id);
-    return textMode
-        ? (_text[id]?.text.trim().isNotEmpty ?? false)
-        : (_choice[id]?.isNotEmpty ?? false);
-  }
-
-  String _answerFor(Map<String, dynamic> q) {
-    final id = q['id'].toString();
-    if (_skipped.contains(id)) return 'user skipped the question';
-    final textMode = _kind(q) == 'free_text' || _freeText.contains(id);
-    return textMode ? (_text[id]?.text.trim() ?? '') : (_choice[id] ?? '');
-  }
-
-  void _submit() {
-    if (_questions.isEmpty || !_ready || _sent) return;
-    if (_step < _questions.length - 1) {
-      setState(() => _step++);
-      return;
-    }
-    setState(() => _sent = true);
-    final parts =
-        _questions.map((q) => '${q['text']}\n→ ${_answerFor(q)}').toList();
-    widget.onSend({'kind': 'answer', 'value': parts.join('\n\n')});
-  }
-
-  void _skip() {
-    final q = _currentQuestion;
-    if (q == null || _sent) return;
-    _skipped.add(q['id'].toString());
-    _freeText.remove(q['id'].toString());
-    _choice.remove(q['id'].toString());
-    if (_step < _questions.length - 1) {
-      setState(() => _step++);
-    } else {
-      _submit();
-    }
-  }
-
-  void _toggleFreeText() {
-    final q = _currentQuestion;
-    if (q == null || _sent) return;
-    final id = q['id'].toString();
-    setState(() {
-      _skipped.remove(id);
-      _freeText.contains(id) ? _freeText.remove(id) : _freeText.add(id);
-    });
-  }
-
-  Widget _freeTextToggle(String id) => InkWell(
-        onTap: _sent ? null : _toggleFreeText,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(_freeText.contains(id) ? 'check' : 'edit',
-                size: 14, color: AppColors.accent),
-            const SizedBox(width: 6),
-            Text(
-                _freeText.contains(id)
-                    ? 'Writing a response'
-                    : 'Write your own answer',
-                style: sans(12, color: AppColors.accent)),
-          ]),
-        ),
-      );
-
-  Widget _skipButton() => TextButton(
-        onPressed: _sent ? null : _skip,
-        style: TextButton.styleFrom(
-            foregroundColor: AppColors.fg3,
-            padding: const EdgeInsets.symmetric(horizontal: 8)),
-        child: Text('Skip', style: sans(12, color: AppColors.fg3)),
-      );
-
-  Widget _chip(String label, bool sel, VoidCallback onTap) => Material(
-        color:
-            sel ? AppColors.accent.withValues(alpha: 0.18) : AppColors.surface2,
-        shape: StadiumBorder(
-          side: BorderSide(
-            color: sel ? AppColors.accent : Colors.transparent,
-            width: 1.2,
-          ),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const StadiumBorder(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(label,
-                style: sans(13,
-                    weight: FontWeight.w600,
-                    color: sel ? AppColors.accent : AppColors.fg2)),
-          ),
-        ),
-      );
-
-  Widget _choiceRow(String label, bool sel, VoidCallback onTap) => Material(
-        color:
-            sel ? AppColors.accent.withValues(alpha: 0.14) : Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.md),
-          side: BorderSide(
-            color: sel ? AppColors.accent : AppColors.border2,
-            width: sel ? 1.2 : 1,
-          ),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(R.md),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            child: Row(children: [
-              Expanded(
-                  child: Text(label,
-                      style: sans(14,
-                          height: 1.4,
-                          weight: sel ? FontWeight.w600 : FontWeight.w500,
-                          color: sel ? AppColors.fg1 : AppColors.fg2))),
-              if (sel) ...[
-                const SizedBox(width: 10),
-                AppIcon('check', size: 16, color: AppColors.accent)
-              ],
-            ]),
-          ),
-        ),
-      );
-
-  List<Widget> _inputFor(Map<String, dynamic> q) {
-    final id = q['id'].toString();
-    final k = _kind(q);
-    final opts =
-        k == 'confirm' ? const ['Confirm', 'Cancel'] : const ['Yes', 'No'];
-    final vals =
-        k == 'confirm' ? const ['confirm', 'cancel'] : const ['yes', 'no'];
-    final choices =
-        ((q['answer_kind']?['choices'] as List?) ?? const []).map((e) {
-      if (e is Map) {
-        final label = '${e['label'] ?? ''}'.trim();
-        final value = '${e['value'] ?? ''}'.trim();
-        final v = value.isEmpty ? label : value;
-        return (value: v, label: label.isEmpty ? v : label);
-      }
-      final s = '$e';
-      return (value: s, label: s);
-    }).toList();
-    final controller = _controllerFor(id);
-    return [
-      if (k == 'single_choice')
-        ...choices.map((c) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _choiceRow(
-                  c.label,
-                  _choice[id] == c.value,
-                  () => setState(() {
-                        _choice[id] = c.value;
-                        _freeText.remove(id);
-                      })),
-            )),
-      if (k == 'yes_no' || k == 'confirm')
-        Wrap(spacing: 8, children: [
-          for (var i = 0; i < opts.length; i++)
-            _chip(opts[i], _choice[id] == vals[i],
-                () => setState(() => _choice[id] = vals[i])),
-        ]),
-      if (k == 'single_choice' || k == 'yes_no' || k == 'confirm')
-        _freeTextToggle(id),
-      if (k == 'free_text' || _freeText.contains(id))
-        AppField(
-            controller: controller,
-            hint: 'Write your answer',
-            minLines: 2,
-            maxLines: 4,
-            onSubmitted: (_) => _submit()),
-    ];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ctx = widget.question['context']?.toString();
-    final total = _questions.length;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(
-              child: Text(_sent ? 'Sending…' : 'Question',
-                  style: sans(15.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
-            ),
-            Text(
-              total > 1 ? '${_step + 1} of $total' : 'Input required',
-              style: sans(12, color: AppColors.accent),
-            ),
-          ]),
-          if (ctx != null && ctx.isNotEmpty && ctx != 'null') ...[
-            const SizedBox(height: 8),
-            Text(ctx, style: sans(13, height: 1.45, color: AppColors.fg3)),
-          ],
-          ...() {
-            final q = _currentQuestion;
-            if (q == null) return <Widget>[];
-            return <Widget>[
-              const SizedBox(height: 12),
-              Text(q['text']?.toString() ?? '',
-                  style: sans(14, height: 1.45, color: AppColors.fg1)),
-              const SizedBox(height: 10),
-              ..._inputFor(q),
-            ];
-          }(),
-          const SizedBox(height: 14),
-          Row(children: [
-            _skipButton(),
-            if (_step > 0) ...[
-              const SizedBox(width: 4),
-              Btn('Back',
-                  small: true,
-                  variant: BtnVariant.ghost,
-                  onTap: _sent ? null : () => setState(() => _step--)),
-            ],
-            const Spacer(),
-            Btn(
-                _sent
-                    ? 'Sending…'
-                    : (_step < total - 1 ? 'Continue' : 'Submit'),
-                small: true,
-                disabled: !_ready || _sent,
-                onTap: (_ready && !_sent) ? _submit : null),
-          ]),
-        ]),
-      ),
-    );
-  }
-}
-
-/// Paints the sampled microphone amplitude as a compact live waveform.
-class _WaveformPainter extends CustomPainter {
-  final List<double> samples;
-  const _WaveformPainter(this.samples);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.accent
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    if (samples.isEmpty) {
-      canvas.drawLine(
-        Offset(0, size.height / 2),
-        Offset(size.width, size.height / 2),
-        paint..color = AppColors.fg4,
-      );
-      return;
-    }
-    final waveformWidth = math.min(size.width, samples.length * 4.0);
-    for (var i = 0; i < samples.length; i++) {
-      final amplitude = samples[i].clamp(0.04, 1.0).toDouble();
-      final half =
-          (size.height * 0.45 * amplitude).clamp(2.0, size.height * 0.45);
-      final x = i * 4.0 + 2.0;
-      if (x > waveformWidth) break;
-      canvas.drawLine(
-        Offset(x, size.height / 2 - half),
-        Offset(x, size.height / 2 + half),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _WaveformPainter oldDelegate) =>
-      oldDelegate.samples != samples;
-}
-
-/// A pending composer attachment (image, file, or audio) being uploaded.
-class _Attachment {
-  final String name;
-  final bool isImage;
-  final bool isAudio;
-  final String? localPath; // local source (for image thumbnails)
-  String? remotePath; // daemon path once uploaded
-  bool uploading = true;
-  _Attachment(
-      {required this.name,
-      required this.isImage,
-      required this.isAudio,
-      this.localPath});
-}
-
-/// Inline circular send button for the composer.
-class _SendBtn extends StatelessWidget {
-  final bool enabled;
-  final bool running;
-  final VoidCallback? onTap;
-  const _SendBtn({required this.enabled, this.running = false, this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    final size = kMobile ? 42.0 : 34.0;
-    final iconSize =
-        running ? (kMobile ? 16.0 : 13.0) : (kMobile ? 18.0 : 15.0);
-    return Material(
-      color: enabled ? AppColors.fg1 : AppColors.surface2,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Center(
-              child: AppIcon(running ? 'stop' : 'arrow-up',
-                  size: iconSize,
-                  color: enabled ? AppColors.bg : AppColors.fg4)),
-        ),
-      ),
-    );
-  }
-}
-
-class _SessionActionsPanel extends StatefulWidget {
-  final HarnessState? session;
-  final String title;
-  final Future<void> Function(String name) onRename;
-  final void Function(bool manual) onApproval;
-  final void Function(String text) onSetGoal;
-  final VoidCallback onCancelGoal;
-  final VoidCallback onLanes;
-  final VoidCallback? onTasks;
-  final VoidCallback onTerm;
-  final VoidCallback onGit;
-  final VoidCallback onFiles;
-  final VoidCallback onProcesses;
-  final VoidCallback onRecurring;
-  final VoidCallback onCompact;
-  final VoidCallback onCheckpoints;
-  final VoidCallback onUsage;
-  final bool hideShell;
-  final bool hideRename;
-  final bool hideWorkspace;
-  final bool hideGoal;
-  final bool hideCheckpoints;
-  const _SessionActionsPanel({
-    required this.session,
-    required this.title,
-    required this.onRename,
-    required this.onApproval,
-    required this.onSetGoal,
-    required this.onCancelGoal,
-    required this.onLanes,
-    this.onTasks,
-    required this.onTerm,
-    required this.onGit,
-    required this.onFiles,
-    required this.onProcesses,
-    required this.onRecurring,
-    required this.onCompact,
-    required this.onCheckpoints,
-    required this.onUsage,
-    this.hideShell = false,
-    this.hideRename = false,
-    this.hideWorkspace = false,
-    this.hideGoal = false,
-    this.hideCheckpoints = false,
-  });
-
-  @override
-  State<_SessionActionsPanel> createState() => _SessionActionsPanelState();
-}
-
-class _SessionActionsPanelState extends State<_SessionActionsPanel> {
-  String? _open;
-  bool? _manualOverride;
-  late final TextEditingController _titleCtl =
-      TextEditingController(text: widget.title);
-  late final TextEditingController _goalCtl = TextEditingController();
-  bool _savingTitle = false;
-
-  @override
-  void dispose() {
-    _titleCtl.dispose();
-    _goalCtl.dispose();
-    super.dispose();
-  }
-
-  void _toggle(String id) => setState(() => _open = _open == id ? null : id);
-
-  Widget _section(String label) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
-        child: SectionLabel(label),
-      );
-
-  Widget _row({
-    required String icon,
-    required String label,
-    String? value,
-    String? id,
-    VoidCallback? onTap,
-    Widget? child,
-  }) {
-    final open = id != null && _open == id;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        InkWell(
-          onTap: onTap ?? (id == null ? null : () => _toggle(id)),
-          borderRadius: BorderRadius.circular(R.sm),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-            child: Row(children: [
-              AppIcon(icon, size: 18, color: AppColors.fg2),
-              const SizedBox(width: 12),
-              Text(label, style: sans(15, color: AppColors.fg1)),
-              const Spacer(),
-              if (value != null) ...[
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: sans(12.5, color: AppColors.fg4)),
-                ),
-                const SizedBox(width: 6),
-              ],
-              if (id != null)
-                AppIcon(open ? 'chevron-down' : 'chevron-right',
-                    size: 15, color: AppColors.fg4)
-              else
-                const SizedBox(width: 15),
-            ]),
-          ),
-        ),
-        if (open && child != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            child: child,
-          ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = widget.session;
-    final manual = _manualOverride ?? ((s?.approvalMode ?? 'auto') == 'manual');
-    final goalOn = s?.goal?.ongoing ?? false;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _section('Session'),
-        if (!widget.hideRename)
-          _row(
-            icon: 'edit',
-            label: 'Rename',
-            id: 'rename',
-            value: widget.title.isEmpty ? null : widget.title,
-            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Expanded(
-                child: AppField(
-                    controller: _titleCtl,
-                    hint: 'Session title',
-                    onSubmitted: (_) => _saveTitle()),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 1),
-                child: Btn(_savingTitle ? '…' : 'Save',
-                    small: true, disabled: _savingTitle, onTap: _saveTitle),
-              ),
-            ]),
-          ),
-        if (!kMacOS)
-          _row(
-            icon: 'shield',
-            label: 'Approval',
-            id: 'approval',
-            value: manual ? 'Ask' : 'Auto',
-            child: Row(children: [
-              Expanded(
-                child: Btn('Auto',
-                    variant: manual ? BtnVariant.secondary : BtnVariant.primary,
-                    onTap: () {
-                  setState(() => _manualOverride = false);
-                  widget.onApproval(false);
-                }),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Btn('Ask',
-                    variant: manual ? BtnVariant.primary : BtnVariant.secondary,
-                    onTap: () {
-                  setState(() => _manualOverride = true);
-                  widget.onApproval(true);
-                }),
-              ),
-            ]),
-          ),
-        if (!kMacOS && !widget.hideGoal)
-          _row(
-            icon: 'zap',
-            label: goalOn ? 'Goal' : 'Set goal',
-            id: 'goal',
-            value: goalOn ? (s!.goal!.paused ? 'paused' : 'running') : null,
-            child: goalOn
-                ? Btn('Cancel goal',
-                    variant: BtnVariant.secondary, onTap: widget.onCancelGoal)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AppField(
-                          controller: _goalCtl,
-                          hint: 'What should the agent work toward?',
-                          minLines: 2,
-                          maxLines: 4),
-                      const SizedBox(height: 8),
-                      Btn('Set goal', onTap: () {
-                        final t = _goalCtl.text.trim();
-                        if (t.isEmpty) return;
-                        widget.onSetGoal(t);
-                        _goalCtl.clear();
-                      }),
-                    ],
-                  ),
-          ),
-        if (!kMacOS && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
-          _row(icon: 'layers', label: 'Lanes', onTap: widget.onLanes),
-        if (widget.onTasks != null)
-          _row(icon: 'layers', label: 'Tasks', onTap: widget.onTasks),
-        _row(icon: 'scheduled', label: 'Scheduled', onTap: widget.onRecurring),
-        if (!widget.hideWorkspace) ...[
-          _section('Workspace'),
-          if (!kMacOS)
-            _row(icon: 'git-branch', label: 'Git', onTap: widget.onGit),
-          _row(icon: 'folder', label: 'Open files', onTap: widget.onFiles),
-          if (!widget.hideShell)
-            _row(
-                icon: 'terminal', label: 'Session shell', onTap: widget.onTerm),
-          _row(icon: 'list', label: 'Processes', onTap: widget.onProcesses),
-        ],
-        _section('History'),
-        _row(
-            icon: 'minimize',
-            label: 'Compact history',
-            onTap: widget.onCompact),
-        if (!widget.hideCheckpoints)
-          _row(
-              icon: 'history',
-              label: 'Checkpoints',
-              onTap: widget.onCheckpoints),
-        _row(icon: 'activity', label: 'Usage', onTap: widget.onUsage),
-      ],
-    );
-  }
-
-  Future<void> _saveTitle() async {
-    final name = _titleCtl.text.trim();
-    if (name.isEmpty || _savingTitle) return;
-    setState(() => _savingTitle = true);
-    try {
-      await widget.onRename(name);
-    } finally {
-      if (mounted) setState(() => _savingTitle = false);
-    }
+        : guardedScaffold;
   }
 }

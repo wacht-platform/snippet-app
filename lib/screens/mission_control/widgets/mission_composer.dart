@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../drafts.dart';
 import '../../../platform.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
@@ -22,6 +23,20 @@ class _MissionComposerState extends State<MissionComposer> {
   final _controller = TextEditingController();
   final _focus = FocusNode();
 
+  // Unsent text survives leaving Mission Control, like a session's draft.
+  String get _draftKey =>
+      Drafts.keyFor(widget.state.client.baseUrl, 'mission-control');
+
+  void _saveDraft() =>
+      Drafts.instance.save(_draftKey, Draft(text: _controller.text));
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.text = Drafts.instance.of(_draftKey)?.text ?? '';
+    _controller.addListener(_saveDraft);
+  }
+
   @override
   void deactivate() {
     _focus.unfocus();
@@ -31,6 +46,8 @@ class _MissionComposerState extends State<MissionComposer> {
   @override
   void dispose() {
     _focus.unfocus();
+    _controller.removeListener(_saveDraft);
+    Drafts.instance.save(_draftKey, Draft(text: _controller.text), now: true);
     _controller.dispose();
     _focus.dispose();
     super.dispose();
@@ -61,7 +78,6 @@ class _MissionComposerState extends State<MissionComposer> {
         decoration: BoxDecoration(
           color: AppColors.bg,
           borderRadius: BorderRadius.circular(R.card),
-          border: Border.all(color: AppColors.border),
         ),
         padding: const EdgeInsets.fromLTRB(18, 20, 12, 14),
         child: Column(
@@ -90,13 +106,13 @@ class _MissionComposerState extends State<MissionComposer> {
                 cursorColor: AppColors.fg1,
                 onSubmitted: (_) => _send(),
                 onChanged: (_) => setState(() {}),
-                style: sans(16, height: 1.45, color: AppColors.fg1),
+                style: sans(kMobile ? 16 : 14, height: 1.45, color: AppColors.fg1),
                 decoration: InputDecoration(
                   isCollapsed: true,
                   contentPadding: const EdgeInsets.fromLTRB(2, 4, 8, 14),
                   border: InputBorder.none,
                   hintText: 'Ask anything',
-                  hintStyle: sans(16, height: 1.45, color: AppColors.fg4),
+                  hintStyle: sans(kMobile ? 16 : 14, height: 1.45, color: AppColors.fg4),
                 ),
               ),
             ),
@@ -113,14 +129,7 @@ class _MissionComposerState extends State<MissionComposer> {
                     height: 36,
                     child: Center(
                       child: sending
-                          ? SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.bg,
-                              ),
-                            )
+                          ? Spinner(size: 14, color: AppColors.bg)
                           : AppIcon('arrow-up',
                               size: 16,
                               color: _canSend ? AppColors.bg : AppColors.fg4),

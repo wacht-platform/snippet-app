@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../mission_control_state.dart';
+import '../../../platform.dart';
 
 class ActivityFeed extends StatelessWidget {
   const ActivityFeed({
@@ -23,24 +24,9 @@ class ActivityFeed extends StatelessWidget {
   Widget build(BuildContext context) {
     final feed = state.feed;
     if (feed.isEmpty) {
+      // The header already says "Connecting…"; the feed shows its shape.
       if (state.loading && state.fatalError == null) {
-        return Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.8,
-                  color: AppColors.fg3,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text('Connecting…', style: sans(13, color: AppColors.fg3)),
-            ],
-          ),
-        );
+        return const _FeedSkeleton();
       }
       final err = state.fatalError;
       return Center(
@@ -89,6 +75,7 @@ class _FeedRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (item) {
       UserMessageItem m => Bubble(mine: true, text: m.text),
+      BoardMessageItem b => _BoardMessageRow(message: b.message),
       AgentTextItem a => Bubble(mine: false, text: a.text),
       TaskEventItem t => _TaskEventRow(item: t, onTap: () => onTapTask(t.task)),
       QuestionItem q => _QuestionRow(item: q, onTap: () => onTapQuestion(q)),
@@ -97,7 +84,9 @@ class _FeedRow extends StatelessWidget {
           child: Center(
             child: Text(s.text,
                 textAlign: TextAlign.center,
-                style: sans(12, color: AppColors.fg4)),
+                // Information, not a placeholder: `fg3`, never `fg4` (the
+                // disabled ramp). Same rule the board's count already states.
+                style: TS.meta()),
           ),
         ),
     };
@@ -112,7 +101,7 @@ class _TaskEventRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (item.kind) {
-      'working' => AppColors.run,
+      'working' || 'stalled' => AppColors.run,
       'done' => AppColors.ok,
       'blocked' || 'failed' => AppColors.danger,
       _ => AppColors.fg3,
@@ -136,12 +125,63 @@ class _TaskEventRow extends StatelessWidget {
                 item.task.title.isEmpty ? item.kind : item.task.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(13.5, color: AppColors.fg1),
+                style: sans(13, color: AppColors.fg1),
               ),
             ),
-            Text(item.kind, style: sans(12, color: AppColors.fg4)),
+            Text(item.kind, style: TS.meta()),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+class _BoardMessageRow extends StatelessWidget {
+  const _BoardMessageRow({required this.message});
+  final BoardMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    final from = message.fromId.trim().isEmpty ? 'someone' : message.fromId;
+    final label =
+        message.threadId.isEmpty ? 'board' : 'board · ${message.threadId}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                  color: AppColors.accent, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(from,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13, color: AppColors.fg1)),
+                  ),
+                  Text(label, style: TS.meta()),
+                ]),
+                if (message.body.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(message.body.trim(),
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -167,15 +207,60 @@ class _QuestionRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Needs input', style: sans(12, color: AppColors.fg3)),
+                  Text('Needs input', style: TS.meta()),
                   const SizedBox(height: 4),
-                  Text(item.question, style: sans(15.5, color: AppColors.fg1)),
+                  Text(item.question, style: sans(kMobile ? 16 : 14, color: AppColors.fg1)),
                 ],
               ),
             ),
             Text('Reply', style: sans(13, color: AppColors.accent)),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+/// A conversation's shape while the feed connects: a message, a reply, a card.
+class _FeedSkeleton extends StatelessWidget {
+  const _FeedSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double factor, double h) => FractionallySizedBox(
+          widthFactor: factor,
+          alignment: Alignment.centerLeft,
+          child: Skeleton(height: h, color: AppColors.hover),
+        );
+    Widget exchange(double a, double b) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Skeleton(height: 44, radius: R.card, color: AppColors.surface1),
+            const SizedBox(height: S.s16),
+            bar(a, 12),
+            const SizedBox(height: S.s8),
+            bar(b, 12),
+            const SizedBox(height: S.s16),
+            Container(
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(R.md),
+              ),
+            ),
+          ],
+        );
+    return Semantics(
+      label: 'Loading',
+      child: ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(M.gutter, S.s16, M.gutter, S.s16),
+        children: [
+          exchange(0.9, 0.6),
+          const SizedBox(height: S.s24),
+          exchange(0.75, 0.45),
+        ],
       ),
     );
   }

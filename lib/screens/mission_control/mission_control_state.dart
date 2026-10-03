@@ -17,6 +17,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../api.dart';
 import '../../models.dart';
+import '../../swr.dart';
 
 /// One row in the activity feed. The feed is a chat-style log of everything
 /// that has happened between the user and the MC session, plus the events
@@ -37,6 +38,15 @@ class UserMessageItem extends FeedItem {
   });
   final String text;
   final bool failed;
+}
+
+class BoardMessageItem extends FeedItem {
+  const BoardMessageItem({
+    required super.id,
+    required super.timestamp,
+    required this.message,
+  });
+  final BoardMessage message;
 }
 
 class AgentTextItem extends FeedItem {
@@ -126,6 +136,27 @@ bool isMissionControlListRow(SessionInfo session) {
   return isMissionControlTab(sessionId: session.id, title: session.title);
 }
 
+/// Whether a session id names an agent inbox rather than a project session.
+bool isInboxSession(String? id) {
+  if (id == null || id.isEmpty) return false;
+  final normalized = id.replaceAll(r'\', '/').trim();
+  if (normalized.startsWith('inbox-') || normalized.startsWith('inbox/')) {
+    return true;
+  }
+  final lastSlash = normalized.lastIndexOf('/');
+  if (lastSlash >= 0 && lastSlash + 1 < normalized.length) {
+    final name = normalized.substring(lastSlash + 1);
+    if (name.startsWith('inbox-')) return true;
+  }
+  return false;
+}
+
+/// Whether a session row represents an agent inbox.
+bool isInboxSessionRow(SessionInfo session) {
+  return isInboxSession(session.id) ||
+      session.folder.trim().toLowerCase() == 'inbox';
+}
+
 /// `/attach` may deliver text as a String or as UTF-8 bytes.
 String decodeAttachPayload(dynamic raw) {
   return switch (raw) {
@@ -154,10 +185,13 @@ class MissionEnvelope {
     if (!isReport) return 'queued';
     return switch (status) {
       'done' || 'completed' => 'done',
-      'failed' || 'cancelled' => 'failed',
+      'failed' => 'failed',
+      'cancelled' => 'cancelled',
       'blocked' => 'blocked',
+      'stalled' => 'stalled',
       'in_progress' || 'working' => 'working',
-      _ => 'done',
+      'message' => 'message',
+      _ => 'update',
     };
   }
 }
@@ -173,12 +207,196 @@ MissionEnvelope? parseMissionEnvelope(String text) {
     return match?.group(1)?.trim() ?? '';
   }
 
+  // A task's scope may sit on the lines after `scope:` (the current envelope)
+  // or on the same line (older ones); it runs until the closing instruction.
+  String scope() {
+    final inline = RegExp(r'^scope:[ \t]*(\S.*)$', multiLine: true)
+        .firstMatch(t)
+        ?.group(1)
+        ?.trim();
+    if (inline != null && inline.isNotEmpty) return inline;
+    final start = t.indexOf('\nscope:\n');
+    if (start < 0) return '';
+    final rest = t.substring(start + '\nscope:\n'.length);
+    final end = rest.indexOf('\n\nBegin now.');
+    final close = rest.indexOf('[/mission_control_task]');
+    final cut = end >= 0 ? end : (close >= 0 ? close : rest.length);
+    return rest.substring(0, cut).trim();
+  }
+
   return MissionEnvelope(
     isReport: isReport,
     taskId: field('task_id'),
     title: field('title'),
     status: isReport ? field('status') : 'pending',
-    summary: isReport ? field('summary') : field('scope'),
+    summary: isReport ? field('summary') : scope(),
+  );
+}
+
+/// A human/agent message routed from the coordination board into a session's
+/// transcript. Rendered as a compact card so the raw envelope never appears.
+class BoardMessage {
+  const BoardMessage({
+    required this.threadId,
+    required this.fromId,
+    required this.fromKind,
+    required this.body,
+  });
+  final String threadId;
+  final String fromId;
+  final String fromKind;
+  final String body;
+}
+
+BoardMessage? parseBoardMessage(String text) {
+  final t = text.trim();
+  if (!t.contains('[coordination_board_message]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  // The body is the final field before the closing tag. Anchor to the last
+  // line-starting `body: ` so a prior message that happens to contain the text
+  // "body: " in its history digest can't be mistaken for the field.
+  final end = t.lastIndexOf('[/coordination_board_message]');
+  final bodyMarker = t.lastIndexOf('\nbody: ');
+  var body = (bodyMarker >= 0 && end > bodyMarker)
+      ? t.substring(bodyMarker + '\nbody: '.length, end).trim()
+      : '';
+
+  return BoardMessage(
+    threadId: field('thread_id'),
+    fromId: field('from_id'),
+    fromKind: field('from_kind'),
+    body: body,
+  );
+}
+
+/// A DIRECT message delivered into an agent's inbox session.
+///
+/// Same shape of problem as [BoardMessage]: the envelope is an internal
+/// transport, and rendering it raw puts `rules:`, history rows, and the closing
+/// tag in the user's transcript. Parsed so only who-and-what is shown.
+class DirectMessage {
+  const DirectMessage({
+    required this.threadId,
+    required this.fromId,
+    required this.fromKind,
+    required this.body,
+    this.isReply = false,
+  });
+  final String threadId;
+  final String fromId;
+  final String fromKind;
+  final String body;
+
+  /// True when this is an ANSWER to a question this session asked, rather than
+  /// a message addressed to this session's agent. The two read differently.
+  final bool isReply;
+
+  /// How to name the sender in a one-line label.
+  String get fromLabel {
+    final id = fromId.trim();
+    if (id.isEmpty) return 'someone';
+    if (fromKind == 'human' || id == 'local') return 'you';
+    return id;
+  }
+}
+
+DirectMessage? parseDirectMessage(String text) {
+  final t = text.trim();
+  if (!t.contains('[direct_message]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  // The body is the final field before the closing tag, and the history digest
+  // above it can itself contain "body: ", so anchor to the LAST occurrence —
+  // the same rule the board message uses.
+  final end = t.lastIndexOf('[/direct_message]');
+  final bodyMarker = t.lastIndexOf('\nbody: ');
+  final body = (bodyMarker >= 0 && end > bodyMarker)
+      ? t.substring(bodyMarker + '\nbody: '.length, end).trim()
+      : '';
+
+  return DirectMessage(
+    threadId: field('thread_id'),
+    fromId: field('from'),
+    fromKind: field('from_kind'),
+    body: body,
+  );
+}
+
+/// The REPLY an agent sent back into a session that asked it something.
+///
+/// Delivered as a user-turn so the session's own agent sees the answer and the
+/// transcript keeps a record of the exchange — which is the whole point of
+/// asking from inside a session rather than in the agent's inbox.
+DirectMessage? parseCoordinationReply(String text) {
+  final t = text.trim();
+  if (!t.contains('[coordination_reply]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  final end = t.lastIndexOf('[/coordination_reply]');
+  final bodyMarker = t.lastIndexOf('\nbody: ');
+  final body = (bodyMarker >= 0 && end > bodyMarker)
+      ? t.substring(bodyMarker + '\nbody: '.length, end).trim()
+      : '';
+
+  // The envelope writes `from: <kind>:<id>`, so split it rather than expecting
+  // a separate field.
+  final raw = field('from');
+  final split = raw.indexOf(':');
+  return DirectMessage(
+    threadId: field('thread_id'),
+    fromId: split > 0 ? raw.substring(split + 1) : raw,
+    fromKind: split > 0 ? raw.substring(0, split) : 'agent',
+    body: body,
+    isReply: true,
+  );
+}
+
+/// The assignment envelope handed to a session that is being given work.
+///
+/// A third internal transport with the same problem: the raw form is a field
+/// list plus a paragraph of rules, none of which belongs in a transcript.
+class AssignmentEnvelope {
+  const AssignmentEnvelope({
+    required this.assignmentId,
+    required this.goalId,
+    required this.agentId,
+    required this.scope,
+    required this.definitionOfDone,
+  });
+  final String assignmentId;
+  final String goalId;
+  final String agentId;
+  final String scope;
+  final String definitionOfDone;
+}
+
+AssignmentEnvelope? parseAssignmentEnvelope(String text) {
+  final t = text.trim();
+  if (!t.contains('[coordination_assignment]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+  return AssignmentEnvelope(
+    assignmentId: field('assignment_id'),
+    goalId: field('goal_id'),
+    agentId: field('agent_id'),
+    scope: field('scope'),
+    definitionOfDone: field('definition_of_done'),
   );
 }
 
@@ -206,6 +424,15 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
               'status': envelope.isReport ? envelope.status : 'pending',
             }),
             kind: envelope.eventKind,
+          ));
+          break;
+        }
+        final board = parseBoardMessage(text);
+        if (board != null) {
+          out.add(BoardMessageItem(
+            id: 'h-b-$i',
+            timestamp: now,
+            message: board,
           ));
           break;
         }
@@ -255,12 +482,10 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   MissionControlState({
     required this.client,
     this.mcSessionId,
-    Duration pollInterval = const Duration(seconds: 20),
-  }) : _pollInterval = pollInterval;
+  });
 
   final DaemonClient client;
   String? mcSessionId;
-  final Duration _pollInterval;
 
   MissionControlOverview? overview;
   List<MissionControlTask> tasks = const [];
@@ -274,7 +499,8 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   bool loading = true;
   bool sending = false;
   int _feedGeneration = 0;
-  Timer? _pollTimer;
+  Swr<_McSnapshot>? _snapshot;
+  _McSnapshot? _applied;
   Timer? _reconnectTimer;
   Timer? _hydrateTimer;
   WebSocketChannel? _ws;
@@ -291,6 +517,16 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
     detail: '',
   );
 
+  final Map<String, Future<MissionControlTask>> _fullTasks = {};
+
+  Future<MissionControlTask> fullTask(MissionControlTask task) {
+    final key = '${task.id}@${task.updatedAt}';
+    return _fullTasks[key] ??= client.mcTask(task.id).catchError((Object _) {
+      _fullTasks.remove(key);
+      return MissionControlTask.preview(task);
+    });
+  }
+
   /// Read-only views.
   List<MissionControlTask> get activeTasks =>
       tasks.where((task) => task.isActive).toList();
@@ -305,7 +541,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   void start() {
     WidgetsBinding.instance.addObserver(this);
     _bootstrap();
-    _startPoll();
+    _watchSnapshot();
   }
 
   @override
@@ -313,7 +549,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       if (!_foreground) {
         _foreground = true;
-        _startPoll();
+        _watchSnapshot();
       }
       if (_ws == null) _connectWs();
       _refresh(silent: true);
@@ -322,17 +558,50 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _foreground = false;
-      _pollTimer?.cancel();
-      _pollTimer = null;
+      _snapshot?.dispose();
+      _snapshot = null;
     }
   }
 
-  void _startPoll() {
-    _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(_pollInterval, (_) {
-      if (!_foreground || mcSessionId == null) return;
-      _refresh(silent: true);
-    });
+  void _watchSnapshot() {
+    _snapshot?.dispose();
+    _snapshot = Swr<_McSnapshot>(
+      client: client,
+      key: 'mc:snapshot',
+      fetch: _fetchSnapshot,
+      revalidateOn: (e) => Swr.coordination(e) || Swr.sessionStatus(e),
+      onChange: _applySnapshot,
+    );
+    _applySnapshot();
+  }
+
+  Future<_McSnapshot> _fetchSnapshot() async {
+    final results = await Future.wait([
+      client.mcOverview(),
+      client.mcTasks(archived: false),
+      client.mcSessions(archived: false),
+    ]).timeout(const Duration(seconds: 8));
+    return (
+      overview: results[0] as MissionControlOverview,
+      tasks: results[1] as List<MissionControlTask>,
+      sessions: results[2] as List<ManagedSession>,
+    );
+  }
+
+  void _applySnapshot() {
+    final swr = _snapshot;
+    if (swr == null || _closed) return;
+    final data = swr.data;
+    if (data != null && !identical(data, _applied)) {
+      _applied = data;
+      overview = data.overview;
+      tasks = data.tasks;
+      sessions = data.sessions;
+      _reconcileFeed();
+      _recomputeAgent();
+    }
+    staleError = swr.error == null ? null : '${swr.error}';
+    notifyListeners();
   }
 
   Future<void> _bootstrap() async {
@@ -369,7 +638,7 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     _closed = true;
     WidgetsBinding.instance.removeObserver(this);
-    _pollTimer?.cancel();
+    _snapshot?.dispose();
     _reconnectTimer?.cancel();
     _hydrateTimer?.cancel();
     _detachWs();
@@ -383,23 +652,12 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _refresh({bool silent = false}) async {
     if (silent && !_foreground) return;
     if (!silent) fatalError = null;
-    try {
-      final results = await Future.wait([
-        client.mcOverview(),
-        client.mcTasks(archived: false),
-        client.mcSessions(archived: false),
-      ]).timeout(const Duration(seconds: 8));
-      overview = results[0] as MissionControlOverview;
-      tasks = (results[1] as List<MissionControlTask>);
-      sessions = (results[2] as List<ManagedSession>);
-      _reconcileFeed();
-      _recomputeAgent();
-      staleError = null;
-    } catch (e) {
-      staleError = '$e';
-    } finally {
-      if (!_closed) notifyListeners();
+    final swr = _snapshot;
+    if (swr == null) {
+      if (_foreground) _watchSnapshot();
+      return;
     }
+    await swr.refresh();
   }
 
   void _detachWs() {
@@ -711,3 +969,24 @@ extension on AgentSnapshot {
         unreadNotifications: unreadNotifications ?? this.unreadNotifications,
       );
 }
+
+Widget? withFullTask(
+  MissionControlState? state,
+  Object? task,
+  Widget Function(MissionControlTask task) build,
+) {
+  if (state == null || task is! MissionControlTask || !task.summary) {
+    return null;
+  }
+  return FutureBuilder<MissionControlTask>(
+    future: state.fullTask(task),
+    builder: (context, snap) =>
+        build(snap.data ?? MissionControlTask.preview(task)),
+  );
+}
+
+typedef _McSnapshot = ({
+  MissionControlOverview overview,
+  List<MissionControlTask> tasks,
+  List<ManagedSession> sessions,
+});

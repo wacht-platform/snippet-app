@@ -1,0 +1,691 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../api.dart';
+import '../../coordination/coordination_thread_state.dart';
+import '../../models.dart';
+import '../../theme.dart';
+import '../../widgets.dart';
+import 'task_common.dart' show statusColor;
+
+/// One task: its state, its roster, its links, and its own message room.
+///
+/// The room is the whole point of a task owning a thread. Agents assigned to
+/// this task — and the human — read and post here, and nobody on a DIFFERENT
+/// task is woken by it, which is what a single global board could not give.
+class TaskDetailScreen extends StatefulWidget {
+  const TaskDetailScreen({
+    super.key,
+    required this.client,
+    required this.taskId,
+    this.onClose,
+  });
+
+  final DaemonClient client;
+  final String taskId;
+  final VoidCallback? onClose;
+
+  @override
+  State<TaskDetailScreen> createState() => _TaskDetailScreenState();
+}
+
+class _TaskDetailScreenState extends State<TaskDetailScreen> {
+  TaskItem? task;
+  List<TaskAgent> roster = const [];
+  TaskLinks links = const TaskLinks();
+  bool loading = true;
+  String? error;
+  bool busy = false;
+
+  CoordinationThreadState? room;
+  final _composer = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    room?.removeListener(_onRoomChanged);
+    room?.dispose();
+    _composer.dispose();
+    super.dispose();
+  }
+
+  void _onRoomChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _load() async {
+    try {
+      final task = await widget.client.getTask(widget.taskId);
+      final roster = await widget.client.taskAgents(widget.taskId);
+      final links = await widget.client.taskLinks(widget.taskId);
+      if (!mounted) return;
+      // The room is keyed by the task's own thread id, which the daemon derives
+      // from the task — so a client never invents one, and reconnecting lands in
+      // the same conversation.
+      final room = CoordinationThreadState(
+          client: widget.client, threadId: task.threadId)
+        ..addListener(_onRoomChanged);
+      room.attachLive();
+      unawaited(room.refresh());
+      setState(() {
+        this.task = task;
+        this.roster = roster;
+        this.links = links;
+        this.room = room;
+        error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  void _publish(TaskItem t) {
+    final feed = widget.client.swr.entry<List<TaskItem>>('coordination:tasks');
+    final data = feed.data;
+    if (data == null) return;
+    feed.mutate([for (final x in data) x.id == t.id ? t : x]);
+  }
+
+  Future<void> _setStatus(TaskStatus status) async {
+    final before = task;
+    if (before == null) return;
+    final moved = before.movedTo(status);
+    setState(() => task = moved);
+    _publish(moved);
+    try {
+      final updated = await widget.client.setTaskStatus(widget.taskId, status);
+      if (!mounted) return;
+      setState(() => task = updated);
+      _publish(updated);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => task = before);
+      _publish(before);
+      toast(context, '$e', danger: true);
+    }
+  }
+
+  Future<void> _addAgent() async {
+    final agents = await widget.client.coordinationAgents();
+    if (!mounted) return;
+    final onTask = roster.where((r) => r.active).map((r) => r.agentId).toSet();
+    // Mission Control is not a task agent — it coordinates — so it is not
+    // offered for membership either.
+    final candidates = agents
+        .where((a) => !onTask.contains(a.id) && !a.isMissionControl)
+        .toList();
+    if (candidates.isEmpty) {
+      toast(context, 'Every agent is already on this task');
+      return;
+    }
+    final picked = await showAppSheet<String>(
+      context,
+      title: 'Add an agent',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final a in candidates)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => Navigator.of(context).pop(a.id),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                  child: Row(children: [
+                    AppIcon('agent', size: 16, color: AppColors.fg3),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                          a.displayName.trim().isEmpty ? a.id : a.displayName,
+                          style: sans(13, color: AppColors.fg1)),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final before = roster;
+    setState(() => roster = [
+          ...roster,
+          TaskAgent.fromJson({
+            'task_id': widget.taskId,
+            'agent_id': picked,
+            'role': 'implementer',
+            'status': roster.any((r) => r.active) ? 'waiting' : 'active',
+            'added_at': DateTime.now().toUtc().toIso8601String(),
+          }),
+        ]);
+    try {
+      await widget.client.addTaskAgent(widget.taskId, picked);
+      final updated = await widget.client.taskAgents(widget.taskId);
+      if (!mounted) return;
+      setState(() => roster = updated);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => roster = before);
+      toast(context, '$e', danger: true);
+    }
+  }
+
+  Future<void> _transferLeaseTo(TaskAgent target) async {
+    final currentActive = roster.firstWhere(
+      (a) => a.hasSessionLease && a.active,
+      orElse: () => roster.first,
+    );
+    final confirm = await showAppSheet<bool>(
+      context,
+      title: 'Transfer session lease',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Transfer the active work session lease to ${target.agentId}?\nOnly one agent can work in the session at a time.',
+              style: sans(13, color: AppColors.fg2, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel', style: sans(13, color: AppColors.fg3)),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('Transfer lease', style: sans(13)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final before = roster;
+    TaskAgent withStatus(TaskAgent a, String status) => TaskAgent.fromJson({
+          'task_id': a.taskId,
+          'agent_id': a.agentId,
+          'role': a.role,
+          'work_session_id': a.workSessionId,
+          'scope': a.scope,
+          'status': status,
+          'added_at': a.addedAt,
+          'removed_at': a.removedAt,
+        });
+    setState(() => roster = [
+          for (final a in roster)
+            a.agentId == target.agentId
+                ? withStatus(a, 'active')
+                : a.agentId == currentActive.agentId
+                    ? withStatus(a, 'waiting')
+                    : a
+        ]);
+    try {
+      await widget.client.transferTaskLease(
+        widget.taskId,
+        currentActive.agentId,
+        target.agentId,
+      );
+      final updated = await widget.client.taskAgents(widget.taskId);
+      if (mounted) setState(() => roster = updated);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => roster = before);
+      toast(context, '$e', danger: true);
+    }
+  }
+
+  Future<void> _linkTask() async {
+    final cached =
+        widget.client.swr.entry<List<TaskItem>>('coordination:tasks').data;
+    final all = cached ?? await widget.client.tasks();
+    if (!mounted) return;
+    final other = all.where((t) => t.id != widget.taskId).toList();
+    if (other.isEmpty) {
+      toast(context, 'No other task to link to');
+      return;
+    }
+    final picked = await showAppSheet<String>(
+      context,
+      title: 'Blocks which task?',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final t in other)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => Navigator.of(context).pop(t.id),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                  child: Text(t.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13, color: AppColors.fg1)),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    try {
+      await widget.client.linkTasks(widget.taskId, picked);
+      final updated = await widget.client.taskLinks(widget.taskId);
+      if (!mounted) return;
+      setState(() => links = updated);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
+  Future<void> _send() async {
+    final text = _composer.text.trim();
+    final room = this.room;
+    if (text.isEmpty || room == null) return;
+    _composer.clear();
+    final sent = await room.send(
+      actorKind: 'human',
+      actorId: 'local',
+      body: text,
+      // Stable per attempt so a retried send cannot double-post.
+      idempotencyKey:
+          'task-${widget.taskId}-${DateTime.now().microsecondsSinceEpoch}',
+    );
+    if (sent == null) _composer.text = text;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = task;
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: Column(children: [
+          SnAppBar(
+            title: t?.title ?? 'Task',
+            compact: true,
+            onBack: widget.onClose ?? () => Navigator.of(context).pop(),
+          ),
+          Expanded(child: _body(t)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _body(TaskItem? t) {
+    return loading
+        ? const Center(child: DelayedSpinner(size: 22))
+        : error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(error!,
+                      textAlign: TextAlign.center,
+                      style: sans(12, color: AppColors.danger)),
+                ),
+              )
+            : t == null
+                ? const EmptyState(icon: 'layers', title: 'Task not found')
+                : Column(children: [
+                    Expanded(
+                      child: CustomScrollView(slivers: [
+                        SliverToBoxAdapter(child: _meta(t)),
+                        SliverToBoxAdapter(
+                            child: Divider(height: 1, color: AppColors.line)),
+                        ..._roomSlivers(),
+                      ]),
+                    ),
+                    _composerBar(),
+                  ]);
+  }
+
+  Widget _meta(TaskItem t) => Padding(
+        padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s16, S.s12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (t.description.trim().isNotEmpty) ...[
+              _Description(markdown: t.description),
+              const SizedBox(height: S.s12),
+            ],
+            // Column picker. The current state is always shown, so the row
+            // reads as the task's position; In progress is never offered, as
+            // only a dispatch starts work.
+            SizedBox(
+              height: 32,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (final s in TaskStatus.values)
+                    if (s == t.status ||
+                        (s != TaskStatus.inProgress &&
+                            (s == TaskStatus.todo ||
+                                !{
+                                  TaskStatus.done,
+                                  TaskStatus.failed,
+                                  TaskStatus.cancelled
+                                }.contains(t.status))))
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: busy || s == t.status
+                              ? null
+                              : () => _setStatus(s),
+                          borderRadius: BorderRadius.circular(R.chip),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              // Same chip rule as the board's filter bar: the
+                              // surface STEP separates, never a hairline.
+                              color: s == t.status
+                                  ? AppColors.surface2
+                                  : AppColors.surface3,
+                              borderRadius: BorderRadius.circular(R.chip),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              if (s == t.status) ...[
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                      color: statusColor(s),
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: S.s6),
+                              ],
+                              Text(s.label,
+                                  style: sans(12,
+                                      weight: s == t.status ? W.label : W.body,
+                                      color: s == t.status
+                                          ? AppColors.fg1
+                                          : AppColors.fg3)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _section('Agents', onAdd: _addAgent),
+            if (roster.isEmpty)
+              Text('Nobody assigned yet.', style: TS.meta())
+            else
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final a in roster)
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: (a.active && !a.hasSessionLease)
+                            ? () => _transferLeaseTo(a)
+                            : null,
+                        borderRadius: BorderRadius.circular(R.chip),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: a.hasSessionLease
+                                ? AppColors.accentBg
+                                : (a.active
+                                    ? AppColors.surface2
+                                    : AppColors.surface3),
+                            borderRadius: BorderRadius.circular(R.chip),
+                            border: a.hasSessionLease
+                                ? Border.all(
+                                    color:
+                                        AppColors.accent.withValues(alpha: 0.4),
+                                    width: 1)
+                                : null,
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text(a.agentId,
+                                style: sans(12,
+                                    color: a.hasSessionLease
+                                        ? AppColors.accent
+                                        : (a.active
+                                            ? AppColors.fg1
+                                            : AppColors.fg3))),
+                            const SizedBox(width: 5),
+                            Text(
+                              a.hasSessionLease
+                                  ? 'active lease'
+                                  : (a.active ? 'waiting' : 'left'),
+                              style: sans(11,
+                                  color: a.hasSessionLease
+                                      ? AppColors.ok
+                                      : AppColors.fg3),
+                            ),
+                          ]),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            const SizedBox(height: 14),
+            _section('Related', onAdd: _linkTask),
+            if (links.links.isEmpty && links.blockedBy.isEmpty)
+              Text('No linked tasks.', style: TS.meta())
+            else ...[
+              // Blockers first: "what is holding this up" is the question the
+              // links exist to answer.
+              for (final blocker in links.blockedBy)
+                _linkRow('Blocked by', blocker, AppColors.danger),
+              for (final l in links.links)
+                if (l.kind == TaskLinkKind.relatesTo)
+                  _linkRow(
+                      'Relates to',
+                      l.toTaskId == t.id ? l.fromTaskId : l.toTaskId,
+                      AppColors.fg3),
+            ],
+          ],
+        ),
+      );
+
+  Widget _section(String label, {required VoidCallback onAdd}) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(children: [
+          Text(label.toUpperCase(), style: caps(11, color: AppColors.fg3)),
+          const Spacer(),
+          GestureDetector(
+            onTap: onAdd,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: AppIcon('plus', size: 14, color: AppColors.fg3),
+            ),
+          ),
+        ]),
+      );
+
+  Widget _linkRow(String prefix, String id, Color color) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(children: [
+          Text('$prefix  ', style: sans(11, color: color)),
+          Expanded(
+            child: Text(id,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: mono(11, color: AppColors.fg3)),
+          ),
+        ]),
+      );
+
+  List<Widget> _roomSlivers() {
+    final room = this.room;
+    if (room == null) return const [];
+    if (room.events.isEmpty) {
+      return const [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(top: S.s16),
+            child: EmptyState(
+              icon: 'message-text',
+              title: 'No messages yet',
+              body: 'Agents on this task talk here. You can post too.',
+            ),
+          ),
+        ),
+      ];
+    }
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.all(S.s12),
+        sliver: SliverList.builder(
+          itemCount: room.events.length,
+          itemBuilder: (_, i) {
+            final e = room.events[i];
+            final mine = e.actorKind == 'human';
+            final body = e.payload['body']?.toString() ?? '';
+            if (body.trim().isEmpty) return const SizedBox.shrink();
+            return Align(
+              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: S.s8),
+                padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
+                constraints: const BoxConstraints(maxWidth: 520),
+                decoration: BoxDecoration(
+                  color: mine ? AppColors.overlay : AppColors.raised,
+                  borderRadius: BorderRadius.circular(R.md),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!mine)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: S.s4),
+                        child:
+                            Text(e.actorId, style: TS.label(AppColors.accent)),
+                      ),
+                    MarkdownBody(
+                      data: body,
+                      selectable: true,
+                      styleSheet: markdownStyle(context),
+                      builders: {'pre': PreBlockBuilder()},
+                      onTapLink: (txt, href, title) => openMarkdownLink(href),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ];
+  }
+
+  Widget _composerBar() => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+          child: Row(children: [
+            Expanded(
+              child: AppField(
+                controller: _composer,
+                hint: 'Message this task…',
+                maxLines: 4,
+                minLines: 1,
+                onSubmitted: (_) => _send(),
+              ),
+            ),
+            const SizedBox(width: 6),
+            IconBtn('send',
+                size: 40,
+                iconSize: 18,
+                tooltip: 'Send',
+                onTap: (room?.sending ?? false) ? null : _send),
+          ]),
+        ),
+      );
+}
+
+class _Description extends StatefulWidget {
+  const _Description({required this.markdown});
+
+  final String markdown;
+
+  @override
+  State<_Description> createState() => _DescriptionState();
+}
+
+class _DescriptionState extends State<_Description> {
+  static const _foldHeight = 260.0;
+  bool _expanded = false;
+
+  bool get _long =>
+      widget.markdown.length > 700 ||
+      '\n'.allMatches(widget.markdown).length > 14;
+
+  @override
+  Widget build(BuildContext context) {
+    final body = MarkdownBody(
+      data: widget.markdown,
+      selectable: true,
+      styleSheet: markdownStyle(context),
+      builders: {'pre': PreBlockBuilder()},
+      onTapLink: (txt, href, title) => openMarkdownLink(href),
+    );
+    if (!_long) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedSize(
+          duration: Motion.base,
+          curve: Motion.enter,
+          alignment: Alignment.topCenter,
+          child: _expanded
+              ? body
+              : SizedBox(
+                  height: _foldHeight,
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: (r) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.7, 1],
+                      colors: [Colors.white, Colors.transparent],
+                    ).createShader(r),
+                    child: ClipRect(
+                      child: OverflowBox(
+                        alignment: Alignment.topLeft,
+                        minHeight: 0,
+                        maxHeight: double.infinity,
+                        child: body,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+        TextAction(_expanded ? 'Show less' : 'Show more',
+            icon: _expanded ? 'chevron-up' : 'chevron-down',
+            onTap: () => setState(() => _expanded = !_expanded)),
+      ],
+    );
+  }
+}

@@ -1,0 +1,393 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:snippet/api.dart';
+import 'package:snippet/swr.dart';
+import 'package:snippet/models.dart';
+import 'package:snippet/screens/agents_sidebar_panel.dart';
+import 'package:snippet/screens/create_agent_form.dart';
+import 'package:snippet/screens/shell_nav.dart';
+import 'package:snippet/theme.dart';
+import 'package:snippet/widgets.dart';
+
+/// The agents panel must read like every other sidebar panel.
+///
+/// It did not: it drew its own 15px title while Terminals, Git Diff and the file
+/// tree all render the shared `ShellSectionHeader`, and its row names were
+/// hard-coded `W.label` while the canonical `ShellNavRow` is
+/// `selected ? W.label : W.body`. So an idle agent was heavier than an idle
+/// session in the same rail — which is what "looks like it had bold font"
+/// describes. `flutter analyze` cannot see any of it.
+class _FakeAgentsClient extends DaemonClient {
+  _FakeAgentsClient() : super('https://daemon.invalid', 'test-token');
+
+  final _deviceEvents = DeviceEventHub.local();
+
+  @override
+  DeviceEventHub get deviceEvents => _deviceEvents;
+
+  String? builtPrompt;
+
+  @override
+  Future<void> buildCoordinationAgent(String prompt) async {
+    builtPrompt = prompt;
+  }
+
+  @override
+  Future<List<CoordinationAgent>> coordinationAgents() async => [
+        CoordinationAgent.fromJson({
+          'id': 'a1',
+          'display_name': 'Ada',
+          'handle': 'ada',
+          'role': 'reviewer',
+          'status': 'active',
+        }),
+        if (builtPrompt != null)
+          CoordinationAgent.fromJson({
+            'id': 'a2',
+            'display_name': 'New agent',
+            'handle': 'new-agent',
+            'role': 'reviewer',
+            'status': 'active',
+          }),
+      ];
+
+}
+
+void main() {
+  Future<void> asDesktop(Future<void> Function() body) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      await body();
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  }
+
+  Future<void> pumpPanel(WidgetTester tester, {double width = 320}) async {
+    tester.view.physicalSize = Size(width, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: AgentsSidebarPanel(client: _FakeAgentsClient()),
+      ),
+    ));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('an idle agent name is not heavier than an idle session row',
+      (tester) async {
+    await asDesktop(() async {
+      await pumpPanel(tester);
+
+      final name = tester.widget<Text>(find.text('Ada'));
+      final style = name.style!;
+      expect(style.fontWeight, W.body,
+          reason: 'the canonical ShellNavRow is '
+              '`selected ? W.label : W.body`; an idle row must be 400');
+    });
+  });
+
+  testWidgets('desktop uses the shared section header, not a bespoke title',
+      (tester) async {
+    await asDesktop(() async {
+      await pumpPanel(tester);
+
+      // Every sibling panel renders this; a panel with its own header is how the
+      // rail drifted into two different section styles.
+      expect(find.byType(ShellSectionHeader), findsOneWidget);
+      // The shared header renders the label uppercased.
+      expect(find.text('AGENTS'), findsOneWidget);
+    });
+  });
+
+  testWidgets('the + action opens the shared create-agent form',
+      (tester) async {
+    await asDesktop(() async {
+      await pumpPanel(tester);
+
+      expect(find.byType(CreateAgentForm), findsNothing);
+      await tester.tap(find.byTooltip('Create agent'));
+      await tester.pumpAndSettle();
+
+      // The SAME form Mission Control's directory presents, so the two cannot
+      // offer different fields.
+      expect(find.byType(CreateAgentForm), findsOneWidget);
+      expect(find.text('Build agent'), findsOneWidget);
+    });
+  });
+
+  for (final scenario in [
+    (size: const Size(1000, 700), scale: 1.0, offset: const Offset(700, 600)),
+    (size: const Size(300, 600), scale: 2.0, offset: const Offset(0, 250)),
+  ]) {
+    testWidgets('create popover fits ${scenario.size} at ${scenario.scale}x',
+        (tester) async {
+      await asDesktop(() async {
+        tester.view.physicalSize = scenario.size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final client = _FakeAgentsClient();
+        await tester.pumpWidget(MaterialApp(
+          theme: ThemeData.dark(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: const EdgeInsets.fromLTRB(18, 24, 18, 20),
+              textScaler: TextScaler.linear(scenario.scale),
+            ),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Stack(children: [
+              Positioned(
+                left: scenario.offset.dx,
+                top: scenario.offset.dy,
+                width: 280,
+                height: 100,
+                child: AgentsSidebarPanel(client: client),
+              ),
+            ]),
+          ),
+        ));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Create agent'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final popup = tester.getRect(
+            find.byKey(const ValueKey('create-agent-popover')));
+        expect(popup.left, greaterThanOrEqualTo(18));
+        expect(popup.top, greaterThanOrEqualTo(24));
+        expect(popup.right, lessThanOrEqualTo(scenario.size.width - 18));
+        expect(popup.bottom, lessThanOrEqualTo(scenario.size.height - 20));
+        expect(popup.width, lessThanOrEqualTo(340));
+        final header = tester.getRect(find.text('Create agent'));
+        final field = tester.getRect(find.byType(TextField));
+        final button = tester.getRect(find.byType(Btn));
+        expect(popup.contains(header.topLeft), isTrue);
+        expect(popup.contains(button.bottomRight), isTrue);
+        expect(header.bottom, lessThan(field.top));
+        expect(field.bottom, lessThan(button.top));
+        expect(tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+            isTrue);
+        await tester.tap(find.text('Build agent'));
+        await tester.pumpAndSettle();
+        expect(find.text('Describe the agent you want it to become.'), findsOneWidget);
+        await tester.enterText(find.byType(TextField), '  Review security issues in repos  ');
+        await tester.tap(find.text('Build agent'));
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 5));
+        expect(client.builtPrompt, 'Review security issues in repos');
+        expect(find.byType(CreateAgentForm), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    });
+  }
+
+  testWidgets('rows land on the same left inset as every sibling panel',
+      (tester) async {
+    await asDesktop(() async {
+      await pumpPanel(tester);
+
+      // Canonical content x is list inset 8 + kNavPadH 12 = 20. Rows used to sit
+      // at 16 (8 + this panel's own 8), which is what read as inset differently
+      // from the rest of the rail. The active/idle grouping is gone — a lease is
+      // never acquired, so every row is idle — leaving one flat list.
+      const expected = kSidebarContentInset + kNavPadH;
+
+      final avatar = tester.getTopLeft(find.byType(AgentStateIcon)).dx;
+      expect(avatar, closeTo(expected, 0.5),
+          reason: 'row content must share the same x as the header above it');
+    });
+  });
+
+  testWidgets('agents show nested assigned folders without @ tags or roles',
+      (tester) async {
+    await asDesktop(() async {
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final assignedClient = _CustomAgentsClient([
+        CoordinationAgent.fromJson({
+          'id': 'a1',
+          'display_name': 'Builder',
+          'handle': 'builder',
+          'role': 'developer',
+          'status': 'active',
+          'assigned_sessions': [
+            {
+              'id': 's1',
+              'title': 'feature/auth',
+              'conversation': 'feature/auth',
+              'last_active': nowSec - 120,
+            },
+          ],
+        }),
+      ]);
+
+      tester.view.physicalSize = const Size(360, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AgentsSidebarPanel(client: assignedClient),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // Shows agent name and nested folder title
+      expect(find.text('Builder'), findsOneWidget);
+      expect(find.text('feature/auth'), findsOneWidget);
+
+      // Shows relative time for the assignment
+      expect(find.text('2m'), findsWidgets);
+
+      // Does NOT show @handle or role
+      expect(find.text('@builder'), findsNothing);
+      expect(find.text('developer'), findsNothing);
+    });
+  });
+
+  testWidgets('tapping chevron collapses and expands nested sessions in tree view',
+      (tester) async {
+    await asDesktop(() async {
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final assignedClient = _CustomAgentsClient([
+        CoordinationAgent.fromJson({
+          'id': 'a1',
+          'display_name': 'Builder',
+          'handle': 'builder',
+          'role': 'developer',
+          'status': 'active',
+          'assigned_sessions': [
+            {
+              'id': 's1',
+              'title': 'feature/auth',
+              'conversation': 'feature/auth',
+              'last_active': nowSec - 120,
+            },
+          ],
+        }),
+      ]);
+
+      tester.view.physicalSize = const Size(360, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AgentsSidebarPanel(client: assignedClient),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('feature/auth'), findsOneWidget);
+      expect(find.text('1'), findsNothing);
+
+      // Tap chevron to collapse
+      await tester.tap(find.byWidgetPredicate(
+          (w) => w is AppIcon && w.name == 'chevron-down'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('feature/auth'), findsNothing);
+      expect(find.text('1'), findsOneWidget);
+
+      // Tap chevron to expand again
+      await tester.tap(find.byWidgetPredicate(
+          (w) => w is AppIcon && w.name == 'chevron-right'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('feature/auth'), findsOneWidget);
+      expect(find.text('1'), findsNothing);
+    });
+  });
+
+  testWidgets('tapping agent name opens agent conversation even if agent has sessions',
+      (tester) async {
+    CoordinationAgent? openedAgent;
+    final assignedClient = _CustomAgentsClient([
+        CoordinationAgent.fromJson({
+          'id': 'a1',
+          'display_name': 'Builder',
+          'handle': 'builder',
+          'role': 'developer',
+          'status': 'active',
+          'assigned_sessions': [
+            {
+              'id': 's1',
+              'title': 'feature/auth',
+              'conversation': 'feature/auth',
+              'last_active': 1000,
+            },
+          ],
+        }),
+      ]);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AgentsSidebarPanel(
+            client: assignedClient,
+            onOpenAgent: (a) => openedAgent = a,
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Builder'), findsOneWidget);
+      await tester.tap(find.text('Builder'));
+      await tester.pumpAndSettle();
+
+      expect(openedAgent, isNotNull);
+      expect(openedAgent?.id, 'a1');
+    });
+
+  testWidgets('agent inbox sessions are not shown under assigned sessions',
+      (tester) async {
+    final assignedClient = _CustomAgentsClient([
+      CoordinationAgent.fromJson({
+        'id': 'a1',
+        'display_name': 'Builder',
+        'handle': 'builder',
+        'role': 'developer',
+        'status': 'active',
+        'assigned_sessions': [
+          {
+            'id': 'inbox-a1',
+            'title': 'Agent Inbox',
+            'conversation': 'default',
+            'last_active': 2000,
+          },
+          {
+            'id': 's1',
+            'title': 'feature/auth',
+            'conversation': 'feature/auth',
+            'last_active': 1000,
+          },
+        ],
+      }),
+    ]);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: AgentsSidebarPanel(
+          client: assignedClient,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Builder'), findsOneWidget);
+    expect(find.text('feature/auth'), findsOneWidget);
+    expect(find.text('Agent Inbox'), findsNothing);
+    expect(find.text('inbox-a1'), findsNothing);
+  });
+}
+
+class _CustomAgentsClient extends DaemonClient {
+  final List<CoordinationAgent> _agents;
+  _CustomAgentsClient(this._agents)
+      : super('https://daemon.invalid', 'test-token');
+
+  @override
+  Future<List<CoordinationAgent>> coordinationAgents() async => _agents;
+}

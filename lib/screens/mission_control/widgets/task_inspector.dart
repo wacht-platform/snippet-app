@@ -14,6 +14,9 @@ class TaskInspector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final full = withFullTask(
+        state, task, (t) => TaskInspector(task: t, state: state));
+    if (full != null) return full;
     final t = task;
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -27,8 +30,7 @@ class TaskInspector extends StatelessWidget {
                   t.title as String,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style:
-                      sans(15, weight: FontWeight.w600, color: AppColors.fg1),
+                  style: TS.sectionTitle(),
                 ),
               ),
               _StatusPill(status: t.status as String),
@@ -45,8 +47,12 @@ class TaskInspector extends StatelessWidget {
           if ((t.description as String).isNotEmpty) ...[
             const SectionLabel('Description'),
             const SizedBox(height: 4),
-            Text(t.description as String,
-                style: sans(13, color: AppColors.fg2)),
+            MarkdownBody(
+                data: t.description as String,
+                selectable: true,
+                styleSheet: markdownStyle(context),
+                builders: {'pre': PreBlockBuilder()},
+                onTapLink: (txt, href, title) => openMarkdownLink(href)),
             const SizedBox(height: 12),
           ],
           if (state != null) ...[
@@ -106,7 +112,7 @@ class _StatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(R.sm),
       ),
       child: Text(status, style: mono(10, color: color)),
     );

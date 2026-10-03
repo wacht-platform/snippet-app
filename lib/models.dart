@@ -32,7 +32,7 @@ String hostOf(String url) {
 
 /// A configured model profile (from GET /config). Keys are never sent back — only
 /// [hasKey] tells whether one is set.
-class ModelProfile {
+class InferenceProfile {
   final String name;
   final String provider;
   final String baseUrl;
@@ -45,7 +45,21 @@ class ModelProfile {
   final bool? supportsImages; // null on daemons that don't report it yet
   final bool xSearch; // xAI server-side X search
 
-  ModelProfile.fromJson(Map<String, dynamic> j)
+  InferenceProfile withActive(bool value) => InferenceProfile.fromJson({
+        'name': name,
+        'provider': provider,
+        'base_url': baseUrl,
+        'model': model,
+        'has_key': hasKey,
+        'active': value,
+        'context_window': contextWindow,
+        'reasoning_effort': reasoningEffort,
+        'stream': stream,
+        'supports_images': supportsImages,
+        'x_search': xSearch,
+      });
+
+  InferenceProfile.fromJson(Map<String, dynamic> j)
       : name = j['name'] as String? ?? '',
         provider = j['provider'] as String? ?? '',
         baseUrl = j['base_url'] as String? ?? '',
@@ -60,13 +74,14 @@ class ModelProfile {
         xSearch = j['x_search'] == true;
 
   /// Whether this profile is ready to use. Most providers need an API key, but
-  /// ChatGPT authenticates via an OAuth login (no key), so a keyless chatgpt
-  /// profile is still usable — don't gate it on [hasKey].
-  bool get usable => hasKey || provider == 'chatgpt';
+  /// the subscription providers sign in instead — ChatGPT via OAuth, Grok via a
+  /// device code — so a keyless one is still usable; don't gate it on [hasKey].
+  bool get usable =>
+      hasKey || const {'chatgpt', 'xai', 'grok'}.contains(provider);
 }
 
 class ServerConfig {
-  final List<ModelProfile> profiles;
+  final List<InferenceProfile> profiles;
   final String? active;
 
   /// Profile that delegated lanes run on; null → they use the active model.
@@ -76,7 +91,7 @@ class ServerConfig {
 
   ServerConfig.fromJson(Map<String, dynamic> j)
       : profiles = ((j['profiles'] as List?) ?? const [])
-            .map((e) => ModelProfile.fromJson(e as Map<String, dynamic>))
+            .map((e) => InferenceProfile.fromJson(e as Map<String, dynamic>))
             .toList(),
         active = j['active'] as String?,
         delegate = j['delegate'] as String?,
@@ -111,6 +126,33 @@ class SessionInfo {
   final int lastActive;
   final bool running;
   final String? profile;
+  /// The agent this session IS, if any — an inbox belongs to an agent, and a
+  /// specialized session runs as one. A durable property of the session.
+  final String? agentId;
+
+  /// The agent dispatched to work here right now, from the task board's roster.
+  ///
+  /// A different question from [agentId]: a plain project session is nobody's,
+  /// yet Mission Control can dispatch an agent into it — and that is exactly the
+  /// case the session list needs to show. [agentId] alone could never answer it,
+  /// because dispatch writes the roster, not the session's identity.
+  final String? workerAgentId;
+
+  /// Who to name on a session row: whoever is working here, else whoever the
+  /// session belongs to. Precedence lives here so every row agrees, and so the
+  /// rule is stated once rather than repeated at each call site.
+  String? get displayAgentId => workerAgentId ?? agentId;
+
+  /// For a session in a git worktree: the folder in the main checkout it was
+  /// made from, and the worktree's branch.
+  final String? originFolder;
+  final String? branch;
+
+  /// The folder a person knows this session by: the project, not the
+  /// generated worktree directory.
+  String get projectFolder => originFolder ?? folder;
+
+  bool get inWorktree => originFolder != null;
 
   SessionInfo.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -120,7 +162,11 @@ class SessionInfo {
         status = j['status'] as String? ?? '',
         lastActive = (j['last_active'] as num?)?.toInt() ?? 0,
         running = j['running'] == true,
-        profile = j['profile'] as String?;
+        profile = j['profile'] as String?,
+        agentId = j['agent_id'] as String?,
+        workerAgentId = j['worker_agent_id'] as String?,
+        originFolder = j['origin_folder'] as String?,
+        branch = j['branch'] as String?;
 
   SessionInfo withTitle(String title) => SessionInfo._(
         id: id,
@@ -131,6 +177,10 @@ class SessionInfo {
         lastActive: lastActive,
         running: running,
         profile: profile,
+        agentId: agentId,
+        workerAgentId: workerAgentId,
+        originFolder: originFolder,
+        branch: branch,
       );
 
   SessionInfo withStatus(String status) => SessionInfo._(
@@ -142,6 +192,10 @@ class SessionInfo {
         lastActive: lastActive,
         running: status == 'running',
         profile: profile,
+        agentId: agentId,
+        workerAgentId: workerAgentId,
+        originFolder: originFolder,
+        branch: branch,
       );
 
   const SessionInfo._({
@@ -153,7 +207,43 @@ class SessionInfo {
     required this.lastActive,
     required this.running,
     required this.profile,
+    this.agentId,
+    this.workerAgentId,
+    this.originFolder,
+    this.branch,
   });
+}
+
+/// Where a new session works: a new git worktree of the folder, or the folder.
+enum WorkspaceMode {
+  worktree('worktree'),
+  folder('folder');
+
+  const WorkspaceMode(this.wire);
+  final String wire;
+}
+
+/// A repository's main checkout and its linked worktrees.
+class RepoWorktrees {
+  /// Null outside a git repository.
+  final String? repo;
+  final List<Worktree> worktrees;
+
+  RepoWorktrees.fromJson(Map<String, dynamic> j)
+      : repo = j['repo'] as String?,
+        worktrees = [
+          for (final w in (j['worktrees'] as List? ?? const []))
+            Worktree.fromJson(w as Map<String, dynamic>),
+        ];
+}
+
+class Worktree {
+  final String path;
+  final String? branch;
+
+  Worktree.fromJson(Map<String, dynamic> j)
+      : path = j['path'] as String? ?? '',
+        branch = j['branch'] as String?;
 }
 
 class FsEntry {
@@ -216,13 +306,44 @@ class RateWindow {
       resetsAt > 0 ||
       usedPercent.isFinite && usedPercent > 0;
 
+  /// The window rolled over since this snapshot was taken.
+  ///
+  /// Rate limits are account-wide and only observed when a session runs, so a
+  /// snapshot can outlive its own window. Once `resetsAt` is in the past,
+  /// `usedPercent` describes the PREVIOUS window and the true current usage is
+  /// near zero — so rendering "1% left" with a 99%-full bar asserts a figure we
+  /// know to be wrong.
+  bool get isExpired =>
+      resetsAt > 0 &&
+      DateTime.fromMillisecondsSinceEpoch(resetsAt * 1000)
+          .isBefore(DateTime.now());
+
   double get leftPercent => (100 - usedPercent).clamp(0, 100).toDouble();
+}
+
+class UsageModel {
+  final String model;
+  final int calls;
+  final int totalTokens;
+  final int promptTokens;
+  final int completionTokens;
+  final int cacheReadTokens;
+
+  UsageModel.fromJson(Map<String, dynamic> j)
+      : model = j['model'] as String? ?? '',
+        calls = (j['calls'] as num?)?.toInt() ?? 0,
+        totalTokens = (j['total_tokens'] as num?)?.toInt() ?? 0,
+        promptTokens = (j['prompt_tokens'] as num?)?.toInt() ?? 0,
+        completionTokens = (j['completion_tokens'] as num?)?.toInt() ?? 0,
+        cacheReadTokens = (j['cache_read_tokens'] as num?)?.toInt() ?? 0;
 }
 
 class UsageProvider {
   final String provider;
   final String? profile;
   final String model;
+  final int calls;
+  final List<UsageModel> models;
   final int sessions;
   final int totalTokens;
   final int promptTokens;
@@ -230,15 +351,34 @@ class UsageProvider {
   final int cacheReadTokens;
   final List<RateWindow> rateLimits;
 
+  /// Whether this provider can report rate limits at all.
+  ///
+  /// Only the ChatGPT/Codex subscription exposes them; every other provider
+  /// hardcodes no snapshot, and opencode returns no such headers even in
+  /// principle. So an empty [rateLimits] means one of two very different things,
+  /// and the card must not blur them: a provider that CAN report just hasn't yet,
+  /// whereas one that cannot will never show a number.
+  ///
+  /// Null means UNKNOWN — a daemon predating this field. Kept distinct from
+  /// false so we never assert a provider *cannot* report when we simply haven't
+  /// been told; the UI falls back to neutral wording in that case.
+  final bool? rateLimitsSupported;
+
   UsageProvider.fromJson(Map<String, dynamic> j)
       : provider = j['provider'] as String? ?? '',
         profile = j['profile'] as String?,
         model = j['model'] as String? ?? '',
+        calls = (j['calls'] as num?)?.toInt() ?? 0,
+        models = ((j['models'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => UsageModel.fromJson(e.cast<String, dynamic>()))
+            .toList(),
         sessions = (j['sessions'] as num?)?.toInt() ?? 0,
         totalTokens = (j['total_tokens'] as num?)?.toInt() ?? 0,
         promptTokens = (j['prompt_tokens'] as num?)?.toInt() ?? 0,
         completionTokens = (j['completion_tokens'] as num?)?.toInt() ?? 0,
         cacheReadTokens = (j['cache_read_tokens'] as num?)?.toInt() ?? 0,
+        rateLimitsSupported = j['rate_limits_supported'] as bool?,
         rateLimits = _reportedRateWindows(j['rate_limits']);
 
   static List<RateWindow> _reportedRateWindows(dynamic raw) {
@@ -472,40 +612,43 @@ class HarnessState {
       turnStartedAt: base.turnStartedAt,
       compactingStartedAt: base.compactingStartedAt,
       watchCount: base.watchCount,
-      lanes: base.lanes,
+      lanes: d.containsKey('lanes') ? base.lanes : lanes,
       queuedInputs:
           d.containsKey('queued_inputs') ? base.queuedInputs : queuedInputs,
     );
   }
 
-  HarnessState prependEvents(List<Map<String, dynamic>> older) {
-    if (older.isEmpty) return this;
-    return HarnessState(
-      status: status,
-      workspace: workspace,
-      title: title,
-      events: [...older, ...events],
-      finalText: finalText,
-      approvalMode: approvalMode,
-      pendingQuestion: pendingQuestion,
-      totalTokens: totalTokens,
-      promptTokens: promptTokens,
-      completionTokens: completionTokens,
-      cacheReadTokens: cacheReadTokens,
-      lastPromptTokens: lastPromptTokens,
-      contextWindow: contextWindow,
-      ratePrimary: ratePrimary,
-      rateSecondary: rateSecondary,
-      checkpoints: checkpoints,
-      goal: goal,
-      compacting: compacting,
-      turnStartedAt: turnStartedAt,
-      compactingStartedAt: compactingStartedAt,
-      watchCount: watchCount,
-      lanes: lanes,
-      queuedInputs: queuedInputs,
-    );
-  }
+  HarnessState replaceEvent(int index, Map<String, dynamic> event) =>
+      _withEvents(List<Map<String, dynamic>>.of(events)..[index] = event);
+
+  HarnessState prependEvents(List<Map<String, dynamic>> older) =>
+      older.isEmpty ? this : _withEvents([...older, ...events]);
+
+  HarnessState _withEvents(List<Map<String, dynamic>> next) => HarnessState(
+        status: status,
+        workspace: workspace,
+        title: title,
+        events: next,
+        finalText: finalText,
+        approvalMode: approvalMode,
+        pendingQuestion: pendingQuestion,
+        totalTokens: totalTokens,
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+        cacheReadTokens: cacheReadTokens,
+        lastPromptTokens: lastPromptTokens,
+        contextWindow: contextWindow,
+        ratePrimary: ratePrimary,
+        rateSecondary: rateSecondary,
+        checkpoints: checkpoints,
+        goal: goal,
+        compacting: compacting,
+        turnStartedAt: turnStartedAt,
+        compactingStartedAt: compactingStartedAt,
+        watchCount: watchCount,
+        lanes: lanes,
+        queuedInputs: queuedInputs,
+      );
 
   HarnessState withApprovalMode(String mode) => HarnessState(
         status: status,
@@ -645,15 +788,18 @@ String rateWindowLabel(int minutes) {
   return 'limit';
 }
 
-/// "resets in 2h 14m · 15:45" from a Unix-epoch-seconds reset time (null if
-/// unknown or already elapsed). Durations normalize up — minutes → hours → days
-/// (so a weekly window reads "6d 6h", not "150h 54m"). The local clock time is
-/// appended only for near resets (< 1 day out), where it's actually useful.
+/// "resets in 2h 14m · 15:45" from a Unix-epoch-seconds reset time. Durations
+/// normalize up — minutes → hours → days (so a weekly window reads "6d 6h", not
+/// "150h 54m"). The local clock time is appended only for near resets (< 1 day
+/// out), where it's actually useful.
+///
+/// Returns null once the reset has passed: the window rolled over, so there is
+/// no upcoming reset to name. Callers show [RateWindow.isExpired] instead.
 String? rateResetLabel(int resetsAt) {
   if (resetsAt <= 0) return null;
   final reset = DateTime.fromMillisecondsSinceEpoch(resetsAt * 1000);
   final d = reset.difference(DateTime.now());
-  if (d.isNegative) return 'awaiting update';
+  if (d.isNegative) return null;
   final days = d.inDays, h = d.inHours % 24, m = d.inMinutes % 60;
   if (days > 0) return 'resets in ${h > 0 ? '${days}d ${h}h' : '${days}d'}';
   final rel = d.inHours > 0
@@ -788,6 +934,156 @@ class NotificationMarker {
         delivered = j['delivered'] as bool? ?? false;
 }
 
+class AgentAssignedSession {
+  final String id;
+  final String title;
+  final String conversation;
+  final int lastActive;
+
+  const AgentAssignedSession({
+    required this.id,
+    required this.title,
+    required this.conversation,
+    required this.lastActive,
+  });
+
+  AgentAssignedSession.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        conversation = j['conversation'] as String? ?? '',
+        lastActive = (j['last_active'] as num?)?.toInt() ?? 0;
+}
+
+/// A specialized worker identity in the SQLite coordination directory.
+class CoordinationAgent {
+  final String id;
+  final String displayName;
+  final String handle;
+  final String kind;
+  final String status;
+  final String role;
+  final List<String> capabilities;
+  final List<AgentAssignedSession> assignedSessions;
+
+  CoordinationAgent.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        displayName = j['display_name'] as String? ?? '',
+        handle = j['handle'] as String? ?? '',
+        kind = j['kind'] as String? ?? 'worker',
+        status = j['status'] as String? ?? 'active',
+        role = j['role'] as String? ?? 'implementer',
+        capabilities = ((j['capabilities'] as List?) ?? const [])
+            .whereType<String>()
+            .toList(),
+        assignedSessions = ((j['assigned_sessions'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => AgentAssignedSession.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+
+  bool get available => status == 'active';
+
+  /// True for Mission Control, the coordinator.
+  ///
+  /// It is not a peer agent: it has its own pinned chat, and it does not take
+  /// work the way a worker does. Any list of agents a user picks FROM should
+  /// exclude it — it is a destination reached by its own session, not an entry
+  /// in a list of workers.
+  bool get isMissionControl => kind == 'mission_control' || id == 'mission-control';
+}
+
+/// One row of an agent's coordination memory: what it dispatched, what came
+/// back, or what it concluded.
+class BoardEntry {
+  final int id;
+  final String agentId;
+
+  /// `dispatched`, `reported`, or `noted`.
+  final String kind;
+  final String? sessionId;
+
+  /// The folder the row concerns, when it concerns one.
+  final String? workspace;
+  final String summary;
+
+  /// Links a dispatch to its later report.
+  final String? correlationId;
+  final String createdAt;
+
+  BoardEntry.fromJson(Map<String, dynamic> j)
+      : id = (j['id'] as num?)?.toInt() ?? 0,
+        agentId = j['agent_id'] as String? ?? '',
+        kind = j['kind'] as String? ?? '',
+        sessionId = (j['session_id'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['session_id'] as String).trim(),
+        workspace = (j['workspace'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['workspace'] as String).trim(),
+        summary = j['summary'] as String? ?? '',
+        correlationId = (j['correlation_id'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['correlation_id'] as String).trim(),
+        createdAt = j['created_at'] as String? ?? '';
+}
+
+/// A direct conversation as listed for a participant, with its unread count.
+class DirectThreadSummary {
+  final String threadId;
+  final String title;
+
+  /// The other participant: `human` or `agent`.
+  final String peerKind;
+  final String peerId;
+  final int unread;
+  final int lastSequence;
+  final String createdAt;
+
+  DirectThreadSummary.fromJson(Map<String, dynamic> j)
+      : threadId = j['thread_id'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        peerKind = j['peer_kind'] as String? ?? '',
+        peerId = j['peer_id'] as String? ?? '',
+        unread = (j['unread'] as num?)?.toInt() ?? 0,
+        lastSequence = (j['last_sequence'] as num?)?.toInt() ?? 0,
+        createdAt = j['created_at'] as String? ?? '';
+
+  bool get hasUnread => unread > 0;
+}
+
+
+class CoordinationEvent {
+  final String eventId;
+  final String threadId;
+  final String partitionKey;
+  final int sequence;
+  final String eventType;
+  final String actorKind;
+  final String actorId;
+  final int payloadVersion;
+  final Map<String, dynamic> payload;
+  final String? causationId;
+  final String? correlationId;
+  final String idempotencyKey;
+  final String createdAt;
+
+  CoordinationEvent.fromJson(Map<String, dynamic> j)
+      : eventId = j['event_id'] as String? ?? '',
+        threadId = j['thread_id'] as String? ?? '',
+        partitionKey = j['partition_key'] as String? ?? '',
+        sequence = (j['sequence'] as num?)?.toInt() ?? 0,
+        eventType = j['event_type'] as String? ?? '',
+        actorKind = j['actor_kind'] as String? ?? '',
+        actorId = j['actor_id'] as String? ?? '',
+        payloadVersion = (j['payload_version'] as num?)?.toInt() ?? 1,
+        payload = (j['payload'] as Map?)?.cast<String, dynamic>() ?? const {},
+        causationId = j['causation_id'] as String?,
+        correlationId = j['correlation_id'] as String?,
+        idempotencyKey = j['idempotency_key'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '';
+
+  String get body => payload['body'] is String ? payload['body'] as String : '';
+}
+
 /// A task tracked by Mission Control.
 class MissionControlTask {
   final String id;
@@ -800,14 +1096,28 @@ class MissionControlTask {
   final String? sessionId; // link to a managed session
   final bool archived;
   final List<NotificationMarker> notifications;
+  final bool summary;
+
+  MissionControlTask.preview(MissionControlTask o)
+      : id = o.id,
+        title = o.title,
+        description = o.description,
+        status = o.status,
+        createdAt = o.createdAt,
+        updatedAt = o.updatedAt,
+        sessionId = o.sessionId,
+        archived = o.archived,
+        notifications = o.notifications,
+        summary = false;
 
   MissionControlTask.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
+        summary = j['summary'] == true,
         title = j['title'] as String? ?? '',
         description = j['description'] as String? ?? '',
         status = j['status'] as String? ?? 'pending',
-        createdAt = (j['created_at'] as num?)?.toInt() ?? 0,
-        updatedAt = (j['updated_at'] as num?)?.toInt() ?? 0,
+        createdAt = _epochSeconds(j['created_at']),
+        updatedAt = _epochSeconds(j['updated_at']),
         sessionId = j['session_id'] as String?,
         archived = j['archived'] as bool? ?? false,
         notifications = ((j['notifications'] as List?) ?? const [])
@@ -817,6 +1127,15 @@ class MissionControlTask {
 
   bool get isActive =>
       !archived && (status == 'pending' || status == 'in_progress');
+}
+
+int _epochSeconds(dynamic raw) {
+  if (raw is num) return raw.toInt();
+  if (raw is String) {
+    final parsed = DateTime.tryParse(raw);
+    if (parsed != null) return parsed.millisecondsSinceEpoch ~/ 1000;
+  }
+  return 0;
 }
 
 /// A managed session registered in Mission Control.
@@ -918,6 +1237,157 @@ class RecurringJob {
   }
 }
 
+
 /// Global notifier bumped whenever model profiles are added, updated, or deleted
 /// so open session views, composers, and settings can refresh their pickers live.
 final ValueNotifier<int> modelsRevision = ValueNotifier<int>(0);
+
+/// Lifecycle of a task on the board.
+///
+/// Deliberately smaller than the assignment states: a task is what a HUMAN
+/// filed, so it carries the columns a person works in and nothing about
+/// dispatch, which is Mission Control's concern.
+enum TaskStatus {
+  todo('todo', 'To do'),
+  inProgress('in_progress', 'In progress'),
+  blocked('blocked', 'Blocked'),
+  done('done', 'Done'),
+  failed('failed', 'Failed'),
+  cancelled('cancelled', 'Cancelled');
+
+  const TaskStatus(this.wire, this.label);
+  final String wire;
+  final String label;
+
+  static TaskStatus parse(String? value) => TaskStatus.values.firstWhere(
+        (s) => s.wire == value,
+        // An unknown status from a newer daemon must not crash the board; Todo
+        // is the safe column because it is the one that still needs action.
+        orElse: () => TaskStatus.todo,
+      );
+}
+
+/// How two tasks relate. `blocks` is an ordering constraint, `relatesTo` is
+/// context — one field with a discriminator so the board draws both without
+/// guessing intent.
+enum TaskLinkKind {
+  blocks('blocks'),
+  relatesTo('relates_to');
+
+  const TaskLinkKind(this.wire);
+  final String wire;
+
+  static TaskLinkKind parse(String? value) => TaskLinkKind.values.firstWhere(
+        (k) => k.wire == value,
+        orElse: () => TaskLinkKind.relatesTo,
+      );
+}
+
+class TaskLink {
+  final String fromTaskId;
+  final String toTaskId;
+  final TaskLinkKind kind;
+  final String createdAt;
+
+  TaskLink.fromJson(Map<String, dynamic> j)
+      : fromTaskId = j['from_task_id'] as String? ?? '',
+        toTaskId = j['to_task_id'] as String? ?? '',
+        kind = TaskLinkKind.parse(j['kind'] as String?),
+        createdAt = j['created_at'] as String? ?? '';
+}
+
+class TaskAgent {
+  final String taskId;
+  final String agentId;
+  final String role;
+  final String? workSessionId;
+  final String scope;
+  final String status;
+  final String addedAt;
+  final String? removedAt;
+
+  bool get active => removedAt == null;
+  bool get hasSessionLease => status == 'active';
+
+  TaskAgent.fromJson(Map<String, dynamic> j)
+      : taskId = j['task_id'] as String? ?? '',
+        agentId = j['agent_id'] as String? ?? '',
+        role = j['role'] as String? ?? '',
+        workSessionId = j['work_session_id'] as String?,
+        scope = j['scope'] as String? ?? '',
+        status = j['status'] as String? ?? 'pending',
+        addedAt = j['added_at'] as String? ?? '',
+        removedAt = j['removed_at'] as String?;
+}
+
+class TaskItem {
+  final String id;
+  final String title;
+  final String description;
+  final String plan;
+  final TaskStatus status;
+  final int priority;
+  final String createdByKind;
+  final String createdById;
+  final String createdAt;
+  final String updatedAt;
+  final String? completedAt;
+  final String threadId;
+
+  /// The session the task is routed to.
+  final String sessionId;
+
+  TaskItem.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        title = j['title'] as String? ?? '',
+        description = j['description'] as String? ?? '',
+        plan = j['plan'] as String? ?? '',
+        status = TaskStatus.parse(j['status'] as String?),
+        priority = (j['priority'] as num?)?.toInt() ?? 0,
+        createdByKind = j['created_by_kind'] as String? ?? '',
+        createdById = j['created_by_id'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '',
+        updatedAt = j['updated_at'] as String? ?? '',
+        completedAt = j['completed_at'] as String?,
+        threadId = j['thread_id'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '';
+
+  /// This task in another column, for showing a move before the daemon
+  /// confirms it.
+  TaskItem movedTo(TaskStatus to) => TaskItem._moved(this, to);
+
+  TaskItem._moved(TaskItem t, TaskStatus to)
+      : id = t.id,
+        title = t.title,
+        description = t.description,
+        plan = t.plan,
+        status = to,
+        priority = t.priority,
+        createdByKind = t.createdByKind,
+        createdById = t.createdById,
+        createdAt = t.createdAt,
+        updatedAt = t.updatedAt,
+        completedAt = t.completedAt,
+        threadId = t.threadId,
+        sessionId = t.sessionId;
+}
+
+/// A task's links plus its resolved blockers.
+///
+/// `blockedBy` is separate from `links` because it is the REVERSE of the stored
+/// edge: "a blocks b" is read from b as "b is blocked by a", and a board that
+/// only drew outgoing edges would render a blocked task as unblocked.
+class TaskLinks {
+  final List<TaskLink> links;
+  final List<String> blockedBy;
+
+  const TaskLinks({this.links = const [], this.blockedBy = const []});
+
+  TaskLinks.fromJson(Map<String, dynamic> j)
+      : links = ((j['links'] as List?) ?? const [])
+            .map((e) => TaskLink.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        blockedBy = ((j['blocked_by'] as List?) ?? const [])
+            .whereType<String>()
+            .toList();
+}

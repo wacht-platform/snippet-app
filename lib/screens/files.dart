@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:media_store_plus/media_store_plus.dart';
@@ -20,6 +22,8 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'editor.dart';
 import 'git.dart';
+import 'file_viewer.dart';
+export 'file_viewer.dart';
 
 /// Standalone file browser — navigate folders and view file contents on a
 /// connected machine without opening an agent session.
@@ -48,7 +52,14 @@ class FileExplorer extends StatefulWidget {
 }
 
 class _FileExplorerState extends State<FileExplorer> {
-  late Future<FsListing> _future;
+  FsListing? _listing;
+  final Set<String> _deleting = {};
+  bool _dirLoading = true;
+  String? _dirError;
+  final Map<String, FsListing> _cache = {};
+  bool _forward = true;
+  int _req = 0;
+  bool _searching = false;
   bool _selecting = false;
   final Set<String> _selected = {};
   String?
@@ -57,18 +68,53 @@ class _FileExplorerState extends State<FileExplorer> {
       _root; // the folder we opened at — the OS back button climbs no higher
   String? _viewingPath;
   String? _viewingName;
+  final TextEditingController _filterCtl = TextEditingController();
+  String _filter = '';
 
   @override
   void initState() {
     super.initState();
-    _future = widget.client.fs(widget.start);
+    _go(widget.start);
   }
 
-  void _go(String? path) => setState(() {
-        _future = widget.client.fs(path);
-        _selecting = false;
-        _selected.clear();
+  @override
+  void dispose() {
+    _filterCtl.dispose();
+    super.dispose();
+  }
+
+  void _go(String? path, {bool forward = true}) {
+    final req = ++_req;
+    final cached = path == null ? null : _cache[path];
+    setState(() {
+      _forward = forward;
+      if (cached != null) _listing = cached;
+      _dirLoading = true;
+      _dirError = null;
+      _filterCtl.clear();
+      _filter = '';
+      _searching = false;
+      _selecting = false;
+      _selected.clear();
+    });
+    widget.client.fs(path).then((l) {
+      _cache[l.path] = l;
+      if (!mounted || req != _req) return;
+      setState(() {
+        _listing = l;
+        _dirLoading = false;
       });
+    }, onError: (Object e) {
+      if (!mounted || req != _req) return;
+      setState(() {
+        _dirLoading = false;
+        if (_listing == null) _dirError = '$e';
+      });
+      if (_listing != null) toast(context, '$e', danger: true);
+    });
+  }
+
+  void _up(FsListing listing) => _go(listing.parent, forward: false);
 
   void _toggle(FsEntry e) => setState(() {
         if (!_selected.remove(e.path)) _selected.add(e.path);
@@ -95,22 +141,24 @@ class _FileExplorerState extends State<FileExplorer> {
           'Permanently deletes the selected item${n == 1 ? '' : 's'} from the machine. Folders are removed with their contents.',
       confirmLabel: 'Delete',
     );
-    if (!ok) return;
-    if (mounted)
-      setState(() => _busy = 'Deleting $n item${n == 1 ? '' : 's'}…');
-    var failed = 0;
-    for (final p in _selected.toList()) {
-      try {
-        await widget.client.deletePath(p);
-      } catch (_) {
-        failed++;
-      }
-    }
+    if (!ok || !mounted) return;
+    final paths = _selected.toList();
+    setState(() {
+      _deleting.addAll(paths);
+      _selecting = false;
+      _selected.clear();
+    });
+    final results = await Future.wait(paths.map((p) => widget.client
+        .deletePath(p)
+        .then((_) => true, onError: (Object _) => false)));
     if (!mounted) return;
-    setState(() => _busy = null);
-    if (failed > 0)
-      toast(context, 'Failed to delete $failed item(s)', danger: true);
-    _go(cwd); // refresh + clears selection
+    final failed = results.where((ok) => !ok).length;
+    setState(() => _deleting.removeAll(paths));
+    if (failed > 0) {
+      toast(context, "Couldn't delete $failed item${failed == 1 ? '' : 's'}",
+          danger: true);
+    }
+    _go(cwd);
   }
 
   Future<void> _newFolder(String cwd) async {
@@ -165,25 +213,17 @@ class _FileExplorerState extends State<FileExplorer> {
       pick(e.path);
       return;
     }
+    // ON PHONES the viewer is a full route, whatever the host offered. See
+    // `openFileForViewing` — `onOpenFile` opens a shell TAB, which the phone
+    // shell never draws. Desktop keeps the tab behaviour below.
+    if (openFileForViewing(context,
+        client: widget.client, path: e.path, name: e.name)) {
+      return;
+    }
     final open = widget.onOpenFile;
     if (open != null) {
       (widget.onClose ?? () => Navigator.of(context).pop())();
       open(e.path, e.name);
-      return;
-    }
-    // On phones the explorer is commonly hosted inside a general-dialog route.
-    // Replacing that dialog's child with a second Scaffold can leave the dialog
-    // route with an invalid/black surface on Android. Push the viewer as a real
-    // page instead; the explorer remains safely below it and back returns here.
-    if (kMobile) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => FileViewer(
-          client: widget.client,
-          path: e.path,
-          name: e.name,
-          onClose: () => Navigator.of(context).pop(),
-        ),
-      ));
       return;
     }
     setState(() {
@@ -199,6 +239,43 @@ class _FileExplorerState extends State<FileExplorer> {
         builder: (_, close) =>
             GitScreen(client: widget.client, folder: dir, onClose: close),
       );
+
+  void _showFolderActions(String cwd) {
+    void run(VoidCallback action) {
+      Navigator.of(context).pop();
+      action();
+    }
+
+    showAppSheet(
+      context,
+      title: 'Folder actions',
+      child: SheetActions([
+        if (widget.onNewChat != null)
+          SheetAction('plus', 'New chat here',
+              () => run(() => widget.onNewChat!(cwd))),
+        SheetAction('git-branch', 'Git', () => run(() => _openGit(cwd))),
+        SheetAction('upload', 'Upload files',
+            _busy == null ? () => run(() => _upload(cwd)) : null),
+        SheetAction('folder-plus', 'New folder',
+            _busy == null ? () => run(() => _newFolder(cwd)) : null),
+      ]),
+    );
+  }
+
+  List<FsEntry> _visibleEntries(FsListing listing) {
+    final query = _filter.trim().toLowerCase();
+    final entries = [
+      for (final entry in listing.entries)
+        if (!_deleting.contains(entry.path) &&
+            (query.isEmpty || entry.name.toLowerCase().contains(query)))
+          entry,
+    ];
+    entries.sort((a, b) {
+      if (a.isDir != b.isDir) return a.isDir ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return entries;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -217,10 +294,9 @@ class _FileExplorerState extends State<FileExplorer> {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: FutureBuilder<FsListing>(
-          future: _future,
-          builder: (context, snap) {
-            final listing = snap.data;
+        child: Builder(
+          builder: (context) {
+            final listing = _listing;
             if (listing != null) _root ??= listing.path;
             final segs = (listing?.path ?? '')
                 .split('/')
@@ -241,7 +317,7 @@ class _FileExplorerState extends State<FileExplorer> {
                 } else if (listing != null &&
                     listing.parent != null &&
                     listing.path != _root) {
-                  _go(listing.parent);
+                  _up(listing);
                 }
               },
               child: Column(children: [
@@ -263,7 +339,7 @@ class _FileExplorerState extends State<FileExplorer> {
                               ? _exitSelect
                               : (listing?.parent != null &&
                                       listing?.path != _root
-                                  ? () => _go(listing!.parent!)
+                                  ? () => _up(listing!)
                                   : (widget.onClose ??
                                       () => Navigator.pop(context)))),
                       const SizedBox(width: 4),
@@ -271,15 +347,14 @@ class _FileExplorerState extends State<FileExplorer> {
                         child: segs.isEmpty
                             ? Text(widget.title,
                                 style: sans(13,
-                                    weight: FontWeight.w600,
-                                    color: AppColors.fg1))
+                                    weight: W.label, color: AppColors.fg1))
                             : SingleChildScrollView(
                                 scrollDirection: Axis.horizontal,
                                 child: Row(children: [
                                   GestureDetector(
                                     onTap: listing?.parent == null
                                         ? null
-                                        : () => _go('/'),
+                                        : () => _go('/', forward: false),
                                     child: AppIcon('folder',
                                         size: 14, color: AppColors.fg3),
                                   ),
@@ -296,7 +371,8 @@ class _FileExplorerState extends State<FileExplorer> {
                                       onTap: i == segs.length - 1
                                           ? null
                                           : () => _go(
-                                              '/${segs.sublist(0, i + 1).join('/')}'),
+                                              '/${segs.sublist(0, i + 1).join('/')}',
+                                              forward: false),
                                       child: Text(segs[i],
                                           style: mono(12,
                                               color: i == segs.length - 1
@@ -310,7 +386,8 @@ class _FileExplorerState extends State<FileExplorer> {
                       const SizedBox(width: 8),
                       if (_selecting) ...[
                         Text('${_selected.length} selected',
-                            style: sans(12, color: AppColors.accent)),
+                            style: sans(12,
+                                tabular: true, color: AppColors.accent)),
                         const SizedBox(width: 8),
                         IconBtn('trash',
                             size: 28,
@@ -349,7 +426,7 @@ class _FileExplorerState extends State<FileExplorer> {
                                     const SizedBox(width: 4),
                                     Text('New chat here',
                                         style: sans(11,
-                                            weight: FontWeight.w600,
+                                            weight: W.label,
                                             color: AppColors.accent)),
                                   ]),
                             ),
@@ -391,10 +468,19 @@ class _FileExplorerState extends State<FileExplorer> {
                   SnAppBar(
                     title: _selecting
                         ? '${_selected.length} selected'
-                        : widget.title,
+                        : _folderTitle(listing),
+                    // No subtitle. The folder path was printed TWICE — here and
+                    // again in the row below the divider — so the same long
+                    // string appeared twice within ~40dp and the header read as
+                    // broken. The path describes the LIST, so it belongs in that
+                    // row (with the item count); this bar names the screen.
+                    titleSize: kMobile ? M.sectionTitle : 15,
+                    compact: true,
                     onBack: _selecting
                         ? _exitSelect
-                        : (widget.onClose ?? () => Navigator.pop(context)),
+                        : (listing?.parent != null && listing?.path != _root
+                            ? () => _up(listing!)
+                            : (widget.onClose ?? () => Navigator.pop(context))),
                     actions: _selecting
                         ? [
                             IconBtn('trash',
@@ -408,154 +494,217 @@ class _FileExplorerState extends State<FileExplorer> {
                           ]
                         : [
                             if (listing != null)
-                              IconBtn('git-branch',
-                                  tooltip: 'Git',
-                                  onTap: () => _openGit(listing.path)),
+                              IconBtn('search',
+                                  tooltip: 'Filter files',
+                                  active: _searching || _filter.isNotEmpty,
+                                  onTap: () => setState(() {
+                                        _searching = !_searching;
+                                        if (!_searching) {
+                                          _filterCtl.clear();
+                                          _filter = '';
+                                        }
+                                      })),
+                            if (listing != null && widget.onNewChat != null)
+                              IconBtn('plus',
+                                  tooltip: 'New chat here',
+                                  onTap: () => widget.onNewChat!(listing.path)),
                             if (listing != null)
-                              IconBtn('upload',
-                                  tooltip: 'Upload files',
-                                  onTap: _busy != null
-                                      ? null
-                                      : () => _upload(listing.path)),
-                            if (listing != null)
-                              IconBtn('folder-plus',
-                                  tooltip: 'New folder',
-                                  onTap: _busy != null
-                                      ? null
-                                      : () => _newFolder(listing.path)),
+                              IconBtn('more-vertical',
+                                  tooltip: 'Folder actions',
+                                  onTap: () =>
+                                      _showFolderActions(listing.path)),
+                            if (widget.onClose != null &&
+                                listing?.path != _root)
+                              IconBtn('x',
+                                  tooltip: 'Close', onTap: widget.onClose),
                           ],
                   ),
-                  if (segs.isNotEmpty ||
-                      (!_selecting &&
-                          listing != null &&
-                          widget.onNewChat != null))
-                    Container(
-                      height: 38,
-                      decoration: BoxDecoration(
-                          border: Border(
-                              bottom: BorderSide(color: AppColors.border))),
-                      child: Row(children: [
-                        Expanded(
-                          child: segs.isEmpty
-                              ? const SizedBox.shrink()
-                              : SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14),
-                                  child: Row(children: [
-                                    GestureDetector(
-                                      onTap: listing?.parent == null
-                                          ? null
-                                          : () => _go('/'),
-                                      child: Text('/',
-                                          style: mono(11.5,
-                                              color: listing?.parent == null
-                                                  ? AppColors.fg4
-                                                  : AppColors.fg3)),
-                                    ),
-                                    for (var i = 0; i < segs.length; i++) ...[
-                                      if (i > 0)
-                                        Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 2),
-                                            child: AppIcon('chevron-right',
-                                                size: 13,
-                                                color: AppColors.fg4)),
-                                      GestureDetector(
-                                        onTap: i == segs.length - 1
-                                            ? null
-                                            : () => _go(
-                                                '/${segs.sublist(0, i + 1).join('/')}'),
-                                        child: Text(segs[i],
-                                            style: mono(11.5,
-                                                color: i == segs.length - 1
-                                                    ? AppColors.fg1
-                                                    : AppColors.fg3)),
-                                      ),
-                                    ],
-                                  ]),
-                                ),
-                        ),
-                        if (!_selecting &&
-                            listing != null &&
-                            widget.onNewChat != null)
-                          InkWell(
-                            onTap: () => widget.onNewChat!(listing.path),
-                            borderRadius: BorderRadius.circular(R.xs),
-                            child: Container(
-                              margin: const EdgeInsets.only(right: 10),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.accentBg,
-                                borderRadius: BorderRadius.circular(R.xs),
-                                border: Border.all(color: AppColors.accentLine),
-                              ),
-                              child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    AppIcon('plus',
-                                        size: 11, color: AppColors.accent),
-                                    const SizedBox(width: 4),
-                                    Text('New chat',
-                                        style: sans(11,
-                                            weight: FontWeight.w600,
-                                            color: AppColors.accent)),
-                                  ]),
-                            ),
-                          ),
-                      ]),
-                    ),
+                  if (!_selecting && listing != null)
+                    _mobileSwitcherContext(listing),
                 ],
+                if (_dirLoading && listing != null)
+                  LinearProgressIndicator(
+                      minHeight: 2,
+                      backgroundColor: Colors.transparent,
+                      color: AppColors.accent)
+                else
+                  const SizedBox(height: 2),
                 Expanded(
-                  child: snap.connectionState == ConnectionState.waiting
-                      ? Center(
-                          child: SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: AppColors.fg3)))
-                      : snap.hasError
+                  child: listing == null && _dirError == null
+                      ? Center(child: DelayedSpinner(size: 22))
+                      : listing == null
                           ? Center(
                               child: Padding(
                                   padding: const EdgeInsets.all(24),
-                                  child: Text('${snap.error}',
+                                  child: Text(_dirError ?? '',
                                       textAlign: TextAlign.center,
-                                      style: sans(12.5, color: AppColors.fg3))))
-                          : ListView(
-                              padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
-                              children: [
-                                if (listing!.parent != null && !_selecting)
-                                  _Row(
-                                      icon: 'folder-open',
-                                      name: '.. (parent directory)',
-                                      muted: true,
-                                      onTap: () => _go(listing.parent)),
-                                ...listing.entries.map((e) => _Row(
-                                      icon: _entryIcon(e.name, e.isDir),
-                                      name: e.name,
-                                      git: e.git,
-                                      chevron:
-                                          e.isDir && kMobile && !_selecting,
-                                      selecting: _selecting,
-                                      selected: _selected.contains(e.path),
-                                      onTap: _selecting
-                                          ? () => _toggle(e)
-                                          : (e.isDir
-                                              ? () => _go(e.path)
-                                              : () => _openFile(e)),
-                                      onLongPress: () => _selecting
-                                          ? _toggle(e)
-                                          : _enterSelect(e),
-                                    )),
-                              ],
-                            ),
+                                      style: TS.meta())))
+                          : _animatedList(listing),
                 ),
               ]),
             );
           },
         ),
       ),
+    );
+  }
+
+  String _folderTitle(FsListing? listing) {
+    final path = listing?.path ?? '';
+    if (path.isEmpty) return widget.title;
+    if (path == '/') return '/';
+    final segs = path.split('/').where((p) => p.isNotEmpty).toList();
+    if (segs.length == 2 && segs[0] == 'home') return 'Home';
+    return segs.isEmpty ? widget.title : segs.last;
+  }
+
+  Widget _animatedList(FsListing listing) {
+    final reduced = reduceMotion(context);
+    return AnimatedSwitcher(
+      duration: Motion.base,
+      switchInCurve: Motion.enter,
+      switchOutCurve: Motion.exit,
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topCenter,
+        children: [...previous, if (current != null) current],
+      ),
+      transitionBuilder: (child, anim) {
+        if (reduced) return FadeTransition(opacity: anim, child: child);
+        final incoming = child.key == ValueKey(listing.path);
+        final dir = _forward ? 1.0 : -1.0;
+        final dx = incoming ? 0.15 * dir : -0.15 * dir;
+        return FadeTransition(
+          opacity: anim,
+          child: SlideTransition(
+            position:
+                Tween(begin: Offset(dx, 0), end: Offset.zero).animate(anim),
+            child: child,
+          ),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey(listing.path),
+        child: _entryList(listing),
+      ),
+    );
+  }
+
+  Widget _entryList(FsListing listing) {
+    final entries = _visibleEntries(listing);
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+          kMobile ? S.s8 : M.gutter, S.s4, kMobile ? S.s8 : M.gutter, S.s24),
+      children: [
+        if (!kMobile && listing.parent != null && !_selecting)
+          _Row(
+              icon: 'folder-open',
+              name: '.. (parent directory)',
+              muted: true,
+              onTap: () => _up(listing)),
+        if (entries.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: S.s40),
+            child: Text(
+                _filter.isEmpty
+                    ? 'This folder is empty.'
+                    : 'No matching files.',
+                textAlign: TextAlign.center,
+                style: TS.ui(AppColors.fg3)),
+          ),
+        ...entries.map((e) => _Row(
+              icon: _entryIcon(e.name, e.isDir),
+              name: e.name,
+              git: e.git,
+              chevron: e.isDir && kMobile && !_selecting,
+              selecting: _selecting,
+              selected: _selected.contains(e.path),
+              onTap: _selecting
+                  ? () => _toggle(e)
+                  : (e.isDir ? () => _go(e.path) : () => _openFile(e)),
+              onLongPress: () => _selecting ? _toggle(e) : _enterSelect(e),
+            )),
+      ],
+    );
+  }
+
+  Widget _mobileSwitcherContext(FsListing listing) {
+    final segs = listing.path.split('/').where((p) => p.isNotEmpty).toList();
+    final home = segs.length >= 2 && segs[0] == 'home' ? 2 : 0;
+    final crumbs = <(String, String)>[
+      if (home == 2) ('~', '/${segs[0]}/${segs[1]}') else ('/', '/'),
+      for (var i = home; i < segs.length - 1; i++)
+        (segs[i], '/${segs.sublist(0, i + 1).join('/')}'),
+    ];
+    final showCrumbs = segs.length > home;
+    if (!showCrumbs && !_searching && _filter.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(S.s8, S.s4, M.gutter, S.s4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(children: [
+                for (var i = 0; i < (showCrumbs ? crumbs.length : 0); i++) ...[
+                  if (i > 0)
+                    AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(R.sm),
+                    onTap: () => _go(crumbs[i].$2, forward: false),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: S.s6, vertical: S.s8),
+                      child: Text(crumbs[i].$1,
+                          style: TS
+                              .label(AppColors.fg3)
+                              .copyWith(fontWeight: W.body)),
+                    ),
+                  ),
+                ],
+              ]),
+            ),
+          ),
+        ]),
+        if (_searching || _filter.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.s6, S.s4, 0, S.s4),
+            child: Container(
+              height: M.minTarget,
+              padding: const EdgeInsets.symmetric(horizontal: S.s12),
+              decoration: BoxDecoration(
+                color: AppColors.raised,
+                borderRadius: BorderRadius.circular(R.md),
+              ),
+              child: Row(children: [
+                AppIcon('search', size: 16, color: AppColors.fg4),
+                const SizedBox(width: S.s8),
+                Expanded(
+                  child: TextField(
+                    controller: _filterCtl,
+                    autofocus: true,
+                    onChanged: (value) => setState(() => _filter = value),
+                    style: TS.ui(AppColors.fg1),
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: 'Filter this folder',
+                      hintStyle: TS.ui(AppColors.fg4),
+                    ),
+                  ),
+                ),
+                if (_filter.isNotEmpty)
+                  IconBtn('x', size: 32, iconSize: 14, tooltip: 'Clear filter',
+                      onTap: () {
+                    _filterCtl.clear();
+                    setState(() => _filter = '');
+                  }),
+              ]),
+            ),
+          ),
+      ]),
     );
   }
 
@@ -583,9 +732,32 @@ class _FileExplorerState extends State<FileExplorer> {
         l.endsWith('.jpeg') ||
         l.endsWith('.webp') ||
         l.endsWith('.svg') ||
-        l.endsWith('.gif')) {
+        l.endsWith('.gif') ||
+        l.endsWith('.bmp') ||
+        l.endsWith('.heic') ||
+        l.endsWith('.heif') ||
+        l.endsWith('.avif')) {
       return 'image';
     }
+    // Media get their own glyphs so a folder full of clips is scannable, and so
+    // the row reads as "this plays" rather than as an unknown file.
+    if (l.endsWith('.mp4') ||
+        l.endsWith('.m4v') ||
+        l.endsWith('.mov') ||
+        l.endsWith('.webm') ||
+        l.endsWith('.mkv') ||
+        l.endsWith('.avi')) {
+      return 'film';
+    }
+    if (l.endsWith('.mp3') ||
+        l.endsWith('.m4a') ||
+        l.endsWith('.wav') ||
+        l.endsWith('.ogg') ||
+        l.endsWith('.flac') ||
+        l.endsWith('.aac')) {
+      return 'music';
+    }
+    if (l.endsWith('.pdf')) return 'pdf';
     if (l.endsWith('.json') ||
         l.endsWith('.toml') ||
         l.endsWith('.yaml') ||
@@ -594,7 +766,10 @@ class _FileExplorerState extends State<FileExplorer> {
         l.endsWith('.env')) {
       return 'settings';
     }
-    return 'file-text';
+    // `file`, not the arbitrary `file-text` this used to return: that name has no
+    // case in the icon map, so every unrecognised file rendered as the map's
+    // generic fallback circle instead of a document.
+    return 'file';
   }
 }
 
@@ -617,36 +792,53 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final isFolder = icon == 'folder' || icon == 'folder-open';
+    // One tone for files and folders, and a sans label — matching the desktop
+    // file tree. Mono made the phone listing read as a terminal dump, and a
+    // brighter folder invented a hierarchy the language does not have: colour
+    // here is reserved for state, not file type. Folder glyphs stay faintly
+    // distinct by icon alone, which is what the desktop panel does.
+    final iconColor = AppColors.fg3;
     return Material(
-      color: selected ? AppColors.accentBg : Colors.transparent,
+      // Selection is a neutral surface step; the accent is reserved for
+      // STATE. An accent-filled row among files read as an alert.
+      color: selected ? AppColors.surface2 : Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(R.sm),
-        child: Padding(
-          padding:
-              EdgeInsets.symmetric(horizontal: 14, vertical: kMobile ? 12 : 9),
-          child: Row(children: [
-            if (selecting) ...[_checkbox(selected), const SizedBox(width: 11)],
-            AppIcon(icon,
-                size: 16, color: isFolder ? AppColors.accent : AppColors.fg3),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(kMobile ? 13 : 12.5,
-                        color: muted ? AppColors.fg3 : AppColors.fg1))),
-            if (git) ...[
-              AppIcon('git-branch', size: 12, color: AppColors.ok),
-              const SizedBox(width: 4),
-              Text('git', style: mono(10.5, color: AppColors.fg3)),
-              const SizedBox(width: 8),
-            ],
-            if (chevron)
-              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-          ]),
+        child: SizedBox(
+          // A full phone touch target on mobile, the tighter desktop row
+          // otherwise.
+          height: kMobile ? M.rowHeight : 42,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: kMobile ? M.rowPadH : 14),
+            child: Row(children: [
+              if (selecting) ...[
+                _checkbox(selected),
+                const SizedBox(width: 11)
+              ],
+              // A plain glyph, as on desktop: the filled tiles made every row
+              // a card and halved how many fit on a phone screen.
+              AppIcon(icon,
+                  size: kMobile ? 19 : 16,
+                  color: isFolder && kMobile ? AppColors.accent : iconColor),
+              SizedBox(width: kMobile ? S.s12 : 10),
+              Expanded(
+                  child: Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(kMobile ? M.rowTitle : 13,
+                          weight: isFolder && kMobile ? W.label : W.body,
+                          color: muted ? AppColors.fg3 : AppColors.fg1))),
+              if (git) ...[
+                const Tag('git', tone: Tone.ok, icon: 'git-branch'),
+                const SizedBox(width: S.s8),
+              ],
+              if (chevron)
+                AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+            ]),
+          ),
         ),
       ),
     );
@@ -658,495 +850,14 @@ class _Row extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: on ? AppColors.accent : Colors.transparent,
+          color: on ? AppColors.accentFill : Colors.transparent,
           border: Border.all(
-              color: on ? AppColors.accent : AppColors.border2, width: 1.5),
+              color: on ? AppColors.accentFill : AppColors.border2, width: 1.5),
         ),
-        child: on
-            ? Icon(Icons.check_rounded, size: 12, color: AppColors.accentFg)
-            : null,
+        child:
+            on ? AppIcon('check', size: 12, color: AppColors.accentFg) : null,
       );
 }
 
-/// Read-only viewer for one file.
-class FileViewer extends StatefulWidget {
-  final DaemonClient client;
-  final String path;
-  final String name;
-  final VoidCallback? onClose;
-
-  /// When true (desktop/shell tab), the window already has a tab strip —
-  /// skip the in-pane title bar and put download/edit on a thin action row.
-  final bool embedded;
-  const FileViewer(
-      {super.key,
-      required this.client,
-      required this.path,
-      required this.name,
-      this.onClose,
-      this.embedded = false});
-  @override
-  State<FileViewer> createState() => _FileViewerState();
-}
-
-class _FileViewerState extends State<FileViewer> {
-  final CodeLineEditingController _controller = CodeLineEditingController();
-  FileContent? _f;
-  bool _loading = true;
-  bool _downloading = false;
-  String? _error;
-
-  static const _imageExts = {
-    'png',
-    'jpg',
-    'jpeg',
-    'gif',
-    'webp',
-    'bmp',
-    'heic',
-    'heif'
-  };
-  static const _videoExts = {'mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi'};
-  String get _ext {
-    final d = widget.name.lastIndexOf('.');
-    return d >= 0 ? widget.name.substring(d + 1).toLowerCase() : '';
-  }
-
-  bool get _isImage => _imageExts.contains(_ext);
-  bool get _isVideo => _videoExts.contains(_ext);
-  bool get _isMedia => _isImage || _isVideo;
-
-  Future<void> _download() async {
-    setState(() => _downloading = true);
-    try {
-      final message = await downloadRemoteFileWithCancel(
-        context,
-        widget.client,
-        path: widget.path,
-        name: widget.name,
-      );
-      if (!mounted) return;
-      setState(() => _downloading = false);
-      if (message != null) toast(context, message);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _downloading = false);
-      toast(context, '$e', danger: true);
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    // Media renders straight from its streaming URL — no text read.
-    if (_isMedia) {
-      _loading = false;
-    } else {
-      _load();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    try {
-      final f = await widget.client.readFile(widget.path);
-      if (!mounted) return;
-      if (!f.binary) _controller.text = f.content;
-      setState(() {
-        _f = f;
-        _loading = false;
-        _error = null;
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = '$e';
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final f = _f;
-    final actions = <Widget>[
-      IconBtn('download',
-          tooltip: 'Download', onTap: _downloading ? null : _download),
-      if (!_isMedia && !(f?.binary ?? false))
-        IconBtn('edit',
-            tooltip: 'Edit',
-            onTap: () => presentScreen(
-                  context,
-                  style: PanelStyle.dialog,
-                  dismissible: false,
-                  builder: (_, close) => EditorScreen(
-                      client: widget.client,
-                      path: widget.path,
-                      name: widget.name,
-                      onClose: close),
-                ).then((_) => _load())),
-    ];
-    return Scaffold(
-      backgroundColor: readingBg,
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          if (!widget.embedded)
-            SnAppBar(
-                title: widget.name,
-                subtitle: widget.path,
-                onBack: widget.onClose ?? () => Navigator.pop(context),
-                actions: actions),
-          if (_isImage)
-            Expanded(
-              child: ColoredBox(
-                color: Colors.black,
-                child: InteractiveViewer(
-                  minScale: 1,
-                  maxScale: 6,
-                  child: Center(
-                    child: Image.network(
-                      widget.client.fileUrl(widget.path),
-                      cacheWidth: (MediaQuery.sizeOf(context).width *
-                              MediaQuery.devicePixelRatioOf(context))
-                          .round()
-                          .clamp(720, 2048),
-                      cacheHeight: (MediaQuery.sizeOf(context).height *
-                              MediaQuery.devicePixelRatioOf(context))
-                          .round()
-                          .clamp(720, 2048),
-                      filterQuality: FilterQuality.low,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (ctx, child, prog) => prog == null
-                          ? child
-                          : Center(
-                              child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.fg3))),
-                      errorBuilder: (ctx, e, st) => EmptyState(
-                          icon: 'alert-triangle',
-                          title: "Can't load image",
-                          body: '$e'),
-                    ),
-                  ),
-                ),
-              ),
-            )
-          else if (_isVideo && !kWindows)
-            Expanded(child: _VideoView(url: widget.client.fileUrl(widget.path)))
-          else if (_isVideo)
-            Expanded(
-              child: EmptyState(
-                  icon: 'film',
-                  title: 'No video preview on Windows',
-                  body:
-                      'Download the file and play it with your media player.'),
-            )
-          else if (_loading)
-            Expanded(
-                child: Center(
-                    child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3))))
-          else if (_error != null)
-            Expanded(
-                child: EmptyState(
-                    icon: 'alert-triangle',
-                    title: 'Failed to load',
-                    body: _error!))
-          else if (f!.binary)
-            Expanded(
-              child: Center(
-                child: EmptyState(
-                  icon: 'file',
-                  title: widget.name,
-                  body: '${formatBytes(f.size)} · can\'t preview this file.',
-                  action: Btn(
-                    _downloading ? 'Downloading…' : 'Download',
-                    icon: 'download',
-                    disabled: _downloading,
-                    onTap: _download,
-                  ),
-                ),
-              ),
-            )
-          else ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.border))),
-              child: Text(
-                  '${f.content.split('\n').length} lines · ${formatBytes(f.size)}${f.truncated ? ' · truncated' : ''}',
-                  style: mono(10.5, color: AppColors.fg4)),
-            ),
-            Expanded(
-              child: CodeEditor(
-                controller: _controller,
-                readOnly: true,
-                wordWrap: false,
-                style: codeEditorStyle(widget.name),
-                indicatorBuilder:
-                    (context, editingController, chunkController, notifier) {
-                  return Row(children: [
-                    DefaultCodeLineNumber(
-                        controller: editingController, notifier: notifier),
-                    DefaultCodeChunkIndicator(
-                        width: 20,
-                        controller: chunkController,
-                        notifier: notifier),
-                  ]);
-                },
-              ),
-            ),
-          ],
-        ]),
-      ),
-    );
-  }
-}
-
-/// Streaming video player (chewie over video_player). Points at the daemon's
-/// /fs/download URL, which serves a video content-type and Range requests — so
-/// playback streams and seeks instead of downloading the whole file first.
-class _VideoView extends StatefulWidget {
-  final String url;
-  const _VideoView({required this.url});
-  @override
-  State<_VideoView> createState() => _VideoViewState();
-}
-
-class _VideoViewState extends State<_VideoView> {
-  VideoPlayerController? _vc;
-  ChewieController? _chewie;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    try {
-      final vc = VideoPlayerController.networkUrl(
-        Uri.parse(widget.url),
-        // Mix with other audio rather than demanding exclusive audio focus — so
-        // playback isn't silently blocked when something else holds focus (e.g.
-        // an active phone call).
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-      );
-      // Surface a runtime playback error (decode/source failure) instead of a
-      // dead play button — video_player reports these on the value, not as a throw.
-      vc.addListener(_onValue);
-      await vc.initialize();
-      if (!mounted) {
-        vc.dispose();
-        return;
-      }
-      setState(() {
-        _vc = vc;
-        _chewie = ChewieController(
-          videoPlayerController: vc,
-          autoPlay: true, // a tapped video should just start
-          looping: false,
-          allowFullScreen: true,
-          aspectRatio:
-              vc.value.aspectRatio == 0 ? 16 / 9 : vc.value.aspectRatio,
-          errorBuilder: (ctx, msg) => EmptyState(
-              icon: 'alert-triangle', title: "Can't play video", body: msg),
-          materialProgressColors: ChewieProgressColors(
-            playedColor: AppColors.accent,
-            handleColor: AppColors.accent,
-            bufferedColor: AppColors.surface3,
-            backgroundColor: AppColors.surface2,
-          ),
-        );
-      });
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    }
-  }
-
-  void _onValue() {
-    final vc = _vc;
-    if (vc != null && vc.value.hasError && _error == null && mounted) {
-      setState(() => _error = vc.value.errorDescription ?? 'playback error');
-    }
-  }
-
-  @override
-  void dispose() {
-    _vc?.removeListener(_onValue);
-    _chewie?.dispose();
-    _vc?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    if (_error != null) {
-      return EmptyState(
-          icon: 'alert-triangle', title: "Can't play video", body: _error!);
-    }
-    final ch = _chewie;
-    if (ch == null) {
-      return Center(
-          child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.fg3)));
-    }
-    // Chewie sizes the video from its own aspectRatio; letterbox on black.
-    return ColoredBox(color: Colors.black, child: Chewie(controller: ch));
-  }
-}
-
-Future<String?> downloadRemoteFileWithCancel(
-  BuildContext context,
-  DaemonClient client, {
-  required String path,
-  required String name,
-}) {
-  return downloadRemoteFile(context, client, path: path, name: name);
-}
-
-/// Download a remote daemon path to the device. Used by the file viewer and by
-/// agent `present_file` cards in chat. Returns a short status message, or null
-/// when a modal/notification already covered the outcome.
-Future<String?> downloadRemoteFile(
-  BuildContext context,
-  DaemonClient client, {
-  required String path,
-  required String name,
-  bool Function()? isCancelled,
-}) async {
-  var cancelled = false;
-  final progressId = await notifyDownloadStarted(
-    name,
-    onCancel: () => cancelled = true,
-  );
-  final tempDir = await getTemporaryDirectory();
-  final tempFile = File(
-      '${tempDir.path}/snippet-download-${DateTime.now().microsecondsSinceEpoch}-$name');
-  try {
-    await client.downloadToFile(
-      path,
-      tempFile,
-      onProgress: (received, total) {
-        if (total != null && total > 0) {
-          final percent = ((received * 100) ~/ total).clamp(0, 100);
-          notifyDownloadProgress(progressId, name, percent);
-        }
-      },
-      isCancelled: () => cancelled || (isCancelled?.call() ?? false),
-    );
-
-    if (kMobile) {
-      final supportFile =
-          File('${(await getApplicationSupportDirectory()).path}/$name');
-      await supportFile.parent.create(recursive: true);
-      await tempFile.copy(supportFile.path);
-      Future<String?> shareIt() async {
-        final res = await SharePlus.instance
-            .share(ShareParams(files: [XFile(supportFile.path, name: name)]));
-        return res.status == ShareResultStatus.success ? 'Saved $name' : null;
-      }
-
-      if (Platform.isAndroid) {
-        var saved = false;
-        try {
-          await MediaStore.ensureInitialized();
-          MediaStore.appFolder = 'Snippet';
-          final info = await MediaStore().saveFile(
-            tempFilePath: tempFile.path,
-            dirType: DirType.download,
-            dirName: DirName.download,
-            relativePath: FilePath.root,
-          );
-          saved = info != null;
-        } catch (_) {
-          saved = false;
-        }
-        if (saved) {
-          await notifyDownload(name, supportFile.path, id: progressId);
-          if (context.mounted) {
-            await _downloadDoneSheetFor(context, name, supportFile.path);
-          }
-          return null;
-        }
-        await notifyDownloadFailure(
-            progressId, name, 'Could not save to Downloads; sharing instead.');
-        return shareIt();
-      }
-      await notifyDownload(name, supportFile.path, id: progressId);
-      return shareIt();
-    }
-
-    final saved = await saveLocalFile(
-        fileName: name, bytes: await tempFile.readAsBytes());
-    if (saved == null) return null;
-    await notifyDownload(name, saved, id: progressId);
-    return 'Downloaded $name';
-  } on DownloadCancelled {
-    await notifyDownloadCancelled(progressId);
-    return 'Download cancelled.';
-  } catch (e) {
-    await notifyDownloadFailure(progressId, name, e);
-    rethrow;
-  } finally {
-    unregisterDownloadCancel(progressId);
-    try {
-      if (await tempFile.exists()) await tempFile.delete();
-    } catch (_) {}
-  }
-}
-
-Future<void> _downloadDoneSheetFor(
-    BuildContext context, String name, String path) async {
-  void shareFile() {
-    SharePlus.instance.share(ShareParams(files: [XFile(path, name: name)]));
-  }
-
-  final action = await showAppSheet<String>(context,
-      title: 'Saved to Downloads',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(name, style: sans(13, height: 1.4, color: AppColors.fg2)),
-          const SizedBox(height: 16),
-          Btn('Open',
-              icon: 'file',
-              full: true,
-              onTap: () => Navigator.pop(context, 'open')),
-          const SizedBox(height: 8),
-          Btn('Share',
-              icon: 'upload',
-              variant: BtnVariant.secondary,
-              full: true,
-              onTap: () => Navigator.pop(context, 'share')),
-          const SizedBox(height: 4),
-        ],
-      ));
-  if (action == 'open') {
-    final opened = await openLocalFile(path);
-    if (!opened) shareFile();
-  } else if (action == 'share') {
-    shareFile();
-  }
-}
+/// Push the file viewer as a full-screen route.
+///
