@@ -20,6 +20,8 @@ const _providers = [
   ('opencode-go', 'OpenCode Go'),
   ('xai', 'xAI (Grok)'),
   ('chatgpt', 'ChatGPT'),
+  ('claude-code', 'Claude Code'),
+  ('antigravity', 'Antigravity'),
 ];
 
 String _providerLabel(String p) =>
@@ -28,7 +30,12 @@ String _providerLabel(String p) =>
 bool _needsBaseUrl(String p) =>
     p == 'openai-compatible' || p == 'anthropic-compatible';
 bool _defaultImages(String p) =>
-    p == 'anthropic' || p == 'gemini' || p == 'openai' || p == 'chatgpt';
+    p == 'anthropic' ||
+    p == 'gemini' ||
+    p == 'openai' ||
+    p == 'chatgpt' ||
+    p == 'claude-code' ||
+    p == 'antigravity';
 // Providers that go through the OpenAI-compatible adapter, where `stream` applies.
 bool _usesOpenAiAdapter(String p) =>
     p == 'openai' ||
@@ -94,6 +101,8 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   bool get _isEdit => widget.existing != null;
   bool get _isChatgpt => _provider == 'chatgpt';
   bool get _isXai => _provider == 'xai';
+  bool get _isClaudeCode => _provider == 'claude-code';
+  bool get _isAntigravity => _provider == 'antigravity';
 
   @override
   void initState() {
@@ -480,7 +489,13 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                     label: 'Model',
                     controller: _model,
                     mono: true,
-                    hint: _isChatgpt ? 'gpt-5.1-codex' : 'claude-sonnet-4.5')),
+                    hint: _isChatgpt
+                        ? 'gpt-5.1-codex'
+                        : _isClaudeCode
+                            ? 'sonnet'
+                            : _isAntigravity
+                                ? 'gemini-3.8-flash-high'
+                                : 'claude-sonnet-4.5')),
             const SizedBox(width: 8),
             if (_loadingModels)
               const Padding(
@@ -556,6 +571,11 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
               begin: (c) => c.xaiLoginBegin(),
               signOut: (c) => c.xaiLogout(),
             )
+          else if (_isClaudeCode || _isAntigravity)
+            _CliAgentStatus(
+                key: ValueKey(_provider),
+                client: widget.client,
+                provider: _provider)
           else
             AppField(
               label: 'API key',
@@ -831,6 +851,123 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
 
 /// Subscription sign-in (ChatGPT / xAI) via the daemon's device-code flow:
 /// shows the code + verification URL, then polls until the token is stored.
+class _CliAgentStatus extends StatefulWidget {
+  final DaemonClient client;
+  final String provider;
+  const _CliAgentStatus(
+      {super.key, required this.client, required this.provider});
+  @override
+  State<_CliAgentStatus> createState() => _CliAgentStatusState();
+}
+
+class _CliAgentStatusState extends State<_CliAgentStatus> {
+  Map<String, dynamic>? _status;
+  String? _err;
+  bool _loading = true;
+
+  bool get _claude => widget.provider == 'claude-code';
+  String get _label => _claude ? 'Claude Code' : 'Antigravity';
+  String get _command => _claude ? 'claude' : 'agy';
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _loading = true;
+      _err = null;
+    });
+    try {
+      final s = await widget.client.cliAgentStatus(widget.provider);
+      if (mounted)
+        setState(() {
+          _status = s;
+          _loading = false;
+        });
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          _err = '$e';
+          _loading = false;
+        });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final blurb = Text(
+        'Runs the $_label CLI installed on the machine running snippet, signed in the way it already is — no API key. Snippet supplies the prompt, its tools and approvals.',
+        style: sans(12, height: 1.4, color: AppColors.fg3));
+    final recheck = GestureDetector(
+        onTap: _loading ? null : _refresh,
+        child: Text(_loading ? 'Checking…' : 'Recheck', style: TS.meta()));
+    final s = _status;
+    final installed = s?['installed'] == true;
+    final signedIn = s?['signed_in'] == true;
+    Widget state;
+    if (s == null) {
+      state = Row(children: [
+        Expanded(
+            child: Text(_err ?? 'Checking this machine…',
+                style: sans(12,
+                    color: _err == null ? AppColors.fg3 : AppColors.danger))),
+        recheck,
+      ]);
+    } else {
+      final version = s['version'] as String?;
+      final account = s['account'] as String?;
+      final (icon, color, title, hint) = !installed
+          ? (
+              'alert-triangle',
+              AppColors.danger,
+              '$_label isn\'t installed',
+              'Install the $_label CLI (`$_command`) on the machine running snippet, then recheck.'
+            )
+          : !signedIn
+              ? (
+                  'alert-triangle',
+                  AppColors.run,
+                  '$_label isn\'t signed in',
+                  'Run `$_command` once on that machine and sign in, then recheck.'
+                )
+              : (
+                  'check',
+                  AppColors.ok,
+                  '$_label ${version ?? ''} · signed in${account == null ? '' : ' ($account)'}',
+                  s['path'] as String? ?? ''
+                );
+      state = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          AppIcon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(title.trim(),
+                  style: sans(13, color: AppColors.fg2),
+                  overflow: TextOverflow.ellipsis)),
+          recheck,
+        ]),
+        if (hint.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: Text(hint,
+                  style: installed && signedIn
+                      ? mono(11, color: AppColors.fg4)
+                      : sans(12, height: 1.4, color: AppColors.fg3))),
+        ],
+      ]);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      state,
+      const SizedBox(height: 10),
+      blurb,
+    ]);
+  }
+}
+
 class _SubSignIn extends StatefulWidget {
   final DaemonClient client;
   final String signedInLabel;

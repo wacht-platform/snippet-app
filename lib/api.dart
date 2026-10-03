@@ -181,8 +181,15 @@ class DaemonClient {
     );
   }
 
-  Future<Map<String, dynamic>> notificationsPage({required int sinceCreatedAt, required int sinceEventId, int limit = 500}) async {
-    final r = await http.get(_uri('/notifications', {'since_created_at': '$sinceCreatedAt', 'since_event_id': '$sinceEventId', 'limit': '${limit.clamp(1, 500)}'}));
+  Future<Map<String, dynamic>> notificationsPage(
+      {required int sinceCreatedAt,
+      required int sinceEventId,
+      int limit = 500}) async {
+    final r = await http.get(_uri('/notifications', {
+      'since_created_at': '$sinceCreatedAt',
+      'since_event_id': '$sinceEventId',
+      'limit': '${limit.clamp(1, 500)}'
+    }));
     if (r.statusCode != 200) throw _err('notifications', r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
@@ -211,8 +218,7 @@ class DaemonClient {
 
   Future<UsageSummary> getUsage({DateTime? since}) async {
     final r = await http.get(_uri('/usage', {
-      if (since != null)
-        'since': '${since.millisecondsSinceEpoch ~/ 1000}',
+      if (since != null) 'since': '${since.millisecondsSinceEpoch ~/ 1000}',
     }));
     if (r.statusCode != 200) throw _err('load usage', r);
     return UsageSummary.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
@@ -316,12 +322,17 @@ class DaemonClient {
     final pending = () async {
       final r = await http.get(_uri('/vault'));
       if (r.statusCode != 200) throw _err('vault', r);
-      final value = ((jsonDecode(r.body) as Map<String, dynamic>)['names'] as List? ?? const []).cast<String>();
+      final value =
+          ((jsonDecode(r.body) as Map<String, dynamic>)['names'] as List? ??
+                  const [])
+              .cast<String>();
       _vaultCache = value;
       return [...value];
     }();
     _vaultInFlight = pending;
-    try { return await pending; } finally {
+    try {
+      return await pending;
+    } finally {
       if (identical(_vaultInFlight, pending)) _vaultInFlight = null;
     }
   }
@@ -375,6 +386,14 @@ class DaemonClient {
     final r = await http.get(_uri('/chatgpt/status'));
     if (r.statusCode != 200) return false;
     return (jsonDecode(r.body) as Map<String, dynamic>)['signed_in'] == true;
+  }
+
+  Future<Map<String, dynamic>> cliAgentStatus(String provider) async {
+    final r = await http.get(_uri('/cli-agent/status', {'provider': provider}));
+    if (r.statusCode != 200) {
+      throw Exception(r.body.isEmpty ? 'HTTP ${r.statusCode}' : r.body);
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
   Future<void> chatgptLogout() async {
@@ -694,7 +713,8 @@ class DaemonClient {
     final r = await http
         .get(_uri('/mission-control/tasks/${Uri.encodeComponent(id)}'));
     if (r.statusCode != 200) throw _err('load mission control task', r);
-    return MissionControlTask.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+    return MissionControlTask.fromJson(
+        jsonDecode(r.body) as Map<String, dynamic>);
   }
 
   /// POST /mission-control/tasks — create a new task. Returns the created task.
@@ -828,11 +848,12 @@ class DaemonClient {
     int limit = 50,
   }) async {
     final query = <String, String>{'limit': '$limit'};
-    if (workspace != null && workspace.isNotEmpty) query['workspace'] = workspace;
+    if (workspace != null && workspace.isNotEmpty)
+      query['workspace'] = workspace;
     if (contains != null && contains.isNotEmpty) query['contains'] = contains;
     if (kind != null && kind.isNotEmpty) query['kind'] = kind;
-    final r = await http.get(
-        _uri('/agents/${Uri.encodeComponent(agentId)}/board', query));
+    final r = await http
+        .get(_uri('/agents/${Uri.encodeComponent(agentId)}/board', query));
     if (r.statusCode != 200) throw _err('load agent board', r);
     final entries = (jsonDecode(r.body) as Map<String, dynamic>)['entries'];
     return ((entries as List?) ?? const [])
@@ -981,7 +1002,6 @@ class DaemonClient {
     );
     if (r.statusCode != 200) throw _err('mark thread read', r);
   }
-
 
   /// GET /coordination/threads/{threadId}/events — cursor-paged board events.
   Future<List<CoordinationEvent>> coordinationEvents(
@@ -1191,7 +1211,9 @@ class DaemonClient {
       return [...list];
     }();
     _recurringInFlight = pending;
-    try { return await pending; } finally {
+    try {
+      return await pending;
+    } finally {
       if (identical(_recurringInFlight, pending)) _recurringInFlight = null;
     }
   }
