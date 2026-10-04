@@ -126,6 +126,7 @@ class SessionInfo {
   final int lastActive;
   final bool running;
   final String? profile;
+
   /// The agent this session IS, if any — an inbox belongs to an agent, and a
   /// specialized session runs as one. A durable property of the session.
   final String? agentId;
@@ -295,7 +296,8 @@ class RateWindow {
   final double usedPercent;
   final int windowMinutes;
   final int resetsAt;
-  RateWindow.fromJson(Map<String, dynamic> j)
+  final String? label;
+  RateWindow.fromJson(Map<String, dynamic> j, {this.label})
       : usedPercent = (j['used_percent'] as num?)?.toDouble() ?? 0,
         windowMinutes = (j['window_minutes'] as num?)?.toInt() ?? 0,
         resetsAt = (j['resets_at'] as num?)?.toInt() ?? 0;
@@ -396,7 +398,8 @@ class UsageProvider {
         if (window.isReported) out.add(window);
       } else {
         for (final value in windows) {
-          final window = RateWindow.fromJson(value.cast<String, dynamic>());
+          final window = RateWindow.fromJson(value.cast<String, dynamic>(),
+              label: snapshot['label'] as String?);
           if (window.isReported) out.add(window);
         }
       }
@@ -977,7 +980,8 @@ class CoordinationAgent {
             .toList(),
         assignedSessions = ((j['assigned_sessions'] as List?) ?? const [])
             .whereType<Map>()
-            .map((e) => AgentAssignedSession.fromJson(Map<String, dynamic>.from(e)))
+            .map((e) =>
+                AgentAssignedSession.fromJson(Map<String, dynamic>.from(e)))
             .toList();
 
   bool get available => status == 'active';
@@ -988,7 +992,8 @@ class CoordinationAgent {
   /// work the way a worker does. Any list of agents a user picks FROM should
   /// exclude it — it is a destination reached by its own session, not an entry
   /// in a list of workers.
-  bool get isMissionControl => kind == 'mission_control' || id == 'mission-control';
+  bool get isMissionControl =>
+      kind == 'mission_control' || id == 'mission-control';
 }
 
 /// One row of an agent's coordination memory: what it dispatched, what came
@@ -1049,7 +1054,6 @@ class DirectThreadSummary {
 
   bool get hasUnread => unread > 0;
 }
-
 
 class CoordinationEvent {
   final String eventId;
@@ -1236,7 +1240,6 @@ class RecurringJob {
     return kind;
   }
 }
-
 
 /// Global notifier bumped whenever model profiles are added, updated, or deleted
 /// so open session views, composers, and settings can refresh their pickers live.

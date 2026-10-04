@@ -339,6 +339,10 @@ class _RateRow extends StatelessWidget {
   final RateWindow rate;
   const _RateRow({required this.rate});
 
+  String get _title => rate.label == null
+      ? rateWindowLabel(rate.windowMinutes)
+      : '${rate.label} · ${rateWindowLabel(rate.windowMinutes)}';
+
   @override
   Widget build(BuildContext context) {
     final reset = rateResetLabel(rate.resetsAt);
@@ -347,7 +351,7 @@ class _RateRow extends StatelessWidget {
     // were current (99% used / 1% left on a window that has already reset).
     if (rate.isExpired) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(rateWindowLabel(rate.windowMinutes), style: TS.ui()),
+        Text(_title, style: TS.ui()),
         const SizedBox(height: S.s4),
         Text('Rolled over · awaiting the next report', style: TS.meta()),
       ]);
@@ -361,7 +365,7 @@ class _RateRow extends StatelessWidget {
             : AppColors.ok;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(rateWindowLabel(rate.windowMinutes), style: TS.ui()),
+        Text(_title, style: TS.ui()),
         Text('${remaining.round()}% left', style: TS.label(color)),
       ]),
       const SizedBox(height: S.s6),
