@@ -437,7 +437,7 @@ class M {
 const double kComposerGutter = 16;
 
 // ---------------------------------------------------------------------------
-// Typography — Manrope for UI, Geist Mono for code.
+// Typography — Instrument Sans for UI, JetBrains Mono for code.
 //
 // The ceiling is 500. `600` exists as `strong` only for the single large page
 // title; everything else is 400 with 500 reserved for controls and row titles,
@@ -456,11 +456,10 @@ class W {
 /// Optical tracking. The reference sits slightly tight at every size
 /// (-0.05px at 12–13px, -0.3px at 20px).
 double _tracking(double size) {
-  if (size >= 32) return -0.6;
-  if (size >= 24) return -0.4;
-  if (size >= 17) return -0.3;
-  if (size >= 14) return -0.1;
-  return -0.05;
+  if (size >= 32) return -0.5;
+  if (size >= 24) return -0.3;
+  if (size >= 17) return -0.15;
+  return 0;
 }
 
 TextStyle sans(double size,
@@ -477,7 +476,7 @@ TextStyle sans(double size,
       letterSpacing: spacing ?? _tracking(size),
       color: color ?? AppColors.fg2,
       // Proportional digits have different widths, so a ticking timer or a
-      // counter shimmers and reflows as it updates. Manrope ships `tnum`
+      // counter shimmers and reflows as it updates. Instrument Sans ships `tnum`
       // (verified in the font's GSUB table), so this is a real substitution.
       fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
     );
@@ -524,8 +523,8 @@ TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-const kSansFamily = 'Manrope';
-const kMonoFamily = 'GeistMono';
+const kSansFamily = 'InstrumentSans';
+const kMonoFamily = 'JetBrainsMono';
 
 String get monoFamily => kMonoFamily;
 

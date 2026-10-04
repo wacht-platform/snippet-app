@@ -78,7 +78,8 @@ label or glyph; colour is never the only channel.
 
 ## Typography
 
-Manrope for UI, Geist Mono for code, paths and identifiers. Both bundled —
+Instrument Sans for UI, JetBrains Mono for code, paths and identifiers. Both
+bundled —
 never fetched at runtime.
 
 | Role | Size / line | Weight | Use |
