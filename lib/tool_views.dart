@@ -61,6 +61,7 @@ String toolArgSummary(String tool, dynamic args) {
     'skill' => s('name'),
     'monitor' => s('path').isNotEmpty ? s('path') : s('action'),
     'present_file' => s('path'),
+    'read_file' => s('path'),
     'ping_user' => s('title'),
     'schedule_followup' => s('note'),
     _ => '',
@@ -140,6 +141,8 @@ bool toolHasDetail(ToolStep step) {
     case 'web_search':
     case 'web_read':
       return resultHasBody();
+    case 'read_file':
+      return true;
     default:
       final shown = toolArgSummary(tool, args);
       return shown.contains('…') || resultHasBody();
@@ -158,6 +161,7 @@ String toolTitle(String tool) => switch (tool) {
       'skill' => 'Skill',
       'monitor' => 'Watch',
       'present_file' => 'Present',
+      'read_file' => 'Read',
       _ => _humanizeTool(tool),
     };
 
@@ -280,6 +284,8 @@ List<Widget> _toolBody(
       return _monitorView(a, d);
     case 'present_file':
       return _presentView(context, a, d);
+    case 'read_file':
+      return _readFileView(a, d);
     default:
       return coordinationToolBody(context, tool, a, d) ?? _simpleFallback(a, d);
   }
@@ -397,6 +403,55 @@ List<Widget> _bashView(Map? a, Map? d) {
         stderr: stderr,
         exitCode: exit,
         showCommand: labelled)
+  ];
+}
+
+List<Widget> _readFileView(Map? a, Map? d) {
+  final path = (d?['path'] ?? a?['path'] ?? '').toString();
+  final entries = d?['entries'];
+  if (entries is List) {
+    final total = (d?['total'] as num?)?.toInt() ?? entries.length;
+    final lines = entries.map((e) {
+      final parts = e.toString().split('\t');
+      return parts.length == 2
+          ? '${parts[0].padRight(36)} ${parts[1]}'
+          : e.toString();
+    }).join('\n');
+    return [
+      _ToolPanel(
+        header: _PanelPath(path, icon: 'folder'),
+        trailing: [
+          Tag('$total ${total == 1 ? 'entry' : 'entries'}', mono: true)
+        ],
+        copyText: lines,
+        body: _PanelText(lines.isEmpty ? '(empty folder)' : lines),
+      ),
+    ];
+  }
+  if (d?['binary'] == true) {
+    return [
+      _ToolPanel(
+        header: _PanelPath(path),
+        body:
+            Text('Binary file, ${d?['bytes'] ?? '?'} bytes', style: TS.meta()),
+      ),
+    ];
+  }
+  final content = (d?['content'] ?? '').toString();
+  final total = (d?['total_lines'] as num?)?.toInt();
+  if (content.isEmpty && path.isEmpty) return const [];
+  return [
+    _ToolPanel(
+      header: _PanelPath(path),
+      trailing: [
+        if (total != null)
+          Tag('$total ${total == 1 ? 'line' : 'lines'}', mono: true),
+      ],
+      copyText: content,
+      body: _PanelText(content.isEmpty
+          ? '(empty file)'
+          : _previewLines(content, maxLines: 400)),
+    ),
   ];
 }
 
