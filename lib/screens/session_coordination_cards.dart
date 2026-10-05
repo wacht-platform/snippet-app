@@ -6,7 +6,13 @@ import '../markdown_widgets.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'mission_control/mission_control_state.dart'
-    show AssignmentEnvelope, BoardMessage, DirectMessage, MissionEnvelope;
+    show
+        AssignmentEnvelope,
+        AutonomousRound,
+        BoardMessage,
+        DirectMessage,
+        MissionEnvelope,
+        WorkerQuestion;
 
 /// Work and messages that arrive from another thread (Mission Control, another
 /// agent, the coordination board) share one card, in the plan card's idiom: a
@@ -21,6 +27,7 @@ class _ThreadCard extends StatefulWidget {
   final String body;
   final String? reference;
   final String? footer;
+  final String? preview;
   const _ThreadCard({
     required this.icon,
     required this.tone,
@@ -30,6 +37,7 @@ class _ThreadCard extends StatefulWidget {
     required this.body,
     this.reference,
     this.footer,
+    this.preview,
   });
 
   @override
@@ -106,7 +114,12 @@ class _ThreadCardState extends State<_ThreadCard> {
                         builders: {'pre': PreBlockBuilder()},
                         onTapLink: (_, href, __) => openMarkdownLink(href),
                       )
-                    : MarkdownPreview(data: body, maxLines: 3, style: text),
+                    : widget.preview != null
+                        ? Text(widget.preview!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: text)
+                        : MarkdownPreview(data: body, maxLines: 3, style: text),
               ),
             ],
             if (footer.isNotEmpty) ...[
@@ -201,6 +214,54 @@ class DirectMessageCard extends StatelessWidget {
       body: message.body,
     );
   }
+}
+
+class AutonomousRoundCard extends StatelessWidget {
+  const AutonomousRoundCard({super.key, required this.round});
+  final AutonomousRound round;
+
+  @override
+  Widget build(BuildContext context) => _ThreadCard(
+        icon: 'activity',
+        tone: round.due.isNotEmpty ? Tone.run : Tone.neutral,
+        kind: 'Autonomous round',
+        title: round.headline,
+        status: _roundTime(round.time),
+        body: round.markdown,
+        preview: _roundPreview(round),
+      );
+}
+
+String _roundTime(String time) {
+  final parts = time.trim().split(RegExp(r'\s+'));
+  if (parts.length < 2) return time.isEmpty ? 'Round' : time;
+  return '${parts.first} ${parts.last}';
+}
+
+String _plain(String line) => line.replaceAll('**', '');
+
+String _roundPreview(AutonomousRound round) {
+  if (round.due.isNotEmpty) return 'Due: ${_plain(round.due.first)}';
+  if (round.changed.isNotEmpty)
+    return 'Changed: ${_plain(round.changed.first)}';
+  if (round.open.isNotEmpty) return _plain(round.open.first);
+  return 'Nothing changed, nothing open.';
+}
+
+class WorkerQuestionCard extends StatelessWidget {
+  const WorkerQuestionCard({super.key, required this.question});
+  final WorkerQuestion question;
+
+  @override
+  Widget build(BuildContext context) => _ThreadCard(
+        icon: 'message-text',
+        tone: Tone.run,
+        kind: 'Worker question',
+        title: question.task.isEmpty ? null : question.task,
+        status: 'Waiting',
+        body: question.question,
+        footer: 'Mission Control answers from your brief, or pings you',
+      );
 }
 
 class AgentMessageCard extends StatelessWidget {

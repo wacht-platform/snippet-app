@@ -76,6 +76,18 @@ class _FeedRow extends StatelessWidget {
     return switch (item) {
       UserMessageItem m => Bubble(mine: true, text: m.text),
       BoardMessageItem b => _BoardMessageRow(message: b.message),
+      AutonomousRoundItem r => _EnvelopeRow(
+          color: r.round.due.isNotEmpty ? AppColors.run : AppColors.fg4,
+          title: 'Autonomous round',
+          meta: r.round.time,
+          body: r.round.headline),
+      WorkerQuestionItem w => _EnvelopeRow(
+          color: AppColors.run,
+          title: w.question.task.isEmpty
+              ? 'Worker question'
+              : 'Worker question · ${w.question.task}',
+          meta: 'waiting',
+          body: w.question.question),
       AgentTextItem a => Bubble(mine: false, text: a.text),
       TaskEventItem t => _TaskEventRow(item: t, onTap: () => onTapTask(t.task)),
       QuestionItem q => _QuestionRow(item: q, onTap: () => onTapQuestion(q)),
@@ -132,6 +144,57 @@ class _TaskEventRow extends StatelessWidget {
           ]),
         ),
       ),
+    );
+  }
+}
+
+class _EnvelopeRow extends StatelessWidget {
+  const _EnvelopeRow(
+      {required this.color,
+      required this.title,
+      required this.meta,
+      required this.body});
+  final Color color;
+  final String title;
+  final String meta;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, color: AppColors.fg1)),
+              ),
+              if (meta.isNotEmpty) Text(meta, style: TS.meta()),
+            ]),
+            if (body.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(body.trim(),
+                  maxLines: 6,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12, height: 1.35, color: AppColors.fg3)),
+            ],
+          ]),
+        ),
+      ]),
     );
   }
 }
@@ -209,7 +272,8 @@ class _QuestionRow extends StatelessWidget {
                 children: [
                   Text('Needs input', style: TS.meta()),
                   const SizedBox(height: 4),
-                  Text(item.question, style: sans(kMobile ? 16 : 14, color: AppColors.fg1)),
+                  Text(item.question,
+                      style: sans(kMobile ? 16 : 14, color: AppColors.fg1)),
                 ],
               ),
             ),

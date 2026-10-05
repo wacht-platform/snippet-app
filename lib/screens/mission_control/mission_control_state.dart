@@ -82,6 +82,24 @@ class QuestionItem extends FeedItem {
   final String? taskId;
 }
 
+class AutonomousRoundItem extends FeedItem {
+  const AutonomousRoundItem({
+    required super.id,
+    required super.timestamp,
+    required this.round,
+  });
+  final AutonomousRound round;
+}
+
+class WorkerQuestionItem extends FeedItem {
+  const WorkerQuestionItem({
+    required super.id,
+    required super.timestamp,
+    required this.question,
+  });
+  final WorkerQuestion question;
+}
+
 class SystemNoteItem extends FeedItem {
   const SystemNoteItem({
     required super.id,
@@ -231,6 +249,130 @@ MissionEnvelope? parseMissionEnvelope(String text) {
     status: isReport ? field('status') : 'pending',
     summary: isReport ? field('summary') : scope(),
   );
+}
+
+/// The periodic round the daemon hands Mission Control in autonomous mode.
+/// Parsed so the transcript shows a compact summary instead of the envelope.
+class AutonomousRound {
+  const AutonomousRound({
+    required this.time,
+    required this.firstRound,
+    required this.quiet,
+    required this.changed,
+    required this.open,
+    required this.due,
+    required this.scheduled,
+  });
+  final String time;
+  final bool firstRound;
+  final bool quiet;
+  final List<String> changed;
+  final List<String> open;
+  final List<String> due;
+  final List<String> scheduled;
+
+  String get headline {
+    final parts = <String>[
+      if (firstRound) 'Autonomy switched on',
+      '${open.length} open',
+      if (changed.isNotEmpty) '${changed.length} changed',
+      if (due.isNotEmpty)
+        '${due.length} follow-up${due.length == 1 ? '' : 's'} due',
+    ];
+    return parts.join(' · ');
+  }
+
+  String get markdown {
+    final out = StringBuffer();
+    void section(String title, List<String> items) {
+      if (items.isEmpty) return;
+      out.writeln('**$title**');
+      for (final item in items) {
+        out.writeln('- $item');
+      }
+      out.writeln();
+    }
+
+    section('Follow-ups due', due);
+    section('Changed since last round', changed);
+    section('Open work', open);
+    section('Scheduled', scheduled);
+    if (quiet)
+      out.writeln('_Quiet hours: non-urgent pings wait until morning._');
+    final text = out.toString().trim();
+    return text.isEmpty ? 'Nothing changed, nothing open.' : text;
+  }
+}
+
+String _taskLine(String raw) {
+  final parts = raw.split(' · ').map((p) => p.trim()).toList();
+  if (parts.length < 3) return raw;
+  final status = parts[0].replaceAll('_', ' ');
+  final title = parts[1];
+  final note = parts.length > 3 ? parts.sublist(3).join(' · ') : '';
+  return note.isEmpty ? '**$title** · $status' : '**$title** · $status · $note';
+}
+
+AutonomousRound? parseAutonomousRound(String text) {
+  final t = text.trim();
+  if (!t.startsWith('[autonomous_round]')) return null;
+  final lines = t.split('\n');
+  String field(String name) {
+    for (final l in lines) {
+      if (l.startsWith('$name:')) return l.substring(name.length + 1).trim();
+    }
+    return '';
+  }
+
+  List<String> section(String heading) {
+    final start = lines.indexWhere((l) => l.trim() == '## $heading');
+    if (start < 0) return const [];
+    final items = <String>[];
+    for (final l in lines.skip(start + 1)) {
+      final line = l.trim();
+      if (line.startsWith('## ') || line.startsWith('[/autonomous_round]'))
+        break;
+      if (line.startsWith('- ')) items.add(line.substring(2));
+    }
+    return items;
+  }
+
+  return AutonomousRound(
+    time: field('time'),
+    firstRound: field('last round').startsWith('never'),
+    quiet: field('quiet hours').startsWith('yes'),
+    changed: section('Changed since last round').map(_taskLine).toList(),
+    open: section('Open work').map(_taskLine).toList(),
+    due: section('Follow-ups due now'),
+    scheduled: section('Follow-ups scheduled'),
+  );
+}
+
+/// A worker paused on a question, forwarded to Mission Control.
+class WorkerQuestion {
+  const WorkerQuestion(
+      {required this.taskId, required this.task, required this.question});
+  final String taskId;
+  final String task;
+  final String question;
+}
+
+WorkerQuestion? parseWorkerQuestion(String text) {
+  final t = text.trim();
+  if (!t.startsWith('[worker_question]')) return null;
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  final start = t.indexOf('\nquestion:\n');
+  final end = t.indexOf('[/worker_question]');
+  final question = start >= 0 && end > start
+      ? t.substring(start + '\nquestion:\n'.length, end).trim()
+      : '';
+  return WorkerQuestion(
+      taskId: field('task_id'), task: field('task'), question: question);
 }
 
 /// A human/agent message routed from the coordination board into a session's
@@ -391,6 +533,7 @@ AssignmentEnvelope? parseAssignmentEnvelope(String text) {
         RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
     return match?.group(1)?.trim() ?? '';
   }
+
   return AssignmentEnvelope(
     assignmentId: field('assignment_id'),
     goalId: field('goal_id'),
@@ -425,6 +568,18 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
             }),
             kind: envelope.eventKind,
           ));
+          break;
+        }
+        final round = parseAutonomousRound(text);
+        if (round != null) {
+          out.add(
+              AutonomousRoundItem(id: 'h-r-$i', timestamp: now, round: round));
+          break;
+        }
+        final workerQuestion = parseWorkerQuestion(text);
+        if (workerQuestion != null) {
+          out.add(WorkerQuestionItem(
+              id: 'h-w-$i', timestamp: now, question: workerQuestion));
           break;
         }
         final board = parseBoardMessage(text);

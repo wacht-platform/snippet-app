@@ -45,6 +45,8 @@ import 'mission_control/mission_control_state.dart'
     show
         isDedicatedMcSession,
         parseMissionEnvelope,
+        parseAutonomousRound,
+        parseWorkerQuestion,
         parseBoardMessage,
         parseDirectMessage,
         parseCoordinationReply,

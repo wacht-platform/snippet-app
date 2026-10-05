@@ -53,26 +53,26 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       final open = _openToolRows.contains(key);
       if (open && clipped && resultAt != null) _requestFullEvent(resultAt);
       return DenseToolRow(
-          key: ValueKey('tool-row-$key'),
-          tool: tool,
-          args: args,
-          result: result,
-          open: open,
-          onOpenChanged: (next) {
-            if (!mounted) return;
-            if (next && clipped && resultAt != null) {
-              _requestFullEvent(resultAt);
+        key: ValueKey('tool-row-$key'),
+        tool: tool,
+        args: args,
+        result: result,
+        open: open,
+        onOpenChanged: (next) {
+          if (!mounted) return;
+          if (next && clipped && resultAt != null) {
+            _requestFullEvent(resultAt);
+          }
+          _setState(() {
+            if (next) {
+              _openToolRows.add(key);
+            } else {
+              _openToolRows.remove(key);
             }
-            _setState(() {
-              if (next) {
-                _openToolRows.add(key);
-              } else {
-                _openToolRows.remove(key);
-              }
-              _transcriptDirty = true;
-            });
-          },
-        );
+            _transcriptDirty = true;
+          });
+        },
+      );
     }
 
     void flushPending(String fallbackKey) {
@@ -99,7 +99,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         for (final r in run.whereType<DenseToolRow>())
           ToolStep(tool: r.tool, args: r.args, result: r.result),
       ], running: running);
-      final live = _toolBatches.putIfAbsent(toolKey, () => ValueNotifier(batch));
+      final live =
+          _toolBatches.putIfAbsent(toolKey, () => ValueNotifier(batch));
       // An open sheet listens to this; update it after the frame so the sheet
       // never rebuilds in the middle of the transcript's own build.
       WidgetsBinding.instance.addPostFrameCallback((_) => live.value = batch);
@@ -185,6 +186,16 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             addEvent(key, MissionEnvelopeCard(envelope: envelope));
             break;
           }
+          final round = parseAutonomousRound(text);
+          if (round != null) {
+            addEvent(key, AutonomousRoundCard(round: round));
+            break;
+          }
+          final workerQuestion = parseWorkerQuestion(text);
+          if (workerQuestion != null) {
+            addEvent(key, WorkerQuestionCard(question: workerQuestion));
+            break;
+          }
           final board = parseBoardMessage(text);
           if (board != null) {
             addEvent(key, BoardMessageCard(message: board));
@@ -210,7 +221,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               KeyedSubtree(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 4, bottom: 20),
-                    child: Bubble(mine: true, text: text, client: widget.client)),
+                    child:
+                        Bubble(mine: true, text: text, client: widget.client)),
               ));
         case 'assistant_text':
           endTools(key);
@@ -238,11 +250,11 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           addEvent(
               key,
               NoteLine(_s(e['error']),
-                  error: true,
-                  label: 'Invalid call · ${_s(e['tool_name'])}'));
+                  error: true, label: 'Invalid call · ${_s(e['tool_name'])}'));
         case 'plan_updated':
           endTools(key);
-          final steps = (e['steps'] as List? ?? const []).whereType<Map>().toList();
+          final steps =
+              (e['steps'] as List? ?? const []).whereType<Map>().toList();
           if (steps.isNotEmpty) {
             addEvent(key, _PlanCard(steps, _s(e['explanation'])));
           }
@@ -306,9 +318,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           }
           // The open question is already the answer bar under the transcript;
           // it joins the record once answered.
-          final laterQuestion = events
-              .skip(qi + 1)
-              .any((n) => n['kind'] == 'user_question');
+          final laterQuestion =
+              events.skip(qi + 1).any((n) => n['kind'] == 'user_question');
           if (answer == null && !laterQuestion && _questionOpen) break;
           addEvent(key, _QuestionRecord(e, answer: answer));
         case 'approval_request':
@@ -345,8 +356,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             SingleImage(client: widget.client, path: path),
             if (caption.isNotEmpty) ...[
               const SizedBox(height: 6),
-              Text(caption,
-                  style: sans(12, height: 1.4, color: AppColors.fg3)),
+              Text(caption, style: sans(12, height: 1.4, color: AppColors.fg3)),
             ],
           ]),
         ),
@@ -532,7 +542,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       context,
       style: PanelStyle.drawer,
       purpose: ShellPanelPurpose.lanes,
-      originClient: widget.client, originSessionId: widget.sessionId,
+      originClient: widget.client,
+      originSessionId: widget.sessionId,
       builder: (_, close) => LanesScreen(
         liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
         onClose: close,
@@ -602,7 +613,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       presentScreen(context,
           style: PanelStyle.drawer,
           purpose: ShellPanelPurpose.checkpoints,
-          originClient: widget.client, originSessionId: widget.sessionId,
+          originClient: widget.client,
+          originSessionId: widget.sessionId,
           builder: (_, close) => _SessionActionPanel(
               title: 'Checkpoints', onClose: close, child: content));
     }
