@@ -21,17 +21,17 @@ String _relative(int? epoch, {bool future = false}) {
 
 String dutyStatusLine(Map<String, dynamic>? duty) {
   if (duty == null) return '';
-  if (duty['on'] != true) return 'Off duty';
+  if (duty['on'] != true) return 'Autonomy off';
   final next = duty['next_round_at'] as int?;
   final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  final parts = <String>['On duty'];
+  final parts = <String>['Autonomous'];
   if (duty['in_quiet_hours'] == true) parts.add('quiet hours');
   if (next != null && next > now)
     parts.add('next check ${_relative(next, future: true)}');
   return parts.join(' · ');
 }
 
-/// Header chip: shows whether Mission Control is on duty and opens the panel.
+/// Header chip: shows whether Mission Control is autonomous and opens the panel.
 class DutyChip extends StatefulWidget {
   final DaemonClient client;
   final void Function(Widget panel) open;
@@ -92,7 +92,7 @@ class _DutyChipState extends State<DutyChip> {
                   shape: BoxShape.circle),
             ),
             const SizedBox(width: 6),
-            Text(on ? 'On duty' : 'Off duty',
+            Text(on ? 'Autonomous' : 'Autonomy off',
                 style: TS.label(on ? AppColors.ok : AppColors.fg3)),
           ]),
         ),
@@ -174,16 +174,16 @@ class _DutyPanelState extends State<DutyPanel> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
-        Text('Mission Control on duty', style: TS.sectionTitle()),
+        Text('Autonomous Mission Control', style: TS.sectionTitle()),
         const SizedBox(height: 6),
         Text(
-            'On duty, Mission Control works like a chief of staff while you are away: it checks on running work, verifies results, retries and re-routes, answers workers when it can, and pings your phone only for decisions, finished work and problems.',
+            'When autonomous, Mission Control works like a chief of staff while you are away: it checks on running work, verifies results, retries and re-routes, answers workers when it can, and pings your phone only for decisions, finished work and problems.',
             style: TS.meta().copyWith(height: 1.45)),
         const SizedBox(height: 16),
         AppToggle(
           on: on,
           onChanged: (v) => _set({'on': v}),
-          label: on ? 'On duty' : 'Off duty',
+          label: on ? 'Autonomous' : 'Autonomy off',
           sub: dutyStatusLine(_duty),
         ),
         const SizedBox(height: 20),
