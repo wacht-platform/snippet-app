@@ -317,8 +317,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                 _title.isEmpty ? 'Session' : _title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style:
-                    sans(kMobile ? M.sectionTitle : 15, weight: W.label, color: AppColors.fg1),
+                style: sans(kMobile ? M.sectionTitle : 15,
+                    weight: W.label, color: AppColors.fg1),
               ),
             ),
           ),
@@ -605,6 +605,14 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     _toast('Cancelling the goal');
   }
 
+  void _openAutonomy() {
+    showAppSheet(context,
+        title: 'Autonomous mode',
+        maxWidth: 440,
+        maxHeight: 680,
+        child: AutonomyPanel(client: widget.client, embedded: true));
+  }
+
   void _openRecurring() {
     // Desktop: the shell owns the panes and opens this as a right-pane readout,
     // the same shape Tasks/Lanes/Checkpoints get. A session cannot toggle a pane
@@ -618,7 +626,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     presentScreen(context,
         style: PanelStyle.drawer,
         purpose: ShellPanelPurpose.recurring,
-        originClient: widget.client, originSessionId: widget.sessionId,
+        originClient: widget.client,
+        originSessionId: widget.sessionId,
         builder: (_, close) => RecurringScreen(
             client: widget.client,
             onClose: close,
@@ -671,7 +680,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         presentScreen(context,
             style: PanelStyle.drawer,
             purpose: ShellPanelPurpose.files,
-            originClient: widget.client, originSessionId: widget.sessionId,
+            originClient: widget.client,
+            originSessionId: widget.sessionId,
             maxWidth: 1060,
             maxHeight: 760,
             builder: (_, close) => FileExplorer(
@@ -708,7 +718,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         presentScreen(context,
             style: PanelStyle.drawer,
             purpose: ShellPanelPurpose.processes,
-            originClient: widget.client, originSessionId: widget.sessionId,
+            originClient: widget.client,
+            originSessionId: widget.sessionId,
             builder: (_, close) => ProcessesScreen(
                 client: widget.client,
                 sessionId: widget.sessionId,
@@ -745,6 +756,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           detail: value,
         );
     return [
+      if (_isMissionControl) item('activity', 'Autonomous mode', _openAutonomy),
       item('edit', 'Rename session', _renameCurrent),
       item('shield', 'Approval: Auto', () => _setApproval(false),
           value: manual ? null : 'on'),
@@ -773,7 +785,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         presentScreen(context,
             style: PanelStyle.drawer,
             purpose: ShellPanelPurpose.files,
-            originClient: widget.client, originSessionId: widget.sessionId,
+            originClient: widget.client,
+            originSessionId: widget.sessionId,
             maxWidth: 1060,
             maxHeight: 760,
             builder: (_, close) => FileExplorer(
@@ -819,6 +832,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       hideWorkspace: _isMissionControl,
       hideGoal: _isMissionControl,
       hideCheckpoints: _isMissionControl,
+      onAutonomy: _isMissionControl ? () => navigate!(_openAutonomy) : null,
       onSetGoal: (text) {
         _send({'kind': 'set_goal', 'value': text});
         _toast('Goal set — the agent will drive toward it');
@@ -849,7 +863,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       onProcesses: () => navigate!(() => presentScreen(context,
           style: PanelStyle.drawer,
           purpose: ShellPanelPurpose.processes,
-          originClient: widget.client, originSessionId: widget.sessionId,
+          originClient: widget.client,
+          originSessionId: widget.sessionId,
           builder: (_, close) => ProcessesScreen(
               client: widget.client,
               sessionId: widget.sessionId,

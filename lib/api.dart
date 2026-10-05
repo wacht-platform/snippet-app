@@ -689,19 +689,20 @@ class DaemonClient {
         policy;
   }
 
-  /// GET /mission-control/duty — whether Mission Control is on duty, its rhythm
+  /// GET /mission-control/autonomy — whether Mission Control is autonomous, its rhythm
   /// and quiet hours, and when it last and next checks in.
-  Future<Map<String, dynamic>> mcDuty() async {
-    final r = await http.get(_uri('/mission-control/duty'));
-    if (r.statusCode != 200) throw _err('get Mission Control duty', r);
+  Future<Map<String, dynamic>> mcAutonomy() async {
+    final r = await http.get(_uri('/mission-control/autonomy'));
+    if (r.statusCode != 200) throw _err('get Mission Control autonomy', r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
-  /// POST /mission-control/duty — change any of on / round_minutes / quiet hours.
-  Future<Map<String, dynamic>> mcSetDuty(Map<String, dynamic> changes) async {
-    final r = await http.post(_uri('/mission-control/duty'),
+  /// POST /mission-control/autonomy — change any of on / round_minutes / quiet hours.
+  Future<Map<String, dynamic>> mcSetAutonomy(
+      Map<String, dynamic> changes) async {
+    final r = await http.post(_uri('/mission-control/autonomy'),
         headers: _json, body: jsonEncode(changes));
-    if (r.statusCode != 200) throw _err('set Mission Control duty', r);
+    if (r.statusCode != 200) throw _err('set Mission Control autonomy', r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 

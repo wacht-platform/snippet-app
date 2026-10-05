@@ -76,7 +76,8 @@ class _QuestionRecord extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(left: BorderSide(color: AppColors.accent, width: 2)),
           ),
-          child: Text(text, style: sans(13, height: 1.45, color: AppColors.fg2)),
+          child:
+              Text(text, style: sans(13, height: 1.45, color: AppColors.fg2)),
         );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -100,8 +101,8 @@ class _QuestionRecord extends StatelessWidget {
                     style: mono(10, color: AppColors.fg3)),
               ),
               Text(answered ? 'answered' : 'no answer',
-                  style: mono(10,
-                      color: answered ? AppColors.ok : AppColors.fg3)),
+                  style:
+                      mono(10, color: answered ? AppColors.ok : AppColors.fg3)),
             ]),
             if (ctx != null) ...[
               const SizedBox(height: 5),
@@ -229,7 +230,8 @@ class ApprovalBarState extends State<ApprovalBar> {
               const SizedBox(width: S.s8),
               Expanded(
                   child: Text(question,
-                      style: TS.ui(AppColors.fg1)
+                      style: TS
+                          .ui(AppColors.fg1)
                           .copyWith(fontWeight: FontWeight.w600))),
               if (total > 1) ...[
                 const SizedBox(width: S.s8),
@@ -243,8 +245,7 @@ class ApprovalBarState extends State<ApprovalBar> {
                   constraints: const BoxConstraints(maxHeight: 140),
                   child: Container(
                     width: double.infinity,
-                    padding:
-                        const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s6),
+                    padding: const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s6),
                     decoration: BoxDecoration(
                       color: AppColors.canvas,
                       borderRadius: BorderRadius.circular(R.sm + 2),
@@ -258,7 +259,8 @@ class ApprovalBarState extends State<ApprovalBar> {
                                   height: 1.45, color: AppColors.accent)),
                         TextSpan(
                             text: detail,
-                            style: mono(12, height: 1.45, color: AppColors.fg1)),
+                            style:
+                                mono(12, height: 1.45, color: AppColors.fg1)),
                       ])),
                     ),
                   ),
@@ -285,17 +287,16 @@ class ApprovalBarState extends State<ApprovalBar> {
               ),
             ],
             const SizedBox(height: S.s8),
-              Row(children: [
-                if (canAlways)
-                  TextAction('Always allow',
-                      onTap: _sent
-                          ? null
-                          : () => _decide({'kind': 'approve_all'})),
-                const Spacer(),
-                reject,
-                const SizedBox(width: S.s8),
-                allow,
-              ]),
+            Row(children: [
+              if (canAlways)
+                TextAction('Always allow',
+                    onTap:
+                        _sent ? null : () => _decide({'kind': 'approve_all'})),
+              const Spacer(),
+              reject,
+              const SizedBox(width: S.s8),
+              allow,
+            ]),
           ],
         ),
       ),
@@ -392,7 +393,8 @@ class _QOption {
   /// when it says something the label doesn't ("android" for "Android" adds
   /// nothing).
   String get answer {
-    String norm(String x) => x.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    String norm(String x) =>
+        x.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     return norm(value) == norm(label) ? label : '$label ($value)';
   }
 }
@@ -476,7 +478,8 @@ class QuestionBarState extends State<QuestionBar> {
       case 'single_choice':
       case 'multi_choice':
         final opts = [
-          for (final e in ((ak['choices'] as List?) ?? const []).whereType<Map>())
+          for (final e
+              in ((ak['choices'] as List?) ?? const []).whereType<Map>())
             _QOption('${e['value']}'.trim(), '${e['label']}'.trim(),
                 description: '${e['description'] ?? ''}'.trim(),
                 recommended: e['recommended'] == true),
@@ -1121,6 +1124,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onResumeGoal;
   final VoidCallback onLanes;
   final VoidCallback? onGiveWork;
+  final VoidCallback? onAutonomy;
   final bool hideShell;
   final VoidCallback onTerm;
   final VoidCallback onGit;
@@ -1139,6 +1143,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onResumeGoal,
     required this.onLanes,
     this.onGiveWork,
+    this.onAutonomy,
     this.hideShell = false,
     required this.onTerm,
     required this.onGit,
@@ -1274,6 +1279,13 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     final goalOn = s?.goal?.ongoing ?? false;
 
     final sessionRows = <Widget>[
+      if (widget.onAutonomy != null)
+        _row(
+            icon: 'activity',
+            label: 'Autonomous mode',
+            detail:
+                'Checks in, keeps work moving and pings you while you are away',
+            onTap: widget.onAutonomy),
       if (!widget.hideGoal)
         _row(
           icon: 'zap',

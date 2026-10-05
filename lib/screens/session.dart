@@ -40,6 +40,7 @@ import 'lanes.dart';
 import 'recurring.dart';
 import 'session_panels.dart';
 import 'session_coordination_cards.dart';
+import 'mission_control/widgets/autonomy_panel.dart';
 import 'mission_control/mission_control_state.dart'
     show
         isDedicatedMcSession,
@@ -167,9 +168,7 @@ class _SessionActionPanel extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
             child: Row(children: [
-              Expanded(
-                  child: Text(title,
-                      style: TS.sectionTitle())),
+              Expanded(child: Text(title, style: TS.sectionTitle())),
               IconBtn('x',
                   size: 34, iconSize: 18, tooltip: 'Close', onTap: onClose),
             ]),
@@ -386,7 +385,8 @@ class _SessionScreenState extends State<SessionScreen>
   int _pasteN = 0;
 
   /// This session's unsent text survives switching away and back.
-  String get _draftKey => Drafts.keyFor(widget.client.baseUrl, widget.sessionId);
+  String get _draftKey =>
+      Drafts.keyFor(widget.client.baseUrl, widget.sessionId);
   bool _switchingSession = false;
 
   /// What this composer would lose on leaving: its text and whatever is
@@ -430,10 +430,8 @@ class _SessionScreenState extends State<SessionScreen>
     if (_attachments.isEmpty && draft.attachments.isNotEmpty) {
       _attachments.addAll(draft.attachments.map(_Attachment.fromDraft));
     }
-    _savedAttachmentIds = _attachments
-        .where((a) => a.ready)
-        .map((a) => a.toDraft().id)
-        .join('|');
+    _savedAttachmentIds =
+        _attachments.where((a) => a.ready).map((a) => a.toDraft().id).join('|');
   }
 
   void _interceptBigPaste() {
@@ -594,7 +592,8 @@ class _SessionScreenState extends State<SessionScreen>
         if (!mounted || _closed || _pendingDecision == null) return;
         if (_state?.status != 'waiting_for_input') return;
         setState(() => _pendingDecision = null);
-        toast(context, "That didn't reach the session. Try again.", danger: true);
+        toast(context, "That didn't reach the session. Try again.",
+            danger: true);
       });
       _decisionTimer?.cancel();
       _decisionTimer = Timer(const Duration(seconds: 6), () {
@@ -1149,7 +1148,8 @@ class _SessionScreenState extends State<SessionScreen>
                                                         mine: true,
                                                         text: _pending[pi],
                                                         selectable: false,
-                                                        client: widget.client))),
+                                                        client:
+                                                            widget.client))),
                                           _LiveStreamRow(
                                             key: const ValueKey(
                                                 'live-stream-row'),
