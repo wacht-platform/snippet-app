@@ -11,6 +11,7 @@ import '../../mission_control/coordination_agent_directory.dart';
 import '../mission_control_state.dart';
 import '../mobile/mobile_mc.dart'
     show showMissionControlPanel, showNotificationInbox;
+import 'duty_panel.dart';
 
 class MissionControlHeader extends StatelessWidget {
   const MissionControlHeader.compact({
@@ -78,6 +79,11 @@ class MissionControlHeader extends StatelessWidget {
             ),
           ),
         ),
+        DutyChip(
+          client: state.client,
+          open: (panel) => showMissionControlPanel(context, panel),
+        ),
+        const SizedBox(width: 4),
         IconBtn(
           'agent',
           size: 40,

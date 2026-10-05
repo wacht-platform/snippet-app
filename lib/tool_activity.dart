@@ -40,8 +40,13 @@ String toolVerb(String tool, {required bool running}) {
     'monitor' => ('Watched', 'Watching'),
     'present_file' => ('Shared', 'Sharing'),
     'set_session_title' => ('Titled the chat', 'Titling the chat'),
-    _ => ('Used ${toolTitle(tool).toLowerCase()}',
-        'Using ${toolTitle(tool).toLowerCase()}'),
+    'ping_user' => ('Pinged you', 'Pinging you'),
+    'update_brief' => ('Updated its brief', 'Updating its brief'),
+    'schedule_followup' => ('Scheduled a check', 'Scheduling a check'),
+    _ => (
+        'Used ${toolTitle(tool).toLowerCase()}',
+        'Using ${toolTitle(tool).toLowerCase()}'
+      ),
   };
   return running ? doing : done;
 }
@@ -57,7 +62,10 @@ String _fileName(String path) => path.split('/').last;
   final actions = {for (final c in changes) c['action']?.toString() ?? ''};
   if (paths.length > 1 || actions.length > 1) {
     final n = paths.length;
-    return (running ? 'Changing' : 'Changed', '$n ${n == 1 ? 'file' : 'files'}');
+    return (
+      running ? 'Changing' : 'Changed',
+      '$n ${n == 1 ? 'file' : 'files'}'
+    );
   }
   final first = changes.first;
   final name = _fileName(first['path']?.toString() ?? '');
@@ -67,9 +75,8 @@ String _fileName(String path) => path.split('/').last;
     'move' => ('Moved', 'Moving'),
     _ => ('Edited', 'Editing'),
   };
-  final target = actions.first == 'move'
-      ? '$name → ${first['to'] ?? ''}'
-      : name;
+  final target =
+      actions.first == 'move' ? '$name → ${first['to'] ?? ''}' : name;
   return (running ? doing : done, target);
 }
 
@@ -149,7 +156,8 @@ List<FileChange> fileChanges(Iterable<ToolStep> steps) {
 String activitySummary(List<ToolStep> steps) {
   if (steps.length == 1) return toolSentence(steps.first);
   String plural(int n, String one, String many) => n == 1 ? one : many;
-  int count(ToolKind kind) => steps.where((s) => toolKind(s.tool) == kind).length;
+  int count(ToolKind kind) =>
+      steps.where((s) => toolKind(s.tool) == kind).length;
   final changeSteps = count(ToolKind.change);
   final changed = fileChanges(steps).length;
   final runs = count(ToolKind.run);

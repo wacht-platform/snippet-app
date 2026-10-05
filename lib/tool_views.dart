@@ -61,6 +61,8 @@ String toolArgSummary(String tool, dynamic args) {
     'skill' => s('name'),
     'monitor' => s('path').isNotEmpty ? s('path') : s('action'),
     'present_file' => s('path'),
+    'ping_user' => s('title'),
+    'schedule_followup' => s('note'),
     _ => '',
   };
   if (v.isNotEmpty) return first(v);
@@ -279,8 +281,7 @@ List<Widget> _toolBody(
     case 'present_file':
       return _presentView(context, a, d);
     default:
-      return coordinationToolBody(context, tool, a, d) ??
-          _simpleFallback(a, d);
+      return coordinationToolBody(context, tool, a, d) ?? _simpleFallback(a, d);
   }
 }
 
@@ -288,7 +289,9 @@ List<Widget> _toolBody(
 
 String _changesSummary(dynamic changes) {
   if (changes is! List || changes.isEmpty) return '';
-  final first = changes.first is Map ? (changes.first as Map)['path']?.toString() ?? '' : '';
+  final first = changes.first is Map
+      ? (changes.first as Map)['path']?.toString() ?? ''
+      : '';
   return changes.length == 1 ? first : '$first (+${changes.length - 1} more)';
 }
 
@@ -318,11 +321,14 @@ List<Widget> _changeFilesView(Map? a, Map? d) {
         ));
       case 'create':
         final content = field('content');
-        final n = content.isEmpty ? 0 : '\n'.allMatches(content.trimRight()).length + 1;
+        final n = content.isEmpty
+            ? 0
+            : '\n'.allMatches(content.trimRight()).length + 1;
         out.add(_ToolPanel(
           header: _PanelPath(path),
           trailing: [
-            if (raw['overwrite'] == true) const Tag('Overwrite', tone: Tone.run),
+            if (raw['overwrite'] == true)
+              const Tag('Overwrite', tone: Tone.run),
             Tag('$n ${n == 1 ? 'line' : 'lines'}', mono: true),
           ],
           copyText: content,
@@ -423,8 +429,8 @@ List<Widget> _webReadView(Map? a, Map? d) {
   final out = <Widget>[];
   final title = d?['title']?.toString() ?? '';
   if (title.isNotEmpty) {
-    out.add(
-        Text(title, style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)));
+    out.add(Text(title,
+        style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)));
     out.add(const SizedBox(height: 4));
   }
   if (d?['published_date'] != null) {
@@ -445,7 +451,8 @@ List<Widget> _titleView(Map? a, Map? d) {
     return [Text('Cleared title', style: sans(13, color: AppColors.fg3))];
   }
   return [
-    Text(title, style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
+    Text(title,
+        style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
   ];
 }
 

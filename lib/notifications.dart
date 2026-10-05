@@ -186,7 +186,7 @@ Future<void> notifySessionEvent({
   FlutterLocalNotificationsPlugin? plugin,
 }) async {
   if (!kCanNotify || !kMobile) return;
-  final important = kind == 'waiting' || kind == 'error';
+  final important = kind == 'waiting' || kind == 'error' || kind == 'ping';
   await (plugin ?? _mainNotif).show(
     id: notificationId,
     title: title,
@@ -295,6 +295,7 @@ Future<void> initNotifications() async {
     'done' => ('${inst.label} finished', title),
     'error' => ('${inst.label} hit an error', title),
     'idle' => ('${inst.label} stopped', title),
+    'ping' => (title.isEmpty ? 'Mission Control' : title, message),
     'term' => (
         message.isEmpty ? '${inst.label} · $title' : message,
         message.isEmpty ? 'Terminal' : title,
@@ -374,7 +375,8 @@ void _writeForegroundLease() {
   final fg = notificationAppForeground;
   final key = fg ? visibleNotificationSession.value : null;
   _foregroundWrites = _foregroundWrites.catchError((Object _) {}).then(
-      (_) async => (await NotificationInbox.open()).setForeground(fg, visibleKey: key));
+      (_) async =>
+          (await NotificationInbox.open()).setForeground(fg, visibleKey: key));
   unawaited(_foregroundWrites.catchError((Object _) {}));
 }
 
@@ -394,8 +396,8 @@ void reportForeground(bool fg) {
     _foregroundHeartbeat?.cancel();
     _writeForegroundLease();
     if (fg) {
-      _foregroundHeartbeat = Timer.periodic(const Duration(seconds: 20),
-          (_) => _writeForegroundLease());
+      _foregroundHeartbeat = Timer.periodic(
+          const Duration(seconds: 20), (_) => _writeForegroundLease());
     }
   }
   if (fg) unawaited(syncSavedNotifications().catchError((Object _) {}));
