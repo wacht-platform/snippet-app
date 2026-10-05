@@ -75,9 +75,12 @@ class InferenceProfile {
 
   /// Whether this profile is ready to use. Most providers need an API key, but
   /// the subscription providers sign in instead — ChatGPT via OAuth, Grok via a
-  /// device code — so a keyless one is still usable; don't gate it on [hasKey].
+  /// device code, and Claude Code / Antigravity use their CLI's own sign-in —
+  /// so a keyless one is still usable; don't gate it on [hasKey].
   bool get usable =>
-      hasKey || const {'chatgpt', 'xai', 'grok'}.contains(provider);
+      hasKey ||
+      const {'chatgpt', 'xai', 'grok', 'claude-code', 'antigravity'}
+          .contains(provider);
 }
 
 class ServerConfig {
