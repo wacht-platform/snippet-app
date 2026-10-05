@@ -287,6 +287,9 @@ List<Widget> _toolBody(
     case 'read_file':
       return _readFileView(a, d);
     default:
+      if (d?['custom_tool'] != null) {
+        return _bashView({'command': d?['command'], 'label': tool}, d);
+      }
       return coordinationToolBody(context, tool, a, d) ?? _simpleFallback(a, d);
   }
 }
