@@ -701,7 +701,11 @@ class DaemonClient {
   Future<Map<String, dynamic>> mcSetAutonomy(
       Map<String, dynamic> changes) async {
     final r = await http.post(_uri('/mission-control/autonomy'),
-        headers: _json, body: jsonEncode(changes));
+        headers: _json,
+        body: jsonEncode({
+          ...changes,
+          'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+        }));
     if (r.statusCode != 200) throw _err('set Mission Control autonomy', r);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }

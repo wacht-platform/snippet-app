@@ -19,6 +19,23 @@ String _relative(int? epoch, {bool future = false}) {
   return future ? 'in $text' : '$text ago';
 }
 
+Future<Map<String, dynamic>> loadAutonomy(DaemonClient client) async {
+  final loaded = await client.mcAutonomy();
+  final local = DateTime.now().timeZoneOffset.inMinutes;
+  if ((loaded['utc_offset_minutes'] as num?)?.toInt() != local) {
+    return client.mcSetAutonomy({});
+  }
+  return loaded;
+}
+
+String _offsetLabel(int? minutes) {
+  final m = minutes ?? DateTime.now().timeZoneOffset.inMinutes;
+  final sign = m < 0 ? '−' : '+';
+  final h = m.abs() ~/ 60;
+  final mm = (m.abs() % 60).toString().padLeft(2, '0');
+  return 'UTC$sign$h:$mm';
+}
+
 String autonomyStatusLine(Map<String, dynamic>? autonomy) {
   if (autonomy == null) return '';
   if (autonomy['on'] != true) return 'Autonomy off';
@@ -60,7 +77,7 @@ class _AutonomyChipState extends State<AutonomyChip> {
 
   Future<void> _load() async {
     try {
-      final autonomy = await widget.client.mcAutonomy();
+      final autonomy = await loadAutonomy(widget.client);
       if (mounted) setState(() => _autonomy = autonomy);
     } catch (_) {}
   }
@@ -128,7 +145,7 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
 
   Future<void> _load() async {
     try {
-      final loaded = await widget.client.mcAutonomy();
+      final loaded = await loadAutonomy(widget.client);
       if (mounted) setState(() => _autonomy = loaded);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -237,7 +254,7 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
       Text(
           held > 0
               ? '$held ping${held == 1 ? '' : 's'} held until quiet hours end.'
-              : 'Non-urgent pings wait until quiet hours end; urgent ones come through.',
+              : 'In your time (${_offsetLabel((_autonomy['utc_offset_minutes'] as num?)?.toInt())}). Non-urgent pings wait until quiet hours end; urgent ones come through.',
           style: TS.meta().copyWith(height: 1.4)),
       if (lastAt != null) ...[
         const SizedBox(height: 20),
