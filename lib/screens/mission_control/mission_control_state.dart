@@ -313,6 +313,15 @@ String _taskLine(String raw) {
   return note.isEmpty ? '**$title** · $status' : '**$title** · $status · $note';
 }
 
+String _roundTime(String raw) {
+  final head = raw.split(' (').first.trim();
+  final parts = head.split(RegExp(r'\s+'));
+  if (parts.length >= 4 && parts.last.contains(':')) {
+    return '${parts.first} ${parts.last}';
+  }
+  return head;
+}
+
 AutonomousRound? parseAutonomousRound(String text) {
   final t = text.trim();
   if (!t.startsWith('[autonomous_round]')) return null;
@@ -338,7 +347,7 @@ AutonomousRound? parseAutonomousRound(String text) {
   }
 
   return AutonomousRound(
-    time: field('time'),
+    time: _roundTime(field('time')),
     firstRound: field('last round').startsWith('never'),
     quiet: field('quiet hours').startsWith('yes'),
     changed: section('Changed since last round').map(_taskLine).toList(),
