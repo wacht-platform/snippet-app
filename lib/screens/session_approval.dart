@@ -169,6 +169,10 @@ class ApprovalBarState extends State<ApprovalBar> {
   static final _vaultPrefix = RegExp(
       r'^\s*⚠?\s*uses vault secret\(s\) \[([^\]]*)\]\s*[—-]\s*',
       dotAll: true);
+  static final _lanePrefix = RegExp(r'^lane «(.+?)» · ');
+  static final _customTool = RegExp(
+      r'^⚠ (new )?custom tool `([^`]+)`(?:, uses vault secret\(s\) \[([^\]]*)\])? — runs: ',
+      dotAll: true);
 
   @override
   Widget build(BuildContext context) {
@@ -176,26 +180,36 @@ class ApprovalBarState extends State<ApprovalBar> {
     final tool = req?['tool_name']?.toString() ?? '';
     var detail = (req?['summary']?.toString() ?? '').trim();
     if (detail.isEmpty) detail = toolArgSummary(tool, req?['arguments']);
-    final vault = _vaultPrefix.firstMatch(detail);
-    final secrets = vault == null
-        ? const <String>[]
-        : vault
-            .group(1)!
-            .split(',')
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
-            .toList();
+    final lane = _lanePrefix.firstMatch(detail);
+    final laneName = lane?.group(1);
+    if (lane != null) detail = detail.substring(lane.end).trim();
+    List<String> names(String? raw) => (raw ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final custom = _customTool.firstMatch(detail);
+    final vault = custom == null ? _vaultPrefix.firstMatch(detail) : null;
+    final secrets =
+        custom != null ? names(custom.group(3)) : names(vault?.group(1));
+    final newCustom = custom?.group(1) != null;
+    if (custom != null) detail = detail.substring(custom.end).trim();
     if (vault != null) detail = detail.substring(vault.end).trim();
     final isVault = secrets.isNotEmpty;
     final index = (req?['index'] as num?)?.toInt() ?? 1;
     final total = (req?['total'] as num?)?.toInt() ?? 1;
-    final question = switch (tool) {
-      'bash' => 'Run this command?',
-      'change_files' => 'Make these file changes?',
-      '' => 'Allow this action?',
-      _ => 'Allow ${toolTitle(tool).toLowerCase()}?',
-    };
-    final isShell = tool == 'bash';
+    final action = custom != null
+        ? (newCustom
+            ? 'Run new custom tool ${custom.group(2)}?'
+            : 'Run custom tool ${custom.group(2)}?')
+        : switch (tool) {
+            'bash' => 'Run this command?',
+            'change_files' => 'Make these file changes?',
+            '' => 'Allow this action?',
+            _ => 'Allow ${toolTitle(tool).toLowerCase()}?',
+          };
+    final question = laneName == null ? action : 'Lane «$laneName» · $action';
+    final isShell = tool == 'bash' || custom != null;
 
     final allow = Btn(_sent ? 'Sending' : 'Allow',
         small: true,
@@ -206,7 +220,8 @@ class ApprovalBarState extends State<ApprovalBar> {
         variant: BtnVariant.secondary,
         disabled: _sent,
         onTap: () => _decide({'kind': 'deny'}));
-    final canAlways = widget.showApproveAll && !isVault;
+    final canAlways =
+        widget.showApproveAll && !isVault && laneName == null && !newCustom;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
