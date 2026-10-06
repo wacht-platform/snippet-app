@@ -61,24 +61,25 @@ String _fileName(String path) => path.split('/').last;
   if (changes.isEmpty) return (toolVerb(step.tool, running: running), '');
   final paths = {for (final c in changes) c['path']?.toString() ?? ''};
   final actions = {for (final c in changes) c['action']?.toString() ?? ''};
+  final failed = !running && step.failed;
   if (paths.length > 1 || actions.length > 1) {
     final n = paths.length;
     return (
-      running ? 'Changing' : 'Changed',
+      running ? 'Changing' : (failed ? "Couldn't change" : 'Changed'),
       '$n ${n == 1 ? 'file' : 'files'}'
     );
   }
   final first = changes.first;
   final name = _fileName(first['path']?.toString() ?? '');
-  final (done, doing) = switch (actions.first) {
-    'create' => ('Created', 'Creating'),
-    'delete' => ('Deleted', 'Deleting'),
-    'move' => ('Moved', 'Moving'),
-    _ => ('Edited', 'Editing'),
+  final (done, doing, tried) = switch (actions.first) {
+    'create' => ('Created', 'Creating', "Couldn't create"),
+    'delete' => ('Deleted', 'Deleting', "Couldn't delete"),
+    'move' => ('Moved', 'Moving', "Couldn't move"),
+    _ => ('Edited', 'Editing', "Couldn't edit"),
   };
   final target =
       actions.first == 'move' ? '$name → ${first['to'] ?? ''}' : name;
-  return (running ? doing : done, target);
+  return (running ? doing : (failed ? tried : done), target);
 }
 
 String toolObject(ToolStep step) {

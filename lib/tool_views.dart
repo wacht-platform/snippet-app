@@ -266,7 +266,7 @@ List<Widget> _toolBody(
     BuildContext context, String tool, Map? a, Map? d, String? status) {
   switch (tool) {
     case 'change_files':
-      return _changeFilesView(a, d);
+      return _changeFilesView(a, d, failed: status == 'error');
     case 'view_image':
       return _imageView(context, a, d);
     case 'bash':
@@ -304,7 +304,7 @@ String _changesSummary(dynamic changes) {
   return changes.length == 1 ? first : '$first (+${changes.length - 1} more)';
 }
 
-List<Widget> _changeFilesView(Map? a, Map? d) {
+List<Widget> _changeFilesView(Map? a, Map? d, {bool failed = false}) {
   final changes = a?['changes'];
   if (changes is! List) return const [];
   final out = <Widget>[];
@@ -347,12 +347,14 @@ List<Widget> _changeFilesView(Map? a, Map? d) {
       case 'delete':
         out.add(_ToolPanel(
           header: _PanelPath(path),
-          trailing: const [Tag('Deleted', tone: Tone.danger)],
+          trailing: [
+            failed ? const Tag('Delete') : const Tag('Deleted', tone: Tone.danger)
+          ],
         ));
       case 'move':
         out.add(_ToolPanel(
           header: _PanelPath('$path → ${field('to')}'),
-          trailing: const [Tag('Moved')],
+          trailing: [Tag(failed ? 'Move' : 'Moved')],
         ));
     }
   }
