@@ -211,6 +211,11 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             addEvent(key, DirectMessageCard(message: reply));
             break;
           }
+          final parent = parseParentMessage(text);
+          if (parent != null) {
+            addEvent(key, ParentMessageCard(body: parent));
+            break;
+          }
           final assignment = parseAssignmentEnvelope(text);
           if (assignment != null) {
             addEvent(key, AssignmentCard(assignment: assignment));

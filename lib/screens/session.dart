@@ -50,6 +50,7 @@ import 'mission_control/mission_control_state.dart'
         parseBoardMessage,
         parseDirectMessage,
         parseCoordinationReply,
+        parseParentMessage,
         parseAssignmentEnvelope;
 
 part 'session_socket.dart';

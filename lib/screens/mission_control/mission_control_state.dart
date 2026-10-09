@@ -520,6 +520,16 @@ DirectMessage? parseCoordinationReply(String text) {
   );
 }
 
+/// A message from the agent that delegated a lane, delivered into the lane.
+String? parseParentMessage(String text) {
+  final t = text.trim();
+  if (!t.startsWith('[parent_message]')) return null;
+  final end = t.lastIndexOf('[/parent_message]');
+  return t
+      .substring('[parent_message]'.length, end > 0 ? end : t.length)
+      .trim();
+}
+
 /// Work Mission Control offers an agent, carried as the body of a direct
 /// message. Nothing starts until the agent claims it.
 class TaskOffer {

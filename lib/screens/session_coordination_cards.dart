@@ -291,11 +291,30 @@ class AgentMessageCard extends StatelessWidget {
   final bool outbound;
 
   @override
+  Widget build(BuildContext context) {
+    final lane = agentId.startsWith('lane ');
+    return _ThreadCard(
+      icon: outbound ? 'send' : (lane ? 'message' : 'corner-down-right'),
+      tone: outbound ? Tone.neutral : Tone.accent,
+      kind: outbound
+          ? 'Message to $agentId'
+          : (lane ? 'Message from $agentId' : 'Reply from $agentId'),
+      status: outbound ? 'Sent' : (lane ? 'Lane' : 'Reply'),
+      body: body,
+    );
+  }
+}
+
+class ParentMessageCard extends StatelessWidget {
+  const ParentMessageCard({super.key, required this.body});
+  final String body;
+
+  @override
   Widget build(BuildContext context) => _ThreadCard(
-        icon: outbound ? 'send' : 'corner-down-right',
-        tone: outbound ? Tone.neutral : Tone.accent,
-        kind: outbound ? 'Message to $agentId' : 'Reply from $agentId',
-        status: outbound ? 'Sent' : 'Reply',
+        icon: 'corner-down-right',
+        tone: Tone.accent,
+        kind: 'From the agent that handed this over',
+        status: 'Message',
         body: body,
       );
 }
