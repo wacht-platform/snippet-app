@@ -489,14 +489,19 @@ DirectMessage? parseDirectMessage(String text) {
 /// asking from inside a session rather than in the agent's inbox.
 DirectMessage? parseCoordinationReply(String text) {
   final t = text.trim();
-  if (!t.contains('[coordination_reply]')) return null;
+  final tag = t.contains('[agent_reply]')
+      ? 'agent_reply'
+      : t.contains('[coordination_reply]')
+          ? 'coordination_reply'
+          : null;
+  if (tag == null) return null;
   String field(String name) {
     final match =
         RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
     return match?.group(1)?.trim() ?? '';
   }
 
-  final end = t.lastIndexOf('[/coordination_reply]');
+  final end = t.lastIndexOf('[/$tag]');
   final bodyMarker = t.lastIndexOf('\nbody: ');
   final body = (bodyMarker >= 0 && end > bodyMarker)
       ? t.substring(bodyMarker + '\nbody: '.length, end).trim()
@@ -512,6 +517,39 @@ DirectMessage? parseCoordinationReply(String text) {
     fromKind: split > 0 ? raw.substring(0, split) : 'agent',
     body: body,
     isReply: true,
+  );
+}
+
+/// Work Mission Control offers an agent, carried as the body of a direct
+/// message. Nothing starts until the agent claims it.
+class TaskOffer {
+  const TaskOffer({
+    required this.taskId,
+    required this.title,
+    required this.briefing,
+  });
+  final String taskId;
+  final String title;
+  final String briefing;
+}
+
+TaskOffer? parseTaskOffer(String text) {
+  final start = text.indexOf('[task_offer]');
+  final end = text.indexOf('[/task_offer]');
+  if (start < 0 || end < start) return null;
+  final t = text.substring(start, end);
+  String field(String name) {
+    final match =
+        RegExp(r'^' + name + r':\s*(.*)$', multiLine: true).firstMatch(t);
+    return match?.group(1)?.trim() ?? '';
+  }
+
+  final marker = t.indexOf('\nbriefing:');
+  return TaskOffer(
+    taskId: field('task_id'),
+    title: field('title'),
+    briefing:
+        marker >= 0 ? t.substring(marker + '\nbriefing:'.length).trim() : '',
   );
 }
 

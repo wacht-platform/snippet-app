@@ -12,7 +12,8 @@ import 'mission_control/mission_control_state.dart'
         BoardMessage,
         DirectMessage,
         MissionEnvelope,
-        WorkerQuestion;
+        WorkerQuestion,
+        parseTaskOffer;
 
 /// Work and messages that arrive from another thread (Mission Control, another
 /// agent, the coordination board) share one card, in the plan card's idiom: a
@@ -206,6 +207,19 @@ class DirectMessageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final from = message.fromLabel;
     final who = from == 'you' ? 'You' : from;
+    final offer = message.isReply ? null : parseTaskOffer(message.body);
+    if (offer != null) {
+      return _ThreadCard(
+        icon: 'agent',
+        tone: Tone.run,
+        kind: 'Task offer from $who',
+        title: offer.title.isEmpty ? null : offer.title,
+        reference: offer.taskId.isEmpty ? null : _short(offer.taskId),
+        status: 'Offered',
+        body: offer.briefing,
+        footer: 'Starts once claimed; the agent can also ask or decline',
+      );
+    }
     return _ThreadCard(
       icon: message.isReply ? 'corner-down-right' : 'message',
       tone: Tone.accent,
