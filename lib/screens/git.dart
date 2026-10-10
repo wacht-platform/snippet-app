@@ -558,54 +558,64 @@ class _GitScreenState extends State<GitScreen> {
     final dir = slash != -1 ? f.path.substring(0, slash + 1) : '';
     final fileName = slash != -1 ? f.path.substring(slash + 1) : f.path;
 
-    return InkWell(
-      onTap: () => _openDiff(f),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(S.s12, S.s4, S.s4, S.s4),
-        child: Row(children: [
-          Container(
-            width: 20,
-            height: 20,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(6),
+    return Tooltip(
+        message: f.path,
+        waitDuration: const Duration(milliseconds: 600),
+        child: Semantics(
+          label: f.path,
+          child: InkWell(
+            onTap: () => _openDiff(f),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(S.s12, S.s4, S.s4, S.s4),
+              child: Row(children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(code == '?' ? 'U' : code,
+                      style: mono(11, color: fg)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text.rich(
+                    kMobile
+                        ? TextSpan(children: [
+                            if (dir.isNotEmpty)
+                              TextSpan(
+                                  text: dir,
+                                  style: TS.codeSmall(AppColors.fg3)),
+                            TextSpan(
+                                text: fileName,
+                                style: TS.codeSmall(AppColors.fg1)),
+                          ])
+                        : TextSpan(children: [
+                            TextSpan(
+                                text: fileName,
+                                style: sans(13.5, color: AppColors.fg1)),
+                            if (dir.isNotEmpty)
+                              TextSpan(
+                                  text: '  ${dir.substring(0, dir.length - 1)}',
+                                  style: sans(12, color: AppColors.fg4)),
+                          ]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconBtn(
+                  staged ? 'minus' : 'plus',
+                  size: 30,
+                  iconSize: 14,
+                  tooltip: staged ? 'Unstage' : 'Stage',
+                  onTap: _busy ? null : () => _toggleStage(f, staged: staged),
+                ),
+              ]),
             ),
-            child: Text(code == '?' ? 'U' : code, style: mono(11, color: fg)),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text.rich(
-              kMobile
-                  ? TextSpan(children: [
-                      if (dir.isNotEmpty)
-                        TextSpan(text: dir, style: TS.codeSmall(AppColors.fg3)),
-                      TextSpan(
-                          text: fileName, style: TS.codeSmall(AppColors.fg1)),
-                    ])
-                  : TextSpan(children: [
-                      TextSpan(
-                          text: fileName,
-                          style: sans(13.5, color: AppColors.fg1)),
-                      if (dir.isNotEmpty)
-                        TextSpan(
-                            text: '  ${dir.substring(0, dir.length - 1)}',
-                            style: sans(12, color: AppColors.fg4)),
-                    ]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          IconBtn(
-            staged ? 'minus' : 'plus',
-            size: 30,
-            iconSize: 14,
-            tooltip: staged ? 'Unstage' : 'Stage',
-            onTap: _busy ? null : () => _toggleStage(f, staged: staged),
-          ),
-        ]),
-      ),
-    );
+        ));
   }
 
   Tone _statusTone(String code) => switch (code) {

@@ -255,32 +255,41 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     final dir = slash > 0 ? f.path.substring(0, slash) : '';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: widget.onOpenDiff == null ? null : () => widget.onOpenDiff!(f),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
-            child: Row(children: [
-              _statusLetter(f),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text.rich(
-                  TextSpan(children: [
-                    TextSpan(text: name),
-                    if (dir.isNotEmpty)
-                      TextSpan(
-                          text: '  $dir',
-                          style: sans(12, color: AppColors.fg4)),
-                  ]),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13.5, color: AppColors.fg1),
-                ),
+      child: Tooltip(
+        message: f.path,
+        waitDuration: const Duration(milliseconds: 600),
+        child: Semantics(
+          label: f.path,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: widget.onOpenDiff == null
+                  ? null
+                  : () => widget.onOpenDiff!(f),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+                child: Row(children: [
+                  _statusLetter(f),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(children: [
+                        TextSpan(text: name),
+                        if (dir.isNotEmpty)
+                          TextSpan(
+                              text: '  $dir',
+                              style: sans(12, color: AppColors.fg4)),
+                      ]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13.5, color: AppColors.fg1),
+                    ),
+                  ),
+                ]),
               ),
-            ]),
+            ),
           ),
         ),
       ),

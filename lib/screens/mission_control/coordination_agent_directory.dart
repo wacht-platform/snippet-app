@@ -54,23 +54,52 @@ class _CoordinationAgentDirectoryState
 
   void _onRefreshSignal() => refresh();
 
+  int _generation = 0;
+
   Future<void> refresh() async {
+    final generation = ++_generation;
     if (mounted) {
       setState(() {
         loading = true;
         error = null;
       });
     }
+    List<CoordinationAgent>? next;
+    String? failure;
     try {
       // Mission Control has its own pinned chat, so it is not one of the agents
       // offered here — this list is the workers a user dispatches to.
-      agents = (await widget.client.coordinationAgents())
+      next = (await widget.client.coordinationAgents())
           .where((a) => !a.isMissionControl)
           .toList();
     } catch (e) {
-      error = '$e';
+      failure = '$e';
     }
-    if (mounted) setState(() => loading = false);
+    if (!mounted || generation != _generation) return;
+    setState(() {
+      if (next != null) agents = next;
+      error = failure;
+      loading = false;
+    });
+  }
+
+  Future<void> _awaitNewAgent() async {
+    final before = agents.map((a) => a.id).toSet();
+    for (var i = 0; i < 20; i++) {
+      await Future<void>.delayed(const Duration(seconds: 3));
+      if (!mounted) return;
+      try {
+        final latest = await widget.client.coordinationAgents();
+        if (latest.any((a) => !a.isMissionControl && !before.contains(a.id))) {
+          await refresh();
+          if (mounted) toast(context, 'New agent is ready');
+          return;
+        }
+      } catch (_) {}
+    }
+    if (mounted) {
+      toast(context, 'Still building — check Mission Control for progress.');
+    }
   }
 
   Future<void> _create() async {
@@ -79,7 +108,9 @@ class _CoordinationAgentDirectoryState
       title: 'Create agent',
       child: CreateAgentForm(client: widget.client),
     );
-    if (created == true) await refresh();
+    if (created != true || !mounted) return;
+    toast(context, 'Building agent — it appears here when ready');
+    await _awaitNewAgent();
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:re_editor/re_editor.dart';
 
@@ -207,26 +208,7 @@ class _EditorScreenState extends State<EditorScreen> {
               onBack: _maybePop,
               actions: [
                 if (!_loading && _error == null) ...[
-                  ValueListenableBuilder<CodeLineEditingValue>(
-                    valueListenable: _controller,
-                    builder: (_, __, ___) => Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconBtn('undo',
-                            size: 36,
-                            iconSize: 18,
-                            tooltip: 'Undo',
-                            onTap:
-                                _controller.canUndo ? _controller.undo : null),
-                        IconBtn('redo',
-                            size: 36,
-                            iconSize: 18,
-                            tooltip: 'Redo',
-                            onTap:
-                                _controller.canRedo ? _controller.redo : null),
-                      ],
-                    ),
-                  ),
+                  _UndoRedo(controller: _controller),
                   IconBtn('wrap',
                       size: 36,
                       iconSize: 18,
@@ -418,5 +400,65 @@ class _Key extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _UndoRedo extends StatefulWidget {
+  const _UndoRedo({required this.controller});
+  final CodeLineEditingController controller;
+
+  @override
+  State<_UndoRedo> createState() => _UndoRedoState();
+}
+
+class _UndoRedoState extends State<_UndoRedo> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_changed);
+  }
+
+  @override
+  void didUpdateWidget(_UndoRedo old) {
+    super.didUpdateWidget(old);
+    if (old.controller != widget.controller) {
+      old.controller.removeListener(_changed);
+      widget.controller.addListener(_changed);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (!mounted) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.controller;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      IconBtn('undo',
+          size: 36,
+          iconSize: 18,
+          tooltip: 'Undo',
+          onTap: c.canUndo ? c.undo : null),
+      IconBtn('redo',
+          size: 36,
+          iconSize: 18,
+          tooltip: 'Redo',
+          onTap: c.canRedo ? c.redo : null),
+    ]);
   }
 }

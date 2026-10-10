@@ -1227,40 +1227,58 @@ class _HoverCopy extends StatefulWidget {
 
 class _HoverCopyState extends State<_HoverCopy> {
   bool _hover = false;
+  bool _focused = false;
+
+  void _copy() {
+    Clipboard.setData(ClipboardData(text: widget.text));
+    toast(context, 'Copied');
+  }
 
   @override
-  Widget build(BuildContext context) => MouseRegion(
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
+  Widget build(BuildContext context) {
+    final shown = _hover || _focused;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onLongPress: _copy,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             widget.child,
             AnimatedOpacity(
-              opacity: _hover ? 1 : 0,
+              opacity: shown ? 1 : 0,
               duration: Motion.quick,
-              child: IgnorePointer(
-                ignoring: !_hover,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: widget.text));
-                      toast(context, 'Copied');
-                    },
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      AppIcon('copy', size: 12, color: AppColors.fg4),
-                      const SizedBox(width: 5),
-                      Text('Copy', style: TS.meta()),
-                    ]),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Semantics(
+                  button: true,
+                  label: 'Copy reply',
+                  child: IgnorePointer(
+                    ignoring: !shown,
+                    child: InkWell(
+                      onTap: _copy,
+                      onFocusChange: (f) => setState(() => _focused = f),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 2, vertical: 2),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          AppIcon('copy', size: 12, color: AppColors.fg4),
+                          const SizedBox(width: 5),
+                          Text('Copy', style: TS.meta()),
+                        ]),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ],
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// Dim note (centered) / error (left-aligned, capped at two lines).

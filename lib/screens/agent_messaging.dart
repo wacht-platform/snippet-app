@@ -344,7 +344,22 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   int _attachmentGeneration = 0;
 
   final AudioRecorder _recorder = AudioRecorder();
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  AudioPlayer? _player;
+
+  AudioPlayer get _audioPlayer {
+    final existing = _player;
+    if (existing != null) return existing;
+    final player = AudioPlayer();
+    _playerStateSub = player.onPlayerStateChanged.listen((state) {
+      if (!mounted) return;
+      setState(() => _isPlayingRecording = state == PlayerState.playing);
+    });
+    _positionSub = player.onPositionChanged.listen((position) {
+      if (!mounted) return;
+      setState(() => _playbackPosition = position);
+    });
+    return _player = player;
+  }
 
   StreamSubscription<Amplitude>? _amplitudeSub;
   StreamSubscription<PlayerState>? _playerStateSub;
@@ -372,14 +387,6 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     _events = _thread.data ?? const [];
     _loading = _thread.data == null;
     if (_events.isNotEmpty) _jumpToBottom();
-    _playerStateSub = _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (!mounted) return;
-      setState(() => _isPlayingRecording = state == PlayerState.playing);
-    });
-    _positionSub = _audioPlayer.onPositionChanged.listen((position) {
-      if (!mounted) return;
-      setState(() => _playbackPosition = position);
-    });
   }
 
   @override
@@ -395,7 +402,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     if (kCanRecord) {
       unawaited(_recorder.dispose());
     }
-    unawaited(_audioPlayer.dispose());
+    final player = _player;
+    if (player != null) unawaited(player.dispose());
     final pendingPath = _recordingPath;
     if (pendingPath != null) {
       try {
@@ -604,7 +612,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     _recordingTimer?.cancel();
     _recordingTimer = null;
     try {
-      await _audioPlayer.stop();
+      await _player?.stop();
     } catch (_) {}
     if (path != null) {
       try {
@@ -642,7 +650,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           readBytes: () async => bytes,
         )
       ]);
-      await _audioPlayer.stop();
+      await _player?.stop();
       if (path != null) {
         try {
           final file = File(path);
