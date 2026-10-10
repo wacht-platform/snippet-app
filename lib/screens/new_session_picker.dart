@@ -6,6 +6,7 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../pull_refresh.dart';
 
 /// Open a folder to start a new conversation in.
 ///
@@ -352,9 +353,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
               Expanded(
                 child: _loading && _listing == null
                     ? const Center(child: Spinner(size: 20))
-                    : RefreshIndicator(
-                        color: AppColors.accent,
-                        backgroundColor: AppColors.surface3,
+                    : PullToRefresh(
                         onRefresh: () async => _go(_here),
                         child: _folderList(),
                       ),

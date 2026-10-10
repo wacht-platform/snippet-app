@@ -8,6 +8,7 @@ import '../../theme.dart';
 import '../../widgets.dart';
 import '../shell_nav.dart' show kNavPadH, kNavRowHeight;
 import 'task_common.dart';
+import '../../pull_refresh.dart';
 
 /// Tasks grouped by status, in board order, narrowed by a search and a status
 /// filter. The phone tab, the desktop sidebar and the standalone screen all
@@ -43,12 +44,12 @@ class TaskList extends StatelessWidget {
             ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 24)
             : const EdgeInsets.fromLTRB(8, 0, 8, 18));
     if (visible.isEmpty) {
-      return RefreshIndicator(
+      return PullToRefresh(
         onRefresh: onRefresh,
         child: ListView(padding: pad, children: [_empty()]),
       );
     }
-    return RefreshIndicator(
+    return PullToRefresh(
       onRefresh: onRefresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),

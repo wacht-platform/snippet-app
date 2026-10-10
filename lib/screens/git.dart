@@ -6,6 +6,7 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../pull_refresh.dart';
 
 /// Git for one session's workspace: status (staged / changed / untracked),
 /// per-file diff, stage/unstage/commit, branch switch, push/pull. All operations
@@ -250,11 +251,6 @@ class _GitScreenState extends State<GitScreen> {
                 style: sans(12, weight: W.label, color: AppColors.fg1),
               ),
             ),
-            IconBtn('refresh',
-                size: 26,
-                iconSize: 13,
-                tooltip: 'Refresh',
-                onTap: _busy ? null : _load),
             if (widget.onClose != null) ...[
               const SizedBox(width: 2),
               IconBtn('x',
@@ -270,7 +266,6 @@ class _GitScreenState extends State<GitScreen> {
           title: 'Git',
           subtitle: st != null && st.ok ? st.branch : null,
           onBack: widget.onClose ?? () => Navigator.pop(context),
-          actions: [IconBtn('refresh', onTap: _busy ? null : _load)],
         ),
       if (_busy || _refreshing)
         LinearProgressIndicator(
@@ -320,56 +315,60 @@ class _GitScreenState extends State<GitScreen> {
     return Column(children: [
       _header(st),
       Expanded(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
-          children: [
-            _commitComposer(st),
-            if (empty)
-              const Padding(
-                padding: EdgeInsets.only(top: 24),
-                child: EmptyState(
-                  icon: 'check-check',
-                  title: 'Working tree clean',
-                  body: 'No changes to commit.',
-                ),
-              )
-            else ...[
-              if (staged.isNotEmpty) ...[
-                _sectionCard(
-                  title: 'Staged',
-                  count: staged.length,
-                  actionLabel: 'Unstage all',
-                  onAction: () => _op(() => widget.client.gitUnstage(_repo)),
-                  files: staged,
-                  staged: true,
-                ),
-                const SizedBox(height: S.s16),
-              ],
-              if (changed.isNotEmpty) ...[
-                _sectionCard(
-                  title: 'Changes',
-                  count: changed.length,
-                  actionLabel: 'Stage all',
-                  onAction: () =>
-                      _op(() => widget.client.gitStage(_repo, all: true)),
-                  files: changed,
-                  staged: false,
-                ),
-                const SizedBox(height: S.s16),
-              ],
-              if (untracked.isNotEmpty) ...[
-                _sectionCard(
-                  title: 'Untracked',
-                  count: untracked.length,
-                  actionLabel: 'Stage all',
-                  onAction: () =>
-                      _op(() => widget.client.gitStage(_repo, all: true)),
-                  files: untracked,
-                  staged: false,
-                ),
+        child: PullToRefresh(
+          onRefresh: () async => _load(),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
+            children: [
+              _commitComposer(st),
+              if (empty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: EmptyState(
+                    icon: 'check-check',
+                    title: 'Working tree clean',
+                    body: 'No changes to commit.',
+                  ),
+                )
+              else ...[
+                if (staged.isNotEmpty) ...[
+                  _sectionCard(
+                    title: 'Staged',
+                    count: staged.length,
+                    actionLabel: 'Unstage all',
+                    onAction: () => _op(() => widget.client.gitUnstage(_repo)),
+                    files: staged,
+                    staged: true,
+                  ),
+                  const SizedBox(height: S.s16),
+                ],
+                if (changed.isNotEmpty) ...[
+                  _sectionCard(
+                    title: 'Changes',
+                    count: changed.length,
+                    actionLabel: 'Stage all',
+                    onAction: () =>
+                        _op(() => widget.client.gitStage(_repo, all: true)),
+                    files: changed,
+                    staged: false,
+                  ),
+                  const SizedBox(height: S.s16),
+                ],
+                if (untracked.isNotEmpty) ...[
+                  _sectionCard(
+                    title: 'Untracked',
+                    count: untracked.length,
+                    actionLabel: 'Stage all',
+                    onAction: () =>
+                        _op(() => widget.client.gitStage(_repo, all: true)),
+                    files: untracked,
+                    staged: false,
+                  ),
+                ],
               ],
             ],
-          ],
+          ),
         ),
       ),
     ]);

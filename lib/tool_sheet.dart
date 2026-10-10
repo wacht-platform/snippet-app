@@ -452,16 +452,6 @@ class _TimelineState extends State<_Timeline> {
     final steps = widget.batch.steps;
     final running = widget.batch.running && steps.any((s) => s.running);
     final failed = steps.where((s) => s.failed).length;
-    final status = [
-      '${steps.length} ${steps.length == 1 ? 'step' : 'steps'}',
-      if (failed > 0) '$failed failed',
-      if (running) 'running' else if (failed == 0) 'all passed',
-    ].join(' · ');
-    final dot = running
-        ? AppColors.run
-        : failed > 0
-            ? AppColors.danger
-            : AppColors.ok;
     final commands = steps
         .where((s) => s.tool == 'bash' || s.tool == 'manage_process')
         .length;
@@ -509,19 +499,21 @@ class _TimelineState extends State<_Timeline> {
               children: [
                 Text('Activity',
                     style: sans(20, spacing: -0.4, color: AppColors.fg1)),
-                const SizedBox(height: 3),
-                Row(children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration:
-                        BoxDecoration(color: dot, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                      child:
-                          Text(status, style: sans(13, color: AppColors.fg3))),
-                ]),
+                if (running) ...[
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                          color: AppColors.run, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                        child: Text('Running',
+                            style: sans(13, color: AppColors.fg3))),
+                  ]),
+                ],
               ],
             ),
           ),

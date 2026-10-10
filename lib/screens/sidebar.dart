@@ -20,6 +20,7 @@ import 'shell_models.dart';
 import 'shell_nav.dart';
 import 'sidebar_mobile.dart';
 import 'tasks/tasks_panel.dart';
+import '../pull_refresh.dart';
 export 'sidebar_mobile.dart';
 
 class Sidebar extends StatefulWidget {
@@ -799,9 +800,7 @@ class SidebarState extends State<Sidebar> {
               style: TS.meta()),
         ));
       }
-      return RefreshIndicator(
-        color: AppColors.accent,
-        backgroundColor: AppColors.surface3,
+      return PullToRefresh(
         onRefresh: () async => widget.onRefreshSessions(),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 16),
@@ -836,9 +835,7 @@ class SidebarState extends State<Sidebar> {
         children: children);
     // Phones: the natural refresh gesture. Desktop keeps the header button.
     if (!kMobile) return listView;
-    return RefreshIndicator(
-      color: AppColors.accent,
-      backgroundColor: AppColors.surface2,
+    return PullToRefresh(
       onRefresh: () async => widget.onRefreshSessions(),
       child: listView,
     );
@@ -869,107 +866,111 @@ class SidebarState extends State<Sidebar> {
       }
       rows.add(_desktopChatRow(s));
     }
-    return ListView(
-      padding: const EdgeInsets.only(top: 2, bottom: 16),
-      children: [
-        ShellSectionHeader(
-          label: 'Chats',
-          actions: [
-            ShellSectionAction(
-              icon: 'search',
-              tooltip: 'Search chats',
-              onTap: () {
-                setState(() {
-                  _desktopChatsSearchOpen = !_desktopChatsSearchOpen;
-                  if (!_desktopChatsSearchOpen) {
-                    _desktopChatsSearchCtl.clear();
-                    _filterQuery = '';
-                  }
-                });
-                if (_desktopChatsSearchOpen) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) _desktopChatsSearchFocus.requestFocus();
+    return PullToRefresh(
+      onRefresh: () async => widget.onRefreshSessions(),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(top: 2, bottom: 16),
+        children: [
+          ShellSectionHeader(
+            label: 'Chats',
+            actions: [
+              ShellSectionAction(
+                icon: 'search',
+                tooltip: 'Search chats',
+                onTap: () {
+                  setState(() {
+                    _desktopChatsSearchOpen = !_desktopChatsSearchOpen;
+                    if (!_desktopChatsSearchOpen) {
+                      _desktopChatsSearchCtl.clear();
+                      _filterQuery = '';
+                    }
                   });
-                }
-              },
-            ),
-            ShellSectionAction(
-              icon: 'plus',
-              tooltip: 'New chat',
-              onTap: hasClient ? widget.onNewSession : null,
-            ),
-          ],
-        ),
-        if (_desktopChatsSearchOpen)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-            child: Container(
-              height: 28,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.sm),
+                  if (_desktopChatsSearchOpen) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) _desktopChatsSearchFocus.requestFocus();
+                    });
+                  }
+                },
               ),
-              child: Row(
-                children: [
-                  AppIcon('search', size: 14, color: AppColors.fg3),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: TextField(
-                      controller: _desktopChatsSearchCtl,
-                      focusNode: _desktopChatsSearchFocus,
-                      onChanged: (v) => setState(() => _filterQuery = v),
-                      style: sans(13, color: AppColors.fg1),
-                      decoration: InputDecoration(
-                        isCollapsed: true,
-                        border: InputBorder.none,
-                        hintText: 'Search chats…',
-                        hintStyle: TS.meta(AppColors.fg4),
+              ShellSectionAction(
+                icon: 'plus',
+                tooltip: 'New chat',
+                onTap: hasClient ? widget.onNewSession : null,
+              ),
+            ],
+          ),
+          if (_desktopChatsSearchOpen)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+              child: Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(R.sm),
+                ),
+                child: Row(
+                  children: [
+                    AppIcon('search', size: 14, color: AppColors.fg3),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: TextField(
+                        controller: _desktopChatsSearchCtl,
+                        focusNode: _desktopChatsSearchFocus,
+                        onChanged: (v) => setState(() => _filterQuery = v),
+                        style: sans(13, color: AppColors.fg1),
+                        decoration: InputDecoration(
+                          isCollapsed: true,
+                          border: InputBorder.none,
+                          hintText: 'Search chats…',
+                          hintStyle: TS.meta(AppColors.fg4),
+                        ),
                       ),
                     ),
-                  ),
-                  if (_desktopChatsSearchCtl.text.isNotEmpty)
-                    IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear',
-                        onTap: () {
-                      _desktopChatsSearchCtl.clear();
-                      setState(() => _filterQuery = '');
-                    }),
-                ],
+                    if (_desktopChatsSearchCtl.text.isNotEmpty)
+                      IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear',
+                          onTap: () {
+                        _desktopChatsSearchCtl.clear();
+                        setState(() => _filterQuery = '');
+                      }),
+                  ],
+                ),
               ),
             ),
-          ),
-        if (!hasClient)
-          const SidebarEmpty('Add a machine to begin.')
-        else if (list.isEmpty)
-          // Distinguish "no conversations" from "none match the search": saying
-          // "No chats yet" over a searched list reads as data loss.
-          SidebarEmpty(_filterQuery.trim().isNotEmpty
-              ? 'No chats match the search.'
-              : 'No chats yet.')
-        else ...[
-          if (client != null &&
-              mc.isNotEmpty &&
-              !_selecting &&
-              _filterQuery.trim().isEmpty)
+          if (!hasClient)
+            const SidebarEmpty('Add a machine to begin.')
+          else if (list.isEmpty)
+            // Distinguish "no conversations" from "none match the search": saying
+            // "No chats yet" over a searched list reads as data loss.
+            SidebarEmpty(_filterQuery.trim().isNotEmpty
+                ? 'No chats match the search.'
+                : 'No chats yet.')
+          else ...[
+            if (client != null &&
+                mc.isNotEmpty &&
+                !_selecting &&
+                _filterQuery.trim().isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
+                child: MissionControlCard(
+                  client: client,
+                  session: mc.first,
+                  waitingChats:
+                      list.where((s) => s.status == 'waiting_for_input').length,
+                  onOpen: widget.onOpenMissionControl,
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
-              child: MissionControlCard(
-                client: client,
-                session: mc.first,
-                waitingChats:
-                    list.where((s) => s.status == 'waiting_for_input').length,
-                onOpen: widget.onOpenMissionControl,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: rows,
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: rows,
-            ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 

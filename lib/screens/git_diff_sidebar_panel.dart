@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'git.dart';
 import 'shell_nav.dart';
+import '../pull_refresh.dart';
 
 /// Git Diff sidebar panel.
 ///
@@ -175,38 +176,35 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     final branch = _status?.branch ?? '';
     final isClean = files.isEmpty;
 
-    return Container(
-      color: kMobile ? AppColors.bg : Colors.transparent,
-      child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 16),
-        children: [
-          ShellSectionHeader(
-            label: 'Git Diff',
-            actions: [
-              ShellSectionAction(
-                icon: 'refresh',
-                tooltip: 'Refresh diff',
-                onTap: refresh,
-              ),
+    return PullToRefresh(
+      onRefresh: refresh,
+      child: Container(
+        color: kMobile ? AppColors.bg : Colors.transparent,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          children: [
+            ShellSectionHeader(
+              label: 'Git Diff',
+            ),
+            _branchRow(repoName, branch, files.length),
+            if (_loading && _status == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Spinner(size: 18),
+                ),
+              )
+            else if (_error != null)
+              _errorState()
+            else if (isClean)
+              _cleanState()
+            else ...[
+              const SizedBox(height: 6),
+              for (final f in files) _fileRow(f),
             ],
-          ),
-          _branchRow(repoName, branch, files.length),
-          if (_loading && _status == null)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Spinner(size: 18),
-              ),
-            )
-          else if (_error != null)
-            _errorState()
-          else if (isClean)
-            _cleanState()
-          else ...[
-            const SizedBox(height: 6),
-            for (final f in files) _fileRow(f),
           ],
-        ],
+        ),
       ),
     );
   }

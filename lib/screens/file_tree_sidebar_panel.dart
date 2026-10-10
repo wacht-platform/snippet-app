@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 import 'shell_rail.dart';
+import '../pull_refresh.dart';
 
 /// Nesting step for a tree level.
 ///
@@ -313,73 +314,72 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
         : lastPathSegment(widget.workspacePath, ifEmpty: 'Workspace');
     final entries = _listing?.entries ?? const <FsEntry>[];
 
-    return Container(
-      color: kMobile ? AppColors.bg : Colors.transparent,
-      child: ListView(
-        // Horizontal insets belong to each child (the section header carries
-        // its own), so the list itself only manages the top and tail.
-        padding: const EdgeInsets.only(top: 8, bottom: 16),
-        children: [
-          ShellSectionHeader(
-            label: 'File Tree',
-            actions: [
-              ShellSectionAction(
-                icon: 'refresh',
-                tooltip: 'Refresh files',
-                onTap: () => refresh(),
-              ),
-              // `Builder` gives each menu a context that anchors to its OWN
-              // button: `Element.findRenderObject` walks DOWN to the button's
-              // box, so the popover opens under the control that summoned it
-              // rather than at the panel's corner.
-              Builder(
-                builder: (ctx) => ShellSectionAction(
-                  icon: 'search',
-                  tooltip: 'Search files',
-                  onTap: () => _openFileSearch(ctx),
+    return PullToRefresh(
+      onRefresh: refresh,
+      child: Container(
+        color: kMobile ? AppColors.bg : Colors.transparent,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          // Horizontal insets belong to each child (the section header carries
+          // its own), so the list itself only manages the top and tail.
+          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          children: [
+            ShellSectionHeader(
+              label: 'File Tree',
+              actions: [
+                // `Builder` gives each menu a context that anchors to its OWN
+                // button: `Element.findRenderObject` walks DOWN to the button's
+                // box, so the popover opens under the control that summoned it
+                // rather than at the panel's corner.
+                Builder(
+                  builder: (ctx) => ShellSectionAction(
+                    icon: 'search',
+                    tooltip: 'Search files',
+                    onTap: () => _openFileSearch(ctx),
+                  ),
                 ),
-              ),
-              Builder(
-                builder: (ctx) => ShellSectionAction(
-                  icon: 'upload',
-                  tooltip: 'Upload files',
-                  // Enabled before the first listing arrives: `_createDir` falls
-                  // back to the workspace root, so an upload is valid even while
-                  // the tree is still loading. Tinted while busy — accent is the
-                  // state channel, and "uploading" is a state.
-                  active: _uploading,
-                  onTap: _uploading ? null : _uploadFiles,
+                Builder(
+                  builder: (ctx) => ShellSectionAction(
+                    icon: 'upload',
+                    tooltip: 'Upload files',
+                    // Enabled before the first listing arrives: `_createDir` falls
+                    // back to the workspace root, so an upload is valid even while
+                    // the tree is still loading. Tinted while busy — accent is the
+                    // state channel, and "uploading" is a state.
+                    active: _uploading,
+                    onTap: _uploading ? null : _uploadFiles,
+                  ),
                 ),
-              ),
-              Builder(
-                builder: (ctx) => ShellSectionAction(
-                  icon: 'plus',
-                  tooltip: 'New file or folder',
-                  onTap: _listing == null ? null : () => _openAddMenu(ctx),
+                Builder(
+                  builder: (ctx) => ShellSectionAction(
+                    icon: 'plus',
+                    tooltip: 'New file or folder',
+                    onTap: _listing == null ? null : () => _openAddMenu(ctx),
+                  ),
                 ),
-              ),
+              ],
+            ),
+            _workspaceRow(wsName),
+            if (_loading && _listing == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Spinner(size: 18),
+                ),
+              )
+            else if (_error != null)
+              _rootError()
+            else if (entries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+                child: Text('Empty directory', style: TS.meta()),
+              )
+            else ...[
+              const SizedBox(height: 4),
+              ..._buildRows(entries, depth: 0),
             ],
-          ),
-          _workspaceRow(wsName),
-          if (_loading && _listing == null)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Spinner(size: 18),
-              ),
-            )
-          else if (_error != null)
-            _rootError()
-          else if (entries.isEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-              child: Text('Empty directory', style: TS.meta()),
-            )
-          else ...[
-            const SizedBox(height: 4),
-            ..._buildRows(entries, depth: 0),
           ],
-        ],
+        ),
       ),
     );
   }

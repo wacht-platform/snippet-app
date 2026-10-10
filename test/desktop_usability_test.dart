@@ -186,10 +186,12 @@ void main() {
       expect(find.text('main.dart'), findsOneWidget);
       expect(find.text('utils.dart'), findsOneWidget);
 
-      // Test manual refresh button
-      final refreshBtn = find.byTooltip('Refresh files');
-      expect(refreshBtn, findsOneWidget);
-      await tester.tap(refreshBtn);
+      // A hard scroll up past the top refreshes.
+      final at = tester.getCenter(find.text('main.dart'));
+      for (var i = 0; i < 3; i++) {
+        tester.binding.handlePointerEvent(PointerScrollEvent(
+            position: at, scrollDelta: const Offset(0, -120)));
+      }
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 

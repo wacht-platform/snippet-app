@@ -159,7 +159,6 @@ class _EditorScreenState extends State<EditorScreen> {
             const SizedBox(height: 8),
             Btn('Reload theirs',
                 variant: BtnVariant.secondary,
-                icon: 'refresh',
                 onTap: () => Navigator.pop(context, 'reload')),
             const SizedBox(height: 8),
             Btn('Cancel',

@@ -6,6 +6,7 @@ import '../api.dart';
 import '../swr.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../pull_refresh.dart';
 
 /// Background processes the agent started (dev servers, tunnels, a browser) via
 /// `bash {background:true}`. Lists them from /bg with a live status, a log tail,
@@ -123,7 +124,6 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             titleSize: 14,
             compact: true,
             onBack: widget.onClose ?? () => Navigator.pop(context),
-            actions: [IconBtn('refresh', onTap: () => _load())],
           ),
           if (_loading)
             const Expanded(child: Center(child: DelayedSpinner()))
@@ -140,9 +140,12 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                         'Long-running jobs the agent starts (servers, tunnels) show up here.'))
           else
             Expanded(
-                child: ListView(
-                    padding: const EdgeInsets.all(S.s16),
-                    children: [for (final p in procs) _row(p)])),
+                child: PullToRefresh(
+                    onRefresh: () => _load(),
+                    child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(S.s16),
+                        children: [for (final p in procs) _row(p)]))),
         ]),
       ),
     );

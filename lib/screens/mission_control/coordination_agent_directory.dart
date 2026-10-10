@@ -9,6 +9,7 @@ import '../../widgets.dart';
 import '../create_agent_form.dart';
 import 'coordination_agent_detail.dart';
 import '../../platform.dart';
+import '../../pull_refresh.dart';
 
 class CoordinationAgentDirectory extends StatefulWidget {
   const CoordinationAgentDirectory({
@@ -83,7 +84,7 @@ class _CoordinationAgentDirectoryState
 
   @override
   Widget build(BuildContext context) {
-    final body = RefreshIndicator(
+    final body = PullToRefresh(
       onRefresh: refresh,
       child: loading
           ? const PageLoader()
@@ -128,12 +129,6 @@ class _CoordinationAgentDirectoryState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Agents'),
-        actions: [
-          IconButton(
-            onPressed: refresh,
-            icon: AppIcon('refresh', size: 19, color: AppColors.fg2),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,

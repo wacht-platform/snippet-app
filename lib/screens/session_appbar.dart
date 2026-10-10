@@ -1140,8 +1140,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             _connect();
           },
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon('refresh', size: 13, color: AppColors.danger),
-            const SizedBox(width: 5),
             Text('Retry now',
                 style: sans(12, weight: W.label, color: AppColors.danger)),
           ]),

@@ -8,6 +8,7 @@ import '../widgets.dart';
 import 'agent_card.dart';
 import 'create_agent_form.dart';
 import 'shell_nav.dart';
+import '../pull_refresh.dart';
 
 /// The agent team, as a sidebar panel — the reference app's "People with
 /// access" slot, holding our agents instead of collaborators.
@@ -314,9 +315,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       });
 
     if (kMobile) {
-      return RefreshIndicator(
-        color: AppColors.accent,
-        backgroundColor: AppColors.surface3,
+      return PullToRefresh(
         onRefresh: refresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -374,11 +373,6 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                 },
               ),
               createBtn,
-              ShellSectionAction(
-                icon: 'refresh',
-                tooltip: 'Refresh',
-                onTap: busy ? null : refresh,
-              ),
             ],
           ),
           if (_searchOpen)
@@ -387,13 +381,17 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
               child: _desktopSearchBar(),
             ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 18),
-              children: [
-                ...desktopChildren,
-                if (ordered.isEmpty && desktopChildren.isEmpty)
-                  q.isNotEmpty ? const _EmptySearch() : _EmptyTeam(),
-              ],
+            child: PullToRefresh(
+              onRefresh: refresh,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 18),
+                children: [
+                  ...desktopChildren,
+                  if (ordered.isEmpty && desktopChildren.isEmpty)
+                    q.isNotEmpty ? const _EmptySearch() : _EmptyTeam(),
+                ],
+              ),
             ),
           ),
         ],

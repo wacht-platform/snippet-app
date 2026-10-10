@@ -19,6 +19,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../swr.dart';
+import '../pull_refresh.dart';
 
 /// Pick one agent from the directory, as an anchored DROPDOWN.
 ///
@@ -983,13 +984,6 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               ],
             ),
           ),
-          IconBtn(
-            'refresh',
-            size: M.minTarget,
-            iconSize: 18,
-            tooltip: 'Refresh',
-            onTap: () => _load(silent: false),
-          ),
           if (!kMobile && widget.onClose != null) ...[
             const SizedBox(width: 4),
             IconBtn(
@@ -1031,8 +1025,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       );
     }
     if (_events.isEmpty) {
-      return RefreshIndicator(
-        color: AppColors.accent,
+      return PullToRefresh(
         onRefresh: () => _load(silent: true),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -1052,8 +1045,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         ),
       );
     }
-    return RefreshIndicator(
-      color: AppColors.accent,
+    return PullToRefresh(
       onRefresh: () => _load(silent: true),
       child: ListView.builder(
         controller: _scroll,

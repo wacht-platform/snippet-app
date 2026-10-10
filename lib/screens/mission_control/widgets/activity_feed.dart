@@ -8,6 +8,7 @@ import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../mission_control_state.dart';
 import '../../../platform.dart';
+import '../../../pull_refresh.dart';
 
 class ActivityFeed extends StatelessWidget {
   const ActivityFeed({
@@ -37,8 +38,7 @@ class ActivityFeed extends StatelessWidget {
         ),
       );
     }
-    return RefreshIndicator(
-      color: AppColors.accent,
+    return PullToRefresh(
       onRefresh: () async {
         await state.refresh(silent: true);
       },
