@@ -96,7 +96,8 @@ class TaskList extends StatelessWidget {
 }
 
 class TaskStatusHeader extends StatelessWidget {
-  const TaskStatusHeader({super.key, required this.status, required this.count});
+  const TaskStatusHeader(
+      {super.key, required this.status, required this.count});
   final TaskStatus status;
   final int count;
 
@@ -157,7 +158,9 @@ class TaskRow extends StatelessWidget {
                       Text(task.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: kMobile ? TS.rowTitle(AppColors.fg2) : TS.label()),
+                          style: kMobile
+                              ? TS.rowTitle(AppColors.fg2)
+                              : TS.label()),
                       if (kMobile && detail.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(detail,
@@ -190,7 +193,8 @@ class PriorityMark extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
         decoration: BoxDecoration(
-            color: AppColors.accentBg, borderRadius: BorderRadius.circular(R.xs)),
+            color: AppColors.accentBg,
+            borderRadius: BorderRadius.circular(R.xs)),
         child: Text('P$priority',
             style: sans(11, weight: W.label, color: AppColors.accent)),
       );
@@ -235,7 +239,13 @@ class _FilterPanelState extends State<_FilterPanel> {
             selected: _selected.isEmpty,
             onTap: () => setState(() => _selected.clear()),
           ),
-          const SizedBox(height: S.s8),
+          if (kMobile)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+              child: Container(height: 1, color: AppColors.line),
+            )
+          else
+            const SizedBox(height: S.s8),
           for (final s in TaskStatus.values)
             _row(
               label: s.label,
@@ -261,58 +271,117 @@ class _FilterPanelState extends State<_FilterPanel> {
     int? count,
     Color? dot,
   }) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: S.s2),
-        child: Material(
-          color: selected ? AppColors.accentBg : Colors.transparent,
-          borderRadius: BorderRadius.circular(R.md),
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onTap();
-            },
-            borderRadius: BorderRadius.circular(R.md),
-            child: Container(
-              height: kMobile ? M.minTarget + 4 : 36,
-              padding: const EdgeInsets.symmetric(horizontal: S.s12),
-              child: Row(children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: selected ? AppColors.accentFill : Colors.transparent,
-                    border: Border.all(
-                        color: selected
-                            ? AppColors.accentFill
-                            : AppColors.lineStrong,
-                        width: 1.5),
+      kMobile
+          ? _mobileRow(
+              label: label,
+              selected: selected,
+              onTap: onTap,
+              count: count,
+              dot: dot)
+          : Padding(
+              padding: const EdgeInsets.only(bottom: S.s2),
+              child: Material(
+                color: selected ? AppColors.accentBg : Colors.transparent,
+                borderRadius: BorderRadius.circular(R.md),
+                child: InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    onTap();
+                  },
+                  borderRadius: BorderRadius.circular(R.md),
+                  child: Container(
+                    height: kMobile ? M.minTarget + 4 : 36,
+                    padding: const EdgeInsets.symmetric(horizontal: S.s12),
+                    child: Row(children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: selected
+                              ? AppColors.accentFill
+                              : Colors.transparent,
+                          border: Border.all(
+                              color: selected
+                                  ? AppColors.accentFill
+                                  : AppColors.lineStrong,
+                              width: 1.5),
+                        ),
+                        child: selected
+                            ? AppIcon('check',
+                                size: 12, color: AppColors.accentFg)
+                            : null,
+                      ),
+                      const SizedBox(width: S.s12),
+                      if (dot != null) ...[
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration:
+                              BoxDecoration(color: dot, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: S.s8),
+                      ],
+                      Expanded(
+                        child: Text(label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TS
+                                .ui(selected ? AppColors.fg1 : AppColors.fg2)),
+                      ),
+                      if (count != null) Text('$count', style: TS.meta()),
+                    ]),
                   ),
-                  child: selected
-                      ? AppIcon('check', size: 12, color: AppColors.accentFg)
-                      : null,
                 ),
-                const SizedBox(width: S.s12),
-                if (dot != null) ...[
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration:
-                        BoxDecoration(color: dot, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: S.s8),
-                ],
-                Expanded(
-                  child: Text(label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TS.ui(selected ? AppColors.fg1 : AppColors.fg2)),
-                ),
-                if (count != null) Text('$count', style: TS.meta()),
-              ]),
+              ),
+            );
+
+  Widget _mobileRow({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    int? count,
+    Color? dot,
+  }) =>
+      InkWell(
+        borderRadius: BorderRadius.circular(R.lg),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(children: [
+            if (dot != null) ...[
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 14),
+            ],
+            Expanded(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(16,
+                      color: selected ? AppColors.accent : AppColors.fg1)),
             ),
-          ),
+            if (count != null)
+              Text('$count',
+                  style: sans(14, color: AppColors.fg3, tabular: true)),
+            SizedBox(
+              width: 32,
+              child: selected
+                  ? Align(
+                      alignment: Alignment.centerRight,
+                      child:
+                          AppIcon('check', size: 18, color: AppColors.accent))
+                  : null,
+            ),
+          ]),
         ),
       );
 }

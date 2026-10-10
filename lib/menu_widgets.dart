@@ -25,26 +25,36 @@ PopupMenuItem<T> appMenuItem<T>({
   final color = danger ? AppColors.danger : AppColors.fg1;
   return PopupMenuItem<T>(
     value: value,
-    height: height,
-    padding: const EdgeInsets.symmetric(horizontal: S.s12),
-    child: Row(children: [
-      if (icon != null) ...[
-        AppIcon(icon,
-            size: 16, color: danger ? AppColors.danger : AppColors.fg3),
-        const SizedBox(width: S.s12),
-      ],
-      Expanded(
-        child: Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: (kMobile ? TS.ui(color) : sans(13, color: color))),
-      ),
-      if (detail != null) Text(detail, style: TS.meta()),
-      if (selected) ...[
-        const SizedBox(width: S.s8),
-        AppIcon('check', size: 14, color: AppColors.accent),
-      ],
-    ]),
+    height: kMobile ? 52 : height,
+    padding: EdgeInsets.symmetric(horizontal: kMobile ? 16 : S.s12),
+    child: Padding(
+      padding: kMobile
+          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4)
+          : EdgeInsets.zero,
+      child: Row(children: [
+        if (icon != null) ...[
+          AppIcon(icon,
+              size: kMobile ? 19 : 16,
+              color: danger ? AppColors.danger : AppColors.fg3),
+          SizedBox(width: kMobile ? 14 : S.s12),
+        ],
+        Expanded(
+          child: Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: (kMobile
+                  ? sans(16, color: selected ? AppColors.accent : color)
+                  : sans(13, color: color))),
+        ),
+        if (detail != null)
+          Text(detail,
+              style: kMobile ? sans(13, color: AppColors.fg3) : TS.meta()),
+        if (selected) ...[
+          const SizedBox(width: S.s8),
+          AppIcon('check', size: kMobile ? 18 : 14, color: AppColors.accent),
+        ],
+      ]),
+    ),
   );
 }
 
@@ -60,6 +70,50 @@ PopupMenuItem<T> appMenuRow<T>({
   bool selected = false,
   double height = 56,
 }) {
+  if (kMobile) {
+    return PopupMenuItem<T>(
+      value: value,
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+        child: Row(children: [
+          AppIcon(icon,
+              size: 19, color: selected ? AppColors.accent : AppColors.fg3),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(16,
+                        height: 21 / 16,
+                        color: selected ? AppColors.accent : AppColors.fg1)),
+                if (description != null) ...[
+                  const SizedBox(height: 2),
+                  Text(description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13, height: 18 / 13, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            Text(trailing, style: sans(13, color: AppColors.fg3)),
+          ],
+          if (selected) ...[
+            const SizedBox(width: 10),
+            AppIcon('check', size: 18, color: AppColors.accent),
+          ],
+        ]),
+      ),
+    );
+  }
   return PopupMenuItem<T>(
     value: value,
     height: height,
@@ -127,10 +181,14 @@ PopupMenuItem<T> appMenuRow<T>({
 PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
       enabled: false,
       height: 34,
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
+      padding: kMobile
+          ? const EdgeInsets.fromLTRB(16, 12, 16, 2)
+          : const EdgeInsets.fromLTRB(14, 8, 14, 2),
       // Upper case -> `caps()`, and a group heading is a label, not a
       // disabled control, so `fg3` rather than the `fg4` placeholder rung.
-      child: Text(label.toUpperCase(), style: TS.overline()),
+      child: kMobile
+          ? Text(label, style: sans(12, color: AppColors.fg4))
+          : Text(label.toUpperCase(), style: TS.overline()),
     );
 
 /// Present a menu in the shape the platform expects.
@@ -193,32 +251,27 @@ Future<T?> showAppMenu<T>(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: S.s6),
+                  const SizedBox(height: S.s8),
                   Center(
                       child: Container(
-                          width: 32,
+                          width: 36,
                           height: 4,
                           decoration: BoxDecoration(
                               color: AppColors.lineStrong,
                               borderRadius: BorderRadius.circular(R.pill)))),
-                  const SizedBox(height: S.s8),
+                  const SizedBox(height: S.s12),
                   Flexible(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: S.s12),
+                      padding: const EdgeInsets.symmetric(horizontal: S.s4),
                       child: Material(
-                        color: AppColors.overlay,
-                        borderRadius: BorderRadius.circular(R.md),
-                        clipBehavior: Clip.antiAlias,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: S.s4),
-                          child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (final item in items)
-                                  _appMenuSheetEntry(sheet, item),
-                              ]),
-                        ),
+                        color: Colors.transparent,
+                        child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final item in items)
+                                _appMenuSheetEntry(sheet, item),
+                            ]),
                       ),
                     ),
                   ),
@@ -290,7 +343,12 @@ Future<T?> showAppMenu<T>(
 /// defaults are not.
 Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
   if (entry is PopupMenuDivider) {
-    return Divider(height: 9, thickness: 1, color: AppColors.line);
+    return Divider(
+        height: 17,
+        thickness: 1,
+        indent: 16,
+        endIndent: 16,
+        color: AppColors.line);
   }
   if (entry is! PopupMenuItem<T>) {
     return const SizedBox.shrink();
@@ -304,6 +362,7 @@ Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
     );
   }
   return InkWell(
+    borderRadius: BorderRadius.circular(R.lg),
     onTap: () => Navigator.pop(sheet, entry.value),
     child: Padding(
       // The row now draws its own rounded, filled hit area for desktop, where a

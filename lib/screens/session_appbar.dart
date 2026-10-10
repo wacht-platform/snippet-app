@@ -476,20 +476,68 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   Widget _mobileTermTab() {
     final i = _termFocus.clamp(0, _terms.length - 1);
     final t = _terms[i];
+    final folder = lastPathSegment(_state?.workspace ?? '', ifEmpty: '');
     return Material(
-      color: const Color(0xff000000),
+      color: AppColors.canvas,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+          padding: const EdgeInsets.fromLTRB(6, 6, 10, 0),
           child: Row(children: [
             IconBtn('chevron-left',
-                size: 36,
-                iconSize: 18,
+                size: M.minTarget,
+                iconSize: 20,
                 tooltip: 'Back to chat',
                 onTap: () => _setState(() => _termOpen = false)),
-            Expanded(child: _termTabStrip(i, compact: false)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Shell',
+                      style: TS.sectionTitle().copyWith(fontSize: 17)),
+                  const SizedBox(height: 1),
+                  Row(children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                          color: t.alive ? AppColors.ok : AppColors.fg4,
+                          shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                          [
+                            t.alive ? 'Running' : 'Starting',
+                            if (folder.isNotEmpty) folder
+                          ].join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(12, color: AppColors.fg3)),
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+            Material(
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _openTerm(fresh: true),
+                child: SizedBox.square(
+                  dimension: 38,
+                  child: Center(
+                      child: AppIcon('plus', size: 18, color: AppColors.fg1)),
+                ),
+              ),
+            ),
           ]),
         ),
+        if (_terms.length > 1)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+            child: _mobileTermTabs(i),
+          ),
         Expanded(
           child: SessionTermView(
             alive: t.alive,
@@ -517,6 +565,53 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     if (name == null || name.trim().isEmpty) return;
     _setState(() => t.title = name.trim());
     _publishTerminals();
+  }
+
+  Widget _mobileTermTabs(int focus) {
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _terms.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (_, n) {
+          final on = n == focus;
+          final pane = _terms[n];
+          return Material(
+            color: on ? AppColors.surface2 : Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(R.pill),
+              side: BorderSide(
+                  color: on ? AppColors.surface2 : AppColors.border2),
+            ),
+            child: InkWell(
+              customBorder: const StadiumBorder(),
+              onTap: () {
+                _setState(() => _termFocus = n);
+                _publishTerminals();
+              },
+              onLongPress: () => _renameTerm(pane.id),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 6, 0),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(pane.title,
+                      style:
+                          sans(13, color: on ? AppColors.fg1 : AppColors.fg3)),
+                  GestureDetector(
+                    onTap: () => _closeTerm(pane.id),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: AppIcon('x', size: 12, color: AppColors.fg4),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Widget _termTabStrip(int focus, {required bool compact}) {

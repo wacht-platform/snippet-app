@@ -521,6 +521,31 @@ class SettingsPanelState extends State<SettingsPanel> {
             AppIcon('chevron-right', size: 15, color: AppColors.fg4),
           ]),
         );
+    Widget tile(SettingsPage page, String icon, String title, String detail) =>
+        Material(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(R.lg),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => widget.onSection?.call(page),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppIcon(icon, size: 20, color: AppColors.fg3),
+                  const SizedBox(height: 10),
+                  Text(title,
+                      style: sans(15, height: 20 / 15, color: AppColors.fg1)),
+                  Text(detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12, height: 16 / 12, color: AppColors.fg3)),
+                ],
+              ),
+            ),
+          ),
+        );
     Widget label(String text) => Padding(
           padding: const EdgeInsets.fromLTRB(S.s4, 20, S.s4, 6),
           child: Text(text,
@@ -593,12 +618,25 @@ class SettingsPanelState extends State<SettingsPanel> {
             ]),
           ),
         ),
-        label('Work'),
-        ListGroup(children: [
-          nav(SettingsPage.models, 'Models'),
-          nav(SettingsPage.usage, 'Usage'),
-          nav(SettingsPage.vault, 'Vault'),
-          nav(SettingsPage.scheduled, 'Scheduled jobs'),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+              child: tile(SettingsPage.models, 'ai-chip', 'Models',
+                  'Profiles and keys')),
+          const SizedBox(width: 10),
+          Expanded(
+              child: tile(SettingsPage.usage, 'analytics', 'Usage',
+                  'Tokens and spend')),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+              child: tile(SettingsPage.vault, 'lock-key', 'Vault',
+                  'Secrets for agents')),
+          const SizedBox(width: 10),
+          Expanded(
+              child: tile(SettingsPage.scheduled, 'repeat', 'Scheduled',
+                  'Recurring jobs')),
         ]),
         if (kCanNotify) ...[
           label('Phone'),

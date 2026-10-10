@@ -36,45 +36,84 @@ class Pills<T> extends StatelessWidget {
   final ValueChanged<T>? onSelect;
   const Pills(
       {super.key, required this.items, required this.selected, this.onSelect});
-  @override
-  Widget build(BuildContext context) =>
-      Wrap(spacing: 7, runSpacing: 7, children: [
-        for (final (val, label) in items)
-          Pressable(
-            enabled: onSelect != null,
-            child: GestureDetector(
-              onTap: onSelect == null
-                  ? null
-                  : () {
-                      HapticFeedback.selectionClick();
-                      onSelect!(val);
-                    },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-                decoration: BoxDecoration(
-                  // Selection is a NEUTRAL surface step, not the accent. The
-                  // accent is reserved for STATE (running, needs-attention), so
-                  // an accent-filled chip reads as an alert rather than "this is
-                  // on" — and it collides with the same hue already meaning
-                  // status elsewhere. Matches IconBtn.active and the nav rows.
-                  color:
-                      selected == val ? AppColors.surface3 : AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.pill),
-                  border: Border.all(
-                      color: selected == val
-                          ? AppColors.border2
-                          : AppColors.border),
+  Widget _segmented() => Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            for (final (val, label) in items)
+              GestureDetector(
+                onTap: onSelect == null
+                    ? null
+                    : () {
+                        HapticFeedback.selectionClick();
+                        onSelect!(val);
+                      },
+                child: AnimatedContainer(
+                  duration: Motion.quick,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: selected == val
+                        ? AppColors.surface3
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(label,
+                      style: sans(14,
+                          color:
+                              selected == val ? AppColors.fg1 : AppColors.fg3)),
                 ),
-                child: Text(label,
-                    style: sans(12,
-                        weight: W.label,
-                        color:
-                            selected == val ? AppColors.fg1 : AppColors.fg2)),
+              ),
+          ]),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => kMobile
+      ? _segmented()
+      : Wrap(spacing: 7, runSpacing: 7, children: [
+          for (final (val, label) in items)
+            Pressable(
+              enabled: onSelect != null,
+              child: GestureDetector(
+                onTap: onSelect == null
+                    ? null
+                    : () {
+                        HapticFeedback.selectionClick();
+                        onSelect!(val);
+                      },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                  decoration: BoxDecoration(
+                    // Selection is a NEUTRAL surface step, not the accent. The
+                    // accent is reserved for STATE (running, needs-attention), so
+                    // an accent-filled chip reads as an alert rather than "this is
+                    // on" — and it collides with the same hue already meaning
+                    // status elsewhere. Matches IconBtn.active and the nav rows.
+                    color: selected == val
+                        ? AppColors.surface3
+                        : AppColors.surface2,
+                    borderRadius: BorderRadius.circular(R.pill),
+                    border: Border.all(
+                        color: selected == val
+                            ? AppColors.border2
+                            : AppColors.border),
+                  ),
+                  child: Text(label,
+                      style: sans(12,
+                          weight: W.label,
+                          color:
+                              selected == val ? AppColors.fg1 : AppColors.fg2)),
+                ),
               ),
             ),
-          ),
-      ]);
+        ]);
 }
 
 void openMarkdownLink(String? href) {
@@ -1610,12 +1649,16 @@ class AppToggle extends StatelessWidget {
   final ValueChanged<bool> onChanged;
   final String label;
   final String? sub;
+
+  /// A row inside a grouped card, without a card of its own.
+  final bool flat;
   const AppToggle(
       {super.key,
       required this.on,
       required this.onChanged,
       required this.label,
-      this.sub});
+      this.sub,
+      this.flat = false});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -1627,20 +1670,30 @@ class AppToggle extends StatelessWidget {
         },
         borderRadius: BorderRadius.circular(R.md),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(R.md),
-          ),
+          padding: flat
+              ? const EdgeInsets.symmetric(vertical: 10)
+              : const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: flat
+              ? null
+              : BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(R.md),
+                ),
           child: Row(children: [
             Expanded(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: TS.label(AppColors.fg1)),
+                    Text(label,
+                        style: kMobile
+                            ? sans(15, height: 20 / 15, color: AppColors.fg1)
+                            : TS.label(AppColors.fg1)),
                     if (sub != null) ...[
                       const SizedBox(height: 3),
-                      Text(sub!, style: TS.caption())
+                      Text(sub!,
+                          style: kMobile
+                              ? sans(13, height: 18 / 13, color: AppColors.fg3)
+                              : TS.caption())
                     ],
                   ]),
             ),

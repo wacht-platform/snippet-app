@@ -62,18 +62,22 @@ class _AppFieldState extends State<AppField> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (widget.label != null) ...[
         Text(widget.label!,
-            style: sans(12, weight: W.label, color: AppColors.fg2)),
-        const SizedBox(height: 7),
+            style: kMobile
+                ? sans(12, color: AppColors.fg4)
+                : sans(12, weight: W.label, color: AppColors.fg2)),
+        SizedBox(height: kMobile ? 6 : 7),
       ],
       AnimatedContainer(
         duration: Motion.quick,
-        padding: const EdgeInsets.symmetric(horizontal: 11),
-        constraints: BoxConstraints(minHeight: kMobile ? 44 : 34),
+        padding: EdgeInsets.symmetric(horizontal: kMobile ? 14 : 11),
+        constraints: BoxConstraints(minHeight: kMobile ? 48 : 34),
         decoration: BoxDecoration(
           color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(kMobile ? 12 : R.md),
           border: Border.all(
-              color: _focus.hasFocus ? AppColors.accentLine : AppColors.border),
+              color: _focus.hasFocus
+                  ? AppColors.accentLine
+                  : (kMobile ? Colors.transparent : AppColors.border)),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           if (widget.icon != null) ...[
@@ -92,17 +96,21 @@ class _AppFieldState extends State<AppField> {
               keyboardType: widget.keyboardType,
               onSubmitted: widget.onSubmitted,
               cursorColor: AppColors.accent,
-              style: widget.mono
-                  ? mono(13, color: AppColors.fg1)
-                  : sans(13, color: AppColors.fg1),
+              style: kMobile
+                  ? sans(15, color: AppColors.fg1)
+                  : widget.mono
+                      ? mono(13, color: AppColors.fg1)
+                      : sans(13, color: AppColors.fg1),
               decoration: InputDecoration(
                 isCollapsed: true,
                 contentPadding: EdgeInsets.symmetric(vertical: kMobile ? 8 : 8),
                 border: InputBorder.none,
                 hintText: widget.hint,
-                hintStyle: widget.mono
-                    ? mono(13, color: AppColors.fg4)
-                    : sans(13, color: AppColors.fg4),
+                hintStyle: kMobile
+                    ? sans(15, color: AppColors.fg4)
+                    : widget.mono
+                        ? mono(13, color: AppColors.fg4)
+                        : sans(13, color: AppColors.fg4),
               ),
             ),
           ),
@@ -112,7 +120,9 @@ class _AppFieldState extends State<AppField> {
       if (widget.helper != null) ...[
         const SizedBox(height: 7),
         Text(widget.helper!,
-            style: sans(11, height: 1.4, color: AppColors.fg3)),
+            style: kMobile
+                ? sans(12, height: 17 / 12, color: AppColors.fg4)
+                : sans(11, height: 1.4, color: AppColors.fg3)),
       ],
     ]);
   }
@@ -174,8 +184,8 @@ class _DialogFrame extends StatelessWidget {
                       child: Text(title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              sans(kMobile ? 15 : 14, weight: W.label, color: AppColors.fg1)),
+                          style: sans(kMobile ? 15 : 14,
+                              weight: W.label, color: AppColors.fg1)),
                     ),
                     if (onClose != null)
                       IconBtn('x',

@@ -698,35 +698,319 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
         ],
       ),
     );
-    final footer = Container(
-      padding: EdgeInsets.fromLTRB(16, 6, 16,
-          widget.embedded ? 8 : 8 + MediaQuery.of(context).padding.bottom),
-      decoration: const BoxDecoration(),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Btn('Cancel',
-              variant: BtnVariant.ghost, small: true, onTap: _dismiss),
-          const SizedBox(width: 8),
-          Btn(_busy ? 'Saving…' : 'Save',
-              small: true,
-              disabled: _busy || _model.text.trim().isEmpty,
-              onTap: _save),
-        ],
-      ),
-    );
+    final footer = kMobile
+        ? Padding(
+            padding: EdgeInsets.fromLTRB(
+                16, 8, 16, 12 + MediaQuery.of(context).padding.bottom),
+            child: Btn(_busy ? 'Saving…' : 'Save profile',
+                full: true,
+                disabled: _busy || _model.text.trim().isEmpty,
+                onTap: _save),
+          )
+        : Container(
+            padding: EdgeInsets.fromLTRB(
+                16,
+                6,
+                16,
+                widget.embedded
+                    ? 8
+                    : 8 + MediaQuery.of(context).padding.bottom),
+            decoration: const BoxDecoration(),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Btn('Cancel',
+                    variant: BtnVariant.ghost, small: true, onTap: _dismiss),
+                const SizedBox(width: 8),
+                Btn(_busy ? 'Saving…' : 'Save',
+                    small: true,
+                    disabled: _busy || _model.text.trim().isEmpty,
+                    onTap: _save),
+              ],
+            ),
+          );
     final body = Column(children: [
       // No embedded header. When embedded, the HOST level owns the header
       // (inference_profiles.dart draws "Edit profile" / "Add profile"), so
       // drawing one here stacked a second back row under it — two rows, two
       // exits, same screen.
       if (!widget.embedded) SnAppBar(title: title, onBack: _dismiss),
-      form,
+      if (kMobile) Expanded(child: _mobileForm(pills)) else form,
       footer,
     ]);
     if (widget.embedded) return body;
     return Scaffold(
       body: SafeArea(bottom: false, child: body),
+    );
+  }
+
+  Widget _section(String label, List<Widget> children, {String? note}) =>
+      Padding(
+        padding: const EdgeInsets.only(top: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+              child: Text(label, style: sans(12, color: AppColors.fg4)),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: children,
+              ),
+            ),
+            if (note != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                child: Text(note,
+                    style: sans(12, height: 17 / 12, color: AppColors.fg4)),
+              ),
+          ],
+        ),
+      );
+
+  Widget _gap() => const SizedBox(height: 14);
+
+  Widget _rule() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Container(height: 1, color: AppColors.border),
+      );
+
+  Widget _mobileForm(List<(String, String)> pills) {
+    final modelName = _model.text.trim();
+    final toggles = <Widget>[
+      AppToggle(
+          flat: true,
+          on: _images,
+          onChanged: (v) => setState(() => _images = v),
+          label: 'Supports images',
+          sub: 'Send screenshots and diagrams to this model'),
+      if (_usesOpenAiAdapter(_provider))
+        AppToggle(
+            flat: true,
+            on: _stream,
+            onChanged: (v) => setState(() => _stream = v),
+            label: 'Stream responses',
+            sub: 'For models that return nothing otherwise'),
+      if (_isXai)
+        AppToggle(
+            flat: true,
+            on: _xSearch,
+            onChanged: (v) => setState(() => _xSearch = v),
+            label: 'X search',
+            sub: 'Let Grok search X with xAI’s server-side tool'),
+      AppToggle(
+          flat: true,
+          on: _active,
+          onChanged: (v) => setState(() => _active = v),
+          label: 'Use for new chats',
+          sub: 'Make this the active model'),
+      AppToggle(
+          flat: true,
+          on: _delegate,
+          onChanged: (v) => setState(() => _delegate = v),
+          label: 'Use for lanes',
+          sub: 'Delegated lanes run on this profile'),
+    ];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_providerLabel(_provider),
+                  style: sans(12, color: AppColors.fg4)),
+              const SizedBox(height: 2),
+              Text(
+                  modelName.isEmpty
+                      ? (_isEdit ? 'Edit profile' : 'New profile')
+                      : modelName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(26,
+                      spacing: -0.7, height: 31 / 26, color: AppColors.fg1)),
+              if (_active) ...[
+                const SizedBox(height: 6),
+                Row(children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                        color: AppColors.ok, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                  Text('Active for new chats',
+                      style: sans(13, color: AppColors.fg3)),
+                ]),
+              ],
+            ],
+          ),
+        ),
+        _section('Model', [
+          if (!_isEdit) ...[
+            Text('Provider', style: sans(12, color: AppColors.fg4)),
+            const SizedBox(height: 6),
+            Pills<String>(
+              items: pills,
+              selected: _provider,
+              onSelect: (val) => setState(() {
+                _provider = val;
+                _images = _defaultImages(val);
+                _catalogModels = null;
+                _showModelBrowser = false;
+                _modelSearch.clear();
+                _scheduleReasoning();
+              }),
+            ),
+            _gap(),
+            AppField(
+                label: 'Profile name',
+                controller: _name,
+                hint: 'Defaults to the provider'),
+            _gap(),
+          ],
+          if (_needsBaseUrl(_provider)) ...[
+            AppField(
+                label: 'Base URL',
+                controller: _baseUrl,
+                hint: 'https://api.example.com/v1'),
+            _gap(),
+          ],
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(
+                child: AppField(
+                    label: 'Model',
+                    controller: _model,
+                    hint: _isChatgpt
+                        ? 'gpt-5.1-codex'
+                        : _isClaudeCode
+                            ? 'sonnet'
+                            : _isAntigravity
+                                ? 'gemini-3.8-flash-high'
+                                : 'claude-sonnet-4.5')),
+            const SizedBox(width: 8),
+            if (_loadingModels)
+              const SizedBox.square(
+                  dimension: 48, child: Center(child: Spinner(size: 20)))
+            else
+              Material(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _busy ? null : _browseModels,
+                  child: SizedBox.square(
+                    dimension: 48,
+                    child: Center(
+                        child: AppIcon(_showModelBrowser ? 'x' : 'list',
+                            size: 18, color: AppColors.fg2)),
+                  ),
+                ),
+              ),
+          ]),
+          if (_showModelBrowser && _catalogModels != null)
+            _inlineModelBrowser(),
+          if (_modelHint != null) ...[
+            const SizedBox(height: 6),
+            Text(_modelHint!,
+                style: sans(12, height: 17 / 12, color: AppColors.fg4)),
+          ],
+          _gap(),
+          AppField(
+            label: 'Context window',
+            controller: _ctx,
+            keyboardType: TextInputType.number,
+            hint: 'Tokens, e.g. 200000',
+            helper: 'Sets the context gauge and when history is compacted.',
+          ),
+        ]),
+        _section(
+          '${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort',
+          [
+            if (_effortAdjustable)
+              Pills<String>(
+                items: _effortItems,
+                selected:
+                    _effortItems.any((i) => i.$1 == _effort) ? _effort : '',
+                onSelect: (val) => setState(() => _effort = val),
+              )
+            else
+              Text(
+                  _reasoning!['control'] == 'model'
+                      ? 'Set by the model you pick'
+                      : 'Not adjustable for this model',
+                  style: sans(15, color: AppColors.fg2)),
+          ],
+          note: (_reasoning?['note'] as String?) ??
+              'More thinking is better on hard problems and uses more tokens.',
+        ),
+        _section('Access', [
+          if (_isChatgpt)
+            _SubSignIn(
+              client: widget.client,
+              signedInLabel: 'Signed in to ChatGPT',
+              blurb:
+                  'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
+              buttonLabel: 'Sign in with ChatGPT',
+              signedIn: (c) => c.chatgptSignedIn(),
+              begin: (c) => c.chatgptLoginBegin(),
+              signOut: (c) => c.chatgptLogout(),
+            )
+          else if (_isXai)
+            _SubSignIn(
+              client: widget.client,
+              signedInLabel: 'Signed in to xAI',
+              blurb:
+                  'Grok uses your SuperGrok / X Premium subscription — no API key.',
+              buttonLabel: 'Sign in with SuperGrok / X Premium',
+              signedIn: (c) => c.xaiSignedIn(),
+              begin: (c) => c.xaiLoginBegin(),
+              signOut: (c) => c.xaiLogout(),
+            )
+          else if (_isClaudeCode || _isAntigravity)
+            _CliAgentStatus(
+                key: ValueKey(_provider),
+                client: widget.client,
+                provider: _provider)
+          else
+            AppField(
+              label: 'API key',
+              controller: _key,
+              obscure: !_showKey,
+              icon: 'key',
+              hint: _isEdit && widget.existing!.hasKey
+                  ? 'Leave blank to keep the current key'
+                  : 'sk-…',
+              helper: 'Stored on your machine, never sent to snippet servers.',
+              rightSlot: GestureDetector(
+                onTap: () => setState(() => _showKey = !_showKey),
+                child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Text(_showKey ? 'Hide' : 'Show',
+                        style: sans(13, color: AppColors.fg3))),
+              ),
+            ),
+        ]),
+        _section('Behaviour', [
+          for (var i = 0; i < toggles.length; i++) ...[
+            if (i > 0) _rule(),
+            toggles[i],
+          ],
+        ]),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 14, 4, 0),
+            child: Text(_error!, style: sans(13, color: AppColors.danger)),
+          ),
+      ],
     );
   }
 }
