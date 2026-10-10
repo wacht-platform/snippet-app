@@ -288,6 +288,54 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
+  Widget _readOnlyHeader(String status) {
+    final live = status == 'running';
+    final label = switch (status) {
+      'running' => 'Working',
+      'completed' || 'idle' => 'Finished',
+      'failed' => 'Failed',
+      'connecting' => 'Connecting',
+      _ => status,
+    };
+    final (fg, _) = toneColors(live ? Tone.run : Tone.neutral);
+    return Container(
+      height: kMobile ? M.appBarHeight : 44,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      color: AppColors.bg,
+      child: Row(children: [
+        IconBtn('chevron-left',
+            size: kMobile ? M.minTarget : 32,
+            iconSize: 20,
+            tooltip: 'Back',
+            onTap: () => Navigator.of(context).maybePop()),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              _title.isEmpty ? 'Lane' : _title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(kMobile ? M.sectionTitle : 15,
+                  weight: W.label, color: AppColors.fg1),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Text(label, style: mono(11, color: fg)),
+          ]),
+        ),
+      ]),
+    );
+  }
+
   Widget _mobileHeader(HarnessState? s) {
     return Container(
       height: M.appBarHeight,

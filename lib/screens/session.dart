@@ -131,6 +131,11 @@ class SessionScreen extends StatefulWidget {
   /// inactive session must never intercept Android back from the Chats home.
   final bool mobileActive;
 
+  /// A transcript to watch, not to talk to: a delegated lane's run. No
+  /// composer, approvals or actions; [banner] sits under the header.
+  final bool readOnly;
+  final Widget? banner;
+
   const SessionScreen(
       {super.key,
       required this.client,
@@ -150,6 +155,8 @@ class SessionScreen extends StatefulWidget {
       this.inboundShare,
       this.onShareConsumed,
       this.mobileActive = true,
+      this.readOnly = false,
+      this.banner,
       this.onTitle});
   @override
   State<SessionScreen> createState() => _SessionScreenState();
@@ -1092,12 +1099,17 @@ class _SessionScreenState extends State<SessionScreen>
                     return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (kMobile)
+                          if (widget.readOnly)
+                            _readOnlyHeader(status)
+                          else if (kMobile)
                             _mobileHeader(s)
                           else if (!kMacOS)
                             _desktopBar(s, running),
                           // Desktop keeps the detailed chip strip.
-                          if (!kMobile && !kMacOS) _statusStrip(s, running),
+                          if (!kMobile && !kMacOS && !widget.readOnly)
+                            _statusStrip(s, running),
+                          if (widget.readOnly && widget.banner != null)
+                            _centerWide(widget.banner!),
                           if (_connError != null) _disconnectedBanner(),
                           Expanded(
                             child: Stack(children: [
@@ -1107,7 +1119,9 @@ class _SessionScreenState extends State<SessionScreen>
                                       onNotification: _onScroll,
                                       child: Builder(builder: (context) {
                                         final timeline = <Widget>[
-                                          if (items.isEmpty && !running)
+                                          if (items.isEmpty &&
+                                              !running &&
+                                              !widget.readOnly)
                                             const EmptyState(
                                                 icon: 'terminal',
                                                 title: 'Session ready',
@@ -1232,7 +1246,9 @@ class _SessionScreenState extends State<SessionScreen>
                           // The question/approval bars are PINNED here (not inside the scroll
                           // list) so a "needs input" request is always visible — buried at the
                           // bottom of a scrolled-up transcript it read as "the agent is stuck".
-                          if (waiting && _pendingApproval(events))
+                          if (!widget.readOnly &&
+                              waiting &&
+                              _pendingApproval(events))
                             _centerWide(ConstrainedBox(
                               constraints: BoxConstraints(maxHeight: barsCap),
                               child: Padding(
@@ -1252,7 +1268,9 @@ class _SessionScreenState extends State<SessionScreen>
                                         _pendingApprovalTotal(events) > 1),
                               ),
                             )),
-                          if (waiting && s?.pendingQuestion != null)
+                          if (!widget.readOnly &&
+                              waiting &&
+                              s?.pendingQuestion != null)
                             _centerWide(ConstrainedBox(
                               constraints: BoxConstraints(maxHeight: barsCap),
                               child: Padding(
@@ -1274,7 +1292,8 @@ class _SessionScreenState extends State<SessionScreen>
                                     onSend: _sendDecision),
                               ),
                             )),
-                          if (!(waiting && s?.pendingQuestion != null))
+                          if (!widget.readOnly &&
+                              !(waiting && s?.pendingQuestion != null))
                             _centerWide(_inputBar(running)),
                         ]);
                   }),

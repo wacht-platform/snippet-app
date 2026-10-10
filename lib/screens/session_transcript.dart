@@ -287,7 +287,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                 LaneNotice(
                   title: title,
                   live: () => liveLane(id),
-                  onOpen: _showLanes,
+                  onOpen: () => _openLane(id),
                 ));
           }
         case 'lane_cancelled':
@@ -302,7 +302,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                 LaneNotice(
                   title: _s(e['title']),
                   live: () => liveLane(id),
-                  onOpen: _showLanes,
+                  onOpen: () => _openLane(id),
                   summary: _s(e['summary']),
                 ));
           }
@@ -541,6 +541,26 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
     }
   }
 
+  /// Watch one lane at work: its own transcript, live and read-only, under a
+  /// banner saying what it was asked to do.
+  void _openLane(String id) {
+    final lane = (_state?.lanes ?? const <LaneInfo>[])
+        .where((l) => l.id == id)
+        .firstOrNull;
+    final transcript = lane?.transcript;
+    if (lane == null || transcript == null || transcript.isEmpty) {
+      _showLanes();
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => LaneTranscriptScreen(
+        client: widget.client,
+        laneId: id,
+        liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
+      ),
+    ));
+  }
+
   void _showLanes() {
     if ((_state?.lanes ?? const <LaneInfo>[]).isEmpty) return;
     presentScreen(
@@ -552,6 +572,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       builder: (_, close) => LanesScreen(
         liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
         onClose: close,
+        client: widget.client,
       ),
     );
   }

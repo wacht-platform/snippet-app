@@ -3,21 +3,26 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../api.dart';
+import '../media_views.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'session.dart';
 
 /// A focused view of delegated work. The session owns the live state; this
 /// screen polls the getter so progress continues updating while it is open.
 class LanesScreen extends StatefulWidget {
   final List<LaneInfo> Function() liveLanes;
   final VoidCallback? onClose;
+  final DaemonClient? client;
 
   const LanesScreen({
     super.key,
     required this.liveLanes,
     this.onClose,
+    this.client,
   });
 
   @override
@@ -51,7 +56,6 @@ class _LanesScreenState extends State<LanesScreen> {
     final lanes = widget.liveLanes();
     _shown = lanes;
 
-
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -71,18 +75,18 @@ class _LanesScreenState extends State<LanesScreen> {
                 : ListView(
                     padding:
                         const EdgeInsets.fromLTRB(S.s16, S.s16, S.s16, S.s32),
-                    children: laneSections(lanes, liveLanes: widget.liveLanes),
+                    children: laneSections(lanes,
+                        liveLanes: widget.liveLanes, client: widget.client),
                   ),
           ),
         ]),
       ),
     );
   }
-
 }
 
 List<Widget> laneSections(List<LaneInfo> lanes,
-    {List<LaneInfo> Function()? liveLanes}) {
+    {List<LaneInfo> Function()? liveLanes, DaemonClient? client}) {
   final running = lanes.where((l) => l.running).toList();
   final failed = lanes.where((l) => l.status == 'failed').toList();
   final cancelled = lanes.where((l) => l.status == 'cancelled').toList();
@@ -98,7 +102,10 @@ List<Widget> laneSections(List<LaneInfo> lanes,
     for (var i = 0; i < items.length; i++) {
       if (i > 0) out.add(const SizedBox(height: S.s8));
       out.add(LaneDetailCard(
-          key: ValueKey(items[i].id), lane: items[i], liveLanes: liveLanes));
+          key: ValueKey(items[i].id),
+          lane: items[i],
+          liveLanes: liveLanes,
+          client: client));
     }
   }
 
@@ -113,8 +120,13 @@ class LaneDetailCard extends StatefulWidget {
   final LaneInfo lane;
   final List<LaneInfo> Function()? liveLanes;
   final bool detail;
-  const LaneDetailCard({super.key, required this.lane, this.liveLanes,
-    this.detail = false});
+  final DaemonClient? client;
+  const LaneDetailCard(
+      {super.key,
+      required this.lane,
+      this.liveLanes,
+      this.detail = false,
+      this.client});
 
   @override
   State<LaneDetailCard> createState() => _LaneDetailCardState();
@@ -127,7 +139,6 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
 
   @override
   Widget build(BuildContext context) {
-
     final failed = lane.status == 'failed';
     final cancelled = lane.status == 'cancelled';
     final tone = lane.running
@@ -165,12 +176,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          onTap: widget.detail ? null : () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => LaneDetailScreen(
-              laneId: lane.id,
-              liveLanes: widget.liveLanes ?? () => [widget.lane],
-            )),
-          ),
+          onTap: widget.detail ? null : () => _open(context),
           child: Padding(
             padding:
                 EdgeInsets.fromLTRB(12, dense ? 9 : 12, 12, dense ? 10 : 12),
@@ -230,6 +236,19 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
         ),
       ),
     );
+  }
+
+  void _open(BuildContext context) {
+    final client = widget.client ?? DaemonScope.maybeOf(context);
+    final live = widget.liveLanes ?? () => [widget.lane];
+    final transcript = lane.transcript;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) =>
+          client != null && transcript != null && transcript.isNotEmpty
+              ? LaneTranscriptScreen(
+                  client: client, laneId: lane.id, liveLanes: live)
+              : LaneDetailScreen(laneId: lane.id, liveLanes: live),
+    ));
   }
 
   Widget _details(BuildContext context) {
@@ -312,8 +331,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
 class LaneDetailScreen extends StatefulWidget {
   final String laneId;
   final List<LaneInfo> Function() liveLanes;
-  const LaneDetailScreen({super.key, required this.laneId,
-    required this.liveLanes});
+  const LaneDetailScreen(
+      {super.key, required this.laneId, required this.liveLanes});
 
   @override
   State<LaneDetailScreen> createState() => _LaneDetailScreenState();
@@ -338,19 +357,29 @@ class _LaneDetailScreenState extends State<LaneDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final lane = widget.liveLanes()
-        .where((lane) => lane.id == widget.laneId).firstOrNull;
+    final lane = widget
+        .liveLanes()
+        .where((lane) => lane.id == widget.laneId)
+        .firstOrNull;
     return Scaffold(
-      body: SafeArea(bottom: false, child: Column(children: [
-        SnAppBar(title: lane?.title ?? 'Lane details', titleSize: 14,
-          compact: true, onBack: () => Navigator.of(context).pop()),
-        Expanded(child: lane == null
-          ? const EmptyState(icon: 'layers', title: 'Lane unavailable',
-              body: 'This delegated lane is no longer available.')
-          : ListView(padding: const EdgeInsets.all(S.s16), children: [
-              LaneDetailCard(lane: lane, detail: true),
-            ])),
-      ])),
+      body: SafeArea(
+          bottom: false,
+          child: Column(children: [
+            SnAppBar(
+                title: lane?.title ?? 'Lane details',
+                titleSize: 14,
+                compact: true,
+                onBack: () => Navigator.of(context).pop()),
+            Expanded(
+                child: lane == null
+                    ? const EmptyState(
+                        icon: 'layers',
+                        title: 'Lane unavailable',
+                        body: 'This delegated lane is no longer available.')
+                    : ListView(padding: const EdgeInsets.all(S.s16), children: [
+                        LaneDetailCard(lane: lane, detail: true),
+                      ])),
+          ])),
     );
   }
 }
@@ -442,5 +471,136 @@ class _TimelineEntryRow extends StatelessWidget {
     if (parsed == null) return raw;
     String two(int v) => v.toString().padLeft(2, '0');
     return '${two(parsed.hour)}:${two(parsed.minute)}:${two(parsed.second)}';
+  }
+}
+
+/// A lane at work, as it happens: its own transcript (every command, edit,
+/// search and message) streamed read-only, under a banner saying who it is
+/// and what it was asked to do.
+class LaneTranscriptScreen extends StatelessWidget {
+  final DaemonClient client;
+  final String laneId;
+  final List<LaneInfo> Function() liveLanes;
+  const LaneTranscriptScreen(
+      {super.key,
+      required this.client,
+      required this.laneId,
+      required this.liveLanes});
+
+  @override
+  Widget build(BuildContext context) {
+    final lane = liveLanes().where((l) => l.id == laneId).firstOrNull;
+    final transcript = lane?.transcript;
+    if (lane == null || transcript == null || transcript.isEmpty) {
+      return LaneDetailScreen(laneId: laneId, liveLanes: liveLanes);
+    }
+    return SessionScreen(
+      client: client,
+      sessionId: transcript,
+      title: lane.title,
+      readOnly: true,
+      acceptDrops: false,
+      banner: LaneBrief(laneId: laneId, liveLanes: liveLanes),
+    );
+  }
+}
+
+/// Who the lane is and what it owes: identity, access, time, the brief it was
+/// handed and, once done, its report. Collapsed to a few lines; tap to open.
+class LaneBrief extends StatefulWidget {
+  final String laneId;
+  final List<LaneInfo> Function() liveLanes;
+  const LaneBrief({super.key, required this.laneId, required this.liveLanes});
+
+  @override
+  State<LaneBrief> createState() => _LaneBriefState();
+}
+
+class _LaneBriefState extends State<LaneBrief> {
+  Timer? _ticker;
+  bool _open = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _elapsed(LaneInfo lane) {
+    final start = DateTime.tryParse(lane.startedAt);
+    if (start == null) return '';
+    final delta = DateTime.now().toUtc().difference(start.toUtc());
+    if (delta.inSeconds < 60) return '${delta.inSeconds}s';
+    if (delta.inMinutes < 60) return '${delta.inMinutes}m';
+    return '${delta.inHours}h ${delta.inMinutes % 60}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lane =
+        widget.liveLanes().where((l) => l.id == widget.laneId).firstOrNull;
+    if (lane == null) return const SizedBox.shrink();
+    final meta = mono(10, color: AppColors.fg3);
+    final body = sans(kMobile ? 14 : 12, height: 1.45, color: AppColors.fg2);
+    final facts = [
+      if (lane.agent != null && lane.agent!.isNotEmpty) 'as ${lane.agent}',
+      lane.readOnly ? 'read-only' : 'can edit',
+      if (lane.profile != null && lane.profile!.isNotEmpty) lane.profile!,
+      if (lane.running) 'working ${_elapsed(lane)}' else lane.status,
+    ];
+    final handoff = lane.handoff?.trim() ?? '';
+    final summary = lane.summary?.trim() ?? '';
+    final error = lane.error?.trim() ?? '';
+    final lines = _open ? 1000 : 3;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          kMobile ? M.gutter : 20, 4, kMobile ? M.gutter : 20, 8),
+      child: Material(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(R.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(R.md),
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(facts.join(' · '), style: meta),
+                if (handoff.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('Asked to', style: meta),
+                  const SizedBox(height: 2),
+                  MarkdownPreview(data: handoff, maxLines: lines, style: body),
+                ],
+                if (summary.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('Reported', style: meta),
+                  const SizedBox(height: 2),
+                  MarkdownPreview(data: summary, maxLines: lines, style: body),
+                ],
+                if (error.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(error,
+                      maxLines: lines,
+                      overflow: TextOverflow.ellipsis,
+                      style: body.copyWith(color: AppColors.danger)),
+                ],
+                const SizedBox(height: 6),
+                Text(_open ? 'Show less' : 'Show the full brief', style: meta),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

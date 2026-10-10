@@ -697,6 +697,10 @@ class LaneInfo {
   final String? activityKind;
   final String? activityAt;
   final List<LaneActivity> activityLog;
+  final String? transcript;
+  final String? agent;
+  final bool readOnly;
+  final String? profile;
   LaneInfo({
     required this.id,
     required this.title,
@@ -710,6 +714,10 @@ class LaneInfo {
     this.activityKind,
     this.activityAt,
     this.activityLog = const [],
+    this.transcript,
+    this.agent,
+    this.readOnly = false,
+    this.profile,
   });
   factory LaneInfo.fromJson(Map<String, dynamic> j) {
     String s(dynamic v) {
@@ -746,6 +754,10 @@ class LaneInfo {
       activityKind: opt(j['activity_kind']),
       activityAt: opt(j['activity_at']),
       activityLog: log,
+      transcript: opt(j['transcript']),
+      agent: opt(j['agent']),
+      readOnly: j['read_only'] == true,
+      profile: opt(j['profile']),
     );
   }
   bool get running => status == 'running';
