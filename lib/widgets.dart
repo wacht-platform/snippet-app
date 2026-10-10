@@ -1530,12 +1530,17 @@ class SnAppBar extends StatelessWidget {
     return Container(
       height: compact ? 52 : 64,
       padding: EdgeInsets.fromLTRB(
-          onBack != null || leading != null ? S.s4 : S.s12, 0, S.s8, 0),
+          onBack != null || leading != null
+              ? (kMobile ? 6 : S.s4)
+              : (kMobile ? M.gutter : S.s12),
+          0,
+          kMobile ? 10 : S.s8,
+          0),
       decoration: BoxDecoration(
         // Follows the ambient shell surface — desktop panels re-theme this to
         // surface1 so the bar never reads as a darker strip (mobile: still bg).
         color: background ?? Theme.of(context).scaffoldBackgroundColor,
-        border: bordered
+        border: bordered && !kMobile
             ? Border(bottom: BorderSide(color: AppColors.border))
             : null,
       ),
@@ -1557,12 +1562,19 @@ class SnAppBar extends StatelessWidget {
                 Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: display(titleSize ?? (kMobile ? 17 : 15))),
+                    style: kMobile && (titleSize ?? 0) >= 22
+                        ? TS.pageTitle()
+                        : kMobile
+                            ? sans(titleSize ?? 18,
+                                spacing: -0.3, color: AppColors.fg1)
+                            : display(titleSize ?? 15)),
                 if (subtitle != null)
                   Text(subtitle!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TS.codeSmall()),
+                      style: kMobile
+                          ? sans(12, color: AppColors.fg3)
+                          : TS.codeSmall()),
               ]),
         ),
         ...actions,

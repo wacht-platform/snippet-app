@@ -113,8 +113,7 @@ class TasksPanelState extends State<TasksPanel> {
   Widget _phoneHeader() => Padding(
         padding: const EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
         child: Row(children: [
-          Text('Tasks',
-              style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
+          Text('Tasks', style: TS.pageTitle()),
           const Spacer(),
           IconBtn('sliders',
               size: M.minTarget,
@@ -172,9 +171,8 @@ class TasksPanelState extends State<TasksPanel> {
       filter: _filter,
       onOpen: _open,
       onRefresh: _feed.refresh,
-      padding: kMobile
-          ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 16)
-          : null,
+      padding:
+          kMobile ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 16) : null,
     );
   }
 }

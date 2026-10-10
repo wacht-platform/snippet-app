@@ -372,7 +372,10 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
         padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 16, 12, 10, 8),
         child: Row(children: [
           Expanded(
-            child: Text('New chat', style: TS.sectionTitle()),
+            child: Text('New chat',
+                style: kMobile
+                    ? sans(22, spacing: -0.5, color: AppColors.fg1)
+                    : TS.sectionTitle()),
           ),
           if (widget.onClose != null)
             IconBtn('x',
@@ -388,13 +391,21 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   Widget _breadcrumbs() {
     final crumbs = _crumbs;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: kMobile ? M.gutter : 16),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: AppColors.border),
-          bottom: BorderSide(color: AppColors.border),
-        ),
-      ),
+      margin: kMobile
+          ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 8)
+          : EdgeInsets.zero,
+      padding: EdgeInsets.symmetric(horizontal: kMobile ? 12 : 16),
+      decoration: kMobile
+          ? BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(12),
+            )
+          : BoxDecoration(
+              border: Border(
+                top: BorderSide(color: AppColors.border),
+                bottom: BorderSide(color: AppColors.border),
+              ),
+            ),
       child: Row(children: [
         Expanded(
           child: SizedBox(

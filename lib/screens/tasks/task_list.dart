@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../models.dart';
 import '../../platform.dart';
+import '../../components.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import '../shell_nav.dart' show kNavPadH, kNavRowHeight;
@@ -62,6 +63,15 @@ class TaskList extends StatelessWidget {
 
   List<Widget> _group(TaskStatus status, Iterable<TaskItem> items) {
     if (items.isEmpty) return const [];
+    if (kMobile) {
+      return [
+        TaskStatusHeader(status: status, count: items.length),
+        ListGroup(children: [
+          for (final task in items)
+            TaskRow(task: task, onTap: () => onOpen(task)),
+        ]),
+      ];
+    }
     return [
       TaskStatusHeader(status: status, count: items.length),
       for (final task in items) TaskRow(task: task, onTap: () => onOpen(task)),
@@ -103,7 +113,9 @@ class TaskStatusHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.fromLTRB(kMobile ? 4 : 12, 14, 12, 6),
+        padding: kMobile
+            ? const EdgeInsets.fromLTRB(4, 20, 4, 8)
+            : const EdgeInsets.fromLTRB(12, 14, 12, 6),
         child: Row(children: [
           Container(
             width: 6,
@@ -112,9 +124,13 @@ class TaskStatusHeader extends StatelessWidget {
                 color: statusColor(status), shape: BoxShape.circle),
           ),
           const SizedBox(width: S.s8),
-          Text(status.label, style: TS.label()),
+          Text(status.label,
+              style: kMobile ? sans(13, color: AppColors.fg2) : TS.label()),
           const SizedBox(width: S.s8),
-          CountBadge(count),
+          if (kMobile)
+            Text('$count', style: sans(13, color: AppColors.fg4))
+          else
+            CountBadge(count),
         ]),
       );
 }
@@ -130,6 +146,42 @@ class TaskRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final detail = task.description.trim().split('\n').first;
     final age = taskAge(task);
+    if (kMobile) {
+      return InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(children: [
+            if (task.priority > 0) ...[
+              PriorityMark(task.priority),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(task.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(16, height: 21 / 16, color: AppColors.fg1)),
+                  if (detail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13, height: 18 / 13, color: AppColors.fg3)),
+                  ],
+                ],
+              ),
+            ),
+            if (age.isNotEmpty) ...[
+              const SizedBox(width: 12),
+              Text(age, style: sans(12, color: AppColors.fg4, tabular: true)),
+            ],
+          ]),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(

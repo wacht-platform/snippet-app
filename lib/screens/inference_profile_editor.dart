@@ -744,22 +744,28 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     );
   }
 
-  Widget _section(String label, List<Widget> children, {String? note}) =>
+  Widget _section(String label, List<Widget> children,
+          {String? note, bool card = false}) =>
       Padding(
-        padding: const EdgeInsets.only(top: 18),
+        padding: const EdgeInsets.only(top: 22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
-              child: Text(label, style: sans(12, color: AppColors.fg4)),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              decoration: BoxDecoration(
-                color: AppColors.surface1,
-                borderRadius: BorderRadius.circular(16),
+            if (label.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 0, 4, 6),
+                child: Text(label, style: sans(12, color: AppColors.fg4)),
               ),
+            Container(
+              padding: card
+                  ? const EdgeInsets.fromLTRB(16, 4, 16, 4)
+                  : EdgeInsets.zero,
+              decoration: card
+                  ? BoxDecoration(
+                      color: AppColors.surface1,
+                      borderRadius: BorderRadius.circular(16),
+                    )
+                  : null,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: children,
@@ -854,7 +860,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             ],
           ),
         ),
-        _section('Model', [
+        _section('', [
           if (!_isEdit) ...[
             Text('Provider', style: sans(12, color: AppColors.fg4)),
             const SizedBox(height: 6),
@@ -884,38 +890,27 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                 hint: 'https://api.example.com/v1'),
             _gap(),
           ],
-          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Expanded(
-                child: AppField(
-                    label: 'Model',
-                    controller: _model,
-                    hint: _isChatgpt
-                        ? 'gpt-5.1-codex'
-                        : _isClaudeCode
-                            ? 'sonnet'
-                            : _isAntigravity
-                                ? 'gemini-3.8-flash-high'
-                                : 'claude-sonnet-4.5')),
-            const SizedBox(width: 8),
-            if (_loadingModels)
-              const SizedBox.square(
-                  dimension: 48, child: Center(child: Spinner(size: 20)))
-            else
-              Material(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: _busy ? null : _browseModels,
-                  child: SizedBox.square(
-                    dimension: 48,
-                    child: Center(
-                        child: AppIcon(_showModelBrowser ? 'x' : 'list',
-                            size: 18, color: AppColors.fg2)),
-                  ),
-                ),
-              ),
-          ]),
+          AppField(
+              label: 'Model',
+              controller: _model,
+              hint: _isChatgpt
+                  ? 'gpt-5.1-codex'
+                  : _isClaudeCode
+                      ? 'sonnet'
+                      : _isAntigravity
+                          ? 'gemini-3.8-flash-high'
+                          : 'claude-sonnet-4.5',
+              rightSlot: _loadingModels
+                  ? const Spinner(size: 16)
+                  : GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _busy ? null : _browseModels,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 0, 8),
+                        child: Text(_showModelBrowser ? 'Close' : 'Browse',
+                            style: sans(14, color: AppColors.accent)),
+                      ),
+                    )),
           if (_showModelBrowser && _catalogModels != null)
             _inlineModelBrowser(),
           if (_modelHint != null) ...[
@@ -929,7 +924,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             controller: _ctx,
             keyboardType: TextInputType.number,
             hint: 'Tokens, e.g. 200000',
-            helper: 'Sets the context gauge and when history is compacted.',
           ),
         ]),
         _section(
@@ -949,10 +943,8 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                       : 'Not adjustable for this model',
                   style: sans(15, color: AppColors.fg2)),
           ],
-          note: (_reasoning?['note'] as String?) ??
-              'More thinking is better on hard problems and uses more tokens.',
         ),
-        _section('Access', [
+        _section('', [
           if (_isChatgpt)
             _SubSignIn(
               client: widget.client,
@@ -989,7 +981,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
               hint: _isEdit && widget.existing!.hasKey
                   ? 'Leave blank to keep the current key'
                   : 'sk-…',
-              helper: 'Stored on your machine, never sent to snippet servers.',
               rightSlot: GestureDetector(
                 onTap: () => setState(() => _showKey = !_showKey),
                 child: Padding(
@@ -999,7 +990,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
               ),
             ),
         ]),
-        _section('Behaviour', [
+        _section(card: true, 'Behaviour', [
           for (var i = 0; i < toggles.length; i++) ...[
             if (i > 0) _rule(),
             toggles[i],

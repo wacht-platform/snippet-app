@@ -160,7 +160,9 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     final summary = lane.summary?.trim();
     final error = lane.error?.trim();
     final dense = !kMobile;
-    final meta = mono(10, color: AppColors.fg3);
+    final meta = kMobile
+        ? sans(13, color: AppColors.fg4)
+        : mono(10, color: AppColors.fg3);
     final body = sans(dense ? 12 : 14, height: 1.45, color: AppColors.fg2);
     // Everything under the header lines up with the title, past the dot.
     Widget indented(Widget child, {double top = 6}) =>
@@ -169,8 +171,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(R.md),
+        border: kMobile ? null : Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(kMobile ? R.lg : R.md),
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -205,7 +207,10 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                   const SizedBox(width: 10),
                   Padding(
                     padding: EdgeInsets.only(top: dense ? 3 : 4),
-                    child: Text(status, style: mono(10, color: toneFg)),
+                    child: Text(status,
+                        style: kMobile
+                            ? sans(12, color: toneFg)
+                            : mono(10, color: toneFg)),
                   ),
                 ]),
                 if (activity != null && activity.isNotEmpty && lane.running)

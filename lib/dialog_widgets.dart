@@ -437,8 +437,10 @@ Future<T?> showAppSheet<T>(BuildContext context,
                     child: SingleChildScrollView(
                       padding: EdgeInsets.fromLTRB(
                           S.s12, S.s6, S.s12, S.s12 + media.padding.bottom),
-                      child:
-                          SurfaceScope(group: AppColors.overlay, child: child),
+                      child: SurfaceScope(
+                          group:
+                              kMobile ? Colors.transparent : AppColors.overlay,
+                          child: child),
                     ),
                   ),
                 ]),

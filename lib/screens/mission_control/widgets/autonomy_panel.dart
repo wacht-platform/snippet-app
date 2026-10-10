@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../api.dart';
+import '../../../platform.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 
@@ -214,11 +215,14 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
         Text('Autonomous Mission Control', style: TS.sectionTitle()),
         const SizedBox(height: 6),
       ],
-      Text(
-          'When autonomous, Mission Control works like a chief of staff while you are away: it checks on running work, verifies results, retries and re-routes, answers workers when it can, and pings your phone only for decisions, finished work and problems.',
-          style: TS.meta().copyWith(height: 1.45)),
-      const SizedBox(height: 16),
+      if (!kMobile) ...[
+        Text(
+            'When autonomous, Mission Control works like a chief of staff while you are away: it checks on running work, verifies results, retries and re-routes, answers workers when it can, and pings your phone only for decisions, finished work and problems.',
+            style: TS.meta().copyWith(height: 1.45)),
+        const SizedBox(height: 16),
+      ],
       AppToggle(
+        flat: kMobile,
         on: on,
         onChanged: (v) => _set({'on': v}),
         label: on ? 'Autonomous' : 'Autonomy off',
@@ -232,10 +236,12 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
         selected: rhythm,
         onSelect: (v) => _set({'round_minutes': v}),
       ),
-      const SizedBox(height: 6),
-      Text(
-          'Reports and worker questions wake it at once. The regular check only runs when something changed, so quiet hours cost nothing.',
-          style: TS.meta().copyWith(height: 1.4)),
+      if (!kMobile) ...[
+        const SizedBox(height: 6),
+        Text(
+            'Reports and worker questions wake it at once. The regular check only runs when something changed, so quiet hours cost nothing.',
+            style: TS.meta().copyWith(height: 1.4)),
+      ],
       const SizedBox(height: 20),
       Text('Quiet hours', style: TS.label(AppColors.fg2)),
       const SizedBox(height: 8),
@@ -250,12 +256,14 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
           });
         },
       ),
-      const SizedBox(height: 6),
-      Text(
-          held > 0
-              ? '$held ping${held == 1 ? '' : 's'} held until quiet hours end.'
-              : 'In your time (${_offsetLabel((_autonomy['utc_offset_minutes'] as num?)?.toInt())}). Non-urgent pings wait until quiet hours end; urgent ones come through.',
-          style: TS.meta().copyWith(height: 1.4)),
+      if (!kMobile || held > 0) ...[
+        const SizedBox(height: 6),
+        Text(
+            held > 0
+                ? '$held ping${held == 1 ? '' : 's'} held until quiet hours end.'
+                : 'In your time (${_offsetLabel((_autonomy['utc_offset_minutes'] as num?)?.toInt())}). Non-urgent pings wait until quiet hours end; urgent ones come through.',
+            style: TS.meta().copyWith(height: 1.4)),
+      ],
       if (lastAt != null) ...[
         const SizedBox(height: 20),
         Text('Last round', style: TS.label(AppColors.fg2)),
@@ -267,7 +275,17 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
             ].join(' · '),
             style: TS.ui()),
       ],
-      if (followups.isNotEmpty) ...[
+      if (followups.isNotEmpty && kMobile) ...[
+        const SizedBox(height: 20),
+        Text('Next follow-up', style: TS.label(AppColors.fg2)),
+        const SizedBox(height: 6),
+        Text(
+            '${_relative(followups.first['due_at'] as int?, future: true)} · ${followups.first['note'] ?? ''}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TS.ui()),
+      ],
+      if (followups.isNotEmpty && !kMobile) ...[
         const SizedBox(height: 20),
         Text('Follow-ups it scheduled', style: TS.label(AppColors.fg2)),
         const SizedBox(height: 8),
