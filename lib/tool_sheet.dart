@@ -518,25 +518,19 @@ class _TimelineState extends State<_Timeline> {
                         BoxDecoration(color: dot, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 6),
-                  Text(status, style: sans(13, color: AppColors.fg3)),
+                  Flexible(
+                      child:
+                          Text(status, style: sans(13, color: AppColors.fg3))),
                 ]),
               ],
             ),
           ),
           if (widget.onClose != null)
-            Material(
-              color: AppColors.surface2,
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: widget.onClose,
-                child: SizedBox.square(
-                  dimension: 32,
-                  child: Center(
-                      child: AppIcon('x', size: 14, color: AppColors.fg3)),
-                ),
-              ),
-            ),
+            IconBtn('x',
+                size: M.minTarget,
+                iconSize: 16,
+                tooltip: 'Close',
+                onTap: widget.onClose),
         ]),
       ),
       if (chips.isNotEmpty)

@@ -33,6 +33,28 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
         expect(find.byType(DraggableScrollableSheet), findsOneWidget);
+        if (!detail) {
+          final title = find.text('Activity');
+          expect(tester.widget<Text>(title).style!.fontSize, 20);
+          final sheetTop = tester.getRect(find.byType(ToolBatchView)).top;
+          final close = find.byWidgetPredicate((widget) =>
+              widget is IconBtn && widget.tooltip == 'Close');
+          final closeBounds = tester.getRect(close);
+          expect(closeBounds.width, greaterThanOrEqualTo(44));
+          expect(closeBounds.height, greaterThanOrEqualTo(44));
+          final handle = find.byWidgetPredicate((widget) =>
+              widget is Container &&
+              widget.constraints?.maxWidth == 36 &&
+              widget.constraints?.maxHeight == 4);
+          expect(handle, findsOneWidget);
+          expect(tester.getRect(handle).top - sheetTop, lessThanOrEqualTo(10));
+          expect(tester.takeException(), isNull);
+          await tester.tapAt(Offset(closeBounds.left + 2, closeBounds.center.dy));
+          await tester.pumpAndSettle();
+          expect(find.byType(ToolBatchView), findsNothing);
+          debugDefaultTargetPlatformOverride = null;
+          return;
+        }
         final title = find.text(detail ? 'Command' : 'Activity');
         final header = find.ancestor(of: title, matching: find.byWidgetPredicate(
           (widget) => widget.runtimeType.toString() == '_SheetHeader',
