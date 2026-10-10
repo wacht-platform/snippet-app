@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 
 import '../../../theme.dart';
 import '../../../widgets.dart';
+import '../../../panel.dart';
+import '../coordination_agent_directory.dart';
 import '../mission_control_screen.dart' show ChangeNotifierProvider;
 import '../mission_control_state.dart';
 import '../widgets/mission_control_header.dart';
@@ -133,6 +135,26 @@ class _LeftRail extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
         children: [
+          const SectionLabel('Browse'),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Btn('Agents',
+                    small: true,
+                    icon: 'agent',
+                    full: true,
+                    onTap: () => presentScreen(
+                          context,
+                          style: PanelStyle.drawer,
+                          purpose: ShellPanelPurpose.agents, originClient: state.client,
+                          builder: (_, close) =>
+                              CoordinationAgentDirectory(client: state.client),
+                        )),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
           const SectionLabel('Active tasks'),
           const SizedBox(height: 8),
           if (state.activeTasks.isEmpty)
@@ -155,7 +177,7 @@ class _LeftRail extends StatelessWidget {
 
   Widget _emptyHint(String text) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Text(text, style: sans(12, color: AppColors.fg4)),
+        child: Text(text, style: TS.meta()),
       );
 }
 
@@ -170,7 +192,7 @@ class _TaskRow extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(R.md),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -229,7 +251,7 @@ class _SessionRow extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(R.md),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -351,7 +373,7 @@ class _QuestionInspectorState extends State<_QuestionInspector> {
         children: [
           const SectionLabel('Agent is asking'),
           const SizedBox(height: 12),
-          Text(widget.question.question, style: sans(14, color: AppColors.fg1)),
+          Text(widget.question.question, style: TS.ui(AppColors.fg1)),
           const SizedBox(height: 16),
           TextField(
             controller: _controller,
@@ -394,7 +416,7 @@ class _SessionInspector extends StatelessWidget {
             (session.title as String).isEmpty
                 ? session.folder as String
                 : session.title as String,
-            style: sans(15, weight: FontWeight.w600, color: AppColors.fg1),
+            style: TS.sectionTitle(),
           ),
           const SizedBox(height: 4),
           Text(session.folder as String, style: mono(11, color: AppColors.fg3)),

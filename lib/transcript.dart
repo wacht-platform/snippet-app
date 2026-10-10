@@ -1,12 +1,15 @@
 // Transcript components: expandable mono tool rows (output inline, one tap — not
 // buried in sheets), first-class lane cards with ticking elapsed, and styled system
 // rows for watches, goals, and compaction.
-import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'platform.dart';
 import 'theme.dart';
+import 'tool_activity.dart';
+import 'tool_sheet.dart';
 import 'tool_views.dart';
 import 'widgets.dart';
 
@@ -19,7 +22,15 @@ class DenseToolRow extends StatefulWidget {
   final String tool;
   final dynamic args;
   final dynamic result; // null while running
-  const DenseToolRow({super.key, required this.tool, this.args, this.result});
+  final bool? open;
+  final ValueChanged<bool>? onOpenChanged;
+  const DenseToolRow(
+      {super.key,
+      required this.tool,
+      this.args,
+      this.result,
+      this.open,
+      this.onOpenChanged});
 
   bool get pending => result == null;
 
@@ -28,58 +39,83 @@ class DenseToolRow extends StatefulWidget {
 }
 
 class _DenseToolRowState extends State<DenseToolRow> {
-  bool _open = false;
+  bool _localOpen = false;
+
+  bool get _open => widget.open ?? _localOpen;
+
+  void _toggle() {
+    final next = !_open;
+    if (widget.onOpenChanged != null) {
+      widget.onOpenChanged!(next);
+    } else {
+      setState(() => _localOpen = next);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final canExpand = toolIsExpandable(widget.tool, widget.args, widget.result);
-    final summary = widget.tool == 'bash'
-        ? 'shell command'
-        : toolArgSummary(widget.tool, widget.args);
+    final step =
+        ToolStep(tool: widget.tool, args: widget.args, result: widget.result);
+    final canExpand = toolHasDetail(step);
+    final failed = step.failed;
+    final (verb, object) = toolSentenceParts(step);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: canExpand ? () => setState(() => _open = !_open) : null,
+          onTap: canExpand ? _toggle : null,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
+            padding: const EdgeInsets.symmetric(vertical: S.s4),
             child: Row(children: [
-              AppIcon(toolIcon(widget.tool), size: 15, color: AppColors.fg3),
-              const SizedBox(width: 8),
-              Text(toolTitle(widget.tool),
-                  style:
-                      sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
-              if (summary.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(R.sm),
-                    ),
-                    child: Text(summary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(12.5, color: AppColors.fg3)),
-                  ),
+              SizedBox(
+                width: 16,
+                child: Center(
+                  // Pending calls don't spin: the transcript has one live
+                  // indicator (the status line at the bottom).
+                  child:
+                      AppIcon(failed ? 'alert-triangle' : toolIcon(widget.tool),
+                          size: 14,
+                          color: widget.result == null
+                              ? AppColors.run
+                              : failed
+                                  ? AppColors.danger
+                                  : AppColors.fg4),
                 ),
-              ],
+              ),
+              const SizedBox(width: S.s8),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                        text: verb,
+                        style:
+                            TS.ui(failed ? AppColors.danger : AppColors.fg2)),
+                    if (object.isNotEmpty)
+                      TextSpan(text: ' $object', style: TS.ui(AppColors.fg3)),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               ..._metaWidgets(),
+              if (canExpand) ...[
+                const SizedBox(width: S.s6),
+                AppIcon(_open ? 'chevron-down' : 'chevron-right',
+                    size: 12, color: AppColors.fg4),
+              ],
             ]),
           ),
         ),
         if (_open && canExpand)
           Padding(
-            padding: const EdgeInsets.only(top: 2, bottom: 6),
+            padding: const EdgeInsets.fromLTRB(24, S.s2, 0, S.s8),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 220),
+              constraints: const BoxConstraints(maxHeight: 360),
               child: SingleChildScrollView(
                 child: DefaultTextStyle(
-                  style: mono(11.5, height: 1.4, color: AppColors.fg3),
+                  style: mono(11, height: 1.4, color: AppColors.fg3),
                   child: safeToolDetailView(context,
                       tool: widget.tool,
                       args: widget.args,
@@ -93,76 +129,28 @@ class _DenseToolRowState extends State<DenseToolRow> {
   }
 
   List<Widget> _metaWidgets() {
-    if (widget.tool == 'edit_file' ||
-        widget.tool == 'write_file' ||
-        widget.tool == 'replace_file_content') {
-      final a = widget.args;
-      if (a is Map) {
-        final add = (a['new_string'] ?? a['content'] ?? '')
-            .toString()
-            .split('\n')
-            .length;
-        final del = a['old_string'] == null
-            ? 0
-            : (a['old_string'] ?? '').toString().split('\n').length;
-        return [
-          const SizedBox(width: 10),
-          Text('+$add', style: sans(12, color: AppColors.ok)),
-          const SizedBox(width: 6),
-          Text('-$del', style: sans(12, color: AppColors.danger)),
-        ];
-      }
-    }
-    return const [];
+    if (widget.tool != 'change_files') return const [];
+    final step =
+        ToolStep(tool: widget.tool, args: widget.args, result: widget.result);
+    final changes = fileChanges([step]);
+    final added = changes.fold<int>(0, (sum, c) => sum + c.added);
+    final removed = changes.fold<int>(0, (sum, c) => sum + c.removed);
+    if (added == 0 && removed == 0) return const [];
+    return [
+      const SizedBox(width: S.s8),
+      Text('+$added', style: TS.meta(AppColors.ok)),
+      const SizedBox(width: S.s4),
+      Text('-$removed', style: TS.meta(AppColors.danger)),
+    ];
   }
 }
 
-/// Terminal-style running indicator: the classic braille spinner, mono + amber —
-/// on-theme for Terminal Ink where the Material ring felt foreign.
-class BrailleSpinner extends StatefulWidget {
+class BrailleSpinner extends StatelessWidget {
   final Color? color;
   const BrailleSpinner({super.key, this.color});
   @override
-  State<BrailleSpinner> createState() => _BrailleSpinnerState();
-}
-
-/// Shared braille animation timer: one Timer.periodic drives all visible
-/// spinners, avoiding N individual timers when many tool calls run at once.
-class _BrailleSpinnerState extends State<BrailleSpinner> {
-  static const _frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  static Timer? _sharedTimer;
-  static int _tick = 0;
-  static final Set<State<BrailleSpinner>> _listeners = {};
-
-  static void _onTick(_) {
-    _tick = (_tick + 1) % _frames.length;
-    for (final s in _listeners) {
-      if (s.mounted) s.setState(() {});
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _listeners.add(this);
-    if (_sharedTimer == null || !_sharedTimer!.isActive) {
-      _sharedTimer = Timer.periodic(const Duration(milliseconds: 150), _onTick);
-    }
-  }
-
-  @override
-  void dispose() {
-    _listeners.remove(this);
-    if (_listeners.isEmpty) {
-      _sharedTimer?.cancel();
-      _sharedTimer = null;
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Text(_frames[_tick],
-      style: mono(12, color: widget.color ?? AppColors.run));
+  Widget build(BuildContext context) =>
+      Spinner(size: 14, color: color ?? AppColors.run);
 }
 
 /// Consecutive tools as a BeUI group: one header row, details on expand.
@@ -171,50 +159,178 @@ class ToolRun extends StatefulWidget {
   final bool running;
   final bool open;
   final ValueChanged<bool>? onOpenChanged;
+
+  /// When given, tapping the run opens it as a sheet (bottom sheet on phones,
+  /// side panel on desktop) that follows this live batch, instead of expanding
+  /// inline.
+  final ValueListenable<ToolBatch>? batch;
   const ToolRun(this.rows,
-      {super.key, this.running = false, this.open = false, this.onOpenChanged});
+      {super.key,
+      this.running = false,
+      this.open = false,
+      this.onOpenChanged,
+      this.batch});
   @override
   State<ToolRun> createState() => _ToolRunState();
 }
 
 class _ToolRunState extends State<ToolRun> {
-  void _toggle() => widget.onOpenChanged?.call(!widget.open);
+  void _toggle() {
+    final batch = widget.batch;
+    if (batch != null) {
+      showToolBatchSheet(context, batch: batch);
+      return;
+    }
+    widget.onOpenChanged?.call(!widget.open);
+  }
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final n = widget.rows.length;
-    final label = widget.running
-        ? (n == 1 ? 'Running tool' : 'Running tools')
-        : (n == 1 ? 'Ran 1 tool' : 'Ran $n tools');
+    final steps = [
+      for (final r in widget.rows.whereType<DenseToolRow>())
+        ToolStep(tool: r.tool, args: r.args, result: r.result),
+    ];
+    final current = steps.lastWhere((s) => s.running,
+        orElse: () => steps.isEmpty ? const ToolStep(tool: '') : steps.last);
+    final running = widget.running && steps.any((s) => s.running);
+    final failures = steps.where((s) => s.failed).length;
+    final changes = fileChanges(steps);
+    // A run of acknowledgements only (assign, archive, …) has nothing to open.
+    final openable =
+        steps.isEmpty || widget.running || steps.any(toolHasDetail);
+    final headline =
+        running ? toolSentence(current, running: true) : activitySummary(steps);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: _toggle,
+          onTap: openable ? _toggle : null,
           child: Row(children: [
-            if (widget.running)
-              const SizedBox(width: 16, child: Center(child: BrailleSpinner()))
-            else
-              AppIcon('check', size: 13, color: AppColors.fg4),
-            const SizedBox(width: 8),
-            Text(label, style: sans(13, color: AppColors.fg3)),
-            const SizedBox(width: 4),
-            AppIcon(widget.open ? 'chevron-down' : 'chevron-right',
-                size: 13, color: AppColors.fg4),
+            SizedBox(
+              width: 16,
+              child: Center(
+                child: running
+                    ? AppIcon(toolIcon(current.tool),
+                        size: 14, color: AppColors.run)
+                    : AppIcon(failures > 0 ? 'alert-triangle' : 'check',
+                        size: 14,
+                        color: failures > 0 ? AppColors.danger : AppColors.fg4),
+              ),
+            ),
+            const SizedBox(width: S.s8),
+            Expanded(
+              child: Text(headline,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TS.ui(running ? AppColors.fg2 : AppColors.fg3)),
+            ),
+            if (!running && failures > 0) ...[
+              const SizedBox(width: S.s8),
+              Text('$failures failed', style: TS.meta(AppColors.danger)),
+            ],
+            if (openable) ...[
+              const SizedBox(width: S.s6),
+              AnimatedRotation(
+                turns: widget.open && widget.batch == null ? 0.25 : 0,
+                duration: Motion.fast,
+                curve: Motion.enter,
+                child: AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+              ),
+            ],
           ]),
         ),
-        if (widget.open) ...[
-          const SizedBox(height: 8),
-          for (var i = 0; i < widget.rows.length; i++) ...[
-            if (i > 0) const SizedBox(height: 2),
-            widget.rows[i],
-          ],
-        ],
+        AnimatedSize(
+          duration: Motion.open,
+          reverseDuration: Motion.close,
+          curve: Motion.enter,
+          alignment: Alignment.topCenter,
+          child: AnimatedSwitcher(
+            duration: Motion.fast,
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.topCenter,
+              children: [...previous, if (current != null) current],
+            ),
+            child: widget.open && widget.batch == null
+                ? Padding(
+                    key: const ValueKey('steps'),
+                    padding: const EdgeInsets.only(left: 24, top: S.s4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: widget.rows,
+                    ),
+                  )
+                : changes.isNotEmpty
+                    ? Padding(
+                        key: const ValueKey('changes'),
+                        padding: const EdgeInsets.only(left: 24, top: S.s6),
+                        child: _ChangedFiles(changes: changes, onTap: _toggle),
+                      )
+                    : const SizedBox(
+                        key: ValueKey('none'), width: double.infinity),
+          ),
+        ),
       ]),
     );
   }
+}
+
+class _ChangedFiles extends StatelessWidget {
+  const _ChangedFiles({required this.changes, required this.onTap});
+
+  final List<FileChange> changes;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(R.md),
+        clipBehavior: Clip.antiAlias,
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var i = 0; i < changes.length; i++) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, color: AppColors.line),
+            InkWell(
+              onTap: onTap,
+              child: SizedBox(
+                height: 34,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: S.s12),
+                  child: Row(children: [
+                    AppIcon(
+                        switch (changes[i].kind) {
+                          FileChangeKind.created => 'file-plus',
+                          FileChangeKind.deleted => 'trash',
+                          FileChangeKind.moved => 'arrow-right',
+                          FileChangeKind.edited => 'edit',
+                        },
+                        size: 13,
+                        color: AppColors.fg3),
+                    const SizedBox(width: S.s8),
+                    Expanded(
+                      child: Text(changes[i].name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TS.codeSmall(AppColors.fg1)),
+                    ),
+                    if (changes[i].added + changes[i].removed > 0) ...[
+                      const SizedBox(width: S.s8),
+                      Text('+${changes[i].added}',
+                          style: TS.meta(AppColors.ok)),
+                      const SizedBox(width: S.s4),
+                      Text('−${changes[i].removed}',
+                          style: TS.meta(AppColors.danger)),
+                    ],
+                  ]),
+                ),
+              ),
+            ),
+          ],
+        ]),
+      );
 }
 
 // ---------------------------------------------------------------------------
@@ -238,63 +354,182 @@ class LaneNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final lane = live();
     final failed = lane?.status == 'failed';
     final running = lane?.running ?? false;
-    final color = running
-        ? AppColors.accent
+    final done = lane != null && !running && !failed;
+    final activity = lane?.activity?.trim();
+    final displaySummary = summary?.trim().isNotEmpty == true
+        ? summary!.trim()
+        : lane?.summary?.trim();
+    final tone = running
+        ? Tone.accent
         : failed
-            ? AppColors.danger
-            : AppColors.fg4;
+            ? Tone.danger
+            : done
+                ? Tone.ok
+                : Tone.neutral;
     final status = running
-        ? 'running'
+        ? 'Running'
         : failed
-            ? 'failed'
-            : 'complete';
+            ? 'Failed'
+            : done
+                ? 'Completed'
+                : 'Queued';
+
+    if (kMobile) {
+      final agent = lane?.agent?.trim() ?? '';
+      final dot = running
+          ? AppColors.run
+          : failed
+              ? AppColors.danger
+              : done
+                  ? AppColors.ok
+                  : AppColors.fg4;
+      final started = DateTime.tryParse(lane?.startedAt ?? '');
+      String elapsed() {
+        if (started == null) return '';
+        final d = DateTime.now().toUtc().difference(started.toUtc());
+        if (d.inMinutes < 1) return '${d.inSeconds}s';
+        if (d.inHours < 1) return '${d.inMinutes}m ${d.inSeconds % 60}s';
+        return '${d.inHours}h ${d.inMinutes % 60}m';
+      }
+
+      final meta = sans(12, height: 16 / 12, color: AppColors.fg3);
+      return Semantics(
+        button: true,
+        label: '$title, ${status.toLowerCase()}. Open the lane.',
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: S.s6),
+          child: Material(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.lg),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onOpen,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 13, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration:
+                            BoxDecoration(color: dot, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(agent.isEmpty ? 'Lane' : 'Lane · as $agent',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: meta),
+                      ),
+                      Text(running ? elapsed() : status,
+                          style: meta.copyWith(fontFeatures: const [
+                            FontFeature.tabularFigures()
+                          ])),
+                    ]),
+                    const SizedBox(height: 6),
+                    Text(title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(15,
+                            weight: W.label,
+                            height: 20 / 15,
+                            color: AppColors.fg1)),
+                    if (running && activity != null && activity.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(activity,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              mono(12, height: 16 / 12, color: AppColors.fg4)),
+                    ],
+                    if (!running &&
+                        displaySummary != null &&
+                        displaySummary.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      MarkdownPreview(
+                          data: displaySummary,
+                          maxLines: 2,
+                          style:
+                              sans(13, height: 19 / 13, color: AppColors.fg3)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Semantics(
       button: true,
-      label: '$title, $status. Open delegated lanes.',
+      label: '$title, ${status.toLowerCase()}. Open delegated lanes.',
       onTap: onOpen,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: onOpen,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(children: [
-                  AppIcon('layers', size: 15, color: color),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(12.5,
-                          weight: FontWeight.w600, color: AppColors.fg2),
+        padding: const EdgeInsets.symmetric(vertical: S.s6),
+        child: Material(
+          color: AppColors.raised,
+          borderRadius: BorderRadius.circular(R.md),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onOpen,
+            child: Padding(
+              padding: const EdgeInsets.all(S.s12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    IconTile(
+                      running
+                          ? 'agent'
+                          : failed
+                              ? 'alert-triangle'
+                              : 'check',
+                      tone: tone,
+                      size: 28,
                     ),
-                  ),
-                  const SizedBox(width: 9),
-                  Text(status, style: mono(9.5, color: color)),
-                  const SizedBox(width: 5),
-                  SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Center(
-                      child: AppIcon('chevron-right',
-                          size: 11, color: AppColors.fg4),
+                    const SizedBox(width: S.s12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TS.rowTitle()),
+                          if (running &&
+                              activity != null &&
+                              activity.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: S.s2),
+                              child: Text(activity,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TS.codeSmall()),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                ]),
-                if (summary != null && summary!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  MarkdownPreview(data: summary!, maxLines: 2),
+                    const SizedBox(width: S.s8),
+                    Tag(status, tone: tone, live: running),
+                    const SizedBox(width: S.s4),
+                    AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+                  ]),
+                  if (displaySummary != null && displaySummary.isNotEmpty) ...[
+                    const SizedBox(height: S.s8),
+                    InsetPanel(
+                      padding: const EdgeInsets.all(S.s8),
+                      child: MarkdownPreview(data: displaySummary, maxLines: 2),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -359,38 +594,383 @@ class SystemRow extends StatelessWidget {
       }
       final detail = reasoning.trim();
       return Padding(
-        padding: const EdgeInsets.only(top: 4, bottom: 16),
+        padding: const EdgeInsets.only(top: S.s4, bottom: S.s16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _SystemDivider(label: label),
           if (detail.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: MarkdownPreview(data: detail, maxLines: 12),
+              padding: const EdgeInsets.only(top: S.s8),
+              child: MarkdownBody(
+                data: detail,
+                selectable: true,
+                styleSheet: markdownStyle(context),
+                builders: {'pre': PreBlockBuilder()},
+                onTapLink: (txt, href, title) => openMarkdownLink(href),
+              ),
             ),
         ]),
       );
     }
 
-    final (glyph, color) = switch (step) {
-      'watch_added' || 'watch_removed' => ('◉', AppColors.run),
-      'file_watch' => ('◉', AppColors.accent),
-      'interrupted' => ('■', AppColors.danger),
-      _ => ('·', AppColors.fg4),
-    };
+    switch (step) {
+      case 'watch_added':
+        final m = RegExp(r'^watching "(.*)" \((.*)\)$', dotAll: true)
+            .firstMatch(reasoning.trim());
+        return _WatchLine(
+          icon: 'eye',
+          verb: 'Watching',
+          subject: m?.group(1) ?? reasoning,
+          path: m?.group(2),
+        );
+      case 'watch_removed':
+        final m =
+            RegExp(r'^stopped watching "(.*)"$').firstMatch(reasoning.trim());
+        return _WatchLine(
+          icon: 'eye-off',
+          verb: 'Stopped watching',
+          subject: m?.group(1) ?? reasoning,
+          muted: true,
+        );
+      case 'file_watch':
+        final m = RegExp(r'^"(.*?)" — (.*?) grew: ?(.*)$', dotAll: true)
+            .firstMatch(reasoning);
+        return _WatchFired(
+          subject: m?.group(1) ?? 'Watched file',
+          path: m?.group(2) ?? '',
+          preview: (m?.group(3) ?? reasoning).trim(),
+        );
+      case 'interrupted':
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: S.s6),
+          child: Row(children: [
+            SizedBox(
+                width: 16,
+                child: Center(
+                    child: AppIcon('stop', size: 14, color: AppColors.danger))),
+            const SizedBox(width: S.s8),
+            Text('You stopped the run', style: TS.label(AppColors.danger)),
+          ]),
+        );
+    }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: S.s4),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(
             width: 16,
-            child: Center(child: Text(glyph, style: mono(11, color: color)))),
-        const SizedBox(width: 6),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Center(
+                  child: AppIcon('activity', size: 14, color: AppColors.fg4)),
+            )),
+        const SizedBox(width: S.s8),
         Expanded(
           child: Text(reasoning,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: sans(11.5, height: 1.4, color: AppColors.fg4)),
+              maxLines: 3, overflow: TextOverflow.ellipsis, style: TS.meta()),
         ),
       ]),
+    );
+  }
+}
+
+class _WatchLine extends StatelessWidget {
+  const _WatchLine({
+    required this.icon,
+    required this.verb,
+    required this.subject,
+    this.path,
+    this.muted = false,
+  });
+
+  final String icon;
+  final String verb;
+  final String subject;
+  final String? path;
+  final bool muted;
+
+  Widget _mobile() {
+    if (muted) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(children: [
+          AppIcon(icon, size: 14, color: AppColors.fg4),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('$verb $subject',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(13, color: AppColors.fg4)),
+          ),
+        ]),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(17),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(icon, size: 14, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text('$verb $subject',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, color: AppColors.fg2)),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (kMobile) return _mobile();
+    final strong = muted ? AppColors.fg3 : AppColors.fg2;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      child: Row(children: [
+        SizedBox(
+            width: 16,
+            child: Center(
+                child: AppIcon(icon,
+                    size: 16,
+                    color: muted ? AppColors.fg4 : AppColors.accent))),
+        const SizedBox(width: S.s8),
+        Text(verb,
+            style: TS.label(strong).copyWith(fontWeight: weightFor(W.body))),
+        const SizedBox(width: S.s6),
+        Flexible(
+          flex: 0,
+          child: Text(subject,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TS.label(muted ? AppColors.fg3 : AppColors.fg1)),
+        ),
+        if (path != null && path!.isNotEmpty) ...[
+          const SizedBox(width: S.s8),
+          Expanded(
+            child: Text(path!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TS.codeSmall(AppColors.fg4)),
+          ),
+        ] else
+          const Spacer(),
+      ]),
+    );
+  }
+}
+
+class _WatchFired extends StatefulWidget {
+  const _WatchFired(
+      {required this.subject, required this.path, required this.preview});
+
+  final String subject;
+  final String path;
+  final String preview;
+
+  @override
+  State<_WatchFired> createState() => _WatchFiredState();
+}
+
+class _WatchFiredState extends State<_WatchFired> {
+  String get subject => widget.subject;
+  String get path => widget.path;
+  String get preview => widget.preview;
+
+  void _openTail() {
+    showAppSheet(context,
+        title: '$subject changed',
+        maxHeight: 640,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (path.isNotEmpty) ...[
+              Text(path, style: mono(12, color: AppColors.fg4)),
+              const SizedBox(height: 12),
+            ],
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: BoxDecoration(
+                  color: AppColors.bg,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: SingleChildScrollView(
+                  reverse: true,
+                  child: SelectableText(preview,
+                      style: mono(12, height: 1.55, color: AppColors.fg2)),
+                ),
+              ),
+            ),
+          ],
+        ));
+  }
+
+  Widget _mobile() {
+    final last = preview
+        .split('\n')
+        .map((l) => l.trim())
+        .lastWhere((l) => l.isNotEmpty, orElse: () => '');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Material(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: preview.isEmpty ? null : _openTail,
+          child: SizedBox(
+            height: 44,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 12, 0),
+              child: Row(children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                      color: AppColors.accent, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 10),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(14, color: AppColors.fg1)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(last,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(12, color: AppColors.fg3)),
+                ),
+                if (preview.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+                ],
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (kMobile) return _mobile();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          SizedBox(
+              width: 16,
+              child: Center(
+                  child:
+                      AppIcon('activity', size: 16, color: AppColors.accent))),
+          const SizedBox(width: S.s8),
+          Flexible(
+            flex: 0,
+            child: Text('$subject changed',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TS.label(AppColors.fg1)),
+          ),
+          if (path.isNotEmpty) ...[
+            const SizedBox(width: S.s8),
+            Expanded(
+              child: Text(path,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TS.codeSmall(AppColors.fg4)),
+            ),
+          ] else
+            const Spacer(),
+        ]),
+        if (preview.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, S.s4, 0, 0),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s6),
+              decoration: BoxDecoration(
+                color: AppColors.raised,
+                borderRadius: BorderRadius.circular(R.sm + 2),
+              ),
+              child: Text(preview,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(12, height: 1.4, color: AppColors.fg2)),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+/// A coordination event in the chat canvas: this agent was messaged, or this
+/// agent dispatched work into a session.
+///
+/// Rendered in the CONVERSATION because the event concerns THIS session's agent
+/// — a message arriving for it, or work it handed out. It is deliberately a
+/// quiet one-line notice, not a chat bubble: the message itself lives in the
+/// agent's direct thread, and pretending otherwise here would suggest you are
+/// talking in this chat when you are not.
+class AgentEventRow extends StatelessWidget {
+  const AgentEventRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.detail,
+    this.accent = false,
+  });
+
+  final String icon;
+  final String label;
+  final String detail;
+  final bool accent;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final color = accent ? AppColors.accent : AppColors.fg3;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: AppIcon(icon, size: 13, color: color),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: sans(12, weight: W.label, color: color)),
+                if (detail.trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(detail,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12, height: 1.35, color: AppColors.fg3)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -404,18 +984,16 @@ class _SystemDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    final style = mono(10.5, color: AppColors.fg4);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: S.s12),
       child: Row(children: [
-        const Expanded(child: Divider(height: 1, thickness: 0.6)),
+        Expanded(child: Container(height: 1, color: AppColors.line)),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(label,
-              style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+          padding: const EdgeInsets.symmetric(horizontal: S.s12),
+          child: Text(label[0].toUpperCase() + label.substring(1),
+              style: TS.meta(), maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
-        const Expanded(child: Divider(height: 1, thickness: 0.6)),
+        Expanded(child: Container(height: 1, color: AppColors.line)),
       ]),
     );
   }

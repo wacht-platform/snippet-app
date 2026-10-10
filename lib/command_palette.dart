@@ -31,8 +31,8 @@ Future<void> showCommandPalette(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'palette',
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      transitionDuration: const Duration(milliseconds: 140),
+      barrierColor: AppColors.scrim,
+      transitionDuration: Motion.quick,
       pageBuilder: (ctx, _, __) => Align(
         alignment: const Alignment(0, -0.5),
         child: Padding(
@@ -44,7 +44,7 @@ Future<void> showCommandPalette(
         ),
       ),
       transitionBuilder: (ctx, anim, _, child) {
-        final c = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        final c = CurvedAnimation(parent: anim, curve: Motion.enter);
         return FadeTransition(
             opacity: c,
             child: ScaleTransition(
@@ -53,6 +53,7 @@ Future<void> showCommandPalette(
     );
   }
   return showModalBottomSheet(
+    sheetAnimationStyle: sheetMotion,
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
@@ -70,15 +71,16 @@ Future<void> showCommandPalette(
   );
 }
 
-Widget _frame(Widget child) => Material(
-      color: AppColors.surface1,
+Widget _frame(Widget child) => ClipRRect(
       borderRadius: BorderRadius.circular(R.card),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
+      child: Material(
+        color: AppColors.glassSurface,
+        child: Container(
+          decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: AppColors.border2)),
-        child: child,
+          ),
+          child: child,
+        ),
       ),
     );
 
@@ -120,7 +122,8 @@ class _PaletteState extends State<_Palette> {
         .where((s) =>
             _q.isEmpty ||
             s.title.toLowerCase().contains(_q) ||
-            s.folder.toLowerCase().contains(_q))
+            s.projectFolder.toLowerCase().contains(_q) ||
+            (s.branch?.toLowerCase().contains(_q) ?? false))
         .take(12)
         .toList();
     final cmds = widget.commands
@@ -137,12 +140,12 @@ class _PaletteState extends State<_Palette> {
               controller: _ctrl,
               autofocus: true,
               cursorColor: AppColors.accent,
-              style: sans(14, color: AppColors.fg1),
+              style: TS.ui(AppColors.fg1),
               decoration: InputDecoration(
                 isCollapsed: true,
                 border: InputBorder.none,
                 hintText: 'Search chats or run a command',
-                hintStyle: sans(14, color: AppColors.fg4),
+                hintStyle: sans(kMobile ? 14 : 13, color: AppColors.fg4),
               ),
             ),
           ),
@@ -158,7 +161,9 @@ class _PaletteState extends State<_Palette> {
               _label('Chats'),
               ...chats.map((s) => _row(
                     title: s.title.isEmpty ? '(untitled)' : s.title,
-                    hint: _proj(s.folder),
+                    hint: s.inWorktree
+                        ? '${_proj(s.projectFolder)} · ${s.branch ?? 'worktree'}'
+                        : _proj(s.projectFolder),
                     onTap: () {
                       Navigator.pop(context);
                       widget.onOpenChat(s);
@@ -182,7 +187,7 @@ class _PaletteState extends State<_Palette> {
                   padding: EdgeInsets.all(20),
                   child: Center(
                       child: Text('No matches',
-                          style: sans(12.5, color: AppColors.fg4)))),
+                          style: TS.meta()))),
           ],
         ),
       ),
@@ -213,7 +218,7 @@ class _PaletteState extends State<_Palette> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(13, color: AppColors.fg1))),
-            if (hint != null) Text(hint, style: mono(11, color: AppColors.fg4)),
+            if (hint != null) Text(hint, style: mono(11, color: AppColors.fg3)),
           ]),
         ),
       ),

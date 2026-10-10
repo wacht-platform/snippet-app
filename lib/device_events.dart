@@ -8,6 +8,7 @@ class DeviceEvent {
   final String session;
   final String status;
   final String queueId;
+  final Map<String, dynamic>? notification;
 
   const DeviceEvent({
     required this.kind,
@@ -15,6 +16,7 @@ class DeviceEvent {
     this.session = '',
     this.status = '',
     this.queueId = '',
+    this.notification,
   });
 
   factory DeviceEvent.fromJson(Object? raw) {
@@ -25,6 +27,9 @@ class DeviceEvent {
       session: raw['session']?.toString() ?? '',
       status: raw['status']?.toString() ?? '',
       queueId: raw['queue_id']?.toString() ?? '',
+      notification: raw['notification'] is Map<String, dynamic>
+          ? raw['notification'] as Map<String, dynamic>
+          : null,
     );
   }
 

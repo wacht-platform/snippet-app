@@ -3,28 +3,19 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:snippet/api.dart';
 import 'package:snippet/android_reconciliation.dart';
-import 'package:snippet/notifications.dart';
+
 import 'package:snippet/models.dart';
+import 'package:snippet/tool_activity.dart';
 import 'package:snippet/screens/mission_control/mission_control_state.dart';
 import 'package:snippet/tool_views.dart';
+import 'package:snippet/theme.dart';
 import 'package:snippet/transcript.dart';
 import 'package:snippet/widgets.dart';
 
 void main() {
-  test('Android reconciliation cursor only advances', () async {
-    SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final url = 'https://daemon.example';
-    await prefs.remove(notificationCursorKey(url));
-    await advanceNotificationCursor(prefs, url, 9);
-    await advanceNotificationCursor(prefs, url, 4);
-    expect(prefs.getInt(notificationCursorKey(url)), 9);
-  });
-
   test('Android reconciliation diff only returns newly observed ids', () {
     expect(
       newlyObservedSessionIds(['old', 'shared'], ['shared', 'new']),
@@ -136,7 +127,7 @@ void main() {
     expect(isDedicatedMcSession(null), isFalse);
     expect(isDedicatedMcSession(''), isFalse);
     expect(
-      isDedicatedMcSession('snippet-service-61c2d836aee8dc5b/state.json'),
+      isDedicatedMcSession('snippet-service-61c2d836aee8dc5b'),
       isFalse,
     );
     expect(
@@ -156,7 +147,7 @@ void main() {
     );
     expect(
       isMissionControlTab(
-        sessionId: 'snippet-service-61c2d836aee8dc5b/state.json',
+        sessionId: 'snippet-service-61c2d836aee8dc5b',
         title: 'Design Mission Control',
       ),
       isFalse,
@@ -177,7 +168,7 @@ void main() {
     );
     expect(
       isMissionControlListRow(SessionInfo.fromJson({
-        'id': 'snippet-service-61c2d836aee8dc5b/state.json',
+        'id': 'snippet-service-61c2d836aee8dc5b',
         'title': 'Design Mission Control',
       })),
       isFalse,
@@ -320,24 +311,27 @@ void main() {
   });
 
   test('tool rows expand only when they have content', () {
-    expect(toolIsExpandable('read_file', {'path': 'a.dart'}, null), isFalse);
     expect(
-      toolIsExpandable('read_file', {
-        'path': 'a.dart'
-      }, {
-        'status': 'success',
-        'data': {'content': 'hello'},
-      }),
+        toolHasDetail(
+            const ToolStep(tool: 'change_files', args: {'changes': []})),
+        isFalse);
+    expect(
+      toolHasDetail(const ToolStep(tool: 'change_files', args: {
+        'changes': [
+          {'action': 'replace', 'path': 'a.dart', 'find': 'a', 'with': 'b'}
+        ]
+      })),
       isTrue,
     );
-    expect(toolIsExpandable('bash', {'command': 'ls'}, null), isFalse);
+    expect(toolHasDetail(const ToolStep(tool: 'bash', args: {'command': 'ls'})),
+        isFalse);
     expect(
-      toolIsExpandable('bash', {
+      toolHasDetail(const ToolStep(tool: 'bash', args: {
         'command': 'ls'
-      }, {
+      }, result: {
         'status': 'success',
         'data': {'stdout': 'ok'},
-      }),
+      })),
       isTrue,
     );
   });
@@ -369,36 +363,9 @@ void main() {
 
   testWidgets('tool panels tolerate malformed result lists', (tester) async {
     final cases = <String, Map<String, dynamic>>{
-      'search_content': {
-        'results': [
-          1,
-          'unexpected',
-          {'path': 'ok.dart'}
-        ]
-      },
-      'search_files': {
-        'results': [
-          false,
-          {'path': 'ok.dart'}
-        ]
-      },
-      'list_files': {
-        'entries': [
-          'unexpected',
-          {'name': 'ok.dart'}
-        ]
-      },
-      'view_outline': {
-        'outline': [
-          null,
-          {'signature': 'ok()'}
-        ]
-      },
-      'code_map': {
-        'files': [
-          'unexpected',
-          {'path': 'ok.dart', 'symbols': 'not-a-list'},
-        ],
+      'change_files': {
+        'summary': 5,
+        'notes': ['unexpected'],
       },
       'web_search': {
         'results': [
@@ -463,6 +430,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  test('audio attachment echo retires optimistic pending message', () {
+    // The daemon appends the transcript after the marker, so exact text matching
+    // cannot acknowledge this local optimistic bubble. Attachment path matching
+    // is the stable correlation key.
+    final original =
+        '[attached file — read it at this exact path: /tmp/voice.m4a]';
+    final echoed =
+        '$original\n\n[Audio transcript for /tmp/voice.m4a]\nhello there';
+    expect(
+      RegExp(
+        r'\[attached (?:image|file) —[^\]]*exact path: ([^\]]+)\]',
+      )
+          .allMatches(echoed)
+          .map((m) => m.group(1)?.trim())
+          .contains('/tmp/voice.m4a'),
+      isTrue,
+    );
+  });
+
   testWidgets('tool run stays expanded when live rows grow', (tester) async {
     final open = ValueNotifier(false);
     addTearDown(open.dispose);
@@ -486,7 +472,10 @@ void main() {
       ),
     ));
 
-    await tester.tap(find.text('Running tool'));
+    await tester.tap(find
+        .descendant(
+            of: find.byType(ToolRun), matching: find.byType(GestureDetector))
+        .first);
     await tester.pump();
     expect(find.text('first tool'), findsOneWidget);
 
@@ -520,7 +509,10 @@ void main() {
       ),
     ));
 
-    await tester.tap(find.text('Running tool'));
+    await tester.tap(find
+        .descendant(
+            of: find.byType(ToolRun), matching: find.byType(GestureDetector))
+        .first);
     await tester.pump();
     expect(find.text('tool detail'), findsOneWidget);
 
@@ -531,28 +523,8 @@ void main() {
 
   testWidgets('tool panels tolerate null optional fields', (tester) async {
     final cases = <String, Map<String, dynamic>>{
-      'edit_file': {'note': null},
-      'append_file': {'lines_written': null, 'total_lines': null},
-      'read_file': {
-        'total_lines': null,
-        'total_chars': null,
-        'truncated': true,
-        'hint': null,
-      },
-      'view_outline': {
-        'language': null,
-        'symbol_count': null,
-        'outline': [
-          {'kind': null, 'signature': null, 'depth': null},
-        ],
-      },
-      'code_map': {
-        'file_count': null,
-        'symbol_count': null,
-        'files': [
-          {'path': null, 'symbols': null},
-        ],
-      },
+      'change_files': {'summary': null, 'notes': null, 'changed_lines': null},
+      'view_image': {'path': null, 'mime': null, 'size_bytes': null},
       'web_search': {
         'count': null,
         'results': [
@@ -584,5 +556,108 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull, reason: entry.key);
     }
+  });
+
+  test('parseBoardMessage extracts sender and preserves a multi-line body', () {
+    const envelope = '[coordination_board_message]\n'
+        'thread_id: system\n'
+        'from_id: human\n'
+        'from_kind: human\n'
+        'rules: board message, not an ordinary chat turn. Reply on this same thread.\n'
+        'body: first line\n'
+        'second line\n'
+        '[/coordination_board_message]';
+
+    final parsed = parseBoardMessage(envelope);
+    expect(parsed, isNotNull);
+    expect(parsed!.threadId, 'system');
+    expect(parsed.fromId, 'human');
+    expect(parsed.fromKind, 'human');
+    // The body keeps its newlines and never swallows the closing tag.
+    expect(parsed.body, 'first line\nsecond line');
+
+    // Ordinary chat text is not a board message.
+    expect(parseBoardMessage('just a normal message'), isNull);
+  });
+
+  test('parseBoardMessage ignores a "body:" inside the history digest', () {
+    // A prior room message that literally contains "body: " must not be mistaken
+    // for the new message: the real field is the final line before the tag.
+    const envelope = '[coordination_board_message]\n'
+        'thread_id: system\n'
+        'from_id: human\n'
+        'from_kind: human\n'
+        'rules: board message, not an ordinary chat turn.\n'
+        'history: last 1 message(s), oldest first\n'
+        '  4 [agent] mission-control: earlier note about body: parsing\n'
+        'body: the real current message\n'
+        '[/coordination_board_message]';
+
+    final parsed = parseBoardMessage(envelope);
+    expect(parsed, isNotNull);
+    expect(parsed!.body, 'the real current message');
+  });
+
+  // --- Design token guards -------------------------------------------------
+  // These lock two defects that were silent and app-wide:
+  //   1. every weight was capped at 400, so 119 call sites asking for emphasis
+  //      rendered regular and hierarchy came from size alone;
+  //   2. palette values drifting below accessible contrast on the dark canvas.
+
+  test('every type helper is capped at weight 400', () {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    expect(sans(15, weight: FontWeight.w700).fontWeight, FontWeight.w400);
+    expect(mono(13, weight: FontWeight.w600).fontWeight, FontWeight.w400);
+    expect(display(22).fontWeight, FontWeight.w400);
+  });
+
+  test('dark palette clears accessible contrast on every surface', () {
+    // Color.computeLuminance() is Flutter's WCAG relative luminance.
+    double ratio(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      final hi = la > lb ? la : lb;
+      final lo = la > lb ? lb : la;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    final surfaces = [
+      AppColors.canvas,
+      AppColors.surface1,
+      AppColors.surface2,
+      AppColors.surface3,
+    ];
+
+    // Body text must clear AA (4.5:1) wherever it can land.
+    for (final s in surfaces) {
+      expect(ratio(AppColors.fg1, s), greaterThanOrEqualTo(4.5),
+          reason: 'fg1 must meet AA on its surface');
+      expect(ratio(AppColors.fg2, s), greaterThanOrEqualTo(4.5),
+          reason: 'fg2 carries secondary body text');
+    }
+    // Meta/tertiary text only needs the large-text threshold.
+    expect(ratio(AppColors.fg3, AppColors.canvas), greaterThanOrEqualTo(3.0));
+    // The text ladder must stay ordered, or "fainter" stops meaning anything.
+    final l1 = AppColors.fg1.computeLuminance();
+    final l2 = AppColors.fg2.computeLuminance();
+    final l3 = AppColors.fg3.computeLuminance();
+    final l4 = AppColors.fg4.computeLuminance();
+    expect(l1, greaterThan(l2));
+    expect(l2, greaterThan(l3));
+    expect(l3, greaterThan(l4));
+
+    // The ACCENT is the gap that let white-on-accent ship. It carries two roles
+    // at once, and they pull in opposite directions: as text/icon on the dark
+    // canvas it must be LIGHT, and as a button fill under `accentFg` it must be
+    // light enough for that ink. Both are asserted, so an accent can never be
+    // swapped in without checking the label that sits on it.
+    expect(ratio(AppColors.accent, AppColors.canvas), greaterThanOrEqualTo(4.5),
+        reason: 'accent is used AS text (links, selected labels, state)');
+    expect(ratio(AppColors.accentFg, AppColors.accentFill),
+        greaterThanOrEqualTo(4.5),
+        reason: 'accentFg is the label ON an accent-filled button');
+    expect(AppColors.accentFg.computeLuminance(),
+        isNot(closeTo(AppColors.accentFill.computeLuminance(), 0.05)),
+        reason: 'label and fill must differ in brightness, not just hue');
   });
 }

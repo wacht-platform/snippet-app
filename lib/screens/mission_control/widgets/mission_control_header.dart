@@ -7,8 +7,11 @@ import 'package:flutter/material.dart';
 
 import '../../../theme.dart';
 import '../../../widgets.dart';
+import '../../mission_control/coordination_agent_directory.dart';
 import '../mission_control_state.dart';
-import '../mobile/mobile_mc.dart' show showNotificationInbox;
+import '../mobile/mobile_mc.dart'
+    show showMissionControlPanel, showNotificationInbox;
+import 'autonomy_panel.dart';
 
 class MissionControlHeader extends StatelessWidget {
   const MissionControlHeader.compact({
@@ -54,33 +57,41 @@ class MissionControlHeader extends StatelessWidget {
                 Text('Mission Control',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(_compact ? 17 : 16.5,
-                        weight: FontWeight.w600, color: AppColors.fg1)),
+                    style: sans(_compact ? 18 : 16,
+                        weight: W.label, color: AppColors.fg1)),
                 const SizedBox(height: 3),
                 Row(children: [
                   if (state.loading)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: SizedBox(
-                        width: 10,
-                        height: 10,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.4,
-                          color: AppColors.fg3,
-                        ),
-                      ),
+                      child: Spinner(size: 10, color: AppColors.fg3),
                     ),
                   Expanded(
                     child: Text(
                       state.loading ? 'Connecting…' : facts.join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(12, color: AppColors.fg3),
+                      style: TS.meta(),
                     ),
                   ),
                 ]),
               ],
             ),
+          ),
+        ),
+        AutonomyChip(
+          client: state.client,
+          open: (panel) => showMissionControlPanel(context, panel),
+        ),
+        const SizedBox(width: 4),
+        IconBtn(
+          'agent',
+          size: 40,
+          iconSize: 18,
+          tooltip: 'Agents',
+          onTap: () => showMissionControlPanel(
+            context,
+            CoordinationAgentDirectory(client: state.client),
           ),
         ),
         Stack(clipBehavior: Clip.none, children: [

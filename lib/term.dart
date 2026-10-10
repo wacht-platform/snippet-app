@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
+import 'platform.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -57,7 +58,35 @@ class _SessionTermViewState extends State<SessionTermView> {
     ('F10', TerminalKey.f10),
   ];
 
-  static final _theme = TerminalTheme(
+  static final _emberTheme = TerminalTheme(
+    cursor: const Color(0xff9DB0FF),
+    selection: const Color(0x559DB0FF),
+    foreground: const Color(0xffEDE7DD),
+    background: const Color(0xff121110),
+    black: const Color(0xff1B1917),
+    red: const Color(0xffE5745F),
+    green: const Color(0xff7FB88F),
+    yellow: const Color(0xffD4923C),
+    blue: const Color(0xff9DB0FF),
+    magenta: const Color(0xffC79BD8),
+    cyan: const Color(0xff7FC4C0),
+    white: const Color(0xffCFC8BC),
+    brightBlack: const Color(0xff7A7368),
+    brightRed: const Color(0xffEE9583),
+    brightGreen: const Color(0xff9DCCA9),
+    brightYellow: const Color(0xffE3A85A),
+    brightBlue: const Color(0xffB4C3FF),
+    brightMagenta: const Color(0xffD8B4E6),
+    brightCyan: const Color(0xff9FD6D2),
+    brightWhite: const Color(0xffEDE7DD),
+    searchHitBackground: const Color(0xffD4923C),
+    searchHitBackgroundCurrent: const Color(0xffE3A85A),
+    searchHitForeground: const Color(0xff121110),
+  );
+
+  static TerminalTheme get _theme => kMobile ? _emberTheme : _graphiteTheme;
+
+  static final _graphiteTheme = TerminalTheme(
     cursor: const Color(0xffffffff),
     selection: const Color(0x66ffffff),
     foreground: const Color(0xffe5e5e5),
@@ -168,6 +197,7 @@ class _SessionTermViewState extends State<SessionTermView> {
   }
 
   Widget _modChip(String label, bool on, VoidCallback tap) {
+    if (kMobile) return _mobileKey(label, tap, on: on);
     return InkWell(
       onTap: tap,
       borderRadius: BorderRadius.circular(R.sm),
@@ -184,7 +214,28 @@ class _SessionTermViewState extends State<SessionTermView> {
     );
   }
 
+  Widget _mobileKey(String label, VoidCallback tap,
+      {bool on = false, double minWidth = 0}) {
+    return Material(
+      color: on ? AppColors.accentFill : AppColors.surface2,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: tap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          constraints: BoxConstraints(
+              minWidth: minWidth > 0 ? minWidth : 44, minHeight: 38),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(label,
+              style: sans(13, color: on ? AppColors.accentFg : AppColors.fg1)),
+        ),
+      ),
+    );
+  }
+
   Widget _keyChip(String label, VoidCallback tap, {double minWidth = 0}) {
+    if (kMobile) return _mobileKey(label, tap, minWidth: minWidth);
     return InkWell(
       onTap: tap,
       borderRadius: BorderRadius.circular(R.sm),
@@ -211,7 +262,7 @@ class _SessionTermViewState extends State<SessionTermView> {
             ],
           ],
         );
-    const w = 36.0;
+    final w = kMobile ? 40.0 : 36.0;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -236,7 +287,7 @@ class _SessionTermViewState extends State<SessionTermView> {
           padding: const EdgeInsets.fromLTRB(12, 8, 8, 6),
           child: Row(children: [
             Text(widget.alive ? 'Shell' : 'Shell · starting',
-                style: sans(13, weight: FontWeight.w600, color: AppColors.fg1)),
+                style: TS.label(AppColors.fg1)),
             const Spacer(),
             if (widget.onNew != null)
               IconBtn('plus',
@@ -263,17 +314,25 @@ class _SessionTermViewState extends State<SessionTermView> {
           hardwareKeyboardOnly: false,
           deleteDetection: widget.mobileKeys,
           keyboardType: TextInputType.visiblePassword,
-          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          textStyle: const TerminalStyle(
-            fontSize: 13,
-            fontFamily: 'monospace',
-          ),
+          padding: kMobile
+              ? const EdgeInsets.fromLTRB(14, 8, 12, 8)
+              : const EdgeInsets.fromLTRB(8, 6, 8, 6),
+          textStyle: kMobile
+              ? TerminalStyle(fontSize: 13, fontFamily: kMonoFamily)
+              : const TerminalStyle(
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                ),
         ),
       ),
       if (widget.mobileKeys)
-        Padding(
+        Container(
+          color: kMobile ? AppColors.surface1 : null,
           padding: EdgeInsets.fromLTRB(
-              8, 4, 8, 8 + MediaQuery.viewInsetsOf(context).bottom),
+              kMobile ? 12 : 8,
+              kMobile ? 10 : 4,
+              kMobile ? 12 : 8,
+              (kMobile ? 12 : 8) + MediaQuery.viewInsetsOf(context).bottom),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -315,5 +374,28 @@ class _SessionTermViewState extends State<SessionTermView> {
           ),
         ),
     ]);
+  }
+}
+
+/// A `Terminal` that fixes `clear`.
+///
+/// CSI 2J only blanks the viewport, so fish's `clear` (CUP 1;1 then reprint)
+/// leaves the last history line glued to the new prompt. Pushing the screen into
+/// scrollback first matches gnome-terminal / iTerm. Lives here rather than in
+/// session.dart so the global-shell controller can share it without importing
+/// the session screen.
+class ClearScrollTerminal extends Terminal {
+  ClearScrollTerminal() : super(maxLines: 5000);
+
+  @override
+  void eraseDisplay() {
+    if (!buffer.isAltBuffer) {
+      final n = viewHeight;
+      for (var i = 0; i < n; i++) {
+        buffer.index();
+      }
+    }
+    buffer.eraseDisplay();
+    buffer.setCursor(0, 0);
   }
 }

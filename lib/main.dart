@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
+import 'drafts.dart';
 import 'notifications.dart';
+import 'notification_popovers.dart';
 import 'android_reconciliation.dart';
 import 'platform.dart';
 import 'screens/adaptive_home.dart';
 import 'theme.dart';
+import 'widgets.dart';
+import 'response_cache.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -18,16 +21,13 @@ Widget _buildErrorWidget(FlutterErrorDetails details) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.warning_amber_rounded,
-                size: 28, color: AppColors.danger),
+            AppIcon('alert-triangle', size: 28, color: AppColors.danger),
             const SizedBox(height: 12),
             Text('This panel could not be displayed',
-                textAlign: TextAlign.center,
-                style: sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
+                textAlign: TextAlign.center, style: TS.sectionTitle()),
             const SizedBox(height: 6),
             Text('Close it and try again.',
-                textAlign: TextAlign.center,
-                style: sans(12, color: AppColors.fg3)),
+                textAlign: TextAlign.center, style: TS.meta()),
           ],
         ),
       ),
@@ -46,6 +46,8 @@ void main() async {
   try {
     await ThemeManager.instance.init();
   } catch (_) {}
+  await Drafts.instance.init();
+  await ResponseCache.instance.init();
   if (kCanNotify) {
     try {
       await initNotifications();
@@ -72,7 +74,7 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ThemeManager.instance.addListener(_onThemeChange);
-    if (kCanNotify) reportForeground(true);
+    reportForeground(true);
   }
 
   @override
@@ -86,10 +88,8 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!kCanNotify) return;
     final fg = state == AppLifecycleState.resumed;
     reportForeground(fg);
-    if (!fg) reportOpenSession('');
   }
 
   @override
@@ -99,9 +99,16 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: kMobile
-          ? const WithForegroundTask(child: AdaptiveHome())
-          : const AdaptiveHome(),
+      // Deliberately NOT wrapped in WithForegroundTask. That widget is a
+      // `WillPopScope`, and `Navigator.maybePop` consults WillPopScope callbacks
+      // BEFORE a route's `PopScope` popDisposition. While the watcher service was
+      // running it returned false and called minimizeApp(), which swallowed the
+      // back event entirely — so back from a session backgrounded the app
+      // instead of returning to the chat list. The shell now owns back
+      // explicitly and reproduces the minimize-at-root behaviour itself.
+      builder: (context, child) =>
+          NotificationPopovers(child: child ?? const SizedBox.shrink()),
+      home: const AdaptiveHome(),
     );
   }
 }

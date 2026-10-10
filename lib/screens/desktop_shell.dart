@@ -1,92 +1,97 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math' as math;
-import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
+import '../swr.dart';
+import '../session_status_updates.dart';
 import '../command_palette.dart';
 import '../device_events.dart';
 import '../models.dart';
 import '../notifications.dart';
+import '../notification_sync.dart';
+import '../notification_inbox.dart';
+import '../notification_conversation.dart';
+import 'tasks/task_common.dart';
 import '../panel.dart';
+import '../shell_panel.dart';
 import '../platform.dart';
 import '../share_inbound.dart';
+import '../shells.dart';
 import '../store.dart';
+import '../term.dart' show SessionTermView;
 import '../theme.dart';
+import '../tool_sheet.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
 import 'editor.dart';
 import 'files.dart';
 import 'git.dart';
-import 'models.dart';
-import 'usage.dart';
-import 'vault.dart';
-import 'recurring.dart';
-import 'session.dart';
+import 'inbound_share_picker.dart';
 import 'mission_control.dart';
+import 'tasks/task_kanban.dart';
+import 'tasks/tasks_panel.dart';
+import 'mobile_shell.dart';
+import 'new_session_picker.dart';
+import 'session.dart';
+import 'settings_panel.dart';
+import 'shell_card_tab_strip.dart';
+import 'shell_main_pane.dart';
+import 'shell_models.dart';
+import 'shell_nav.dart';
+import 'shell_pane_view.dart';
+import 'shell_rail.dart';
+import 'shell_rail_tools.dart';
+import 'shell_shortcuts.dart';
+import 'shell_sidebar_host.dart';
+import 'shell_split_view.dart';
+import 'shell_welcome.dart';
+import 'shell_window_bar.dart';
+import '../motion.dart';
 
-/// Desktop two-pane shell: a persistent left sidebar (instances + sessions) and
-/// a main pane showing the selected session. Tools (git/files/editor/models)
-/// open as floating panels/drawers from within the session, or the sidebar.
+export 'inbound_share_picker.dart';
+export 'mobile_shell.dart';
+export 'settings_panel.dart';
+export 'shell_card_tab_strip.dart';
+export 'shell_components.dart';
+export 'shell_main_pane.dart';
+export 'shell_models.dart';
+export 'shell_pane_view.dart';
+export 'shell_rail_tools.dart';
+export 'shell_shortcuts.dart';
+export 'shell_sidebar_host.dart';
+export 'shell_split_view.dart';
+export 'shell_welcome.dart';
+export 'shell_window_bar.dart';
+export 'sidebar.dart';
+
+part 'desktop_shell_mobile.dart';
+part 'desktop_shell_panes.dart';
+part 'desktop_shell_tabs.dart';
+
 class DesktopShell extends StatefulWidget {
   const DesktopShell({super.key});
   @override
   State<DesktopShell> createState() => _DesktopShellState();
 }
 
-/// One open tab in the shell — a live chat session or an opened file, on a
-/// given instance.
-class _ShellTab {
-  final DaemonClient client;
-  final String instanceUrl;
-  final String? sessionId;
-  final String? filePath;
-  String title;
-  String? profile;
-  SharedInbound? inboundShare;
-  _ShellTab.session({
-    required this.client,
-    required this.instanceUrl,
-    required this.sessionId,
-    required this.title,
-    this.profile,
-    this.inboundShare,
-  }) : filePath = null;
-  _ShellTab.file({
-    required this.client,
-    required this.instanceUrl,
-    required this.filePath,
-    required this.title,
-  })  : sessionId = null,
-        profile = null;
-  bool get isFile => filePath != null;
-  bool get isMissionControl =>
-      !isFile && isMissionControlTab(sessionId: sessionId, title: title);
-  String get key => isFile
-      ? '$instanceUrl|file|$filePath'
-      : isMissionControl
-          ? '$instanceUrl|mission-control'
-          : '$instanceUrl|$sessionId';
-}
-
-class _MacSessionStatus {
-  final HarnessState? state;
-  final bool running;
-  const _MacSessionStatus(this.state, this.running);
-}
-
-class _MacSessionControls {
-  final VoidCallback stop;
-  final void Function(String action, [String? extra]) performAction;
-  const _MacSessionControls(this.stop, this.performAction);
-}
+typedef _Pane = ShellPane;
+typedef _MobileHome = MobileHome;
+typedef _ShellTab = ShellTab;
+typedef _MacSessionStatus = MacSessionStatus;
+typedef _MacSessionControls = MacSessionControls;
+typedef _RightPanel = RightPanel;
+typedef _RightTab = RightTab;
 
 class _DesktopShellState extends State<DesktopShell>
     with WidgetsBindingObserver {
+  void _setState(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
+
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final InstanceStore _store = InstanceStore();
   List<Instance> _instances = const [];
@@ -97,11 +102,45 @@ class _DesktopShellState extends State<DesktopShell>
   final PageController _pageController = PageController();
   final ScrollController _stripController = ScrollController();
   final Map<String, GlobalKey> _chipKeys = {};
-  _ShellTab? get _activeTab =>
-      (_activeIndex >= 0 && _activeIndex < _tabs.length)
-          ? _tabs[_activeIndex]
-          : null;
+
+  /// Daemon-wide interactive shells.
+  ///
+  /// Owns its own socket (`/shells`), so a shell survives switching or closing a
+  /// session — which is the whole point of it being global. Its tab list is
+  /// mirrored into `_tabs` by `_syncGlobalShellTabs` so shells are ordinary pane
+  /// tabs, draggable and closeable like anything else.
+  final ShellsController _shells = ShellsController();
+
+  /// The selected MAIN workspace tab — what the window bar highlights and what
+  /// the left pane shows when no auxiliary tab is covering it.
+  ///
+  /// Deliberately main-only: an auxiliary tab (terminal, preview, diff) is a
+  /// per-pane choice and must not move the window bar's selection.
+  _ShellTab? get _activeTab {
+    final i = _activeIndex;
+    if (i >= 0 && i < _tabs.length && !_isAuxiliary(_tabs[i])) return _tabs[i];
+    final mains = _mainTabs;
+    return mains.isEmpty ? null : mains.first;
+  }
+
   String? get _sessionId => _activeTab?.sessionId;
+
+  /// A tab's session run state, for tinting its icon.
+  ///
+  /// Prefers the live status the session publishes (`_macSessionStatuses`, kept
+  /// current by `_setMacSessionStatus`) and falls back to the list's cached
+  /// status, so a tab reads correctly even before its session first reports.
+  String? _statusForTab(_ShellTab t) {
+    final live = _macSessionStatuses[t.key];
+    if (live != null) {
+      return sessionDisplayStatus(live.state, live.running);
+    }
+    for (final s in _sessions ?? const <SessionInfo>[]) {
+      if (s.id == t.sessionId) return s.status;
+    }
+    return null;
+  }
+
   bool _loading = true;
   // Session list lives here (not in the sidebar) so it survives drawer open/close
   // and is shared with the "recent sessions" placeholder.
@@ -111,23 +150,282 @@ class _DesktopShellState extends State<DesktopShell>
   // state so an unreachable daemon doesn't masquerade as "No chats yet".
   String? _sessionsError;
   bool _drawerOpen = false;
+
+  /// Phone navigation is intentionally not a collapsed desktop drawer. Chats is
+  /// a full-screen home, and one active session is its own full-screen reading
+  /// surface with a clear return affordance.
+  bool _mobileChatsOpen = true;
+
+  /// Which place the phone home is showing.
+  ///
+  /// Owned by the SHELL, not the sidebar: `_mobileShell`'s back handler must see
+  /// it, or pressing back from Settings would exit the app instead of returning
+  /// to Chats. Desktop navigates with the sidebar rail, so this is phone-only.
+  _MobileHome _mobileHome = _MobileHome.chats;
+
+  /// Phone drill-down: which settings section is open, and which agent's detail.
+  ///
+  /// Both live HERE rather than inside their own screens because two things
+  /// outside them must read them: the back handler (to unwind one level at a
+  /// time) and the bar's visibility (to hide itself while drilled down).
+  _SettingsPage? _mobileSettingsSection;
+  CoordinationAgent? _mobileAgent;
+
+  final List<_MobileRoute> _mobileRouteHistory = [
+    const _MobileRoute(home: MobileHome.chats),
+  ];
+
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
   final Map<String, _MacSessionControls> _macSessionControls = {};
+
+  /// Terminals, bridged from each mounted `SessionScreen`.
+  ///
+  /// The session owns the pty and the ids; the SHELL owns the pane. A terminal
+  /// therefore outlives switching sessions — which it must, because you start a
+  /// shell and then keep reading the chat.
+  final Map<String, TerminalHost> _termHosts = {};
+
+  /// Whether each tab's session currently wants its terminal pane open.
+  /// `_termOpen` in the session; the shell honours it but can also minimize
+  /// independently without killing the pty.
+  final Map<String, bool> _termPaneOpen = {};
+
   GitStatus? _macGit;
   String _macGitKey = '';
 
+  Revalidator? _sessionsRevalidator;
   Timer? _sessionsTicker;
   bool _appForeground = true;
   WebSocketChannel? _eventsChannel;
   StreamSubscription? _eventsSub;
   Timer? _eventsReconnect;
   int _eventsGeneration = 0;
-  // Live status from /events (and open-tab callbacks). Survives a slow
-  // /sessions refetch so the list doesn't flicker back to stale.
-  final Map<String, String> _liveStatus = {};
+  final _liveStatus = SessionStatusUpdates();
+
+  /// Which agents are working in each session, as display initials.
+  ///
+  /// Keyed by session id. Shown inline on the session rows — the phone card and
+  /// the desktop sidebar row both render it — so "who is working where" is
+  /// answerable without opening anything. Kept separate from [_sessions] so a
+  /// coordination failure can never take the session list down with it.
   bool _sidebarGit = false;
+
+  /// Secondary-pane width, dragged by its handle. Width-driven rather than a
+  /// flex ratio because a flex ratio cannot be dragged and has no natural size.
+  double _paneWidth = kPaneDefaultWidth;
+
+  /// Which contextual sidebar the rail is showing. Purely a shell concern: the
+  /// conversation you're reading stays put while this changes.
+  ShellSection _section = ShellSection.sessions;
+
+  /// Detail shown in the right pane. Null = pane hidden, so the transcript gets
+  /// the full width until something asks for detail — a pane that is always
+  /// present would cost space even when nothing needs inspecting.
+  /// Tabs open in the secondary pane: session readouts and agent details.
+  ///
+  /// A LIST, not one exclusive selection. Lanes, Checkpoints, Usage and a named
+  /// agent are independent things; keeping one meant closing one to open
+  /// another, which is why the rail buttons behaved like radio buttons.
+  ///
+  /// These share ONE strip and ONE selection with docked `_ShellTab`s — see
+  /// `_activeKey`. Rendering them as a separate, mutually-exclusive view is what
+  /// made a dropped tab hide the readout that was already there.
+  final List<_RightTab> _rightTabs = [];
+
+  /// The user collapsed a pane. Hiding a pane is always a view action and never
+  /// destroys anything — a terminal tab lives on in the sidebar, and its pty
+  /// stays alive, so re-opening is instant.
+  bool _rightCollapsed = false;
+  bool _leftCollapsed = false;
+
+  /// Terminal tabs the user dismissed from a pane's strip.
+  ///
+  /// Dismissing a terminal closes only its VIEW. The pty keeps running in the
+  /// daemon and the shell stays listed in the Terminals panel, so re-opening is
+  /// instant. Without this the chip's close hid the whole PANE the terminal
+  /// lived in — conversation included — instead of just the terminal's view.
+  final Set<String> _hiddenTabs = {};
+
+  /// Which tab each pane is showing, keyed by pane. Separate from `_activeIndex`
+  /// so the two containers keep independent selections.
+  final Map<_Pane, String> _activeKey = {};
+
+  /// The pane that was last activated or interacted with.
+  _Pane _activePane = _Pane.left;
+
+  /// Root session selected for each inner tab group. A root is always present as
+  /// that group's first, locked tab; its files, diffs and terminals reference it
+  /// through `_ShellTab.groupSessionKey`.
+  final Map<_Pane, String> _groupRootKey = {};
+
+  /// True when this readout is the tab the pane is currently showing.
+  ///
+  /// Reads the pane's ONE selection slot, which docked `_ShellTab`s share — a
+  /// readout and a docked tab can never both be "active".
+  bool _rightPanelActive(_RightPanel p) {
+    final key = _RightTab.panel(p).key;
+    return _activeKey[_Pane.right] == key || _activeKey[_Pane.left] == key;
+  }
+
+  /// Open a readout in the pane, focusing it if it is already open.
+  ///
+  /// Toggling CLOSED when the same panel is already focused keeps the old
+  /// affordance (tap the lit button to dismiss), while a different panel ADDS a
+  /// tab instead of replacing one — that replacement was the bug.
+  void _toggleRightPanel(_RightPanel p) {
+    if (p == _RightPanel.none) return;
+    final key = _RightTab.panel(p).key;
+    setState(() {
+      _rightCollapsed = false;
+      // Focused already? Dismiss it, wherever it currently lives.
+      if (_activeKey[_Pane.right] == key) {
+        _closeRightTab(key);
+        return;
+      }
+      if (_activeKey[_Pane.left] == key) {
+        _closeRightTab(key);
+        return;
+      }
+      // The rail button opens a readout in the SECONDARY pane, so re-target it
+      // if a drag previously parked it on the left.
+      final existing = _rightTabs.where((t) => t.key == key).firstOrNull;
+      if (existing == null) {
+        _rightTabs.add(_RightTab.panel(p));
+      } else {
+        existing.pane = _Pane.right;
+      }
+      _activePane = _Pane.right;
+      _activeKey[_Pane.right] = key;
+    });
+  }
+
+  /// Show a tool batch in the side pane's Tools tab, replacing whatever batch
+  /// it showed, and focus it.
+  void _openRightTools(ValueListenable<ToolBatch> batch) {
+    final tab = _RightTab.tools(batch);
+    setState(() {
+      _rightCollapsed = false;
+      _rightTabs.removeWhere((t) => t.key == tab.key);
+      _rightTabs.add(tab);
+      _activePane = _Pane.right;
+      _activeKey[_Pane.right] = tab.key;
+    });
+  }
+
+  /// A file opened from a side-pane readout goes to the main pane, next to the
+  /// session, not over the readout it was opened from.
+  void _openFileFromRightPane(String path, String name) {
+    final t = _activeTab;
+    if (t == null) return;
+    _activePane = _Pane.left;
+    _openFileTab(t.client, t.instanceUrl, path, name);
+  }
+
+  /// Open an agent's detail as a pane tab, focusing it if already open.
+  void _openRightAgent(CoordinationAgent a) {
+    final key = _RightTab.agent(a).key;
+    setState(() {
+      _rightCollapsed = false;
+      final existing = _rightTabs.where((t) => t.key == key).firstOrNull;
+      if (existing == null) {
+        _rightTabs.add(_RightTab.agent(a));
+      } else {
+        existing.pane = _Pane.right;
+      }
+      _activePane = _Pane.right;
+      _activeKey[_Pane.right] = key;
+    });
+  }
+
+  /// Close ONE readout tab. Does not collapse the pane — other tabs may remain,
+  /// and even an empty pane stays open so the next rail tap lands somewhere.
+  Future<Object?> _openShellPanel(ShellPanelRequest request) {
+    final existing = _rightTabs.where((t) => t.key == request.key).firstOrNull;
+    final tab = existing ?? _RightTab.request(request);
+    setState(() {
+      if (existing == null) _rightTabs.add(tab);
+      _rightCollapsed = false;
+      _activePane = tab.pane;
+      _activeKey[tab.pane] = tab.key;
+    });
+    return tab.request!.dismissed.future;
+  }
+
+  void _closeRightTab(String key) {
+    if (!mounted) return;
+    setState(() {
+      for (final tab in _rightTabs.where((t) => t.key == key)) {
+        tab.request?.complete();
+      }
+      _rightTabs.removeWhere((t) => t.key == key);
+      for (final pane in _Pane.values) {
+        if (_activeKey[pane] != key) continue;
+        // Fall back to another readout in the SAME pane, else hand the slot
+        // back to that pane's docked tabs (or leave it empty).
+        final rest = [
+          for (final r in _rightTabs)
+            if (r.pane == pane) r,
+        ];
+        if (rest.isNotEmpty) {
+          _activeKey[pane] = rest.last.key;
+        } else {
+          _activeKey.remove(pane);
+        }
+      }
+    });
+  }
+
+  /// The button list at the far right of the navigation band.
+  ///
+  /// Same shape as the icon strip over the sidebar, per the steer. Carries the
+  /// session-scoped actions the removed bottom strip held — but ONLY what the
+  /// LHS panels do NOT provide: Git, Files and Terminals have panels of their
+  /// own, so repeating them here would be two doors to one room.
+  ///
+  /// The cluster is inline for EVERY session, including Mission Control: a "⋯"
+  /// that hides four one-tap actions behind a menu is friction, and it made MC
+  /// the only session whose controls were not visible.
+  ///
+  /// What differs is the CONTENT, because MC is not a workspace session. It
+  /// orchestrates, so it gets the board and the agents it assigns; the
+  /// authoring trio (goal, lanes, checkpoints) belongs to a session that owns a
+  /// working tree, and MC's own menus never offered them.
+  /// Sections the sidebar strip hides for the ACTIVE session.
+  ///
+  /// Mission Control has no working tree — it orchestrates other sessions — so
+  /// its Terminal and Git Diff are two buttons that open empty panels. Hiding
+  /// them is honest about what MC can do.
+  Set<ShellSection> get _hiddenSections =>
+      (_activeTab?.isMissionControl ?? false)
+          ? const {ShellSection.terminal, ShellSection.git}
+          : const {};
+
+  /// The section actually rendered.
+  ///
+  /// `_section` is sticky, so switching to Mission Control while Terminal is
+  /// selected would leave a hidden section live — the strip would show no lit
+  /// button while the panel below still rendered a terminal MC cannot have. The
+  /// clamp falls back to Sessions, which is never hidden.
+  ShellSection get _effectiveSection =>
+      _hiddenSections.contains(_section) ? ShellSection.sessions : _section;
+
+  List<Widget> _railTools() => buildShellRailTools(
+        activeTab: _activeTab,
+        macSessionStatus:
+            _activeTab == null ? null : _macSessionStatuses[_activeTab!.key],
+        isRightPanelActive: _rightPanelActive,
+        onToggleRightPanel: _toggleRightPanel,
+        onSessionAction: _dispatchSessionAction,
+        onOpenGoalPopover: _openGoalPopover,
+      );
+
+  Future<void> _openGoalPopover(BuildContext btnCtx) => showGoalPopover(
+        context: context,
+        anchorContext: btnCtx,
+        onSetGoal: (text) => _dispatchSessionAction('goal', text),
+      );
 
   @override
   void initState() {
@@ -136,22 +434,35 @@ class _DesktopShellState extends State<DesktopShell>
     _loadInstances();
     // Tapping a session notification opens it in-place (consistent with the app),
     // not a separate full-screen route.
-    if (kCanNotify) onNotifTap = _onNotif;
+    onNotifTap = _onNotif;
     _startSessionsTicker();
     if (!kMobile) HardwareKeyboard.instance.addHandler(_handleGlobalShortcuts);
     if (kMobile) ShareInbound.listen(_onInboundShare);
+    // Global shells mirror into tabs whenever the daemon reports a change: a
+    // reconnect adopts whatever ptys already exist, so live shells never vanish
+    // from the strip just because the socket dropped.
+    _shells.addListener(_syncGlobalShellTabs);
   }
 
   @override
   void dispose() {
+    for (final tab in _rightTabs) {
+      tab.request?.complete();
+    }
+    reportVisibleNotificationSession(null, null);
     WidgetsBinding.instance.removeObserver(this);
-    if (!kMobile)
+    if (!kMobile) {
       HardwareKeyboard.instance.removeHandler(_handleGlobalShortcuts);
+    }
     _sessionsTicker?.cancel();
     _stopEventsWatch();
     _persistTabsDebounce?.cancel();
     _pageController.dispose();
     _stripController.dispose();
+    _shells.removeListener(_syncGlobalShellTabs);
+    // Closes the socket only. Never the ptys: a shell outlives this window, which
+    // is the entire point of it being daemon-wide.
+    _shells.dispose();
     if (onNotifTap == _onNotif) onNotifTap = null;
     if (kMobile) ShareInbound.dispose();
     super.dispose();
@@ -161,6 +472,8 @@ class _DesktopShellState extends State<DesktopShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final fg = state == AppLifecycleState.resumed;
     _appForeground = fg;
+    reportForeground(fg);
+    if (mounted) setState(() {});
     if (fg) {
       _startSessionsTicker();
       _connectEventsWatch();
@@ -173,95 +486,44 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _startSessionsTicker() {
     _sessionsTicker?.cancel();
-    final period = Duration(seconds: kMobile ? 90 : 30);
-    _sessionsTicker = Timer.periodic(period, (_) {
-      if (!mounted || !_appForeground) return;
-      if (!_sessionsLoading) _loadSessions();
-      _refreshHealth();
+    _sessionsTicker = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted && _appForeground) _refreshHealth();
     });
   }
 
-  bool _mod(LogicalKeyboardKey left, LogicalKeyboardKey right) {
-    final keys = HardwareKeyboard.instance.logicalKeysPressed;
-    return keys.contains(left) || keys.contains(right);
-  }
+  late final _shortcutsHandler = ShellShortcutsHandler(
+    onCloseActiveTab: _closeActiveTab,
+    onNewSession: _newSessionFlow,
+    onActivateRelativeTab: _activateRelativeMainTab,
+    onActivateTab: _activateMainTab,
+    onOpenActiveFiles: _openActiveFiles,
+    onOpenMacGit: _openMacGit,
+    onToggleSidebar: _toggleSidebar,
+    onToggleRightPanel: _toggleSecondaryPane,
+    onOpenCommandPalette: _openCommandPalette,
+    onFocusComposer: () =>
+        _macSessionControls[_activeTab?.key]?.performAction('focus_composer'),
+    onStopRunningTask: () => _macSessionControls[_activeTab?.key]?.stop(),
+    onShowShortcuts: _showDesktopShortcuts,
+  );
 
-  bool get _metaDown =>
-      _mod(LogicalKeyboardKey.metaLeft, LogicalKeyboardKey.metaRight);
-  bool get _ctrlDown =>
-      _mod(LogicalKeyboardKey.controlLeft, LogicalKeyboardKey.controlRight);
-  bool get _altDown =>
-      _mod(LogicalKeyboardKey.altLeft, LogicalKeyboardKey.altRight);
-  bool get _shiftDown =>
-      _mod(LogicalKeyboardKey.shiftLeft, LogicalKeyboardKey.shiftRight);
-  bool get _cmdOrCtrl => _metaDown || _ctrlDown;
+  bool _handleGlobalShortcuts(KeyEvent event) =>
+      _shortcutsHandler.handleKeyEvent(event);
 
-  /// Tab / window chords must not depend on Focus staying on the shell.
-  /// Clicking a tab, a message, or the composer steals focus and used to
-  /// kill Ctrl+Tab and Cmd+W after the first use.
-  bool _handleGlobalShortcuts(KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
-    if (!_cmdOrCtrl) return false;
-    final key = event.logicalKey;
-
-    if (key == LogicalKeyboardKey.keyW && !_shiftDown && !_altDown) {
-      if (_activeIndex >= 0) _closeTab(_activeIndex);
-      return true;
-    }
-    if (key == LogicalKeyboardKey.keyT && !_shiftDown && !_altDown) {
-      _newSessionFlow();
-      return true;
-    }
-    if ((key == LogicalKeyboardKey.tab || key == LogicalKeyboardKey.pageDown) &&
-        _ctrlDown &&
-        !_altDown &&
-        !_metaDown) {
-      _activateRelativeTab(_shiftDown ? -1 : 1);
-      return true;
-    }
-    if (key == LogicalKeyboardKey.pageUp &&
-        _ctrlDown &&
-        !_altDown &&
-        !_metaDown) {
-      _activateRelativeTab(-1);
-      return true;
-    }
-    if ((key == LogicalKeyboardKey.arrowLeft ||
-            key == LogicalKeyboardKey.arrowRight) &&
-        _altDown) {
-      _activateRelativeTab(key == LogicalKeyboardKey.arrowLeft ? -1 : 1);
-      return true;
-    }
-    if (key == LogicalKeyboardKey.keyF && _shiftDown && !_altDown) {
-      _openActiveFiles();
-      return true;
-    }
-    if (key == LogicalKeyboardKey.keyG && _shiftDown && !_altDown) {
-      _openMacGit();
-      return true;
-    }
-    if (key == LogicalKeyboardKey.period && !_shiftDown && !_altDown) {
-      _macSessionControls[_activeTab?.key]?.stop();
-      return true;
-    }
-    if (key == LogicalKeyboardKey.slash && !_shiftDown && !_altDown) {
-      _showDesktopShortcuts();
-      return true;
-    }
-    for (var i = 0; i < 9; i++) {
-      if (key.keyId == LogicalKeyboardKey.digit1.keyId + i &&
-          !_shiftDown &&
-          !_altDown) {
-        _activateTab(i);
-        return true;
-      }
-    }
-    return false;
+  /// Drop every per-tab bookkeeping entry for a tab that is going away.
+  ///
+  /// Kept in one place so a newly added map cannot be forgotten at the six
+  /// teardown sites.
+  void _clearTabState(String key) {
+    _macSessionStatuses.remove(key);
+    _macSessionControls.remove(key);
+    _termHosts.remove(key);
+    _termPaneOpen.remove(key);
   }
 
   void _setMacSessionStatus(String key, HarnessState? state, bool running) {
     _macSessionStatuses[key] = _MacSessionStatus(state, running);
-    final status = state?.status ?? (running ? 'running' : 'idle');
+    final status = sessionDisplayStatus(state, running);
     String? sessionId;
     for (final t in _tabs) {
       if (t.key == key) {
@@ -273,9 +535,148 @@ class _DesktopShellState extends State<DesktopShell>
     if (mounted) setState(() {});
   }
 
+  /// Record a tab's terminal host so the shell's pane can render it.
+  ///
+  /// Skips `setState` when nothing actually changed: `SessionScreen` publishes
+  /// this on every `alive`/`live` transition, and rebuilding the whole shell to
+  /// discover an identical list would be wasted frames.
+  void _setTerminalHost(String key, TerminalHost host, bool open) {
+    final prev = _termHosts[key];
+    final prevTerms = prev?.terms ?? const <TerminalInfo>[];
+    final hostTerms = host.terms;
+    final changed = prev == null ||
+        prevTerms.length != hostTerms.length ||
+        host.focus != prev.focus ||
+        [_termPaneOpen[key] != open].any((x) => x) ||
+        [
+          for (var i = 0; i < hostTerms.length; i++)
+            prevTerms[i].id != hostTerms[i].id ||
+                prevTerms[i].title != hostTerms[i].title ||
+                prevTerms[i].alive != hostTerms[i].alive ||
+                prevTerms[i].live != hostTerms[i].live,
+        ].any((x) => x);
+
+    _termHosts[key] = host;
+    // Capture BEFORE assigning: the un-minimize check below compares against
+    // the previous value, and assigning first made it permanently false.
+    final wasOpen = _termPaneOpen[key] ?? false;
+    _termPaneOpen[key] = open;
+
+    // A terminal is a TAB like anything else: reconcile the strip against the
+    // session's live list so a new pty gets a tab and an exited one loses it.
+    final tabsChanged = _reconcileTermTabs(key, host);
+
+    // A terminal created from the SIDEBAR must reveal its pane: creating is the
+    // sidebar's job, showing the result is the shell's.
+    if (prevTerms.isEmpty && hostTerms.isNotEmpty) {
+      _rightCollapsed = false;
+      _showTabPane(key, host);
+    }
+    // An explicit open from the sidebar un-minimizes. Without this, tapping a
+    // terminal in the sidebar would flip the session's flag while the shell kept
+    // showing nothing.
+    if (open && !wasOpen && hostTerms.isNotEmpty) {
+      _rightCollapsed = false;
+      _showTabPane(key, host);
+    }
+    if ((changed || tabsChanged) && mounted) setState(() {});
+  }
+
+  /// Reveal the pane holding a session's terminal tab.
+  void _showTabPane(String sessionKey, TerminalHost host) {
+    final id = host.activeId;
+    if (id == null) return;
+    for (final t in _tabs) {
+      if (t.isTerminal && t.termSessionKey == sessionKey && t.termId == id) {
+        // A terminal is AUXILIARY: selecting it docks it in its pane without
+        // moving the window bar's selection.
+        _dockAux(t.pane, t.key);
+        return;
+      }
+    }
+  }
+
+  /// Add tabs for new terminals and drop tabs whose pty is gone.
+  ///
+  /// Returns true when the tab list changed, so the caller can repaint.
+  bool _reconcileTermTabs(String sessionKey, TerminalHost host) {
+    final live = {for (final t in host.terms) t.id: t};
+    var changed = false;
+
+    // Gone: the pty exited or the sidebar destroyed it. Remove the TAB only —
+    // never `_clearTabState`, which is keyed by session and would wipe the host
+    // shared with this session's other terminals.
+    final stale = [
+      for (final t in _tabs)
+        if (t.isTerminal &&
+            t.termSessionKey == sessionKey &&
+            !live.containsKey(t.termId))
+          t,
+    ];
+    for (final t in stale) {
+      final i = _tabs.indexOf(t);
+      if (i < 0) continue;
+      _tabs.removeAt(i);
+      if (_tabs.isEmpty) {
+        _activeIndex = -1;
+      } else if (_activeIndex >= _tabs.length) {
+        _activeIndex = _tabs.length - 1;
+      } else if (i < _activeIndex) {
+        _activeIndex--;
+      }
+      changed = true;
+    }
+
+    // New: give each live pty a tab, docked where it was requested.
+    _ShellTab? owner;
+    for (final t in _tabs) {
+      if (t.key == sessionKey) {
+        owner = t;
+        break;
+      }
+    }
+    if (owner == null) return changed;
+    for (final info in host.terms) {
+      final exists = _tabs.any((t) =>
+          t.isTerminal &&
+          t.termSessionKey == sessionKey &&
+          t.termId == info.id);
+      if (exists) continue;
+      // A session terminal is a sibling of its one locked conversation root.
+      // Selecting another session hides it but leaves the session-owned pty
+      // untouched; returning to the session restores the tab and scrollback.
+      final target = owner.pane;
+      _tabs.add(_ShellTab.terminal(
+        client: owner.client,
+        instanceUrl: owner.instanceUrl,
+        termSessionKey: sessionKey,
+        termId: info.id,
+        title: info.title,
+        pane: target,
+        groupSessionKey: owner.key,
+      ));
+      if (_groupRootFor(target) == owner.key) {
+        _activeKey[target] = _tabs.last.key;
+      }
+      changed = true;
+    }
+
+    // Renames: the sidebar can retitle a terminal, and the tab follows.
+    for (final t in _tabs) {
+      if (t.isTerminal && t.termSessionKey == sessionKey) {
+        final info = live[t.termId];
+        if (info != null && info.title != t.title) {
+          t.title = info.title;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
   void _patchSessionStatus(String sessionId, String status) {
     if (sessionId.isEmpty || status.isEmpty) return;
-    _liveStatus[sessionId] = status;
+    _liveStatus.record(sessionId, status);
     final sessions = _sessions;
     if (sessions == null) return;
     final i = sessions.indexWhere((s) => s.id == sessionId);
@@ -286,17 +687,9 @@ class _DesktopShellState extends State<DesktopShell>
     ];
   }
 
-  void _applyLiveStatus(List<SessionInfo> sessions) {
-    if (_liveStatus.isEmpty) return;
-    for (var i = 0; i < sessions.length; i++) {
-      final live = _liveStatus[sessions[i].id];
-      if (live != null && live.isNotEmpty && sessions[i].status != live) {
-        sessions[i] = sessions[i].withStatus(live);
-      }
-    }
-  }
-
   void _stopEventsWatch() {
+    _sessionsRevalidator?.dispose();
+    _sessionsRevalidator = null;
     _eventsGeneration++;
     _eventsReconnect?.cancel();
     _eventsReconnect = null;
@@ -313,17 +706,34 @@ class _DesktopShellState extends State<DesktopShell>
       return;
     }
     _stopEventsWatch();
+    _sessionsRevalidator = Revalidator(
+      client: c,
+      on: Swr.sessionStatus,
+      debounce: const Duration(seconds: 1),
+      onRevalidate: ({required bool force}) {
+        if (mounted && _appForeground && !_sessionsLoading) _loadSessions();
+      },
+    );
     final generation = _eventsGeneration;
     try {
       final ch = c.events();
+      if (_active != null) {
+        unawaited(syncNotificationInstance(_active!).catchError((Object _) {}));
+      }
       _eventsChannel = ch;
       _eventsSub = ch.stream.listen(
         (msg) {
-          if (generation != _eventsGeneration || !identical(ch, _eventsChannel))
+          if (generation != _eventsGeneration ||
+              !identical(ch, _eventsChannel)) {
             return;
+          }
           final event = DeviceEvent.decode(msg);
           if (event == null) return;
           final kind = event.kind;
+          if (kind == 'notification' && _active != null) {
+            unawaited(receiveLiveNotification(_active!, msg)
+                .catchError((Object _) {}));
+          }
           if (kind == 'models' || kind == 'config') {
             c.invalidateConfig();
             modelsRevision.value++;
@@ -348,7 +758,10 @@ class _DesktopShellState extends State<DesktopShell>
     if (!mounted || !_appForeground || _client == null) return;
     _eventsReconnect?.cancel();
     _eventsReconnect = Timer(const Duration(seconds: 3), () {
-      if (mounted && _appForeground) _connectEventsWatch();
+      if (mounted && _appForeground) {
+        _connectEventsWatch();
+        if (!_sessionsLoading) _loadSessions();
+      }
     });
   }
 
@@ -410,391 +823,161 @@ class _DesktopShellState extends State<DesktopShell>
         }
       }
     }
-    return lastPathSegment(session?.folder ?? '',
+    final project = lastPathSegment(session?.projectFolder ?? '',
         ifEmpty: _active?.label ?? 'Workspace');
+    final branch = session?.branch;
+    return session?.inWorktree == true && branch != null
+        ? '$project · $branch'
+        : project;
   }
 
-  String? _macBranchLabel() {
-    final branch = _macGit?.branch.trim();
-    return branch == null || branch.isEmpty ? null : branch;
-  }
-
-  String _macChangeLabel() {
-    final git = _macGit;
-    if (git == null || git.clean || git.files.isEmpty) return '';
-    return '${git.files.length} change${git.files.length == 1 ? '' : 's'}';
-  }
-
-  // Bring the active tab's chip into view in the strip.
-  void _scrollStripToActive() {
-    final t = _activeTab;
-    if (t == null) return;
-    final ctx = _chipKeys[t.key]?.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(ctx,
-          alignment: 0.5,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut);
+  /// The active tab's workspace folder, or null when it cannot be resolved
+  /// (no session open, file tab, or the folder is not in the list yet). The
+  /// files panel falls back to the daemon home when this is null.
+  String? _activeWorkspaceFolder() {
+    final id = _activeTab?.sessionId;
+    if (id == null) return null;
+    for (final candidate in _sessions ?? const <SessionInfo>[]) {
+      if (candidate.id == id) {
+        final folder = candidate.folder.trim();
+        return folder.isEmpty ? null : folder;
+      }
     }
+    return null;
   }
 
   Timer? _persistTabsDebounce;
-  void _persistTabs() {
-    // Debounce rapid tab mutations (close/open/reorder) to avoid N
-    // sequential SharedPreferences writes in a single frame.
-    _persistTabsDebounce?.cancel();
-    _persistTabsDebounce = Timer(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
-      _store.saveOpenTabs(
-        _tabs
-            .map((t) => OpenTabDescriptor(
-                  instanceUrl: t.instanceUrl,
-                  sessionId: t.sessionId,
-                  filePath: t.filePath,
-                  title: t.title,
-                  profile: t.profile,
-                ))
-            .toList(),
-        _activeIndex,
-      );
-    });
+
+  void _toggleSidebar() {
+    setState(() => _leftCollapsed = !_leftCollapsed);
   }
 
-  Future<void> _restoreTabs(List<Instance> instances) async {
-    final saved = await _store.loadOpenTabs();
-    if (!mounted || saved.tabs.isEmpty) return;
-    final byUrl = {for (final inst in instances) inst.url: inst};
-    final restored = <_ShellTab>[];
-    for (final descriptor in saved.tabs) {
-      final inst = byUrl[descriptor.instanceUrl];
-      if (inst == null) continue;
-      final client = DaemonClient(inst.url, inst.token);
-      if (descriptor.isFile) {
-        restored.add(_ShellTab.file(
-          client: client,
-          instanceUrl: inst.url,
-          filePath: descriptor.filePath!,
-          title: descriptor.title,
-        ));
-      } else if (descriptor.sessionId != null) {
-        final mc = isMissionControlTab(
-            sessionId: descriptor.sessionId, title: descriptor.title);
-        if (mc &&
-            restored
-                .any((t) => t.isMissionControl && t.instanceUrl == inst.url)) {
-          continue;
-        }
-        restored.add(_ShellTab.session(
-          client: client,
-          instanceUrl: inst.url,
-          sessionId: mc ? 'mission-control' : descriptor.sessionId,
-          title: mc ? 'Mission Control' : descriptor.title,
-          profile: descriptor.profile,
-        ));
-      }
-    }
-    if (!mounted) return;
-    setState(() {
-      if (restored.isNotEmpty) {
-        _tabs
-          ..clear()
-          ..addAll(restored);
-        _activeIndex = saved.activeIndex.clamp(0, restored.length - 1);
-        final active = _tabs[_activeIndex];
-        _active = byUrl[active.instanceUrl];
-        _client =
-            _active == null ? null : DaemonClient(_active!.url, _active!.token);
-      }
-    });
-    _ensurePinnedMissionControl();
-    _persistTabs();
-    _syncPage();
+  void _toggleSecondaryPane() {
+    setState(() => _rightCollapsed = !_rightCollapsed);
   }
 
-  _ShellTab _mcTabFor(Instance inst) => _ShellTab.session(
-        client: DaemonClient(inst.url, inst.token),
-        instanceUrl: inst.url,
-        sessionId: 'mission-control',
-        title: 'Mission Control',
-      );
-
-  void _ensurePinnedMissionControl() {
-    final inst = _active;
-    final client = _client;
-    if (inst == null) return;
-    if (client != null) unawaited(client.mcOpen().catchError((_) => ''));
-    var same = 0;
-    var foreign = 0;
-    var extras = 0;
-    var leftover = false;
-    for (final t in _tabs) {
-      if (!t.isMissionControl) continue;
-      if (t.instanceUrl != inst.url) {
-        foreign++;
-        continue;
-      }
-      if (same == 0) {
-        leftover =
-            !isDedicatedMcSession(t.sessionId) || t.title != 'Mission Control';
-      } else {
-        extras++;
-      }
-      same++;
-    }
-    final alreadyPinned = same == 1 &&
-        extras == 0 &&
-        foreign == 0 &&
-        !leftover &&
-        _tabs.isNotEmpty &&
-        _tabs.first.isMissionControl &&
-        _tabs.first.instanceUrl == inst.url;
-    if (alreadyPinned) {
-      if (_activeIndex < 0) {
-        setState(() => _activeIndex = 0);
-        _persistTabs();
-        _syncPage();
-      }
-      return;
-    }
-    if (foreign > 0 || extras > 0 || leftover) {
-      FocusManager.instance.primaryFocus?.unfocus();
-    }
-    setState(() {
-      final activeKey = (_activeIndex >= 0 && _activeIndex < _tabs.length)
-          ? _tabs[_activeIndex].key
-          : null;
-      SharedInbound? share;
-      _ShellTab? kept;
-      final next = <_ShellTab>[];
-      for (final t in _tabs) {
-        if (!t.isMissionControl) {
-          next.add(t);
-          continue;
-        }
-        if (t.instanceUrl != inst.url) {
-          _macSessionStatuses.remove(t.key);
-          _macSessionControls.remove(t.key);
-          continue;
-        }
-        if (kept == null) {
-          kept = t;
-          share = t.inboundShare;
-        } else {
-          _macSessionStatuses.remove(t.key);
-          _macSessionControls.remove(t.key);
-        }
-      }
-      if (kept == null ||
-          !isDedicatedMcSession(kept.sessionId) ||
-          kept.title != 'Mission Control') {
-        kept = _mcTabFor(inst)..inboundShare = share ?? kept?.inboundShare;
-      }
-      next.insert(0, kept);
-      _tabs
-        ..clear()
-        ..addAll(next);
-      final idx =
-          activeKey == null ? 0 : _tabs.indexWhere((t) => t.key == activeKey);
-      _activeIndex = idx >= 0 ? idx : 0;
-    });
-    _persistTabs();
-    _syncPage();
-  }
-
-  void _openMissionControlTab() {
-    final inst = _active;
-    if (inst == null) return;
-    _ensurePinnedMissionControl();
-    final i = _tabs
-        .indexWhere((t) => t.isMissionControl && t.instanceUrl == inst.url);
-    if (i >= 0) _activateTab(i);
-  }
-
-  void _closeOthers(int keep) {
-    if (keep < 0 || keep >= _tabs.length) return;
-    final kept = _tabs[keep];
-    final url = _active?.url;
-    final pinned = _tabs
-        .where((tab) => tab.isMissionControl && tab.instanceUrl == url)
-        .toList();
-    final survivors = <_ShellTab>[
-      ...pinned.where((tab) => !identical(tab, kept)),
-      kept,
-    ];
-    final keptKeys = survivors.map((tab) => tab.key).toSet();
-    final removedKeys = _tabs
-        .where((tab) => !keptKeys.contains(tab.key))
-        .map((tab) => tab.key)
-        .toList();
-    setState(() {
-      _tabs
-        ..clear()
-        ..addAll(survivors);
-      _activeIndex = _tabs.indexWhere((tab) => identical(tab, kept));
-      if (_activeIndex < 0) _activeIndex = 0;
-      for (final key in removedKeys) {
-        _macSessionStatuses.remove(key);
-        _macSessionControls.remove(key);
-      }
-    });
-    _ensurePinnedMissionControl();
-    _persistTabs();
-    _syncPage();
-  }
-
-  void _closeAllTabs() {
-    final url = _active?.url;
-    setState(() {
-      for (final tab in _tabs.where((t) =>
-          !t.isMissionControl || (url != null && t.instanceUrl != url))) {
-        _macSessionStatuses.remove(tab.key);
-        _macSessionControls.remove(tab.key);
-      }
-      _tabs.removeWhere(
-          (t) => !t.isMissionControl || (url != null && t.instanceUrl != url));
-      _activeIndex = _tabs.isEmpty ? -1 : 0;
-    });
-    _ensurePinnedMissionControl();
-    _persistTabs();
-    _syncPage();
-  }
-
-  void _tabMenu(int i) {
-    if (i < 0 || i >= _tabs.length) return;
-    final t = _tabs[i];
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface1,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
-            child: Row(children: [
-              AppIcon(t.isFile ? 'file' : 'terminal',
-                  size: 15, color: AppColors.fg3),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(t.title.isEmpty ? '(untitled)' : t.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(14, color: AppColors.fg1)),
-              ),
-            ]),
-          ),
-          Divider(height: 1, color: AppColors.border),
-          if (!t.isMissionControl)
-            _tabMenuItem(ctx, 'x', 'Close tab', () => _closeTab(i)),
-          if (_tabs.any((tab) => !tab.isMissionControl))
-            _tabMenuItem(
-                ctx, 'copy', 'Close other tabs', () => _closeOthers(i)),
-          if (_tabs.any((tab) => !tab.isMissionControl))
-            _tabMenuItem(ctx, 'trash', 'Close all tabs', _closeAllTabs,
-                danger: true),
-        ]),
-      ),
-    );
-  }
-
-  Widget _tabMenuItem(
-      BuildContext ctx, String icon, String label, VoidCallback onTap,
-      {bool danger = false}) {
-    final color = danger ? AppColors.danger : AppColors.fg1;
-    return InkWell(
-      onTap: () {
-        Navigator.of(ctx).pop();
-        onTap();
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        child: Row(children: [
-          AppIcon(icon, size: 16, color: color),
-          const SizedBox(width: 12),
-          Text(label, style: sans(13.5, color: color)),
-        ]),
-      ),
-    );
-  }
-
-  void _closeTab(int i) {
-    if (i < 0 || i >= _tabs.length) return;
-    if (_tabs[i].isMissionControl) return;
-    final key = _tabs[i].key;
-    setState(() {
-      _macSessionStatuses.remove(key);
-      _macSessionControls.remove(key);
-      _tabs.removeAt(i);
-      if (_tabs.isEmpty) {
-        _activeIndex = -1;
-      } else if (_activeIndex >= _tabs.length) {
-        _activeIndex = _tabs.length - 1;
-      } else if (i < _activeIndex) {
-        _activeIndex--;
-      }
-    });
-    _persistTabs();
-    _syncPage();
-  }
-
-  void _activateTab(int i) {
-    if (i < 0 || i >= _tabs.length) return;
-    // PageView keeps each session mounted. Remove focus from the old composer
-    // before changing pages so the platform text-input client cannot remain
-    // attached to the previous session after a swipe or tab tap.
-    FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _activeIndex = i);
-    _persistTabs();
-    _syncPage();
-  }
-
-  void _activateRelativeTab(int delta) {
-    if (_tabs.length < 2 || _activeIndex < 0) return;
-    final next = (_activeIndex + delta) % _tabs.length;
-    _activateTab(next < 0 ? next + _tabs.length : next);
-  }
-
-  void _openActiveFiles() =>
+  void _openActiveFiles() {
+    if (kMobile) {
       _macSessionControls[_activeTab?.key]?.performAction('files');
+    } else {
+      setState(() {
+        if (_section == ShellSection.files && !_leftCollapsed) {
+          _leftCollapsed = true;
+        } else {
+          _section = ShellSection.files;
+          _leftCollapsed = false;
+        }
+      });
+    }
+  }
 
-  void _showDesktopShortcuts() {
-    showAppSheet(
+  void _openMacGit() {
+    setState(() {
+      _sidebarGit = !_sidebarGit;
+      if (_section == ShellSection.git && !_leftCollapsed) {
+        _leftCollapsed = true;
+      } else {
+        _section = ShellSection.git;
+        _leftCollapsed = false;
+      }
+    });
+  }
+
+  void _openCommandPalette() {
+    showCommandPalette(
       context,
-      title: 'Keyboard shortcuts',
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        _shortcutRow('⌘/Ctrl T', 'New session'),
-        _shortcutRow('⌘/Ctrl W', 'Close active tab'),
-        _shortcutRow('⌘/Ctrl 1–9', 'Switch to tab'),
-        _shortcutRow('⌘ ⌥ ← / → · Ctrl Tab · Ctrl PageUp/PageDown',
-            'Previous / next tab'),
-        _shortcutRow('⌘/Ctrl ⇧ F', 'Browse files'),
-        _shortcutRow('⌘/Ctrl ⇧ G', 'Open Git'),
-        _shortcutRow('⌘/Ctrl .', 'Stop active run'),
-        _shortcutRow('⌘/Ctrl Enter', 'Send message'),
-      ]),
+      sessions: _sessions ?? const <SessionInfo>[],
+      onOpenChat: (s) => _openSession(s.id, s.title, s.profile),
+      commands: [
+        PaletteCommand(
+          'plus',
+          'New Session',
+          '⌘/Ctrl T',
+          _newSessionFlow,
+        ),
+        PaletteCommand(
+          'sidebar',
+          'Toggle Primary Sidebar',
+          '⌘/Ctrl B',
+          _toggleSidebar,
+        ),
+        PaletteCommand(
+          'layout-sidebar-right',
+          'Toggle Secondary Panel',
+          '⌘/Ctrl \\',
+          _toggleSecondaryPane,
+        ),
+        PaletteCommand(
+          'file',
+          'Open File Tree',
+          '⌘/Ctrl ⇧ E',
+          _openActiveFiles,
+        ),
+        PaletteCommand(
+          'git-branch',
+          'Open Git Diff',
+          '⌘/Ctrl ⇧ G',
+          _openMacGit,
+        ),
+        PaletteCommand(
+          'terminal',
+          'Open Terminals',
+          '',
+          () => setState(() {
+            _section = ShellSection.terminal;
+            _leftCollapsed = false;
+          }),
+        ),
+        PaletteCommand(
+          'task',
+          'Open Tasks',
+          '',
+          () => setState(() {
+            _section = ShellSection.tasks;
+            _leftCollapsed = false;
+          }),
+        ),
+        PaletteCommand(
+          'agent',
+          'Open Agents',
+          '',
+          () => setState(() {
+            _section = ShellSection.agents;
+            _leftCollapsed = false;
+          }),
+        ),
+        PaletteCommand(
+          'message-text',
+          'Open Chats List',
+          '',
+          () => setState(() {
+            _section = ShellSection.sessions;
+            _leftCollapsed = false;
+          }),
+        ),
+        PaletteCommand(
+          'help-circle',
+          'Keyboard Shortcuts',
+          '⌘/Ctrl /',
+          _showDesktopShortcuts,
+        ),
+        PaletteCommand(
+          'stop-circle',
+          'Stop Active Run',
+          '⌘/Ctrl .',
+          () => _macSessionControls[_activeTab?.key]?.stop(),
+        ),
+      ],
     );
   }
 
-  Widget _shortcutRow(String keys, String label) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
-        child: Row(children: [
-          Expanded(child: Text(label, style: sans(13, color: AppColors.fg1))),
-          Text(keys, style: mono(11.5, color: AppColors.fg3)),
-        ]),
-      );
-
-  Widget _desktopShortcuts(Widget child) {
-    // Chords are handled globally in _handleGlobalShortcuts so they keep
-    // working after a tab click or composer focus steal.
-    return child;
-  }
+  void _showDesktopShortcuts() => showDesktopShortcutsDialog(context);
 
   void _onNotif(Map<String, dynamic> m) async {
     if (!mounted) return;
     final url = '${m['url']}';
     final sid = '${m['session'] ?? ''}';
-    if (url.isEmpty || sid.isEmpty) return;
+    if (url.isEmpty) return;
     // Cold-start taps can race _loadInstances — make sure the list is in before
     // resolving, then resolve the instance (and its token) from the STORE, not
     // the payload. An unknown/removed instance is ignored gracefully instead of
@@ -822,8 +1005,34 @@ class _DesktopShellState extends State<DesktopShell>
       _sessions = null;
       _liveStatus.clear();
     });
+    // AFTER setState: setClient notifies, which re-enters via
+    // `_syncGlobalShellTabs` -> setState, and calling setState during setState
+    // throws. Global shells are per-machine, so they reconnect here.
+    _shells.setClient(_client);
     _connectEventsWatch();
-    _openSession(sid, '${m['title'] ?? 'session'}', null);
+    final notificationId = m['notification_id'] as String?;
+    if (notificationId != null)
+      await (await NotificationInbox.open()).markRead(notificationId);
+    if (!mounted) return;
+    final destination = m['destination'];
+    if (destination is Map && destination['type'] == 'task') {
+      await openTaskDetail(context, _client!, '${destination['id']}');
+    } else if (destination is Map && destination['type'] == 'conversation') {
+      try {
+        final opened = await openNotificationConversation(
+            context, _client!, '${destination['id']}');
+        if (!opened && mounted)
+          toast(
+              context, 'This conversation is not available in the human inbox.',
+              danger: true);
+      } catch (_) {
+        if (mounted)
+          toast(context, 'Could not resolve this conversation.', danger: true);
+      }
+    } else if (sid.isNotEmpty) {
+      _openSession(sid, '${m['title'] ?? 'session'}', null,
+          fromNotification: true);
+    }
     _loadSessions();
   }
 
@@ -833,10 +1042,17 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() {
       _instances = items;
       _active ??= items.isNotEmpty ? items.first : null;
-      _client =
-          _active != null ? DaemonClient(_active!.url, _active!.token) : null;
+      if (_client?.baseUrl != _active?.url) {
+        _client =
+            _active != null ? DaemonClient(_active!.url, _active!.token) : null;
+      }
       _loading = false;
     });
+    // Wire the daemon-wide shell socket on COLD START too. `_selectInstance` and
+    // `_onNotif` already do this; skipping it here left the Terminal tab with no
+    // `/shells` connection, so a shell created from the sidebar was an optimistic
+    // local row with no pty behind it — a black pane with only a caret.
+    _shells.setClient(_client);
     await _restoreTabs(items);
     _ensurePinnedMissionControl();
     _connectEventsWatch();
@@ -857,6 +1073,7 @@ class _DesktopShellState extends State<DesktopShell>
       setState(() => _sessions = <SessionInfo>[]);
       return;
     }
+    final statusRevision = _liveStatus.revision;
     setState(() => _sessionsLoading = true);
     try {
       final s = await c.sessions(limit: 60);
@@ -865,15 +1082,17 @@ class _DesktopShellState extends State<DesktopShell>
       if (!identical(c, _client)) return;
       // Mission Control stays pinned at the top of the list; leftover titled
       // chats that alias it are still collapsed so it isn't listed twice.
+      // Agent inboxes are mailboxes, never human chat sessions.
       s.removeWhere((row) =>
-          isMissionControlListRow(row) && !isDedicatedMcSession(row.id));
+          (isMissionControlListRow(row) && !isDedicatedMcSession(row.id)) ||
+          isInboxSessionRow(row));
       s.sort((a, b) {
         final am = isDedicatedMcSession(a.id);
         final bm = isDedicatedMcSession(b.id);
         if (am != bm) return am ? -1 : 1;
         return b.lastActive.compareTo(a.lastActive);
       });
-      _applyLiveStatus(s);
+      _liveStatus.merge(s, since: statusRevision);
       if (mounted) {
         setState(() {
           _sessions = s;
@@ -881,6 +1100,8 @@ class _DesktopShellState extends State<DesktopShell>
           _sessionsError = null;
         });
       }
+      // Decoration only, fired after the list is already on screen. Kept out of
+      // the request above so a coordination outage can never blank the list.
     } catch (_) {
       // Unreachable daemon must not masquerade as "No chats yet" — surface it.
       if (identical(c, _client) && mounted) {
@@ -893,34 +1114,41 @@ class _DesktopShellState extends State<DesktopShell>
     }
   }
 
-  // Start a chat by browsing to a folder in the file explorer and tapping
-  // "New chat here" — the explorer doubles as the new-chat picker.
+  // Start a chat by picking a folder using NewSessionPicker on both desktop and mobile.
   Future<void> _newSessionFlow() async {
     final c = _client;
     final active = _active;
     if (c == null) return;
     await presentScreen(
       context,
-      style: PanelStyle.drawer,
-      maxWidth: 1060,
-      maxHeight: 760,
-      builder: (_, close) => FileExplorer(
+      style: PanelStyle.dialog,
+      // Wider and shorter than a default dialog: this is a folder BROWSER, so
+      // horizontal room is what buys legibility (deep paths and long folder
+      // names), while extra height only stretched a list that rarely fills it —
+      // leaving a tall empty box around short content.
+      maxWidth: 440,
+      maxHeight: 500,
+      builder: (_, close) => NewSessionPicker(
         client: c,
-        title: active?.label ?? 'Files',
+        machineLabel: active?.label ?? '',
+        // Deliberately NOT `_activeWorkspaceFolder()`. This picker is the entry
+        // point for a NEW conversation and must stand on its own: inheriting the
+        // open session's workspace both implied a dependency on one existing and
+        // silently narrowed where a new chat could start. Null lets the daemon
+        // answer with its home directory, which is the sane default.
+        startPath: null,
         onClose: close,
-        onOpenFile: (path, name) {
-          close();
-          if (active != null) {
-            _openFileTab(c, active.url, path, name);
-          }
-        },
-        onNewChat: (folder) async {
+        onOpenFolder: (folder, workspace) async {
           try {
-            final id = await c.openSession(folder, newConversation: true);
+            final id = await c.openSession(folder,
+                workspace: workspace, newConversation: true);
             _openSession(id, 'New session', null);
             _loadSessions();
           } catch (e) {
+            // Surfaced by the picker as a toast; keep the screen open so the
+            // folder choice is not lost on a transient failure.
             if (mounted) toast(context, '$e', danger: true);
+            rethrow;
           }
           close();
         },
@@ -935,13 +1163,15 @@ class _DesktopShellState extends State<DesktopShell>
       _sessions = null;
       _liveStatus.clear();
     });
+    // See `_onInboundShare`: must follow the setState block.
+    _shells.setClient(_client);
     _ensurePinnedMissionControl();
     _connectEventsWatch();
     _loadSessions();
   }
 
   void _openSession(String id, String title, String? profile,
-      {SharedInbound? share}) {
+      {SharedInbound? share, bool fromNotification = false}) {
     if (isMissionControlTab(sessionId: id, title: title)) {
       _openMissionControlTab();
       _attachShareToActive(share);
@@ -967,6 +1197,27 @@ class _DesktopShellState extends State<DesktopShell>
             profile: profile,
             inboundShare: share));
         _activeIndex = _tabs.length - 1;
+      }
+      final root = _tabs[_activeIndex];
+      _groupRootKey[root.pane] = root.key;
+      _activeKey[root.pane] = root.key;
+      if (kMobile) {
+        if (fromNotification) {
+          _mobileHome = MobileHome.chats;
+          _mobileAgent = null;
+          _mobileSettingsSection = null;
+          _mobileRouteHistory
+            ..clear()
+            ..add(const _MobileRoute(home: MobileHome.chats));
+        }
+        _mobileChatsOpen = false;
+        _pushMobileRoute(_MobileRoute(
+          home: _mobileHome,
+          agent: _mobileAgent,
+          settingsSection: _mobileSettingsSection,
+          inSession: true,
+          sessionTabIndex: _activeIndex,
+        ));
       }
     });
     _persistTabs();
@@ -1034,66 +1285,11 @@ class _DesktopShellState extends State<DesktopShell>
         if (!t.isMissionControl) t.sessionId,
     };
     final rest = cached.where((s) => !openIds.contains(s.id)).toList();
-    final picked = await showAppSheet<String>(
-      context,
-      title: 'Send to',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final t in open)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: AppIcon(t.isMissionControl ? 'layers' : 'terminal',
-                  size: 18,
-                  color: t.isMissionControl ? AppColors.accent : AppColors.fg3),
-              title: Text(
-                  t.isMissionControl
-                      ? 'Mission Control'
-                      : (t.title.trim().isEmpty ? '(untitled)' : t.title),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(15,
-                      weight: t.isMissionControl
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                      color: AppColors.fg1)),
-              subtitle: Text(
-                  t.isMissionControl
-                      ? (_active?.label ?? 'this machine')
-                      : 'Open tab',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg4)),
-              onTap: () => Navigator.pop(context,
-                  t.isMissionControl ? 'mission-control' : t.sessionId),
-            ),
-          if (open.isEmpty)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: AppIcon('layers', size: 18, color: AppColors.accent),
-              title: Text('Mission Control',
-                  style:
-                      sans(15, weight: FontWeight.w600, color: AppColors.fg1)),
-              subtitle: Text(_active?.label ?? 'this machine',
-                  style: sans(12, color: AppColors.fg4)),
-              onTap: () => Navigator.pop(context, 'mission-control'),
-            ),
-          for (final s in rest)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: AppIcon('terminal', size: 18, color: AppColors.fg3),
-              title: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(15, color: AppColors.fg1)),
-              subtitle: Text(s.folder.trim().isEmpty ? 'session' : s.folder,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg4)),
-              onTap: () => Navigator.pop(context, s.id),
-            ),
-        ],
-      ),
+    final picked = await showInboundSharePicker(
+      context: context,
+      openTabs: open,
+      restSessions: rest,
+      machineLabel: _active?.label ?? 'this machine',
     );
     if (!mounted || picked == null || picked.isEmpty) return;
     if (picked == 'mission-control') {
@@ -1111,136 +1307,90 @@ class _DesktopShellState extends State<DesktopShell>
         share: share);
   }
 
-  void _openFileTab(DaemonClient client, String url, String path, String name) {
-    final existing = _tabs.indexWhere(
-        (t) => t.isFile && t.instanceUrl == url && t.filePath == path);
-    setState(() {
-      if (existing >= 0) {
-        _activeIndex = existing;
-      } else {
-        _tabs.add(_ShellTab.file(
-            client: client, instanceUrl: url, filePath: path, title: name));
-        _activeIndex = _tabs.length - 1;
-      }
-    });
-    _persistTabs();
-    _syncPage();
-  }
-
-  void _closeTabByKey(String key) {
-    final i = _tabs.indexWhere((t) => t.key == key);
-    if (i >= 0) _closeTab(i);
-  }
-
-  // Full-screen on phones (QR scan); a compact natural-height dialog on
-  // desktop (paste; Esc dismisses, Enter submits).
-  Future<void> _addInstanceFlow() async {
-    final inst = kMobile
-        ? await showModal<Instance>(context, const AddInstanceScreen(),
-            width: 480, height: 520)
-        : await showAddMachineDialog(context);
-    if (inst != null) await _onInstanceAdded(inst);
-  }
-
-  Future<void> _renameInstance(Instance inst, String name) async {
-    final items = _instances
-        .map((e) => e.url == inst.url
-            ? Instance(name: name, url: e.url, token: e.token)
-            : e)
-        .toList();
-    await _store.save(items);
-    if (!mounted) return;
-    setState(() {
-      _instances = items;
-      if (_active?.url == inst.url) {
-        _active = items.firstWhere((e) => e.url == inst.url);
-      }
-    });
-  }
-
-  Future<void> _onInstanceAdded(Instance inst) async {
-    final items = [..._instances]..removeWhere((e) => e.url == inst.url);
-    items.add(inst);
-    await _store.save(items);
-    if (!mounted) return;
-    setState(() => _instances = items);
-    _selectInstance(inst);
-    _refreshHealth();
-  }
-
-  Future<void> _removeInstance(Instance inst) async {
-    final items = [..._instances]..removeWhere((e) => e.url == inst.url);
-    await _store.save(items);
-    if (!mounted) return;
-    setState(() {
-      _instances = items;
-      for (final tab in _tabs.where((t) => t.instanceUrl == inst.url)) {
-        _macSessionStatuses.remove(tab.key);
-        _macSessionControls.remove(tab.key);
-      }
-      _tabs.removeWhere((t) => t.instanceUrl == inst.url);
-      if (_activeIndex >= _tabs.length) _activeIndex = _tabs.length - 1;
-      if (_active?.url == inst.url) {
-        _active = items.isNotEmpty ? items.first : null;
-        _client =
-            _active != null ? DaemonClient(_active!.url, _active!.token) : null;
-        _liveStatus.clear();
-      }
-    });
-    _ensurePinnedMissionControl();
-    _connectEventsWatch();
-    _syncPage();
-  }
-
-  Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) {
-    final tab = _activeTab;
-    if (_sidebarGit && tab != null && !tab.isFile) {
-      final path = tab.filePath;
-      final slash = path?.lastIndexOf('/') ?? -1;
-      final folder =
-          path != null && slash > 0 ? path.substring(0, slash) : null;
-      return Container(
-        color: AppColors.surface1,
-        child: GitScreen(
-          client: tab.client,
-          sessionId: tab.sessionId ?? '',
-          folder: folder,
-          embedded: true,
-          onClose: () => setState(() => _sidebarGit = false),
-        ),
+  Widget _sidebar({VoidCallback? onAfterPick, bool topInset = true}) =>
+      ShellSidebarHost(
+        effectiveSection: _effectiveSection,
+        shells: _shells.shells,
+        focusShellId: _shells.focusId,
+        activeWorkspaceFolder: _activeWorkspaceFolder(),
+        client: _client,
+        activeInstance: _active,
+        activeTab: _activeTab,
+        sidebarGit: _sidebarGit,
+        onCloseGit: () => setState(() => _sidebarGit = false),
+        onNewTerminal: _newGlobalShell,
+        onOpenTerminal: (idx) {
+          final s = _shells.shells;
+          if (idx >= 0 && idx < s.length) _focusGlobalShell(s[idx].id);
+        },
+        onCloseTerminal: _closeGlobalShell,
+        onOpenRightAgent: _openRightAgent,
+        onOpenSession: (id, title, profile) => _openSession(id, title, profile),
+        onOpenDiff: (f) {
+          final c = _client;
+          if (c != null) {
+            _openDiffTab(c, _active?.url ?? '', _activeTab?.sessionId ?? '', f);
+          }
+        },
+        onOpenFile: (path, name) {
+          final c = _client;
+          if (c != null) {
+            _openFileTab(c, _active?.url ?? '', path, name);
+          }
+        },
+        topInset: topInset,
+        onAfterPick: onAfterPick,
+        instances: _instances,
+        selectedSessionId: _sessionId,
+        sessions: _sessions,
+        sessionsLoading: _sessionsLoading,
+        sessionsError: _sessionsError,
+        onRefreshSessions: _loadSessions,
+        onSessionAction: _dispatchSessionAction,
+        onNewSession: _newSessionFlow,
+        onSelectInstance: _selectInstance,
+        onOpenMissionControl: _openMissionControlTab,
+        onAddInstance: _addInstanceFlow,
+        onRenameInstance: _renameInstance,
+        onRemoveInstance: _removeInstance,
+        onSessionDeleted: _onSessionDeleted,
+        health: _health,
+        onRefreshHealth: _refreshHealth,
+        mobileHome: _mobileHome,
+        onMobileHome: (h) => setState(() {
+          _mobileHome = h;
+          _mobileSettingsSection = null;
+          _mobileAgent = null;
+          _pushMobileRoute(_MobileRoute(home: h));
+        }),
+        mobileSettingsSection: _mobileSettingsSection,
+        onSettingsSection: (s) {
+          if (s == null) {
+            _handleMobileBack();
+          } else {
+            setState(() {
+              _mobileSettingsSection = s;
+              _pushMobileRoute(
+                  _MobileRoute(home: _MobileHome.settings, settingsSection: s));
+            });
+          }
+        },
+        mobileAgent: _mobileAgent,
+        onMobileAgent: (a) {
+          if (a == null) {
+            _handleMobileBack();
+          } else {
+            setState(() {
+              _mobileAgent = a;
+              _pushMobileRoute(
+                  _MobileRoute(home: _MobileHome.agents, agent: a));
+            });
+          }
+        },
+        onSettingsClose: () {
+          _handleMobileBack();
+        },
       );
-    }
-    return _Sidebar(
-      topInset: topInset,
-      instances: _instances,
-      active: _active,
-      client: _client,
-      selectedSessionId: _sessionId,
-      sessions: _sessions,
-      sessionsLoading: _sessionsLoading,
-      sessionsError: _sessionsError,
-      onRefreshSessions: _loadSessions,
-      onNewSession: () {
-        _newSessionFlow();
-        onAfterPick?.call();
-      },
-      onSelectInstance: _selectInstance,
-      onOpenMissionControl: () {
-        _openMissionControlTab();
-        onAfterPick?.call();
-      },
-      onOpenSession: (id, title, profile) {
-        _openSession(id, title, profile);
-        onAfterPick?.call();
-      },
-      onAddInstance: _addInstanceFlow,
-      onRenameInstance: _renameInstance,
-      onRemoveInstance: _removeInstance,
-      onSessionDeleted: _onSessionDeleted,
-      health: _health,
-      onRefreshHealth: _refreshHealth,
-    );
-  }
 
   void _onSessionDeleted(String id) {
     if (isDedicatedMcSession(id)) return;
@@ -1249,2815 +1399,125 @@ class _DesktopShellState extends State<DesktopShell>
     _loadSessions();
   }
 
-  Widget _macNavigationBar() {
-    final tab = _activeTab;
-    final controls = tab == null ? null : _macSessionControls[tab.key];
-    final running = _macSessionStatuses[tab?.key]?.running ?? false;
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(children: [
-        Expanded(
-          child: ListView.builder(
-            controller: _stripController,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            itemCount: _tabs.length,
-            itemBuilder: (_, i) => _tabChip(i),
-          ),
-        ),
-        if (tab != null && tab.isFile) ...[
-          _macTopIconAction(
-              'download', 'Download', () => _downloadActiveFile()),
-          _macTopIconAction('edit', 'Edit', () => _editActiveFile()),
-        ] else if (controls != null) ...[
-          if (running)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: IconBtn('stop',
-                  size: 26,
-                  iconSize: 12,
-                  tooltip: 'Stop running task',
-                  onTap: controls.stop),
-            ),
-        ],
-        IconBtn('plus',
-            size: 26,
-            iconSize: 13,
-            tooltip: 'New session',
-            onTap: _newSessionFlow),
-        const SizedBox(width: 8),
-      ]),
-    );
+  void _dispatchSessionAction(String action, [String? extra]) {
+    final key = _activeTab?.key;
+    if (key == null) return;
+    _macSessionControls[key]?.performAction(action, extra);
+    if (_drawerOpen) _scaffoldKey.currentState?.closeDrawer();
   }
 
-  Widget _macApprovalChip({
-    required bool manual,
-    required void Function(bool manual) onPick,
-  }) {
-    return Builder(builder: (chipCtx) {
-      return Tooltip(
-        message: manual ? 'Ask before tool actions' : 'Auto-approve tools',
-        child: InkWell(
-          onTap: () => _pickApprovalMode(chipCtx, manual, onPick),
-          borderRadius: BorderRadius.circular(R.xs),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon('shield', size: 12, color: AppColors.fg3),
-              const SizedBox(width: 5),
-              Text(manual ? 'Ask' : 'Auto',
-                  style: sans(10.5, color: AppColors.fg2)),
-              const SizedBox(width: 2),
-              AppIcon('chevron-down', size: 9, color: AppColors.fg4),
-            ]),
-          ),
-        ),
-      );
-    });
-  }
-
-  Future<void> _pickApprovalMode(
-    BuildContext chipCtx,
-    bool manual,
-    void Function(bool manual) onPick,
-  ) async {
-    final box = chipCtx.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(chipCtx).context.findRenderObject() as RenderBox?;
-    RelativeRect position;
-    if (box != null && overlay != null) {
-      final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      final openUp = origin.dy > overlay.size.height / 2;
-      position = RelativeRect.fromLTRB(
-        origin.dx
-            .clamp(12.0, math.max(12.0, overlay.size.width - 280).toDouble()),
-        openUp ? (origin.dy - 110) : (origin.dy + box.size.height + 4),
-        overlay.size.width - origin.dx - box.size.width,
-        openUp ? (overlay.size.height - origin.dy + 4) : 0,
-      );
-    } else {
-      position = const RelativeRect.fromLTRB(16, 48, 16, 16);
-    }
-    final picked = await showMenu<bool>(
-      context: chipCtx,
-      position: position,
-      color: AppColors.surface1,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      shape: appMenuShape,
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
-      items: [
-        appMenuItem(
-          value: false,
-          icon: 'zap',
-          label: 'Auto',
-          detail: 'Run tools without asking',
-          selected: !manual,
-        ),
-        appMenuItem(
-          value: true,
-          icon: 'shield',
-          label: 'Ask',
-          detail: 'Confirm each tool',
-          selected: manual,
-        ),
-      ],
-    );
-    if (picked == null || picked == manual) return;
-    onPick(picked);
-  }
-
-  Widget _macGoalChip({
-    required bool active,
-    required bool paused,
-    required void Function(String text) onSet,
-    required VoidCallback onCancel,
-  }) {
-    return Builder(builder: (chipCtx) {
-      return Tooltip(
-        message: active
-            ? (paused
-                ? 'Goal paused — tap to cancel'
-                : 'Goal running — tap to cancel')
-            : 'Set an autonomous goal',
-        child: InkWell(
-          onTap: () {
-            if (active) {
-              onCancel();
-              return;
-            }
-            _pickGoal(chipCtx, onSet);
-          },
-          borderRadius: BorderRadius.circular(R.xs),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon('zap',
-                  size: 12, color: active ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 5),
-              Text(active ? (paused ? 'Paused' : 'Goal') : 'Goal',
-                  style: sans(10.5,
-                      color: active ? AppColors.accent : AppColors.fg2)),
-              if (!active) ...[
-                const SizedBox(width: 2),
-                AppIcon('chevron-down', size: 9, color: AppColors.fg4),
-              ],
-            ]),
-          ),
-        ),
-      );
-    });
-  }
-
-  Future<void> _pickGoal(
-    BuildContext chipCtx,
-    void Function(String text) onSet,
-  ) async {
-    final box = chipCtx.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(chipCtx).context.findRenderObject() as RenderBox?;
-    Offset origin = Offset.zero;
-    Size size = Size.zero;
-    if (box != null && overlay != null) {
-      origin = box.localToGlobal(Offset.zero, ancestor: overlay);
-      size = box.size;
-    }
-    final openUp = origin.dy > (overlay?.size.height ?? 600) / 2;
-    final text = await showDialog<String>(
-      context: chipCtx,
-      barrierColor: Colors.black.withValues(alpha: 0.35),
-      builder: (ctx) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: Stack(children: [
-            Positioned(
-              left: origin.dx.clamp(
-                  12.0,
-                  overlay == null
-                      ? origin.dx
-                      : math.max(12.0, overlay.size.width - 292).toDouble()),
-              top: openUp ? null : origin.dy + size.height + 4,
-              bottom: openUp
-                  ? (overlay == null
-                      ? 40.0
-                      : overlay.size.height - origin.dy + 4)
-                  : null,
-              child: Material(
-                color: AppColors.surface1,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(R.sm),
-                ),
-                child: ConstrainedBox(
-                  constraints:
-                      const BoxConstraints(minWidth: 240, maxWidth: 280),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                    child: _GoalPopover(onSet: (t) => Navigator.pop(ctx, t)),
-                  ),
-                ),
-              ),
-            ),
-          ]),
-        );
-      },
-    );
-    final t = text?.trim();
-    if (t == null || t.isEmpty) return;
-    onSet(t);
-  }
-
-  Widget _macTopAction(
-      String icon, String label, String tooltip, VoidCallback onTap) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.xs),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(icon, size: 12, color: AppColors.fg3),
-            const SizedBox(width: 5),
-            Text(label, style: sans(10.5, color: AppColors.fg2)),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _macTopIconAction(String icon, String tooltip, VoidCallback onTap) {
-    return Tooltip(
-      message: tooltip,
-      child:
-          IconBtn(icon, size: 26, iconSize: 12, tooltip: tooltip, onTap: onTap),
-    );
-  }
-
-  Widget _macStatusBar() {
-    final tab = _activeTab;
-    final controls = tab == null ? null : _macSessionControls[tab.key];
-    final status = tab == null ? null : _macSessionStatuses[tab.key];
-    final state = status?.state;
-    final statusLabel = state?.compacting == true
-        ? 'Compacting'
-        : state?.status == 'waiting_for_input'
-            ? 'Needs input'
-            : status?.running == true
-                ? 'Running'
-                : null;
-    final statusColor = state?.compacting == true
-        ? AppColors.accent
-        : state?.status == 'waiting_for_input'
-            ? AppColors.accent
-            : AppColors.run;
-    final connected = _client != null;
-    final rightActions = <Widget>[];
-    if (controls != null) {
-      rightActions.addAll([
-        _macApprovalChip(
-          manual: state?.approvalMode == 'manual',
-          onPick: (manual) =>
-              controls.performAction(manual ? 'approval_ask' : 'approval_auto'),
-        ),
-        _macGoalChip(
-          active: state?.goal?.ongoing == true,
-          paused: state?.goal?.paused == true,
-          onSet: (text) => controls.performAction('goal', text),
-          onCancel: () => controls.performAction('goal'),
-        ),
-        if (state?.lanes.isNotEmpty ?? false)
-          _macStatusAction(
-              'layers', 'Lanes', () => controls.performAction('lanes')),
-        _macStatusAction('scheduled', 'Scheduled',
-            () => controls.performAction('recurring')),
-        _macStatusAction(
-            'folder', 'Files', () => controls.performAction('files')),
-        if (tab?.isMissionControl != true)
-          _macStatusAction(
-              'terminal', 'Shell', () => controls.performAction('shell')),
-        _macStatusAction(
-            'list', 'Processes', () => controls.performAction('processes')),
-        _macStatusAction(
-            'activity', 'Usage', () => controls.performAction('usage')),
-        _macStatusAction('history', 'Checkpoints',
-            () => controls.performAction('checkpoints')),
-      ]);
-    }
-    return Container(
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: Stack(children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Row(children: [
-              StatusDot(status: connected ? 'online' : 'offline', size: 6),
-              const SizedBox(width: 7),
-              Text(connected ? 'Connected' : 'Offline',
-                  style: sans(10.5,
-                      color: connected ? AppColors.fg2 : AppColors.danger)),
-              if (statusLabel != null) ...[
-                const SizedBox(width: 14),
-                Container(width: 1, height: 12, color: AppColors.border2),
-                const SizedBox(width: 10),
-                Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                        color: statusColor, shape: BoxShape.circle)),
-                const SizedBox(width: 6),
-                Text(statusLabel, style: sans(10.5, color: statusColor)),
-              ],
-              if (tab != null) ...[
-                const SizedBox(width: 14),
-                Container(width: 1, height: 12, color: AppColors.border2),
-                const SizedBox(width: 14),
-                AppIcon(tab.isFile ? 'file' : 'terminal',
-                    size: 11, color: AppColors.fg4),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(tab.title.isEmpty ? 'session' : tab.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(10, color: AppColors.fg4)),
-                ),
-              ],
-            ]),
-          ),
-        ),
-        if (rightActions.isNotEmpty)
-          Align(
-            alignment: Alignment.centerRight,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 1, height: 12, color: AppColors.border2),
-              const SizedBox(width: 8),
-              for (var i = 0; i < rightActions.length; i++) ...[
-                if (i > 0) const SizedBox(width: 10),
-                rightActions[i],
-              ],
-            ]),
-          ),
-      ]),
-    );
-  }
-
-  Widget _macStatusAction(String icon, String label, VoidCallback onTap) {
-    return Tooltip(
-      message: label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(R.xs),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(icon, size: 11, color: AppColors.fg4),
-            const SizedBox(width: 5),
-            Text(label, style: mono(10, color: AppColors.fg3)),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _macWindowBar() {
-    // `fullSizeContentView` does not expose the native titlebar inset through
-    // MediaQuery, so that value is false even while traffic lights are visible.
-    // Ask AppKit instead; reserve their full hit area until native fullscreen
-    // confirms that macOS has removed them.
-    return FutureBuilder<bool>(
-      future: macOSIsFullscreen(),
-      builder: (context, snapshot) =>
-          _macWindowBarContent(hasWindowControls: snapshot.data != true),
-    );
-  }
-
-  Widget _macWindowBarContent({required bool hasWindowControls}) {
-    final branch = _macBranchLabel();
-    final changes = _macChangeLabel();
-    return SizedBox(
-      height: kMacTitlebar + 8,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: AppColors.bg,
-          border: Border(bottom: BorderSide(color: AppColors.border)),
-        ),
-        child: Padding(
-          // Reserve room for traffic lights only while macOS actually draws
-          // them; full-screen removes those controls, so use the space.
-          padding:
-              EdgeInsets.only(left: hasWindowControls ? 88 : 16, right: 16),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Semantics(
-              button: true,
-              label: 'Open Git',
-              child: InkWell(
-                borderRadius: BorderRadius.circular(R.sm),
-                onTap: _openMacGit,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color:
-                        _sidebarGit ? AppColors.accentBg : Colors.transparent,
-                    borderRadius: BorderRadius.circular(R.sm),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    AppIcon('folder-open', size: 13, color: AppColors.fg3),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      flex: 2,
-                      child: Text(_macRepositoryLabel(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12.5,
-                              weight: FontWeight.w500, color: AppColors.fg1)),
-                    ),
-                    if (branch != null) ...[
-                      const SizedBox(width: 12),
-                      Container(width: 1, height: 14, color: AppColors.border2),
-                      const SizedBox(width: 12),
-                      AppIcon('git-branch', size: 13, color: AppColors.fg3),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(branch,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: mono(11.5, color: AppColors.fg2)),
-                      ),
-                    ],
-                    if (changes.isNotEmpty) ...[
-                      const SizedBox(width: 12),
-                      Container(width: 1, height: 14, color: AppColors.border2),
-                      const SizedBox(width: 12),
-                      Text(changes, style: sans(11, color: AppColors.fg4)),
-                    ],
-                  ]),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _downloadActiveFile() async {
-    final tab = _activeTab;
-    if (tab == null || !tab.isFile) return;
-    try {
-      final message = await downloadRemoteFileWithCancel(
-        context,
-        tab.client,
-        path: tab.filePath!,
-        name: tab.title,
-      );
-      if (!mounted) return;
-      if (message != null) toast(context, message);
-    } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
-    }
-  }
-
-  void _editActiveFile() {
-    final tab = _activeTab;
-    if (tab == null || !tab.isFile) return;
-    presentScreen(
-      context,
-      style: PanelStyle.dialog,
-      dismissible: false,
-      builder: (_, close) => EditorScreen(
-        client: tab.client,
-        path: tab.filePath!,
-        name: tab.title,
-        onClose: close,
-      ),
-    );
-  }
-
-  void _openMacGit() {
-    setState(() => _sidebarGit = !_sidebarGit);
-  }
+  final _topMachineKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     if (_loading) {
       return Scaffold(
-        backgroundColor: readingBg,
-        body: Center(
-            child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg3))),
+        backgroundColor: Colors.transparent,
+        body: Center(child: DelayedSpinner(size: 22)),
       );
     }
-    return _desktopShortcuts(LayoutBuilder(builder: (context, c) {
-      // Narrow window → keep the native shell but collapse the sidebar to a drawer.
-      if (c.maxWidth < kShellCompact) {
-        // Full-width drawer on phones; a capped one on a shrunk desktop window.
-        final drawerW =
-            kMobile ? c.maxWidth : (c.maxWidth * 0.86).clamp(280.0, 360.0);
-        // Back from an open session: reveal the sessions drawer FIRST, then a
-        // second back exits. (Only intercept when a session is open and the drawer
-        // is closed; from the open drawer or the home placeholder, back exits.)
-        return PopScope(
-          canPop: _drawerOpen || _sessionId == null,
-          onPopInvokedWithResult: (didPop, _) {
-            if (didPop) return;
-            _scaffoldKey.currentState?.openDrawer();
-          },
-          child: Scaffold(
-            key: _scaffoldKey,
-            backgroundColor: readingBg,
-            onDrawerChanged: (open) => setState(() => _drawerOpen = open),
-            // Keep drawer gestures confined to the physical edge. A wide edge
-            // target competes with fast, slightly angled transcript scrolling.
-            drawerEdgeDragWidth: kMobile ? 20 : 24,
-            drawer: Drawer(
-              width: drawerW,
-              backgroundColor: AppColors.bg,
-              shape: const RoundedRectangleBorder(),
-              child: SafeArea(
-                  child: _sidebar(
-                      topInset: !kMacOS,
-                      onAfterPick: () =>
-                          _scaffoldKey.currentState?.closeDrawer())),
-            ),
-            // Narrow: the toolbar's sidebar-toggle is at the far left under the
-            // traffic lights, so inset the whole pane below them.
-            body: SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(top: kMacOS ? kMacTitlebar : 0),
-                child: _mainPane(
-                    onMenu: () => _scaffoldKey.currentState?.openDrawer()),
-              ),
-            ),
-          ),
-        );
-      }
-      // Wide macOS uses a persistent sidebar column beside the content column.
-      // The tab strip belongs only to the content pane, so the sidebar can use
-      // the full height below the native title bar without an empty header gap.
-      if (kMacOS) {
-        return Scaffold(
-          backgroundColor: readingBg,
-          body: SafeArea(
-            child: Column(children: [
-              _macWindowBar(),
-              Expanded(
-                child: Row(children: [
-                  SizedBox(width: 300, child: _sidebar(topInset: false)),
-                  VerticalDivider(
-                      width: 1, thickness: 1, color: AppColors.border),
-                  Expanded(
-                    child: Column(children: [
-                      _macNavigationBar(),
-                      Expanded(child: _mainPane()),
-                    ]),
+    if (kMobile) return _mobileShell();
+    return ShellPanelScope(
+        open: _openShellPanel,
+        client: _client,
+        sessionId: _activeTab?.sessionId,
+        child: LayoutBuilder(builder: (context, c) {
+          _ShellTab? visibleTab;
+          if (c.maxWidth < kShellCompact) {
+            if (_activeIndex >= 0 && _activeIndex < _tabs.length) {
+              visibleTab = _tabs[_activeIndex];
+            }
+          } else {
+            final pane = _focusedPane;
+            final tabs = _tabsIn(pane);
+            final key = _activeKey[pane];
+            final selected = tabs.where((t) => t.key == key).firstOrNull;
+            final readoutSelected =
+                _rightTabs.any((r) => r.pane == pane && r.key == key);
+            visibleTab = selected ??
+                (!readoutSelected && tabs.isNotEmpty ? tabs.first : null);
+          }
+          final visible = _appForeground &&
+              visibleTab != null &&
+              !_isAuxiliary(visibleTab) &&
+              !visibleTab.isMissionControl;
+          reportVisibleNotificationSession(
+              visible ? visibleTab.instanceUrl : null,
+              visible ? visibleTab.sessionId : null);
+          // Narrow window → keep the native shell but collapse the sidebar to a drawer.
+          if (c.maxWidth < kShellCompact) {
+            // Full-width drawer on phones; a capped one on a shrunk desktop window.
+            final drawerW =
+                kMobile ? c.maxWidth : (c.maxWidth * 0.86).clamp(280.0, 360.0);
+            // Back from an open session: reveal the sessions drawer FIRST, then a
+            // second back exits. (Only intercept when a session is open and the drawer
+            // is closed; from the open drawer or the home placeholder, back exits.)
+            return PopScope(
+              canPop: _drawerOpen || _sessionId == null,
+              onPopInvokedWithResult: (didPop, _) {
+                if (didPop) return;
+                _scaffoldKey.currentState?.openDrawer();
+              },
+              child: Scaffold(
+                key: _scaffoldKey,
+                backgroundColor: Colors.transparent,
+                onDrawerChanged: (open) => setState(() => _drawerOpen = open),
+                // Keep drawer gestures confined to the physical edge. A wide edge
+                // target competes with fast, slightly angled transcript scrolling.
+                drawerEdgeDragWidth: kMobile ? 20 : 24,
+                drawer: Drawer(
+                  width: drawerW,
+                  backgroundColor: AppColors.windowBg,
+                  shape: const RoundedRectangleBorder(),
+                  child: SafeArea(
+                      child: _sidebar(
+                          topInset: !kMacOS,
+                          onAfterPick: () =>
+                              _scaffoldKey.currentState?.closeDrawer())),
+                ),
+                // Narrow: the toolbar's sidebar-toggle is at the far left under the
+                // traffic lights, so inset the whole pane below them.
+                body: SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: kMacOS ? kMacTitlebar : 0),
+                    child: _mainPane(
+                        onMenu: () => _scaffoldKey.currentState?.openDrawer()),
                   ),
+                ),
+              ),
+            );
+          }
+          // Wide macOS uses a persistent sidebar column beside the content column.
+          // The tab strip belongs only to the content pane, so the sidebar can use
+          // the full height below the native title bar without an empty header gap.
+          if (kMacOS) {
+            return Scaffold(
+              // The window paints the chrome surface; the reading pane inside it is
+              // the darker canvas.
+              backgroundColor: Colors.transparent,
+              body: SafeArea(
+                child: Column(children: [
+                  _macWindowBar(),
+                  _bodyRow(topInset: false),
                 ]),
               ),
-              _macStatusBar(),
-            ]),
-          ),
-        );
-      }
+            );
+          }
 
-      return Scaffold(
-        backgroundColor: readingBg,
-        body: SafeArea(
-          child: Column(children: [
-            Expanded(
-              child: Row(children: [
-                SizedBox(width: 300, child: _sidebar(topInset: true)),
-                VerticalDivider(
-                    width: 1, thickness: 1, color: AppColors.border),
-                Expanded(child: _mainPane()),
+          return Scaffold(
+            backgroundColor: Colors.transparent,
+            body: SafeArea(
+              child: Column(children: [
+                _macWindowBar(),
+                _bodyRow(topInset: false),
               ]),
-            ),
-          ]),
-        ),
-      );
-    }));
-  }
-
-  Widget _mainPane({VoidCallback? onMenu}) {
-    final client = _client;
-    if (client == null) {
-      return _withMenu(onMenu, _welcome());
-    }
-    if (_tabs.isEmpty) {
-      return _withMenu(onMenu, _recentPlaceholder());
-    }
-    return Column(children: [
-      // Narrow desktop keeps its local strip because the sidebar is a drawer.
-      if (!kMacOS) _tabStrip(onMenu),
-      Expanded(
-        // Pane-scoped MediaQuery so window-width sizing (chat bubbles) fits the pane.
-        child: LayoutBuilder(builder: (ctx, c) {
-          final mq = MediaQuery.of(ctx);
-          return MediaQuery(
-            data: mq.copyWith(size: Size(c.maxWidth, c.maxHeight)),
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                // Disconnect the old session's TextField as soon as a horizontal
-                // page swipe starts. Waiting for onPageChanged leaves the old
-                // field as the platform text-input client during the gesture.
-                if (notification is ScrollStartNotification &&
-                    notification.metrics.axis == Axis.horizontal) {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                }
-                return false;
-              },
-              child: PageView.builder(
-                controller: _pageController,
-                physics: kMobile ? null : const NeverScrollableScrollPhysics(),
-                itemCount: _tabs.length,
-                onPageChanged: (i) {
-                  // PageView keeps each session mounted. Remove focus from the
-                  // old composer before changing the active page so the platform
-                  // text-input client cannot remain attached to the previous
-                  // session after a swipe.
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  setState(() => _activeIndex = i);
-                  _persistTabs();
-                  _scrollStripToActive();
-                  _refreshMacGit();
-                },
-                itemBuilder: (_, i) {
-                  final t = _tabs[i];
-                  return _KeepAlive(
-                    key: ValueKey(t.key),
-                    keep: t.isMissionControl || i == _activeIndex,
-                    child: t.isFile
-                        ? FileViewer(
-                            key: ValueKey(t.key),
-                            client: t.client,
-                            path: t.filePath!,
-                            name: t.title,
-                            embedded: true,
-                            onClose: () => _closeTabByKey(t.key),
-                          )
-                        : SessionScreen(
-                            key: ValueKey(t.key),
-                            client: t.client,
-                            sessionId: t.sessionId!,
-                            title: t.title,
-                            profile: t.profile,
-                            embedded: true,
-                            inboundShare: t.inboundShare,
-                            onShareConsumed: t.inboundShare == null
-                                ? null
-                                : () => setState(() => t.inboundShare = null),
-                            acceptDrops: i == _activeIndex,
-                            onTitle: (title) =>
-                                _onSessionTitle(t.sessionId!, title),
-                            onMenu: null,
-                            onOpenFileTab: (path, name) => _openFileTab(
-                                t.client, t.instanceUrl, path, name),
-                            onOpenSession: _openSession,
-                            onMacStatus: (state, running) =>
-                                _setMacSessionStatus(t.key, state, running),
-                            onMacControls: !kMobile
-                                ? (stop, performAction) =>
-                                    _setMacSessionControls(
-                                        t.key, stop, performAction)
-                                : null,
-                          ),
-                  );
-                },
-              ),
             ),
           );
-        }),
-      ),
-    ]);
-  }
-
-  Widget _tabStrip(VoidCallback? onMenu) {
-    final compact = kMobile ? 56.0 : (kMacOS ? 38.0 : 40.0);
-    return Container(
-      height: compact,
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(children: [
-        if (onMenu != null)
-          IconBtn('sidebar',
-              size: kMobile ? 52 : 38,
-              iconSize: kMobile ? 28 : 18,
-              tooltip: 'Sidebar',
-              onTap: onMenu),
-        Expanded(
-          child: ListView.builder(
-            controller: _stripController,
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: kMobile ? 4 : 8),
-            itemCount: _tabs.length,
-            itemBuilder: (_, i) => _tabChip(i),
-          ),
-        ),
-        if (!kMobile && _activeTab?.isFile == true) ...[
-          IconBtn('download',
-              size: 38,
-              iconSize: 16,
-              tooltip: 'Download',
-              onTap: _downloadActiveFile),
-          IconBtn('edit',
-              size: 38, iconSize: 16, tooltip: 'Edit', onTap: _editActiveFile),
-        ],
-        IconBtn('plus',
-            size: kMobile ? 52 : 38,
-            iconSize: kMobile ? 25 : 17,
-            tooltip: 'New session',
-            onTap: _newSessionFlow),
-      ]),
-    );
-  }
-
-  Widget _tabChip(int i) {
-    final t = _tabs[i];
-    final active = i == _activeIndex;
-    final desktop = !kMobile;
-    final mac = kMacOS && desktop;
-    final title = t.title.isEmpty ? '(untitled)' : t.title;
-    final key = _chipKeys.putIfAbsent(t.key, () => GlobalKey());
-    return GestureDetector(
-      onTap: () => _activateTab(i),
-      onLongPress: () => _tabMenu(i),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        key: key,
-        margin: desktop
-            ? EdgeInsets.zero
-            : const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
-        padding:
-            EdgeInsets.only(left: desktop ? 12 : 13, right: desktop ? 8 : 5),
-        constraints: BoxConstraints(maxWidth: active ? 240 : 180),
-        decoration: BoxDecoration(
-          color: desktop
-              ? (active ? AppColors.surface1 : Colors.transparent)
-              : (active ? AppColors.surface2 : Colors.transparent),
-          borderRadius: BorderRadius.zero,
-          border: desktop
-              ? Border(
-                  bottom: BorderSide(
-                      color: active ? AppColors.accent : Colors.transparent,
-                      width: 2),
-                )
-              : null,
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (t.isMissionControl)
-            AppIcon('layers',
-                size: mac ? 13 : 12,
-                color: active ? AppColors.accent : AppColors.fg4)
-          else if (t.isFile)
-            AppIcon('file',
-                size: mac ? 13 : 12,
-                color: active ? AppColors.accent : AppColors.fg4)
-          else
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: active ? AppColors.accent : AppColors.fg4),
-            ),
-          SizedBox(width: mac ? 7 : 8),
-          Flexible(
-            child: Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(mac ? 12 : 12.5,
-                    color: active ? AppColors.fg1 : AppColors.fg3)),
-          ),
-          if (!t.isMissionControl) ...[
-            SizedBox(width: mac ? 3 : 4),
-            GestureDetector(
-              onTap: () => _closeTab(i),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: EdgeInsets.all(mac ? 4 : 5),
-                child: AppIcon('x', size: mac ? 11 : 11, color: AppColors.fg4),
-              ),
-            ),
-          ],
-        ]),
-      ),
-    );
-  }
-
-  // No session selected → recent sessions + a New chat button (instead of a bare
-  // "nothing selected" message).
-  Widget _recentPlaceholder() {
-    final sessions = (_sessions ?? const <SessionInfo>[]).take(8).toList();
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: ConstrainedBox(
-          // Clamp the block so recent sessions stay a bounded, centered preview
-          // with breathing room top/bottom instead of filling a small viewport;
-          // the list scrolls within when there are more than fit.
-          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 520),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            children: [
-              Text('Recent sessions', style: display(24)),
-              const SizedBox(height: 6),
-              Text(
-                  'Pick up where you left off, or start a new chat from Browse.',
-                  style: sans(12.5, height: 1.4, color: AppColors.fg3)),
-              const SizedBox(height: 18),
-              if (_sessionsLoading && _sessions == null)
-                Center(
-                    child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: AppColors.fg3))))
-              else if (sessions.isEmpty)
-                Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text('No sessions yet.',
-                        style: sans(12.5, color: AppColors.fg4)))
-              else
-                ...sessions.map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: AppCard(
-                        onTap: () => _openSession(s.id, s.title, s.profile),
-                        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                        child: Row(children: [
-                          Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(s.title.isEmpty ? '(untitled)' : s.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: sans(13.5, color: AppColors.fg1)),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                      lastPathSegment(s.folder,
-                                          ifEmpty: s.folder),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: mono(10.5, color: AppColors.fg4)),
-                                ]),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(relativeTime(s.lastActive),
-                              style: mono(10, color: AppColors.fg4)),
-                        ]),
-                      ),
-                    )),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // When collapsed, overlay a sidebar-toggle on the welcome/empty states.
-  Widget _withMenu(VoidCallback? onMenu, Widget child) {
-    if (onMenu == null) return child;
-    return Stack(children: [
-      child,
-      Positioned(
-          top: 6,
-          left: 6,
-          child: IconBtn('sidebar',
-              size: kMobile ? 44 : 38,
-              iconSize: kMobile ? 25 : 19,
-              tooltip: 'Sidebar',
-              onTap: onMenu)),
-    ]);
-  }
-
-  Widget _welcome() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(R.card),
-                        border: Border.all(color: AppColors.border)),
-                    child: AppIcon('cpu', size: 24, color: AppColors.fg3),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text('No instance connected',
-                    textAlign: TextAlign.center,
-                    style: sans(15.5, color: AppColors.fg1)),
-                const SizedBox(height: 8),
-                Text.rich(
-                  TextSpan(
-                      style: sans(12.5, height: 1.5, color: AppColors.fg3),
-                      children: [
-                        const TextSpan(text: 'Run '),
-                        TextSpan(
-                            text: 'snippet serve',
-                            style: mono(12, color: AppColors.fg2)),
-                        const TextSpan(
-                            text:
-                                ' on a machine, then paste the connection string it prints.'),
-                      ]),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 22),
-                Center(
-                    child: PillBtn('Add machine',
-                        icon: 'plus', onTap: _addInstanceFlow)),
-              ]),
-        ),
-      ),
-    );
+        }));
   }
 }
 
-class _GoalPopover extends StatefulWidget {
-  final void Function(String text) onSet;
-  const _GoalPopover({required this.onSet});
-
-  @override
-  State<_GoalPopover> createState() => _GoalPopoverState();
-}
-
-class _GoalPopoverState extends State<_GoalPopover> {
-  final _ctl = TextEditingController();
-
-  @override
-  void dispose() {
-    _ctl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final t = _ctl.text.trim();
-    if (t.isEmpty) return;
-    widget.onSet(t);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('Set goal',
-            style: sans(12.5, weight: FontWeight.w600, color: AppColors.fg1)),
-        const SizedBox(height: 8),
-        AppField(
-          controller: _ctl,
-          hint: 'What should the agent work toward?',
-          autofocus: true,
-          minLines: 2,
-          maxLines: 4,
-          onSubmitted: (_) => _submit(),
-        ),
-        const SizedBox(height: 8),
-        Row(children: [
-          const Spacer(),
-          Btn('Cancel',
-              variant: BtnVariant.ghost,
-              small: true,
-              onTap: () => Navigator.pop(context)),
-          const SizedBox(width: 6),
-          Btn('Set goal', small: true, onTap: _submit),
-        ]),
-      ],
-    );
-  }
-}
-
-/// Keeps a swiped-away tab mounted so its WebSocket attach and scroll position
-/// survive switching between tabs.
-class _KeepAlive extends StatefulWidget {
-  final Widget child;
-  final bool keep;
-  const _KeepAlive({super.key, required this.child, this.keep = true});
-  @override
-  State<_KeepAlive> createState() => _KeepAliveState();
-}
-
-class _KeepAliveState extends State<_KeepAlive>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => widget.keep;
-  @override
-  void didUpdateWidget(covariant _KeepAlive oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.keep != widget.keep) updateKeepAlive();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    super.build(context);
-    return widget.child;
-  }
-}
-
-class _Sidebar extends StatefulWidget {
-  final List<Instance> instances;
-  final Instance? active;
-  final DaemonClient? client;
-  final String? selectedSessionId;
-  final List<SessionInfo>? sessions;
-  final bool sessionsLoading;
-  final String? sessionsError;
-  final VoidCallback onRefreshSessions;
-  final VoidCallback onNewSession;
-  final void Function(Instance) onSelectInstance;
-  final VoidCallback onOpenMissionControl;
-  final void Function(String id, String title, String? profile) onOpenSession;
-  final VoidCallback onAddInstance;
-  final void Function(Instance, String) onRenameInstance;
-  final void Function(Instance) onRemoveInstance;
-  final void Function(String id) onSessionDeleted;
-  final Map<String, bool> health;
-  final VoidCallback onRefreshHealth;
-  final bool topInset;
-  const _Sidebar({
-    required this.instances,
-    required this.active,
-    required this.client,
-    required this.selectedSessionId,
-    required this.sessions,
-    required this.sessionsLoading,
-    this.sessionsError,
-    required this.onRefreshSessions,
-    required this.onNewSession,
-    required this.onSelectInstance,
-    required this.onOpenMissionControl,
-    required this.onOpenSession,
-    required this.onAddInstance,
-    required this.onRenameInstance,
-    required this.onRemoveInstance,
-    required this.onSessionDeleted,
-    required this.health,
-    required this.onRefreshHealth,
-    required this.topInset,
-  });
-  @override
-  State<_Sidebar> createState() => _SidebarState();
-}
-
-class _SidebarState extends State<_Sidebar> {
-  // The session list now lives in the shell (passed via widget.sessions); the
-  // sidebar is presentational, so opening the drawer doesn't refetch.
-  String _filter = 'all'; // all | input | running | done
-  final _machineKey = GlobalKey(); // anchors the desktop machine popover
-  bool _selecting = false;
-  final Set<String> _selected = {};
-  String? _renamingId;
-  String? _hoveredId;
-  final TextEditingController _renameCtl = TextEditingController();
-  final FocusNode _renameFocus = FocusNode();
-
-  @override
-  void dispose() {
-    _renameCtl.dispose();
-    _renameFocus.dispose();
-    super.dispose();
-  }
-
-  void _openMc() {
-    if (widget.client == null) return;
-    widget.onOpenMissionControl();
-  }
-
-  List<SessionInfo>? get _sessions => widget.sessions;
-  bool get _loading => widget.sessionsLoading;
-
-  void _showFilterSheet() {
-    final counts = <String, int>{
-      'all': widget.sessions?.length ?? 0,
-      'input': widget.sessions
-              ?.where((s) => s.status == 'waiting_for_input')
-              .length ??
-          0,
-      'running':
-          widget.sessions?.where((s) => s.status == 'running').length ?? 0,
-      'done': widget.sessions
-              ?.where((s) =>
-                  s.status != 'waiting_for_input' && s.status != 'running')
-              .length ??
-          0,
-    };
-    showAppSheet(
-      context,
-      title: 'Filter conversations',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final (val, label) in [
-            ('all', 'All'),
-            ('input', 'Needs input'),
-            ('running', 'Running'),
-            ('done', 'Done')
-          ]) ...[
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              title: Text(label,
-                  style: sans(16,
-                      color:
-                          _filter == val ? AppColors.accent : AppColors.fg1)),
-              trailing: Text('${counts[val] ?? 0}',
-                  style: sans(14, color: AppColors.fg3)),
-              onTap: () {
-                setState(() => _filter = val);
-                Navigator.pop(context);
-              },
-            ),
-            if (val != 'done') Divider(height: 1, color: AppColors.border),
-          ],
-        ],
-      ),
-    );
-  }
-
-  void _openSearch() {
-    showCommandPalette(
-      context,
-      sessions: _sessions ?? const [],
-      onOpenChat: (s) => widget.onOpenSession(s.id, s.title, s.profile),
-      commands: [
-        PaletteCommand('layers', 'Mission Control', '', _openMc),
-        PaletteCommand('edit', 'New chat', '', widget.onNewSession),
-        PaletteCommand('folder', 'Open folder', '', widget.onNewSession),
-        PaletteCommand('settings', 'Settings', '', _openSettings),
-      ],
-    );
-  }
-
-  void _openSettings() {
-    final c = widget.client;
-    if (c == null) return;
-    presentScreen(context,
-        maxWidth: 640,
-        maxHeight: 620,
-        builder: (_, close) => _SettingsPanel(
-              client: c,
-              instances: widget.instances,
-              active: widget.active,
-              onRemove: widget.onRemoveInstance,
-              onClose: close,
-            ));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final hasClient = widget.client != null;
-    return Container(
-      color: AppColors.bg, // shell surface — darker than the chat canvas
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (widget.topInset && kMacOS) SizedBox(height: kMacTitlebar + 6),
-        if (kMobile) ...[
-          // Mobile: full-height conversations list with the machine row at the bottom.
-          Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Conversations section header with filter icon.
-                  if (hasClient && (_sessions?.isNotEmpty ?? false))
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-                      child: _selecting
-                          ? Row(children: [
-                              Text('${_selected.length} selected',
-                                  style: sans(16,
-                                      weight: FontWeight.w600,
-                                      color: AppColors.fg1)),
-                              const Spacer(),
-                              IconBtn('x',
-                                  size: 32,
-                                  iconSize: 18,
-                                  tooltip: 'Cancel',
-                                  onTap: _exitSelect),
-                              IconBtn('trash',
-                                  size: 32,
-                                  iconSize: 16,
-                                  tooltip: 'Delete selected',
-                                  onTap: _selected.isEmpty
-                                      ? null
-                                      : _confirmDeleteSelected),
-                            ])
-                          : Row(children: [
-                              Text('Conversations',
-                                  style: sans(20,
-                                      weight: FontWeight.w600,
-                                      color: AppColors.fg1)),
-                              const Spacer(),
-                              GestureDetector(
-                                onTap: _showFilterSheet,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(4),
-                                  child: Icon(Icons.filter_list_rounded,
-                                      size: 24,
-                                      color: _filter != 'all'
-                                          ? AppColors.accent
-                                          : AppColors.fg3),
-                                ),
-                              ),
-                            ]),
-                    ),
-                  if (hasClient && !_selecting) _stickyMissionControl(),
-                  Expanded(
-                    child: !hasClient
-                        ? Center(
-                            child: Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Text('Add a machine to begin.',
-                                    textAlign: TextAlign.center,
-                                    style: sans(12.5, color: AppColors.fg4))))
-                        : _sessionList(),
-                  ),
-                ]),
-          ),
-          // Bottom actions row: search + folder + settings + machine avatar.
-          _mobileBottomBar(),
-        ],
-        if (!kMobile) ...[
-          _machineHeader(),
-          _navRow('search', 'Search', onTap: hasClient ? _openSearch : null),
-          _navRow('folder', 'Browse',
-              sub: 'files · new chat',
-              onTap: hasClient ? widget.onNewSession : null),
-          if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
-              child: Row(children: [
-                Text('${_selected.length} selected',
-                    style: sans(11.5, color: AppColors.fg3)),
-                const Spacer(),
-                IconBtn('x',
-                    size: 28,
-                    iconSize: 15,
-                    tooltip: 'Cancel',
-                    onTap: _exitSelect),
-                IconBtn('trash',
-                    size: 28,
-                    iconSize: 14,
-                    tooltip: 'Delete selected',
-                    onTap: _selected.isEmpty ? null : _confirmDeleteSelected),
-              ]),
-            ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: !hasClient
-                ? Center(
-                    child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Text('Add a machine to begin.',
-                            textAlign: TextAlign.center,
-                            style: sans(12.5, color: AppColors.fg4))))
-                : _sessionList(),
-          ),
-        ],
-      ]),
-    );
-  }
-
-  /// Grok-style "Browse" card at the top of the mobile drawer.
-  Widget _browseCard() {
-    return Material(
-      color: AppColors.surface2,
-      borderRadius: BorderRadius.circular(R.card),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.card),
-        onTap: widget.client != null ? widget.onNewSession : null,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.card),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surface3,
-                borderRadius: BorderRadius.circular(R.sm),
-              ),
-              child: AppIcon('folder', size: 16, color: AppColors.fg2),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Browse',
-                        style: sans(14,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(height: 1),
-                    Text('files · new chat',
-                        style: sans(11.5, color: AppColors.fg4)),
-                  ]),
-            ),
-            AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  Widget _stickyMissionControl() {
-    final mc = (_sessions ?? const <SessionInfo>[])
-        .where((s) => isDedicatedMcSession(s.id))
-        .toList();
-    if (mc.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      child: _missionControlPin(mc.first),
-    );
-  }
-
-  /// Bottom bar on mobile: full-width search pill + settings + new-chat.
-  Widget _mobileBottomBar() {
-    final hasClient = widget.client != null;
-    final a = widget.active;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20,
-          8,
-          20,
-          10 +
-              MediaQuery.of(context)
-                  .padding
-                  .bottom), // safe-area-ish bottom padding
-      decoration: BoxDecoration(
-        color: AppColors.bg,
-        border: Border(top: BorderSide(color: AppColors.border, width: 0.5)),
-      ),
-      child: Row(children: [
-        // Search pill.
-        Expanded(
-          child: GestureDetector(
-            onTap: hasClient ? _openSearch : null,
-            child: Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.sm),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(children: [
-                AppIcon('search', size: 16, color: AppColors.fg4),
-                const SizedBox(width: 8),
-                Text('Search…', style: sans(13.5, color: AppColors.fg4)),
-              ]),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        IconBtn('folder',
-            size: 38,
-            iconSize: 19,
-            tooltip: 'Browse',
-            onTap: hasClient ? widget.onNewSession : null),
-        const SizedBox(width: 2),
-        IconBtn('settings',
-            size: 38,
-            iconSize: 19,
-            tooltip: 'Settings',
-            onTap: hasClient ? _openSettings : null),
-        const SizedBox(width: 2),
-        // Small machine avatar — tap to switch machines.
-        GestureDetector(
-          onTap: hasClient
-              ? (widget.instances.isEmpty
-                  ? widget.onAddInstance
-                  : _openMachines)
-              : null,
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border, width: 1),
-            ),
-            alignment: Alignment.center,
-            child: a == null
-                ? AppIcon('plus', size: 14, color: AppColors.fg2)
-                : Text(
-                    (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
-                    style:
-                        sans(13, weight: FontWeight.w600, color: AppColors.fg1),
-                  ),
-          ),
-        ),
-      ]),
-    );
-  }
-
-  // The sidebar/drawer reads bigger on phones than on desktop.
-  double get _navText => kMobile ? 16.5 : 13;
-  double get _navIcon => kMobile ? 22 : 16;
-  double get _navPadV => kMobile ? 13 : 8;
-  double get _rowTitle => kMobile ? 14.5 : 12.5;
-  double get _rowTime => kMobile ? 11.5 : 10;
-
-  Widget _navRow(String icon, String label,
-      {String? sub, VoidCallback? onTap, bool active = false}) {
-    // Desktop: flat rounded rows matching the thread list (no sub line).
-    if (!kMobile) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(6, 0, 6, 1),
-        child: Material(
-          color: active ? AppColors.accentBg : Colors.transparent,
-          borderRadius: BorderRadius.circular(R.sm),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(R.sm),
-            onTap: onTap,
-            child: Opacity(
-              opacity: onTap == null ? 0.45 : 1,
-              child: Container(
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Row(children: [
-                  AppIcon(icon, size: 15, color: AppColors.fg3),
-                  const SizedBox(width: 10),
-                  Text(label, style: sans(12.5, color: AppColors.fg1)),
-                ]),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    return Material(
-      color: active ? AppColors.accentBg : Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Opacity(
-          opacity: onTap == null ? 0.45 : 1,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(14, _navPadV, 14, _navPadV),
-            child: Row(children: [
-              AppIcon(icon, size: _navIcon, color: AppColors.fg2),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label, style: sans(_navText, color: AppColors.fg1)),
-                      if (sub != null)
-                        Text(sub, style: sans(12, color: AppColors.fg4)),
-                    ]),
-              ),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  static bool _statusMatch(String filter, SessionInfo s) => switch (filter) {
-        'input' => s.status == 'waiting_for_input',
-        'running' => s.status == 'running',
-        'done' => s.status != 'waiting_for_input' && s.status != 'running',
-        _ => true,
-      };
-
-  Widget _sessionList() {
-    if (_loading && _sessions == null) {
-      return Center(
-          child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.fg3)));
-    }
-    final all = _sessions ?? const <SessionInfo>[];
-    if (all.isEmpty) {
-      // Offline ≠ empty: a failed fetch gets an explicit error + retry.
-      if (widget.sessionsError != null) {
-        return ListView(
-            padding:
-                EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
-            children: [
-              Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    AppIcon('wifi-off', size: 20, color: AppColors.fg4),
-                    const SizedBox(height: 10),
-                    Text(widget.sessionsError!,
-                        textAlign: TextAlign.center,
-                        style: sans(12.5, color: AppColors.fg3)),
-                    const SizedBox(height: 12),
-                    TextButton(
-                        onPressed: widget.onRefreshSessions,
-                        child: Text('Retry',
-                            style: sans(12.5, color: AppColors.accent))),
-                  ])),
-            ]);
-      }
-      return ListView(
-          padding:
-              EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
-          children: [
-            Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text('No chats yet.',
-                    textAlign: TextAlign.center,
-                    style: sans(12.5, color: AppColors.fg4))),
-          ]);
-    }
-    final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
-    final list = all
-        .where((s) => !isDedicatedMcSession(s.id) && _statusMatch(_filter, s))
-        .toList();
-    final children = <Widget>[];
-    if (!kMobile && mc.isNotEmpty) {
-      children.add(_missionControlPin(mc.first));
-    }
-    final newest = <String, int>{};
-    for (final s in list) {
-      final t = newest[s.folder];
-      if (t == null || s.lastActive > t) newest[s.folder] = s.lastActive;
-    }
-    list.sort((a, b) {
-      final fa = newest[a.folder] ?? 0;
-      final fb = newest[b.folder] ?? 0;
-      if (fa != fb) return fb.compareTo(fa);
-      final byFolder = a.folder.compareTo(b.folder);
-      if (byFolder != 0) return byFolder;
-      return b.lastActive.compareTo(a.lastActive);
-    });
-    final groups = <String, List<SessionInfo>>{};
-    final order = <String>[];
-    for (final s in list) {
-      final bucket = groups.putIfAbsent(s.folder, () {
-        order.add(s.folder);
-        return <SessionInfo>[];
-      });
-      bucket.add(s);
-    }
-    var firstFolder = true;
-    for (final key in order) {
-      final sessions = groups[key]!;
-      children.add(_folderHeader(key, first: firstFolder && mc.isEmpty));
-      firstFolder = false;
-      for (var i = 0; i < sessions.length; i++) {
-        if (kMobile) {
-          children.add(Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: _sessionCard(sessions[i])));
-        } else {
-          children.add(
-              _desktopTreeRow(sessions[i], last: i == sessions.length - 1));
-        }
-      }
-    }
-    if (list.isEmpty && (mc.isEmpty || _filter != 'all')) {
-      children.add(Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text('Nothing here.',
-              textAlign: TextAlign.center,
-              style: sans(12.5, color: AppColors.fg4))));
-    }
-    final listView = ListView(
-        padding: EdgeInsets.fromLTRB(kMobile ? 20 : 8, 2, kMobile ? 20 : 8, 32),
-        children: children);
-    // Phones: the natural refresh gesture. Desktop keeps the header button.
-    if (!kMobile) return listView;
-    return RefreshIndicator(
-      color: AppColors.accent,
-      backgroundColor: AppColors.surface2,
-      onRefresh: () async => widget.onRefreshSessions(),
-      child: listView,
-    );
-  }
-
-  Widget _filterChips(List<SessionInfo> all) {
-    const items = [
-      ('all', 'All'),
-      ('input', 'Needs input'),
-      ('running', 'Running'),
-      ('done', 'Done')
-    ];
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
-        child: Row(children: [
-          for (final (val, label) in items) ...[
-            _chip(val, label, all.where((s) => _statusMatch(val, s)).length),
-            const SizedBox(width: 7),
-          ],
-        ]),
-      ),
-    );
-  }
-
-  Widget _chip(String val, String label, int n) {
-    final sel = _filter == val;
-    return Material(
-      color: sel ? AppColors.fg1 : AppColors.surface2,
-      borderRadius: BorderRadius.circular(99),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(99),
-        hoverColor: sel
-            ? Colors.transparent
-            : null, // no raise on the light selected chip
-        onTap: () => setState(() => _filter = val),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-          child: Text('$label $n',
-              style: sans(12.5,
-                  weight: FontWeight.w500,
-                  color: sel ? AppColors.bg : AppColors.fg3)),
-        ),
-      ),
-    );
-  }
-
-  Widget _folderHeader(String folder, {required bool first}) {
-    final name =
-        folder.isEmpty ? 'No folder' : lastPathSegment(folder, ifEmpty: folder);
-    if (kMobile) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(4, first ? 6 : 16, 4, 8),
-        child: Row(children: [
-          AppIcon('folder', size: 13, color: AppColors.fg4),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(12, weight: FontWeight.w500, color: AppColors.fg3)),
-          ),
-        ]),
-      );
-    }
-    return Padding(
-      padding: EdgeInsets.fromLTRB(6, first ? 10 : 16, 6, 4),
-      child: Row(children: [
-        AppIcon('folder', size: 13, color: AppColors.fg4),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.left,
-              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
-        ),
-      ]),
-    );
-  }
-
-  Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
-    return _sessionRow(s);
-  }
-
-  Widget _missionControlPin(SessionInfo s) {
-    final selected = s.id == widget.selectedSessionId;
-    final waiting = s.status == 'waiting_for_input';
-    final running = s.status == 'running';
-    void open() => widget.onOpenSession(s.id, 'Mission Control', s.profile);
-    final status = running || waiting
-        ? Container(
-            width: kMobile ? 8 : 6,
-            height: kMobile ? 8 : 6,
-            decoration: BoxDecoration(
-              color: waiting ? AppColors.accent : AppColors.run,
-              shape: BoxShape.circle,
-            ),
-          )
-        : null;
-    if (kMobile) {
-      return GestureDetector(
-        onTap: open,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.accentBg : AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(
-              color: selected ? AppColors.accentLine : AppColors.border,
-            ),
-          ),
-          child: Row(children: [
-            Expanded(
-              child: Text('Mission Control',
-                  style: sans(15.5,
-                      weight: FontWeight.w600, color: AppColors.fg1)),
-            ),
-            if (status != null) status,
-          ]),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
-      child: Material(
-        color: selected ? AppColors.accentBg : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: open,
-          child: Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(children: [
-              AppIcon('layers', size: 14, color: AppColors.accent),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Mission Control',
-                    style: sans(12.5,
-                        weight: FontWeight.w600,
-                        color: selected ? AppColors.fg1 : AppColors.fg2)),
-              ),
-              if (status != null) status,
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Desktop: flat native thread row — no card chrome, rounded hover, a status
-  // dot only when it means something (needs input / running).
-  Widget _sessionRow(SessionInfo s) {
-    final selected = s.id == widget.selectedSessionId;
-    final waiting = s.status == 'waiting_for_input';
-    final running = s.status == 'running';
-    final checked = _selected.contains(s.id);
-    final renaming = _renamingId == s.id;
-    final hovered = !kMobile && _hoveredId == s.id;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hoveredId = s.id),
-      onExit: (_) {
-        if (_hoveredId == s.id) setState(() => _hoveredId = null);
-      },
-      child: Material(
-        color: selected || checked ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
-          onTap: renaming
-              ? null
-              : () {
-                  if (_selecting) {
-                    _toggleSelected(s.id);
-                  } else {
-                    widget.onOpenSession(s.id, s.title, s.profile);
-                  }
-                },
-          onLongPress: renaming
-              ? null
-              : () {
-                  if (_selecting) {
-                    _toggleSelected(s.id);
-                  } else {
-                    _enterSelect(seed: s.id);
-                  }
-                },
-          onSecondaryTapDown: (renaming || !kMobile)
-              ? null
-              : (details) =>
-                  _sessionActions(s, position: details.globalPosition),
-          child: Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(children: [
-              if (_selecting) ...[
-                AppIcon(checked ? 'check' : 'plus',
-                    size: 13,
-                    color: checked ? AppColors.accent : AppColors.fg4),
-                const SizedBox(width: 6),
-              ] else if (waiting || running) ...[
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: waiting ? AppColors.accent : AppColors.run,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              Expanded(
-                  child: renaming
-                      ? _inlineRenameField(s, compact: true)
-                      : Text(s.title.isEmpty ? '(untitled)' : s.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12.5,
-                              color:
-                                  selected ? AppColors.fg1 : AppColors.fg2))),
-              if (!renaming) ...[
-                if (hovered && !_selecting && !isDedicatedMcSession(s.id)) ...[
-                  const SizedBox(width: 4),
-                  Tooltip(
-                    message: 'Rename',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(R.xs),
-                      onTap: () => _beginRename(s),
-                      child: Padding(
-                        padding: const EdgeInsets.all(3),
-                        child: AppIcon('edit', size: 12, color: AppColors.fg3),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Tooltip(
-                    message: 'Delete',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(R.xs),
-                      onTap: () => _confirmDeleteSessions([s]),
-                      child: Padding(
-                        padding: const EdgeInsets.all(3),
-                        child:
-                            AppIcon('trash', size: 12, color: AppColors.danger),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(width: 8),
-                  Text(relativeTime(s.lastActive),
-                      style: mono(10,
-                          color: waiting ? AppColors.accent : AppColors.fg4)),
-                ],
-              ],
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _sessionCard(SessionInfo s) {
-    final running = s.status == 'running';
-    final waiting = s.status == 'waiting_for_input';
-    final checked = _selected.contains(s.id);
-    final renaming = _renamingId == s.id;
-    return GestureDetector(
-      onTap: renaming
-          ? null
-          : () {
-              if (_selecting) {
-                _toggleSelected(s.id);
-              } else {
-                widget.onOpenSession(s.id, s.title, s.profile);
-              }
-            },
-      onLongPress: renaming
-          ? null
-          : () {
-              if (_selecting) {
-                _toggleSelected(s.id);
-              } else {
-                _enterSelect(seed: s.id);
-              }
-            },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-        decoration: BoxDecoration(
-          color: checked ? AppColors.accentBg : AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          if (_selecting) ...[
-            AppIcon(checked ? 'check' : 'plus',
-                size: 16, color: checked ? AppColors.accent : AppColors.fg4),
-            const SizedBox(width: 10),
-          ],
-          Expanded(
-            child: renaming
-                ? _inlineRenameField(s, compact: false)
-                : Text(
-                    s.title.isEmpty ? '(untitled)' : s.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(15.5, color: AppColors.fg1),
-                  ),
-          ),
-          if (!renaming) ...[
-            const SizedBox(width: 10),
-            Text(relativeTime(s.lastActive),
-                style: sans(12, color: AppColors.fg4)),
-          ],
-          if (!_selecting && (running || waiting)) ...[
-            const SizedBox(width: 8),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: running ? AppColors.run : AppColors.accent,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ],
-          if (!_selecting && !renaming) ...[
-            const SizedBox(width: 2),
-            IconBtn('more-vertical',
-                size: 32,
-                iconSize: 16,
-                tooltip: 'Options',
-                onTap: () => _sessionActions(s)),
-          ],
-        ]),
-      ),
-    );
-  }
-
-  // Long-press / right-click a session → rename or delete.
-  Future<void> _sessionActions(SessionInfo s, {Offset? position}) async {
-    if (isDedicatedMcSession(s.id)) return;
-    if (!kMobile) {
-      final overlay =
-          Overlay.of(context).context.findRenderObject() as RenderBox;
-      final point = position ?? overlay.size.center(Offset.zero);
-      final selected = await showMenu<String>(
-        context: context,
-        position: RelativeRect.fromRect(
-          Rect.fromCircle(center: point, radius: 0),
-          Offset.zero & overlay.size,
-        ),
-        color: AppColors.surface1,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        shape: appMenuShape,
-        items: [
-          appMenuItem(value: 'rename', icon: 'edit', label: 'Rename'),
-          appMenuItem(
-              value: 'delete', icon: 'trash', label: 'Delete', danger: true),
-        ],
-      );
-      if (selected == 'rename') {
-        _beginRename(s);
-      } else if (selected == 'delete') {
-        await _confirmDeleteSessions([s]);
-      }
-      return;
-    }
-    showAppSheet(context,
-        title: s.title.isEmpty ? '(untitled)' : s.title,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sessionActionTile('edit', 'Rename', onTap: () {
-              Navigator.pop(context);
-              _beginRename(s);
-            }),
-            _sessionActionTile('trash', 'Delete', danger: true, onTap: () {
-              Navigator.pop(context);
-              _confirmDeleteSessions([s]);
-            }),
-          ],
-        ));
-  }
-
-  Widget _sessionActionTile(String icon, String label,
-      {required VoidCallback onTap, bool danger = false}) {
-    final color = danger ? AppColors.danger : AppColors.fg1;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(R.sm),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 13),
-          child: Row(children: [
-            AppIcon(icon, size: 16, color: color),
-            const SizedBox(width: 12),
-            Text(label, style: sans(13.5, color: color)),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  void _enterSelect({String? seed}) {
-    if (seed != null && isDedicatedMcSession(seed)) return;
-    setState(() {
-      _selecting = true;
-      _renamingId = null;
-      if (seed != null) _selected.add(seed);
-    });
-  }
-
-  void _exitSelect() {
-    setState(() {
-      _selecting = false;
-      _selected.clear();
-    });
-  }
-
-  void _toggleSelected(String id) {
-    if (isDedicatedMcSession(id)) return;
-    setState(() {
-      if (!_selected.add(id)) _selected.remove(id);
-    });
-  }
-
-  void _beginRename(SessionInfo s) {
-    if (isDedicatedMcSession(s.id)) return;
-    _renameCtl.text = s.title;
-    _renameCtl.selection =
-        TextSelection(baseOffset: 0, extentOffset: _renameCtl.text.length);
-    setState(() {
-      _selecting = false;
-      _selected.clear();
-      _renamingId = s.id;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _renameFocus.requestFocus();
-    });
-  }
-
-  Widget _inlineRenameField(SessionInfo s, {required bool compact}) {
-    return TextField(
-      controller: _renameCtl,
-      focusNode: _renameFocus,
-      autofocus: true,
-      maxLines: 1,
-      style: sans(compact ? 12.5 : 16, color: AppColors.fg1),
-      cursorColor: AppColors.fg1,
-      decoration: const InputDecoration(
-        isCollapsed: true,
-        border: InputBorder.none,
-        hintText: 'Session title',
-      ),
-      onSubmitted: (_) => _commitRename(s),
-      onTapOutside: (_) => _commitRename(s),
-    );
-  }
-
-  Future<void> _commitRename(SessionInfo s) async {
-    if (_renamingId != s.id) return;
-    final c = widget.client;
-    final title = _renameCtl.text.trim();
-    setState(() => _renamingId = null);
-    if (c == null || title.isEmpty || title == s.title) return;
-    try {
-      await c.renameSession(s.id, title);
-      widget.onRefreshSessions();
-    } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
-    }
-  }
-
-  Future<void> _confirmDeleteSelected() async {
-    final ids = _selected.toList();
-    final sessions = (widget.sessions ?? const <SessionInfo>[])
-        .where((s) => ids.contains(s.id))
-        .toList();
-    if (sessions.isEmpty) return;
-    await _confirmDeleteSessions(sessions);
-  }
-
-  Future<void> _confirmDeleteSessions(List<SessionInfo> sessions) async {
-    final c = widget.client;
-    if (c == null || sessions.isEmpty) return;
-    final n = sessions.length;
-    final first = sessions.first.title.isEmpty
-        ? '(untitled session)'
-        : sessions.first.title;
-    final body = n == 1
-        ? '$first\n\nPermanently removes the conversation. The folder and its files are untouched.'
-        : 'Delete $n conversations? Folders and files are untouched.';
-    final ok = await confirmAction(
-      context,
-      title: n == 1 ? 'Delete session?' : 'Delete $n sessions?',
-      body: body,
-      confirmLabel: n == 1 ? 'Delete' : 'Delete $n',
-    );
-    if (!ok) return;
-    try {
-      for (final s in sessions) {
-        await c.deleteSession(s.id);
-        widget.onSessionDeleted(s.id);
-      }
-      if (mounted) _exitSelect();
-      widget.onRefreshSessions();
-    } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
-    }
-  }
-
-  // ---- machines ----
-
-  /// The sidebar header IS the machine switcher: active machine label in
-  /// display type with a live dot + chevron, host underneath, refresh trailing.
-  /// Edge-to-edge tap target; hover raise comes from the global theme.
-  Widget _machineHeader() {
-    final a = widget.active;
-    final ok = a == null ? null : widget.health[a.url];
-    final hasClient = widget.client != null;
-    // Mobile: Grok-style profile row with avatar circle + name + host + chevron.
-    if (kMobile) {
-      return Material(
-        key: _machineKey,
-        color: Colors.transparent,
-        child: InkWell(
-          onTap:
-              widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(children: [
-              // Avatar circle — first letter of the machine name.
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.border, width: 1),
-                ),
-                alignment: Alignment.center,
-                child: a == null
-                    ? AppIcon('plus', size: 18, color: AppColors.fg2)
-                    : Text(
-                        (a.label.isNotEmpty ? a.label[0] : '?').toUpperCase(),
-                        style: sans(17,
-                            weight: FontWeight.w600, color: AppColors.fg1),
-                      ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: a == null
-                    ? Text('Add machine', style: sans(15, color: AppColors.fg1))
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(a.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(15,
-                                  weight: FontWeight.w600,
-                                  color: AppColors.fg1)),
-                          const SizedBox(height: 2),
-                          Row(children: [
-                            Container(
-                                width: 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                    color: ok == true
-                                        ? AppColors.ok
-                                        : AppColors.fg4,
-                                    shape: BoxShape.circle)),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(hostOf(a.url),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: mono(11, color: AppColors.fg4)),
-                            ),
-                          ]),
-                        ],
-                      ),
-              ),
-              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-            ]),
-          ),
-        ),
-      );
-    }
-    // Desktop: original compact header.
-    return Material(
-      key: _machineKey,
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: widget.instances.isEmpty ? widget.onAddInstance : _openMachines,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-          child: Row(children: [
-            Expanded(
-              child: a == null
-                  ? Row(children: [
-                      AppIcon('plus', size: 18, color: AppColors.fg1),
-                      const SizedBox(width: 9),
-                      Text('Add machine', style: display(17)),
-                    ])
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Flexible(
-                              child: Text(a.label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: display(17))),
-                          const SizedBox(width: 8),
-                          Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                  color:
-                                      ok == true ? AppColors.ok : AppColors.fg4,
-                                  shape: BoxShape.circle)),
-                          const SizedBox(width: 6),
-                          AppIcon('chevron-down',
-                              size: 16, color: AppColors.fg3),
-                        ]),
-                        const SizedBox(height: 2),
-                        Text(hostOf(a.url),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: mono(11, color: AppColors.fg4)),
-                      ],
-                    ),
-            ),
-            const SizedBox(width: 6),
-            IconBtn('refresh',
-                size: 30,
-                iconSize: 15,
-                tooltip: 'Refresh',
-                onTap:
-                    hasClient && !_loading ? widget.onRefreshSessions : null),
-            IconBtn('settings',
-                size: 30,
-                iconSize: 15,
-                tooltip: 'Settings',
-                onTap: hasClient ? _openSettings : null),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  /// Machine list: bottom sheet on phones, a popover anchored to the block on
-  /// desktop. Same rows + "Add machine" footer either way.
-  Future<void> _openMachines() async {
-    widget.onRefreshHealth();
-    final content = _MachineList(
-      instances: widget.instances,
-      active: widget.active,
-      health: widget.health,
-      onSelect: widget.onSelectInstance,
-      onAdd: widget.onAddInstance,
-      onManage: _machineActions,
-    );
-    if (kMobile) {
-      await showAppSheet(context, title: 'Machines', child: content);
-      return;
-    }
-    final box = _machineKey.currentContext!.findRenderObject() as RenderBox;
-    final origin = box.localToGlobal(Offset.zero);
-    await showGeneralDialog(
-      context: context,
-      barrierDismissible: true, // click-away and Esc dismiss
-      barrierLabel: 'machines',
-      barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 120),
-      pageBuilder: (_, __, ___) => Stack(children: [
-        // Inset from the edge-to-edge header so it reads as a popover.
-        Positioned(
-          left: origin.dx + 10,
-          top: origin.dy + box.size.height + 4,
-          width: box.size.width - 20,
-          child: Material(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
-            elevation: 12,
-            shadowColor: Colors.black87,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border2),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 420),
-                child: SingleChildScrollView(child: content),
-              ),
-            ),
-          ),
-        ),
-      ]),
-      transitionBuilder: (_, anim, __, child) {
-        final curved =
-            CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
-        return BackdropFilter(
-          filter: ImageFilter.blur(
-              sigmaX: 5.0 * curved.value, sigmaY: 5.0 * curved.value),
-          child: FadeTransition(opacity: curved, child: child),
-        );
-      },
-    );
-  }
-
-  // Overflow / long-press on a machine row → rename or remove (existing flows).
-  void _machineActions(Instance i) {
-    showAppSheet(context,
-        title: i.label,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sessionActionTile('edit', 'Rename', onTap: () {
-              Navigator.pop(context);
-              _renameMachine(i);
-            }),
-            _sessionActionTile('trash', 'Remove', danger: true, onTap: () {
-              Navigator.pop(context);
-              _confirmRemoveMachine(i);
-            }),
-          ],
-        ));
-  }
-
-  Future<void> _renameMachine(Instance i) async {
-    final name = await promptText(context,
-        title: 'Rename machine',
-        initial: i.label,
-        hint: 'Machine name',
-        saveLabel: 'Rename');
-    if (name == null || name.isEmpty) return;
-    widget.onRenameInstance(i, name);
-  }
-
-  Future<void> _confirmRemoveMachine(Instance i) async {
-    final ok = await confirmAction(
-      context,
-      title: 'Remove machine?',
-      body:
-          '${i.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
-      confirmLabel: 'Remove',
-    );
-    if (ok) widget.onRemoveInstance(i);
-  }
-}
-
-/// Rows for the machine popover/sheet: live dot (re-pinged on open), label,
-/// host, trailing overflow. Pops itself before invoking any callback.
-class _MachineList extends StatefulWidget {
-  final List<Instance> instances;
-  final Instance? active;
-  final Map<String, bool> health;
-  final void Function(Instance) onSelect;
-  final VoidCallback onAdd;
-  final void Function(Instance) onManage;
-  const _MachineList({
-    required this.instances,
-    required this.active,
-    required this.health,
-    required this.onSelect,
-    required this.onAdd,
-    required this.onManage,
-  });
-  @override
-  State<_MachineList> createState() => _MachineListState();
-}
-
-class _MachineListState extends State<_MachineList> {
-  late final Map<String, bool> _h = {...widget.health};
-
-  @override
-  void initState() {
-    super.initState();
-    for (final i in widget.instances) {
-      DaemonClient(i.url, i.token).health().then((ok) {
-        if (mounted && _h[i.url] != ok) setState(() => _h[i.url] = ok);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ...widget.instances.map(_row),
-          Divider(height: 13, thickness: 1, color: AppColors.border),
-          _addRow(),
-        ]);
-  }
-
-  Widget _row(Instance i) {
-    final selected = i.url == widget.active?.url;
-    final ok = _h[i.url];
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        widget.onSelect(i);
-      },
-      onLongPress: () {
-        Navigator.pop(context);
-        widget.onManage(i);
-      },
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(14, kMobile ? 9 : 6, 4, kMobile ? 9 : 6),
-        child: Row(children: [
-          Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                  color: ok == true ? AppColors.ok : AppColors.fg4,
-                  shape: BoxShape.circle)),
-          const SizedBox(width: 10),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(i.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(kMobile ? 14 : 12.5, color: AppColors.fg1)),
-              const SizedBox(height: 1),
-              Text(hostOf(i.url),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(kMobile ? 11 : 10, color: AppColors.fg4)),
-            ]),
-          ),
-          if (selected) AppIcon('check', size: 14, color: AppColors.accent),
-          IconBtn('more-vertical', size: 30, iconSize: 15, tooltip: 'Manage',
-              onTap: () {
-            Navigator.pop(context);
-            widget.onManage(i);
-          }),
-        ]),
-      ),
-    );
-  }
-
-  Widget _addRow() {
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context);
-        widget.onAdd();
-      },
-      child: Padding(
-        padding:
-            EdgeInsets.fromLTRB(14, kMobile ? 11 : 8, 14, kMobile ? 11 : 8),
-        child: Row(children: [
-          AppIcon('plus', size: 15, color: AppColors.accent),
-          const SizedBox(width: 10),
-          Text('Add machine',
-              style: sans(kMobile ? 14 : 12.5,
-                  weight: FontWeight.w500, color: AppColors.accent)),
-        ]),
-      ),
-    );
-  }
-}
-
-/// Settings dialog: Zed-style sidebar + content pane. Models / vault /
-/// scheduled swap in-place so they never stack a second dialog.
-class _SettingsPanel extends StatefulWidget {
-  final DaemonClient client;
-  final List<Instance> instances;
-  final Instance? active;
-  final void Function(Instance) onRemove;
-  final VoidCallback onClose;
-  const _SettingsPanel({
-    required this.client,
-    required this.instances,
-    required this.active,
-    required this.onRemove,
-    required this.onClose,
-  });
-  @override
-  State<_SettingsPanel> createState() => _SettingsPanelState();
-}
-
-enum _SettingsPage { general, models, usage, vault, scheduled }
-
-class _SettingsPanelState extends State<_SettingsPanel> {
-  late final List<Instance> _instances = [...widget.instances];
-  bool _notif = false;
-  bool _notifBusy = false;
-  _SettingsPage _page = _SettingsPage.general;
-
-  static const _nav = [
-    (_SettingsPage.general, 'settings', 'General'),
-    (_SettingsPage.models, 'cpu', 'Models'),
-    (_SettingsPage.usage, 'activity', 'Usage'),
-    (_SettingsPage.vault, 'key', 'Vault'),
-    (_SettingsPage.scheduled, 'scheduled', 'Scheduled'),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    notificationsEnabled().then((v) {
-      if (mounted) setState(() => _notif = v);
-    });
-  }
-
-  Future<void> _toggleNotif(bool v) async {
-    setState(() => _notifBusy = true);
-    final err = await setNotificationsEnabled(v);
-    if (!mounted) return;
-    setState(() {
-      _notifBusy = false;
-      _notif = err == null ? v : _notif;
-    });
-    if (err != null) toast(context, err);
-  }
-
-  Future<void> _confirmRemove(Instance inst) async {
-    final ok = await confirmAction(
-      context,
-      title: 'Remove instance?',
-      body:
-          '${inst.label}\n\nRemoves the saved connection from this app. The machine and its sessions are untouched.',
-      confirmLabel: 'Remove',
-    );
-    if (!ok) return;
-    widget.onRemove(inst);
-    setState(() => _instances.removeWhere((e) => e.url == inst.url));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    return Scaffold(
-      backgroundColor: AppColors.surface1,
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
-            child: Row(children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Settings',
-                        style: sans(14.5,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text('Configure this workspace and its models.',
-                        style: sans(11.5, color: AppColors.fg3)),
-                  ],
-                ),
-              ),
-              IconBtn('x',
-                  size: 26,
-                  iconSize: 13,
-                  tooltip: 'Close',
-                  onTap: widget.onClose),
-            ]),
-          ),
-          Divider(height: 1, color: AppColors.border),
-          Expanded(
-            child: Column(children: [
-              SizedBox(height: 38, child: _navChips()),
-              Divider(height: 1, color: AppColors.border),
-              Expanded(child: _pageBody()),
-            ]),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  Widget _navChips() {
-    return ListView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      children: [
-        for (final (page, icon, label) in _nav)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Material(
-              color: _page == page ? AppColors.accentBg : Colors.transparent,
-              borderRadius: BorderRadius.circular(R.sm),
-              child: InkWell(
-                onTap: () => setState(() => _page = page),
-                borderRadius: BorderRadius.circular(R.sm),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  child: Row(children: [
-                    AppIcon(icon,
-                        size: 13,
-                        color:
-                            _page == page ? AppColors.accent : AppColors.fg3),
-                    const SizedBox(width: 5),
-                    Text(label,
-                        style: sans(11.5,
-                            weight: _page == page
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: _page == page
-                                ? AppColors.accent
-                                : AppColors.fg2)),
-                  ]),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _pageBody() {
-    return switch (_page) {
-      _SettingsPage.general => _generalPage(),
-      _SettingsPage.models =>
-        ModelsScreen(client: widget.client, embedded: true),
-      _SettingsPage.usage => UsageScreen(client: widget.client, embedded: true),
-      _SettingsPage.vault => VaultScreen(client: widget.client, embedded: true),
-      _SettingsPage.scheduled =>
-        RecurringScreen(client: widget.client, listOnly: true, embedded: true),
-    };
-  }
-
-  Widget _generalPage() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-      children: [
-        Text('General',
-            style: sans(14, weight: FontWeight.w600, color: AppColors.fg1)),
-        const SizedBox(height: 3),
-        Text('Manage the machine this app connects to and its alerts.',
-            style: sans(11.5, color: AppColors.fg3)),
-        const SizedBox(height: 14),
-        Text('MACHINES',
-            style: sans(10,
-                weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
-        const SizedBox(height: 6),
-        if (_instances.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text('No saved connections.',
-                style: sans(12, color: AppColors.fg3)),
-          )
-        else
-          Column(
-            children: [
-              for (var i = 0; i < _instances.length; i++) ...[
-                _instanceRow(_instances[i]),
-                if (i < _instances.length - 1)
-                  Divider(height: 1, color: AppColors.border),
-              ],
-            ],
-          ),
-        if (kCanNotify) ...[
-          const SizedBox(height: 16),
-          Text('NOTIFICATIONS',
-              style: sans(10,
-                  weight: FontWeight.w600, color: AppColors.fg4, spacing: 0.5)),
-          const SizedBox(height: 6),
-          _notifTile(),
-        ],
-      ],
-    );
-  }
-
-  Widget _instanceRow(Instance i) {
-    final isActive = i.url == widget.active?.url;
-    return Material(
-      color: Colors.transparent,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
-        child: Row(children: [
-          AppIcon('cpu',
-              size: 14, color: isActive ? AppColors.accent : AppColors.fg3),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(i.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12.5,
-                        weight: FontWeight.w500, color: AppColors.fg1)),
-                const SizedBox(height: 1),
-                Text(hostOf(i.url),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(10.5, color: AppColors.fg4)),
-              ],
-            ),
-          ),
-          if (isActive)
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: Text('active', style: sans(10, color: AppColors.accent)),
-            ),
-          IconBtn('trash',
-              size: 26,
-              iconSize: 13,
-              tooltip: 'Remove',
-              onTap: () => _confirmRemove(i)),
-        ]),
-      ),
-    );
-  }
-
-  Widget _notifTile() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(children: [
-        AppIcon('zap', size: 14, color: AppColors.fg3),
-        const SizedBox(width: 10),
-        Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Alerts',
-                style:
-                    sans(12.5, weight: FontWeight.w500, color: AppColors.fg1)),
-            const SizedBox(height: 1),
-            Text('Notify when a session needs input',
-                style: sans(11, color: AppColors.fg4)),
-          ]),
-        ),
-        _notifBusy
-            ? SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppColors.fg3))
-            : Transform.scale(
-                scale: 0.72,
-                child: Switch(
-                  value: _notif,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  activeThumbColor: AppColors.accentFg,
-                  activeTrackColor: AppColors.accent,
-                  onChanged: _toggleNotif,
-                ),
-              ),
-      ]),
-    );
-  }
-}
-
-/// Small green pulsing dot indicating a running session.
-class _PulsingDot extends StatefulWidget {
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
-
-class _PulsingDotState extends State<_PulsingDot>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _ctrl.drive(Tween(begin: 0.4, end: 1.0)),
-      child: Container(
-        width: 7,
-        height: 7,
-        decoration: const BoxDecoration(
-          color: Color(0xFF34D399), // emerald-400
-          shape: BoxShape.circle,
-        ),
-      ),
-    );
-  }
-}
+typedef _MachineList = MachineList;
+typedef _SettingsPanel = SettingsPanel;
+typedef _SettingsPage = SettingsPage;

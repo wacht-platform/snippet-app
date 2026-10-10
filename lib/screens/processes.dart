@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../swr.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../pull_refresh.dart';
 
 /// Background processes the agent started (dev servers, tunnels, a browser) via
 /// `bash {background:true}`. Lists them from /bg with a live status, a log tail,
-/// and a stop button. Auto-refreshes while open.
+/// and a stop button. Revalidates when the daemon reports a process change.
 class ProcessesScreen extends StatefulWidget {
   final DaemonClient client;
   final String sessionId;
@@ -26,58 +28,56 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
   String? _openLogId;
   String _log = '';
   bool _logLoading = false;
-  Timer? _ticker;
+  late final Swr<List<Map<String, dynamic>>> _list;
 
   @override
   void initState() {
     super.initState();
-    _load();
-    _ticker = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (mounted) _load(silent: true);
-    });
+    _list = Swr<List<Map<String, dynamic>>>(
+      client: widget.client,
+      key: 'bg:${widget.sessionId}',
+      fetch: () => widget.client.bgList(widget.sessionId),
+      revalidateOn: (e) => e['kind'] == 'process',
+      onChange: _sync,
+    );
+    _procs = _list.data;
+    _loading = _procs == null;
   }
 
   @override
   void dispose() {
-    _ticker?.cancel();
+    _list.dispose();
     super.dispose();
   }
 
-  Future<void> _load({bool silent = false}) async {
-    if (!silent && mounted) {
-      setState(() {
-        _loading = _procs == null;
-        _error = null;
-      });
-    }
-    try {
-      final p = await widget.client.bgList(widget.sessionId);
-      if (!mounted) return;
-      setState(() {
-        _procs = p;
-        _loading = false;
-        if (_openLogId != null && !p.any((e) => '${e['id']}' == _openLogId)) {
-          _openLogId = null;
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = '$e';
-          _loading = false;
-        });
+  Future<void> _load({bool silent = false}) => _list.refresh();
+
+  void _sync() {
+    if (!mounted) return;
+    final p = _list.data;
+    setState(() {
+      _procs = p ?? _procs;
+      _loading = _list.loading;
+      _error = p == null && _list.error != null ? '${_list.error}' : null;
+      if (p != null &&
+          _openLogId != null &&
+          !p.any((e) => '${e['id']}' == _openLogId)) {
+        _openLogId = null;
       }
-    }
+    });
   }
 
+  final Set<String> _stopping = {};
+
   Future<void> _kill(String id) async {
+    setState(() => _stopping.add(id));
     try {
       await widget.client.bgKill(widget.sessionId, id);
-      if (mounted) toast(context, 'Stopped');
     } catch (e) {
       if (mounted) toast(context, '$e', danger: true);
     }
     await _load(silent: true);
+    if (mounted) setState(() => _stopping.remove(id));
   }
 
   Future<void> _toggleLog(String id) async {
@@ -124,16 +124,9 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             titleSize: 14,
             compact: true,
             onBack: widget.onClose ?? () => Navigator.pop(context),
-            actions: [IconBtn('refresh', onTap: () => _load())],
           ),
           if (_loading)
-            Expanded(
-                child: Center(
-                    child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3))))
+            const Expanded(child: Center(child: DelayedSpinner()))
           else if (_error != null)
             Expanded(
                 child: EmptyState(
@@ -147,9 +140,12 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
                         'Long-running jobs the agent starts (servers, tunnels) show up here.'))
           else
             Expanded(
-                child: ListView(
-                    padding: const EdgeInsets.all(14),
-                    children: [for (final p in procs) _row(p)])),
+                child: PullToRefresh(
+                    onRefresh: () => _load(),
+                    child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(S.s16),
+                        children: [for (final p in procs) _row(p)]))),
         ]),
       ),
     );
@@ -159,8 +155,9 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
     final id = '${p['id'] ?? ''}';
     final cmd = '${p['command'] ?? ''}'.replaceAll('\n', ' ');
     final pid = p['pid'] ?? 0;
-    final running = p['running'] == true;
+    final running = p['running'] == true && !_stopping.contains('${p['id']}');
     final status = p['status'] as String?;
+    final failed = !running && status != null && status != '0';
     final statusLabel = running
         ? 'running'
         : switch (status) {
@@ -169,76 +166,68 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
             final c? when c.isNotEmpty => 'exited ($c)',
             _ => 'exited',
           };
+    // A finished process previously wore one grey dot and one grey label
+    // whatever the outcome, so `exited (101)` looked exactly like `exited (ok)`
+    // — the same "failure is invisible" defect the tool rows had. Colour now
+    // summarises the outcome: amber live, danger for non-zero/killed, grey for
+    // a clean exit.
+    final tone = running
+        ? Tone.run
+        : failed
+            ? Tone.danger
+            : Tone.neutral;
     final open = _openLogId == id;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-      decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.card),
-          border: Border.all(color: AppColors.border)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: running ? AppColors.ok : AppColors.fg4)),
-          const SizedBox(width: 9),
-          Expanded(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: S.s8),
+      child: Material(
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(R.md),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s8, S.s8),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+              padding: const EdgeInsets.only(right: S.s8),
               child: Text(cmd,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: mono(12, color: AppColors.fg1))),
-          if (running)
-            TextButton(
-                onPressed: () => _kill(id),
-                style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 0),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4)),
-                child: Text('Stop', style: sans(12, color: AppColors.danger))),
-        ]),
-        const SizedBox(height: 4),
-        Row(children: [
-          Text('pid $pid', style: mono(10.5, color: AppColors.fg4)),
-          const SizedBox(width: 12),
-          Text(statusLabel, style: mono(10.5, color: AppColors.fg4)),
-          const Spacer(),
-          GestureDetector(
-              onTap: () => _toggleLog(id),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Text(open ? 'hide log' : 'log',
-                      style: mono(11,
-                          color: open ? AppColors.accent : AppColors.fg3)))),
-        ]),
-        if (open) ...[
-          const SizedBox(height: 6),
-          Container(
-            constraints: const BoxConstraints(maxHeight: 240),
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-                color: AppColors.bg,
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border)),
-            child: _logLoading
-                ? Center(
-                    child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.fg3)))
-                : SingleChildScrollView(
-                    child: Text(_log.trim().isEmpty ? '(empty)' : _log,
-                        style: mono(10.5, height: 1.4, color: AppColors.fg2))),
-          ),
-        ],
-      ]),
+                  style: TS.code(AppColors.fg1)),
+            ),
+            const SizedBox(height: S.s8),
+            Row(children: [
+              Tag(statusLabel, tone: tone, dot: !running, live: running),
+              const SizedBox(width: S.s8),
+              Text('pid $pid', style: TS.meta()),
+              const Spacer(),
+              TextAction(open ? 'Hide log' : 'Log',
+                  onTap: () => _toggleLog(id)),
+              if (running)
+                TextAction('Stop', onTap: () => _kill(id), danger: true),
+            ]),
+            if (open) ...[
+              const SizedBox(height: S.s8),
+              Padding(
+                padding: const EdgeInsets.only(right: S.s8, bottom: S.s4),
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(S.s12),
+                  decoration: BoxDecoration(
+                      color: AppColors.canvas,
+                      borderRadius: BorderRadius.circular(R.sm + 2)),
+                  child: _logLoading
+                      ? const Center(child: DelayedSpinner(size: 16))
+                      : SingleChildScrollView(
+                          child: SelectableText(
+                              _log.trim().isEmpty ? '(empty)' : _log,
+                              style: TS.codeSmall(AppColors.fg2))),
+                ),
+              ),
+            ],
+          ]),
+        ),
+      ),
     );
   }
 }

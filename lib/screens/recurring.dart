@@ -11,6 +11,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'files.dart';
 import 'mission_control.dart';
+import 'shell_nav.dart';
 
 /// Recurring goals — list, create, pause, and delete jobs that SetGoal a
 /// session. The daemon detects `~/.snippet/recurring/<id>.json`. If that
@@ -31,6 +32,16 @@ class RecurringScreen extends StatefulWidget {
 
   /// When true, skip the app bar and fill the parent (settings dialog pane).
   final bool embedded;
+
+  /// Host-supplied back action for [embedded] use. This screen draws its OWN
+  /// `NavBackRow`, so exactly one header exists per level.
+  final VoidCallback? onBack;
+  final ValueChanged<bool>? onAddingChanged;
+
+  /// Docked in the desktop side pane: compact insets and its own small header,
+  /// since the pane's tab strip carries only the name.
+  final bool pane;
+
   const RecurringScreen({
     super.key,
     required this.client,
@@ -39,12 +50,16 @@ class RecurringScreen extends StatefulWidget {
     this.workspace,
     this.listOnly = false,
     this.embedded = false,
+    this.onBack,
+    this.onAddingChanged,
+    this.pane = false,
   });
   @override
-  State<RecurringScreen> createState() => _RecurringScreenState();
+  State<RecurringScreen> createState() => RecurringScreenState();
 }
 
-class _RecurringScreenState extends State<RecurringScreen> {
+class RecurringScreenState extends State<RecurringScreen>
+    with AutomaticKeepAliveClientMixin {
   late Future<List<RecurringJob>> _future;
   List<SessionInfo>? _sessions;
   StreamSubscription<dynamic>? _eventsSub;
@@ -52,12 +67,40 @@ class _RecurringScreenState extends State<RecurringScreen> {
   Timer? _eventsReconnect;
   bool _closed = false;
 
+  bool _adding = false;
+  bool get isAdding => _adding;
+  bool _submitting = false;
+  final _titleCtrl = TextEditingController();
+  final _promptCtrl = TextEditingController();
+  final _planCtrl = TextEditingController();
+  final _dailyCtrl = TextEditingController(text: '09:00');
+  final _customEveryCtrl = TextEditingController();
+  String _mode = 'preset';
+  String _schedule = 'every 1h';
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void didUpdateWidget(covariant RecurringScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.client != widget.client ||
+        oldWidget.sessionId != widget.sessionId) {
+      _future = widget.client.recurringJobs();
+    }
+  }
+
   @override
   void dispose() {
     _closed = true;
     _refreshDebounce?.cancel();
     _eventsReconnect?.cancel();
     _eventsSub?.cancel();
+    _titleCtrl.dispose();
+    _promptCtrl.dispose();
+    _planCtrl.dispose();
+    _dailyCtrl.dispose();
+    _customEveryCtrl.dispose();
     super.dispose();
   }
 
@@ -112,8 +155,25 @@ class _RecurringScreenState extends State<RecurringScreen> {
     if (mounted) setState(() => _future = widget.client.recurringJobs());
   }
 
+  void add() => _add();
+
   Future<void> _add() async {
     if (!_canAdd) return;
+    if (!kMobile) {
+      setState(() {
+        _titleCtrl.clear();
+        _promptCtrl.clear();
+        _planCtrl.clear();
+        _dailyCtrl.text = '09:00';
+        _customEveryCtrl.clear();
+        _mode = 'preset';
+        _schedule = 'every 1h';
+        _submitting = false;
+        _adding = true;
+      });
+      widget.onAddingChanged?.call(true);
+      return;
+    }
     final title = TextEditingController();
     final prompt = TextEditingController();
     final plan = TextEditingController();
@@ -123,6 +183,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
     var schedule = 'every 1h';
     var mode = 'preset'; // preset | custom | daily | onceAt | onceIn
     final saved = await showModalBottomSheet<bool>(
+      sheetAnimationStyle: sheetMotion,
       context: context,
       backgroundColor: AppColors.surface1,
       isScrollControlled: true,
@@ -160,8 +221,8 @@ class _RecurringScreenState extends State<RecurringScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text('Schedule a goal or message',
-                        style: sans(14,
-                            weight: FontWeight.w600, color: AppColors.fg1)),
+                        style: sans(kMobile ? 14 : 13,
+                            weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     Text(
                       'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',
@@ -173,7 +234,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
                         controller: title,
                         hint: 'Nightly review'),
                     const SizedBox(height: 12),
-                    Text('Schedule', style: sans(12, color: AppColors.fg3)),
+                    Text('Schedule', style: TS.meta()),
                     const SizedBox(height: 6),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final s in const [
@@ -329,21 +390,36 @@ class _RecurringScreenState extends State<RecurringScreen> {
     return 'every $n$unit';
   }
 
+  final Map<String, bool> _enabledOverride = {};
+
+  bool _enabled(RecurringJob job) => _enabledOverride[job.id] ?? job.enabled;
+
   Future<void> _toggle(RecurringJob job) async {
+    final next = !_enabled(job);
+    setState(() => _enabledOverride[job.id] = next);
     try {
-      await widget.client.updateRecurring(job.id, enabled: !job.enabled);
+      await widget.client.updateRecurring(job.id, enabled: next);
       _refresh();
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+      if (mounted) {
+        setState(() => _enabledOverride.remove(job.id));
+        toast(context, '$e', danger: true);
+      }
     }
   }
 
+  final Set<String> _removing = {};
+
   Future<void> _remove(RecurringJob job) async {
+    setState(() => _removing.add(job.id));
     try {
       await widget.client.deleteRecurring(job.id);
       _refresh();
     } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
+      if (mounted) {
+        setState(() => _removing.remove(job.id));
+        toast(context, '$e', danger: true);
+      }
     }
   }
 
@@ -352,33 +428,235 @@ class _RecurringScreenState extends State<RecurringScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding:
+            EdgeInsets.symmetric(horizontal: 10, vertical: kMobile ? 14 : 6),
         decoration: BoxDecoration(
-          color: on
-              ? AppColors.accent.withValues(alpha: 0.16)
-              : AppColors.surface2,
+          // Selection = a NEUTRAL surface step, accent reserved for state.
+          color: on ? AppColors.surface3 : AppColors.surface2,
           borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(color: on ? AppColors.accent : AppColors.border),
+          border: Border.all(color: on ? AppColors.border2 : AppColors.border),
         ),
         child: Text(label,
-            style: sans(12, color: on ? AppColors.accent : AppColors.fg2)),
+            style: sans(12, color: on ? AppColors.fg1 : AppColors.fg2)),
+      ),
+    );
+  }
+
+  Future<void> _saveInline() async {
+    if (_submitting) return;
+    final t = _titleCtrl.text.trim();
+    final p = _promptCtrl.text.trim();
+    final planPath = _planCtrl.text.trim();
+    final sched = switch (_mode) {
+      'daily' => 'daily ${_dailyCtrl.text.trim()}',
+      'onceAt' => 'at ${_dailyCtrl.text.trim()}',
+      'onceIn' => 'in ${_customEveryCtrl.text.trim()}',
+      'custom' => _customSchedule(_customEveryCtrl.text),
+      _ => _schedule,
+    };
+    if (t.isEmpty) {
+      if (mounted) toast(context, 'Title is required', danger: true);
+      return;
+    }
+    if (p.isEmpty && planPath.isEmpty) {
+      if (mounted) {
+        toast(context, 'Goal or plan file is required', danger: true);
+      }
+      return;
+    }
+    if (sched == null) {
+      if (mounted) {
+        toast(context, 'Interval must be at least 5 minutes (e.g. 5m, 2h)',
+            danger: true);
+      }
+      return;
+    }
+    setState(() => _adding = false);
+    widget.onAddingChanged?.call(false);
+    try {
+      await widget.client.createRecurring(
+        title: t,
+        sessionId: _boundSessionId,
+        prompt: p,
+        planPath: planPath.isEmpty ? null : planPath,
+        schedule: sched,
+        goal: true,
+      );
+      _refresh();
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't create $t: $e", danger: true);
+    }
+  }
+
+  Future<void> _pickPlanInline() async {
+    final start =
+        (widget.workspace?.trim().isNotEmpty == true) ? widget.workspace : null;
+    final picked = await presentScreen<String>(
+      context,
+      builder: (_, close) => FileExplorer(
+        client: widget.client,
+        title: 'Plan file',
+        start: start,
+        onClose: close,
+        onPickFile: (path) {},
+      ),
+    );
+    if (picked != null && picked.trim().isNotEmpty && mounted) {
+      setState(() {
+        _planCtrl.text = picked.trim();
+      });
+    }
+  }
+
+  Widget _inlineAddCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Schedule a goal or message',
+                  style: TS.label(AppColors.fg1),
+                ),
+              ),
+              IconBtn('x', size: 24, iconSize: 13, tooltip: 'Cancel',
+                  onTap: () {
+                setState(() => _adding = false);
+                widget.onAddingChanged?.call(false);
+              }),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes.',
+            style: TS.meta(),
+          ),
+          const SizedBox(height: 12),
+          AppField(
+            label: 'Title',
+            controller: _titleCtrl,
+            hint: 'Nightly review',
+          ),
+          const SizedBox(height: 10),
+          Text('Schedule', style: TS.meta()),
+          const SizedBox(height: 6),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final s in const [
+              'every 5m',
+              'every 15m',
+              'every 1h',
+              'every 1d',
+            ])
+              _chip(s, _mode == 'preset' && _schedule == s, () {
+                setState(() {
+                  _mode = 'preset';
+                  _schedule = s;
+                });
+              }),
+            _chip('custom', _mode == 'custom', () {
+              setState(() => _mode = 'custom');
+            }),
+            _chip('daily', _mode == 'daily', () {
+              setState(() => _mode = 'daily');
+            }),
+            _chip('once at', _mode == 'onceAt', () {
+              setState(() => _mode = 'onceAt');
+            }),
+            _chip('once in', _mode == 'onceIn', () {
+              setState(() => _mode = 'onceIn');
+            }),
+          ]),
+          if (_mode == 'custom') ...[
+            const SizedBox(height: 8),
+            AppField(
+              label: 'Every (min 5m)',
+              controller: _customEveryCtrl,
+              mono: true,
+              hint: '5m  ·  90m  ·  2h  ·  300s',
+            ),
+          ],
+          if (_mode == 'daily') ...[
+            const SizedBox(height: 8),
+            AppField(
+              label: 'Time (HH:MM)',
+              controller: _dailyCtrl,
+              mono: true,
+              hint: '09:00',
+            ),
+          ],
+          if (_mode == 'onceAt') ...[
+            const SizedBox(height: 8),
+            AppField(
+              label: 'Time today/tomorrow (HH:MM)',
+              controller: _dailyCtrl,
+              mono: true,
+              hint: '14:30',
+            ),
+          ],
+          if (_mode == 'onceIn') ...[
+            const SizedBox(height: 8),
+            AppField(
+              label: 'From now (e.g. 30m, 2h)',
+              controller: _customEveryCtrl,
+              mono: true,
+              hint: '30m',
+            ),
+          ],
+          const SizedBox(height: 10),
+          AppField(
+            label: 'Goal',
+            controller: _promptCtrl,
+            hint: 'The piece of work to complete',
+            minLines: 2,
+            maxLines: 5,
+          ),
+          const SizedBox(height: 10),
+          AppField(
+            label: 'Plan file (optional)',
+            controller: _planCtrl,
+            mono: true,
+            hint: 'notes/plan.md — pick or type a path',
+            rightSlot: IconBtn('folder',
+                size: 28,
+                iconSize: 14,
+                tooltip: 'Pick file',
+                onTap: _pickPlanInline),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Btn('Cancel', small: true, variant: BtnVariant.ghost, onTap: () {
+                setState(() => _adding = false);
+                widget.onAddingChanged?.call(false);
+              }),
+              const SizedBox(width: 8),
+              Btn('Save job',
+                  small: true, disabled: _submitting, onTap: _saveInline),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     Theme.of(context); // Rebuild on theme change
     final body = FutureBuilder<List<RecurringJob>>(
       future: _future,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return Center(
-              child: SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppColors.fg3)));
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return const ListSkeleton();
         }
         if (snap.hasError) {
           return Padding(
@@ -387,7 +665,10 @@ class _RecurringScreenState extends State<RecurringScreen> {
                 style: sans(13, height: 1.4, color: AppColors.danger)),
           );
         }
-        final allJobs = snap.data ?? const [];
+        final allJobs = [
+          for (final j in snap.data ?? const <RecurringJob>[])
+            if (!_removing.contains(j.id)) j
+        ];
         final bound = widget.sessionId?.trim();
         final jobs = (bound != null && bound.isNotEmpty)
             ? allJobs.where((j) {
@@ -398,62 +679,86 @@ class _RecurringScreenState extends State<RecurringScreen> {
                 return j.sessionId == bound || j.sessionId.contains(bound);
               }).toList()
             : allJobs;
-        final list = ListView(
-          padding: EdgeInsets.fromLTRB(
-              widget.embedded ? 18 : 16, widget.embedded ? 12 : 14, 16, 24),
-          children: [
-            if (jobs.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
-                child: Text('No scheduled jobs yet.',
-                    style: sans(13, color: AppColors.fg3)),
-              ),
-            ...jobs.map(_jobRow),
-            if (_canAdd) ...[
-              const SizedBox(height: 4),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _add,
-                  borderRadius: BorderRadius.circular(R.md),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                    child: Row(children: [
-                      AppIcon('plus', size: 16, color: AppColors.fg3),
-                      const SizedBox(width: 12),
-                      Text('Add job', style: sans(14, color: AppColors.fg2)),
-                    ]),
+        final children = [
+          if (widget.pane)
+            Row(children: [
+              Expanded(child: PaneLabel('Scheduled jobs · ${jobs.length}')),
+              if (_canAdd && !_adding)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: S.s8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(R.xs),
+                    onTap: _add,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: S.s4, vertical: 2),
+                      child: Text('+ New',
+                          style: mono(10, color: AppColors.accent)),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ],
+            ]),
+          if (_adding) ...[_inlineAddCard(), const SizedBox(height: S.s12)],
+          if (jobs.isEmpty && !_adding)
+            EmptyState(
+              icon: 'repeat',
+              title: 'No scheduled jobs',
+              body:
+                  'Run a prompt on a schedule, like a morning triage or a nightly audit.',
+              action: _canAdd && !kMobile
+                  ? HeaderAction('New job', onTap: _add)
+                  : null,
+            )
+          else if (jobs.isNotEmpty)
+            ListGroup(children: [for (final j in jobs) _jobRow(j)]),
+        ];
+        if (!widget.pane) return PageBody(children: children);
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s24),
+          children: children,
         );
-        if (widget.embedded || kMobile) return list;
-        return Center(
-            child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 680), child: list));
       },
     );
-    if (widget.embedded) return body;
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Column(children: [
-          SnAppBar(
-              title: 'Scheduled',
-              titleSize: 14,
-              compact: true,
-              onBack: widget.onClose ?? () => Navigator.pop(context)),
-          Expanded(child: body),
+    // Three cases, and the header differs for each:
+    //   not embedded        → owned Scaffold + SnAppBar
+    //   embedded + onBack   → OWNED NavBackRow (phone drill-down)
+    //   embedded, no onBack → NO header (desktop dialog pane; the host's section
+    //                         chip strip is the navigation)
+    // Drawing a row regardless is what stacked two back rows in the editor.
+    if (!widget.embedded) {
+      return Scaffold(
+        body: SafeArea(
+          bottom: false,
+          child: Column(children: [
+            SnAppBar(
+                title: 'Scheduled jobs',
+                compact: true,
+                onBack: widget.onClose ?? () => Navigator.pop(context),
+                actions: [
+                  if (_canAdd && !_adding) HeaderAction('New job', onTap: _add),
+                ]),
+            Expanded(child: body),
+          ]),
+        ),
+      );
+    }
+    // Embedded with a back action → phone drill-down, so THIS level owns the
+    // header. Embedded without one → the desktop dialog pane, where the host's
+    // section chip strip is the navigation and a back row would duplicate it.
+    if (widget.onBack == null) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        NavBackRow(title: 'Scheduled jobs', onBack: widget.onBack!, trailing: [
+          if (_canAdd && !_adding) HeaderAction('New job', onTap: _add),
         ]),
-      ),
+        Expanded(child: body),
+      ],
     );
   }
 
   String _nextIn(RecurringJob job) {
-    if (!job.enabled) return 'paused';
+    if (!_enabled(job)) return 'paused';
     if (job.queued) return 'queued — next after current goal';
     if (job.nextRunAt <= 0) return '';
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -479,8 +784,8 @@ class _RecurringScreenState extends State<RecurringScreen> {
     final match = _sessions
         ?.where((s) => s.id == job.sessionId || job.sessionId.contains(s.id))
         .firstOrNull;
-    if (match != null && match.folder.isNotEmpty) {
-      return lastPathSegment(match.folder, ifEmpty: match.title);
+    if (match != null && match.projectFolder.isNotEmpty) {
+      return lastPathSegment(match.projectFolder, ifEmpty: match.title);
     }
     final clean = job.sessionId.replaceAll('.json', '');
     if (clean.contains('/conversations/')) {
@@ -493,7 +798,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
   }
 
   Widget _jobRow(RecurringJob job) {
-    final paused = !job.enabled;
+    final paused = !_enabled(job);
     final target = _targetLabel(job);
     final bits = <String>[
       if (!job.delivery) 'message',
@@ -503,25 +808,59 @@ class _RecurringScreenState extends State<RecurringScreen> {
       if (job.planPath != null) job.planPath!,
     ];
     final sub = bits.where((s) => s.isNotEmpty).join(' · ');
+    final error = job.lastError?.trim() ?? '';
+    final dense = !kMobile;
+    final btn = dense ? 26.0 : 32.0;
+    final ico = dense ? 13.0 : 16.0;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(children: [
-        AppIcon('scheduled',
-            size: 16, color: paused ? AppColors.fg4 : AppColors.fg3),
-        const SizedBox(width: 12),
+      padding: dense
+          ? const EdgeInsets.fromLTRB(12, 8, 4, 8)
+          : const EdgeInsets.fromLTRB(S.s12, S.s12, S.s4, S.s12),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (dense)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, right: 10),
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                  color: paused ? AppColors.fg4 : AppColors.accent,
+                  shape: BoxShape.circle),
+            ),
+          )
+        else ...[
+          IconTile('repeat', tone: paused ? Tone.neutral : Tone.accent),
+          const SizedBox(width: S.s12),
+        ],
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(job.title.isEmpty ? job.id : job.title,
-                style: sans(14, color: paused ? AppColors.fg3 : AppColors.fg1)),
-            const SizedBox(height: 2),
-            Text(sub, style: sans(12, color: AppColors.fg4)),
-            if (job.lastError != null && job.lastError!.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(job.lastError!,
+            Row(children: [
+              Flexible(
+                child: Text(job.title.isEmpty ? job.id : job.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: dense
+                        ? sans(13,
+                            color: paused ? AppColors.fg3 : AppColors.fg1)
+                        : TS.rowTitle(paused ? AppColors.fg3 : AppColors.fg1)),
+              ),
+              if (paused && !dense) ...[
+                const SizedBox(width: S.s8),
+                const Tag('Paused'),
+              ],
+            ]),
+            const SizedBox(height: S.s2),
+            Text(sub,
+                style: dense ? mono(10, color: AppColors.fg3) : TS.meta()),
+            if (error.isNotEmpty) ...[
+              const SizedBox(height: S.s4),
+              Text(error,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.danger)),
+                  style: dense
+                      ? sans(12, color: AppColors.danger)
+                      : TS.meta(AppColors.danger)),
             ],
           ]),
         ),
@@ -529,8 +868,8 @@ class _RecurringScreenState extends State<RecurringScreen> {
           button: true,
           label: paused ? 'Resume scheduled job' : 'Pause scheduled job',
           child: IconBtn(paused ? 'play' : 'pause',
-              size: 32,
-              iconSize: 16,
+              size: btn,
+              iconSize: ico,
               tooltip: paused ? 'Resume' : 'Pause',
               onTap: () => _toggle(job)),
         ),
@@ -538,8 +877,8 @@ class _RecurringScreenState extends State<RecurringScreen> {
           button: true,
           label: 'Delete scheduled job',
           child: IconBtn('trash',
-              size: 32,
-              iconSize: 16,
+              size: btn,
+              iconSize: ico,
               tooltip: 'Delete',
               onTap: () => _remove(job)),
         ),
