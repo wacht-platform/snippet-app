@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
 import '../api.dart';
+import '../media_views.dart';
 import '../desktop_pick.dart';
 import '../models.dart';
 import '../panel.dart';
@@ -240,23 +241,24 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
             builder: (ctx) => InkWell(
               onTap: _sending ? null : () => _chooseAgent(ctx),
               borderRadius: BorderRadius.circular(R.sm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-              child: Row(children: [
-                AppIcon('agent', size: 15, color: AppColors.fg3),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(_agentName ?? 'Choose an agent',
-                      style: sans(13,
-                          color: _agentName == null
-                              ? AppColors.fg4
-                              : AppColors.fg1)),
-                ),
-                AppIcon('chevron-down', size: 13, color: AppColors.fg4),
-              ]),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                child: Row(children: [
+                  AppIcon('agent', size: 15, color: AppColors.fg3),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_agentName ?? 'Choose an agent',
+                        style: sans(13,
+                            color: _agentName == null
+                                ? AppColors.fg4
+                                : AppColors.fg1)),
+                  ),
+                  AppIcon('chevron-down', size: 13, color: AppColors.fg4),
+                ]),
+              ),
             ),
           ),
-        ),
         ),
         const SizedBox(height: 14),
         AppField(
@@ -269,8 +271,7 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
         ),
         if (_error != null) ...[
           const SizedBox(height: 12),
-          Text(_error!,
-              style: sans(12, color: AppColors.danger)),
+          Text(_error!, style: sans(12, color: AppColors.danger)),
         ],
         const SizedBox(height: 18),
         Row(children: [
@@ -284,9 +285,7 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
           const SizedBox(width: 10),
           Expanded(
             child: Btn(_sending ? 'Sending…' : 'Send',
-                full: true,
-                disabled: _sending,
-                onTap: _submit),
+                full: true, disabled: _sending, onTap: _submit),
           ),
         ]),
       ],
@@ -417,7 +416,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     setState(() {
       if (next != null) _events = next;
       _loading = _thread.loading;
-      _error = next == null && _thread.error != null ? '${_thread.error}' : null;
+      _error =
+          next == null && _thread.error != null ? '${_thread.error}' : null;
     });
     if (hadNew) {
       unawaitedMarkRead();
@@ -426,7 +426,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   }
 
   void unawaitedMarkRead() {
-    widget.client.markAgentThreadRead(peerId: widget.agentId).catchError((_) {});
+    widget.client
+        .markAgentThreadRead(peerId: widget.agentId)
+        .catchError((_) {});
   }
 
   void _jumpToBottom({bool animated = false}) {
@@ -531,7 +533,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       if (mounted) setState(() => _recordingPath = path);
     } catch (e) {
       if (mounted) setState(() => _isRecording = false);
-      if (mounted) toast(context, 'Could not start recording: $e', danger: true);
+      if (mounted) {
+        toast(context, 'Could not start recording: $e', danger: true);
+      }
     }
   }
 
@@ -565,7 +569,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         _recordingBytes = bytes;
       }
     } catch (e) {
-      if (mounted) toast(context, 'Could not finish recording: $e', danger: true);
+      if (mounted) {
+        toast(context, 'Could not finish recording: $e', danger: true);
+      }
     }
   }
 
@@ -649,7 +655,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       }
       return true;
     } catch (e) {
-      if (mounted) toast(context, 'Could not attach recording: $e', danger: true);
+      if (mounted) {
+        toast(context, 'Could not attach recording: $e', danger: true);
+      }
       return false;
     }
   }
@@ -752,7 +760,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   }
 
   Future<void> _pickPhotos() async {
-    final xs = await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 2200);
+    final xs =
+        await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 2200);
     if (xs.isEmpty) return;
     await _ingest(xs
         .map((x) => (name: x.name, localPath: x.path, readBytes: x.readAsBytes))
@@ -763,7 +772,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     final x = await ImagePicker().pickImage(
         source: ImageSource.camera, imageQuality: 85, maxWidth: 2200);
     if (x == null) return;
-    await _ingest([(name: x.name, localPath: x.path, readBytes: x.readAsBytes)]);
+    await _ingest(
+        [(name: x.name, localPath: x.path, readBytes: x.readAsBytes)]);
   }
 
   Future<void> _pickFiles() async {
@@ -854,7 +864,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         .toList();
     var body = _input.text.trim();
     if (markers.isNotEmpty) {
-      body = body.isEmpty ? markers.join('\n\n') : '$body\n\n${markers.join('\n\n')}';
+      body = body.isEmpty
+          ? markers.join('\n\n')
+          : '$body\n\n${markers.join('\n\n')}';
     }
     if (body.isEmpty) return;
     final typed = _input.text;
@@ -951,8 +963,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                   widget.agentName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style:
-                      sans(kMobile ? M.sectionTitle : 15, weight: W.label, color: AppColors.fg1),
+                  style: sans(kMobile ? M.sectionTitle : 15,
+                      weight: W.label, color: AppColors.fg1),
                 ),
                 if (!kMobile && subtitle.isNotEmpty) ...[
                   const SizedBox(height: 2),
@@ -1026,7 +1038,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                 child: EmptyState(
                   icon: 'message',
                   title: 'Chat with ${widget.agentName}',
-                  body: 'Send a message to discuss tasks or coordinate work directly.',
+                  body:
+                      'Send a message to discuss tasks or coordinate work directly.',
                 ),
               ),
             ),
@@ -1078,6 +1091,86 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           Bubble(mine: false, text: e.body),
         ],
       ),
+    );
+  }
+
+  Widget _mobileRecorder() {
+    final reviewing = !_isRecording && _recordingPath != null;
+    final position = reviewing ? _playbackPosition : _recordingElapsed;
+    Widget roundBtn(String icon, String tip, VoidCallback onTap,
+            {Color? fill, Color? ink}) =>
+        Tooltip(
+          message: tip,
+          child: Material(
+            color: fill ?? AppColors.surface2,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap,
+              child: SizedBox.square(
+                dimension: 46,
+                child: Center(
+                    child:
+                        AppIcon(icon, size: 19, color: ink ?? AppColors.fg1)),
+              ),
+            ),
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(children: [
+        roundBtn('trash', 'Discard', () => unawaited(_discardRecording()),
+            ink: AppColors.fg3),
+        const SizedBox(width: 10),
+        if (reviewing) ...[
+          roundBtn(
+              _isPlayingRecording ? 'pause' : 'play',
+              _isPlayingRecording ? 'Pause' : 'Play',
+              () => unawaited(_toggleRecordingPlayback())),
+          const SizedBox(width: 10),
+        ],
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                if (!reviewing) ...[
+                  StatusDot(
+                      status: 'running', size: 8, color: AppColors.danger),
+                  const SizedBox(width: 6),
+                ],
+                Text(reviewing ? 'Voice note' : 'Recording',
+                    style: sans(13, color: AppColors.fg2)),
+                const Spacer(),
+                Text(_audioTime(position),
+                    style: sans(13,
+                        tabular: true,
+                        color: reviewing ? AppColors.fg3 : AppColors.danger)),
+              ]),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 30,
+                width: double.infinity,
+                child:
+                    CustomPaint(painter: LiveWave(List<double>.of(_waveform))),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        if (_isRecording)
+          roundBtn('stop', 'Stop', () => unawaited(_stopRecording()),
+              fill: AppColors.surface3)
+        else
+          roundBtn('arrow-up', 'Send voice note', () => unawaited(_send()),
+              fill: AppColors.accentFill, ink: AppColors.accentFg),
+      ]),
     );
   }
 
@@ -1225,129 +1318,143 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
           10 + (keyboard > 0 ? 8 : mq.padding.bottom),
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.bg,
-            borderRadius: BorderRadius.circular(R.md),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_isRecording || _recordingPath != null) ...[
-                _recordingPanel(),
-                const SizedBox(height: 8),
-              ],
-              if (_attachments.isNotEmpty) ...[
-                _attachmentBar(),
-                const SizedBox(height: 6),
-              ],
-              CallbackShortcuts(
-                bindings: {
-                  const SingleActivator(LogicalKeyboardKey.enter): () {
-                    if (!kMobile) _send();
-                  },
-                  const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
-                    _send();
-                  },
-                  const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
-                    _send();
-                  },
-                },
-                child: TextField(
-                  controller: _input,
-                  minLines: 2,
-                  maxLines: 8,
-                  cursorColor: AppColors.fg1,
-                  onSubmitted: (_) {
-                    if (!kMobile) _send();
-                  },
-                  style: sans(kMobile ? M.body : 16,
-                      height: 1.45, color: AppColors.fg1),
-                  decoration: InputDecoration(
-                    isCollapsed: true,
-                    contentPadding: const EdgeInsets.fromLTRB(2, 2, 8, 10),
-                    border: InputBorder.none,
-                    hintText: 'Message ${widget.agentName}…',
-                    hintStyle: sans(kMobile ? M.body : 16,
-                        height: 1.45, color: AppColors.fg4),
-                  ),
+        child: kMobile && (_isRecording || _recordingPath != null)
+            ? _mobileRecorder()
+            : Container(
+                decoration: BoxDecoration(
+                  color: kMobile ? AppColors.raised : AppColors.bg,
+                  borderRadius: BorderRadius.circular(kMobile ? 18 : R.md),
+                  border: kMobile ? Border.all(color: AppColors.border) : null,
                 ),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(R.sm),
-                    child: InkWell(
-                      onTap: _onAttachTap,
-                      borderRadius: BorderRadius.circular(R.sm),
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: AppIcon('plus', size: 18, color: AppColors.fg3),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(R.sm),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon('agent', size: 12, color: AppColors.fg3),
-                        const SizedBox(width: 5),
-                        Text(widget.agentName,
-                            style: mono(11, color: AppColors.fg2)),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  if (kCanRecord) ...[
-                    Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(R.sm),
-                      child: InkWell(
-                        onTap: _onMicTap,
-                        borderRadius: BorderRadius.circular(R.sm),
-                        child: Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: AppIcon(
-                            _isRecording ? 'mic-off' : 'mic',
-                            size: 18,
-                            color: _isRecording ? AppColors.danger : AppColors.fg3,
-                          ),
+                padding: kMobile
+                    ? const EdgeInsets.symmetric(horizontal: 12, vertical: 14)
+                    : const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_isRecording || _recordingPath != null) ...[
+                      _recordingPanel(),
+                      const SizedBox(height: 8),
+                    ],
+                    if (_attachments.isNotEmpty) ...[
+                      _attachmentBar(),
+                      const SizedBox(height: 6),
+                    ],
+                    CallbackShortcuts(
+                      bindings: {
+                        const SingleActivator(LogicalKeyboardKey.enter): () {
+                          if (!kMobile) _send();
+                        },
+                        const SingleActivator(LogicalKeyboardKey.enter,
+                            meta: true): () {
+                          _send();
+                        },
+                        const SingleActivator(LogicalKeyboardKey.enter,
+                            control: true): () {
+                          _send();
+                        },
+                      },
+                      child: TextField(
+                        controller: _input,
+                        minLines: kMobile ? 1 : 2,
+                        maxLines: 8,
+                        cursorColor: AppColors.fg1,
+                        onSubmitted: (_) {
+                          if (!kMobile) _send();
+                        },
+                        style: sans(kMobile ? M.body : 16,
+                            height: 1.45, color: AppColors.fg1),
+                        decoration: InputDecoration(
+                          isCollapsed: true,
+                          contentPadding:
+                              const EdgeInsets.fromLTRB(2, 2, 8, 10),
+                          border: InputBorder.none,
+                          hintText: 'Message ${widget.agentName}…',
+                          hintStyle: sans(kMobile ? M.body : 16,
+                              height: 1.45, color: AppColors.fg4),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(R.sm),
+                          child: InkWell(
+                            onTap: _onAttachTap,
+                            borderRadius: BorderRadius.circular(R.sm),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: AppIcon('plus',
+                                  size: 18, color: AppColors.fg3),
+                            ),
+                          ),
+                        ),
+                        if (!kMobile) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface2,
+                              borderRadius: BorderRadius.circular(R.sm),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppIcon('agent',
+                                    size: 12, color: AppColors.fg3),
+                                const SizedBox(width: 5),
+                                Text(widget.agentName,
+                                    style: mono(11, color: AppColors.fg2)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        if (kCanRecord) ...[
+                          Material(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(R.sm),
+                            child: InkWell(
+                              onTap: _onMicTap,
+                              borderRadius: BorderRadius.circular(R.sm),
+                              child: Padding(
+                                padding: const EdgeInsets.all(6),
+                                child: AppIcon(
+                                  _isRecording ? 'mic-off' : 'mic',
+                                  size: 18,
+                                  color: _isRecording
+                                      ? AppColors.danger
+                                      : AppColors.fg3,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _input,
+                          builder: (_, val, __) {
+                            final canSend = (val.text.trim().isNotEmpty ||
+                                    _attachments.isNotEmpty ||
+                                    _isRecording ||
+                                    _recordingPath != null) &&
+                                !_sending;
+                            return _SendBtn(
+                              enabled: canSend,
+                              sending: _sending,
+                              onTap: canSend ? _send : null,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ],
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _input,
-                    builder: (_, val, __) {
-                      final canSend = (val.text.trim().isNotEmpty ||
-                              _attachments.isNotEmpty ||
-                              _isRecording ||
-                              _recordingPath != null) &&
-                          !_sending;
-                      return _SendBtn(
-                        enabled: canSend,
-                        sending: _sending,
-                        onTap: canSend ? _send : null,
-                      );
-                    },
-                  ),
-                ],
+                ),
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1361,12 +1468,15 @@ class _SendBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = kMobile ? M.minTarget : 32.0;
+    final size = kMobile ? 40.0 : 32.0;
+    final ShapeBorder shape = kMobile
+        ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+        : const CircleBorder();
     return Material(
       color: enabled ? AppColors.accentFill : AppColors.hover,
-      shape: const CircleBorder(),
+      shape: shape,
       child: InkWell(
-        customBorder: const CircleBorder(),
+        customBorder: shape,
         onTap: onTap,
         child: SizedBox(
           width: size,
@@ -1429,7 +1539,8 @@ void openAgentThread(
   presentScreen(
     context,
     style: PanelStyle.drawer,
-    purpose: ShellPanelPurpose.conversation, panelId: agentId,
+    purpose: ShellPanelPurpose.conversation,
+    panelId: agentId,
     originClient: client,
     maxWidth: 720,
     maxHeight: 720,

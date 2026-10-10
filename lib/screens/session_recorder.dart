@@ -406,7 +406,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
                 height: 30,
                 width: double.infinity,
                 child: CustomPaint(
-                    painter: _LiveWave(List<double>.of(_waveform),
+                    painter: LiveWave(List<double>.of(_waveform),
                         progress: progress)),
               ),
             ],
@@ -587,36 +587,3 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
 
 /// The newest samples, right-aligned so the wave scrolls in as you speak; in
 /// review the part already played is drawn in the accent.
-class _LiveWave extends CustomPainter {
-  final List<double> samples;
-  final double? progress;
-  const _LiveWave(this.samples, {this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const step = 5.0;
-    final count = (size.width / step).floor();
-    final shown = samples.length > count
-        ? samples.sublist(samples.length - count)
-        : samples;
-    final paint = Paint()
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
-    final start = size.width - shown.length * step;
-    for (var i = 0; i < shown.length; i++) {
-      final x = start + i * step + step / 2;
-      final half = (size.height * 0.48 * shown[i].clamp(0.06, 1.0))
-          .clamp(1.5, size.height * 0.48);
-      final played = progress == null || (i / shown.length) <= progress!;
-      paint.color = progress == null
-          ? AppColors.accent
-          : (played ? AppColors.accent : AppColors.fg4);
-      canvas.drawLine(Offset(x, size.height / 2 - half),
-          Offset(x, size.height / 2 + half), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _LiveWave old) =>
-      old.samples.length != samples.length || old.progress != progress;
-}

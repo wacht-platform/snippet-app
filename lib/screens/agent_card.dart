@@ -6,7 +6,7 @@ import '../theme.dart';
 import '../widgets.dart';
 
 /// One agent on the phone's Agents page, in the Mission Control card's shape:
-/// who it is, whether it is working, its latest note, and its task counts.
+/// who it is, whether it is working, and its task counts.
 class AgentCard extends StatefulWidget {
   final DaemonClient client;
   final CoordinationAgent agent;
@@ -25,7 +25,6 @@ class AgentCard extends StatefulWidget {
 
 class _AgentCardState extends State<AgentCard> {
   List<TaskItem> _tasks = const [];
-  BoardEntry? _latest;
 
   @override
   void initState() {
@@ -44,10 +43,6 @@ class _AgentCardState extends State<AgentCard> {
     try {
       final tasks = await widget.client.tasks(agentId: id, limit: 100);
       if (mounted) setState(() => _tasks = tasks);
-    } catch (_) {}
-    try {
-      final board = await widget.client.agentBoard(id, limit: 1);
-      if (mounted) setState(() => _latest = board.isEmpty ? null : board.first);
     } catch (_) {}
   }
 
@@ -96,7 +91,6 @@ class _AgentCardState extends State<AgentCard> {
                 AppColors.run
               )
             : ('Available', AppColors.ok);
-    final note = _latest?.summary.trim() ?? '';
     final chips = <Widget>[
       if (queued > 0) _chip('$queued queued'),
       if (blocked > 0) _chip('$blocked blocked', dot: AppColors.danger),
@@ -161,14 +155,6 @@ class _AgentCardState extends State<AgentCard> {
                   ),
                   AppIcon('chevron-right', size: 16, color: AppColors.fg4),
                 ]),
-                if (note.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(note,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: serif(15, height: 23 / 15, color: AppColors.fg2)
-                          .copyWith(fontStyle: FontStyle.italic)),
-                ],
                 if (chips.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Wrap(spacing: 8, runSpacing: 8, children: chips),
