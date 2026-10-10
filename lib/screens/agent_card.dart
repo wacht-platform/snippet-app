@@ -5,6 +5,7 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../motion.dart';
 
 /// One agent on the phone's Agents page, in the Mission Control card's shape:
 /// who it is, whether it is working, and its task counts.
@@ -71,7 +72,7 @@ class _AgentCardState extends State<AgentCard> {
             ),
             const SizedBox(width: 6),
           ],
-          Text(label,
+          SwapText(label,
               style: sans(12,
                   height: 16 / 12,
                   color: accent ? AppColors.accent : AppColors.fg2)),
@@ -111,62 +112,68 @@ class _AgentCardState extends State<AgentCard> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: widget.onOpen,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: kMobile ? AppColors.surface2 : AppColors.surface3,
-                      borderRadius: BorderRadius.circular(11),
+          child: AnimatedSize(
+            duration: Motion.base,
+            curve: Motion.enter,
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color:
+                            kMobile ? AppColors.surface2 : AppColors.surface3,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Text(name.characters.first.toUpperCase(),
+                          style: sans(16, color: AppColors.fg1)),
                     ),
-                    child: Text(name.characters.first.toUpperCase(),
-                        style: sans(16, color: AppColors.fg1)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(16,
-                                spacing: -0.2,
-                                height: 21 / 16,
-                                color: AppColors.fg1)),
-                        Row(children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                                color: dot, shape: BoxShape.circle),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                                role.isEmpty ? status : '$status · $role',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(12,
-                                    height: 16 / 12, color: AppColors.fg3)),
-                          ),
-                        ]),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(16,
+                                  spacing: -0.2,
+                                  height: 21 / 16,
+                                  color: AppColors.fg1)),
+                          Row(children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                  color: dot, shape: BoxShape.circle),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: SwapText(
+                                  role.isEmpty ? status : '$status · $role',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: sans(12,
+                                      height: 16 / 12, color: AppColors.fg3)),
+                            ),
+                          ]),
+                        ],
+                      ),
                     ),
-                  ),
-                  AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-                ]),
-                if (chips.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Wrap(spacing: 8, runSpacing: 8, children: chips),
+                    AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+                  ]),
+                  if (chips.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 8, runSpacing: 8, children: chips),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

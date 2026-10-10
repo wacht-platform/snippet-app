@@ -6,6 +6,7 @@ import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../motion.dart';
 
 /// Mission Control pinned at the top of the phone's Chats: what it is doing,
 /// what it last noted, and what needs you, one tap from opening it.
@@ -108,7 +109,7 @@ class _MissionControlCardState extends State<MissionControlCard> {
           ),
           const SizedBox(width: 6),
         ],
-        Text(label,
+        SwapText(label,
             style: sans(12,
                 height: 16 / 12,
                 color: accent ? AppColors.accent : AppColors.fg2)),
@@ -148,57 +149,62 @@ class _MissionControlCardState extends State<MissionControlCard> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: widget.onOpen,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.accentBg,
-                      borderRadius: BorderRadius.circular(10),
+          child: AnimatedSize(
+            duration: Motion.base,
+            curve: Motion.enter,
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.accentBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Center(
+                          child: AppIcon('layers',
+                              size: 17, color: AppColors.accent)),
                     ),
-                    child: Center(
-                        child: AppIcon('layers',
-                            size: 17, color: AppColors.accent)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Mission Control',
-                            style: sans(16,
-                                weight: FontWeight.w700,
-                                spacing: -0.2,
-                                height: 20 / 16,
-                                color: AppColors.fg1)),
-                        Text(_statusLine(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(12,
-                                height: 16 / 12, color: AppColors.fg3)),
-                      ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Mission Control',
+                              style: sans(16,
+                                  weight: FontWeight.w700,
+                                  spacing: -0.2,
+                                  height: 20 / 16,
+                                  color: AppColors.fg1)),
+                          SwapText(_statusLine(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(12,
+                                  height: 16 / 12, color: AppColors.fg3)),
+                        ],
+                      ),
                     ),
-                  ),
-                  AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-                ]),
-                if (note.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(note,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: serif(15, height: 23 / 15, color: AppColors.fg2)
-                          .copyWith(fontStyle: FontStyle.italic)),
+                    AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+                  ]),
+                  if (note.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(note,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: serif(15, height: 23 / 15, color: AppColors.fg2)
+                            .copyWith(fontStyle: FontStyle.italic)),
+                  ],
+                  if (chips.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 8, runSpacing: 8, children: chips),
+                  ],
                 ],
-                if (chips.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Wrap(spacing: 8, runSpacing: 8, children: chips),
-                ],
-              ],
+              ),
             ),
           ),
         ),

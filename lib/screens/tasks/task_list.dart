@@ -9,6 +9,7 @@ import '../../widgets.dart';
 import '../shell_nav.dart' show kNavPadH, kNavRowHeight;
 import 'task_common.dart';
 import '../../pull_refresh.dart';
+import '../../motion.dart';
 
 /// Tasks grouped by status, in board order, narrowed by a search and a status
 /// filter. The phone tab, the desktop sidebar and the standalone screen all
@@ -22,6 +23,7 @@ class TaskList extends StatelessWidget {
     this.query = '',
     this.filter = const {},
     this.padding,
+    this.appearSince,
   });
 
   final List<TaskItem> tasks;
@@ -32,6 +34,10 @@ class TaskList extends StatelessWidget {
   /// Statuses to show; empty means all of them.
   final Set<TaskStatus> filter;
   final EdgeInsets? padding;
+
+  /// When the list first showed these tasks; rows mounted long after it show
+  /// at rest instead of animating in.
+  final DateTime? appearSince;
 
   @override
   Widget build(BuildContext context) {
@@ -54,10 +60,21 @@ class TaskList extends StatelessWidget {
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: pad,
-        children: [
-          for (final status in TaskStatus.values)
-            ..._group(status, visible.where((t) => t.status == status)),
-        ],
+        children: () {
+          final rows = [
+            for (final status in TaskStatus.values)
+              ..._group(status, visible.where((t) => t.status == status)),
+          ];
+          return [
+            for (var i = 0; i < rows.length; i++)
+              Appear(
+                key: rows[i].key,
+                index: i,
+                since: appearSince,
+                child: rows[i],
+              ),
+          ];
+        }(),
       ),
     );
   }
@@ -67,17 +84,28 @@ class TaskList extends StatelessWidget {
     if (kMobile) {
       final list = items.toList();
       return [
-        TaskStatusHeader(status: status, count: list.length),
+        TaskStatusHeader(
+            key: ValueKey('h-${status.name}'),
+            status: status,
+            count: list.length),
         for (var i = 0; i < list.length; i++)
           TaskRow(
+              key: ValueKey('t-${list[i].id}'),
               task: list[i],
               onTap: () => onOpen(list[i]),
               divider: i < list.length - 1),
       ];
     }
     return [
-      TaskStatusHeader(status: status, count: items.length),
-      for (final task in items) TaskRow(task: task, onTap: () => onOpen(task)),
+      TaskStatusHeader(
+          key: ValueKey('h-${status.name}'),
+          status: status,
+          count: items.length),
+      for (final task in items)
+        TaskRow(
+            key: ValueKey('t-${task.id}'),
+            task: task,
+            onTap: () => onOpen(task)),
     ];
   }
 

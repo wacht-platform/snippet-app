@@ -21,6 +21,7 @@ import 'shell_nav.dart';
 import 'sidebar_mobile.dart';
 import 'tasks/tasks_panel.dart';
 import '../pull_refresh.dart';
+import '../motion.dart';
 export 'sidebar_mobile.dart';
 
 class Sidebar extends StatefulWidget {
@@ -93,6 +94,7 @@ class Sidebar extends StatefulWidget {
 }
 
 class SidebarState extends State<Sidebar> {
+  DateTime? _chatsShownAt;
   // The session list now lives in the shell (passed via widget.sessions); the
   // sidebar is presentational, so opening the drawer doesn't refetch.
   String _filterQuery = '';
@@ -789,7 +791,13 @@ class SidebarState extends State<Sidebar> {
         final next = i + 1 < allSorted.length ? allSorted[i + 1] : null;
         final lastInSection =
             next == null || _daySection(next.lastActive) != label;
-        mobileChildren.add(_sessionCard(session, divider: !lastInSection));
+        _chatsShownAt ??= DateTime.now();
+        mobileChildren.add(Appear(
+          key: ValueKey('chat-${session.id}'),
+          index: i,
+          since: _chatsShownAt,
+          child: _sessionCard(session, divider: !lastInSection),
+        ));
       }
       if (mobileChildren.isEmpty) {
         mobileChildren.add(Padding(
@@ -866,7 +874,13 @@ class SidebarState extends State<Sidebar> {
           child: Text(label, style: sans(12, color: AppColors.fg4)),
         ));
       }
-      rows.add(_desktopChatRow(s));
+      _chatsShownAt ??= DateTime.now();
+      rows.add(Appear(
+        key: ValueKey('chat-${s.id}'),
+        index: rows.length,
+        since: _chatsShownAt,
+        child: _desktopChatRow(s),
+      ));
     }
     return PullToRefresh(
       onRefresh: () async => widget.onRefreshSessions(),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
@@ -33,6 +35,7 @@ class Appear extends StatefulWidget {
 
 class _AppearState extends State<Appear> with SingleTickerProviderStateMixin {
   AnimationController? _c;
+  Timer? _delay;
 
   @override
   void initState() {
@@ -47,7 +50,7 @@ class _AppearState extends State<Appear> with SingleTickerProviderStateMixin {
     if (delay == Duration.zero) {
       c.forward();
     } else {
-      Future.delayed(delay, () {
+      _delay = Timer(delay, () {
         if (mounted) c.forward();
       });
     }
@@ -55,6 +58,7 @@ class _AppearState extends State<Appear> with SingleTickerProviderStateMixin {
 
   @override
   void dispose() {
+    _delay?.cancel();
     _c?.dispose();
     super.dispose();
   }
@@ -86,12 +90,16 @@ class Swap extends StatelessWidget {
     required this.child,
     this.duration = Motion.fast,
     this.alignment = Alignment.topCenter,
+    this.fill = false,
   });
 
   final Object stateKey;
   final Widget child;
   final Duration duration;
   final AlignmentGeometry alignment;
+
+  /// Stretch each state to the area's full size, for panels and pages.
+  final bool fill;
 
   @override
   Widget build(BuildContext context) => AnimatedSwitcher(
@@ -101,6 +109,7 @@ class Swap extends StatelessWidget {
         switchOutCurve: Motion.exit,
         layoutBuilder: (current, previous) => Stack(
           alignment: alignment,
+          fit: fill ? StackFit.expand : StackFit.loose,
           children: [...previous, if (current != null) current],
         ),
         child: KeyedSubtree(key: ValueKey(stateKey), child: child),

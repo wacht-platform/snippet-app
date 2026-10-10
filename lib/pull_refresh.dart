@@ -98,26 +98,30 @@ class _PullToRefreshState extends State<PullToRefresh> {
           },
           child: Stack(children: [
             widget.child,
-            if (_refreshing)
-              Positioned(
-                top: 6,
-                left: 0,
-                right: 0,
-                child: IgnorePointer(
-                  child: Center(
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface3,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Spinner(size: 14, color: AppColors.accent),
-                    ),
+            Positioned(
+              top: 6,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: Motion.fast,
+                    child: !_refreshing
+                        ? const SizedBox.shrink()
+                        : Container(
+                            width: 28,
+                            height: 28,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.surface3,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Spinner(size: 14, color: AppColors.accent),
+                          ),
                   ),
                 ),
               ),
+            ),
           ]),
         ),
       ),

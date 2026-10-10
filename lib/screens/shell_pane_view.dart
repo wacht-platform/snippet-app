@@ -215,7 +215,8 @@ class ReadoutChip extends StatelessWidget {
       onTap: onTap,
       child: SizedBox(
         width: width,
-        child: Container(
+        child: AnimatedContainer(
+          duration: Motion.quick,
           height: 32,
           margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
           padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
@@ -305,7 +306,8 @@ class PaneTabChip extends StatelessWidget {
       onTap: onTap,
       child: SizedBox(
         width: width,
-        child: Container(
+        child: AnimatedContainer(
+          duration: Motion.quick,
           height: 32,
           margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
           padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),

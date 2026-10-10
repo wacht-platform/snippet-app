@@ -21,6 +21,8 @@ Future<void> expectGolden(
 ) async {
   // `matchesGoldenFile` resolves a relative path against the test file's own
   // directory; every call site here passes `goldens/<name>`.
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump(const Duration(milliseconds: 400));
   final exists = File('test/visual/$name').existsSync();
   final previous = autoUpdateGoldenFiles;
   if (!exists) autoUpdateGoldenFiles = true;

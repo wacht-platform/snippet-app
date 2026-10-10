@@ -85,74 +85,81 @@ class _ThreadCardState extends State<_ThreadCard> {
           border: kMobile ? null : Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(kMobile ? R.lg : R.md),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              AppIcon(widget.icon, size: 12, color: toneFg),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  ref.isEmpty ? widget.kind : '${widget.kind} · $ref',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: meta,
+        child: AnimatedSize(
+          duration: Motion.base,
+          curve: Motion.enter,
+          alignment: Alignment.topCenter,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                AppIcon(widget.icon, size: 12, color: toneFg),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    ref.isEmpty ? widget.kind : '${widget.kind} · $ref',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: meta,
+                  ),
                 ),
-              ),
-              const SizedBox(width: S.s8),
-              Text(widget.status,
-                  style: kMobile
-                      ? sans(12, weight: W.label, color: toneFg)
-                      : mono(10, color: toneFg)),
-            ]),
-            if (title.isNotEmpty) ...[
-              const SizedBox(height: 5),
-              Text(title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: kMobile
-                      ? sans(15,
-                          weight: W.label,
-                          height: 20 / 15,
-                          color: AppColors.fg1)
-                      : sans(13, weight: W.label, color: AppColors.fg1)),
-            ],
-            if (body.isNotEmpty) ...[
-              SizedBox(height: title.isEmpty ? 5 : 3),
-              AnimatedSize(
-                duration: Motion.fast,
-                curve: Motion.enter,
-                alignment: Alignment.topLeft,
-                child: _open || !long
-                    ? MarkdownBody(
-                        data: body,
-                        selectable: true,
-                        styleSheet: sheet,
-                        builders: {'pre': PreBlockBuilder()},
-                        onTapLink: (_, href, __) => openMarkdownLink(href),
-                      )
-                    : widget.preview != null
-                        ? Text(widget.preview!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: text)
-                        : MarkdownPreview(data: body, maxLines: 3, style: text),
-              ),
-            ],
-            if (footer.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(footer, style: sans(12, height: 1.4, color: AppColors.fg3)),
-            ],
-            if (long)
-              InkWell(
-                onTap: () => setState(() => _open = !_open),
-                borderRadius: BorderRadius.circular(R.xs),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 6, bottom: 2),
-                  child: Text(_open ? 'Show less' : 'Show more', style: meta),
+                const SizedBox(width: S.s8),
+                Text(widget.status,
+                    style: kMobile
+                        ? sans(12, weight: W.label, color: toneFg)
+                        : mono(10, color: toneFg)),
+              ]),
+              if (title.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: kMobile
+                        ? sans(15,
+                            weight: W.label,
+                            height: 20 / 15,
+                            color: AppColors.fg1)
+                        : sans(13, weight: W.label, color: AppColors.fg1)),
+              ],
+              if (body.isNotEmpty) ...[
+                SizedBox(height: title.isEmpty ? 5 : 3),
+                AnimatedSize(
+                  duration: Motion.fast,
+                  curve: Motion.enter,
+                  alignment: Alignment.topLeft,
+                  child: _open || !long
+                      ? MarkdownBody(
+                          data: body,
+                          selectable: true,
+                          styleSheet: sheet,
+                          builders: {'pre': PreBlockBuilder()},
+                          onTapLink: (_, href, __) => openMarkdownLink(href),
+                        )
+                      : widget.preview != null
+                          ? Text(widget.preview!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: text)
+                          : MarkdownPreview(
+                              data: body, maxLines: 3, style: text),
                 ),
-              ),
-          ],
+              ],
+              if (footer.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(footer,
+                    style: sans(12, height: 1.4, color: AppColors.fg3)),
+              ],
+              if (long)
+                InkWell(
+                  onTap: () => setState(() => _open = !_open),
+                  borderRadius: BorderRadius.circular(R.xs),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 6, bottom: 2),
+                    child: Text(_open ? 'Show less' : 'Show more', style: meta),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

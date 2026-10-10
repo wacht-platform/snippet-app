@@ -9,6 +9,7 @@ import '../list_search_field.dart';
 import '../shell_nav.dart';
 import 'task_common.dart';
 import 'task_list.dart';
+import '../../motion.dart';
 
 /// Tasks as a home: the phone's Tasks tab and the desktop sidebar section.
 ///
@@ -35,6 +36,7 @@ class TasksPanelState extends State<TasksPanel> {
   late TaskFeed _feed = TaskFeed(widget.client, onChange: _sync);
   final _search = TextEditingController();
   bool _searchOpen = kMobile;
+  DateTime? _shownAt;
   String _query = '';
   Set<TaskStatus> _filter = {};
 
@@ -93,7 +95,10 @@ class TasksPanelState extends State<TasksPanel> {
         for (final (label, set) in tabs)
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _filter = {...set}),
+            onTap: () => setState(() {
+              _filter = {...set};
+              _shownAt = null;
+            }),
             child: Padding(
               padding: const EdgeInsets.only(right: 22),
               child: Column(
@@ -163,7 +168,14 @@ class TasksPanelState extends State<TasksPanel> {
                   : const EdgeInsets.fromLTRB(18, 0, 10, 4),
               child: _statusStrip(),
             ),
-          Expanded(child: _body()),
+          Expanded(
+            child: Swap(
+              stateKey: _feed.loading
+                  ? 'loading'
+                  : (_feed.error != null ? 'error' : 'list'),
+              child: _body(),
+            ),
+          ),
         ],
       ),
     );
@@ -213,7 +225,9 @@ class TasksPanelState extends State<TasksPanel> {
         ),
       );
     }
+    if (_feed.tasks.isNotEmpty) _shownAt ??= DateTime.now();
     return TaskList(
+      appearSince: _shownAt,
       tasks: _feed.tasks,
       query: _query,
       filter: _filter,

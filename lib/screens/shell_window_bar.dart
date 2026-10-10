@@ -63,7 +63,8 @@ class TopWorkspaceTabChip extends StatelessWidget {
     final title = tab.title.isEmpty ? '(untitled)' : tab.title;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: Motion.quick,
         key: chipKey,
         height: 30,
         padding: EdgeInsets.fromLTRB(10, 0, canClose ? 6 : 12, 0),

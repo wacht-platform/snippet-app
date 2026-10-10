@@ -217,7 +217,11 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   Widget _bodyRow({required bool topInset}) => ShellSplitView(
-        sidebar: _sidebar(topInset: topInset),
+        sidebar: Swap(
+          stateKey: _effectiveSection,
+          fill: true,
+          child: _sidebar(topInset: topInset),
+        ),
         sidebarHeader: ShellSectionTabs(
           section: _effectiveSection,
           onSelect: (s) => _setState(() => _section = s),

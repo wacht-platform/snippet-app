@@ -50,6 +50,7 @@ import 'shell_sidebar_host.dart';
 import 'shell_split_view.dart';
 import 'shell_welcome.dart';
 import 'shell_window_bar.dart';
+import '../motion.dart';
 
 export 'inbound_share_picker.dart';
 export 'mobile_shell.dart';

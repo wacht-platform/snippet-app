@@ -9,6 +9,7 @@ import 'agent_card.dart';
 import 'create_agent_form.dart';
 import 'shell_nav.dart';
 import '../pull_refresh.dart';
+import '../motion.dart';
 
 /// The agent team, as a sidebar panel — the reference app's "People with
 /// access" slot, holding our agents instead of collaborators.
@@ -146,6 +147,7 @@ class AgentsSidebarPanel extends StatefulWidget {
 
 class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   List<CoordinationAgent> agents = const [];
+  DateTime? _shownAt;
 
   String? error;
   bool loading = true;
@@ -310,6 +312,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     );
 
     final q = effectiveQuery.toLowerCase();
+    if (agents.isNotEmpty) _shownAt ??= DateTime.now();
     final ordered = (q.isEmpty
         ? [...agents]
         : agents.where((a) => _agentMatchesMetadata(a, q)).toList())
@@ -325,12 +328,17 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 88),
           children: [
-            for (final agent in ordered)
-              AgentCard(
-                key: ValueKey('agent-card-${agent.id}'),
-                client: widget.client,
-                agent: agent,
-                onOpen: () => widget.onOpenAgent?.call(agent),
+            for (var i = 0; i < ordered.length; i++)
+              Appear(
+                key: ValueKey('appear-agent-${ordered[i].id}'),
+                index: i,
+                since: _shownAt,
+                child: AgentCard(
+                  key: ValueKey('agent-card-${ordered[i].id}'),
+                  client: widget.client,
+                  agent: ordered[i],
+                  onOpen: () => widget.onOpenAgent?.call(ordered[i]),
+                ),
               ),
             if (ordered.isEmpty)
               q.isNotEmpty ? const _EmptySearch() : _EmptyTeam(),
@@ -340,12 +348,17 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     }
 
     final desktopChildren = [
-      for (final agent in ordered)
-        AgentCard(
-          key: ValueKey('agent-card-${agent.id}'),
-          client: widget.client,
-          agent: agent,
-          onOpen: () => widget.onOpenAgent?.call(agent),
+      for (var i = 0; i < ordered.length; i++)
+        Appear(
+          key: ValueKey('appear-agent-${ordered[i].id}'),
+          index: i,
+          since: _shownAt,
+          child: AgentCard(
+            key: ValueKey('agent-card-${ordered[i].id}'),
+            client: widget.client,
+            agent: ordered[i],
+            onOpen: () => widget.onOpenAgent?.call(ordered[i]),
+          ),
         ),
     ];
 

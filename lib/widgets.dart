@@ -929,45 +929,50 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
       child: InkWell(
         onTap: _canExpand ? () => setState(() => _expanded = !_expanded) : null,
         borderRadius: BorderRadius.circular(R.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!_expanded)
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(
-                  child: Text(
-                    _preview.isEmpty ? 'Transcript' : _preview,
-                    maxLines: kMobile ? 2 : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: kMobile
-                        ? sans(13, height: 19 / 13, color: AppColors.fg2)
-                        : sans(12, height: 1.4, color: AppColors.fg2),
+        child: AnimatedSize(
+          duration: Motion.base,
+          curve: Motion.enter,
+          alignment: Alignment.topCenter,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!_expanded)
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    child: Text(
+                      _preview.isEmpty ? 'Transcript' : _preview,
+                      maxLines: kMobile ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: kMobile
+                          ? sans(13, height: 19 / 13, color: AppColors.fg2)
+                          : sans(12, height: 1.4, color: AppColors.fg2),
+                    ),
                   ),
-                ),
-                if (_canExpand) ...[
-                  const SizedBox(width: 8),
-                  AppIcon('chevron-down', size: 13, color: AppColors.fg4),
+                  if (_canExpand) ...[
+                    const SizedBox(width: 8),
+                    AppIcon('chevron-down', size: 13, color: AppColors.fg4),
+                  ],
+                ])
+              else ...[
+                for (var i = 0; i < widget.items.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 6),
+                  Text(
+                    _lineFor(widget.items[i]),
+                    style: sans(kMobile ? 13 : 12,
+                        height: kMobile ? 19 / 13 : 1.4,
+                        color: widget.items[i].unavailable
+                            ? AppColors.fg3
+                            : AppColors.fg2),
+                  ),
                 ],
-              ])
-            else ...[
-              for (var i = 0; i < widget.items.length; i++) ...[
-                if (i > 0) const SizedBox(height: 6),
-                Text(
-                  _lineFor(widget.items[i]),
-                  style: sans(kMobile ? 13 : 12,
-                      height: kMobile ? 19 / 13 : 1.4,
-                      color: widget.items[i].unavailable
-                          ? AppColors.fg3
-                          : AppColors.fg2),
-                ),
+                const SizedBox(height: 4),
+                Row(children: [
+                  const Spacer(),
+                  AppIcon('chevron-up', size: 13, color: AppColors.fg4),
+                ]),
               ],
-              const SizedBox(height: 4),
-              Row(children: [
-                const Spacer(),
-                AppIcon('chevron-up', size: 13, color: AppColors.fg4),
-              ]),
             ],
-          ],
+          ),
         ),
       ),
     );
