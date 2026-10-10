@@ -392,8 +392,6 @@ class SidebarState extends State<Sidebar> {
                           }
                         }),
                         onOpenAgent: (a) => widget.onAgent(a),
-                        onOpenSession: (id, title) =>
-                            widget.onOpenSession(id, title, null),
                         onOpenMissionControl: widget.onOpenMissionControl,
                       ),
                     ),

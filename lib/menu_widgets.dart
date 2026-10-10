@@ -187,7 +187,7 @@ PopupMenuItem<T> appMenuHeading<T>(String label) => PopupMenuItem<T>(
       // Upper case -> `caps()`, and a group heading is a label, not a
       // disabled control, so `fg3` rather than the `fg4` placeholder rung.
       child: kMobile
-          ? Text(label, style: sans(12, color: AppColors.fg4))
+          ? Text(label, style: sans(13, color: AppColors.fg3))
           : Text(label.toUpperCase(), style: TS.overline()),
     );
 
@@ -259,7 +259,7 @@ Future<T?> showAppMenu<T>(
                           decoration: BoxDecoration(
                               color: AppColors.lineStrong,
                               borderRadius: BorderRadius.circular(R.pill)))),
-                  const SizedBox(height: S.s12),
+                  const SizedBox(height: S.s8),
                   Flexible(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: S.s4),
@@ -356,6 +356,12 @@ Widget _appMenuSheetEntry<T>(BuildContext sheet, PopupMenuEntry<T> entry) {
   final pad = entry.padding ?? const EdgeInsets.symmetric(horizontal: S.s12);
   // A heading is a section label and is deliberately NOT tappable.
   if (!entry.enabled) {
+    if (kMobile) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
+        child: entry.child,
+      );
+    }
     return Padding(
       padding: pad,
       child: SizedBox(height: entry.height, child: entry.child),

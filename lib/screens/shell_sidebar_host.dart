@@ -147,7 +147,6 @@ class ShellSidebarHost extends StatelessWidget {
           : AgentsSidebarPanel(
               client: c,
               onOpenAgent: onOpenRightAgent,
-              onOpenSession: (id, title) => onOpenSession(id, title, null),
               onOpenMissionControl: onOpenMissionControl,
             );
     }

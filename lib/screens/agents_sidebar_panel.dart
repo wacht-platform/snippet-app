@@ -5,8 +5,8 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'agent_card.dart';
 import 'create_agent_form.dart';
-import 'mission_control.dart';
 import 'shell_nav.dart';
 
 /// The agent team, as a sidebar panel — the reference app's "People with
@@ -42,10 +42,12 @@ Future<bool?> showCreateAgentDialog(
           pageBuilder: (ctx, _, __) => SafeArea(
             minimum: const EdgeInsets.all(12),
             child: Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+              padding:
+                  EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
               child: LayoutBuilder(builder: (context, constraints) {
                 final origin = (context.findRenderObject() as RenderBox?)
-                    ?.localToGlobal(Offset.zero) ?? Offset.zero;
+                        ?.localToGlobal(Offset.zero) ??
+                    Offset.zero;
                 return CustomSingleChildLayout(
                   delegate: _CreateAgentPopoverLayout(anchor.shift(-origin)),
                   child: Material(
@@ -64,7 +66,8 @@ Future<bool?> showCreateAgentDialog(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text('Create agent',
-                              style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
+                              style: sans(kMobile ? 14 : 13,
+                                  weight: W.label, color: AppColors.fg1)),
                           const SizedBox(height: 12),
                           CreateAgentForm(client: client),
                         ],
@@ -113,7 +116,6 @@ class AgentsSidebarPanel extends StatefulWidget {
     super.key,
     required this.client,
     this.onOpenAgent,
-    this.onOpenSession,
     this.onOpenMissionControl,
     this.trailingHeader,
     this.searchQuery,
@@ -124,9 +126,6 @@ class AgentsSidebarPanel extends StatefulWidget {
 
   /// Called when a row is tapped. The host decides where detail goes.
   final void Function(CoordinationAgent agent)? onOpenAgent;
-
-  /// Open an assigned session when tapped.
-  final void Function(String sessionId, String title)? onOpenSession;
 
   /// Open Mission Control chat when tapped.
   final VoidCallback? onOpenMissionControl;
@@ -146,7 +145,6 @@ class AgentsSidebarPanel extends StatefulWidget {
 
 class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   List<CoordinationAgent> agents = const [];
-  final Set<String> _collapsed = {};
 
   String? error;
   bool loading = true;
@@ -207,35 +205,6 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     if (a.handle.toLowerCase().contains(q)) return true;
     if (a.role.toLowerCase().contains(q)) return true;
     if (a.capabilities.any((c) => c.toLowerCase().contains(q))) return true;
-    return false;
-  }
-
-  bool _matchesSession(AgentAssignedSession s, String q) {
-    if (q.isEmpty) return true;
-    return s.title.toLowerCase().contains(q) ||
-        s.conversation.toLowerCase().contains(q) ||
-        s.id.toLowerCase().contains(q);
-  }
-
-  List<AgentAssignedSession> _sessionsForAgent(CoordinationAgent a, String q) {
-    final all = a.assignedSessions.where((s) => !isInboxSession(s.id)).toList()
-      ..sort((x, y) => y.lastActive.compareTo(x.lastActive));
-    if (q.isEmpty) return all;
-    final direct = _agentMatchesMetadata(a, q);
-    final matching = all.where((s) => _matchesSession(s, q)).toList();
-    if (matching.isNotEmpty) return matching;
-    if (direct) return all;
-    return const [];
-  }
-
-  bool _matchesAgent(CoordinationAgent a, String query) {
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return true;
-    if (_agentMatchesMetadata(a, q)) return true;
-    if (a.assignedSessions
-        .any((s) => !isInboxSession(s.id) && _matchesSession(s, q))) {
-      return true;
-    }
     return false;
   }
 
@@ -336,52 +305,15 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     );
 
     final q = effectiveQuery.toLowerCase();
-    final matchingAgents =
-        q.isEmpty ? agents : agents.where((a) => _matchesAgent(a, q)).toList();
-
-    final ordered = [...matchingAgents]..sort((a, b) {
-        final aSessions = _sessionsForAgent(a, q);
-        final bSessions = _sessionsForAgent(b, q);
-        final aLast = aSessions.fold<int>(
-            0,
-            (latest, session) =>
-                session.lastActive > latest ? session.lastActive : latest);
-        final bLast = bSessions.fold<int>(
-            0,
-            (latest, session) =>
-                session.lastActive > latest ? session.lastActive : latest);
-        if (aLast != bLast) return bLast.compareTo(aLast);
+    final ordered = (q.isEmpty
+        ? [...agents]
+        : agents.where((a) => _agentMatchesMetadata(a, q)).toList())
+      ..sort((a, b) {
+        if (a.available != b.available) return a.available ? -1 : 1;
         return a.displayName.compareTo(b.displayName);
       });
 
     if (kMobile) {
-      final mobileChildren = <Widget>[];
-      for (final agent in ordered) {
-        final sessions = _sessionsForAgent(agent, q);
-        final showSessions = q.isNotEmpty || !_collapsed.contains(agent.id);
-        mobileChildren.add(Padding(
-          padding: const EdgeInsets.only(bottom: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _agentHeader(agent, count: sessions.length),
-              if (showSessions && sessions.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Material(
-                  key: ValueKey('agent-sessions-${agent.id}'),
-                  color: AppColors.surface1,
-                  borderRadius: BorderRadius.circular(R.md),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(children: [
-                    for (final s in sessions) _sessionCard(agent, s),
-                  ]),
-                ),
-              ],
-            ],
-          ),
-        ));
-      }
-
       return RefreshIndicator(
         color: AppColors.accent,
         backgroundColor: AppColors.surface3,
@@ -390,28 +322,23 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 88),
           children: [
-            ...mobileChildren,
-            if (ordered.isEmpty && mobileChildren.isEmpty)
+            for (final agent in ordered)
+              AgentCard(
+                key: ValueKey('agent-card-${agent.id}'),
+                client: widget.client,
+                agent: agent,
+                onOpen: () => widget.onOpenAgent?.call(agent),
+              ),
+            if (ordered.isEmpty)
               q.isNotEmpty ? const _EmptySearch() : _EmptyTeam(),
           ],
         ),
       );
     }
 
-    final desktopChildren = <Widget>[];
-    var first = true;
-    for (final agent in ordered) {
-      final sessions = _sessionsForAgent(agent, q);
-      desktopChildren.add(
-          _agentDesktopHeader(agent, first: first, count: sessions.length));
-      first = false;
-      final showSessions = q.isNotEmpty || !_collapsed.contains(agent.id);
-      if (showSessions) {
-        for (final s in sessions) {
-          desktopChildren.add(_desktopSessionRow(agent, s));
-        }
-      }
-    }
+    final desktopChildren = [
+      for (final agent in ordered) _agentDesktopRow(agent),
+    ];
 
     return Container(
       color: AppColors.bg,
@@ -508,292 +435,33 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     );
   }
 
-  Widget _agentHeader(CoordinationAgent agent, {int count = 0}) {
+  Widget _agentDesktopRow(CoordinationAgent agent) {
     final name =
         agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
-    final isSearching = effectiveQuery.isNotEmpty;
-    final collapsed = isSearching ? false : _collapsed.contains(agent.id);
-    final hasSessions = count > 0;
-    void toggle() {
-      if (hasSessions) {
-        setState(() {
-          if (collapsed) {
-            _collapsed.remove(agent.id);
-          } else {
-            _collapsed.add(agent.id);
-          }
-        });
-      }
-    }
-
-    void openAgent() {
-      if (widget.onOpenAgent != null) {
-        widget.onOpenAgent!(agent);
-      } else {
-        toggle();
-      }
-    }
-
-    final chevron = collapsed ? 'chevron-right' : 'chevron-down';
-
-    final meta = [
-      if (agent.role.trim().isNotEmpty) agent.role.trim(),
-      agent.available ? 'Online' : 'Offline',
-    ].join(' · ');
-
-    return Row(children: [
-      Expanded(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(R.sm),
-            onTap: openAgent,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: S.s8),
-              child: Row(children: [
-                Avatar(name, size: 36, presence: agent.available),
-                const SizedBox(width: S.s12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TS.rowTitle()),
-                      const SizedBox(height: S.s2),
-                      Text(meta,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TS.meta()),
-                    ],
-                  ),
-                ),
-              ]),
-            ),
-          ),
-        ),
-      ),
-      if (hasSessions)
-        Tooltip(
-          message: '${collapsed ? 'Expand' : 'Collapse'} sessions for $name',
-          child: Semantics(
-            button: true,
-            label: '$count assigned sessions',
-            expanded: !collapsed,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(R.sm),
-              onTap: isSearching ? null : toggle,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                    minWidth: M.minTarget, minHeight: M.minTarget),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const SizedBox(width: 8),
-                  Text('$count',
-                      style: sans(M.meta, tabular: true, color: AppColors.fg3)),
-                  const SizedBox(width: 6),
-                  AppIcon(chevron, size: 14, color: AppColors.fg3),
-                  const SizedBox(width: 8),
-                ]),
-              ),
-            ),
-          ),
-        ),
-    ]);
-  }
-
-  Widget _sessionCard(CoordinationAgent agent, AgentAssignedSession s) {
-    final title = s.title.trim().isNotEmpty
-        ? s.title.trim()
-        : (s.conversation.trim().isNotEmpty
-            ? s.conversation.trim()
-            : 'Session');
-    final isChat =
-        s.conversation.trim().isNotEmpty || s.id.contains('/conversations/');
-    final icon = isChat ? 'chat-thread' : 'folder';
-
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
       child: InkWell(
         borderRadius: BorderRadius.circular(R.sm),
-        onTap: () {
-          if (widget.onOpenSession != null) {
-            widget.onOpenSession!(s.id, s.title);
-          } else if (widget.onOpenAgent != null) {
-            widget.onOpenAgent!(agent);
-          }
-        },
-        child: SizedBox(
-          height: M.rowHeight,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                AppIcon(icon, size: 16, color: AppColors.fg3),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? M.rowTitle : 13, color: AppColors.fg2),
-                  ),
-                ),
-                if (s.lastActive > 0) ...[
-                  const SizedBox(width: 10),
-                  Text(
-                    relativeTime(s.lastActive),
-                    style: sans(M.meta, tabular: true, color: AppColors.fg3),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _agentDesktopHeader(CoordinationAgent agent,
-      {required bool first, int count = 0}) {
-    final name =
-        agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
-    final isSearching = effectiveQuery.isNotEmpty;
-    final collapsed = isSearching ? false : _collapsed.contains(agent.id);
-    final hasSessions = count > 0;
-    final lastActive = agent.assignedSessions.fold<int>(
-      0,
-      (latest, s) => s.lastActive > latest ? s.lastActive : latest,
-    );
-    void toggle() {
-      if (hasSessions) {
-        setState(() {
-          if (collapsed) {
-            _collapsed.remove(agent.id);
-          } else {
-            _collapsed.add(agent.id);
-          }
-        });
-      }
-    }
-
-    void openAgent() {
-      if (widget.onOpenAgent != null) {
-        widget.onOpenAgent!(agent);
-      } else {
-        toggle();
-      }
-    }
-
-    final chevron = collapsed ? 'chevron-right' : 'chevron-down';
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(R.sm),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
-        onTap: openAgent,
+        onTap: widget.onOpenAgent == null
+            ? null
+            : () => widget.onOpenAgent!(agent),
         child: SizedBox(
           height: 26,
           child: Padding(
-            padding: EdgeInsets.fromLTRB(hasSessions ? 4 : kNavPadH, 0, 6, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (hasSessions) ...[
-                  Material(
-                    color: Colors.transparent,
-                    child: InkResponse(
-                      onTap: toggle,
-                      radius: 12,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 3, vertical: 4),
-                        child: AppIcon(chevron, size: 12, color: AppColors.fg4),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-                AgentStateIcon(
-                  active: agent.available && hasSessions,
-                  size: 13,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TS.ui(AppColors.fg1)),
-                ),
-                if (collapsed && count > 0) ...[
-                  InkWell(
-                    onTap: toggle,
-                    child: Text('$count',
-                        style: sans(11, tabular: true, color: AppColors.fg3)),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                if (lastActive > 0)
-                  Text(
-                    relativeTime(lastActive),
-                    style: sans(11, tabular: true, color: AppColors.fg3),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Desktop session row matching `_sessionRow` in desktop_shell.dart.
-  Widget _desktopSessionRow(CoordinationAgent agent, AgentAssignedSession s) {
-    final title = s.title.trim().isNotEmpty
-        ? s.title.trim()
-        : (s.conversation.trim().isNotEmpty
-            ? s.conversation.trim()
-            : 'Session');
-    final isChat =
-        s.conversation.trim().isNotEmpty || s.id.contains('/conversations/');
-    final icon = isChat ? 'chat-thread' : 'folder';
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(R.sm),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
-        onTap: () {
-          if (widget.onOpenSession != null) {
-            widget.onOpenSession!(s.id, s.title);
-          } else if (widget.onOpenAgent != null) {
-            widget.onOpenAgent!(agent);
-          }
-        },
-        child: Container(
-          height: 24,
-          padding: const EdgeInsets.fromLTRB(26, 0, 6, 0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              AppIcon(icon, size: 12, color: AppColors.fg3),
-              const SizedBox(width: 7),
+            padding: const EdgeInsets.fromLTRB(kNavPadH, 0, 6, 0),
+            child: Row(children: [
+              AgentStateIcon(active: agent.available, size: 13),
+              const SizedBox(width: 6),
               Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg2),
-                ),
+                child: Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TS.ui(AppColors.fg1)),
               ),
-              if (s.lastActive > 0)
-                Text(
-                  relativeTime(s.lastActive),
-                  style: sans(11, tabular: true, color: AppColors.fg3),
-                ),
-            ],
+              if (agent.role.trim().isNotEmpty)
+                Text(agent.role.trim(), style: sans(11, color: AppColors.fg3)),
+            ]),
           ),
         ),
       ),

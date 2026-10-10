@@ -952,26 +952,6 @@ class NotificationMarker {
         delivered = j['delivered'] as bool? ?? false;
 }
 
-class AgentAssignedSession {
-  final String id;
-  final String title;
-  final String conversation;
-  final int lastActive;
-
-  const AgentAssignedSession({
-    required this.id,
-    required this.title,
-    required this.conversation,
-    required this.lastActive,
-  });
-
-  AgentAssignedSession.fromJson(Map<String, dynamic> j)
-      : id = j['id'] as String? ?? '',
-        title = j['title'] as String? ?? '',
-        conversation = j['conversation'] as String? ?? '',
-        lastActive = (j['last_active'] as num?)?.toInt() ?? 0;
-}
-
 /// A specialized worker identity in the SQLite coordination directory.
 class CoordinationAgent {
   final String id;
@@ -981,7 +961,6 @@ class CoordinationAgent {
   final String status;
   final String role;
   final List<String> capabilities;
-  final List<AgentAssignedSession> assignedSessions;
 
   CoordinationAgent.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -992,11 +971,6 @@ class CoordinationAgent {
         role = j['role'] as String? ?? 'implementer',
         capabilities = ((j['capabilities'] as List?) ?? const [])
             .whereType<String>()
-            .toList(),
-        assignedSessions = ((j['assigned_sessions'] as List?) ?? const [])
-            .whereType<Map>()
-            .map((e) =>
-                AgentAssignedSession.fromJson(Map<String, dynamic>.from(e)))
             .toList();
 
   bool get available => status == 'active';

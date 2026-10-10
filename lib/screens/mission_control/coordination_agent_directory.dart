@@ -152,7 +152,6 @@ class _AgentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sessions = agent.assignedSessions.length;
     return Material(
       color: AppColors.raised,
       borderRadius: BorderRadius.circular(R.md),
@@ -161,7 +160,9 @@ class _AgentCard extends StatelessWidget {
         onTap: () => presentScreen(
           context,
           style: PanelStyle.drawer,
-          purpose: ShellPanelPurpose.agent, panelId: agent.id, originClient: client,
+          purpose: ShellPanelPurpose.agent,
+          panelId: agent.id,
+          originClient: client,
           builder: (_, __) =>
               CoordinationAgentDetail(agent: agent, client: client),
         ),
@@ -211,16 +212,6 @@ class _AgentCard extends StatelessWidget {
                   ],
                 ),
               ],
-              if (sessions > 0) ...[
-                const SizedBox(height: S.s12),
-                Row(children: [
-                  AppIcon('folder', size: 14, color: AppColors.fg3),
-                  const SizedBox(width: S.s6),
-                  Text(
-                      '$sessions active ${sessions == 1 ? 'session' : 'sessions'}',
-                      style: TS.meta()),
-                ]),
-              ],
             ],
           ),
         ),
@@ -254,7 +245,8 @@ class _MessageState extends StatelessWidget {
           const SizedBox(height: 18),
           Text(title,
               textAlign: TextAlign.center,
-              style: sans(kMobile ? 20 : 17, weight: W.label, color: AppColors.fg1)),
+              style: sans(kMobile ? 20 : 17,
+                  weight: W.label, color: AppColors.fg1)),
           const SizedBox(height: 8),
           Text(message,
               textAlign: TextAlign.center,

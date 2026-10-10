@@ -57,20 +57,13 @@ void main() {
           'handle': 'snippet',
           'role': 'assistant',
           'status': 'active',
-          'assigned_sessions': [
-            {
-              'id': 's1',
-              'title': 'defenseclaw investigation',
-              'conversation': 'defenseclaw investigation',
-              'last_active': 1000,
-            },
-            {
-              'id': 's2',
-              'title': 'Unrelated project work',
-              'conversation': 'Unrelated project work',
-              'last_active': 900,
-            },
-          ],
+        }),
+        CoordinationAgent.fromJson({
+          'id': 'a2',
+          'display_name': 'Reviewer',
+          'handle': 'reviewer',
+          'role': 'security review',
+          'status': 'active',
         }),
       ]);
 
@@ -158,17 +151,17 @@ void main() {
       expect(find.text('No tasks yet'), findsOneWidget);
       expect(find.byTooltip('New task'), findsOneWidget);
 
-      // 3. Agents: filtering narrows sessions under an agent.
+      // 3. Agents: one card per agent, and filtering narrows the agents.
       await tester.tap(_tab('Agents'));
       await tester.pumpAndSettle();
-      expect(find.text('defenseclaw investigation'), findsOneWidget);
-      expect(find.text('Unrelated project work'), findsOneWidget);
+      expect(find.text('Snippet'), findsOneWidget);
+      expect(find.text('Reviewer'), findsOneWidget);
       expect(find.byTooltip('Mission Control'), findsNothing);
 
-      await tester.enterText(_field('Search agents'), 'defenseclaw');
+      await tester.enterText(_field('Search agents'), 'security');
       await tester.pumpAndSettle();
-      expect(find.text('defenseclaw investigation'), findsOneWidget);
-      expect(find.text('Unrelated project work'), findsNothing);
+      expect(find.text('Reviewer'), findsOneWidget);
+      expect(find.text('Snippet'), findsNothing);
       await tester.enterText(_field('Search agents'), 'nonexistentquery');
       await tester.pumpAndSettle();
       expect(find.text('No agents match the search.'), findsOneWidget);
