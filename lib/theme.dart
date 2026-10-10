@@ -841,6 +841,8 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedUpload01;
     case 'download':
       return HugeIcons.strokeRoundedDownload01;
+    case 'share':
+      return HugeIcons.strokeRoundedShare08;
     case 'file':
       return HugeIcons.strokeRoundedFile01;
     case 'git-branch':

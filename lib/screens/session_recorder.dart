@@ -38,7 +38,6 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
     }
   }
 
-
   Future<void> _startRecording() async {
     if (!kCanRecord) return;
     // Flip the UI first so the tap feels instant; permission + encoder
@@ -95,10 +94,10 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
           .listen((a) {
         final level = ((a.current + 60) / 60).clamp(0.04, 1.0).toDouble();
         if (!mounted) return;
-          _waveform.add(level);
-          // Keep a denser rolling waveform so the bars stay close together
-          // when the strip spans the full composer width.
-          if (_waveform.length > 180) _waveform.removeAt(0);
+        _waveform.add(level);
+        // Keep a denser rolling waveform so the bars stay close together
+        // when the strip spans the full composer width.
+        if (_waveform.length > 180) _waveform.removeAt(0);
         _recorderTick.value++;
       });
       _recordingTimer?.cancel();
@@ -189,6 +188,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       _toast('Could not play recording: $e');
     }
   }
+
   Future<bool> _confirmRecording() async {
     final path = _recordingPath;
     var bytes = _recordingBytes;
@@ -332,6 +332,94 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
               tooltip: 'Use recording',
               onTap: () => unawaited(_confirmRecording())),
         ],
+      ]),
+    );
+  }
+
+  /// The phone composer while a voice note is being recorded or reviewed:
+  /// the whole bar becomes the recorder, with a live waveform and one send.
+  Widget _mobileRecorder(bool running) {
+    final reviewing = !_isRecording && _recordingPath != null;
+    final position = reviewing ? _playbackPosition : _recordingElapsed;
+    final total = _playbackDuration.inMilliseconds;
+    final progress = !reviewing || total <= 0
+        ? null
+        : (_playbackPosition.inMilliseconds / total).clamp(0.0, 1.0);
+    Widget roundBtn(String icon, String tip, VoidCallback onTap,
+            {Color? fill, Color? ink}) =>
+        Tooltip(
+          message: tip,
+          child: Material(
+            color: fill ?? AppColors.surface2,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap,
+              child: SizedBox.square(
+                dimension: 46,
+                child: Center(
+                    child:
+                        AppIcon(icon, size: 19, color: ink ?? AppColors.fg1)),
+              ),
+            ),
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(children: [
+        roundBtn('trash', 'Discard', () => unawaited(_discardRecording()),
+            ink: AppColors.fg3),
+        const SizedBox(width: 10),
+        if (reviewing) ...[
+          roundBtn(
+              _isPlayingRecording ? 'pause' : 'play',
+              _isPlayingRecording ? 'Pause' : 'Play',
+              () => unawaited(_toggleRecordingPlayback())),
+          const SizedBox(width: 10),
+        ],
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                if (!reviewing) ...[
+                  StatusDot(
+                      status: 'running', size: 8, color: AppColors.danger),
+                  const SizedBox(width: 6),
+                ],
+                Text(reviewing ? 'Voice note' : 'Recording',
+                    style: sans(13, color: AppColors.fg2)),
+                const Spacer(),
+                Text(_audioTime(position),
+                    style: sans(13,
+                        tabular: true,
+                        color: reviewing ? AppColors.fg3 : AppColors.danger)),
+              ]),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 30,
+                width: double.infinity,
+                child: CustomPaint(
+                    painter: _LiveWave(List<double>.of(_waveform),
+                        progress: progress)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        if (_isRecording)
+          roundBtn('stop', 'Stop', () => unawaited(_stopRecording()),
+              fill: AppColors.surface3)
+        else
+          roundBtn(
+              'arrow-up', 'Send voice note', () => unawaited(_sendMessage()),
+              fill: AppColors.accentFill, ink: AppColors.accentFg),
       ]),
     );
   }
@@ -495,5 +583,40 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       }
     } catch (_) {}
   }
+}
 
+/// The newest samples, right-aligned so the wave scrolls in as you speak; in
+/// review the part already played is drawn in the accent.
+class _LiveWave extends CustomPainter {
+  final List<double> samples;
+  final double? progress;
+  const _LiveWave(this.samples, {this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const step = 5.0;
+    final count = (size.width / step).floor();
+    final shown = samples.length > count
+        ? samples.sublist(samples.length - count)
+        : samples;
+    final paint = Paint()
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    final start = size.width - shown.length * step;
+    for (var i = 0; i < shown.length; i++) {
+      final x = start + i * step + step / 2;
+      final half = (size.height * 0.48 * shown[i].clamp(0.06, 1.0))
+          .clamp(1.5, size.height * 0.48);
+      final played = progress == null || (i / shown.length) <= progress!;
+      paint.color = progress == null
+          ? AppColors.accent
+          : (played ? AppColors.accent : AppColors.fg4);
+      canvas.drawLine(Offset(x, size.height / 2 - half),
+          Offset(x, size.height / 2 + half), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LiveWave old) =>
+      old.samples.length != samples.length || old.progress != progress;
 }

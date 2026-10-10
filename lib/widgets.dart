@@ -919,7 +919,8 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
   bool get _canExpand {
     if (widget.items.length > 1) return true;
     if (widget.items.isEmpty) return false;
-    return _lineFor(widget.items.first).contains('\n') || _preview.length > 72;
+    return _lineFor(widget.items.first).contains('\n') ||
+        _preview.length > (kMobile ? 110 : 72);
   }
 
   @override
@@ -938,9 +939,11 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
                 Expanded(
                   child: Text(
                     _preview.isEmpty ? 'Transcript' : _preview,
-                    maxLines: 1,
+                    maxLines: kMobile ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(12, height: 1.4, color: AppColors.fg2),
+                    style: kMobile
+                        ? sans(13, height: 19 / 13, color: AppColors.fg2)
+                        : sans(12, height: 1.4, color: AppColors.fg2),
                   ),
                 ),
                 if (_canExpand) ...[
@@ -953,8 +956,8 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
                 if (i > 0) const SizedBox(height: 6),
                 Text(
                   _lineFor(widget.items[i]),
-                  style: sans(12,
-                      height: 1.4,
+                  style: sans(kMobile ? 13 : 12,
+                      height: kMobile ? 19 / 13 : 1.4,
                       color: widget.items[i].unavailable
                           ? AppColors.fg3
                           : AppColors.fg2),
@@ -1142,15 +1145,20 @@ class Bubble extends StatelessWidget {
             Text('YOU', style: caps(11, color: AppColors.fg4, spacing: 0.8)),
             const SizedBox(height: 4),
             if (media != null)
-              for (final m in media) ...[m, const SizedBox(height: 6)],
+              for (final m in media) ...[
+                Align(alignment: Alignment.centerLeft, child: m),
+                const SizedBox(height: 8),
+              ],
             if (shown.isNotEmpty) mineText,
-            for (var i = 0; i < voice.length; i++) ...[
-              SizedBox(height: i == 0 && shown.isEmpty ? 0 : 8),
-              voice[i],
-            ],
-            for (final extra in extras) ...[
-              const SizedBox(height: 4),
-              extra,
+            if (media == null || media.isEmpty) ...[
+              for (var i = 0; i < voice.length; i++) ...[
+                SizedBox(height: i == 0 && shown.isEmpty ? 0 : 8),
+                voice[i],
+              ],
+              for (final extra in extras) ...[
+                const SizedBox(height: 4),
+                extra,
+              ],
             ],
             ...pastedCards,
             const SizedBox(height: 14),
@@ -1243,10 +1251,13 @@ extension on Bubble {
     final maxWidth =
         (MediaQuery.sizeOf(context).width - 32).clamp(160.0, 280.0);
     Widget card(Widget child) => Container(
-          padding: const EdgeInsets.fromLTRB(10, 9, 12, 9),
+          constraints: kMobile ? const BoxConstraints(maxWidth: 320) : null,
+          padding: kMobile
+              ? const EdgeInsets.fromLTRB(10, 10, 14, 12)
+              : const EdgeInsets.fromLTRB(10, 9, 12, 9),
           decoration: BoxDecoration(
             color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(R.card),
+            borderRadius: BorderRadius.circular(kMobile ? 18 : R.card),
           ),
           child: child,
         );

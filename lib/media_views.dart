@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'api.dart';
 import 'platform.dart';
@@ -150,14 +154,15 @@ List<SentAttachment> parseSentAttachments(String text) => [
 /// Open a file the way the platform wants: on desktop in a tab next to the
 /// session (like any other file), on phones images in the full-screen viewer
 /// and everything else in the file viewer.
-void openMedia(BuildContext context, DaemonClient client, String path) {
+void openMedia(BuildContext context, DaemonClient client, String path,
+    {List<String>? gallery}) {
   final openTab = DaemonScope.scopeOf(context)?.onOpenFile;
   if (!kMobile && openTab != null) {
     openTab(path, baseName(path));
     return;
   }
   if (mediaKindOf(path) == MediaKind.image) {
-    showImageViewer(context, client: client, path: path);
+    showImageViewer(context, client: client, path: path, gallery: gallery);
     return;
   }
   pushFileViewerRoute(context,
@@ -175,6 +180,8 @@ class ImageThumb extends StatelessWidget {
 
   /// Decode width in physical pixels; defaults to the displayed width.
   final int? cacheWidth;
+
+  final List<String>? gallery;
   const ImageThumb({
     super.key,
     required this.client,
@@ -183,6 +190,7 @@ class ImageThumb extends StatelessWidget {
     required this.height,
     this.fit = BoxFit.cover,
     this.cacheWidth,
+    this.gallery,
   });
 
   @override
@@ -197,13 +205,13 @@ class ImageThumb extends StatelessWidget {
       label: baseName(path),
       button: true,
       child: GestureDetector(
-        onTap: () => openMedia(context, client, path),
+        onTap: () => openMedia(context, client, path, gallery: gallery),
         child: Container(
           width: width,
           height: height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(kMobile ? 14 : R.md),
+            border: kMobile ? null : Border.all(color: AppColors.border),
           ),
           clipBehavior: Clip.antiAlias,
           child: Image(
@@ -252,9 +260,10 @@ class ImageGallery extends StatelessWidget {
     if (paths.length == 1) {
       return SingleImage(client: client, path: paths.first);
     }
-    const gap = 6.0;
+    final gap = kMobile ? 4.0 : 6.0;
     final columns = paths.length == 2 || paths.length == 4 ? 2 : 3;
-    final side = ((maxWidth.clamp(0, 280) - gap * (columns - 1)) / columns)
+    final cap = kMobile ? 240.0 : 280.0;
+    final side = ((maxWidth.clamp(0, cap) - gap * (columns - 1)) / columns)
         .floorToDouble();
     return SizedBox(
       width: side * columns + gap * (columns - 1),
@@ -263,7 +272,12 @@ class ImageGallery extends StatelessWidget {
         runSpacing: gap,
         children: [
           for (final path in paths)
-            ImageThumb(client: client, path: path, width: side, height: side),
+            ImageThumb(
+                client: client,
+                path: path,
+                width: side,
+                height: side,
+                gallery: paths),
         ],
       ),
     );
@@ -284,7 +298,7 @@ class SingleImage extends StatefulWidget {
 }
 
 class _SingleImageState extends State<SingleImage> {
-  static const _maxHeight = 320.0;
+  static double get _maxHeight => kMobile ? 240.0 : 320.0;
   static const _minSide = 72.0;
 
   ImageStream? _stream;
@@ -306,8 +320,8 @@ class _SingleImageState extends State<SingleImage> {
     }
   }
 
-  double get _maxWidth =>
-      (MediaQuery.sizeOf(context).width - 32).clamp(160.0, 420.0);
+  double get _maxWidth => (MediaQuery.sizeOf(context).width - 32)
+      .clamp(160.0, kMobile ? 240.0 : 420.0);
 
   // The same decode the thumb shows, so the image is fetched once.
   int get _cacheWidth =>
@@ -346,8 +360,8 @@ class _SingleImageState extends State<SingleImage> {
   Widget build(BuildContext context) {
     final maxWidth = _maxWidth;
     final size = _size;
-    var w = 260.0.clamp(0.0, maxWidth);
-    var h = 180.0;
+    var w = (kMobile ? 200.0 : 260.0).clamp(0.0, maxWidth);
+    var h = kMobile ? 150.0 : 180.0;
     if (size != null && size.width > 0 && size.height > 0) {
       final scale = [maxWidth / size.width, _maxHeight / size.height, 1.0]
           .reduce((a, b) => a < b ? a : b);
@@ -390,29 +404,32 @@ class FileChip extends StatelessWidget {
         label.contains('.') ? label.split('.').last.toUpperCase() : 'FILE';
     final tap = onTap ??
         (client == null ? null : () => openMedia(context, client!, path));
+    final radius = kMobile ? 14.0 : R.md;
     return Material(
-      color: AppColors.surface1,
-      borderRadius: BorderRadius.circular(R.md),
+      color: kMobile ? AppColors.surface2 : AppColors.surface1,
+      borderRadius: BorderRadius.circular(radius),
       child: InkWell(
         onTap: tap,
-        borderRadius: BorderRadius.circular(R.md),
+        borderRadius: BorderRadius.circular(radius),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 260),
-          padding: const EdgeInsets.fromLTRB(8, 7, 10, 7),
+          padding: kMobile
+              ? const EdgeInsets.fromLTRB(10, 10, 12, 10)
+              : const EdgeInsets.fromLTRB(8, 7, 10, 7),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(R.md),
-            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(radius),
+            border: kMobile ? null : Border.all(color: AppColors.border),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Container(
-              width: 30,
-              height: 30,
+              width: kMobile ? 36 : 30,
+              height: kMobile ? 36 : 30,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: kind == MediaKind.pdf
                     ? AppColors.dangerBg
                     : AppColors.surface3,
-                borderRadius: BorderRadius.circular(R.sm),
+                borderRadius: BorderRadius.circular(kMobile ? 10 : R.sm),
               ),
               child: AppIcon(_iconFor(kind),
                   size: 15,
@@ -428,9 +445,13 @@ class FileChip extends StatelessWidget {
                   Text(label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13, weight: W.label, color: AppColors.fg1)),
+                      style: sans(kMobile ? 14 : 13,
+                          weight: W.label, color: AppColors.fg1)),
+                  if (kMobile) const SizedBox(height: 2),
                   Text(ext.length > 6 ? 'FILE' : ext,
-                      style: mono(10, color: AppColors.fg3)),
+                      style: kMobile
+                          ? sans(12, color: AppColors.fg3)
+                          : mono(10, color: AppColors.fg3)),
                 ],
               ),
             ),
@@ -516,11 +537,88 @@ class _VoiceNoteState extends State<VoiceNote> {
     return '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
   }
 
+  Future<void> _seekTo(double fraction) async {
+    final player = _player;
+    if (player == null || _duration == Duration.zero) return;
+    await player.seek(_duration * fraction.clamp(0.0, 1.0));
+  }
+
+  Widget _mobile(double progress) {
+    final time = _error ??
+        (_duration == Duration.zero
+            ? 'Voice note'
+            : _playing || _position > Duration.zero
+                ? '${_clock(_position)} / ${_clock(_duration)}'
+                : _clock(_duration));
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(children: [
+          Semantics(
+            button: true,
+            label: _playing ? 'Pause voice note' : 'Play voice note',
+            child: Material(
+              color: AppColors.accent,
+              shape: const CircleBorder(),
+              child: InkWell(
+                onTap: _error == null ? _toggle : null,
+                customBorder: const CircleBorder(),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Center(
+                    child: _loading
+                        ? Spinner(size: 15, color: AppColors.accentFg)
+                        : AppIcon(_playing ? 'pause' : 'play',
+                            size: 16, color: AppColors.accentFg),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (_, c) => GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (d) => _seekTo(d.localPosition.dx / c.maxWidth),
+                onHorizontalDragUpdate: (d) =>
+                    _seekTo(d.localPosition.dx / c.maxWidth),
+                child: SizedBox(
+                  height: 28,
+                  child: CustomPaint(
+                    painter: _NoteWave(
+                      seed: widget.path.hashCode,
+                      progress: progress,
+                      played: AppColors.accent,
+                      rest: AppColors.fg4.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(time,
+              style: sans(12,
+                  tabular: true,
+                  color: _error == null ? AppColors.fg3 : AppColors.danger)),
+        ]),
+        if (widget.transcript != null) ...[
+          const SizedBox(height: 10),
+          widget.transcript!,
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = _duration.inMilliseconds;
     final progress =
         total <= 0 ? 0.0 : (_position.inMilliseconds / total).clamp(0.0, 1.0);
+    if (kMobile) return _mobile(progress);
     final time = _duration == Duration.zero
         ? 'Voice note'
         : '${_clock(_position)} / ${_clock(_duration)}';
@@ -594,19 +692,63 @@ class _VoiceNoteState extends State<VoiceNote> {
   }
 }
 
+class _NoteWave extends CustomPainter {
+  final int seed;
+  final double progress;
+  final Color played;
+  final Color rest;
+  const _NoteWave(
+      {required this.seed,
+      required this.progress,
+      required this.played,
+      required this.rest});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const step = 5.0;
+    const stroke = 3.0;
+    final count = (size.width / step).floor();
+    if (count <= 0) return;
+    final rnd = math.Random(seed);
+    final paint = Paint()
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+    final mid = size.height / 2;
+    for (var i = 0; i < count; i++) {
+      final t = i / count;
+      final envelope = 0.35 + 0.65 * math.sin(math.pi * (0.08 + t * 0.84));
+      final h = math.max(3.0,
+          (size.height - stroke) * envelope * (0.3 + rnd.nextDouble() * 0.7));
+      final x = i * step + stroke / 2;
+      paint.color = t < progress ? played : rest;
+      canvas.drawLine(Offset(x, mid - h / 2), Offset(x, mid + h / 2), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_NoteWave old) =>
+      old.progress != progress ||
+      old.seed != seed ||
+      old.played != played ||
+      old.rest != rest;
+}
+
 /// Full-screen image viewer: black backdrop, pinch to zoom, tap or swipe down
 /// to close.
 Future<void> showImageViewer(
   BuildContext context, {
   required DaemonClient client,
   required String path,
+  List<String>? gallery,
 }) {
+  final paths = gallery != null && gallery.contains(path) ? gallery : [path];
   return Navigator.of(context, rootNavigator: true).push(PageRouteBuilder<void>(
     opaque: false,
     barrierColor: Colors.black,
     transitionDuration: Motion.fast,
     reverseTransitionDuration: Motion.quick,
-    pageBuilder: (_, __, ___) => _ImageViewer(client: client, path: path),
+    pageBuilder: (_, __, ___) => _ImageViewer(
+        client: client, paths: paths, initial: paths.indexOf(path)),
     transitionsBuilder: (_, animation, __, child) =>
         FadeTransition(opacity: animation, child: child),
   ));
@@ -614,36 +756,131 @@ Future<void> showImageViewer(
 
 class _ImageViewer extends StatefulWidget {
   final DaemonClient client;
-  final String path;
-  const _ImageViewer({required this.client, required this.path});
+  final List<String> paths;
+  final int initial;
+  const _ImageViewer(
+      {required this.client, required this.paths, required this.initial});
 
   @override
   State<_ImageViewer> createState() => _ImageViewerState();
 }
 
 class _ImageViewerState extends State<_ImageViewer> {
-  final TransformationController _zoom = TransformationController();
+  late final PageController _pages = PageController(initialPage: _index);
+  late int _index = widget.initial;
+  final Map<int, TransformationController> _zooms = {};
   double _dragY = 0;
+  bool _chrome = true;
+  bool _busy = false;
 
-  bool get _zoomed => _zoom.value.getMaxScaleOnAxis() > 1.01;
+  String get _path => widget.paths[_index];
+
+  TransformationController _zoomFor(int i) =>
+      _zooms.putIfAbsent(i, TransformationController.new);
+
+  bool get _zoomed => _zoomFor(_index).value.getMaxScaleOnAxis() > 1.01;
 
   @override
   void dispose() {
-    _zoom.dispose();
+    _pages.dispose();
+    for (final z in _zooms.values) {
+      z.dispose();
+    }
     super.dispose();
   }
+
+  Future<void> _share() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final name = baseName(_path);
+      final bytes = await widget.client.downloadFile(_path);
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/snippet-share-$name');
+      await file.writeAsBytes(bytes, flush: true);
+      await SharePlus.instance
+          .share(ShareParams(files: [XFile(file.path, name: name)]));
+    } catch (_) {
+      if (mounted) toast(context, "Couldn't share this image");
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _save() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final msg = await downloadRemoteFile(context, widget.client,
+          path: _path, name: baseName(_path));
+      if (msg != null && mounted) toast(context, msg);
+    } catch (_) {
+      if (mounted) toast(context, "Couldn't save this image");
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _copyPath() async {
+    await Clipboard.setData(ClipboardData(text: _path));
+    if (mounted) toast(context, 'Path copied');
+  }
+
+  Widget _page(int i, Size size, double dpr) {
+    final zoom = _zoomFor(i);
+    return InteractiveViewer(
+      transformationController: zoom,
+      minScale: 1,
+      maxScale: 6,
+      onInteractionEnd: (_) => setState(() {}),
+      child: Center(
+        child: Image(
+          image: ResizeImage.resizeIfNeeded(
+            (size.width * dpr).round().clamp(720, 2400),
+            null,
+            widget.client.imageProvider(widget.paths[i]),
+          ),
+          fit: BoxFit.contain,
+          loadingBuilder: (_, child, progress) => progress == null
+              ? child
+              : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          errorBuilder: (_, __, ___) => Text("Can't load this image",
+              style: sans(13, color: Colors.white70)),
+        ),
+      ),
+    );
+  }
+
+  Widget _action(String icon, String label, VoidCallback onTap) => Expanded(
+        child: InkWell(
+          onTap: _busy ? null : onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon(icon, size: 20, color: Colors.white),
+              const SizedBox(height: 6),
+              Text(label, style: sans(12, color: Colors.white70)),
+            ]),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final fade = (1 - (_dragY.abs() / 400)).clamp(0.3, 1.0);
+    final many = widget.paths.length > 1;
+    final showChrome = _chrome && _dragY == 0;
     return Scaffold(
       backgroundColor: Colors.black.withValues(alpha: fade),
       body: Stack(children: [
         Positioned.fill(
           child: GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+            onTap: kMobile
+                ? () => setState(() => _chrome = !_chrome)
+                : () => Navigator.of(context).pop(),
             onVerticalDragUpdate:
                 _zoomed ? null : (d) => setState(() => _dragY += d.delta.dy),
             onVerticalDragEnd: _zoomed
@@ -658,27 +895,17 @@ class _ImageViewerState extends State<_ImageViewer> {
                   },
             child: Transform.translate(
               offset: Offset(0, _dragY),
-              child: InteractiveViewer(
-                transformationController: _zoom,
-                minScale: 1,
-                maxScale: 6,
-                onInteractionEnd: (_) => setState(() {}),
-                child: Center(
-                  child: Image(
-                    image: ResizeImage.resizeIfNeeded(
-                      (size.width * dpr).round().clamp(720, 2400),
-                      null,
-                      widget.client.imageProvider(widget.path),
-                    ),
-                    fit: BoxFit.contain,
-                    loadingBuilder: (_, child, progress) => progress == null
-                        ? child
-                        : const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2)),
-                    errorBuilder: (_, __, ___) => Text("Can't load this image",
-                        style: sans(13, color: Colors.white70)),
-                  ),
-                ),
+              child: PageView.builder(
+                controller: _pages,
+                itemCount: widget.paths.length,
+                physics: _zoomed
+                    ? const NeverScrollableScrollPhysics()
+                    : const PageScrollPhysics(),
+                onPageChanged: (i) {
+                  _zooms[_index]?.value = Matrix4.identity();
+                  setState(() => _index = i);
+                },
+                itemBuilder: (_, i) => _page(i, size, dpr),
               ),
             ),
           ),
@@ -687,26 +914,111 @@ class _ImageViewerState extends State<_ImageViewer> {
           top: 0,
           left: 0,
           right: 0,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-              child: Row(children: [
-                Expanded(
-                  child: Text(baseName(widget.path),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(13, weight: W.label, color: Colors.white)),
+          child: IgnorePointer(
+            ignoring: !showChrome,
+            child: AnimatedOpacity(
+              opacity: showChrome ? 1 : 0,
+              duration: Motion.quick,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x99000000), Color(0x00000000)],
+                  ),
                 ),
-                IconButton(
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const AppIcon('x', size: 20, color: Colors.white),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+                    child: Row(children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(baseName(_path),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(14,
+                                    weight: W.label, color: Colors.white)),
+                            if (many)
+                              Text('${_index + 1} of ${widget.paths.length}',
+                                  style: sans(12,
+                                      tabular: true, color: Colors.white60)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const AppIcon('x', size: 20, color: Colors.white),
+                      ),
+                    ]),
+                  ),
                 ),
-              ]),
+              ),
             ),
           ),
         ),
+        if (kMobile)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              ignoring: !showChrome,
+              child: AnimatedOpacity(
+                opacity: showChrome ? 1 : 0,
+                duration: Motion.quick,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [Color(0xB3000000), Color(0x00000000)],
+                    ),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        if (many)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (var i = 0; i < widget.paths.length; i++)
+                                  AnimatedContainer(
+                                    duration: Motion.quick,
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 3),
+                                    width: i == _index ? 16 : 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: i == _index
+                                          ? Colors.white
+                                          : Colors.white38,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        Row(children: [
+                          _action('share', 'Share', _share),
+                          _action('download', 'Save', _save),
+                          _action('copy', 'Copy path', _copyPath),
+                        ]),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ]),
     );
   }

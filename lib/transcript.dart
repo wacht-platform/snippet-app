@@ -687,8 +687,51 @@ class _WatchLine extends StatelessWidget {
   final String? path;
   final bool muted;
 
+  Widget _mobile() {
+    if (muted) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(children: [
+          AppIcon(icon, size: 14, color: AppColors.fg4),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('$verb $subject',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(13, color: AppColors.fg4)),
+          ),
+        ]),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(17),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon(icon, size: 14, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text('$verb $subject',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, color: AppColors.fg2)),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (kMobile) return _mobile();
     final strong = muted ? AppColors.fg3 : AppColors.fg2;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: S.s6),
@@ -725,7 +768,7 @@ class _WatchLine extends StatelessWidget {
   }
 }
 
-class _WatchFired extends StatelessWidget {
+class _WatchFired extends StatefulWidget {
   const _WatchFired(
       {required this.subject, required this.path, required this.preview});
 
@@ -734,7 +777,98 @@ class _WatchFired extends StatelessWidget {
   final String preview;
 
   @override
+  State<_WatchFired> createState() => _WatchFiredState();
+}
+
+class _WatchFiredState extends State<_WatchFired> {
+  String get subject => widget.subject;
+  String get path => widget.path;
+  String get preview => widget.preview;
+
+  void _openTail() {
+    showAppSheet(context,
+        title: '$subject changed',
+        maxHeight: 640,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (path.isNotEmpty) ...[
+              Text(path, style: mono(12, color: AppColors.fg4)),
+              const SizedBox(height: 12),
+            ],
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: BoxDecoration(
+                  color: AppColors.bg,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: SingleChildScrollView(
+                  reverse: true,
+                  child: SelectableText(preview,
+                      style: mono(12, height: 1.55, color: AppColors.fg2)),
+                ),
+              ),
+            ),
+          ],
+        ));
+  }
+
+  Widget _mobile() {
+    final last = preview
+        .split('\n')
+        .map((l) => l.trim())
+        .lastWhere((l) => l.isNotEmpty, orElse: () => '');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Material(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: preview.isEmpty ? null : _openTail,
+          child: SizedBox(
+            height: 44,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 12, 0),
+              child: Row(children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                      color: AppColors.accent, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 10),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(14, color: AppColors.fg1)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(last,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(12, color: AppColors.fg3)),
+                ),
+                if (preview.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+                ],
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (kMobile) return _mobile();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: S.s6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
