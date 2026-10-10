@@ -1087,6 +1087,33 @@ class Bubble extends StatelessWidget {
       );
     }
 
+    if (kMobile) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('YOU', style: caps(11, color: AppColors.fg4, spacing: 0.8)),
+            const SizedBox(height: 4),
+            if (media != null)
+              for (final m in media) ...[m, const SizedBox(height: 6)],
+            if (shown.isNotEmpty) mineText,
+            for (var i = 0; i < voice.length; i++) ...[
+              SizedBox(height: i == 0 && shown.isEmpty ? 0 : 8),
+              voice[i],
+            ],
+            for (final extra in extras) ...[
+              const SizedBox(height: 4),
+              extra,
+            ],
+            ...pastedCards,
+            const SizedBox(height: 14),
+            Container(height: 1, color: AppColors.border),
+          ],
+        ),
+      );
+    }
+
     if (media != null) {
       return Padding(
         padding: const EdgeInsets.only(top: 4, bottom: 4),
@@ -1106,31 +1133,6 @@ class Bubble extends StatelessWidget {
                 child: mineText,
               ),
             ...pastedCards,
-          ],
-        ),
-      );
-    }
-
-    if (kMobile) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 4, bottom: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('YOU', style: caps(11, color: AppColors.fg4, spacing: 0.8)),
-            const SizedBox(height: 4),
-            if (shown.isNotEmpty) mineText,
-            for (var i = 0; i < voice.length; i++) ...[
-              SizedBox(height: i == 0 && shown.isEmpty ? 0 : 8),
-              voice[i],
-            ],
-            for (final extra in extras) ...[
-              const SizedBox(height: 4),
-              extra,
-            ],
-            ...pastedCards,
-            const SizedBox(height: 14),
-            Container(height: 1, color: AppColors.border),
           ],
         ),
       );

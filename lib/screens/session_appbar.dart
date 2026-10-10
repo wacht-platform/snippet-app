@@ -336,6 +336,31 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
+  Widget _headerStatusLine(HarnessState s) {
+    final (label, dot) = switch (s.status) {
+      'running' => ('Working', AppColors.run),
+      'waiting_for_input' => ('Waiting for you', AppColors.accent),
+      'failed' => ('Stopped on an error', AppColors.danger),
+      'connecting' => ('Connecting', AppColors.fg4),
+      _ => ('Idle', AppColors.fg4),
+    };
+    final folder = lastPathSegment(s.workspace, ifEmpty: '');
+    return Row(children: [
+      Container(
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 6),
+      Flexible(
+        child: Text(folder.isEmpty ? label : '$label · $folder',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: sans(12, height: 16 / 12, color: AppColors.fg3)),
+      ),
+    ]);
+  }
+
   Widget _mobileHeader(HarnessState? s) {
     return Container(
       height: M.appBarHeight,
@@ -358,15 +383,21 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             borderRadius: BorderRadius.circular(R.sm),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
-              // CENTERED, not baseline-stacked: with the status line gone the
-              // title is the sole element, so it should sit on the bar's optical
-              // centre rather than hug the top of a now-empty column.
-              child: Text(
-                _title.isEmpty ? 'Session' : _title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(kMobile ? M.sectionTitle : 15,
-                    weight: W.label, color: AppColors.fg1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _title.isEmpty ? 'Session' : _title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TS.sectionTitle().copyWith(fontSize: 17),
+                  ),
+                  if (s != null) ...[
+                    const SizedBox(height: 1),
+                    _headerStatusLine(s),
+                  ],
+                ],
               ),
             ),
           ),

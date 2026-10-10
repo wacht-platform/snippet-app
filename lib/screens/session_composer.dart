@@ -494,7 +494,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     bool selected = false,
   }) =>
       Material(
-        color: selected ? AppColors.accentBg : AppColors.surface2,
+        color: selected
+            ? AppColors.accentBg
+            : (kMobile ? Colors.transparent : AppColors.surface2),
         borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           onTap: onTap,
@@ -513,7 +515,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                 Text(label,
                     style: sans(12,
                         weight: selected ? W.label : W.body,
-                        color: selected ? AppColors.accent : AppColors.fg2)),
+                        color: selected
+                            ? AppColors.accent
+                            : (kMobile ? AppColors.fg3 : AppColors.fg2))),
                 if (onClear != null)
                   IconBtn('x',
                       size: 22, iconSize: 12, tooltip: 'Clear', onTap: onClear)
@@ -671,10 +675,10 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                 key: _composerCardKey,
                 decoration: BoxDecoration(
                   color: AppColors.raised,
-                  borderRadius: BorderRadius.circular(R.lg),
+                  borderRadius: BorderRadius.circular(kMobile ? 18 : R.lg),
                   border: _draggingFiles
                       ? Border.all(color: AppColors.accent, width: 1.5)
-                      : null,
+                      : (kMobile ? Border.all(color: AppColors.border) : null),
                 ),
                 // The card owns the inset and the rows sit inside it, so there is
                 // no per-row vertical padding to keep in sync. Slightly taller
@@ -733,7 +737,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                           // Two lines minimum: a single-line field read as a
                           // cramped search box, and it hid the fact that the
                           // composer accepts multi-line prose.
-                          minLines: 2,
+                          minLines: kMobile ? 1 : 2,
                           maxLines: 8,
                           cursorColor: AppColors.accent,
                           onSubmitted: (_) => _sendMessage(),
@@ -745,7 +749,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                             contentPadding:
                                 const EdgeInsets.fromLTRB(2, 2, 8, 10),
                             border: InputBorder.none,
-                            hintText: 'Ask anything',
+                            hintText:
+                                kMobile ? 'Reply to Snippet' : 'Ask anything',
                             hintStyle: TS.body(AppColors.fg4),
                           ),
                         ),

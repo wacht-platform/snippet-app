@@ -96,7 +96,8 @@ class SidebarState extends State<Sidebar> {
   String _filterQuery = '';
   String _agentFilterQuery = '';
   final _machineKey = GlobalKey(); // anchors the desktop machine popover
-  final GlobalKey<TasksPanelState> _tasksPanelKey = GlobalKey<TasksPanelState>();
+  final GlobalKey<TasksPanelState> _tasksPanelKey =
+      GlobalKey<TasksPanelState>();
   final GlobalKey<SettingsPanelState> _mobileSettingsKey =
       GlobalKey<SettingsPanelState>();
   SettingsPage? _pendingSettingsCreate;
@@ -232,28 +233,28 @@ class SidebarState extends State<Sidebar> {
           Expanded(
             child: Stack(children: [
               PageView(
-              controller: _pageController,
-              physics: _mobileDrilledDown
-                  ? const NeverScrollableScrollPhysics()
-                  : const ClampingScrollPhysics(),
-              onPageChanged: (index) {
-                if (_targetPage != null && _targetPage != index) {
-                  return;
-                }
-                _targetPage = null;
-                final dest = MobileHome.values[index];
-                if (widget.mobileHome != dest) {
-                  widget.onMobileHome(dest);
-                }
-              },
-              children: [
-                for (final h in MobileHome.values)
-                  SidebarKeepAlivePage(
-                    key: ValueKey('mobile-${h.name}'),
-                    child: _mobileHomeBody(hasClient, h),
-                  ),
-              ],
-            ),
+                controller: _pageController,
+                physics: _mobileDrilledDown
+                    ? const NeverScrollableScrollPhysics()
+                    : const ClampingScrollPhysics(),
+                onPageChanged: (index) {
+                  if (_targetPage != null && _targetPage != index) {
+                    return;
+                  }
+                  _targetPage = null;
+                  final dest = MobileHome.values[index];
+                  if (widget.mobileHome != dest) {
+                    widget.onMobileHome(dest);
+                  }
+                },
+                children: [
+                  for (final h in MobileHome.values)
+                    SidebarKeepAlivePage(
+                      key: ValueKey('mobile-${h.name}'),
+                      child: _mobileHomeBody(hasClient, h),
+                    ),
+                ],
+              ),
             ]),
           ),
           // The bar names the app's TOP LEVEL, so it hides inside a nested
@@ -672,14 +673,30 @@ class SidebarState extends State<Sidebar> {
       return;
     }
     const items = [
-      (SettingsPage.general, 'server', 'Machine',
-          'Connect another computer running snippet'),
-      (SettingsPage.models, 'ai-chip', 'Inference profile',
-          'A model and provider chats can run on'),
-      (SettingsPage.vault, 'lock-key', 'Vault secret',
-          'A key or token your agents can use'),
-      (SettingsPage.scheduled, 'repeat', 'Scheduled job',
-          'A prompt that runs on a schedule'),
+      (
+        SettingsPage.general,
+        'server',
+        'Machine',
+        'Connect another computer running snippet'
+      ),
+      (
+        SettingsPage.models,
+        'ai-chip',
+        'Inference profile',
+        'A model and provider chats can run on'
+      ),
+      (
+        SettingsPage.vault,
+        'lock-key',
+        'Vault secret',
+        'A key or token your agents can use'
+      ),
+      (
+        SettingsPage.scheduled,
+        'repeat',
+        'Scheduled job',
+        'A prompt that runs on a schedule'
+      ),
     ];
     final picked = await showAppSheet<SettingsPage>(
       context,
@@ -691,7 +708,8 @@ class SidebarState extends State<Sidebar> {
               leading: IconTile(icon),
               title: title,
               subtitle: subtitle,
-              trailing: AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+              trailing:
+                  AppIcon('chevron-right', size: 14, color: AppColors.fg4),
               onTap: () => Navigator.of(sheetContext).pop(page),
             ),
         ]),
@@ -762,8 +780,22 @@ class SidebarState extends State<Sidebar> {
     if (kMobile) {
       final allSorted = _sortSessionsByRecency(list);
       final mobileChildren = <Widget>[];
-      for (final session in allSorted) {
-        mobileChildren.add(_sessionCard(session));
+      String? section;
+      for (var i = 0; i < allSorted.length; i++) {
+        final session = allSorted[i];
+        final label = _daySection(session.lastActive);
+        if (label != section) {
+          section = label;
+          mobileChildren.add(Padding(
+            padding: EdgeInsets.only(top: i == 0 ? 10 : 22, bottom: 4),
+            child: Text(label,
+                style: sans(12, weight: W.strong, color: AppColors.fg4)),
+          ));
+        }
+        final next = i + 1 < allSorted.length ? allSorted[i + 1] : null;
+        final lastInSection =
+            next == null || _daySection(next.lastActive) != label;
+        mobileChildren.add(_sessionCard(session, divider: !lastInSection));
       }
       if (mobileChildren.isEmpty) {
         mobileChildren.add(Padding(
@@ -924,8 +956,8 @@ class SidebarState extends State<Sidebar> {
     // Rename edits in place, at the row's own inset.
     if (_renamingId == s.id) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(
-            kNavRowInset, 2, kSidebarContentInset, 2),
+        padding:
+            const EdgeInsets.fromLTRB(kNavRowInset, 2, kSidebarContentInset, 2),
         child: _inlineRenameField(s, compact: true),
       );
     }
@@ -955,7 +987,8 @@ class SidebarState extends State<Sidebar> {
       trailing: !hasAgent && !draft
           ? null
           : Row(mainAxisSize: MainAxisSize.min, children: [
-              if (draft) Text('draft', style: mono(10, color: AppColors.accent)),
+              if (draft)
+                Text('draft', style: mono(10, color: AppColors.accent)),
               if (draft && hasAgent) const SizedBox(width: 6),
               if (hasAgent)
                 AgentBadge(
@@ -1155,7 +1188,62 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  Widget _sessionCard(SessionInfo s) {
+  String _daySection(int lastActive) {
+    final when = DateTime.fromMillisecondsSinceEpoch(lastActive * 1000);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(when.year, when.month, when.day);
+    final days = today.difference(day).inDays;
+    if (days <= 0) return 'Today';
+    if (days == 1) return 'Yesterday';
+    if (days < 7) return 'Earlier this week';
+    return 'Older';
+  }
+
+  Widget _sessionStatusLine(SessionInfo s, String folderName) {
+    final running = sessionIsActive(s.status);
+    final waiting = s.status == 'waiting_for_input';
+    final color =
+        waiting ? AppColors.accent : (running ? AppColors.fg3 : AppColors.fg3);
+    final label = waiting
+        ? 'Waiting for your answer'
+        : running
+            ? (folderName.isEmpty ? 'Working' : 'Working · $folderName')
+            : folderName;
+    return Row(children: [
+      if (running || waiting) ...[
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: running ? AppColors.run : Colors.transparent,
+            border: waiting
+                ? Border.all(color: AppColors.accent, width: 1.5)
+                : null,
+          ),
+        ),
+        const SizedBox(width: 6),
+      ],
+      if (!running && !waiting && s.inWorktree) ...[
+        AppIcon('git-branch', size: 12, color: AppColors.fg4),
+        const SizedBox(width: 4),
+      ],
+      Flexible(
+        child: Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: sans(13, height: 18 / 13, color: color)),
+      ),
+      if (s.displayAgentId != null && s.displayAgentId!.trim().isNotEmpty) ...[
+        const SizedBox(width: 8),
+        AgentBadge(agentId: s.displayAgentId!, working: running),
+      ],
+    ]);
+  }
+
+  Widget _sessionCard(SessionInfo s, {bool divider = false}) {
+    if (kMobile) return _mobileSessionRow(s, divider: divider);
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
     final selected = !kMobile && s.id == widget.selectedSessionId;
@@ -1246,13 +1334,15 @@ class SidebarState extends State<Sidebar> {
               if (!renaming && _hasDraft(s)) ...[
                 const SizedBox(width: 10),
                 Text('Draft',
-                    style: sans(M.meta, weight: W.label, color: AppColors.accent)),
+                    style:
+                        sans(M.meta, weight: W.label, color: AppColors.accent)),
               ] else if (!renaming && trailingText.isNotEmpty) ...[
                 const SizedBox(width: 10),
                 if (s.inWorktree) ...[
                   Tooltip(
                     message: 'Worktree · ${s.branch ?? s.folder}',
-                    child: AppIcon('git-branch', size: 12, color: AppColors.fg3),
+                    child:
+                        AppIcon('git-branch', size: 12, color: AppColors.fg3),
                   ),
                   const SizedBox(width: 4),
                 ],
@@ -1275,6 +1365,85 @@ class SidebarState extends State<Sidebar> {
       duration: Motion.quick,
       padding: EdgeInsets.only(bottom: _selecting ? 2 : 0),
       child: card,
+    );
+  }
+
+  Widget _mobileSessionRow(SessionInfo s, {required bool divider}) {
+    final checked = _selected.contains(s.id);
+    final renaming = _renamingId == s.id;
+    final folderName = s.projectFolder.trim().isEmpty
+        ? ''
+        : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
+    final draft = !renaming && _hasDraft(s);
+    return Material(
+      color: _selecting && checked ? AppColors.accentBg : Colors.transparent,
+      borderRadius: BorderRadius.circular(R.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(R.md),
+        onTap: renaming
+            ? null
+            : () {
+                if (_selecting) {
+                  _toggleSelected(s.id);
+                } else {
+                  widget.onOpenSession(s.id, s.title, s.profile);
+                }
+              },
+        onLongPress: renaming
+            ? null
+            : () {
+                if (_selecting) {
+                  _toggleSelected(s.id);
+                } else {
+                  _sessionActions(s);
+                }
+              },
+        child: Container(
+          constraints: const BoxConstraints(minHeight: M.rowHeight + 10),
+          padding: EdgeInsets.symmetric(
+              horizontal: _selecting ? M.rowPadH : 0, vertical: 12),
+          decoration: BoxDecoration(
+            border: divider && !_selecting
+                ? Border(bottom: BorderSide(color: AppColors.border))
+                : null,
+          ),
+          child: Row(children: [
+            if (_selecting) ...[
+              SelectCheck(checked, size: 20),
+              const SizedBox(width: S.s12),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Expanded(
+                          child: renaming
+                              ? _inlineRenameField(s, compact: false)
+                              : Text(s.title.isEmpty ? '(untitled)' : s.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TS.rowTitle()),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(draft ? 'Draft' : relativeTime(s.lastActive),
+                            style: sans(12,
+                                weight: draft ? W.label : W.body,
+                                color: draft ? AppColors.accent : AppColors.fg4,
+                                tabular: true)),
+                      ]),
+                  const SizedBox(height: 3),
+                  _sessionStatusLine(s, folderName),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -1511,7 +1680,8 @@ class SidebarState extends State<Sidebar> {
     if (!mounted) return;
     setState(() => _deleting.removeAll(failed));
     if (failed.isNotEmpty) {
-      toast(context, "Couldn't delete ${failed.length == 1 ? 'a session' : '${failed.length} sessions'}: $lastError",
+      toast(context,
+          "Couldn't delete ${failed.length == 1 ? 'a session' : '${failed.length} sessions'}: $lastError",
           danger: true);
     }
     widget.onRefreshSessions();

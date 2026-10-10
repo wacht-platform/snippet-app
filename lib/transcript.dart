@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'models.dart';
+import 'platform.dart';
 import 'theme.dart';
 import 'tool_activity.dart';
 import 'tool_sheet.dart';
@@ -73,14 +74,14 @@ class _DenseToolRowState extends State<DenseToolRow> {
                 child: Center(
                   // Pending calls don't spin: the transcript has one live
                   // indicator (the status line at the bottom).
-                  child: AppIcon(
-                      failed ? 'alert-triangle' : toolIcon(widget.tool),
-                      size: 14,
-                      color: widget.result == null
-                          ? AppColors.run
-                          : failed
-                              ? AppColors.danger
-                              : AppColors.fg4),
+                  child:
+                      AppIcon(failed ? 'alert-triangle' : toolIcon(widget.tool),
+                          size: 14,
+                          color: widget.result == null
+                              ? AppColors.run
+                              : failed
+                                  ? AppColors.danger
+                                  : AppColors.fg4),
                 ),
               ),
               const SizedBox(width: S.s8),
@@ -89,7 +90,8 @@ class _DenseToolRowState extends State<DenseToolRow> {
                   TextSpan(children: [
                     TextSpan(
                         text: verb,
-                        style: TS.ui(failed ? AppColors.danger : AppColors.fg2)),
+                        style:
+                            TS.ui(failed ? AppColors.danger : AppColors.fg2)),
                     if (object.isNotEmpty)
                       TextSpan(text: ' $object', style: TS.ui(AppColors.fg3)),
                   ]),
@@ -197,9 +199,8 @@ class _ToolRunState extends State<ToolRun> {
     // A run of acknowledgements only (assign, archive, …) has nothing to open.
     final openable =
         steps.isEmpty || widget.running || steps.any(toolHasDetail);
-    final headline = running
-        ? toolSentence(current, running: true)
-        : activitySummary(steps);
+    final headline =
+        running ? toolSentence(current, running: true) : activitySummary(steps);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: S.s6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -211,7 +212,8 @@ class _ToolRunState extends State<ToolRun> {
               width: 16,
               child: Center(
                 child: running
-                    ? AppIcon(toolIcon(current.tool), size: 14, color: AppColors.run)
+                    ? AppIcon(toolIcon(current.tool),
+                        size: 14, color: AppColors.run)
                     : AppIcon(failures > 0 ? 'alert-triangle' : 'check',
                         size: 14,
                         color: failures > 0 ? AppColors.danger : AppColors.fg4),
@@ -234,8 +236,7 @@ class _ToolRunState extends State<ToolRun> {
                 turns: widget.open && widget.batch == null ? 0.25 : 0,
                 duration: Motion.fast,
                 curve: Motion.enter,
-                child:
-                    AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+                child: AppIcon('chevron-right', size: 12, color: AppColors.fg4),
               ),
             ],
           ]),
@@ -268,7 +269,8 @@ class _ToolRunState extends State<ToolRun> {
                         padding: const EdgeInsets.only(left: 24, top: S.s6),
                         child: _ChangedFiles(changes: changes, onTap: _toggle),
                       )
-                    : const SizedBox(key: ValueKey('none'), width: double.infinity),
+                    : const SizedBox(
+                        key: ValueKey('none'), width: double.infinity),
           ),
         ),
       ]),
@@ -287,7 +289,8 @@ class _ChangedFiles extends StatelessWidget {
         color: AppColors.raised,
         borderRadius: BorderRadius.circular(R.md),
         clipBehavior: Clip.antiAlias,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           for (var i = 0; i < changes.length; i++) ...[
             if (i > 0) Divider(height: 1, thickness: 1, color: AppColors.line),
             InkWell(
@@ -304,7 +307,8 @@ class _ChangedFiles extends StatelessWidget {
                           FileChangeKind.moved => 'arrow-right',
                           FileChangeKind.edited => 'edit',
                         },
-                        size: 13, color: AppColors.fg3),
+                        size: 13,
+                        color: AppColors.fg3),
                     const SizedBox(width: S.s8),
                     Expanded(
                       child: Text(changes[i].name,
@@ -372,6 +376,96 @@ class LaneNotice extends StatelessWidget {
             : done
                 ? 'Completed'
                 : 'Queued';
+
+    if (kMobile) {
+      final agent = lane?.agent?.trim() ?? '';
+      final dot = running
+          ? AppColors.run
+          : failed
+              ? AppColors.danger
+              : done
+                  ? AppColors.ok
+                  : AppColors.fg4;
+      final started = DateTime.tryParse(lane?.startedAt ?? '');
+      String elapsed() {
+        if (started == null) return '';
+        final d = DateTime.now().toUtc().difference(started.toUtc());
+        if (d.inMinutes < 1) return '${d.inSeconds}s';
+        if (d.inHours < 1) return '${d.inMinutes}m ${d.inSeconds % 60}s';
+        return '${d.inHours}h ${d.inMinutes % 60}m';
+      }
+
+      final meta = sans(12, height: 16 / 12, color: AppColors.fg3);
+      return Semantics(
+        button: true,
+        label: '$title, ${status.toLowerCase()}. Open the lane.',
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: S.s6),
+          child: Material(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.lg),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onOpen,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 13, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration:
+                            BoxDecoration(color: dot, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(agent.isEmpty ? 'Lane' : 'Lane · as $agent',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: meta),
+                      ),
+                      Text(running ? elapsed() : status,
+                          style: meta.copyWith(fontFeatures: const [
+                            FontFeature.tabularFigures()
+                          ])),
+                    ]),
+                    const SizedBox(height: 6),
+                    Text(title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(15,
+                            weight: W.label,
+                            height: 20 / 15,
+                            color: AppColors.fg1)),
+                    if (running && activity != null && activity.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      Text(activity,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              mono(12, height: 16 / 12, color: AppColors.fg4)),
+                    ],
+                    if (!running &&
+                        displaySummary != null &&
+                        displaySummary.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      MarkdownPreview(
+                          data: displaySummary,
+                          maxLines: 2,
+                          style:
+                              sans(13, height: 19 / 13, color: AppColors.fg3)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Semantics(
       button: true,

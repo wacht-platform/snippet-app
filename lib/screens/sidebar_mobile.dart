@@ -43,39 +43,18 @@ class SidebarMobileBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(kMobileBarRadius);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 8),
-      child: Container(
-        height: kMobileBarHeight,
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x59000000),
-              blurRadius: 16,
-              offset: Offset(0, 6),
-            ),
+    return Container(
+      color: Color.lerp(AppColors.bg, AppColors.surface1, 0.45),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+      child: SizedBox(
+        height: kMobileBarHeight - 8,
+        child: Row(children: [
+          for (final (i, h) in MobileHome.values.indexed) ...[
+            if (i == MobileHome.values.length ~/ 2 && onNew != null)
+              Expanded(child: Center(child: _newButton(onNew!))),
+            Expanded(child: _tab(h, activeHome == h)),
           ],
-        ),
-        child: Material(
-          color: AppColors.surface1,
-          shape: RoundedRectangleBorder(
-            borderRadius: radius,
-            side: BorderSide(color: AppColors.glassBorder),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Row(children: [
-              for (final (i, h) in MobileHome.values.indexed) ...[
-                if (i == MobileHome.values.length ~/ 2 && onNew != null)
-                  Expanded(child: Center(child: _newButton(onNew!))),
-                Expanded(child: _tab(h, activeHome == h)),
-              ],
-            ]),
-          ),
-        ),
+        ]),
       ),
     );
   }
@@ -87,7 +66,8 @@ class SidebarMobileBar extends StatelessWidget {
           label: newLabel,
           child: Material(
             color: AppColors.accentFill,
-            shape: const CircleBorder(),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(R.lg)),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () {
@@ -95,7 +75,7 @@ class SidebarMobileBar extends StatelessWidget {
                 onTap();
               },
               child: SizedBox.square(
-                dimension: 44,
+                dimension: 42,
                 child: Center(
                   child: AppIcon('plus', size: 22, color: AppColors.accentFg),
                 ),
@@ -106,7 +86,7 @@ class SidebarMobileBar extends StatelessWidget {
       );
 
   Widget _tab(MobileHome h, bool active) {
-    final ink = active ? AppColors.fg1 : AppColors.fg3;
+    final ink = active ? AppColors.accent : AppColors.fg4;
     return Semantics(
       selected: active,
       button: true,
@@ -122,21 +102,11 @@ class SidebarMobileBar extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
-              duration: Motion.fast,
-              curve: Motion.enter,
-              width: 48,
-              height: 28,
-              decoration: BoxDecoration(
-                color: active ? AppColors.surface3 : Colors.transparent,
-                borderRadius: BorderRadius.circular(R.pill),
-              ),
-              child: Center(child: AppIcon(h.icon, size: 21, color: ink)),
-            ),
-            const SizedBox(height: 3),
+            AppIcon(h.icon, size: 22, color: ink),
+            const SizedBox(height: 4),
             Text(h.label,
                 style: sans(11,
-                    weight: active ? W.label : W.body,
+                    weight: active ? W.strong : W.body,
                     height: 1.2,
                     color: ink)),
           ],

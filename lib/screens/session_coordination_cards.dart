@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../components.dart';
 import '../markdown_widgets.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'mission_control/mission_control_state.dart'
@@ -293,6 +294,32 @@ class AgentMessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lane = agentId.startsWith('lane ');
+    if (kMobile) {
+      final who = lane ? 'the lane' : agentId;
+      final label = outbound
+          ? 'Sent to $agentId'
+          : (lane ? 'From $who' : 'Reply from $who');
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: S.s8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: caps(11,
+                    color: outbound ? AppColors.fg4 : AppColors.accent,
+                    spacing: 0.8)),
+            const SizedBox(height: 4),
+            Text(body.trim(),
+                style: outbound
+                    ? sans(15, height: 22 / 15, color: AppColors.fg2)
+                    : serif(16, height: 26 / 16, color: AppColors.fg2)
+                        .copyWith(fontStyle: FontStyle.italic)),
+          ],
+        ),
+      );
+    }
     return _ThreadCard(
       icon: outbound ? 'send' : (lane ? 'message' : 'corner-down-right'),
       tone: outbound ? Tone.neutral : Tone.accent,
