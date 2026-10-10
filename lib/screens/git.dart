@@ -194,7 +194,7 @@ class _GitScreenState extends State<GitScreen> {
     );
   }
 
-  Future<void> _branchSheet() async {
+  Future<void> _branchSheet([BuildContext? anchor]) async {
     late final ({
       String current,
       List<String> local,
@@ -207,23 +207,24 @@ class _GitScreenState extends State<GitScreen> {
       return;
     }
     if (!mounted) return;
-    await showAppSheet<void>(
-      context,
-      title: 'Branches',
-      maxWidth: 420,
-      child: GitBranchPicker(
-        current: data.current,
-        local: data.local,
-        remotes: data.remotes,
-        onSelect: (name, {required bool create}) {
-          Navigator.pop(context);
-          _op(
-            () => widget.client.gitCheckout(_repo, name, create: create),
-            okMsg: create ? 'Created $name' : 'Switched to $name',
-          );
-        },
-      ),
+    final picker = GitBranchPicker(
+      current: data.current,
+      local: data.local,
+      remotes: data.remotes,
+      onSelect: (name, {required bool create}) {
+        Navigator.pop(context);
+        _op(
+          () => widget.client.gitCheckout(_repo, name, create: create),
+          okMsg: create ? 'Created $name' : 'Switched to $name',
+        );
+      },
     );
+    if (!kMobile && anchor != null) {
+      await showAnchoredPanel<void>(anchor, width: 380, child: picker);
+    } else {
+      await showAppSheet<void>(context,
+          title: 'Branches', maxWidth: 420, child: picker);
+    }
   }
 
   @override
@@ -373,29 +374,31 @@ class _GitScreenState extends State<GitScreen> {
         Expanded(
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Material(
-              color: AppColors.overlay,
-              borderRadius: BorderRadius.circular(R.sm),
-              child: InkWell(
-                onTap: _busy ? null : _branchSheet,
+            child: Builder(
+              builder: (anchor) => Material(
+                color: AppColors.overlay,
                 borderRadius: BorderRadius.circular(R.sm),
-                child: Container(
-                  height: kMobile ? 36 : 28,
-                  padding: const EdgeInsets.symmetric(horizontal: S.s8),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    AppIcon('git-branch', size: 16, color: AppColors.accent),
-                    const SizedBox(width: S.s6),
-                    Flexible(
-                      child: Text(
-                        st.branch.isEmpty ? '(no branch)' : st.branch,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TS.label(AppColors.fg1),
+                child: InkWell(
+                  onTap: _busy ? null : () => _branchSheet(anchor),
+                  borderRadius: BorderRadius.circular(R.sm),
+                  child: Container(
+                    height: kMobile ? 36 : 28,
+                    padding: const EdgeInsets.symmetric(horizontal: S.s8),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      AppIcon('git-branch', size: 16, color: AppColors.accent),
+                      const SizedBox(width: S.s6),
+                      Flexible(
+                        child: Text(
+                          st.branch.isEmpty ? '(no branch)' : st.branch,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TS.label(AppColors.fg1),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: S.s4),
-                    AppIcon('chevron-down', size: 14, color: AppColors.fg3),
-                  ]),
+                      const SizedBox(width: S.s4),
+                      AppIcon('chevron-down', size: 14, color: AppColors.fg3),
+                    ]),
+                  ),
                 ),
               ),
             ),

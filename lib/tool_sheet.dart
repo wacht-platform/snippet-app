@@ -155,32 +155,24 @@ class _ToolBatchViewState extends State<ToolBatchView> {
                   ),
                 );
               },
-              child: open == null && kMobile
+              child: open == null
                   ? _Timeline(
                       key: const ValueKey(-1),
                       batch: batch,
                       scroll: widget.scroll,
                       onClose: widget.docked ? null : widget.onClose,
                       onShowAll: _show,
+                      docked: widget.docked,
                     )
-                  : open == null
-                      ? _StepList(
-                          key: const ValueKey(-1),
-                          batch: batch,
-                          scroll: widget.scroll,
-                          onClose: widget.docked ? null : widget.onClose,
-                          onOpen: _show,
-                          header: !widget.docked,
-                        )
-                      : _StepDetail(
-                          key: ValueKey(open),
-                          step: batch.steps[open],
-                          index: open,
-                          total: batch.steps.length,
-                          scroll: widget.scroll,
-                          onBack: () => _show(null),
-                          onClose: widget.docked ? null : widget.onClose,
-                        ),
+                  : _StepDetail(
+                      key: ValueKey(open),
+                      step: batch.steps[open],
+                      index: open,
+                      total: batch.steps.length,
+                      scroll: widget.scroll,
+                      onBack: () => _show(null),
+                      onClose: widget.docked ? null : widget.onClose,
+                    ),
             ),
           ),
         );
@@ -250,121 +242,6 @@ class _SheetHeader extends StatelessWidget {
   }
 }
 
-class _StepList extends StatelessWidget {
-  final ToolBatch batch;
-  final ScrollController? scroll;
-  final VoidCallback? onClose;
-  final ValueChanged<int> onOpen;
-
-  /// Docked in the desktop pane, the tab already names the list.
-  final bool header;
-  const _StepList({
-    super.key,
-    required this.batch,
-    required this.scroll,
-    required this.onClose,
-    required this.onOpen,
-    this.header = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final steps = batch.steps;
-    final running = batch.running && steps.any((s) => s.running);
-    // The list itself shows what ran and which failed (their rows turn red);
-    // the header only says when it is still going.
-    final subtitle = running ? 'running' : '';
-    return Column(children: [
-      if (header)
-        _SheetHeader(
-          title: 'Activity',
-          subtitle: subtitle,
-          onClose: onClose,
-        ),
-      Expanded(
-        child: ListView.separated(
-          controller: scroll,
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          itemCount: steps.length,
-          // Dividers span the same 16px margins as the header and the icons,
-          // rather than starting at the label and running off the right edge.
-          separatorBuilder: (_, __) => Container(
-              height: 1,
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              color: AppColors.border),
-          itemBuilder: (_, i) =>
-              _StepRow(step: steps[i], onTap: () => onOpen(i)),
-        ),
-      ),
-    ]);
-  }
-}
-
-class _StepRow extends StatelessWidget {
-  final ToolStep step;
-  final VoidCallback onTap;
-  const _StepRow({required this.step, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final (verb, object) = toolSentenceParts(step);
-    final changes = step.tool == 'change_files'
-        ? fileChanges([step])
-        : const <FileChange>[];
-    final added = changes.fold<int>(0, (sum, c) => sum + c.added);
-    final removed = changes.fold<int>(0, (sum, c) => sum + c.removed);
-    final openable = toolHasDetail(step);
-    return InkWell(
-      onTap: openable ? onTap : null,
-      child: Padding(
-        // Right inset centres the chevron under the header's close button.
-        padding: const EdgeInsets.fromLTRB(16, 11, 23, 11),
-        child: Row(children: [
-          SizedBox(
-            width: 18,
-            child: Center(
-              child: step.running
-                  ? Spinner(size: 14, color: AppColors.run)
-                  : AppIcon(
-                      step.failed ? 'alert-triangle' : toolIcon(step.tool),
-                      size: 15,
-                      color: step.failed ? AppColors.danger : AppColors.fg3),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text.rich(
-              TextSpan(children: [
-                TextSpan(
-                    text: verb,
-                    style: sans(13,
-                        weight: W.label,
-                        color: step.failed ? AppColors.danger : AppColors.fg1)),
-                if (object.isNotEmpty)
-                  TextSpan(
-                      text: ' $object', style: sans(13, color: AppColors.fg3)),
-              ]),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (added + removed > 0) ...[
-            const SizedBox(width: 8),
-            Text('+$added', style: TS.meta(AppColors.ok)),
-            const SizedBox(width: 4),
-            Text('−$removed', style: TS.meta(AppColors.danger)),
-          ],
-          if (openable) ...[
-            const SizedBox(width: 8),
-            AppIcon('chevron-right', size: 13, color: AppColors.fg4),
-          ] else
-            const SizedBox(width: 21),
-        ]),
-      ),
-    );
-  }
-}
-
 class _StepDetail extends StatelessWidget {
   final ToolStep step;
   final int index;
@@ -390,14 +267,41 @@ class _StepDetail extends StatelessWidget {
         ? (object.isEmpty ? verb : 'Command')
         : (object.isEmpty ? verb : '$verb $object');
     return Column(children: [
-      _SheetHeader(
-        leading: IconBtn('chevron-left',
-            size: 34, iconSize: 18, tooltip: 'Back', onTap: onBack),
-        title: title,
-        subtitle: null,
-        compact: true,
-        onClose: onClose,
-      ),
+      if (kMobile)
+        _SheetHeader(
+          leading: IconBtn('chevron-left',
+              size: 34, iconSize: 18, tooltip: 'Back', onTap: onBack),
+          title: title,
+          subtitle: null,
+          compact: true,
+          onClose: onClose,
+        )
+      else
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextButton.icon(
+                onPressed: onBack,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.fg3,
+                  minimumSize: const Size(0, 28),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                ),
+                icon: AppIcon('chevron-left', size: 14, color: AppColors.fg3),
+                label: Text('All steps', style: sans(13, color: AppColors.fg3)),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 6, 0, 0),
+                child: Text(title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(15, height: 20 / 15, color: AppColors.fg1)),
+              ),
+            ],
+          ),
+        ),
       Expanded(
         child: SingleChildScrollView(
           controller: scroll,
@@ -429,12 +333,14 @@ class _Timeline extends StatefulWidget {
   final ScrollController? scroll;
   final VoidCallback? onClose;
   final ValueChanged<int> onShowAll;
+  final bool docked;
   const _Timeline({
     super.key,
     required this.batch,
     required this.scroll,
     required this.onClose,
     required this.onShowAll,
+    this.docked = false,
   });
 
   @override
@@ -478,63 +384,66 @@ class _TimelineState extends State<_Timeline> {
             style: sans(12, color: AppColors.fg2))),
     ];
     final lastPassed = !running && failed == 0;
+    final pad = widget.docked ? 16.0 : 20.0;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Center(
-        child: Container(
-          margin: const EdgeInsets.only(top: 8, bottom: 6),
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: AppColors.lineStrong,
-            borderRadius: BorderRadius.circular(R.pill),
-          ),
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 12, 0),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Activity',
-                    style: sans(20, spacing: -0.4, color: AppColors.fg1)),
-                if (running) ...[
-                  const SizedBox(height: 3),
-                  Row(children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                          color: AppColors.run, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                        child: Text('Running',
-                            style: sans(13, color: AppColors.fg3))),
-                  ]),
-                ],
-              ],
+      if (!widget.docked) ...[
+        Center(
+          child: Container(
+            margin: const EdgeInsets.only(top: 8, bottom: 6),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.lineStrong,
+              borderRadius: BorderRadius.circular(R.pill),
             ),
           ),
-          if (widget.onClose != null)
-            IconBtn('x',
-                size: M.minTarget,
-                iconSize: 16,
-                tooltip: 'Close',
-                onTap: widget.onClose),
-        ]),
-      ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 12, 0),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Activity',
+                      style: sans(20, spacing: -0.4, color: AppColors.fg1)),
+                  if (running) ...[
+                    const SizedBox(height: 3),
+                    Row(children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                            color: AppColors.run, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                          child: Text('Running',
+                              style: sans(13, color: AppColors.fg3))),
+                    ]),
+                  ],
+                ],
+              ),
+            ),
+            if (widget.onClose != null)
+              IconBtn('x',
+                  size: M.minTarget,
+                  iconSize: 16,
+                  tooltip: 'Close',
+                  onTap: widget.onClose),
+          ]),
+        ),
+      ],
       if (chips.isNotEmpty)
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          padding: EdgeInsets.fromLTRB(pad, widget.docked ? 14 : 12, pad, 0),
           child: Wrap(spacing: 8, runSpacing: 8, children: chips),
         ),
-      const SizedBox(height: 14),
+      SizedBox(height: widget.docked ? 12 : 14),
       Expanded(
         child: ListView.builder(
           controller: widget.scroll,
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+          padding: EdgeInsets.fromLTRB(pad, 0, pad, 28),
           itemCount: steps.length,
           itemBuilder: (_, i) => _TimelineStep(
             step: steps[i],

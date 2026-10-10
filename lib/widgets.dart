@@ -917,8 +917,7 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
   bool get _canExpand {
     if (widget.items.length > 1) return true;
     if (widget.items.isEmpty) return false;
-    return _lineFor(widget.items.first).contains('\n') ||
-        _preview.length > (kMobile ? 110 : 72);
+    return _lineFor(widget.items.first).contains('\n') || _preview.length > 110;
   }
 
   @override
@@ -941,7 +940,7 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
                   Expanded(
                     child: Text(
                       _preview.isEmpty ? 'Transcript' : _preview,
-                      maxLines: kMobile ? 2 : 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: kMobile
                           ? sans(13, height: 19 / 13, color: AppColors.fg2)
@@ -1466,7 +1465,8 @@ class HeaderAction extends StatelessWidget {
   Widget build(BuildContext context) => kMobile
       ? IconBtn(icon,
           size: M.minTarget, iconSize: 20, tooltip: label, onTap: onTap)
-      : Btn(label, icon: icon, small: true, onTap: onTap);
+      : Btn(label,
+          icon: icon, small: true, variant: BtnVariant.secondary, onTap: onTap);
 }
 
 class SnAppBar extends StatelessWidget {

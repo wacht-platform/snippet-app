@@ -374,10 +374,8 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
                 child: Text('Empty directory', style: TS.meta()),
               )
-            else ...[
-              const SizedBox(height: 4),
+            else
               ..._buildRows(entries, depth: 0),
-            ],
           ],
         ),
       ),
@@ -427,7 +425,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   Widget _workspaceRow(String wsName) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
         child: Container(
-          height: 32,
+          height: kNavRowHeight,
           padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
           child: Row(children: [
             AppIcon('folder-open', size: 14, color: AppColors.fg3),
@@ -438,7 +436,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                   overflow: TextOverflow.ellipsis,
                   style: TS.label(AppColors.fg1)),
             ),
-            AppIcon('chevron-down', size: 12, color: AppColors.fg4),
           ]),
         ),
       );

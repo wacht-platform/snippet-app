@@ -114,7 +114,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     await _git?.refresh();
   }
 
-  Future<void> _branchSheet() async {
+  Future<void> _branchSheet([BuildContext? anchor]) async {
     if (_branchBusy) return;
     late final ({
       String current,
@@ -128,20 +128,21 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
       return;
     }
     if (!mounted) return;
-    await showAppSheet<void>(
-      context,
-      title: 'Branches',
-      maxWidth: 420,
-      child: GitBranchPicker(
-        current: data.current,
-        local: data.local,
-        remotes: data.remotes,
-        onSelect: (name, {required bool create}) {
-          Navigator.pop(context);
-          unawaited(_checkoutBranch(name, create: create));
-        },
-      ),
+    final picker = GitBranchPicker(
+      current: data.current,
+      local: data.local,
+      remotes: data.remotes,
+      onSelect: (name, {required bool create}) {
+        Navigator.pop(context);
+        unawaited(_checkoutBranch(name, create: create));
+      },
     );
+    if (!kMobile && anchor != null) {
+      await showAnchoredPanel<void>(anchor, width: 380, child: picker);
+    } else {
+      await showAppSheet<void>(context,
+          title: 'Branches', maxWidth: 420, child: picker);
+    }
   }
 
   Future<void> _checkoutBranch(String name, {required bool create}) async {
@@ -214,33 +215,35 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   /// local/remote branch picker used by the full Git screen.
   Widget _branchRow(String repoName, String branch, int changes) => Padding(
         padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-        child: Material(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(10),
-          child: InkWell(
+        child: Builder(
+          builder: (anchor) => Material(
+            color: AppColors.surface2,
             borderRadius: BorderRadius.circular(10),
-            onTap: _branchBusy ? null : _branchSheet,
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
-              child: Row(children: [
-                AppIcon('git-branch', size: 14, color: AppColors.accent),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    branch.isEmpty ? repoName : branch,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TS.label(AppColors.fg1),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: _branchBusy ? null : () => _branchSheet(anchor),
+              child: Container(
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+                child: Row(children: [
+                  AppIcon('git-branch', size: 14, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      branch.isEmpty ? repoName : branch,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TS.label(AppColors.fg1),
+                    ),
                   ),
-                ),
-                if (changes > 0) ...[
+                  if (changes > 0) ...[
+                    const SizedBox(width: 6),
+                    Text('$changes changed', style: TS.meta()),
+                  ],
                   const SizedBox(width: 6),
-                  Text('$changes changed', style: TS.meta()),
-                ],
-                const SizedBox(width: 6),
-                AppIcon('chevron-down', size: 13, color: AppColors.fg3),
-              ]),
+                  AppIcon('chevron-down', size: 13, color: AppColors.fg3),
+                ]),
+              ),
             ),
           ),
         ),

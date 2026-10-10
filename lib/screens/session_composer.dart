@@ -662,11 +662,11 @@ extension _SessionScreenComposerExt on _SessionScreenState {
               if (_heldQueue.isNotEmpty) _queuedCard(),
               if (_attachments.isNotEmpty) _attachmentBar(),
               Swap(
-                stateKey: kMobile && (_isRecording || _recordingPath != null)
+                stateKey: (_isRecording || _recordingPath != null)
                     ? 'recorder'
                     : 'composer',
                 alignment: Alignment.bottomCenter,
-                child: kMobile && (_isRecording || _recordingPath != null)
+                child: (_isRecording || _recordingPath != null)
                     ? ValueListenableBuilder<int>(
                         valueListenable: _recorderTick,
                         builder: (_, __, ___) => _mobileRecorder(running),
@@ -675,11 +675,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                            if (_isRecording || _recordingPath != null)
-                              ValueListenableBuilder<int>(
-                                valueListenable: _recorderTick,
-                                builder: (_, __, ___) => _recordingPanel(),
-                              ),
                             Container(
                               key: _composerCardKey,
                               decoration: BoxDecoration(

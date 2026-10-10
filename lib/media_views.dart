@@ -210,8 +210,7 @@ class ImageThumb extends StatelessWidget {
           width: width,
           height: height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(kMobile ? 14 : R.md),
-            border: kMobile ? null : Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(14),
           ),
           clipBehavior: Clip.antiAlias,
           child: Image(
@@ -404,9 +403,9 @@ class FileChip extends StatelessWidget {
         label.contains('.') ? label.split('.').last.toUpperCase() : 'FILE';
     final tap = onTap ??
         (client == null ? null : () => openMedia(context, client!, path));
-    final radius = kMobile ? 14.0 : R.md;
+    const radius = 14.0;
     return Material(
-      color: kMobile ? AppColors.surface2 : AppColors.surface1,
+      color: AppColors.surface2,
       borderRadius: BorderRadius.circular(radius),
       child: InkWell(
         onTap: tap,
@@ -418,7 +417,6 @@ class FileChip extends StatelessWidget {
               : const EdgeInsets.fromLTRB(8, 7, 10, 7),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(radius),
-            border: kMobile ? null : Border.all(color: AppColors.border),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Container(
@@ -618,7 +616,7 @@ class _VoiceNoteState extends State<VoiceNote> {
     final total = _duration.inMilliseconds;
     final progress =
         total <= 0 ? 0.0 : (_position.inMilliseconds / total).clamp(0.0, 1.0);
-    if (kMobile) return _mobile(progress);
+    return _mobile(progress);
     final time = _duration == Duration.zero
         ? 'Voice note'
         : '${_clock(_position)} / ${_clock(_duration)}';
@@ -995,64 +993,63 @@ class _ImageViewerState extends State<_ImageViewer> {
             ),
           ),
         ),
-        if (kMobile)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              ignoring: !showChrome,
-              child: AnimatedOpacity(
-                opacity: showChrome ? 1 : 0,
-                duration: Motion.quick,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [Color(0xB3000000), Color(0x00000000)],
-                    ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: IgnorePointer(
+            ignoring: !showChrome,
+            child: AnimatedOpacity(
+              opacity: showChrome ? 1 : 0,
+              duration: Motion.quick,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Color(0xB3000000), Color(0x00000000)],
                   ),
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        if (many)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                for (var i = 0; i < widget.paths.length; i++)
-                                  AnimatedContainer(
-                                    duration: Motion.quick,
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 3),
-                                    width: i == _index ? 16 : 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: i == _index
-                                          ? Colors.white
-                                          : Colors.white38,
-                                      borderRadius: BorderRadius.circular(3),
-                                    ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      if (many)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              for (var i = 0; i < widget.paths.length; i++)
+                                AnimatedContainer(
+                                  duration: Motion.quick,
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 3),
+                                  width: i == _index ? 16 : 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: i == _index
+                                        ? Colors.white
+                                        : Colors.white38,
+                                    borderRadius: BorderRadius.circular(3),
                                   ),
-                              ],
-                            ),
+                                ),
+                            ],
                           ),
-                        Row(children: [
-                          _action('share', 'Share', _share),
-                          _action('download', 'Save', _save),
-                          _action('copy', 'Copy path', _copyPath),
-                        ]),
+                        ),
+                      Row(children: [
+                        _action('share', 'Share', _share),
+                        _action('download', 'Save', _save),
+                        _action('copy', 'Copy path', _copyPath),
                       ]),
-                    ),
+                    ]),
                   ),
                 ),
               ),
             ),
           ),
+        ),
       ]),
     );
   }

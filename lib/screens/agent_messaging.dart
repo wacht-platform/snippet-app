@@ -1172,61 +1172,6 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     );
   }
 
-  Widget _recordingPanel() {
-    final reviewing = !_isRecording && _recordingPath != null;
-    final position = reviewing ? _playbackPosition : _recordingElapsed;
-    final samples = List<double>.of(_waveform);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-      ),
-      child: Row(children: [
-        InkWell(
-          onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
-          borderRadius: BorderRadius.circular(R.pill),
-          child: SizedBox(
-            width: 32,
-            height: 32,
-            child: Center(
-              child: AppIcon(
-                _isRecording
-                    ? 'stop'
-                    : (_isPlayingRecording ? 'pause' : 'play'),
-                size: 16,
-                color: _isRecording ? AppColors.accent : AppColors.fg1,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(_audioTime(position),
-            style: mono(11,
-                color: _isRecording ? AppColors.accent : AppColors.fg3)),
-        const SizedBox(width: 8),
-        Expanded(
-          child: SizedBox(
-            height: 22,
-            child: CustomPaint(painter: _WaveformPainter(samples)),
-          ),
-        ),
-        if (reviewing) ...[
-          IconBtn('x',
-              size: 28,
-              iconSize: 14,
-              tooltip: 'Discard',
-              onTap: _discardRecording),
-          IconBtn('check',
-              size: 28,
-              iconSize: 14,
-              tooltip: 'Use recording',
-              onTap: () => unawaited(_confirmRecording())),
-        ],
-      ]),
-    );
-  }
-
   Widget _attachmentBar() {
     return SizedBox(
       height: 36,
@@ -1317,11 +1262,11 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           10 + (keyboard > 0 ? 8 : mq.padding.bottom),
         ),
         child: Swap(
-          stateKey: kMobile && (_isRecording || _recordingPath != null)
+          stateKey: (_isRecording || _recordingPath != null)
               ? 'recorder'
               : 'composer',
           alignment: Alignment.bottomCenter,
-          child: kMobile && (_isRecording || _recordingPath != null)
+          child: (_isRecording || _recordingPath != null)
               ? _mobileRecorder()
               : Container(
                   decoration: BoxDecoration(
@@ -1338,10 +1283,6 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (_isRecording || _recordingPath != null) ...[
-                        _recordingPanel(),
-                        const SizedBox(height: 8),
-                      ],
                       if (_attachments.isNotEmpty) ...[
                         _attachmentBar(),
                         const SizedBox(height: 6),
@@ -1572,42 +1513,4 @@ class _AgentAttachment {
     required this.isAudio,
     this.localPath,
   }) : uploading = true;
-}
-
-class _WaveformPainter extends CustomPainter {
-  final List<double> samples;
-  const _WaveformPainter(this.samples);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.accent
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    if (samples.isEmpty) {
-      canvas.drawLine(
-        Offset(0, size.height / 2),
-        Offset(size.width, size.height / 2),
-        paint..color = AppColors.fg4,
-      );
-      return;
-    }
-    final waveformWidth = math.min(size.width, samples.length * 4.0);
-    for (var i = 0; i < samples.length; i++) {
-      final amplitude = samples[i].clamp(0.04, 1.0).toDouble();
-      final half =
-          (size.height * 0.45 * amplitude).clamp(2.0, size.height * 0.45);
-      final x = i * 4.0 + 2.0;
-      if (x > waveformWidth) break;
-      canvas.drawLine(
-        Offset(x, size.height / 2 - half),
-        Offset(x, size.height / 2 + half),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _WaveformPainter oldDelegate) =>
-      oldDelegate.samples != samples;
 }
