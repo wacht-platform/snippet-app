@@ -145,14 +145,6 @@ class _DenseToolRowState extends State<DenseToolRow> {
   }
 }
 
-class BrailleSpinner extends StatelessWidget {
-  final Color? color;
-  const BrailleSpinner({super.key, this.color});
-  @override
-  Widget build(BuildContext context) =>
-      Spinner(size: 14, color: color ?? AppColors.run);
-}
-
 /// Consecutive tools as a BeUI group: one header row, details on expand.
 class ToolRun extends StatefulWidget {
   final List<Widget> rows;
