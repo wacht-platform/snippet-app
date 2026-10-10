@@ -75,7 +75,6 @@ void main() {
       ]);
 
       var newSessionCalled = false;
-      var mcCalled = false;
       var currentHome = MobileHome.chats;
 
       Widget buildTestWidget({MobileHome home = MobileHome.chats}) {
@@ -117,7 +116,7 @@ void main() {
                   onSessionDeleted: (_) {},
                   onRefreshHealth: () {},
                   topInset: false,
-                  onOpenMissionControl: () => mcCalled = true,
+                  onOpenMissionControl: () {},
                   mobileHome: currentHome,
                   onMobileHome: (h) => setState(() => currentHome = h),
                   settingsSection: null,
@@ -164,9 +163,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('defenseclaw investigation'), findsOneWidget);
       expect(find.text('Unrelated project work'), findsOneWidget);
-      await tester.tap(find.byTooltip('Mission Control'));
-      await tester.pumpAndSettle();
-      expect(mcCalled, isTrue);
+      expect(find.byTooltip('Mission Control'), findsNothing);
 
       await tester.enterText(_field('Search agents'), 'defenseclaw');
       await tester.pumpAndSettle();

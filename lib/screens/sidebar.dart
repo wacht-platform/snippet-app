@@ -336,7 +336,7 @@ class SidebarState extends State<Sidebar> {
         return TasksPanel(
           key: _tasksPanelKey,
           client: client,
-          trailing: [_machineAvatarButton()],
+          trailing: const [],
         );
 
       case MobileHome.agents:
@@ -524,7 +524,7 @@ class SidebarState extends State<Sidebar> {
       child: Row(children: [
         Text('Chats', style: TS.pageTitle()),
         const Spacer(),
-        ..._headerTrailing(hasClient, missionControl: false),
+        ..._headerTrailing(hasClient),
       ]),
     );
   }
@@ -534,29 +534,13 @@ class SidebarState extends State<Sidebar> {
       padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
       child: Row(children: [
         Text('Agents', style: TS.pageTitle()),
-        const Spacer(),
-        ..._headerTrailing(hasClient),
       ]),
     );
   }
 
-  /// The controls at the right of every phone page header: Mission Control
-  /// (when this machine has it) and the machine switcher.
-  List<Widget> _headerTrailing(bool hasClient, {bool missionControl = true}) {
-    final mc = (_sessions ?? const <SessionInfo>[])
-        .where((s) => isDedicatedMcSession(s.id))
-        .toList();
-    return [
-      if (hasClient && mc.isNotEmpty && missionControl)
-        IconBtn('layers',
-            size: M.minTarget,
-            iconSize: 19,
-            active: mc.first.id == widget.selectedSessionId,
-            tooltip: 'Mission Control',
-            onTap: widget.onOpenMissionControl),
-      _machineAvatarButton(),
-    ];
-  }
+  /// The control at the right of every phone page header: the machine
+  /// switcher.
+  List<Widget> _headerTrailing(bool hasClient) => [_machineAvatarButton()];
 
   /// The filter field under a phone page header.
   Widget _mobileSearch(TextEditingController controller, String hint,

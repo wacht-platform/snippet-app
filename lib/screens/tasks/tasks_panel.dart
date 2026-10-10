@@ -74,25 +74,64 @@ class TasksPanelState extends State<TasksPanel> {
     if (picked != null && mounted) setState(() => _filter = picked);
   }
 
-  /// One tap narrows the list to a status; All brings everything back.
+  static const _active = {TaskStatus.todo, TaskStatus.inProgress};
+  static const _stuck = {TaskStatus.blocked, TaskStatus.failed};
+
+  /// Quiet text tabs: All, Active, Blocked, Done (and Cancelled once there is
+  /// any). The count sits beside each name; the chosen one is underlined.
   Widget _statusStrip() {
     final tasks = _feed.tasks;
-    final items = <(String, String)>[
-      ('all', 'All ${tasks.length}'),
-      for (final s in TaskStatus.values)
-        if (tasks.any((t) => t.status == s))
-          (s.wire, '${s.label} ${tasks.where((t) => t.status == s).length}'),
+    int count(Set<TaskStatus> s) =>
+        tasks.where((t) => s.contains(t.status)).length;
+    final tabs = <(String, Set<TaskStatus>)>[
+      ('All', const {}),
+      ('Active', _active),
+      ('Blocked', _stuck),
+      ('Done', const {TaskStatus.done}),
+      if (count(const {TaskStatus.cancelled}) > 0)
+        ('Cancelled', const {TaskStatus.cancelled}),
     ];
-    final selected = _filter.length == 1 ? _filter.first.wire : 'all';
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Pills<String>(
-        items: items,
-        selected: selected,
-        onSelect: (v) => setState(() {
-          _filter = v == 'all' ? {} : {TaskStatus.parse(v)};
-        }),
-      ),
+    bool same(Set<TaskStatus> a, Set<TaskStatus> b) =>
+        a.length == b.length && a.containsAll(b);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(children: [
+        for (final (label, set) in tabs)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _filter = {...set}),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(label,
+                        style: sans(15,
+                            color: same(_filter, set)
+                                ? AppColors.fg1
+                                : AppColors.fg3)),
+                    const SizedBox(width: 5),
+                    Text('${set.isEmpty ? tasks.length : count(set)}',
+                        style: sans(13, color: AppColors.fg4, tabular: true)),
+                  ]),
+                  const SizedBox(height: 7),
+                  AnimatedContainer(
+                    duration: Motion.quick,
+                    height: 2,
+                    width: same(_filter, set) ? 20 : 0,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ]),
     );
   }
 
@@ -128,7 +167,7 @@ class TasksPanelState extends State<TasksPanel> {
             ),
           if (kMobile && _feed.tasks.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 4),
+              padding: const EdgeInsets.fromLTRB(M.gutter + 2, 0, M.gutter, 0),
               child: _statusStrip(),
             ),
           Expanded(child: _body()),
