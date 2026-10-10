@@ -8,6 +8,7 @@ import 'package:snippet/models.dart';
 import 'package:snippet/screens/create_agent_form.dart';
 import 'package:snippet/screens/shell_models.dart';
 import 'package:snippet/screens/sidebar.dart';
+import 'package:snippet/screens/mission_control_card.dart';
 import 'package:snippet/theme.dart';
 
 class _FakeTestClient extends DaemonClient {
@@ -130,15 +131,15 @@ void main() {
         );
       }
 
-      // 1. Chats: the four tabs, Mission Control in the header, and a New that
-      // starts a chat.
+      // 1. Chats: the four tabs, Mission Control pinned at the top, and a New
+      // that starts a chat.
       await tester.pumpWidget(buildTestWidget(home: MobileHome.chats));
       await tester.pumpAndSettle();
 
       for (final label in ['Chats', 'Tasks', 'Agents', 'Settings']) {
         expect(_tab(label), findsOneWidget);
       }
-      expect(find.byTooltip('Mission Control'), findsOneWidget);
+      expect(find.byType(MissionControlCard), findsOneWidget);
       await tester.tap(find.byTooltip('New chat'));
       await tester.pumpAndSettle();
       expect(newSessionCalled, isTrue);

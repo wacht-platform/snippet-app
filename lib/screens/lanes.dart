@@ -291,8 +291,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                     ? text.copyWith(color: AppColors.danger)
                     : text,
                 listBullet: text,
-                strong:
-                    text.copyWith(color: AppColors.fg1, fontWeight: W.strong),
+                strong: text.copyWith(
+                    color: AppColors.fg1, fontWeight: weightFor(W.strong)),
               ),
               builders: {'pre': PreBlockBuilder()},
             ),

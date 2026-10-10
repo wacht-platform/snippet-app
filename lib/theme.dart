@@ -339,7 +339,7 @@ class R {
   static const md = 10.0;
   static const card = 10.0;
   static const lg = 14.0;
-  static const sheetTop = 14.0;
+  static const sheetTop = 20.0;
   static const pill = 999.0;
 }
 
@@ -492,6 +492,10 @@ class W {
   static const strong = FontWeight.w600;
 }
 
+/// Phones keep every face at its regular weight: hierarchy comes from size,
+/// ink and space rather than from heavier strokes.
+FontWeight weightFor(FontWeight w) => kMobile ? FontWeight.w400 : w;
+
 /// Optical tracking. The reference sits slightly tight at every size
 /// (-0.05px at 12–13px, -0.3px at 20px).
 double _tracking(double size) {
@@ -510,7 +514,7 @@ TextStyle sans(double size,
     TextStyle(
       fontFamily: kSansFamily,
       fontSize: size,
-      fontWeight: weight,
+      fontWeight: weightFor(weight),
       height: height ?? 1.33,
       letterSpacing: spacing ?? _tracking(size),
       color: color ?? AppColors.fg2,
@@ -525,7 +529,7 @@ TextStyle display(double size,
     TextStyle(
       fontFamily: kSansFamily,
       fontSize: size,
-      fontWeight: weight,
+      fontWeight: weightFor(weight),
       height: height ?? 1.15,
       letterSpacing: _tracking(size),
       color: color ?? AppColors.fg1,
@@ -543,7 +547,7 @@ TextStyle mono(double size,
       fontFamily: kMonoFamily,
       fontFamilyFallback: const ['monospace'],
       fontSize: size,
-      fontWeight: weight,
+      fontWeight: weightFor(weight),
       height: height ?? 1.45,
       letterSpacing: spacing,
       color: color ?? AppColors.fg1,
@@ -572,7 +576,7 @@ TextStyle serif(double size,
     TextStyle(
       fontFamily: kSerifFamily,
       fontSize: size,
-      fontWeight: weight,
+      fontWeight: weightFor(weight),
       height: height ?? 1.6,
       color: color ?? AppColors.fg1,
     );
@@ -710,7 +714,7 @@ ThemeData buildAppTheme() {
 /// titles/labels step up to 500 — no 600+ anywhere in the inherited theme.
 TextTheme _weightedTextTheme(TextTheme t) {
   TextStyle? w(TextStyle? s, FontWeight weight) =>
-      s?.copyWith(fontWeight: weight);
+      s?.copyWith(fontWeight: weightFor(weight));
   return t.copyWith(
     displayLarge: w(t.displayLarge, W.label),
     displayMedium: w(t.displayMedium, W.label),

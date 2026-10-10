@@ -247,7 +247,7 @@ class ApprovalBarState extends State<ApprovalBar> {
                   child: Text(question,
                       style: TS
                           .ui(AppColors.fg1)
-                          .copyWith(fontWeight: FontWeight.w600))),
+                          .copyWith(fontWeight: weightFor(FontWeight.w600)))),
               if (total > 1) ...[
                 const SizedBox(width: S.s8),
                 Tag('$index of $total', mono: true),
@@ -839,7 +839,8 @@ class QuestionBarState extends State<QuestionBar> {
             AppIcon('check', size: 11, color: color),
             const SizedBox(width: 4),
           ],
-          Text(label, style: TS.meta(color).copyWith(fontWeight: W.label)),
+          Text(label,
+              style: TS.meta(color).copyWith(fontWeight: weightFor(W.label))),
         ]),
       ),
     );
@@ -1197,21 +1198,30 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
-          child:
-              Text(label.toUpperCase(), style: caps(10, color: AppColors.fg3)),
+          padding: kMobile
+              ? const EdgeInsets.fromLTRB(4, 20, 4, 6)
+              : const EdgeInsets.fromLTRB(4, 16, 4, 8),
+          child: Text(kMobile ? label : label.toUpperCase(),
+              style: kMobile
+                  ? sans(12, weight: W.strong, color: AppColors.fg4)
+                  : caps(10, color: AppColors.fg3)),
         ),
         Container(
           decoration: BoxDecoration(
             color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.md),
+            borderRadius: BorderRadius.circular(kMobile ? 16 : R.md),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (var i = 0; i < rows.length; i++) ...[
-                if (i > 0) Container(height: 1, color: AppColors.border),
+                if (i > 0)
+                  Container(
+                      height: 1,
+                      margin:
+                          EdgeInsets.symmetric(horizontal: kMobile ? 16 : 0),
+                      color: AppColors.border),
                 rows[i],
               ],
             ],
@@ -1241,24 +1251,35 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             onTap: onTap ?? (expandable ? () => _toggle(id) : null),
             child: Container(
               constraints: const BoxConstraints(minHeight: M.minTarget + 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: EdgeInsets.symmetric(
+                  horizontal: kMobile ? 16 : 14, vertical: kMobile ? 10 : 0),
               child: Row(children: [
-                AppIcon(icon, size: 17, color: AppColors.fg3),
-                const SizedBox(width: 12),
+                if (!kMobile) ...[
+                  AppIcon(icon, size: 17, color: AppColors.fg3),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(label,
-                          style: sans(kMobile ? M.rowTitle : 13,
-                              weight: W.label, color: AppColors.fg1)),
+                          style: kMobile
+                              ? sans(15,
+                                  weight: W.label,
+                                  height: 20 / 15,
+                                  color: AppColors.fg1)
+                              : sans(13,
+                                  weight: W.label, color: AppColors.fg1)),
                       if (detail != null) ...[
                         const SizedBox(height: 2),
                         Text(detail,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(M.meta, color: AppColors.fg3)),
+                            style: kMobile
+                                ? sans(13,
+                                    height: 18 / 13, color: AppColors.fg3)
+                                : sans(M.meta, color: AppColors.fg3)),
                       ],
                     ],
                   ),
@@ -1275,7 +1296,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                   ),
                 ],
                 const SizedBox(width: 8),
-                if (expandable)
+                if (expandable || (kMobile && onTap != null))
                   AppIcon(open ? 'chevron-down' : 'chevron-right',
                       size: 15, color: AppColors.fg4),
               ]),
@@ -1291,10 +1312,229 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     );
   }
 
+  Widget _tile(String icon, String label, String detail, VoidCallback onTap) =>
+      Material(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(R.lg),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppIcon(icon, size: 20, color: AppColors.fg3),
+                const SizedBox(height: 10),
+                Text(label,
+                    style: sans(15,
+                        weight: W.strong,
+                        height: 20 / 15,
+                        color: AppColors.fg1)),
+                Text(detail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12, height: 16 / 12, color: AppColors.fg3)),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _mobileGoal(HarnessState? s, bool goalOn) {
+    final goal = s?.goal;
+    if (goalOn && goal != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+              child: Text('Goal',
+                  style: sans(15,
+                      weight: W.strong, height: 20 / 15, color: AppColors.fg1)),
+            ),
+            Text(goal.paused ? 'Paused' : 'Working on it',
+                style: sans(12,
+                    color: goal.paused ? AppColors.fg3 : AppColors.run)),
+          ]),
+          const SizedBox(height: 4),
+          Text(goal.text,
+              style: serif(15, height: 23 / 15, color: AppColors.fg2)
+                  .copyWith(fontStyle: FontStyle.italic)),
+          const SizedBox(height: 10),
+          Btn(goal.paused ? 'Resume goal' : 'Cancel goal',
+              small: true,
+              variant: BtnVariant.secondary,
+              onTap: goal.paused ? widget.onResumeGoal : widget.onCancelGoal),
+        ],
+      );
+    }
+    final open = _open == 'goal';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => _toggle('goal'),
+          child: Row(children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Set a goal',
+                      style: sans(15,
+                          weight: W.strong,
+                          height: 20 / 15,
+                          color: AppColors.fg1)),
+                  const SizedBox(height: 2),
+                  Text('Something for the agent to work toward on its own',
+                      style: sans(13, height: 18 / 13, color: AppColors.fg3)),
+                ],
+              ),
+            ),
+            AppIcon(open ? 'chevron-down' : 'chevron-right',
+                size: 15, color: AppColors.fg4),
+          ]),
+        ),
+        if (open) ...[
+          const SizedBox(height: 12),
+          AppField(
+              controller: _goalCtl,
+              hint: 'What should the agent work toward?',
+              minLines: 2,
+              maxLines: 4),
+          const SizedBox(height: 8),
+          Btn('Set goal', onTap: () {
+            final t = _goalCtl.text.trim();
+            if (t.isEmpty) return;
+            widget.onSetGoal(t);
+            _goalCtl.clear();
+          }),
+        ],
+      ],
+    );
+  }
+
+  Widget _mobileBuild(HarnessState? s, bool goalOn, List<Widget> workRows,
+      List<Widget> historyRows) {
+    final hero = <Widget>[
+      if (widget.onAutonomy != null)
+        InkWell(
+          onTap: widget.onAutonomy,
+          child: Row(children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Autonomous mode',
+                      style: sans(15,
+                          weight: W.strong,
+                          height: 20 / 15,
+                          color: AppColors.fg1)),
+                  const SizedBox(height: 2),
+                  Text('Keeps the work moving while you are away',
+                      style: sans(13, height: 18 / 13, color: AppColors.fg3)),
+                ],
+              ),
+            ),
+            AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+          ]),
+        ),
+      if (!widget.hideGoal) _mobileGoal(s, goalOn),
+    ];
+    final tiles = <Widget>[
+      _tile('git-branch', 'Git', 'Diffs and commits', widget.onGit),
+      _tile('folder', 'Files', 'Browse the workspace', widget.onFiles),
+      if (!widget.hideShell)
+        _tile('terminal', 'Shell', 'A terminal here', widget.onTerm),
+      _tile('list', 'Processes', 'What is running', widget.onProcesses),
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hero.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < hero.length; i++) ...[
+                  if (i > 0)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Container(height: 1, color: AppColors.border),
+                    ),
+                  hero[i],
+                ],
+              ],
+            ),
+          ),
+        if (!widget.hideWorkspace) ...[
+          const SizedBox(height: 12),
+          for (var i = 0; i < tiles.length; i += 2) ...[
+            if (i > 0) const SizedBox(height: 10),
+            Row(children: [
+              Expanded(child: tiles[i]),
+              const SizedBox(width: 10),
+              Expanded(
+                  child: i + 1 < tiles.length
+                      ? tiles[i + 1]
+                      : const SizedBox.shrink()),
+            ]),
+          ],
+        ],
+        _group('Work', workRows),
+        _group('History', historyRows),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
     final goalOn = s?.goal?.ongoing ?? false;
+    if (kMobile) {
+      final runningLanes = s?.lanes.where((l) => l.running).length ?? 0;
+      final workRows = <Widget>[
+        if (!widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
+          _row(
+              icon: 'layers',
+              label: 'Lanes',
+              detail: runningLanes > 0
+                  ? '$runningLanes working in the background'
+                  : 'Background work, finished',
+              onTap: widget.onLanes),
+        if (widget.onGiveWork != null)
+          _row(
+              icon: 'send',
+              label: 'Message an agent',
+              detail: 'Ask a colleague from this chat',
+              onTap: widget.onGiveWork),
+        _row(
+            icon: 'scheduled',
+            label: 'Scheduled',
+            detail: 'Recurring jobs on this machine',
+            onTap: widget.onRecurring),
+      ];
+      final historyRows = <Widget>[
+        if (!widget.hideCheckpoints)
+          _row(
+              icon: 'history',
+              label: 'Checkpoints',
+              detail: 'Restore the workspace to an earlier point',
+              onTap: widget.onCheckpoints),
+        _row(
+            icon: 'minimize',
+            label: 'Compact history',
+            detail: 'Summarise older turns to free context',
+            onTap: widget.onCompact),
+      ];
+      return _mobileBuild(s, goalOn, workRows, historyRows);
+    }
 
     final sessionRows = <Widget>[
       if (widget.onAutonomy != null)

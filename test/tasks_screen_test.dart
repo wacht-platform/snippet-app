@@ -8,6 +8,7 @@ import 'package:snippet/models.dart';
 import 'package:snippet/screens/tasks/tasks_screen.dart';
 import 'package:snippet/screens/sidebar.dart';
 import 'package:snippet/screens/shell_models.dart';
+import 'package:snippet/screens/mission_control_card.dart';
 
 /// The Tasks board's filter + refresh behaviour.
 ///
@@ -90,8 +91,8 @@ void main() {
 
     await tester.pumpWidget(sidebar(MobileHome.chats));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Mission Control'), findsOneWidget);
-    await tester.tap(find.byTooltip('Mission Control'));
+    expect(find.byType(MissionControlCard), findsOneWidget);
+    await tester.tap(find.byType(MissionControlCard));
     expect(openedMissionControl, isTrue);
     await tester.pumpWidget(const SizedBox.shrink());
     } finally {

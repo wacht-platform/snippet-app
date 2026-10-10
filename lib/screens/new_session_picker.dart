@@ -436,7 +436,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                               ? TS.label(AppColors.fg1)
                               : TS
                                   .label(AppColors.fg3)
-                                  .copyWith(fontWeight: W.body),
+                                  .copyWith(fontWeight: weightFor(W.body)),
                         ),
                       ),
                     ),
@@ -706,14 +706,18 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
               borderRadius: BorderRadius.circular(R.md),
             ),
             child: Row(children: [
-              option('git-branch', 'New worktree',
+              option(
+                  'git-branch',
+                  'New worktree',
                   _existing == null && _mode == WorkspaceMode.worktree,
                   () => setState(() {
                         _mode = WorkspaceMode.worktree;
                         _existing = null;
                       }),
                   tooltip: 'Its own branch and checkout'),
-              option('folder', 'This folder',
+              option(
+                  'folder',
+                  'This folder',
                   _existing == null && _mode == WorkspaceMode.folder,
                   () => setState(() {
                         _mode = WorkspaceMode.folder;

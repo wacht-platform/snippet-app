@@ -156,8 +156,10 @@ List<Widget>? coordinationToolBody(
         _ItemList(
           items: _maps(d?['threads']),
           empty: 'Inbox is empty.',
-          title: (t) => _s(t['title']).isEmpty ? _s(t['peer_id']) : _s(t['title']),
-          status: (t) => (t['unread'] as num? ?? 0) > 0 ? '${t['unread']} unread' : '',
+          title: (t) =>
+              _s(t['title']).isEmpty ? _s(t['peer_id']) : _s(t['title']),
+          status: (t) =>
+              (t['unread'] as num? ?? 0) > 0 ? '${t['unread']} unread' : '',
           meta: (t) => _s(t['peer_id']),
         ),
       ];
@@ -293,7 +295,8 @@ class _Header extends StatelessWidget {
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               child: Text(title,
-                  style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
+                  style: sans(kMobile ? 14 : 13,
+                      weight: W.label, color: AppColors.fg1)),
             ),
             if (status.isNotEmpty) ...[
               const SizedBox(width: 10),
@@ -378,7 +381,8 @@ class _Markdown extends StatelessWidget {
       styleSheet: markdownStyle(context).copyWith(
         p: text,
         listBullet: text,
-        strong: text.copyWith(color: AppColors.fg1, fontWeight: W.strong),
+        strong: text.copyWith(
+            color: AppColors.fg1, fontWeight: weightFor(W.strong)),
         em: text.copyWith(fontStyle: FontStyle.italic),
         a: text.copyWith(color: AppColors.accent),
       ),

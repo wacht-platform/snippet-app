@@ -40,7 +40,7 @@ class Tag extends StatelessWidget {
     final (fg, bg) = toneColors(tone);
     final style = mono
         ? TS.codeSmall(fg).copyWith(fontSize: 11, height: 16 / 11)
-        : TS.meta(fg).copyWith(fontWeight: W.label);
+        : TS.meta(fg).copyWith(fontWeight: weightFor(W.label));
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: S.s8, vertical: S.s2),
       decoration: BoxDecoration(
@@ -87,7 +87,8 @@ class CountBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(R.pill),
       ),
       child: Text('$count',
-          style: TS.meta(fg).copyWith(fontWeight: W.label, height: 1)),
+          style:
+              TS.meta(fg).copyWith(fontWeight: weightFor(W.label), height: 1)),
     );
   }
 }
@@ -115,7 +116,10 @@ class SectionHeader extends StatelessWidget {
     return Padding(
       padding: padding,
       child: Row(children: [
-        Text(title, style: TS.label(AppColors.fg2)),
+        Text(title,
+            style: kMobile
+                ? sans(12, weight: W.strong, color: AppColors.fg4)
+                : TS.label(AppColors.fg2)),
         if (count != null) ...[
           const SizedBox(width: S.s8),
           CountBadge(count!, tone: tone),
@@ -186,10 +190,10 @@ class SheetHeader extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: S.s6),
+          const SizedBox(height: S.s8),
           Center(
             child: Container(
-              width: 32,
+              width: 36,
               height: 4,
               decoration: BoxDecoration(
                 color: AppColors.lineStrong,
@@ -198,15 +202,23 @@ class SheetHeader extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(S.s16, S.s4, S.s6, S.s2),
+            padding: kMobile
+                ? const EdgeInsets.fromLTRB(20, 10, 8, 6)
+                : const EdgeInsets.fromLTRB(S.s16, S.s4, S.s6, S.s2),
             child: Row(children: [
               Expanded(
                 child: Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TS
-                        .rowTitle(AppColors.fg1)
-                        .copyWith(fontWeight: FontWeight.w600)),
+                    style: kMobile
+                        ? sans(20,
+                            weight: FontWeight.w700,
+                            spacing: -0.4,
+                            height: 26 / 20,
+                            color: AppColors.fg1)
+                        : TS
+                            .rowTitle(AppColors.fg1)
+                            .copyWith(fontWeight: weightFor(FontWeight.w600))),
               ),
               Tooltip(
                 message: 'Close',
@@ -299,7 +311,7 @@ class PaneLabel extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s8),
         child: Text(kMobile ? text : text.toUpperCase(),
             style: kMobile
-                ? TS.label(color ?? AppColors.fg2)
+                ? sans(12, weight: W.strong, color: color ?? AppColors.fg4)
                 : TS.overline(color)),
       );
 }
@@ -314,7 +326,7 @@ class ListGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: SurfaceScope.groupOf(context),
-      borderRadius: BorderRadius.circular(R.md),
+      borderRadius: BorderRadius.circular(kMobile ? 16 : R.md),
       clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -323,7 +335,12 @@ class ListGroup extends StatelessWidget {
           if (header != null) header!,
           for (var i = 0; i < children.length; i++) ...[
             if (i > 0 || header != null)
-              Divider(height: 1, thickness: 1, color: AppColors.line),
+              Divider(
+                  height: 1,
+                  thickness: 1,
+                  indent: kMobile ? 16 : 0,
+                  endIndent: kMobile ? 16 : 0,
+                  color: AppColors.line),
             children[i],
           ],
         ],
@@ -357,15 +374,18 @@ class ListRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? AppColors.accentBg : Colors.transparent,
+      color: selected
+          ? (kMobile ? AppColors.surface3 : AppColors.accentBg)
+          : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: kMobile ? M.rowHeight : 36),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s8),
+            padding: kMobile
+                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 11)
+                : const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s8),
             child: Row(children: [
               if (leading != null) ...[leading!, const SizedBox(width: S.s12)],
               Expanded(
@@ -377,15 +397,22 @@ class ListRow extends StatelessWidget {
                         Text(title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TS.rowTitle(
-                                selected ? AppColors.fg1 : AppColors.fg1)),
+                            style: kMobile
+                                ? sans(15,
+                                    weight: W.label,
+                                    height: 20 / 15,
+                                    color: AppColors.fg1)
+                                : TS.rowTitle(AppColors.fg1)),
                     if (subtitle != null && subtitle!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: S.s2),
                         child: Text(subtitle!,
-                            maxLines: 1,
+                            maxLines: kMobile ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TS.meta()),
+                            style: kMobile
+                                ? sans(13,
+                                    height: 18 / 13, color: AppColors.fg3)
+                                : TS.meta()),
                       ),
                   ],
                 ),
@@ -462,7 +489,11 @@ class IconTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (fg, bg) = toneColors(tone);
+    var (fg, bg) = toneColors(tone);
+    if (kMobile && tone == Tone.neutral) {
+      fg = AppColors.fg2;
+      bg = AppColors.surface2;
+    }
     final size = this.size;
     return Container(
       width: size,
@@ -470,7 +501,7 @@ class IconTile extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(R.sm + 2),
+        borderRadius: BorderRadius.circular(kMobile ? 10 : R.sm + 2),
       ),
       child: AppIcon(icon, size: size / 2, color: fg),
     );
@@ -779,7 +810,9 @@ class InlineEditField extends StatelessWidget {
               autofocus: true,
               maxLines: 1,
               style: dense
-                  ? TS.label(AppColors.fg1).copyWith(fontWeight: W.body)
+                  ? TS
+                      .label(AppColors.fg1)
+                      .copyWith(fontWeight: weightFor(W.body))
                   : TS.ui(AppColors.fg1),
               cursorColor: AppColors.accent,
               decoration: InputDecoration(

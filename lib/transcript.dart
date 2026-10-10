@@ -700,7 +700,8 @@ class _WatchLine extends StatelessWidget {
                     size: 16,
                     color: muted ? AppColors.fg4 : AppColors.accent))),
         const SizedBox(width: S.s8),
-        Text(verb, style: TS.label(strong).copyWith(fontWeight: W.body)),
+        Text(verb,
+            style: TS.label(strong).copyWith(fontWeight: weightFor(W.body))),
         const SizedBox(width: S.s6),
         Flexible(
           flex: 0,

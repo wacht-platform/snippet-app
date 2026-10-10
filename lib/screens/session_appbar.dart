@@ -1087,30 +1087,37 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(M.gutter, 10, 8, 6),
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: Row(children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Actions',
-                          style: sans(M.pageTitle,
-                              weight: W.label, color: AppColors.fg1)),
-                      const SizedBox(height: 2),
-                      Text(title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(M.meta, color: AppColors.fg3)),
-                    ],
-                  ),
-                ),
                 IconBtn('x',
                     size: M.minTarget,
                     iconSize: 20,
                     tooltip: 'Close',
                     onTap: () => _scaffoldKey.currentState?.closeEndDrawer()),
               ]),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(M.gutter + 8, 0, M.gutter, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Actions',
+                      style: sans(12, weight: W.strong, color: AppColors.fg4)),
+                  const SizedBox(height: 2),
+                  Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(26,
+                          weight: FontWeight.w700,
+                          spacing: -0.7,
+                          height: 31 / 26,
+                          color: AppColors.fg1)),
+                  if (s != null) ...[
+                    const SizedBox(height: 6),
+                    _headerStatusLine(s),
+                  ],
+                ],
+              ),
             ),
             Expanded(
               child: SingleChildScrollView(

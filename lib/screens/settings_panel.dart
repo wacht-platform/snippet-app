@@ -103,7 +103,9 @@ class _MachineListState extends State<MachineList> {
               Text(i.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: kMobile ? TS.rowTitle(AppColors.fg1) : TS.ui(AppColors.fg1)),
+                  style: kMobile
+                      ? TS.rowTitle(AppColors.fg1)
+                      : TS.ui(AppColors.fg1)),
               const SizedBox(height: S.s2),
               Text(hostOf(i.url),
                   maxLines: 1,
@@ -502,55 +504,109 @@ class SettingsPanelState extends State<SettingsPanel> {
   /// Phone settings HOME.
   Widget _mobileSettingsHome() {
     final active = widget.active;
-    Widget nav(SettingsPage page, String icon, String label,
-            [String summary = '']) =>
+    Widget nav(SettingsPage page, String label, [String summary = '']) =>
         ListRow(
           title: label,
-          leading: IconTile(icon),
           onTap: () => widget.onSection?.call(page),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             if (summary.isNotEmpty)
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 140),
+                constraints: const BoxConstraints(maxWidth: 150),
                 child: Text(summary,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TS.meta()),
+                    style: sans(13, color: AppColors.fg3)),
               ),
-            const SizedBox(width: S.s4),
-            AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+            const SizedBox(width: S.s6),
+            AppIcon('chevron-right', size: 15, color: AppColors.fg4),
           ]),
         );
+    Widget label(String text) => Padding(
+          padding: const EdgeInsets.fromLTRB(S.s4, 20, S.s4, 6),
+          child: Text(text,
+              style: sans(12, weight: W.strong, color: AppColors.fg4)),
+        );
+    final name = active?.label.trim() ?? '';
     return ListView(
-      padding: const EdgeInsets.fromLTRB(S.s16, S.s8, S.s16, S.s40),
+      padding: const EdgeInsets.fromLTRB(S.s16, S.s4, S.s16, S.s40),
       children: [
-        const SectionHeader('Machine',
-            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+        Material(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                    name.isEmpty ? '+' : name.characters.first.toUpperCase(),
+                    style: sans(18,
+                        weight: FontWeight.w700, color: AppColors.fg1)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name.isEmpty ? 'No machine yet' : name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(16,
+                            weight: W.strong,
+                            height: 21 / 16,
+                            color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Row(children: [
+                      if (active != null) ...[
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                              color: AppColors.ok, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Flexible(
+                        child: Text(
+                            active == null
+                                ? 'Add one to begin'
+                                : 'Connected · ${hostOf(active.url)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(13, color: AppColors.fg3)),
+                      ),
+                    ]),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Btn(_instances.length > 1 ? 'Switch' : 'Manage',
+                  small: true,
+                  variant: BtnVariant.secondary,
+                  onTap: () => widget.onSection?.call(SettingsPage.general)),
+            ]),
+          ),
+        ),
+        label('Work'),
         ListGroup(children: [
-          if (active != null)
-            ListRow(
-              title: active.label,
-              subtitle: hostOf(active.url),
-              leading: const IconTile('server', tone: Tone.ok),
-              trailing: const Tag('Connected', tone: Tone.ok, dot: true),
-            ),
-          nav(SettingsPage.general, 'layers', 'Manage machines',
-              '${_instances.length}'),
+          nav(SettingsPage.models, 'Models'),
+          nav(SettingsPage.usage, 'Usage'),
+          nav(SettingsPage.vault, 'Vault'),
+          nav(SettingsPage.scheduled, 'Scheduled jobs'),
         ]),
         if (kCanNotify) ...[
-          const SizedBox(height: S.s20),
-          const SectionHeader('Notifications',
-              padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+          label('Phone'),
           ListGroup(children: [_notifRow()]),
         ],
-        const SizedBox(height: S.s20),
-        const SectionHeader('Workspace',
-            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+        label('Machines'),
         ListGroup(children: [
-          nav(SettingsPage.models, 'ai-chip', 'Inference profiles'),
-          nav(SettingsPage.usage, 'analytics', 'Usage'),
-          nav(SettingsPage.vault, 'lock-key', 'Vault'),
-          nav(SettingsPage.scheduled, 'repeat', 'Scheduled jobs'),
+          nav(SettingsPage.general, 'Manage machines', '${_instances.length}'),
         ]),
       ],
     );
@@ -697,13 +753,16 @@ class SettingsPanelState extends State<SettingsPanel> {
             : HeaderAction('Add machine', onTap: _addMachine),
         SettingsPage.models => _modelsEditing
             ? null
-            : HeaderAction('Add profile', onTap: () => _modelsKey.currentState?.addProfile()),
+            : HeaderAction('Add profile',
+                onTap: () => _modelsKey.currentState?.addProfile()),
         SettingsPage.vault => _vaultAdding
             ? null
-            : HeaderAction('Add secret', onTap: () => _vaultKey.currentState?.add()),
+            : HeaderAction('Add secret',
+                onTap: () => _vaultKey.currentState?.add()),
         SettingsPage.scheduled => _recurringAdding
             ? null
-            : HeaderAction('New job', onTap: () => _recurringKey.currentState?.add()),
+            : HeaderAction('New job',
+                onTap: () => _recurringKey.currentState?.add()),
         _ => null,
       };
 
@@ -823,8 +882,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           icon: 'server',
           title: 'No saved machines',
           body: 'Connect to a machine running snippet serve.',
-          action:
-              HeaderAction('Add machine', onTap: _addMachine),
+          action: HeaderAction('Add machine', onTap: _addMachine),
         )
       else
         ListGroup(children: [for (final i in _instances) _instanceRow(i)]),
@@ -1008,18 +1066,28 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   Widget _notifRow() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s12),
+      padding: kMobile
+          ? const EdgeInsets.fromLTRB(16, 10, 12, 10)
+          : const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s12),
       child: Row(children: [
-        const IconTile('bell'),
-        const SizedBox(width: S.s12),
+        if (!kMobile) ...[
+          const IconTile('bell'),
+          const SizedBox(width: S.s12),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Session notifications', style: TS.rowTitle()),
+              Text(kMobile ? 'Notifications' : 'Session notifications',
+                  style: kMobile
+                      ? sans(15, weight: W.label, color: AppColors.fg1)
+                      : TS.rowTitle()),
               const SizedBox(height: S.s2),
-              Text('When a session finishes or needs your input',
-                  style: TS.meta()),
+              Text(
+                  kMobile
+                      ? 'When a chat needs you or finishes'
+                      : 'When a session finishes or needs your input',
+                  style: kMobile ? sans(13, color: AppColors.fg3) : TS.meta()),
             ],
           ),
         ),
@@ -1068,6 +1136,6 @@ Future<void> showManageMachineSheet({
         );
         if (ok) onRemove(instance);
       }, danger: true),
-    ]    ),
+    ]),
   );
 }

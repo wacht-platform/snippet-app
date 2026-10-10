@@ -579,7 +579,8 @@ class _GitScreenState extends State<GitScreen> {
               borderRadius: BorderRadius.circular(R.xs),
             ),
             child: Text(code == '?' ? 'U' : code,
-                style: TS.codeSmall(fg).copyWith(fontWeight: W.label)),
+                style:
+                    TS.codeSmall(fg).copyWith(fontWeight: weightFor(W.label))),
           ),
           const SizedBox(width: S.s8),
           Expanded(

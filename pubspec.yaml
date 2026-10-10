@@ -65,25 +65,12 @@ flutter:
       fonts:
         - asset: assets/fonts/Geist-400.ttf
           weight: 400
-        - asset: assets/fonts/Geist-500.ttf
-          weight: 500
-        - asset: assets/fonts/Geist-600.ttf
-          weight: 600
-        - asset: assets/fonts/Geist-700.ttf
-          weight: 700
     - family: Literata
       fonts:
         - asset: assets/fonts/Literata-400.ttf
           weight: 400
-        - asset: assets/fonts/Literata-500.ttf
-          weight: 500
-        - asset: assets/fonts/Literata-600.ttf
-          weight: 600
         - asset: assets/fonts/Literata-400-italic.ttf
           weight: 400
-          style: italic
-        - asset: assets/fonts/Literata-500-italic.ttf
-          weight: 500
           style: italic
     - family: JetBrainsMono
       fonts:

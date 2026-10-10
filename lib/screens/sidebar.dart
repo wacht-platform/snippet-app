@@ -12,6 +12,7 @@ import '../widgets.dart';
 import 'agents_sidebar_panel.dart';
 import 'list_search_field.dart';
 import 'mission_control.dart';
+import 'mission_control_card.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'settings_panel.dart';
 import 'shell_components.dart';
@@ -521,10 +522,9 @@ class SidebarState extends State<Sidebar> {
     return Padding(
       padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
       child: Row(children: [
-        Text('Chats',
-            style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
+        Text('Chats', style: TS.pageTitle()),
         const Spacer(),
-        ..._headerTrailing(hasClient),
+        ..._headerTrailing(hasClient, missionControl: false),
       ]),
     );
   }
@@ -533,8 +533,7 @@ class SidebarState extends State<Sidebar> {
     return Padding(
       padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
       child: Row(children: [
-        Text('Agents',
-            style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
+        Text('Agents', style: TS.pageTitle()),
         const Spacer(),
         ..._headerTrailing(hasClient),
       ]),
@@ -543,12 +542,12 @@ class SidebarState extends State<Sidebar> {
 
   /// The controls at the right of every phone page header: Mission Control
   /// (when this machine has it) and the machine switcher.
-  List<Widget> _headerTrailing(bool hasClient) {
+  List<Widget> _headerTrailing(bool hasClient, {bool missionControl = true}) {
     final mc = (_sessions ?? const <SessionInfo>[])
         .where((s) => isDedicatedMcSession(s.id))
         .toList();
     return [
-      if (hasClient && mc.isNotEmpty)
+      if (hasClient && mc.isNotEmpty && missionControl)
         IconBtn('layers',
             size: M.minTarget,
             iconSize: 19,
@@ -572,8 +571,7 @@ class SidebarState extends State<Sidebar> {
     return Padding(
       padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
       child: Row(children: [
-        Text('Settings',
-            style: sans(M.pageTitle, weight: W.label, color: AppColors.fg1)),
+        Text('Settings', style: TS.pageTitle()),
         const Spacer(),
         _machineAvatarButton(),
       ]),
@@ -780,6 +778,19 @@ class SidebarState extends State<Sidebar> {
     if (kMobile) {
       final allSorted = _sortSessionsByRecency(list);
       final mobileChildren = <Widget>[];
+      final client = widget.client;
+      if (client != null &&
+          mc.isNotEmpty &&
+          !_selecting &&
+          _filterQuery.trim().isEmpty) {
+        mobileChildren.add(MissionControlCard(
+          client: client,
+          session: mc.first,
+          waitingChats:
+              allSorted.where((s) => s.status == 'waiting_for_input').length,
+          onOpen: widget.onOpenMissionControl,
+        ));
+      }
       String? section;
       for (var i = 0; i < allSorted.length; i++) {
         final session = allSorted[i];

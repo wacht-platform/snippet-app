@@ -101,12 +101,12 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
       MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
     p: TS.body(),
     pPadding: EdgeInsets.zero,
-    strong: TS.body(AppColors.fg1).copyWith(fontWeight: W.strong),
+    strong: TS.body(AppColors.fg1).copyWith(fontWeight: weightFor(W.strong)),
     em: TS.body().copyWith(fontStyle: FontStyle.italic),
     a: TS.body(AppColors.accent),
     h1: TS.sectionTitle(),
     h1Padding: const EdgeInsets.only(top: S.s12, bottom: S.s4),
-    h2: TS.rowTitle().copyWith(fontWeight: W.strong),
+    h2: TS.rowTitle().copyWith(fontWeight: weightFor(W.strong)),
     h2Padding: const EdgeInsets.only(top: S.s12, bottom: S.s4),
     h3: TS.rowTitle(),
     h3Padding: const EdgeInsets.only(top: S.s8, bottom: S.s2),
@@ -123,7 +123,7 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     ),
     listBullet: TS.body(AppColors.fg3),
     tableBody: TS.ui(),
-    tableHead: TS.ui(AppColors.fg1).copyWith(fontWeight: W.label),
+    tableHead: TS.ui(AppColors.fg1).copyWith(fontWeight: weightFor(W.label)),
     // FlexColumnWidth stretches every markdown table to the full message width.
     // Intrinsic columns keep phone tables content-sized; the markdown package
     // supplies horizontal scrolling when a long URL or code value needs it.
@@ -152,7 +152,7 @@ MarkdownStyleSheet agentMarkdownStyle(BuildContext context) {
   final prose = TS.reading();
   _cachedAgentMarkdownStyle = base.copyWith(
     p: prose,
-    strong: prose.copyWith(fontWeight: W.strong),
+    strong: prose.copyWith(fontWeight: weightFor(W.strong)),
     em: prose.copyWith(fontStyle: FontStyle.italic),
     a: prose.copyWith(color: AppColors.accent),
     listBullet: prose.copyWith(color: AppColors.fg3),
@@ -476,7 +476,8 @@ class Btn extends StatelessWidget {
     // Material's 48dp floors — and it is the primary action of the agent thread
     // composer and every dialog footer. Desktop keeps the compact 28/34 so a
     // mouse-sized toolbar does not grow.
-    final h = small ? (kMobile ? 36.0 : 28.0) : (kMobile ? 44.0 : 34.0);
+    final h = small ? (kMobile ? 36.0 : 28.0) : (kMobile ? 46.0 : 34.0);
+    final radius = kMobile ? (small ? 10.0 : 14.0) : R.sm;
     final child = Row(
       mainAxisSize: full ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -485,7 +486,10 @@ class Btn extends StatelessWidget {
           AppIcon(icon!, size: small ? 15 : 17, color: fg),
           const SizedBox(width: 8)
         ],
-        Text(label, style: sans(small ? 12 : 13, weight: W.label, color: fg)),
+        Text(label,
+            style: kMobile
+                ? sans(small ? 13 : 15, weight: W.strong, color: fg)
+                : sans(small ? 12 : 13, weight: W.label, color: fg)),
         if (iconRight != null) ...[
           const SizedBox(width: 8),
           AppIcon(iconRight!, size: small ? 15 : 17, color: fg)
@@ -498,7 +502,7 @@ class Btn extends StatelessWidget {
         enabled: !disabled && onTap != null,
         child: Material(
           color: bg,
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(radius),
           child: InkWell(
             onTap: disabled || onTap == null
                 ? null
@@ -508,14 +512,17 @@ class Btn extends StatelessWidget {
                     }
                     onTap!();
                   },
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(radius),
             child: Container(
               height: h,
               width: full ? double.infinity : null,
               padding: EdgeInsets.symmetric(horizontal: small ? 12 : 16),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.sm),
-                border: bd != null ? Border.all(color: bd) : null,
+                borderRadius: BorderRadius.circular(radius),
+                border:
+                    bd != null && !(kMobile && variant == BtnVariant.secondary)
+                        ? Border.all(color: bd)
+                        : null,
               ),
               child: child,
             ),
@@ -1582,8 +1589,11 @@ class AppSwitch extends StatelessWidget {
                   child: Container(
                     width: thumb,
                     height: thumb,
-                    decoration: const BoxDecoration(
-                        color: Colors.white, shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                        color: !kMobile
+                            ? Colors.white
+                            : (on ? AppColors.accentFg : AppColors.fg4),
+                        shape: BoxShape.circle),
                   ),
                 ),
               ),

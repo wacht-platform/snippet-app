@@ -251,8 +251,8 @@ class _FileExplorerState extends State<FileExplorer> {
       title: 'Folder actions',
       child: SheetActions([
         if (widget.onNewChat != null)
-          SheetAction('plus', 'New chat here',
-              () => run(() => widget.onNewChat!(cwd))),
+          SheetAction(
+              'plus', 'New chat here', () => run(() => widget.onNewChat!(cwd))),
         SheetAction('git-branch', 'Git', () => run(() => _openGit(cwd))),
         SheetAction('upload', 'Upload files',
             _busy == null ? () => run(() => _upload(cwd)) : null),
@@ -660,7 +660,7 @@ class _FileExplorerState extends State<FileExplorer> {
                       child: Text(crumbs[i].$1,
                           style: TS
                               .label(AppColors.fg3)
-                              .copyWith(fontWeight: W.body)),
+                              .copyWith(fontWeight: weightFor(W.body))),
                     ),
                   ),
                 ],
