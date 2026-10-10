@@ -210,6 +210,7 @@ class _GitScreenState extends State<GitScreen> {
     await showAppSheet<void>(
       context,
       title: 'Branches',
+      maxWidth: 420,
       child: GitBranchPicker(
         current: data.current,
         local: data.local,
@@ -233,23 +234,13 @@ class _GitScreenState extends State<GitScreen> {
       if (widget.embedded)
         Container(
           height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
+          padding: const EdgeInsets.fromLTRB(18, 0, 8, 0),
           child: Row(children: [
-            AppIcon('git-branch', size: 14, color: AppColors.accent),
-            const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                st != null && st.ok && st.branch.isNotEmpty
-                    ? 'Git · ${st.branch}'
-                    : 'Source Control',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(12, weight: W.label, color: AppColors.fg1),
-              ),
+              child: Text('Source control',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, color: AppColors.fg3)),
             ),
             if (widget.onClose != null) ...[
               const SizedBox(width: 2),
@@ -575,20 +566,29 @@ class _GitScreenState extends State<GitScreen> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(R.xs),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(code == '?' ? 'U' : code,
-                style:
-                    TS.codeSmall(fg).copyWith(fontWeight: weightFor(W.label))),
+            child: Text(code == '?' ? 'U' : code, style: mono(11, color: fg)),
           ),
-          const SizedBox(width: S.s8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text.rich(
-              TextSpan(children: [
-                if (dir.isNotEmpty)
-                  TextSpan(text: dir, style: TS.codeSmall(AppColors.fg3)),
-                TextSpan(text: fileName, style: TS.codeSmall(AppColors.fg1)),
-              ]),
+              kMobile
+                  ? TextSpan(children: [
+                      if (dir.isNotEmpty)
+                        TextSpan(text: dir, style: TS.codeSmall(AppColors.fg3)),
+                      TextSpan(
+                          text: fileName, style: TS.codeSmall(AppColors.fg1)),
+                    ])
+                  : TextSpan(children: [
+                      TextSpan(
+                          text: fileName,
+                          style: sans(13.5, color: AppColors.fg1)),
+                      if (dir.isNotEmpty)
+                        TextSpan(
+                            text: '  ${dir.substring(0, dir.length - 1)}',
+                            style: sans(12, color: AppColors.fg4)),
+                    ]),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -666,6 +666,7 @@ class _GitBranchPickerState extends State<GitBranchPicker> {
         !q.contains(' ') &&
         !q.startsWith('-');
 
+    if (!kMobile) return _desktop(local, remotes, q, canCreate);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -729,6 +730,135 @@ class _GitBranchPickerState extends State<GitBranchPicker> {
             if (name == null || name.trim().isEmpty) return;
             widget.onSelect(name.trim(), create: true);
           },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _newBranch() async {
+    final name = await promptText(context,
+        title: 'New branch', hint: 'branch name', saveLabel: 'Create');
+    if (name == null || name.trim().isEmpty) return;
+    widget.onSelect(name.trim(), create: true);
+  }
+
+  void _submit(
+      List<String> local, List<String> remotes, String q, bool canCreate) {
+    final pick = local.where((b) => b != widget.current).firstOrNull;
+    if (pick != null) {
+      widget.onSelect(pick, create: false);
+    } else if (remotes.isNotEmpty) {
+      widget.onSelect(remotes.first, create: false);
+    } else if (canCreate) {
+      widget.onSelect(q, create: true);
+    }
+  }
+
+  Widget _desktopLabel(String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(10, 12, 10, 4),
+        child: Text(text, style: sans(12, color: AppColors.fg4)),
+      );
+
+  Widget _desktopRow({
+    required String icon,
+    required Widget label,
+    required VoidCallback? onTap,
+    bool current = false,
+  }) =>
+      Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: SizedBox(
+            height: 32,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(children: [
+                AppIcon(icon,
+                    size: 14,
+                    color: current ? AppColors.accent : AppColors.fg3),
+                const SizedBox(width: 10),
+                Expanded(child: label),
+                if (current)
+                  AppIcon('check', size: 14, color: AppColors.accent),
+              ]),
+            ),
+          ),
+        ),
+      );
+
+  Widget _desktop(
+      List<String> local, List<String> remotes, String q, bool canCreate) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppField(
+          controller: _q,
+          hint: 'Search or create a branch',
+          icon: 'search',
+          autofocus: true,
+          onSubmitted: (_) => _submit(local, remotes, q, canCreate),
+        ),
+        if (local.isNotEmpty) ...[
+          _desktopLabel('Local'),
+          for (final b in local)
+            _desktopRow(
+              icon: 'git-branch',
+              current: b == widget.current,
+              onTap: b == widget.current
+                  ? null
+                  : () => widget.onSelect(b, create: false),
+              label: Text(b,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(12.5,
+                      color: b == widget.current
+                          ? AppColors.accent
+                          : AppColors.fg1)),
+            ),
+        ],
+        if (remotes.isNotEmpty) ...[
+          _desktopLabel('Remote'),
+          for (final b in remotes)
+            _desktopRow(
+              icon: 'globe',
+              onTap: () => widget.onSelect(b, create: false),
+              label: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: _localNameForRemote(b)),
+                  TextSpan(
+                      text: '  ${b.split('/').first}',
+                      style: sans(12, color: AppColors.fg4)),
+                ]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: mono(12.5, color: AppColors.fg1),
+              ),
+            ),
+        ],
+        if (local.isEmpty && remotes.isEmpty && !canCreate)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Center(
+              child: Text(q.isEmpty ? 'No branches' : 'No matches',
+                  style: sans(13, color: AppColors.fg3)),
+            ),
+          ),
+        const SizedBox(height: 6),
+        Container(height: 1, color: AppColors.border),
+        const SizedBox(height: 6),
+        _desktopRow(
+          icon: 'plus',
+          onTap:
+              canCreate ? () => widget.onSelect(q, create: true) : _newBranch,
+          label: Text(canCreate ? 'Create branch “$q”' : 'New branch…',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(13,
+                  color: canCreate ? AppColors.accent : AppColors.fg2)),
         ),
       ],
     );

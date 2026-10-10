@@ -100,23 +100,24 @@ class TasksPanelState extends State<TasksPanel> {
               _shownAt = null;
             }),
             child: Padding(
-              padding: const EdgeInsets.only(right: 22),
+              padding: EdgeInsets.only(right: kMobile ? 22 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(height: 8),
+                  SizedBox(height: kMobile ? 8 : 4),
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     Text(label,
-                        style: sans(kMobile ? 15 : 14,
+                        style: sans(kMobile ? 15 : 13,
                             color: same(_filter, set)
                                 ? AppColors.fg1
                                 : AppColors.fg3)),
                     const SizedBox(width: 5),
                     Text('${set.isEmpty ? tasks.length : count(set)}',
-                        style: sans(13, color: AppColors.fg4, tabular: true)),
+                        style: sans(kMobile ? 13 : 12,
+                            color: AppColors.fg4, tabular: true)),
                   ]),
-                  const SizedBox(height: 7),
+                  SizedBox(height: kMobile ? 7 : 5),
                   AnimatedContainer(
                     duration: Motion.quick,
                     height: 2,

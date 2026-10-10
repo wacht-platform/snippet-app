@@ -147,7 +147,9 @@ class _ShellSplitViewState extends State<ShellSplitView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (list.isNotEmpty || readouts.isNotEmpty)
+            if (p == ShellPane.right
+                ? list.isNotEmpty || readouts.isNotEmpty
+                : list.length + readouts.length > 1)
               PaneStrip(
                 pane: p,
                 tabs: list,

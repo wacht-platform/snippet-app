@@ -870,7 +870,7 @@ class SidebarState extends State<Sidebar> {
       if (label != day) {
         day = label;
         rows.add(Padding(
-          padding: EdgeInsets.fromLTRB(10, rows.isEmpty ? 6 : 18, 10, 6),
+          padding: EdgeInsets.fromLTRB(10, rows.isEmpty ? 4 : 14, 10, 4),
           child: Text(label, style: sans(12, color: AppColors.fg4)),
         ));
       }
@@ -1016,7 +1016,7 @@ class SidebarState extends State<Sidebar> {
             ? null
             : (d) => _sessionActions(s, position: d.globalPosition),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
           child: Row(children: [
             if (_selecting) ...[
               SelectCheck(checked, size: 14),

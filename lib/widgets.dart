@@ -1110,31 +1110,9 @@ class Bubble extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              agent,
-              if (selectable && shown.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: shown));
-                      toast(context, 'Copied');
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon('clipboard', size: 12, color: AppColors.fg4),
-                        const SizedBox(width: 5),
-                        Text('Copy', style: TS.meta()),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          child: selectable && shown.isNotEmpty
+              ? _HoverCopy(text: shown, child: agent)
+              : agent,
         ),
       );
     }
@@ -1237,6 +1215,53 @@ extension on Bubble {
     }
     return out;
   }
+}
+
+class _HoverCopy extends StatefulWidget {
+  const _HoverCopy({required this.text, required this.child});
+  final String text;
+  final Widget child;
+
+  @override
+  State<_HoverCopy> createState() => _HoverCopyState();
+}
+
+class _HoverCopyState extends State<_HoverCopy> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            widget.child,
+            AnimatedOpacity(
+              opacity: _hover ? 1 : 0,
+              duration: Motion.quick,
+              child: IgnorePointer(
+                ignoring: !_hover,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: widget.text));
+                      toast(context, 'Copied');
+                    },
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      AppIcon('copy', size: 12, color: AppColors.fg4),
+                      const SizedBox(width: 5),
+                      Text('Copy', style: TS.meta()),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 /// Dim note (centered) / error (left-aligned, capped at two lines).

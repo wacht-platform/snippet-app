@@ -693,8 +693,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                               // The card owns the inset and the rows sit inside it, so there is
                               // no per-row vertical padding to keep in sync. Slightly taller
                               // than it is wide-padded, so the field reads as a writing area.
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 14),
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: kMobile ? 14 : 12),
                               child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment:
@@ -762,7 +762,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                         // Two lines minimum: a single-line field read as a
                                         // cramped search box, and it hid the fact that the
                                         // composer accepts multi-line prose.
-                                        minLines: kMobile ? 1 : 2,
+                                        minLines: 1,
                                         maxLines: 8,
                                         cursorColor: AppColors.accent,
                                         onSubmitted: (_) => _sendMessage(),
@@ -775,9 +775,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                               const EdgeInsets.fromLTRB(
                                                   2, 2, 8, 10),
                                           border: InputBorder.none,
-                                          hintText: kMobile
-                                              ? 'Reply to Snippet'
-                                              : 'Ask anything',
+                                          hintText: 'Reply to Snippet',
                                           hintStyle: TS.body(AppColors.fg4),
                                         ),
                                       ),

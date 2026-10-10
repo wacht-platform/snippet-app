@@ -48,7 +48,7 @@ class TerminalsSidebarPanel extends StatelessWidget {
     return Container(
       color: kMobile ? AppColors.bg : Colors.transparent,
       child: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 16),
+        padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
         children: [
           ShellSectionHeader(
             label: 'Terminals',

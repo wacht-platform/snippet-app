@@ -322,7 +322,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
           physics: const AlwaysScrollableScrollPhysics(),
           // Horizontal insets belong to each child (the section header carries
           // its own), so the list itself only manages the top and tail.
-          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
           children: [
             ShellSectionHeader(
               label: 'File Tree',
