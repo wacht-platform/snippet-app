@@ -2,12 +2,14 @@ part of 'desktop_shell.dart';
 
 extension _DesktopShellPanesExt on _DesktopShellState {
   Widget _tabBody(_ShellTab t, {required bool primary}) => kMobile
-    ? _originTabBody(t, primary: primary)
-    : ShellPanelScope(
-    key: ValueKey('body-${t.key}'),
-    open: _openShellPanel, client: t.client, sessionId: t.sessionId,
-    child: _originTabBody(t, primary: primary),
-  );
+      ? _originTabBody(t, primary: primary)
+      : ShellPanelScope(
+          key: ValueKey('body-${t.key}'),
+          open: _openShellPanel,
+          client: t.client,
+          sessionId: t.sessionId,
+          child: _originTabBody(t, primary: primary),
+        );
 
   Widget _originTabBody(_ShellTab t, {required bool primary}) {
     if (t.isBoard) {
@@ -70,7 +72,9 @@ extension _DesktopShellPanesExt on _DesktopShellState {
           : () => _setState(() => t.inboundShare = null),
       acceptDrops: primary,
       mobileActive: !kMobile ||
-          (_appForeground && !_mobileChatsOpen && _mobileHome == _MobileHome.chats),
+          (_appForeground &&
+              !_mobileChatsOpen &&
+              _mobileHome == _MobileHome.chats),
       onTitle: (title) => _onSessionTitle(t.sessionId!, title),
       onMenu: kMobile ? _showMobileChats : null,
       onOpenFileTab: (path, name) =>
@@ -214,6 +218,11 @@ extension _DesktopShellPanesExt on _DesktopShellState {
 
   Widget _bodyRow({required bool topInset}) => ShellSplitView(
         sidebar: _sidebar(topInset: topInset),
+        sidebarHeader: ShellSectionTabs(
+          section: _effectiveSection,
+          onSelect: (s) => _setState(() => _section = s),
+          hidden: _hiddenSections,
+        ),
         paneWidth: _paneWidth,
         leftCollapsed: _leftCollapsed,
         rightCollapsed: _rightCollapsed,
@@ -533,6 +542,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         tabsRow: _mainTabsRow(),
         onOpenSettings: _openShellSettings,
         machineSwitcher: _topMachineSwitcher(),
+        tools: _railTools(),
+        reserveWindowControls: kMacOS,
       );
 
   Widget _topMachineSwitcher() => TopMachineSwitcher(

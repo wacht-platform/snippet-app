@@ -51,16 +51,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
-    - family: InstrumentSans
-      fonts:
-        - asset: assets/fonts/InstrumentSans-400.ttf
-          weight: 400
-        - asset: assets/fonts/InstrumentSans-500.ttf
-          weight: 500
-        - asset: assets/fonts/InstrumentSans-600.ttf
-          weight: 600
-        - asset: assets/fonts/InstrumentSans-700.ttf
-          weight: 700
     - family: Geist
       fonts:
         - asset: assets/fonts/Geist-400.ttf

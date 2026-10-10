@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
@@ -45,7 +46,7 @@ class TerminalsSidebarPanel extends StatelessWidget {
         workspacePath.trim().isEmpty ? '~/workspace' : workspacePath;
 
     return Container(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 16),
         children: [

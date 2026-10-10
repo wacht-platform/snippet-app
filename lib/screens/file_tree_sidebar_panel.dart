@@ -314,7 +314,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
     final entries = _listing?.entries ?? const <FsEntry>[];
 
     return Container(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: ListView(
         // Horizontal insets belong to each child (the section header carries
         // its own), so the list itself only manages the top and tail.

@@ -68,12 +68,6 @@ class TasksPanelState extends State<TasksPanel> {
     if (mounted) await _feed.refresh();
   }
 
-  Future<void> _pickFilter() async {
-    final picked =
-        await showTaskFilter(context, selected: _filter, tasks: _feed.tasks);
-    if (picked != null && mounted) setState(() => _filter = picked);
-  }
-
   static const _active = {TaskStatus.todo, TaskStatus.inProgress};
   static const _stuck = {TaskStatus.blocked, TaskStatus.failed};
 
@@ -109,7 +103,7 @@ class TasksPanelState extends State<TasksPanel> {
                   const SizedBox(height: 8),
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     Text(label,
-                        style: sans(15,
+                        style: sans(kMobile ? 15 : 14,
                             color: same(_filter, set)
                                 ? AppColors.fg1
                                 : AppColors.fg3)),
@@ -143,13 +137,10 @@ class TasksPanelState extends State<TasksPanel> {
         }
       });
 
-  String get _filterTooltip =>
-      _filter.isEmpty ? 'Filter' : 'Filter (${_filter.length} selected)';
-
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -165,9 +156,11 @@ class TasksPanelState extends State<TasksPanel> {
                 onChanged: (v) => setState(() => _query = v),
               ),
             ),
-          if (kMobile && _feed.tasks.isNotEmpty)
+          if (_feed.tasks.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(M.gutter + 2, 0, M.gutter, 0),
+              padding: kMobile
+                  ? const EdgeInsets.fromLTRB(M.gutter + 2, 0, M.gutter, 0)
+                  : const EdgeInsets.fromLTRB(18, 0, 10, 4),
               child: _statusStrip(),
             ),
           Expanded(child: _body()),
@@ -193,11 +186,6 @@ class TasksPanelState extends State<TasksPanel> {
               tooltip: 'Search tasks',
               active: _searchOpen,
               onTap: _toggleSearch),
-          ShellSectionAction(
-              icon: 'sliders',
-              tooltip: _filterTooltip,
-              active: _filter.isNotEmpty,
-              onTap: _pickFilter),
           ShellSectionAction(icon: 'plus', tooltip: 'New task', onTap: create),
         ],
       );

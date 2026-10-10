@@ -604,20 +604,11 @@ void main() {
   //      rendered regular and hierarchy came from size alone;
   //   2. palette values drifting below accessible contrast on the dark canvas.
 
-  test('sans() honours the requested weight (no silent 400 cap)', () {
+  test('every type helper is capped at weight 400', () {
     TestWidgetsFlutterBinding.ensureInitialized();
-    expect(sans(15, weight: FontWeight.w500).fontWeight, FontWeight.w500);
-    expect(sans(15, weight: FontWeight.w600).fontWeight, FontWeight.w600);
-    expect(sans(15, weight: FontWeight.w700).fontWeight, FontWeight.w700);
-    // Default body stays regular.
-    expect(sans(15).fontWeight, FontWeight.w400);
-    // The ramp is reachable through mono() as well.
-    expect(mono(13, weight: FontWeight.w600).fontWeight, FontWeight.w600);
-  });
-
-  test('display() keeps its weight instead of flattening', () {
-    TestWidgetsFlutterBinding.ensureInitialized();
-    expect(display(22).fontWeight, W.title);
+    expect(sans(15, weight: FontWeight.w700).fontWeight, FontWeight.w400);
+    expect(mono(13, weight: FontWeight.w600).fontWeight, FontWeight.w400);
+    expect(display(22).fontWeight, FontWeight.w400);
   });
 
   test('dark palette clears accessible contrast on every surface', () {

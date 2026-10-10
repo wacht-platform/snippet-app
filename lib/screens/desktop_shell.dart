@@ -1417,113 +1417,103 @@ class _DesktopShellState extends State<DesktopShell>
       );
     }
     if (kMobile) return _mobileShell();
-    return ShellPanelScope(open: _openShellPanel, client: _client,
-      sessionId: _activeTab?.sessionId,
-      child: LayoutBuilder(builder: (context, c) {
-      _ShellTab? visibleTab;
-      if (c.maxWidth < kShellCompact) {
-        if (_activeIndex >= 0 && _activeIndex < _tabs.length) {
-          visibleTab = _tabs[_activeIndex];
-        }
-      } else {
-        final pane = _focusedPane;
-        final tabs = _tabsIn(pane);
-        final key = _activeKey[pane];
-        final selected = tabs.where((t) => t.key == key).firstOrNull;
-        final readoutSelected = _rightTabs.any((r) => r.pane == pane && r.key == key);
-        visibleTab = selected ??
-            (!readoutSelected && tabs.isNotEmpty ? tabs.first : null);
-      }
-      final visible = _appForeground && visibleTab != null &&
-          !_isAuxiliary(visibleTab) && !visibleTab.isMissionControl;
-      reportVisibleNotificationSession(
-          visible ? visibleTab.instanceUrl : null,
-          visible ? visibleTab.sessionId : null);
-      // Narrow window → keep the native shell but collapse the sidebar to a drawer.
-      if (c.maxWidth < kShellCompact) {
-        // Full-width drawer on phones; a capped one on a shrunk desktop window.
-        final drawerW =
-            kMobile ? c.maxWidth : (c.maxWidth * 0.86).clamp(280.0, 360.0);
-        // Back from an open session: reveal the sessions drawer FIRST, then a
-        // second back exits. (Only intercept when a session is open and the drawer
-        // is closed; from the open drawer or the home placeholder, back exits.)
-        return PopScope(
-          canPop: _drawerOpen || _sessionId == null,
-          onPopInvokedWithResult: (didPop, _) {
-            if (didPop) return;
-            _scaffoldKey.currentState?.openDrawer();
-          },
-          child: Scaffold(
-            key: _scaffoldKey,
-            backgroundColor: Colors.transparent,
-            onDrawerChanged: (open) => setState(() => _drawerOpen = open),
-            // Keep drawer gestures confined to the physical edge. A wide edge
-            // target competes with fast, slightly angled transcript scrolling.
-            drawerEdgeDragWidth: kMobile ? 20 : 24,
-            drawer: Drawer(
-              width: drawerW,
-              backgroundColor: AppColors.windowBg,
-              shape: const RoundedRectangleBorder(),
-              child: SafeArea(
-                  child: _sidebar(
-                      topInset: !kMacOS,
-                      onAfterPick: () =>
-                          _scaffoldKey.currentState?.closeDrawer())),
-            ),
-            // Narrow: the toolbar's sidebar-toggle is at the far left under the
-            // traffic lights, so inset the whole pane below them.
-            body: SafeArea(
-              child: Padding(
-                padding: EdgeInsets.only(top: kMacOS ? kMacTitlebar : 0),
-                child: _mainPane(
-                    onMenu: () => _scaffoldKey.currentState?.openDrawer()),
+    return ShellPanelScope(
+        open: _openShellPanel,
+        client: _client,
+        sessionId: _activeTab?.sessionId,
+        child: LayoutBuilder(builder: (context, c) {
+          _ShellTab? visibleTab;
+          if (c.maxWidth < kShellCompact) {
+            if (_activeIndex >= 0 && _activeIndex < _tabs.length) {
+              visibleTab = _tabs[_activeIndex];
+            }
+          } else {
+            final pane = _focusedPane;
+            final tabs = _tabsIn(pane);
+            final key = _activeKey[pane];
+            final selected = tabs.where((t) => t.key == key).firstOrNull;
+            final readoutSelected =
+                _rightTabs.any((r) => r.pane == pane && r.key == key);
+            visibleTab = selected ??
+                (!readoutSelected && tabs.isNotEmpty ? tabs.first : null);
+          }
+          final visible = _appForeground &&
+              visibleTab != null &&
+              !_isAuxiliary(visibleTab) &&
+              !visibleTab.isMissionControl;
+          reportVisibleNotificationSession(
+              visible ? visibleTab.instanceUrl : null,
+              visible ? visibleTab.sessionId : null);
+          // Narrow window → keep the native shell but collapse the sidebar to a drawer.
+          if (c.maxWidth < kShellCompact) {
+            // Full-width drawer on phones; a capped one on a shrunk desktop window.
+            final drawerW =
+                kMobile ? c.maxWidth : (c.maxWidth * 0.86).clamp(280.0, 360.0);
+            // Back from an open session: reveal the sessions drawer FIRST, then a
+            // second back exits. (Only intercept when a session is open and the drawer
+            // is closed; from the open drawer or the home placeholder, back exits.)
+            return PopScope(
+              canPop: _drawerOpen || _sessionId == null,
+              onPopInvokedWithResult: (didPop, _) {
+                if (didPop) return;
+                _scaffoldKey.currentState?.openDrawer();
+              },
+              child: Scaffold(
+                key: _scaffoldKey,
+                backgroundColor: Colors.transparent,
+                onDrawerChanged: (open) => setState(() => _drawerOpen = open),
+                // Keep drawer gestures confined to the physical edge. A wide edge
+                // target competes with fast, slightly angled transcript scrolling.
+                drawerEdgeDragWidth: kMobile ? 20 : 24,
+                drawer: Drawer(
+                  width: drawerW,
+                  backgroundColor: AppColors.windowBg,
+                  shape: const RoundedRectangleBorder(),
+                  child: SafeArea(
+                      child: _sidebar(
+                          topInset: !kMacOS,
+                          onAfterPick: () =>
+                              _scaffoldKey.currentState?.closeDrawer())),
+                ),
+                // Narrow: the toolbar's sidebar-toggle is at the far left under the
+                // traffic lights, so inset the whole pane below them.
+                body: SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: kMacOS ? kMacTitlebar : 0),
+                    child: _mainPane(
+                        onMenu: () => _scaffoldKey.currentState?.openDrawer()),
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }
-      // Wide macOS uses a persistent sidebar column beside the content column.
-      // The tab strip belongs only to the content pane, so the sidebar can use
-      // the full height below the native title bar without an empty header gap.
-      if (kMacOS) {
-        return Scaffold(
-          // The window paints the chrome surface; the reading pane inside it is
-          // the darker canvas.
-          backgroundColor: Colors.transparent,
-          body: SafeArea(
-            child: Column(children: [
-              _macWindowBar(),
-              // The navigation band is a shell-level row: full window width,
-              // directly between the title bar and the body.
-              ShellRail(
-                section: _effectiveSection,
-                onSelect: (s) => setState(() => _section = s),
-                tools: _railTools(),
-                hidden: _hiddenSections,
+            );
+          }
+          // Wide macOS uses a persistent sidebar column beside the content column.
+          // The tab strip belongs only to the content pane, so the sidebar can use
+          // the full height below the native title bar without an empty header gap.
+          if (kMacOS) {
+            return Scaffold(
+              // The window paints the chrome surface; the reading pane inside it is
+              // the darker canvas.
+              backgroundColor: Colors.transparent,
+              body: SafeArea(
+                child: Column(children: [
+                  _macWindowBar(),
+                  _bodyRow(topInset: false),
+                ]),
               ),
-              _bodyRow(topInset: false),
-            ]),
-          ),
-        );
-      }
+            );
+          }
 
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
-          child: Column(children: [
-            // The navigation band is a shell-level row: full window width,
-            // directly above the body.
-            ShellRail(
-              section: _effectiveSection,
-              onSelect: (s) => setState(() => _section = s),
-              tools: _railTools(),
-              hidden: _hiddenSections,
+          return Scaffold(
+            backgroundColor: Colors.transparent,
+            body: SafeArea(
+              child: Column(children: [
+                _macWindowBar(),
+                _bodyRow(topInset: false),
+              ]),
             ),
-            _bodyRow(topInset: true),
-          ]),
-        ),
-      );
-    }));
+          );
+        }));
   }
 }
 

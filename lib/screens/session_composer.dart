@@ -494,15 +494,13 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     bool selected = false,
   }) =>
       Material(
-        color: selected
-            ? AppColors.accentBg
-            : (kMobile ? Colors.transparent : AppColors.surface2),
-        borderRadius: BorderRadius.circular(R.sm),
+        color: selected ? AppColors.accentBg : Colors.transparent,
+        borderRadius: BorderRadius.circular(9),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(9),
           child: Container(
-            height: 28,
+            height: kMobile ? 28 : 30,
             padding: EdgeInsets.fromLTRB(9, 0, onClear == null ? 8 : 4, 0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -513,11 +511,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                     color: selected ? AppColors.accent : AppColors.fg3),
                 const SizedBox(width: 6),
                 Text(label,
-                    style: sans(12,
-                        weight: selected ? W.label : W.body,
-                        color: selected
-                            ? AppColors.accent
-                            : (kMobile ? AppColors.fg3 : AppColors.fg2))),
+                    style: sans(kMobile ? 12 : 13,
+                        color: selected ? AppColors.accent : AppColors.fg3)),
                 if (onClear != null)
                   IconBtn('x',
                       size: 22, iconSize: 12, tooltip: 'Clear', onTap: onClear)
@@ -681,12 +676,10 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                   key: _composerCardKey,
                   decoration: BoxDecoration(
                     color: AppColors.raised,
-                    borderRadius: BorderRadius.circular(kMobile ? 18 : R.lg),
+                    borderRadius: BorderRadius.circular(18),
                     border: _draggingFiles
                         ? Border.all(color: AppColors.accent, width: 1.5)
-                        : (kMobile
-                            ? Border.all(color: AppColors.border)
-                            : null),
+                        : Border.all(color: AppColors.border),
                   ),
                   // The card owns the inset and the rows sit inside it, so there is
                   // no per-row vertical padding to keep in sync. Slightly taller

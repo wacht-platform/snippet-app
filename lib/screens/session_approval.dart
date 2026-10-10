@@ -1103,21 +1103,20 @@ class _SendBtn extends StatelessWidget {
   const _SendBtn({required this.enabled, this.running = false, this.onTap});
   @override
   Widget build(BuildContext context) {
-    final size = kMobile ? 40.0 : 32.0;
+    final size = kMobile ? 40.0 : 36.0;
     final iconSize = running ? 14.0 : 16.0;
     final fill = !enabled
         ? AppColors.hover
         : running
-            ? (kMobile ? AppColors.surface3 : AppColors.fg1)
+            ? AppColors.surface3
             : AppColors.accentFill;
     final ink = !enabled
         ? AppColors.fg4
         : running
-            ? (kMobile ? AppColors.fg1 : AppColors.canvas)
+            ? AppColors.fg1
             : AppColors.accentFg;
-    final ShapeBorder shape = kMobile
-        ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-        : const CircleBorder();
+    final ShapeBorder shape =
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
     return Material(
       color: fill,
       shape: shape,

@@ -592,6 +592,11 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   Future<void> _discardRecording() async {
     final path = _recordingPath;
+    if (_isRecording) {
+      try {
+        await _recorder.cancel();
+      } catch (_) {}
+    }
     _amplitudeSub?.cancel();
     _amplitudeSub = null;
     _recordingTimer?.cancel();
@@ -1124,10 +1129,10 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         border: Border.all(color: AppColors.border),
       ),
       child: Row(children: [
-        roundBtn('trash', 'Discard', () => unawaited(_discardRecording()),
-            ink: AppColors.fg3),
-        const SizedBox(width: 10),
         if (reviewing) ...[
+          roundBtn('trash', 'Discard', () => unawaited(_discardRecording()),
+              ink: AppColors.fg3),
+          const SizedBox(width: 10),
           roundBtn(
               _isPlayingRecording ? 'pause' : 'play',
               _isPlayingRecording ? 'Pause' : 'Play',

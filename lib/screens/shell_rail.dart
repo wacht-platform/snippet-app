@@ -59,7 +59,8 @@ class ShellRail extends StatelessWidget {
   /// Guarded against hiding everything: an empty strip is a dead band with no
   /// way back, and the section shown must always be representable.
   List<ShellSection> get _visible {
-    final shown = ShellSection.values.where((s) => !hidden.contains(s)).toList();
+    final shown =
+        ShellSection.values.where((s) => !hidden.contains(s)).toList();
     return shown.isEmpty ? ShellSection.values : shown;
   }
 
@@ -173,6 +174,55 @@ class RailIcon extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+class ShellSectionTabs extends StatelessWidget {
+  const ShellSectionTabs({
+    super.key,
+    required this.section,
+    required this.onSelect,
+    this.hidden = const {},
+  });
+
+  final ShellSection section;
+  final ValueChanged<ShellSection> onSelect;
+  final Set<ShellSection> hidden;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final shown =
+        ShellSection.values.where((s) => !hidden.contains(s)).toList();
+    final items = shown.isEmpty ? ShellSection.values : shown;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 2),
+      child: Row(children: [
+        for (final item in items) ...[
+          Tooltip(
+            message: item.label,
+            waitDuration: const Duration(milliseconds: 400),
+            child: Material(
+              color: item == section ? AppColors.surface2 : Colors.transparent,
+              borderRadius: BorderRadius.circular(9),
+              child: InkWell(
+                onTap: () => onSelect(item),
+                borderRadius: BorderRadius.circular(9),
+                child: SizedBox.square(
+                  dimension: 32,
+                  child: Center(
+                    child: AppIcon(item.icon,
+                        size: 17,
+                        color: item == section ? AppColors.fg1 : AppColors.fg4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 2),
+        ],
+      ]),
+    );
   }
 }
 

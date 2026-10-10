@@ -23,21 +23,35 @@ class _AgentsClient extends DaemonClient {
     if (fail) throw Exception('Offline');
     return [
       CoordinationAgent.fromJson({
-        'id': 'ada', 'display_name': 'Ada', 'role': 'Code reviewer',
+        'id': 'ada',
+        'display_name': 'Ada',
+        'role': 'Code reviewer',
         'assigned_sessions': [
-          {'id': 'auth', 'title': 'Review authentication flow', 'last_active': 0},
+          {
+            'id': 'auth',
+            'title': 'Review authentication flow',
+            'last_active': 0
+          },
           {'id': 'tests', 'title': 'Add regression coverage', 'last_active': 0},
           {'id': 'inbox-ada', 'title': 'Hidden inbox'},
         ],
       }),
       CoordinationAgent.fromJson({
-        'id': 'builder', 'display_name': 'Builder', 'role': 'Implementation',
+        'id': 'builder',
+        'display_name': 'Builder',
+        'role': 'Implementation',
         'assigned_sessions': [
-          {'id': 'mobile', 'title': 'Polish the mobile navigation', 'last_active': 0},
+          {
+            'id': 'mobile',
+            'title': 'Polish the mobile navigation',
+            'last_active': 0
+          },
         ],
       }),
       CoordinationAgent.fromJson({
-        'id': 'research', 'display_name': 'Research', 'role': 'Research and planning',
+        'id': 'research',
+        'display_name': 'Research',
+        'role': 'Research and planning',
         'status': 'disabled',
       }),
     ];
@@ -56,31 +70,44 @@ void main() {
         tester.view.physicalSize = Size(width, 844);
         addTearDown(tester.view.reset);
         String? openedAgent;
-        String? openedSession;
         await tester.pumpWidget(MaterialApp(
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
-          home: Scaffold(body: Sidebar(
-            instances: const [], active: null, client: _AgentsClient(),
-            selectedSessionId: null, sessions: const [], sessionsLoading: false,
-            onRefreshSessions: () {}, onNewSession: () {},
-            onSelectInstance: (_) {}, onOpenMissionControl: () {},
-            onOpenSession: (id, title, profile) => openedSession = id,
-            onAddInstance: () {}, onRenameInstance: (_, name) {},
-            onRemoveInstance: (_) {}, onSessionDeleted: (_) {},
-            health: const {}, onRefreshHealth: () {}, topInset: false,
-            mobileHome: MobileHome.agents, onMobileHome: (_) {},
-            settingsSection: null, onSettingsSection: (_) {}, agent: null,
+          home: Scaffold(
+              body: Sidebar(
+            instances: const [],
+            active: null,
+            client: _AgentsClient(),
+            selectedSessionId: null,
+            sessions: const [],
+            sessionsLoading: false,
+            onRefreshSessions: () {},
+            onNewSession: () {},
+            onSelectInstance: (_) {},
+            onOpenMissionControl: () {},
+            onOpenSession: (_, __, ___) {},
+            onAddInstance: () {},
+            onRenameInstance: (_, name) {},
+            onRemoveInstance: (_) {},
+            onSessionDeleted: (_) {},
+            health: const {},
+            onRefreshHealth: () {},
+            topInset: false,
+            mobileHome: MobileHome.agents,
+            onMobileHome: (_) {},
+            settingsSection: null,
+            onSettingsSection: (_) {},
+            agent: null,
             onAgent: (agent) => openedAgent = agent?.id,
           )),
         ));
         await tester.pump(const Duration(milliseconds: 400));
         await tester.pump(const Duration(milliseconds: 400));
         expect(tester.takeException(), isNull);
-        expect(find.text('Code reviewer · Available'), findsOneWidget);
-        expect(find.text('Research and planning · Unavailable'), findsOneWidget);
+        expect(find.text('Available · Code reviewer'), findsOneWidget);
+        expect(find.text('Paused · Research and planning'), findsOneWidget);
         expect(find.text('Hidden inbox'), findsNothing);
-        final group = find.byKey(const ValueKey('agent-sessions-ada'));
+        final group = find.byKey(const ValueKey('agent-card-ada'));
         expect(tester.getTopLeft(group).dx, M.gutter);
         expect(tester.getSize(group).width, width - 2 * M.gutter);
         await expectGolden(tester, find.byType(Scaffold).first,
@@ -94,27 +121,12 @@ void main() {
 
         await tester.tap(find.text('Ada'));
         expect(openedAgent, 'ada');
-        await tester.tap(find.text('Review authentication flow'));
-        expect(openedSession, 'auth');
-        final collapse = find.byTooltip('Collapse sessions for Ada');
-        expect(tester.getSize(collapse).height, greaterThanOrEqualTo(M.minTarget));
-        await tester.tap(collapse);
-        await tester.pump();
-        expect(find.text('Review authentication flow'), findsNothing);
-        await tester.enterText(_agentSearch, 'authentication');
-        await tester.pump();
-        expect(find.text('Review authentication flow'), findsOneWidget);
-        expect(find.text('Add regression coverage'), findsNothing);
-        expect(find.text('Builder'), findsNothing);
         await tester.enterText(_agentSearch, 'no match');
         await tester.pump();
         expect(find.text('Ada'), findsNothing);
         await tester.enterText(_agentSearch, '');
         await tester.pump();
-        expect(find.text('Review authentication flow'), findsNothing);
-        await tester.tap(find.byTooltip('Expand sessions for Ada'));
-        await tester.pump();
-        expect(find.text('Review authentication flow'), findsOneWidget);
+        expect(find.text('Ada'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
         expect(tester.takeException(), isNull);
@@ -131,7 +143,9 @@ void main() {
       final key = GlobalKey<AgentsSidebarPanelState>();
       await tester.pumpWidget(MaterialApp(
         theme: buildAppTheme(),
-        home: Scaffold(body: AgentsSidebarPanel(key: key, client: _AgentsClient(fail: true))),
+        home: Scaffold(
+            body: AgentsSidebarPanel(
+                key: key, client: _AgentsClient(fail: true))),
       ));
       await tester.pump();
       expect(find.text('Could not load agents'), findsOneWidget);

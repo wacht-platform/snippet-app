@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../swr.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'git.dart';
@@ -175,7 +176,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     final isClean = files.isEmpty;
 
     return Container(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 16),
         children: [

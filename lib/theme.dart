@@ -238,7 +238,7 @@ class ThemeManager extends ChangeNotifier {
 
   int _index = _defaultIndex;
   int get index => _index;
-  ThemePreset get current => kMobile ? _ember : _amoled;
+  ThemePreset get current => _ember;
 
   Future<void> init() async {
     _index = 0;
@@ -285,7 +285,9 @@ class AppColors {
   static Color get lineStrong => currentTheme.border2;
 
   static const Color scrim = Color(0x99000000);
-  static Color get windowBg => currentTheme.bg;
+  static Color get windowBg =>
+      kMobile ? currentTheme.bg : const Color(0xFF0D0C0B);
+  static Color get sidebarPanel => const Color(0xFF171513);
   static Color get glassSurface => currentTheme.surface2;
   static Color get glassBorder => currentTheme.border;
 
@@ -494,7 +496,7 @@ class W {
 
 /// Phones keep every face at its regular weight: hierarchy comes from size,
 /// ink and space rather than from heavier strokes.
-FontWeight weightFor(FontWeight w) => kMobile ? FontWeight.w400 : w;
+FontWeight weightFor(FontWeight w) => FontWeight.w400;
 
 /// Optical tracking. The reference sits slightly tight at every size
 /// (-0.05px at 12–13px, -0.3px at 20px).
@@ -566,7 +568,7 @@ TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-String get kSansFamily => kMobile ? 'Geist' : 'InstrumentSans';
+String get kSansFamily => 'Geist';
 const kSerifFamily = 'Literata';
 
 /// The agent's own writing on a phone: a screen serif at a reading size, so a
@@ -625,7 +627,7 @@ class TS {
   /// The agent's prose: Literata on a phone, the body sans elsewhere.
   static TextStyle reading([Color? c]) => kMobile
       ? serif(17.5, height: 28 / 17.5, color: c ?? AppColors.fg1)
-      : body(c);
+      : serif(16.5, height: 27 / 16.5, color: c ?? AppColors.fg1);
   static TextStyle code([Color? c]) =>
       mono(13, height: 20 / 13, color: c ?? AppColors.fg2);
   static TextStyle codeSmall([Color? c]) =>

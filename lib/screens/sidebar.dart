@@ -219,9 +219,7 @@ class SidebarState extends State<Sidebar> {
     Theme.of(context); // Rebuild on theme change
     final hasClient = widget.client != null;
     return Container(
-      color: !kMobile
-          ? AppColors.windowBg
-          : AppColors.bg, // shell surface — darker than the chat canvas
+      color: !kMobile ? Colors.transparent : AppColors.bg,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (widget.topInset && kMacOS) SizedBox(height: kMacTitlebar + 6),
         if (kMobile) ...[
@@ -856,10 +854,23 @@ class SidebarState extends State<Sidebar> {
         !isInboxSessionRow(s) &&
         _matchesQuery(s)));
 
+    final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
+    final client = widget.client;
+    final rows = <Widget>[];
+    String? day;
+    for (final s in list) {
+      final label = _daySection(s.lastActive);
+      if (label != day) {
+        day = label;
+        rows.add(Padding(
+          padding: EdgeInsets.fromLTRB(10, rows.isEmpty ? 6 : 18, 10, 6),
+          child: Text(label, style: sans(12, color: AppColors.fg4)),
+        ));
+      }
+      rows.add(_desktopChatRow(s));
+    }
     return ListView(
-      // Top inset keeps the first section header clear of the navigation band,
-      // matching the reference's 8px section padding.
-      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      padding: const EdgeInsets.only(top: 2, bottom: 16),
       children: [
         ShellSectionHeader(
           label: 'Chats',
@@ -935,60 +946,96 @@ class SidebarState extends State<Sidebar> {
           SidebarEmpty(_filterQuery.trim().isNotEmpty
               ? 'No chats match the search.'
               : 'No chats yet.')
-        else
-          // Flat list of conversations directly under CHATS (no folder nesting)
-          for (final s in list) _sidebarSessionRow(s),
+        else ...[
+          if (client != null &&
+              mc.isNotEmpty &&
+              !_selecting &&
+              _filterQuery.trim().isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
+              child: MissionControlCard(
+                client: client,
+                session: mc.first,
+                waitingChats:
+                    list.where((s) => s.status == 'waiting_for_input').length,
+                onOpen: widget.onOpenMissionControl,
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: rows,
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  /// One chat row. Workspace is metadata on the row, never a grouping key;
-  /// recency determines the list order.
-  Widget _sidebarSessionRow(SessionInfo s) {
+  Widget _desktopChatRow(SessionInfo s) {
     final selected = s.id == widget.selectedSessionId;
-    // Rename edits in place, at the row's own inset.
     if (_renamingId == s.id) {
       return Padding(
-        padding:
-            const EdgeInsets.fromLTRB(kNavRowInset, 2, kSidebarContentInset, 2),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: _inlineRenameField(s, compact: true),
       );
     }
     final checked = _selected.contains(s.id);
-    final hasAgent =
-        s.displayAgentId != null && s.displayAgentId!.trim().isNotEmpty;
+    final folderName = s.projectFolder.trim().isEmpty
+        ? ''
+        : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
     final draft = _hasDraft(s);
-    return ShellNavRow(
-      id: s.id,
-      label: s.title.trim().isEmpty ? '(untitled)' : s.title,
-      icon: 'chat-thread',
-      tone: ShellTone.chat,
-      selected: _selecting ? checked : selected,
-      onTap: _selecting
-          ? () => _toggleSelected(s.id)
-          : () => widget.onOpenSession(s.id, s.title, s.profile),
-      // Right-click: rename, select or delete, as long-press does on phones.
-      onSecondaryTapDown: _selecting
-          ? null
-          : (d) => _sessionActions(s, position: d.globalPosition),
-      // The icon carries run state (see `sessionStateColor`); while selecting
-      // it becomes the checkbox.
-      leading: _selecting
-          ? SelectCheck(checked, size: 14)
-          : SessionStateIcon(status: s.status, size: kNavIcon),
-      // Who is working here, and whether unsent text is waiting.
-      trailing: !hasAgent && !draft
-          ? null
-          : Row(mainAxisSize: MainAxisSize.min, children: [
-              if (draft)
-                Text('draft', style: mono(10, color: AppColors.accent)),
-              if (draft && hasAgent) const SizedBox(width: 6),
-              if (hasAgent)
-                AgentBadge(
-                  agentId: s.displayAgentId!,
-                  working: sessionIsActive(s.status),
-                ),
-            ]),
+    final on = _selecting ? checked : selected;
+    return Material(
+      color: on ? AppColors.surface2 : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: _selecting
+            ? () => _toggleSelected(s.id)
+            : () => widget.onOpenSession(s.id, s.title, s.profile),
+        onSecondaryTapDown: _selecting
+            ? null
+            : (d) => _sessionActions(s, position: d.globalPosition),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: Row(children: [
+            if (_selecting) ...[
+              SelectCheck(checked, size: 14),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(children: [
+                    Expanded(
+                      child: Text(
+                          s.title.trim().isEmpty ? '(untitled)' : s.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(14,
+                              height: 19 / 14,
+                              color: selected ? AppColors.fg1 : AppColors.fg2)),
+                    ),
+                    if (draft) ...[
+                      const SizedBox(width: 8),
+                      Text('Draft', style: sans(12, color: AppColors.accent)),
+                    ],
+                  ]),
+                  const SizedBox(height: 2),
+                  DefaultTextStyle.merge(
+                    style: const TextStyle(fontSize: 12),
+                    child: _sessionStatusLine(s, folderName, compact: true),
+                  ),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -1193,7 +1240,8 @@ class SidebarState extends State<Sidebar> {
     return 'Older';
   }
 
-  Widget _sessionStatusLine(SessionInfo s, String folderName) {
+  Widget _sessionStatusLine(SessionInfo s, String folderName,
+      {bool compact = false}) {
     final running = sessionIsActive(s.status);
     final waiting = s.status == 'waiting_for_input';
     final color =
@@ -1223,10 +1271,13 @@ class SidebarState extends State<Sidebar> {
         const SizedBox(width: 4),
       ],
       Flexible(
-        child: Text(label,
+        child: Text(
+            label.isEmpty && compact ? relativeTime(s.lastActive) : label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: sans(13, height: 18 / 13, color: color)),
+            style: sans(compact ? 12 : 13,
+                height: compact ? 16 / 12 : 18 / 13,
+                color: compact && !waiting ? AppColors.fg4 : color)),
       ),
       if (s.displayAgentId != null && s.displayAgentId!.trim().isNotEmpty) ...[
         const SizedBox(width: 8),

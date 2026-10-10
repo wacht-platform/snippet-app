@@ -255,7 +255,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   Widget build(BuildContext context) {
     if (loading && agents.isEmpty) {
       return Container(
-        color: AppColors.bg,
+        color: kMobile ? AppColors.bg : Colors.transparent,
         alignment: Alignment.center,
         child: kMobile
             ? const AppLoading(label: 'Loading agents')
@@ -265,7 +265,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     if (error != null && agents.isEmpty) {
       if (kMobile) {
         return Material(
-          color: AppColors.bg,
+          color: kMobile ? AppColors.bg : Colors.transparent,
           child: SafeArea(
             bottom: false,
             child: ListView(
@@ -284,7 +284,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         );
       }
       return Container(
-        color: AppColors.bg,
+        color: kMobile ? AppColors.bg : Colors.transparent,
         padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text('Could not load agents',
@@ -337,11 +337,17 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     }
 
     final desktopChildren = [
-      for (final agent in ordered) _agentDesktopRow(agent),
+      for (final agent in ordered)
+        AgentCard(
+          key: ValueKey('agent-card-${agent.id}'),
+          client: widget.client,
+          agent: agent,
+          onOpen: () => widget.onOpenAgent?.call(agent),
+        ),
     ];
 
     return Container(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -382,7 +388,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 18),
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 18),
               children: [
                 ...desktopChildren,
                 if (ordered.isEmpty && desktopChildren.isEmpty)
@@ -431,39 +437,6 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
               widget.onSearchChanged?.call('');
             }),
         ],
-      ),
-    );
-  }
-
-  Widget _agentDesktopRow(CoordinationAgent agent) {
-    final name =
-        agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(R.sm),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.sm),
-        onTap: widget.onOpenAgent == null
-            ? null
-            : () => widget.onOpenAgent!(agent),
-        child: SizedBox(
-          height: 26,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(kNavPadH, 0, 6, 0),
-            child: Row(children: [
-              AgentStateIcon(active: agent.available, size: 13),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TS.ui(AppColors.fg1)),
-              ),
-              if (agent.role.trim().isNotEmpty)
-                Text(agent.role.trim(), style: sans(11, color: AppColors.fg3)),
-            ]),
-          ),
-        ),
       ),
     );
   }

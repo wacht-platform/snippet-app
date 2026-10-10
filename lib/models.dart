@@ -962,6 +962,10 @@ class CoordinationAgent {
   final String role;
   final List<String> capabilities;
 
+  /// Tasks by status, as the daemon counts them: open work of any age, and
+  /// finished work from the last 7 days. Null when the daemon predates it.
+  final Map<String, int>? taskCounts;
+
   CoordinationAgent.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         displayName = j['display_name'] as String? ?? '',
@@ -971,7 +975,16 @@ class CoordinationAgent {
         role = j['role'] as String? ?? 'implementer',
         capabilities = ((j['capabilities'] as List?) ?? const [])
             .whereType<String>()
-            .toList();
+            .toList(),
+        taskCounts = j['task_counts'] is Map
+            ? {
+                for (final e in (j['task_counts'] as Map).entries)
+                  if (e.value is num) '${e.key}': (e.value as num).toInt()
+              }
+            : null;
+
+  int tasksIn(Set<String> statuses) =>
+      statuses.fold(0, (sum, s) => sum + (taskCounts?[s] ?? 0));
 
   bool get available => status == 'active';
 

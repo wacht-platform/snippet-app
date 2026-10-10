@@ -24,11 +24,21 @@ class _FakeDaemonClient extends DaemonClient {
   List<String> fsCalls = [];
   Map<String, List<Map<String, dynamic>>> fileSystem = {
     '/workspace': [
-      {'name': 'README.md', 'path': '/workspace/README.md', 'is_dir': false, 'git': true},
+      {
+        'name': 'README.md',
+        'path': '/workspace/README.md',
+        'is_dir': false,
+        'git': true
+      },
       {'name': 'src', 'path': '/workspace/src', 'is_dir': true, 'git': true},
     ],
     '/workspace/src': [
-      {'name': 'main.dart', 'path': '/workspace/src/main.dart', 'is_dir': false, 'git': false},
+      {
+        'name': 'main.dart',
+        'path': '/workspace/src/main.dart',
+        'is_dir': false,
+        'git': false
+      },
     ],
   };
 
@@ -47,7 +57,13 @@ class _FakeDaemonClient extends DaemonClient {
 
   int gitStatusCalls = 0;
   List<Map<String, dynamic>> gitFiles = [
-    {'path': 'README.md', 'staged': false, 'untracked': false, 'x': ' ', 'y': 'M'},
+    {
+      'path': 'README.md',
+      'staged': false,
+      'untracked': false,
+      'x': ' ',
+      'y': 'M'
+    },
   ];
 
   @override
@@ -62,10 +78,10 @@ class _FakeDaemonClient extends DaemonClient {
   @override
   Future<({String current, List<String> local, List<String> remotes})>
       gitBranches(String session) async => (
-        current: 'main',
-        local: ['main', 'feature/mobile'],
-        remotes: ['origin/main'],
-      );
+            current: 'main',
+            local: ['main', 'feature/mobile'],
+            remotes: ['origin/main'],
+          );
 
   @override
   Future<Map<String, dynamic>> gitCheckout(String session, String target,
@@ -105,24 +121,29 @@ void main() {
       );
 
       // Verify that handler ignores key up
-      expect(handler.handleKeyEvent(const KeyUpEvent(
-        physicalKey: PhysicalKeyboardKey.keyW,
-        logicalKey: LogicalKeyboardKey.keyW,
-        timeStamp: Duration.zero,
-      )), isFalse);
+      expect(
+          handler.handleKeyEvent(const KeyUpEvent(
+            physicalKey: PhysicalKeyboardKey.keyW,
+            logicalKey: LogicalKeyboardKey.keyW,
+            timeStamp: Duration.zero,
+          )),
+          isFalse);
 
       // F1 without modifiers opens shortcuts dialog
-      expect(handler.handleKeyEvent(const KeyDownEvent(
-        physicalKey: PhysicalKeyboardKey.f1,
-        logicalKey: LogicalKeyboardKey.f1,
-        timeStamp: Duration.zero,
-      )), isTrue);
+      expect(
+          handler.handleKeyEvent(const KeyDownEvent(
+            physicalKey: PhysicalKeyboardKey.f1,
+            logicalKey: LogicalKeyboardKey.f1,
+            timeStamp: Duration.zero,
+          )),
+          isTrue);
       expect(showedShortcuts, isTrue);
     });
   });
 
   group('FileTreeSidebarPanel revalidation', () {
-    testWidgets('background refresh preserves expanded folders and re-fetches subdirectories',
+    testWidgets(
+        'background refresh preserves expanded folders and re-fetches subdirectories',
         (tester) async {
       final fake = _FakeDaemonClient();
 
@@ -154,7 +175,10 @@ void main() {
         'git': false,
       });
 
-      fake.deviceEvents.add({'kind': DeviceEventHub.attachedToolResult, 'workspace': '/workspace'});
+      fake.deviceEvents.add({
+        'kind': DeviceEventHub.attachedToolResult,
+        'workspace': '/workspace'
+      });
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -198,8 +222,11 @@ void main() {
       // Mutate git status to clean
       fake.gitFiles.clear();
 
-      fake.deviceEvents
-          .add({'kind': DeviceEventHub.attachedToolResult, 'session': 'sess-1', 'workspace': '/workspace'});
+      fake.deviceEvents.add({
+        'kind': DeviceEventHub.attachedToolResult,
+        'session': 'sess-1',
+        'workspace': '/workspace'
+      });
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -212,7 +239,8 @@ void main() {
   });
 
   group('Sidebar session list recency ordering', () {
-    testWidgets('sessions are ordered strictly by recency across different folders without folder grouping',
+    testWidgets(
+        'sessions are ordered strictly by recency across different folders without folder grouping',
         (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       try {
@@ -292,18 +320,21 @@ void main() {
         // Check vertical order of sessions on screen:
         // Must be D (4000) -> C (3000) -> B (2000) -> A (1000)
         final posD = tester.getTopLeft(find.text('Gamma Session Newest')).dy;
-        final posC = tester.getTopLeft(find.text('Alpha Session New')) .dy;
+        final posC = tester.getTopLeft(find.text('Alpha Session New')).dy;
         final posB = tester.getTopLeft(find.text('Beta Session Middle')).dy;
-        final posA = tester.getTopLeft(find.text('Alpha Session Old')) .dy;
+        final posA = tester.getTopLeft(find.text('Alpha Session Old')).dy;
 
-        expect(posD, lessThan(posC), reason: 'Gamma (4000) should be above Alpha New (3000)');
-        expect(posC, lessThan(posB), reason: 'Alpha New (3000) should be above Beta (2000)');
-        expect(posB, lessThan(posA), reason: 'Beta (2000) should be above Alpha Old (1000)');
+        expect(posD, lessThan(posC),
+            reason: 'Gamma (4000) should be above Alpha New (3000)');
+        expect(posC, lessThan(posB),
+            reason: 'Alpha New (3000) should be above Beta (2000)');
+        expect(posB, lessThan(posA),
+            reason: 'Beta (2000) should be above Alpha Old (1000)');
 
-        // No folder grouping headers
-        expect(find.text('repo-alpha'), findsNothing);
-        expect(find.text('repo-beta'), findsNothing);
-        expect(find.text('repo-gamma'), findsNothing);
+        // The folder is per-row metadata, never a group header.
+        expect(find.text('repo-alpha'), findsNWidgets(2));
+        expect(find.text('repo-beta'), findsOneWidget);
+        expect(find.text('repo-gamma'), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

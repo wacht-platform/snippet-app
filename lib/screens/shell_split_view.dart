@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
 import 'shell_models.dart';
 import 'shell_nav.dart' show kPaneMinWidth;
 import 'shell_pane_view.dart';
@@ -10,6 +11,7 @@ class ShellSplitView extends StatefulWidget {
   const ShellSplitView({
     super.key,
     required this.sidebar,
+    this.sidebarHeader,
     required this.paneWidth,
     required this.leftCollapsed,
     required this.rightCollapsed,
@@ -35,6 +37,7 @@ class ShellSplitView extends StatefulWidget {
   });
 
   final Widget sidebar;
+  final Widget? sidebarHeader;
   final double paneWidth;
   final bool leftCollapsed;
   final bool rightCollapsed;
@@ -182,39 +185,55 @@ class _ShellSplitViewState extends State<ShellSplitView> {
     final showLeft = !(widget.leftCollapsed && widget.leftTabs.isNotEmpty);
 
     return Expanded(
-      child: Row(children: [
-        SizedBox(
-          width: kSidebarWidth,
-          child: widget.sidebar,
-        ),
-        if (showLeft)
-          Expanded(
-            child: _dropOn(
-              ShellPane.left,
-              _paneView(ShellPane.left, roundRight: !showRight),
-            ),
-          )
-        else
-          Expanded(
-            child: CollapsedPaneStub(
-              pane: ShellPane.left,
-              onExpand: () => widget.onExpandPane(ShellPane.left),
-            ),
-          ),
-        if (showRight) ...[
-          PaneResizeHandle(
-            joinBaseline: showLeft,
-            onResize: widget.onPaneResize,
-          ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        child: Row(children: [
           SizedBox(
-            width: widget.paneWidth.clamp(kPaneMinWidth, double.infinity),
-            child: _dropOn(
-              ShellPane.right,
-              _paneView(ShellPane.right, roundRight: true),
+            width: kSidebarWidth,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: ColoredBox(
+                color: AppColors.sidebarPanel,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (widget.sidebarHeader != null) widget.sidebarHeader!,
+                    Expanded(child: widget.sidebar),
+                  ],
+                ),
+              ),
             ),
           ),
-        ],
-      ]),
+          const SizedBox(width: 8),
+          if (showLeft)
+            Expanded(
+              child: _dropOn(
+                ShellPane.left,
+                _paneView(ShellPane.left, roundRight: !showRight),
+              ),
+            )
+          else
+            Expanded(
+              child: CollapsedPaneStub(
+                pane: ShellPane.left,
+                onExpand: () => widget.onExpandPane(ShellPane.left),
+              ),
+            ),
+          if (showRight) ...[
+            PaneResizeHandle(
+              joinBaseline: showLeft,
+              onResize: widget.onPaneResize,
+            ),
+            SizedBox(
+              width: widget.paneWidth.clamp(kPaneMinWidth, double.infinity),
+              child: _dropOn(
+                ShellPane.right,
+                _paneView(ShellPane.right, roundRight: true),
+              ),
+            ),
+          ],
+        ]),
+      ),
     );
   }
 }

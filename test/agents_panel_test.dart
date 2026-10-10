@@ -52,7 +52,6 @@ class _FakeAgentsClient extends DaemonClient {
             'status': 'active',
           }),
       ];
-
 }
 
 void main() {
@@ -99,7 +98,7 @@ void main() {
       // rail drifted into two different section styles.
       expect(find.byType(ShellSectionHeader), findsOneWidget);
       // The shared header renders the label uppercased.
-      expect(find.text('AGENTS'), findsOneWidget);
+      expect(find.text('Agents'), findsOneWidget);
     });
   });
 
@@ -155,8 +154,8 @@ void main() {
         await tester.tap(find.byTooltip('Create agent'));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        final popup = tester.getRect(
-            find.byKey(const ValueKey('create-agent-popover')));
+        final popup =
+            tester.getRect(find.byKey(const ValueKey('create-agent-popover')));
         expect(popup.left, greaterThanOrEqualTo(18));
         expect(popup.top, greaterThanOrEqualTo(24));
         expect(popup.right, lessThanOrEqualTo(scenario.size.width - 18));
@@ -169,12 +168,18 @@ void main() {
         expect(popup.contains(button.bottomRight), isTrue);
         expect(header.bottom, lessThan(field.top));
         expect(field.bottom, lessThan(button.top));
-        expect(tester.widget<TextField>(find.byType(TextField)).focusNode!.hasFocus,
+        expect(
+            tester
+                .widget<TextField>(find.byType(TextField))
+                .focusNode!
+                .hasFocus,
             isTrue);
         await tester.tap(find.text('Build agent'));
         await tester.pumpAndSettle();
-        expect(find.text('Describe the agent you want it to become.'), findsOneWidget);
-        await tester.enterText(find.byType(TextField), '  Review security issues in repos  ');
+        expect(find.text('Describe the agent you want it to become.'),
+            findsOneWidget);
+        await tester.enterText(
+            find.byType(TextField), '  Review security issues in repos  ');
         await tester.tap(find.text('Build agent'));
         await tester.pumpAndSettle();
         await tester.pump(const Duration(seconds: 3));
@@ -187,62 +192,45 @@ void main() {
     });
   }
 
-  testWidgets('rows land on the same left inset as every sibling panel',
-      (tester) async {
-    await asDesktop(() async {
-      await pumpPanel(tester);
-
-      // Canonical content x is list inset 8 + kNavPadH 12 = 20. Rows used to sit
-      // at 16 (8 + this panel's own 8), which is what read as inset differently
-      // from the rest of the rail. The active/idle grouping is gone — a lease is
-      // never acquired, so every row is idle — leaving one flat list.
-      const expected = kSidebarContentInset + kNavPadH;
-
-      final avatar = tester.getTopLeft(find.byType(AgentStateIcon)).dx;
-      expect(avatar, closeTo(expected, 0.5),
-          reason: 'row content must share the same x as the header above it');
-    });
-  });
-
-  testWidgets('tapping agent name opens agent conversation even if agent has sessions',
+  testWidgets(
+      'tapping agent name opens agent conversation even if agent has sessions',
       (tester) async {
     CoordinationAgent? openedAgent;
     final assignedClient = _CustomAgentsClient([
-        CoordinationAgent.fromJson({
-          'id': 'a1',
-          'display_name': 'Builder',
-          'handle': 'builder',
-          'role': 'developer',
-          'status': 'active',
-          'assigned_sessions': [
-            {
-              'id': 's1',
-              'title': 'feature/auth',
-              'conversation': 'feature/auth',
-              'last_active': 1000,
-            },
-          ],
-        }),
-      ]);
+      CoordinationAgent.fromJson({
+        'id': 'a1',
+        'display_name': 'Builder',
+        'handle': 'builder',
+        'role': 'developer',
+        'status': 'active',
+        'assigned_sessions': [
+          {
+            'id': 's1',
+            'title': 'feature/auth',
+            'conversation': 'feature/auth',
+            'last_active': 1000,
+          },
+        ],
+      }),
+    ]);
 
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(
-          body: AgentsSidebarPanel(
-            client: assignedClient,
-            onOpenAgent: (a) => openedAgent = a,
-          ),
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: AgentsSidebarPanel(
+          client: assignedClient,
+          onOpenAgent: (a) => openedAgent = a,
         ),
-      ));
-      await tester.pumpAndSettle();
+      ),
+    ));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Builder'), findsOneWidget);
-      await tester.tap(find.text('Builder'));
-      await tester.pumpAndSettle();
+    expect(find.text('Builder'), findsOneWidget);
+    await tester.tap(find.text('Builder'));
+    await tester.pumpAndSettle();
 
-      expect(openedAgent, isNotNull);
-      expect(openedAgent?.id, 'a1');
-    });
-
+    expect(openedAgent, isNotNull);
+    expect(openedAgent?.id, 'a1');
+  });
 }
 
 class _CustomAgentsClient extends DaemonClient {

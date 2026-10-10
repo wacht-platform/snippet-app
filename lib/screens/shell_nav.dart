@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -206,6 +207,24 @@ class ShellSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    if (!kMobile) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 10, 8),
+        child: Row(children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: onToggle,
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(20,
+                      height: 26 / 20, spacing: -0.4, color: AppColors.fg1)),
+            ),
+          ),
+          for (final a in actions) ...[a, const SizedBox(width: 2)],
+        ]),
+      );
+    }
     return SizedBox(
       height: kNavHeaderHeight,
       child: Padding(
@@ -311,11 +330,11 @@ class ShellSectionAction extends StatelessWidget {
         waitDuration: const Duration(milliseconds: 400),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(kMobile ? R.md : 9),
           child: SizedBox(
             // 24px target around a 16px glyph.
-            width: 24,
-            height: 24,
+            width: kMobile ? 24 : 32,
+            height: kMobile ? 24 : 32,
             child: Center(
               child: AppIcon(icon,
                   size: 16,

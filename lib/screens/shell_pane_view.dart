@@ -32,36 +32,26 @@ class PaneSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: ColoredBox(
         color: readingBg,
-      ),
-      child: Stack(fit: StackFit.expand, children: [
-        child,
-        if (droppable)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                      color: AppColors.accent, width: kPaneActiveStroke),
+        child: Stack(fit: StackFit.expand, children: [
+          child,
+          if (droppable)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: AppColors.accent, width: kPaneActiveStroke),
+                  ),
                 ),
               ),
             ),
-          ),
-        if (pane == ShellPane.left)
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              child: Container(
-                width: kPaneHairline,
-                color: kPaneSeamColor,
-              ),
-            ),
-          ),
-      ]),
+        ]),
+      ),
     );
   }
 }
@@ -226,23 +216,13 @@ class ReadoutChip extends StatelessWidget {
       child: SizedBox(
         width: width,
         child: Container(
-          height: kPaneTabHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 32,
+          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
+          padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
           decoration: BoxDecoration(
-            color: active ? readingBg : Colors.transparent,
-            border: Border(
-              right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-              top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-            ),
+            color: active ? AppColors.surface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
           ),
-          foregroundDecoration: !active
-              ? null
-              : BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                        color: AppColors.fg1, width: kPaneActiveStroke),
-                  ),
-                ),
           child: Row(children: [
             AppIcon(tab.icon,
                 size: 14, color: active ? AppColors.fg1 : AppColors.fg3),
@@ -252,9 +232,7 @@ class ReadoutChip extends StatelessWidget {
                 tab.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(kPaneTabText,
-                    weight: active ? W.label : W.body,
-                    color: active ? AppColors.fg1 : AppColors.fg3),
+                style: sans(13, color: active ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
             const SizedBox(width: 6),
@@ -328,23 +306,13 @@ class PaneTabChip extends StatelessWidget {
       child: SizedBox(
         width: width,
         child: Container(
-          height: kPaneTabHeight,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 32,
+          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
+          padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
           decoration: BoxDecoration(
-            color: active ? readingBg : Colors.transparent,
-            border: Border(
-              right: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-              top: BorderSide(color: kPaneSeamColor, width: kPaneHairline),
-            ),
+            color: active ? AppColors.surface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
           ),
-          foregroundDecoration: !active
-              ? null
-              : BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                        color: AppColors.fg1, width: kPaneActiveStroke),
-                  ),
-                ),
           child: Row(children: [
             SessionStateIcon(
               status: status,
@@ -357,9 +325,7 @@ class PaneTabChip extends StatelessWidget {
                 tab.title.isEmpty ? '(untitled)' : tab.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(kPaneTabText,
-                    weight: active ? W.label : W.body,
-                    color: active ? AppColors.fg1 : AppColors.fg3),
+                style: sans(13, color: active ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
             if (canDismiss) ...[
@@ -436,14 +402,14 @@ class PaneStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final count = tabs.length + readouts.length;
     return Container(
-      height: kPaneHeaderHeight,
+      height: 46,
       color: readingBg,
       child: Stack(fit: StackFit.expand, children: [
         LayoutBuilder(builder: (context, c) {
-          final w = kPaneTabWidth(c.maxWidth, count);
+          final w = kPaneTabWidth(c.maxWidth - 12, count);
           return ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             itemCount: count,
             separatorBuilder: (_, __) => const SizedBox.shrink(),
             itemBuilder: (_, i) {
@@ -476,14 +442,6 @@ class PaneStrip extends StatelessWidget {
             },
           );
         }),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: IgnorePointer(
-            child: Container(height: kPaneHairline, color: kPaneSeamColor),
-          ),
-        ),
       ]),
     );
   }

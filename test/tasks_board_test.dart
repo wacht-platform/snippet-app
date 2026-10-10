@@ -117,8 +117,8 @@ void main() {
 
     expect(find.byTooltip('Show Cancelled'), findsOneWidget);
     final strip = tester.getCenter(find.byTooltip('Show Cancelled'));
-    final gesture =
-        await tester.startGesture(tester.getCenter(find.text('Write the docs')));
+    final gesture = await tester
+        .startGesture(tester.getCenter(find.text('Write the docs')));
     await tester.pump(const Duration(milliseconds: 50));
     await gesture.moveTo(strip);
     await tester.pump(const Duration(milliseconds: 50));
@@ -186,7 +186,7 @@ void main() {
         home: Scaffold(body: TasksPanel(client: client)),
       ));
       await tester.pumpAndSettle();
-      expect(find.text('TASKS'), findsOneWidget);
+      expect(find.text('Tasks'), findsOneWidget);
       expect(find.text('Desktop task'), findsOneWidget);
       expect(find.byTooltip('Search tasks'), findsOneWidget);
       expect(find.byTooltip('New task'), findsOneWidget);
@@ -201,28 +201,36 @@ void main() {
   test('desktop shell has no board command or creation callback', () {
     final shell = File('lib/screens/desktop_shell.dart').readAsStringSync();
     final tabs = File('lib/screens/desktop_shell_tabs.dart').readAsStringSync();
-    final sidebar = File('lib/screens/shell_sidebar_host.dart').readAsStringSync();
+    final sidebar =
+        File('lib/screens/shell_sidebar_host.dart').readAsStringSync();
     expect(shell, isNot(contains('Open Task Board')));
     expect(shell, isNot(contains("'kanban'")));
     expect(shell, isNot(contains('_openBoardTab')));
     expect(tabs, isNot(contains('_openBoardTab')));
     expect(sidebar, isNot(contains('onOpenBoard')));
-    final panes = File('lib/screens/desktop_shell_panes.dart').readAsStringSync();
+    final panes =
+        File('lib/screens/desktop_shell_panes.dart').readAsStringSync();
     expect(panes, contains('''return kMobile
           ? TaskKanban(key: ValueKey('body-\${t.key}'), client: t.client)
           : TasksPanel(key: ValueKey('body-\${t.key}'), client: t.client);'''));
-    expect(tabs, contains('shouldRestoreShellTab(descriptor, mobile: kMobile)'));
+    expect(
+        tabs, contains('shouldRestoreShellTab(descriptor, mobile: kMobile)'));
   });
 
   test('legacy board restore is omitted on desktop and retained on mobile', () {
     final legacy = OpenTabDescriptor.fromJson({
-      'instanceUrl': 'http://m', 'title': 'Tasks', 'board': true,
-      'pane': 'right', 'groupSessionKey': 'http://m|session',
+      'instanceUrl': 'http://m',
+      'title': 'Tasks',
+      'board': true,
+      'pane': 'right',
+      'groupSessionKey': 'http://m|session',
     });
     expect(shouldRestoreShellTab(legacy, mobile: false), isFalse);
     expect(shouldRestoreShellTab(legacy, mobile: true), isTrue);
     final session = OpenTabDescriptor(
-      instanceUrl: 'http://m', title: 'Chat', sessionId: 'session',
+      instanceUrl: 'http://m',
+      title: 'Chat',
+      sessionId: 'session',
     );
     expect(shouldRestoreShellTab(session, mobile: false), isTrue);
   });

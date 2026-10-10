@@ -65,11 +65,11 @@ class TopWorkspaceTabChip extends StatelessWidget {
       onTap: onTap,
       child: Container(
         key: chipKey,
-        height: kTitleTabHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: 30,
+        padding: EdgeInsets.fromLTRB(10, 0, canClose ? 6 : 12, 0),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.windowBg : Colors.transparent,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(R.md)),
+          color: isActive ? AppColors.surface2 : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -77,17 +77,16 @@ class TopWorkspaceTabChip extends StatelessWidget {
             SessionStateIcon(
               status: status,
               icon: tabIconKind(tab),
-              size: 18,
+              size: 15,
             ),
             const SizedBox(width: 8),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 160),
+              constraints: const BoxConstraints(maxWidth: 180),
               child: Text(
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: sans(kMobile ? 14 : 13,
-                    weight: isActive ? W.label : W.body,
                     color: isActive ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
@@ -135,6 +134,53 @@ class TopMachineSwitcher extends StatelessWidget {
         ? '+'
         : a.label.trim().characters.first.toUpperCase();
 
+    if (a != null) {
+      return Tooltip(
+        message: 'Switch machine',
+        child: Material(
+          key: anchorKey,
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(15),
+          child: InkWell(
+            onTap: hasInstances ? onOpenList : onAdd,
+            borderRadius: BorderRadius.circular(15),
+            child: Container(
+              height: 30,
+              padding: const EdgeInsets.fromLTRB(5, 0, 12, 0),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface3,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(initial, style: sans(11, color: AppColors.fg1)),
+                ),
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 140),
+                  child: Text(a.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13, color: AppColors.fg2)),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: isHealthy == true ? AppColors.ok : AppColors.fg4,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
     return Tooltip(
       message: a == null ? 'Add machine' : 'Switch machine',
       child: Material(
@@ -220,14 +266,16 @@ class MainTabsStrip extends StatelessWidget {
       padding: const EdgeInsets.only(right: 4),
       children: [
         for (final t in tabs) ...[
-          TopWorkspaceTabChip(
-            tab: t,
-            isActive: t == activeTab,
-            status: statusForTab(t),
-            canClose: canCloseTab(t),
-            onTap: () => onActivateTab(t),
-            onClose: () => onCloseTab(t),
-            chipKey: chipKeyFor(t.key),
+          Center(
+            child: TopWorkspaceTabChip(
+              tab: t,
+              isActive: t == activeTab,
+              status: statusForTab(t),
+              canClose: canCloseTab(t),
+              onTap: () => onActivateTab(t),
+              onClose: () => onCloseTab(t),
+              chipKey: chipKeyFor(t.key),
+            ),
           ),
           const SizedBox(width: 4),
         ],
@@ -254,6 +302,8 @@ class MacWindowBar extends StatelessWidget {
   final Widget tabsRow;
   final VoidCallback onOpenSettings;
   final Widget machineSwitcher;
+  final List<Widget> tools;
+  final bool reserveWindowControls;
 
   const MacWindowBar({
     super.key,
@@ -264,6 +314,8 @@ class MacWindowBar extends StatelessWidget {
     required this.tabsRow,
     required this.onOpenSettings,
     required this.machineSwitcher,
+    this.tools = const [],
+    this.reserveWindowControls = true,
   });
 
   @override
@@ -271,7 +323,8 @@ class MacWindowBar extends StatelessWidget {
     return FutureBuilder<bool>(
       future: macOSIsFullscreen(),
       builder: (context, snapshot) {
-        final hasWindowControls = snapshot.data != true;
+        final hasWindowControls =
+            reserveWindowControls && snapshot.data != true;
         return SizedBox(
           height: kTitleBarHeight,
           child: ColoredBox(
@@ -314,6 +367,17 @@ class MacWindowBar extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        for (final tool in tools) ...[
+                          tool,
+                          const SizedBox(width: 4),
+                        ],
+                        if (tools.isNotEmpty)
+                          Container(
+                            width: 1,
+                            height: 16,
+                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                            color: AppColors.border2,
+                          ),
                         IconBtn(
                           'settings',
                           size: 24,
@@ -321,7 +385,7 @@ class MacWindowBar extends StatelessWidget {
                           tooltip: 'Settings',
                           onTap: onOpenSettings,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 10),
                         machineSwitcher,
                       ],
                     ),
