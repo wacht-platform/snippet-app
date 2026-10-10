@@ -374,6 +374,9 @@ class _VideoViewState extends State<_VideoView> {
         // playback isn't silently blocked when something else holds focus (e.g.
         // an active phone call).
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        viewType: Platform.isAndroid
+            ? VideoViewType.platformView
+            : VideoViewType.textureView,
       );
       // Surface a runtime playback error (decode/source failure) instead of a
       // dead play button — video_player reports these on the value, not as a throw.
