@@ -259,7 +259,7 @@ void main() {
           expect(rect.right, closeTo(width - 12 - 30, .01));
         }
         expect(rect.left, greaterThanOrEqualTo(32));
-        expect(rect.height, lessThanOrEqualTo(mobile ? 40 : 44));
+        expect(rect.height, lessThanOrEqualTo(mobile ? 64 : 44));
         expect(find.text('Tap to open'), findsNothing);
         final dismiss = tester.getSize(find.byType(IconButton));
         expect(dismiss.width, greaterThanOrEqualTo(44));
@@ -309,7 +309,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Second'), findsNothing);
     final card = find.byType(InkWell).first;
-    await tester.tapAt(tester.getTopLeft(card) + const Offset(4, 4));
+    await tester.tapAt(tester.getTopLeft(card) + const Offset(24, 24));
     await tester.pumpAndSettle();
     expect(opened, [same(first)]);
     expect(haptics, ['HapticFeedbackType.lightImpact']);

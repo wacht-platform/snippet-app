@@ -75,8 +75,8 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
               key: ValueKey('notification-backing-$layer'),
               decoration: BoxDecoration(
                 color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(R.sm),
-                border: Border.all(color: AppColors.line),
+                borderRadius: BorderRadius.circular(kMobile ? 18 : R.sm),
+                border: kMobile ? null : Border.all(color: AppColors.line),
               ),
             ),
           ),
@@ -86,6 +86,36 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
         child: child,
       ),
     ]);
+  }
+
+  Widget _leadingIcon(Map<String, dynamic> payload) {
+    if (!kMobile) return const SizedBox.shrink();
+    final kind = payload['kind']?.toString();
+    final (fill, ink) = switch (kind) {
+      'done' || 'completed' => (AppColors.okBg, AppColors.ok),
+      'error' || 'failed' => (AppColors.dangerBg, AppColors.danger),
+      'waiting' => (AppColors.runBg, AppColors.run),
+      _ => (AppColors.accentBg, AppColors.accent),
+    };
+    return Container(
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: AppIcon(
+        switch ((payload['destination'] as Map?)?['type']) {
+          'session' => 'terminal',
+          'task' => 'check-circle',
+          'conversation' => 'message-circle',
+          _ => 'info',
+        },
+        size: 16,
+        color: ink,
+      ),
+    );
   }
 
   String _contextLabel(Map<String, dynamic> payload) {
@@ -211,10 +241,15 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                             ),
                             child: _stackedCard(
                                 child: Material(
-                              color: AppColors.surface2,
+                              color: kMobile
+                                  ? AppColors.surface3
+                                  : AppColors.surface2,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(R.sm),
-                                side: BorderSide(color: AppColors.line),
+                                borderRadius:
+                                    BorderRadius.circular(kMobile ? 18 : R.sm),
+                                side: kMobile
+                                    ? BorderSide.none
+                                    : BorderSide(color: AppColors.line),
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
@@ -224,28 +259,30 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                 },
                                 child: Padding(
                                   padding: EdgeInsetsDirectional.fromSTEB(
-                                      S.s8,
-                                      kMobile ? S.s2 : S.s4,
-                                      0,
-                                      kMobile ? S.s2 : S.s4),
+                                      kMobile ? 12 : S.s8,
+                                      kMobile ? 12 : S.s4,
+                                      kMobile ? 4 : 0,
+                                      kMobile ? 12 : S.s4),
                                   child: Row(children: [
-                                    AppIcon(
-                                      switch ((payload['destination']
-                                          as Map?)?['type']) {
-                                        'session' => 'terminal',
-                                        'task' => 'check-circle',
-                                        'conversation' => 'message-circle',
-                                        _ => 'info',
-                                      },
-                                      size: 16,
-                                      color: switch (payload['kind']) {
-                                        'waiting' => AppColors.fg1,
-                                        'done' => AppColors.ok,
-                                        'error' => AppColors.danger,
-                                        _ => AppColors.fg3,
-                                      },
-                                    ),
-                                    const SizedBox(width: S.s8),
+                                    _leadingIcon(payload),
+                                    if (!kMobile)
+                                      AppIcon(
+                                        switch ((payload['destination']
+                                            as Map?)?['type']) {
+                                          'session' => 'terminal',
+                                          'task' => 'check-circle',
+                                          'conversation' => 'message-circle',
+                                          _ => 'info',
+                                        },
+                                        size: 16,
+                                        color: switch (payload['kind']) {
+                                          'waiting' => AppColors.fg1,
+                                          'done' => AppColors.ok,
+                                          'error' => AppColors.danger,
+                                          _ => AppColors.fg3,
+                                        },
+                                      ),
+                                    SizedBox(width: kMobile ? 12 : S.s8),
                                     Expanded(
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
@@ -264,8 +301,10 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                                   'New notification',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: sans(13,
-                                                  height: 16 / 13,
+                                              style: sans(kMobile ? 15 : 13,
+                                                  height: kMobile
+                                                      ? 20 / 15
+                                                      : 16 / 13,
                                                   color: AppColors.fg1),
                                             ),
                                           ),
@@ -273,9 +312,13 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                               .isNotEmpty) ...[
                                             const SizedBox(height: S.s2),
                                             Text(_contextLabel(payload),
-                                                maxLines: 1,
+                                                maxLines: kMobile ? 2 : 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: TS.caption()),
+                                                style: kMobile
+                                                    ? sans(13,
+                                                        height: 18 / 13,
+                                                        color: AppColors.fg3)
+                                                    : TS.caption()),
                                           ],
                                         ],
                                       ),

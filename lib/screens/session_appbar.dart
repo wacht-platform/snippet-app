@@ -1117,6 +1117,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   }
 
   Widget _disconnectedBanner() {
+    if (kMobile) return _mobileDisconnectedBanner();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
@@ -1146,6 +1147,44 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           ]),
         ),
       ]),
+    );
+  }
+
+  Widget _mobileDisconnectedBanner() {
+    final text = _outbox.isEmpty
+        ? (_connError ?? 'Disconnected')
+        : '${_connError ?? 'Disconnected'} · ${_outbox.length} message${_outbox.length == 1 ? '' : 's'} will send on reconnect';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 4),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+        decoration: BoxDecoration(
+          color: AppColors.dangerBg,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(children: [
+          AppIcon('wifi-off', size: 16, color: AppColors.danger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: sans(13, height: 18 / 13, color: AppColors.fg1)),
+          ),
+          TextButton(
+            onPressed: () {
+              _reconnectAttempt = 0;
+              _connect();
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.danger,
+              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+            ),
+            child: Text('Retry', style: sans(13, color: AppColors.danger)),
+          ),
+        ]),
+      ),
     );
   }
 

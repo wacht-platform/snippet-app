@@ -517,22 +517,39 @@ class _ToastCardState extends State<_ToastCard>
           child: Container(
             constraints: const BoxConstraints(maxWidth: 420),
             margin: const EdgeInsets.symmetric(horizontal: M.gutter),
-            padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+            padding: kMobile
+                ? const EdgeInsets.fromLTRB(10, 10, 16, 10)
+                : const EdgeInsets.fromLTRB(12, 10, 14, 10),
             decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.card),
-              border: Border.all(color: AppColors.lineStrong),
+              color: kMobile ? AppColors.surface3 : AppColors.surface2,
+              borderRadius: BorderRadius.circular(kMobile ? 18 : R.card),
+              border: kMobile ? null : Border.all(color: AppColors.lineStrong),
               boxShadow: overlayShadow,
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(widget.danger ? 'alert-triangle' : 'check-circle',
-                  size: 15, color: tone),
-              const SizedBox(width: 10),
+              if (kMobile)
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: widget.danger ? AppColors.dangerBg : AppColors.okBg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: AppIcon(widget.danger ? 'alert-triangle' : 'check',
+                      size: 14, color: tone),
+                )
+              else
+                AppIcon(widget.danger ? 'alert-triangle' : 'check-circle',
+                    size: 15, color: tone),
+              SizedBox(width: kMobile ? 12 : 10),
               Flexible(
                 child: Text(widget.message,
                     maxLines: 4,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(13, height: 1.4, color: AppColors.fg1)
+                    style: sans(kMobile ? 14 : 13,
+                            height: kMobile ? 19 / 14 : 1.4,
+                            color: AppColors.fg1)
                         .copyWith(decoration: TextDecoration.none)),
               ),
               for (final a in widget.actions) ...[
@@ -544,9 +561,9 @@ class _ToastCardState extends State<_ToastCard>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(a.label,
-                        style:
-                            sans(13, weight: W.label, color: AppColors.accent)
-                                .copyWith(decoration: TextDecoration.none)),
+                        style: sans(kMobile ? 14 : 13,
+                                weight: W.label, color: AppColors.accent)
+                            .copyWith(decoration: TextDecoration.none)),
                   ),
                 ),
               ],
