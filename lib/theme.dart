@@ -170,6 +170,45 @@ final _amoled = _dark(
   warn: const Color(0xFFD99E45),
 );
 
+// Phones: warm near-black, warm ink and a periwinkle accent, so the reading
+// serif sits on something softer than graphite. Desktop keeps Graphite.
+const _emberCanvas = Color(0xFF121110);
+final _ember = ThemePreset(
+  name: 'ember',
+  label: 'Ember',
+  bg: _emberCanvas,
+  canvas: _emberCanvas,
+  floor: _emberCanvas,
+  surface1: const Color(0xFF1B1917),
+  surface2: const Color(0xFF221F1B),
+  surface3: const Color(0xFF2A2621),
+  fg1: const Color(0xFFEDE7DD),
+  fg2: const Color(0xFFCFC8BC),
+  fg3: const Color(0xFFA39C90),
+  fg4: const Color(0xFF7A7368),
+  border: const Color(0xFF242120),
+  border2: const Color(0xFF302C27),
+  accent: const Color(0xFF9DB0FF),
+  accentHover: const Color(0xFFB4C3FF),
+  accentFg: const Color(0xFF10142A),
+  accentBg: const Color(0xFF9DB0FF).withValues(alpha: 0.14),
+  accentLine: const Color(0xFF9DB0FF).withValues(alpha: 0.38),
+  accentRing: const Color(0xFF9DB0FF).withValues(alpha: 0.45),
+  accentFill: const Color(0xFF9DB0FF),
+  accentFillHover: const Color(0xFFB4C3FF),
+  ok: const Color(0xFF7FB88F),
+  okBg: const Color(0xFF7FB88F).withValues(alpha: 0.13),
+  run: const Color(0xFFD4923C),
+  runBg: const Color(0xFFD4923C).withValues(alpha: 0.13),
+  danger: const Color(0xFFE5745F),
+  dangerBg: const Color(0xFFE5745F).withValues(alpha: 0.13),
+  diffAddBg: const Color(0xFF7FB88F).withValues(alpha: 0.10),
+  diffDelBg: const Color(0xFFE5745F).withValues(alpha: 0.10),
+  diffAddFg: const Color(0xFF9DCCA9),
+  diffDelFg: const Color(0xFFEE9583),
+  diffGutter: const Color(0xFF302C27),
+);
+
 final List<ThemePreset> allPresets = [_amoled];
 
 // ---------------------------------------------------------------------------
@@ -199,7 +238,7 @@ class ThemeManager extends ChangeNotifier {
 
   int _index = _defaultIndex;
   int get index => _index;
-  ThemePreset get current => _amoled;
+  ThemePreset get current => kMobile ? _ember : _amoled;
 
   Future<void> init() async {
     _index = 0;
@@ -523,7 +562,20 @@ TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-const kSansFamily = 'InstrumentSans';
+String get kSansFamily => kMobile ? 'Geist' : 'InstrumentSans';
+const kSerifFamily = 'Literata';
+
+/// The agent's own writing on a phone: a screen serif at a reading size, so a
+/// long answer reads like a page rather than a wall of UI text.
+TextStyle serif(double size,
+        {FontWeight weight = W.body, double? height, Color? color}) =>
+    TextStyle(
+      fontFamily: kSerifFamily,
+      fontSize: size,
+      fontWeight: weight,
+      height: height ?? 1.6,
+      color: color ?? AppColors.fg1,
+    );
 const kMonoFamily = 'JetBrainsMono';
 
 String get monoFamily => kMonoFamily;
@@ -531,13 +583,25 @@ String get monoFamily => kMonoFamily;
 /// Type roles from docs/design-language.md. Screens use these, not raw sizes.
 class TS {
   static TextStyle pageTitle([Color? c]) => kMobile
-      ? sans(22, weight: W.strong, height: 28 / 22, color: c ?? AppColors.fg1)
+      ? sans(28,
+          weight: FontWeight.w700,
+          height: 34 / 28,
+          spacing: -0.8,
+          color: c ?? AppColors.fg1)
       : sans(18, weight: W.strong, height: 24 / 18, color: c ?? AppColors.fg1);
   static TextStyle sectionTitle([Color? c]) => kMobile
-      ? sans(17, weight: W.strong, height: 24 / 17, color: c ?? AppColors.fg1)
+      ? sans(18,
+          weight: W.strong,
+          height: 24 / 18,
+          spacing: -0.3,
+          color: c ?? AppColors.fg1)
       : sans(15, weight: W.strong, height: 20 / 15, color: c ?? AppColors.fg1);
   static TextStyle rowTitle([Color? c]) => kMobile
-      ? sans(15, weight: W.label, height: 20 / 15, color: c ?? AppColors.fg1)
+      ? sans(16,
+          weight: W.strong,
+          height: 21 / 16,
+          spacing: -0.2,
+          color: c ?? AppColors.fg1)
       : sans(13, weight: W.label, height: 18 / 13, color: c ?? AppColors.fg1);
   static TextStyle body([Color? c]) => sans(kMobile ? 16 : 14,
       height: kMobile ? 24 / 16 : 22 / 14, color: c ?? AppColors.fg2);
@@ -553,6 +617,11 @@ class TS {
       sans(11, height: 14 / 11, color: c ?? AppColors.fg3);
   static TextStyle overline([Color? c]) =>
       caps(11, color: c ?? AppColors.fg3).copyWith(height: 14 / 11);
+
+  /// The agent's prose: Literata on a phone, the body sans elsewhere.
+  static TextStyle reading([Color? c]) => kMobile
+      ? serif(17.5, height: 28 / 17.5, color: c ?? AppColors.fg1)
+      : body(c);
   static TextStyle code([Color? c]) =>
       mono(13, height: 20 / 13, color: c ?? AppColors.fg2);
   static TextStyle codeSmall([Color? c]) =>

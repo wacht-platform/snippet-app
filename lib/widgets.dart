@@ -135,6 +135,36 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
   return _cachedMarkdownStyle!;
 }
 
+/// The agent's replies: [markdownStyle] with the reading serif for prose on a
+/// phone. Headings, code and tables keep the interface faces.
+MarkdownStyleSheet? _cachedAgentMarkdownStyle;
+int? _cachedAgentMarkdownThemeIndex;
+
+MarkdownStyleSheet agentMarkdownStyle(BuildContext context) {
+  final base = markdownStyle(context);
+  if (!kMobile) return base;
+  final themeIndex = ThemeManager.instance.index;
+  if (_cachedAgentMarkdownStyle != null &&
+      _cachedAgentMarkdownThemeIndex == themeIndex) {
+    return _cachedAgentMarkdownStyle!;
+  }
+  _cachedAgentMarkdownThemeIndex = themeIndex;
+  final prose = TS.reading();
+  _cachedAgentMarkdownStyle = base.copyWith(
+    p: prose,
+    strong: prose.copyWith(fontWeight: W.strong),
+    em: prose.copyWith(fontStyle: FontStyle.italic),
+    a: prose.copyWith(color: AppColors.accent),
+    listBullet: prose.copyWith(color: AppColors.fg3),
+    blockquote:
+        prose.copyWith(color: AppColors.fg3, fontStyle: FontStyle.italic),
+    code: TS
+        .code(AppColors.fg1)
+        .copyWith(fontSize: 14, backgroundColor: AppColors.surface1),
+  );
+  return _cachedAgentMarkdownStyle!;
+}
+
 /// Dimmed markdown for live model thinking/reasoning — same structure as
 /// [markdownStyle], quieter palette so it reads as an aside, not the answer.
 MarkdownStyleSheet? _cachedThinkingMarkdownStyle;
@@ -997,7 +1027,7 @@ class Bubble extends StatelessWidget {
     final agentContent = MarkdownBody(
       data: shown,
       selectable: false,
-      styleSheet: markdownStyle(context),
+      styleSheet: agentMarkdownStyle(context),
       builders: {'pre': PreBlockBuilder()},
       onTapLink: (txt, href, title) => openMarkdownLink(href),
     );
@@ -1076,6 +1106,31 @@ class Bubble extends StatelessWidget {
                 child: mineText,
               ),
             ...pastedCards,
+          ],
+        ),
+      );
+    }
+
+    if (kMobile) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('YOU', style: caps(11, color: AppColors.fg4, spacing: 0.8)),
+            const SizedBox(height: 4),
+            if (shown.isNotEmpty) mineText,
+            for (var i = 0; i < voice.length; i++) ...[
+              SizedBox(height: i == 0 && shown.isEmpty ? 0 : 8),
+              voice[i],
+            ],
+            for (final extra in extras) ...[
+              const SizedBox(height: 4),
+              extra,
+            ],
+            ...pastedCards,
+            const SizedBox(height: 14),
+            Container(height: 1, color: AppColors.border),
           ],
         ),
       );

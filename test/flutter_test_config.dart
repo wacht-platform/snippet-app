@@ -14,13 +14,17 @@ Future<void> _loadBundledFonts() async {
   const families = {
     'InstrumentSans': 'InstrumentSans',
     'JetBrainsMono': 'JetBrainsMono',
+    'Geist': 'Geist',
+    'Literata': 'Literata',
   };
   for (final entry in families.entries) {
     final loader = FontLoader(entry.key);
     for (final weight in const [400, 500, 600, 700]) {
-      final file = File('assets/fonts/${entry.value}-$weight.ttf');
-      if (!file.existsSync()) continue;
-      loader.addFont(file.readAsBytes().then(ByteData.sublistView));
+      for (final suffix in const ['', '-italic']) {
+        final file = File('assets/fonts/${entry.value}-$weight$suffix.ttf');
+        if (!file.existsSync()) continue;
+        loader.addFont(file.readAsBytes().then(ByteData.sublistView));
+      }
     }
     await loader.load();
   }
