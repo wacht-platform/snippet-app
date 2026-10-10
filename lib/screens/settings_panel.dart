@@ -17,6 +17,7 @@ import 'recurring.dart';
 import 'shell_nav.dart';
 import 'usage.dart';
 import 'vault.dart';
+import '../motion.dart';
 
 /// Rows for the machine popover/sheet: live dot (re-pinged on open), label,
 /// host, trailing overflow. Pops itself before invoking any callback.
@@ -381,27 +382,24 @@ class SettingsPanelState extends State<SettingsPanel> {
               children: [
                 // Left Column (Sidebar Rail)
                 Container(
-                  width: 220,
-                  decoration: BoxDecoration(color: AppColors.raised),
+                  width: 210,
+                  decoration: BoxDecoration(color: AppColors.sidebarPanel),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Sidebar Header
                       Container(
-                        height: 64,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text('Settings', style: TS.sectionTitle()),
-                          ],
-                        ),
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        alignment: Alignment.centerLeft,
+                        child: Text('Settings',
+                            style: sans(15, color: AppColors.fg1)),
                       ),
                       // Nav Items
                       Expanded(
                         child: ListView(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 8),
+                              horizontal: 8, vertical: 2),
                           children: [
                             for (final (page, icon, label) in _nav)
                               _settingsNavRow(page, icon, label),
@@ -446,24 +444,35 @@ class SettingsPanelState extends State<SettingsPanel> {
                         // Content Pane Header
                         if (!_isNested)
                           Container(
-                            height: 64,
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            height: 52,
+                            padding: const EdgeInsets.fromLTRB(24, 0, 10, 0),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Expanded(
-                                  child: Text(
+                                  child: SwapText(
                                     _pageTitle(_page),
-                                    style: TS.sectionTitle(),
+                                    style: sans(15, color: AppColors.fg1),
                                   ),
                                 ),
                                 if (_pageAction(_page) != null)
                                   _pageAction(_page)!,
+                                const SizedBox(width: 6),
+                                IconBtn('x',
+                                    size: 28,
+                                    iconSize: 14,
+                                    tooltip: 'Close',
+                                    onTap: widget.onClose),
                               ],
                             ),
                           ),
-                        // Active Page Content
-                        Expanded(child: _pageBody()),
+                        Expanded(
+                          child: Swap(
+                            stateKey: _page,
+                            fill: true,
+                            child: _pageBody(),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -811,9 +820,9 @@ class SettingsPanelState extends State<SettingsPanel> {
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
         color: selected ? AppColors.surface2 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.sm),
+        borderRadius: BorderRadius.circular(9),
         child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(9),
           onTap: () => setState(() {
             _page = page;
             _addingMachine = false;
@@ -821,18 +830,17 @@ class SettingsPanelState extends State<SettingsPanel> {
             _renamingUrl = null;
           }),
           child: Container(
-            height: 34,
-            padding: const EdgeInsets.symmetric(horizontal: S.s8),
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(children: [
               AppIcon(icon,
-                  size: 16, color: selected ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 8),
+                  size: 15, color: selected ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(13,
-                        weight: selected ? W.label : W.body,
+                    style: sans(13.5,
                         color: selected ? AppColors.fg1 : AppColors.fg2)),
               ),
             ]),

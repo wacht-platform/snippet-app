@@ -225,6 +225,47 @@ class TaskRow extends StatelessWidget {
         ),
       );
     }
+    if (!kMobile) {
+      return Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+            child: Row(children: [
+              if (task.priority > 0) ...[
+                PriorityMark(task.priority),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(task.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13.5,
+                            height: 19 / 13.5, color: AppColors.fg1)),
+                    if (detail.isNotEmpty)
+                      Text(detail,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              sans(12, height: 16 / 12, color: AppColors.fg4)),
+                  ],
+                ),
+              ),
+              if (age.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(age, style: sans(12, color: AppColors.fg4, tabular: true)),
+              ],
+            ]),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(

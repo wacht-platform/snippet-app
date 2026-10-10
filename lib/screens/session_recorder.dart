@@ -285,62 +285,6 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
     return '$minutes:${remainder.toString().padLeft(2, '0')}';
   }
 
-  Widget _recordingPanel() {
-    final reviewing = !_isRecording && _recordingPath != null;
-    final position = reviewing ? _playbackPosition : _recordingElapsed;
-    final samples = List<double>.of(_waveform);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-      ),
-      child: Row(children: [
-        InkWell(
-          onTap: _isRecording ? _stopRecording : _toggleRecordingPlayback,
-          borderRadius: BorderRadius.circular(R.pill),
-          child: SizedBox(
-            width: 32,
-            height: 32,
-            child: Center(
-              child: AppIcon(
-                _isRecording
-                    ? 'stop'
-                    : (_isPlayingRecording ? 'pause' : 'play'),
-                size: 16,
-                color: _isRecording ? AppColors.accent : AppColors.fg1,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(_audioTime(position),
-            style: mono(11,
-                color: _isRecording ? AppColors.accent : AppColors.fg3)),
-        const SizedBox(width: 8),
-        Expanded(
-          child: SizedBox(
-            height: 22,
-            child: CustomPaint(painter: _WaveformPainter(samples)),
-          ),
-        ),
-        if (reviewing) ...[
-          IconBtn('x',
-              size: 28,
-              iconSize: 14,
-              tooltip: 'Discard',
-              onTap: _discardRecording),
-          IconBtn('check',
-              size: 28,
-              iconSize: 14,
-              tooltip: 'Use recording',
-              onTap: () => unawaited(_confirmRecording())),
-        ],
-      ]),
-    );
-  }
-
   /// The phone composer while a voice note is being recorded or reviewed:
   /// the whole bar becomes the recorder, with a live waveform and one send.
   Widget _mobileRecorder(bool running) {

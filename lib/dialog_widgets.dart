@@ -460,3 +460,68 @@ Future<T?> showAppSheet<T>(BuildContext context,
 /// `Transform.scale(child: Switch(...))` to size a Material switch down, which
 /// scales the whole widget including its touch target and distorts Material's
 /// fixed internal proportions — that is why the result looked wrong.
+
+/// A panel that drops down under [anchor] (desktop pickers): no dimmed
+/// backdrop, closes on an outside click or Escape.
+Future<T?> showAnchoredPanel<T>(
+  BuildContext anchor, {
+  required Widget child,
+  double width = 360,
+  double maxHeight = 460,
+}) {
+  final box = anchor.findRenderObject() as RenderBox?;
+  final overlay = Overlay.of(anchor, rootOverlay: true)
+      .context
+      .findRenderObject() as RenderBox?;
+  if (box == null || overlay == null) {
+    return showAppSheet<T>(anchor, title: '', child: child);
+  }
+  final origin = box.localToGlobal(Offset.zero, ancestor: overlay);
+  final screen = overlay.size;
+  final w = width.clamp(200.0, screen.width - 16);
+  final left = origin.dx.clamp(8.0, screen.width - w - 8);
+  final top = origin.dy + box.size.height + 6;
+  final room = (screen.height - top - 12).clamp(160.0, maxHeight);
+  return showGeneralDialog<T>(
+    context: anchor,
+    barrierDismissible: true,
+    barrierLabel: 'Dismiss',
+    barrierColor: Colors.transparent,
+    transitionDuration: Motion.fast,
+    pageBuilder: (ctx, _, __) => Stack(children: [
+      Positioned(
+        left: left,
+        top: top,
+        width: w,
+        child: Material(
+          color: AppColors.surface2,
+          elevation: 10,
+          shadowColor: Colors.black.withValues(alpha: 0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: AppColors.border2),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: room),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(8),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    ]),
+    transitionBuilder: (_, animation, __, child) {
+      final curve = CurvedAnimation(parent: animation, curve: Motion.enter);
+      return FadeTransition(
+        opacity: curve,
+        child: SlideTransition(
+          position: Tween(begin: const Offset(0, -0.02), end: Offset.zero)
+              .animate(curve),
+          child: child,
+        ),
+      );
+    },
+  );
+}

@@ -182,7 +182,7 @@ class ShellSidebarHost extends StatelessWidget {
       final folder =
           path != null && slash > 0 ? path.substring(0, slash) : null;
       return Container(
-        color: AppColors.surface1,
+        color: Colors.transparent,
         child: GitScreen(
           client: tab.client,
           sessionId: tab.sessionId ?? '',

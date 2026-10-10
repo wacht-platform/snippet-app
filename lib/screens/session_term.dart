@@ -68,21 +68,21 @@ class _CompactingStatusState extends State<_CompactingStatus> {
         children: [
           Row(children: [
             SizedBox(
-                width: 16,
-                child: Center(child: BrailleSpinner(color: AppColors.accent))),
+                width: 22,
+                child: Center(child: WorkingDots(color: AppColors.accent))),
             const SizedBox(width: 8),
-            Flexible(
-              child: Text.rich(TextSpan(children: [
-                TextSpan(
-                    text: 'Compacting',
-                    style: sans(13, weight: W.label, color: AppColors.accent)),
-                TextSpan(
-                    text: ' $_elapsed',
-                    style: sans(13,
-                        tabular: true,
-                        color: AppColors.accent.withValues(alpha: 0.72))),
-              ])),
+            Expanded(
+              child: Shimmer(
+                color: AppColors.accent,
+                child: Text('Compacting context…',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, color: Colors.white)),
+              ),
             ),
+            const SizedBox(width: 8),
+            Text(_elapsed,
+                style: sans(12, color: AppColors.fg4, tabular: true)),
           ]),
           if (detail.isNotEmpty)
             Padding(
@@ -183,21 +183,21 @@ class _ChurningStatusState extends State<_ChurningStatus> {
             child: Row(
               children: [
                 SizedBox(
-                    width: 16,
-                    child:
-                        Center(child: BrailleSpinner(color: AppColors.accent))),
+                    width: 22,
+                    child: Center(child: WorkingDots(color: AppColors.accent))),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(_verb,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          sans(13, weight: W.label, color: AppColors.accent)),
+                  child: Shimmer(
+                    color: AppColors.accent,
+                    child: SwapText('$_verb…',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13, color: Colors.white)),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(_elapsed,
-                    style: mono(11,
-                        color: AppColors.accent.withValues(alpha: 0.72))),
+                    style: sans(12, color: AppColors.fg4, tabular: true)),
                 if (thought.isNotEmpty) ...[
                   const SizedBox(width: 6),
                   AppIcon(_open ? 'chevron-down' : 'chevron-right',

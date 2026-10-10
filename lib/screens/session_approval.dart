@@ -1003,44 +1003,6 @@ class QuestionBarState extends State<QuestionBar> {
   }
 }
 
-class _WaveformPainter extends CustomPainter {
-  final List<double> samples;
-  const _WaveformPainter(this.samples);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.accent
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    if (samples.isEmpty) {
-      canvas.drawLine(
-        Offset(0, size.height / 2),
-        Offset(size.width, size.height / 2),
-        paint..color = AppColors.fg4,
-      );
-      return;
-    }
-    final waveformWidth = math.min(size.width, samples.length * 4.0);
-    for (var i = 0; i < samples.length; i++) {
-      final amplitude = samples[i].clamp(0.04, 1.0).toDouble();
-      final half =
-          (size.height * 0.45 * amplitude).clamp(2.0, size.height * 0.45);
-      final x = i * 4.0 + 2.0;
-      if (x > waveformWidth) break;
-      canvas.drawLine(
-        Offset(x, size.height / 2 - half),
-        Offset(x, size.height / 2 + half),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _WaveformPainter oldDelegate) =>
-      oldDelegate.samples != samples;
-}
-
 class _Attachment {
   final String name;
   final bool isImage;

@@ -145,14 +145,6 @@ class _DenseToolRowState extends State<DenseToolRow> {
   }
 }
 
-class BrailleSpinner extends StatelessWidget {
-  final Color? color;
-  const BrailleSpinner({super.key, this.color});
-  @override
-  Widget build(BuildContext context) =>
-      Spinner(size: 14, color: color ?? AppColors.run);
-}
-
 /// Consecutive tools as a BeUI group: one header row, details on expand.
 class ToolRun extends StatefulWidget {
   final List<Widget> rows;
@@ -377,7 +369,7 @@ class LaneNotice extends StatelessWidget {
                 ? 'Completed'
                 : 'Queued';
 
-    if (kMobile) {
+    {
       final agent = lane?.agent?.trim() ?? '';
       final dot = running
           ? AppColors.run
@@ -731,7 +723,7 @@ class _WatchLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kMobile) return _mobile();
+    return _mobile();
     final strong = muted ? AppColors.fg3 : AppColors.fg2;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: S.s6),
@@ -868,7 +860,7 @@ class _WatchFiredState extends State<_WatchFired> {
 
   @override
   Widget build(BuildContext context) {
-    if (kMobile) return _mobile();
+    return _mobile();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: S.s6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

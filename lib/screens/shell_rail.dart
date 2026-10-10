@@ -196,7 +196,7 @@ class ShellSectionTabs extends StatelessWidget {
         ShellSection.values.where((s) => !hidden.contains(s)).toList();
     final items = shown.isEmpty ? ShellSection.values : shown;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 2),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       child: Row(children: [
         for (final item in items) ...[
           Tooltip(
@@ -209,7 +209,7 @@ class ShellSectionTabs extends StatelessWidget {
                 onTap: () => onSelect(item),
                 borderRadius: BorderRadius.circular(9),
                 child: SizedBox.square(
-                  dimension: 32,
+                  dimension: 30,
                   child: Center(
                     child: AppIcon(item.icon,
                         size: 17,

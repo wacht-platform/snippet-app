@@ -208,8 +208,9 @@ class ShellSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     if (!kMobile) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 10, 8),
+      return Container(
+        height: 38,
+        padding: const EdgeInsets.fromLTRB(18, 2, 8, 2),
         child: Row(children: [
           Expanded(
             child: GestureDetector(
@@ -217,8 +218,7 @@ class ShellSectionHeader extends StatelessWidget {
               child: Text(label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(20,
-                      height: 26 / 20, spacing: -0.4, color: AppColors.fg1)),
+                  style: sans(13, height: 18 / 13, color: AppColors.fg3)),
             ),
           ),
           for (final a in actions) ...[a, const SizedBox(width: 2)],
@@ -333,11 +333,11 @@ class ShellSectionAction extends StatelessWidget {
           borderRadius: BorderRadius.circular(kMobile ? R.md : 9),
           child: SizedBox(
             // 24px target around a 16px glyph.
-            width: kMobile ? 24 : 32,
-            height: kMobile ? 24 : 32,
+            width: kMobile ? 24 : 28,
+            height: kMobile ? 24 : 28,
             child: Center(
               child: AppIcon(icon,
-                  size: 16,
+                  size: kMobile ? 16 : 15,
                   color: active
                       ? AppColors.accent
                       : (onTap == null ? AppColors.fg4 : AppColors.fg3)),

@@ -322,7 +322,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
           physics: const AlwaysScrollableScrollPhysics(),
           // Horizontal insets belong to each child (the section header carries
           // its own), so the list itself only manages the top and tail.
-          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
           children: [
             ShellSectionHeader(
               label: 'File Tree',
@@ -374,10 +374,8 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
                 child: Text('Empty directory', style: TS.meta()),
               )
-            else ...[
-              const SizedBox(height: 4),
+            else
               ..._buildRows(entries, depth: 0),
-            ],
           ],
         ),
       ),
@@ -427,7 +425,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
   Widget _workspaceRow(String wsName) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
         child: Container(
-          height: 32,
+          height: kNavRowHeight,
           padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
           child: Row(children: [
             AppIcon('folder-open', size: 14, color: AppColors.fg3),
@@ -438,7 +436,6 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                   overflow: TextOverflow.ellipsis,
                   style: TS.label(AppColors.fg1)),
             ),
-            AppIcon('chevron-down', size: 12, color: AppColors.fg4),
           ]),
         ),
       );

@@ -55,8 +55,8 @@ class _AgentCardState extends State<AgentCard> {
           : _tasks.where((t) => statuses.contains(t.status)).length;
 
   Widget _chip(String label, {Color? dot, bool accent = false}) => Container(
-        height: 26,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        height: kMobile ? 26 : 22,
+        padding: EdgeInsets.symmetric(horizontal: kMobile ? 10 : 8),
         decoration: BoxDecoration(
           color: accent
               ? AppColors.accentBg
@@ -73,7 +73,7 @@ class _AgentCardState extends State<AgentCard> {
             const SizedBox(width: 6),
           ],
           SwapText(label,
-              style: sans(12,
+              style: sans(kMobile ? 12 : 11.5,
                   height: 16 / 12,
                   color: accent ? AppColors.accent : AppColors.fg2)),
         ]),
@@ -105,7 +105,7 @@ class _AgentCardState extends State<AgentCard> {
         _chip(agent.taskCounts != null ? '$done done this week' : '$done done'),
     ];
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: kMobile ? 10 : 6),
       child: Material(
         color: kMobile ? AppColors.surface1 : AppColors.surface2,
         borderRadius: BorderRadius.circular(kMobile ? 18 : 16),
@@ -117,14 +117,14 @@ class _AgentCardState extends State<AgentCard> {
             curve: Motion.enter,
             alignment: Alignment.topCenter,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(kMobile ? 16 : 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
                     Container(
-                      width: 36,
-                      height: 36,
+                      width: kMobile ? 36 : 28,
+                      height: kMobile ? 36 : 28,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color:
@@ -132,7 +132,7 @@ class _AgentCardState extends State<AgentCard> {
                         borderRadius: BorderRadius.circular(11),
                       ),
                       child: Text(name.characters.first.toUpperCase(),
-                          style: sans(16, color: AppColors.fg1)),
+                          style: sans(kMobile ? 16 : 13, color: AppColors.fg1)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -142,9 +142,9 @@ class _AgentCardState extends State<AgentCard> {
                           Text(name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: sans(16,
+                              style: sans(kMobile ? 16 : 14,
                                   spacing: -0.2,
-                                  height: 21 / 16,
+                                  height: kMobile ? 21 / 16 : 19 / 14,
                                   color: AppColors.fg1)),
                           Row(children: [
                             Container(
@@ -170,7 +170,7 @@ class _AgentCardState extends State<AgentCard> {
                   ]),
                   if (chips.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    Wrap(spacing: 8, runSpacing: 8, children: chips),
+                    Wrap(spacing: 6, runSpacing: 6, children: chips),
                   ],
                 ],
               ),

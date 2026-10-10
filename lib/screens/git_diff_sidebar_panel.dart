@@ -114,7 +114,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     await _git?.refresh();
   }
 
-  Future<void> _branchSheet() async {
+  Future<void> _branchSheet([BuildContext? anchor]) async {
     if (_branchBusy) return;
     late final ({
       String current,
@@ -128,19 +128,21 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
       return;
     }
     if (!mounted) return;
-    await showAppSheet<void>(
-      context,
-      title: 'Branches',
-      child: GitBranchPicker(
-        current: data.current,
-        local: data.local,
-        remotes: data.remotes,
-        onSelect: (name, {required bool create}) {
-          Navigator.pop(context);
-          unawaited(_checkoutBranch(name, create: create));
-        },
-      ),
+    final picker = GitBranchPicker(
+      current: data.current,
+      local: data.local,
+      remotes: data.remotes,
+      onSelect: (name, {required bool create}) {
+        Navigator.pop(context);
+        unawaited(_checkoutBranch(name, create: create));
+      },
     );
+    if (!kMobile && anchor != null) {
+      await showAnchoredPanel<void>(anchor, width: 380, child: picker);
+    } else {
+      await showAppSheet<void>(context,
+          title: 'Branches', maxWidth: 420, child: picker);
+    }
   }
 
   Future<void> _checkoutBranch(String name, {required bool create}) async {
@@ -182,7 +184,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
         color: kMobile ? AppColors.bg : Colors.transparent,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(top: 8, bottom: 16),
+          padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
           children: [
             ShellSectionHeader(
               label: 'Git Diff',
@@ -212,52 +214,87 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   /// Branch + change count on one flat row. Tapping the row opens the same
   /// local/remote branch picker used by the full Git screen.
   Widget _branchRow(String repoName, String branch, int changes) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
-        child: Material(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.sm),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(R.sm),
-            onTap: _branchBusy ? null : _branchSheet,
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
-              child: Row(children: [
-                AppIcon('git-branch', size: 14, color: AppColors.accent),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    branch.isEmpty ? repoName : branch,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TS.label(AppColors.fg1),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+        child: Builder(
+          builder: (anchor) => Material(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: _branchBusy ? null : () => _branchSheet(anchor),
+              child: Container(
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+                child: Row(children: [
+                  AppIcon('git-branch', size: 14, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      branch.isEmpty ? repoName : branch,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TS.label(AppColors.fg1),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  changes == 0 ? 'clean' : '$changes changed',
-                  style: TS.meta(),
-                ),
-                const SizedBox(width: 6),
-                AppIcon('chevron-down', size: 13, color: AppColors.fg3),
-              ]),
+                  if (changes > 0) ...[
+                    const SizedBox(width: 6),
+                    Text('$changes changed', style: TS.meta()),
+                  ],
+                  const SizedBox(width: 6),
+                  AppIcon('chevron-down', size: 13, color: AppColors.fg3),
+                ]),
+              ),
             ),
           ),
         ),
       );
 
-  Widget _fileRow(GitFile f) => ShellNavRow(
-        id: f.path,
-        // Just the file name: the row is 26px and a full path ellipsizes to
-        // nothing useful. The directory is in the tooltip instead.
-        label: lastPathSegment(f.path, ifEmpty: f.path),
-        icon: 'file',
-        // Monochrome icon; the single-letter status carries the state colour,
-        // so colour stays rationed to information.
-        tone: ShellTone.neutral,
-        onTap: widget.onOpenDiff == null ? null : () => widget.onOpenDiff!(f),
-        trailing: _statusLetter(f),
-      );
+  Widget _fileRow(GitFile f) {
+    final name = lastPathSegment(f.path, ifEmpty: f.path);
+    final slash = f.path.lastIndexOf('/');
+    final dir = slash > 0 ? f.path.substring(0, slash) : '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Tooltip(
+        message: f.path,
+        waitDuration: const Duration(milliseconds: 600),
+        child: Semantics(
+          label: f.path,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: widget.onOpenDiff == null
+                  ? null
+                  : () => widget.onOpenDiff!(f),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+                child: Row(children: [
+                  _statusLetter(f),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(children: [
+                        TextSpan(text: name),
+                        if (dir.isNotEmpty)
+                          TextSpan(
+                              text: '  $dir',
+                              style: sans(12, color: AppColors.fg4)),
+                      ]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13.5, color: AppColors.fg1),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   /// The git status character, matching how the full Git screen derives it:
   /// the index char for a staged file, `?` for untracked, else the worktree
@@ -269,53 +306,66 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
         f.staged ? AppColors.ok : (f.untracked ? AppColors.fg3 : AppColors.run);
     return Tooltip(
       message: f.staged ? 'staged' : (f.untracked ? 'untracked' : 'unstaged'),
-      child: Text(letter, style: mono(11, weight: W.label, color: color)),
+      child: Container(
+        width: 20,
+        height: 20,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(letter, style: mono(11, color: color)),
+      ),
     );
   }
 
   Widget _cleanState() => Padding(
-        padding: const EdgeInsets.fromLTRB(
-            kSidebarContentInset, 10, kSidebarContentInset, 8),
-        child: AppCard(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.okBg,
-                borderRadius: BorderRadius.circular(R.xs),
-              ),
-              child: AppIcon('check-check', size: 15, color: AppColors.ok),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Working tree clean', style: TS.label(AppColors.fg1)),
-                  const SizedBox(height: 3),
-                  Text('No local changes · ${_timeAgo(_lastUpdated)}',
-                      style: TS.caption()),
-                  const SizedBox(height: 8),
-                  Btn('Switch branch',
-                      small: true,
-                      icon: 'git-branch',
-                      variant: BtnVariant.ghost,
-                      onTap: _branchBusy ? null : _branchSheet),
-                ],
-              ),
-            ),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            AppIcon('check', size: 14, color: AppColors.ok),
+            const SizedBox(width: 8),
+            Text('No changes', style: sans(13, color: AppColors.fg2)),
           ]),
-        ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 22),
+            child: Text('Working tree clean · ${_timeAgo(_lastUpdated)}',
+                style: sans(12, color: AppColors.fg4)),
+          ),
+        ]),
       );
 
   Widget _errorState() => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_error!, style: sans(12, color: AppColors.danger, height: 1.4)),
-          const SizedBox(height: 10),
-          Btn('Retry', small: true, onTap: refresh),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child:
+                  AppIcon('alert-triangle', size: 14, color: AppColors.danger),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(_error!,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, height: 1.4, color: AppColors.fg2)),
+            ),
+          ]),
+          Padding(
+            padding: const EdgeInsets.only(left: 14, top: 4),
+            child: TextButton(
+              onPressed: refresh,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                minimumSize: const Size(0, 30),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child:
+                  Text('Try again', style: sans(13, color: AppColors.accent)),
+            ),
+          ),
         ]),
       );
 

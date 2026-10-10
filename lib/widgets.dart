@@ -917,8 +917,7 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
   bool get _canExpand {
     if (widget.items.length > 1) return true;
     if (widget.items.isEmpty) return false;
-    return _lineFor(widget.items.first).contains('\n') ||
-        _preview.length > (kMobile ? 110 : 72);
+    return _lineFor(widget.items.first).contains('\n') || _preview.length > 110;
   }
 
   @override
@@ -941,7 +940,7 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
                   Expanded(
                     child: Text(
                       _preview.isEmpty ? 'Transcript' : _preview,
-                      maxLines: kMobile ? 2 : 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: kMobile
                           ? sans(13, height: 19 / 13, color: AppColors.fg2)
@@ -1110,31 +1109,9 @@ class Bubble extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              agent,
-              if (selectable && shown.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: shown));
-                      toast(context, 'Copied');
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AppIcon('clipboard', size: 12, color: AppColors.fg4),
-                        const SizedBox(width: 5),
-                        Text('Copy', style: TS.meta()),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          child: selectable && shown.isNotEmpty
+              ? _HoverCopy(text: shown, child: agent)
+              : agent,
         ),
       );
     }
@@ -1236,6 +1213,71 @@ extension on Bubble {
           VoiceNote(client: client, path: audio[i], transcript: transcript)));
     }
     return out;
+  }
+}
+
+class _HoverCopy extends StatefulWidget {
+  const _HoverCopy({required this.text, required this.child});
+  final String text;
+  final Widget child;
+
+  @override
+  State<_HoverCopy> createState() => _HoverCopyState();
+}
+
+class _HoverCopyState extends State<_HoverCopy> {
+  bool _hover = false;
+  bool _focused = false;
+
+  void _copy() {
+    Clipboard.setData(ClipboardData(text: widget.text));
+    toast(context, 'Copied');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = _hover || _focused;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onLongPress: _copy,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            widget.child,
+            AnimatedOpacity(
+              opacity: shown ? 1 : 0,
+              duration: Motion.quick,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Semantics(
+                  button: true,
+                  label: 'Copy reply',
+                  child: IgnorePointer(
+                    ignoring: !shown,
+                    child: InkWell(
+                      onTap: _copy,
+                      onFocusChange: (f) => setState(() => _focused = f),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 2, vertical: 2),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          AppIcon('copy', size: 12, color: AppColors.fg4),
+                          const SizedBox(width: 5),
+                          Text('Copy', style: TS.meta()),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -1441,7 +1483,8 @@ class HeaderAction extends StatelessWidget {
   Widget build(BuildContext context) => kMobile
       ? IconBtn(icon,
           size: M.minTarget, iconSize: 20, tooltip: label, onTap: onTap)
-      : Btn(label, icon: icon, small: true, onTap: onTap);
+      : Btn(label,
+          icon: icon, small: true, variant: BtnVariant.secondary, onTap: onTap);
 }
 
 class SnAppBar extends StatelessWidget {
