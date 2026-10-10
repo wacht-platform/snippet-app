@@ -69,7 +69,7 @@ class _MissionControlCardState extends State<MissionControlCard> {
 
   String _statusLine() {
     final status = widget.session.status;
-    if (status == 'running') return 'Working on it now';
+    if (status == 'running') return 'Working now';
     if (status == 'waiting_for_input') return 'Waiting for you';
     final a = _autonomy;
     if (a != null && a['on'] == true) {

@@ -12,6 +12,7 @@ import 'package:record/record.dart';
 
 import '../api.dart';
 import '../media_views.dart';
+import '../motion.dart';
 import '../desktop_pick.dart';
 import '../models.dart';
 import '../panel.dart';
@@ -1315,143 +1316,151 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
           10 + (keyboard > 0 ? 8 : mq.padding.bottom),
         ),
-        child: kMobile && (_isRecording || _recordingPath != null)
-            ? _mobileRecorder()
-            : Container(
-                decoration: BoxDecoration(
-                  color: kMobile ? AppColors.raised : AppColors.bg,
-                  borderRadius: BorderRadius.circular(kMobile ? 18 : R.md),
-                  border: kMobile ? Border.all(color: AppColors.border) : null,
-                ),
-                padding: kMobile
-                    ? const EdgeInsets.symmetric(horizontal: 12, vertical: 14)
-                    : const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_isRecording || _recordingPath != null) ...[
-                      _recordingPanel(),
-                      const SizedBox(height: 8),
-                    ],
-                    if (_attachments.isNotEmpty) ...[
-                      _attachmentBar(),
-                      const SizedBox(height: 6),
-                    ],
-                    CallbackShortcuts(
-                      bindings: {
-                        const SingleActivator(LogicalKeyboardKey.enter): () {
-                          if (!kMobile) _send();
+        child: Swap(
+          stateKey: kMobile && (_isRecording || _recordingPath != null)
+              ? 'recorder'
+              : 'composer',
+          alignment: Alignment.bottomCenter,
+          child: kMobile && (_isRecording || _recordingPath != null)
+              ? _mobileRecorder()
+              : Container(
+                  decoration: BoxDecoration(
+                    color: kMobile ? AppColors.raised : AppColors.bg,
+                    borderRadius: BorderRadius.circular(kMobile ? 18 : R.md),
+                    border:
+                        kMobile ? Border.all(color: AppColors.border) : null,
+                  ),
+                  padding: kMobile
+                      ? const EdgeInsets.symmetric(horizontal: 12, vertical: 14)
+                      : const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_isRecording || _recordingPath != null) ...[
+                        _recordingPanel(),
+                        const SizedBox(height: 8),
+                      ],
+                      if (_attachments.isNotEmpty) ...[
+                        _attachmentBar(),
+                        const SizedBox(height: 6),
+                      ],
+                      CallbackShortcuts(
+                        bindings: {
+                          const SingleActivator(LogicalKeyboardKey.enter): () {
+                            if (!kMobile) _send();
+                          },
+                          const SingleActivator(LogicalKeyboardKey.enter,
+                              meta: true): () {
+                            _send();
+                          },
+                          const SingleActivator(LogicalKeyboardKey.enter,
+                              control: true): () {
+                            _send();
+                          },
                         },
-                        const SingleActivator(LogicalKeyboardKey.enter,
-                            meta: true): () {
-                          _send();
-                        },
-                        const SingleActivator(LogicalKeyboardKey.enter,
-                            control: true): () {
-                          _send();
-                        },
-                      },
-                      child: TextField(
-                        controller: _input,
-                        minLines: kMobile ? 1 : 2,
-                        maxLines: 8,
-                        cursorColor: AppColors.fg1,
-                        onSubmitted: (_) {
-                          if (!kMobile) _send();
-                        },
-                        style: sans(kMobile ? M.body : 16,
-                            height: 1.45, color: AppColors.fg1),
-                        decoration: InputDecoration(
-                          isCollapsed: true,
-                          contentPadding:
-                              const EdgeInsets.fromLTRB(2, 2, 8, 10),
-                          border: InputBorder.none,
-                          hintText: 'Message ${widget.agentName}…',
-                          hintStyle: sans(kMobile ? M.body : 16,
-                              height: 1.45, color: AppColors.fg4),
+                        child: TextField(
+                          controller: _input,
+                          minLines: kMobile ? 1 : 2,
+                          maxLines: 8,
+                          cursorColor: AppColors.fg1,
+                          onSubmitted: (_) {
+                            if (!kMobile) _send();
+                          },
+                          style: sans(kMobile ? M.body : 16,
+                              height: 1.45, color: AppColors.fg1),
+                          decoration: InputDecoration(
+                            isCollapsed: true,
+                            contentPadding:
+                                const EdgeInsets.fromLTRB(2, 2, 8, 10),
+                            border: InputBorder.none,
+                            hintText: 'Message ${widget.agentName}…',
+                            hintStyle: sans(kMobile ? M.body : 16,
+                                height: 1.45, color: AppColors.fg4),
+                          ),
                         ),
                       ),
-                    ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(R.sm),
-                          child: InkWell(
-                            onTap: _onAttachTap,
-                            borderRadius: BorderRadius.circular(R.sm),
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: AppIcon('plus',
-                                  size: 18, color: AppColors.fg3),
-                            ),
-                          ),
-                        ),
-                        if (!kMobile) ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface2,
-                              borderRadius: BorderRadius.circular(R.sm),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AppIcon('agent',
-                                    size: 12, color: AppColors.fg3),
-                                const SizedBox(width: 5),
-                                Text(widget.agentName,
-                                    style: mono(11, color: AppColors.fg2)),
-                              ],
-                            ),
-                          ),
-                        ],
-                        const Spacer(),
-                        if (kCanRecord) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
                           Material(
                             color: Colors.transparent,
                             borderRadius: BorderRadius.circular(R.sm),
                             child: InkWell(
-                              onTap: _onMicTap,
+                              onTap: _onAttachTap,
                               borderRadius: BorderRadius.circular(R.sm),
                               child: Padding(
                                 padding: const EdgeInsets.all(6),
-                                child: AppIcon(
-                                  _isRecording ? 'mic-off' : 'mic',
-                                  size: 18,
-                                  color: _isRecording
-                                      ? AppColors.danger
-                                      : AppColors.fg3,
-                                ),
+                                child: AppIcon('plus',
+                                    size: 18, color: AppColors.fg3),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          if (!kMobile) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface2,
+                                borderRadius: BorderRadius.circular(R.sm),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  AppIcon('agent',
+                                      size: 12, color: AppColors.fg3),
+                                  const SizedBox(width: 5),
+                                  Text(widget.agentName,
+                                      style: mono(11, color: AppColors.fg2)),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          if (kCanRecord) ...[
+                            Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(R.sm),
+                              child: InkWell(
+                                onTap: _onMicTap,
+                                borderRadius: BorderRadius.circular(R.sm),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: AppIcon(
+                                    _isRecording ? 'mic-off' : 'mic',
+                                    size: 18,
+                                    color: _isRecording
+                                        ? AppColors.danger
+                                        : AppColors.fg3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _input,
+                            builder: (_, val, __) {
+                              final canSend = (val.text.trim().isNotEmpty ||
+                                      _attachments.isNotEmpty ||
+                                      _isRecording ||
+                                      _recordingPath != null) &&
+                                  !_sending;
+                              return _SendBtn(
+                                enabled: canSend,
+                                sending: _sending,
+                                onTap: canSend ? _send : null,
+                              );
+                            },
+                          ),
                         ],
-                        ValueListenableBuilder<TextEditingValue>(
-                          valueListenable: _input,
-                          builder: (_, val, __) {
-                            final canSend = (val.text.trim().isNotEmpty ||
-                                    _attachments.isNotEmpty ||
-                                    _isRecording ||
-                                    _recordingPath != null) &&
-                                !_sending;
-                            return _SendBtn(
-                              enabled: canSend,
-                              sending: _sending,
-                              onTap: canSend ? _send : null,
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

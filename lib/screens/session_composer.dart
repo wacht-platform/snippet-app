@@ -661,217 +661,269 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             children: [
               if (_heldQueue.isNotEmpty) _queuedCard(),
               if (_attachments.isNotEmpty) _attachmentBar(),
-              if (kMobile && (_isRecording || _recordingPath != null))
-                ValueListenableBuilder<int>(
-                  valueListenable: _recorderTick,
-                  builder: (_, __, ___) => _mobileRecorder(running),
-                )
-              else ...[
-                if (_isRecording || _recordingPath != null)
-                  ValueListenableBuilder<int>(
-                    valueListenable: _recorderTick,
-                    builder: (_, __, ___) => _recordingPanel(),
-                  ),
-                Container(
-                  key: _composerCardKey,
-                  decoration: BoxDecoration(
-                    color: AppColors.raised,
-                    borderRadius: BorderRadius.circular(18),
-                    border: _draggingFiles
-                        ? Border.all(color: AppColors.accent, width: 1.5)
-                        : Border.all(color: AppColors.border),
-                  ),
-                  // The card owns the inset and the rows sit inside it, so there is
-                  // no per-row vertical padding to keep in sync. Slightly taller
-                  // than it is wide-padded, so the field reads as a writing area.
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                  child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_state?.goal?.ongoing == true) ...[
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface2,
-                              borderRadius: BorderRadius.circular(R.sm),
-                            ),
-                            child: Row(children: [
-                              AppIcon('goal',
-                                  size: 14, color: AppColors.accent),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(_state!.goal!.text,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: sans(12, color: AppColors.fg2)),
+              Swap(
+                stateKey: kMobile && (_isRecording || _recordingPath != null)
+                    ? 'recorder'
+                    : 'composer',
+                alignment: Alignment.bottomCenter,
+                child: kMobile && (_isRecording || _recordingPath != null)
+                    ? ValueListenableBuilder<int>(
+                        valueListenable: _recorderTick,
+                        builder: (_, __, ___) => _mobileRecorder(running),
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                            if (_isRecording || _recordingPath != null)
+                              ValueListenableBuilder<int>(
+                                valueListenable: _recorderTick,
+                                builder: (_, __, ___) => _recordingPanel(),
                               ),
-                              Text(_state!.goal!.paused ? 'paused' : 'active',
-                                  style: mono(10, color: AppColors.accent)),
-                              const SizedBox(width: 5),
-                              IconBtn('x',
-                                  size: 26,
-                                  iconSize: 13,
-                                  tooltip: 'Cancel goal',
-                                  onTap: _cancelGoal),
-                            ]),
-                          ),
-                        ],
-                        CallbackShortcuts(
-                          bindings: {
-                            const SingleActivator(LogicalKeyboardKey.enter):
-                                () {
-                              if (!kMobile && _canSend) _sendMessage();
-                            },
-                            const SingleActivator(LogicalKeyboardKey.enter,
-                                meta: true): () {
-                              if (_canSend) _sendMessage();
-                            },
-                            const SingleActivator(LogicalKeyboardKey.enter,
-                                control: true): () {
-                              if (_canSend) _sendMessage();
-                            },
-                          },
-                          child: TextField(
-                            controller: _input,
-                            focusNode: _inputFocus,
-                            // Two lines minimum: a single-line field read as a
-                            // cramped search box, and it hid the fact that the
-                            // composer accepts multi-line prose.
-                            minLines: kMobile ? 1 : 2,
-                            maxLines: 8,
-                            cursorColor: AppColors.accent,
-                            onSubmitted: (_) => _sendMessage(),
-                            style: TS.body(AppColors.fg1),
-                            decoration: InputDecoration(
-                              isCollapsed: true,
-                              // The card supplies the inset; this only adds the gap
-                              // between the text and the control row beneath it.
-                              contentPadding:
-                                  const EdgeInsets.fromLTRB(2, 2, 8, 10),
-                              border: InputBorder.none,
-                              hintText:
-                                  kMobile ? 'Reply to Snippet' : 'Ask anything',
-                              hintStyle: TS.body(AppColors.fg4),
-                            ),
-                          ),
-                        ),
-                        Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Material(
-                                color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(R.sm),
-                                child: InkWell(
-                                  onTap: _onAttachTap,
-                                  borderRadius: BorderRadius.circular(R.sm),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(6),
-                                    child: AppIcon('plus',
-                                        size: 18, color: AppColors.fg3),
-                                  ),
-                                ),
+                            Container(
+                              key: _composerCardKey,
+                              decoration: BoxDecoration(
+                                color: AppColors.raised,
+                                borderRadius: BorderRadius.circular(18),
+                                border: _draggingFiles
+                                    ? Border.all(
+                                        color: AppColors.accent, width: 1.5)
+                                    : Border.all(color: AppColors.border),
                               ),
-                              const SizedBox(width: 4),
-                              // The chip group SCROLLS and the mic/send controls are
-                              // pinned outside it. Three chips plus two buttons
-                              // overflowed a narrow phone, which pushed Send off the
-                              // card; a scrolling group plus fixed trailing controls
-                              // cannot.
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        // Sending to an agent remains a composer action: it
-                                        // changes the destination of this message without
-                                        // adding another control to the session list.
-                                        if (!_isMissionControl) ...[
-                                          Builder(
-                                            builder: (ctx) =>
-                                                _recipientAgentId == null
-                                                    ? _composerChip(
-                                                        icon: 'agent',
-                                                        label: 'Send to',
-                                                        onTap: () =>
-                                                            _pickRecipient(ctx),
-                                                      )
-                                                    : _composerChip(
-                                                        icon: 'agent',
-                                                        label: _recipientAgentName ??
-                                                            _recipientAgentId!,
-                                                        selected: true,
-                                                        onTap: () =>
-                                                            _pickRecipient(ctx),
-                                                        onClear:
-                                                            _clearRecipient,
+                              // The card owns the inset and the rows sit inside it, so there is
+                              // no per-row vertical padding to keep in sync. Slightly taller
+                              // than it is wide-padded, so the field reads as a writing area.
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 14),
+                              child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (_state?.goal?.ongoing == true) ...[
+                                      Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 10),
+                                        padding: const EdgeInsets.fromLTRB(
+                                            10, 8, 8, 8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surface2,
+                                          borderRadius:
+                                              BorderRadius.circular(R.sm),
+                                        ),
+                                        child: Row(children: [
+                                          AppIcon('goal',
+                                              size: 14,
+                                              color: AppColors.accent),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(_state!.goal!.text,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: sans(12,
+                                                    color: AppColors.fg2)),
+                                          ),
+                                          Text(
+                                              _state!.goal!.paused
+                                                  ? 'paused'
+                                                  : 'active',
+                                              style: mono(10,
+                                                  color: AppColors.accent)),
+                                          const SizedBox(width: 5),
+                                          IconBtn('x',
+                                              size: 26,
+                                              iconSize: 13,
+                                              tooltip: 'Cancel goal',
+                                              onTap: _cancelGoal),
+                                        ]),
+                                      ),
+                                    ],
+                                    CallbackShortcuts(
+                                      bindings: {
+                                        const SingleActivator(
+                                            LogicalKeyboardKey.enter): () {
+                                          if (!kMobile && _canSend)
+                                            _sendMessage();
+                                        },
+                                        const SingleActivator(
+                                            LogicalKeyboardKey.enter,
+                                            meta: true): () {
+                                          if (_canSend) _sendMessage();
+                                        },
+                                        const SingleActivator(
+                                            LogicalKeyboardKey.enter,
+                                            control: true): () {
+                                          if (_canSend) _sendMessage();
+                                        },
+                                      },
+                                      child: TextField(
+                                        controller: _input,
+                                        focusNode: _inputFocus,
+                                        // Two lines minimum: a single-line field read as a
+                                        // cramped search box, and it hid the fact that the
+                                        // composer accepts multi-line prose.
+                                        minLines: kMobile ? 1 : 2,
+                                        maxLines: 8,
+                                        cursorColor: AppColors.accent,
+                                        onSubmitted: (_) => _sendMessage(),
+                                        style: TS.body(AppColors.fg1),
+                                        decoration: InputDecoration(
+                                          isCollapsed: true,
+                                          // The card supplies the inset; this only adds the gap
+                                          // between the text and the control row beneath it.
+                                          contentPadding:
+                                              const EdgeInsets.fromLTRB(
+                                                  2, 2, 8, 10),
+                                          border: InputBorder.none,
+                                          hintText: kMobile
+                                              ? 'Reply to Snippet'
+                                              : 'Ask anything',
+                                          hintStyle: TS.body(AppColors.fg4),
+                                        ),
+                                      ),
+                                    ),
+                                    Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Material(
+                                            color: Colors.transparent,
+                                            borderRadius:
+                                                BorderRadius.circular(R.sm),
+                                            child: InkWell(
+                                              onTap: _onAttachTap,
+                                              borderRadius:
+                                                  BorderRadius.circular(R.sm),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(6),
+                                                child: AppIcon('plus',
+                                                    size: 18,
+                                                    color: AppColors.fg3),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          // The chip group SCROLLS and the mic/send controls are
+                                          // pinned outside it. Three chips plus two buttons
+                                          // overflowed a narrow phone, which pushed Send off the
+                                          // card; a scrolling group plus fixed trailing controls
+                                          // cannot.
+                                          Expanded(
+                                            child: SingleChildScrollView(
+                                              scrollDirection: Axis.horizontal,
+                                              child: Row(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    // Sending to an agent remains a composer action: it
+                                                    // changes the destination of this message without
+                                                    // adding another control to the session list.
+                                                    if (!_isMissionControl) ...[
+                                                      Builder(
+                                                        builder: (ctx) =>
+                                                            _recipientAgentId ==
+                                                                    null
+                                                                ? _composerChip(
+                                                                    icon:
+                                                                        'agent',
+                                                                    label:
+                                                                        'Send to',
+                                                                    onTap: () =>
+                                                                        _pickRecipient(
+                                                                            ctx),
+                                                                  )
+                                                                : _composerChip(
+                                                                    icon:
+                                                                        'agent',
+                                                                    label: _recipientAgentName ??
+                                                                        _recipientAgentId!,
+                                                                    selected:
+                                                                        true,
+                                                                    onTap: () =>
+                                                                        _pickRecipient(
+                                                                            ctx),
+                                                                    onClear:
+                                                                        _clearRecipient,
+                                                                  ),
                                                       ),
+                                                      const SizedBox(width: 6),
+                                                    ],
+                                                    // Approval mode lives here instead of the tool
+                                                    // band, so the setting sits next to what it
+                                                    // governs.
+                                                    Builder(
+                                                      builder: (ctx) =>
+                                                          _composerChip(
+                                                        icon: 'shield',
+                                                        label: _approvalLabel,
+                                                        onTap: () =>
+                                                            _switchApproval(
+                                                                ctx),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Builder(builder: (chipCtx) {
+                                                      return _composerChip(
+                                                        icon: 'sparkles',
+                                                        label: _modelLabel ??
+                                                            'Auto',
+                                                        onTap: () =>
+                                                            _switchModel(
+                                                                chipCtx),
+                                                      );
+                                                    }),
+                                                  ]),
+                                            ),
                                           ),
                                           const SizedBox(width: 6),
-                                        ],
-                                        // Approval mode lives here instead of the tool
-                                        // band, so the setting sits next to what it
-                                        // governs.
-                                        Builder(
-                                          builder: (ctx) => _composerChip(
-                                            icon: 'shield',
-                                            label: _approvalLabel,
-                                            onTap: () => _switchApproval(ctx),
+                                          if (kCanRecord) ...[
+                                            Material(
+                                              color: Colors.transparent,
+                                              borderRadius:
+                                                  BorderRadius.circular(R.sm),
+                                              child: InkWell(
+                                                onTap: _onMicTap,
+                                                borderRadius:
+                                                    BorderRadius.circular(R.sm),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.all(6),
+                                                  child: AppIcon(
+                                                      _isRecording
+                                                          ? 'mic-off'
+                                                          : 'mic',
+                                                      size: 18,
+                                                      color: _isRecording
+                                                          ? AppColors.danger
+                                                          : AppColors.fg3),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                          ],
+                                          ValueListenableBuilder<
+                                              TextEditingValue>(
+                                            valueListenable: _input,
+                                            builder: (_, __, ___) {
+                                              final queue = running && _canSend;
+                                              final stop = running && !queue;
+                                              return _SendBtn(
+                                                  enabled: stop || _canSend,
+                                                  running: stop,
+                                                  onTap: stop
+                                                      ? () => _send(
+                                                          {'kind': 'interrupt'})
+                                                      : (_canSend
+                                                          ? _sendMessage
+                                                          : null));
+                                            },
                                           ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Builder(builder: (chipCtx) {
-                                          return _composerChip(
-                                            icon: 'sparkles',
-                                            label: _modelLabel ?? 'Auto',
-                                            onTap: () => _switchModel(chipCtx),
-                                          );
-                                        }),
-                                      ]),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              if (kCanRecord) ...[
-                                Material(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(R.sm),
-                                  child: InkWell(
-                                    onTap: _onMicTap,
-                                    borderRadius: BorderRadius.circular(R.sm),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(6),
-                                      child: AppIcon(
-                                          _isRecording ? 'mic-off' : 'mic',
-                                          size: 18,
-                                          color: _isRecording
-                                              ? AppColors.danger
-                                              : AppColors.fg3),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                              ],
-                              ValueListenableBuilder<TextEditingValue>(
-                                valueListenable: _input,
-                                builder: (_, __, ___) {
-                                  final queue = running && _canSend;
-                                  final stop = running && !queue;
-                                  return _SendBtn(
-                                      enabled: stop || _canSend,
-                                      running: stop,
-                                      onTap: stop
-                                          ? () => _send({'kind': 'interrupt'})
-                                          : (_canSend ? _sendMessage : null));
-                                },
-                              ),
-                            ]),
-                      ]),
-                ),
-              ],
+                                        ]),
+                                  ]),
+                            ),
+                          ]),
+              ),
               _composerMeta(_state),
             ]),
       ),

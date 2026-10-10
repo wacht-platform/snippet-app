@@ -20,6 +20,7 @@ import '../desktop_pick.dart';
 import '../drafts.dart';
 import '../models.dart';
 import '../platform.dart';
+import '../motion.dart';
 import '../theme.dart';
 import '../tool_activity.dart';
 import '../tool_sheet.dart';
@@ -215,6 +216,9 @@ String? _inboxAgentId(String sessionId) {
 
 class _SessionScreenState extends State<SessionScreen>
     with WidgetsBindingObserver {
+  final Set<Key> _shownRows = {};
+  bool _rowsSeeded = false;
+
   void _setState(VoidCallback fn) {
     if (mounted) setState(fn);
   }
@@ -1180,6 +1184,18 @@ class _SessionScreenState extends State<SessionScreen>
                                                 _latestCompactionDetail(events),
                                           ),
                                         ];
+                                        Key rowKey(int i) =>
+                                            timeline[i].key ??
+                                            ValueKey('timeline-$i');
+                                        if (!_rowsSeeded &&
+                                            timeline.length > 1) {
+                                          _rowsSeeded = true;
+                                          for (var i = 0;
+                                              i < timeline.length;
+                                              i++) {
+                                            _shownRows.add(rowKey(i));
+                                          }
+                                        }
                                         return ScrollConfiguration(
                                           behavior:
                                               ScrollConfiguration.of(context)
@@ -1196,19 +1212,25 @@ class _SessionScreenState extends State<SessionScreen>
                                                 24),
                                             itemCount: timeline.length,
                                             itemBuilder: (context, index) {
-                                              final child = timeline[
-                                                  timeline.length - 1 - index];
+                                              final at =
+                                                  timeline.length - 1 - index;
+                                              final child = timeline[at];
+                                              final key = rowKey(at);
+                                              final fresh = _rowsSeeded &&
+                                                  _shownRows.add(key);
                                               return KeyedSubtree(
-                                                key: child.key ??
-                                                    ValueKey('timeline-$index'),
+                                                key: key,
                                                 child: _centerWide(
                                                   Align(
                                                     alignment:
                                                         Alignment.centerLeft,
                                                     child: SizedBox(
                                                       width: double.infinity,
-                                                      child: RepaintBoundary(
-                                                          child: child),
+                                                      child: Appear(
+                                                        enabled: fresh,
+                                                        child: RepaintBoundary(
+                                                            child: child),
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
