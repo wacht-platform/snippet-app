@@ -8,6 +8,7 @@ import 'platform.dart';
 import 'screens/adaptive_home.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import 'response_cache.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -46,6 +47,7 @@ void main() async {
     await ThemeManager.instance.init();
   } catch (_) {}
   await Drafts.instance.init();
+  await ResponseCache.instance.init();
   if (kCanNotify) {
     try {
       await initNotifications();

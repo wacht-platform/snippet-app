@@ -784,6 +784,19 @@ class MissionControlState extends ChangeNotifier with WidgetsBindingObserver {
       revalidateOn: (e) => Swr.coordination(e) || Swr.sessionStatus(e),
       onChange: _applySnapshot,
     );
+    if (_snapshot!.data == null) {
+      final overview = client.cachedMcOverview();
+      final cachedTasks = client.cachedMcTasks();
+      final cachedSessions = client.cachedMcSessions();
+      if (overview != null && cachedTasks != null && cachedSessions != null) {
+        _snapshot!.mutate((
+          overview: overview,
+          tasks: cachedTasks,
+          sessions: cachedSessions,
+        ));
+        unawaited(_snapshot!.refresh());
+      }
+    }
     _applySnapshot();
   }
 

@@ -531,6 +531,8 @@ class SidebarState extends State<Sidebar> {
       padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
       child: Row(children: [
         Text('Agents', style: TS.pageTitle()),
+        const Spacer(),
+        ..._headerTrailing(hasClient),
       ]),
     );
   }

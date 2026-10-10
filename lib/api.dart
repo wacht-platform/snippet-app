@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/io.dart' as ws_io;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'response_cache.dart';
 import 'swr.dart';
 import 'models.dart';
 
@@ -694,6 +695,7 @@ class DaemonClient {
   Future<Map<String, dynamic>> mcAutonomy() async {
     final r = await http.get(_uri('/mission-control/autonomy'));
     if (r.statusCode != 200) throw _err('get Mission Control autonomy', r);
+    _remember('mc-autonomy', r.body);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
@@ -724,9 +726,47 @@ class DaemonClient {
   Future<MissionControlOverview> mcOverview() async {
     final r = await http.get(_uri('/mission-control/overview'));
     if (r.statusCode != 200) throw _err('mission control overview', r);
+    _remember('mc-overview', r.body);
     return MissionControlOverview.fromJson(
         jsonDecode(r.body) as Map<String, dynamic>);
   }
+
+  void _remember(String name, String body) =>
+      ResponseCache.instance.put('$baseUrl|$name', body);
+
+  T? _recall<T>(String name, T Function(dynamic json) parse) {
+    final body = ResponseCache.instance.get('$baseUrl|$name');
+    if (body == null) return null;
+    try {
+      return parse(jsonDecode(body));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  MissionControlOverview? cachedMcOverview() => _recall('mc-overview',
+      (j) => MissionControlOverview.fromJson(j as Map<String, dynamic>));
+
+  List<MissionControlTask>? cachedMcTasks() => _recall(
+      'mc-tasks',
+      (j) => (j as List)
+          .map((e) => MissionControlTask.fromJson(e as Map<String, dynamic>))
+          .toList());
+
+  List<ManagedSession>? cachedMcSessions() => _recall(
+      'mc-sessions',
+      (j) => (j as List)
+          .map((e) => ManagedSession.fromJson(e as Map<String, dynamic>))
+          .toList());
+
+  Map<String, dynamic>? cachedMcAutonomy() =>
+      _recall('mc-autonomy', (j) => j as Map<String, dynamic>);
+
+  List<CoordinationAgent>? cachedCoordinationAgents() => _recall(
+      'agents',
+      (j) => (j as List)
+          .map((e) => CoordinationAgent.fromJson(e as Map<String, dynamic>))
+          .toList());
 
   /// GET /mission-control/tasks — list all tasks (optionally filtered).
   Future<List<MissionControlTask>> mcTasks({bool? archived}) async {
@@ -734,6 +774,7 @@ class DaemonClient {
     if (archived != null) q['archived'] = '$archived';
     final r = await http.get(_uri('/mission-control/tasks', q));
     if (r.statusCode != 200) throw _err('list mission control tasks', r);
+    if (archived == false) _remember('mc-tasks', r.body);
     final list = jsonDecode(r.body) as List;
     return list
         .map((e) => MissionControlTask.fromJson(e as Map<String, dynamic>))
@@ -806,6 +847,7 @@ class DaemonClient {
     final r =
         await http.get(_uri('/mission-control/sessions', q.isEmpty ? null : q));
     if (r.statusCode != 200) throw _err('list mission control sessions', r);
+    if (archived == false) _remember('mc-sessions', r.body);
     final list = jsonDecode(r.body) as List;
     return list
         .map((e) => ManagedSession.fromJson(e as Map<String, dynamic>))
@@ -861,6 +903,7 @@ class DaemonClient {
   Future<List<CoordinationAgent>> coordinationAgents() async {
     final r = await http.get(_uri('/agents'));
     if (r.statusCode != 200) throw _err('list coordination agents', r);
+    _remember('agents', r.body);
     final list = jsonDecode(r.body) as List;
     return list
         .map((e) => CoordinationAgent.fromJson(e as Map<String, dynamic>))

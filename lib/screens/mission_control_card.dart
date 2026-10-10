@@ -35,6 +35,8 @@ class _MissionControlCardState extends State<MissionControlCard> {
   @override
   void initState() {
     super.initState();
+    _autonomy = widget.client.cachedMcAutonomy();
+    _tasks = widget.client.cachedMcTasks() ?? const [];
     _load();
     _poll = Timer.periodic(const Duration(seconds: 30), (_) => _load());
   }

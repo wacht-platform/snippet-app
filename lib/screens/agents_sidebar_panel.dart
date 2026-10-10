@@ -154,6 +154,10 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
   @override
   void initState() {
     super.initState();
+    final cached = widget.client.cachedCoordinationAgents();
+    if (cached != null) {
+      agents = cached.where((a) => !a.isMissionControl).toList();
+    }
     refresh();
   }
 
