@@ -136,6 +136,52 @@ class _FileViewerState extends State<FileViewer> {
   }
 
   bool get _isImage => _imageExts.contains(_ext);
+  bool get _isMarkdown => const {'md', 'markdown', 'mdx'}.contains(_ext);
+  bool _source = false;
+
+  Widget _modeTab(String label, bool on, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: Motion.quick,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: on ? AppColors.surface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(label,
+              style: sans(12.5, color: on ? AppColors.fg1 : AppColors.fg3)),
+        ),
+      );
+
+  Widget _markdownView(String content) => SelectionArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+              kMobile ? M.gutter : 28, 20, kMobile ? M.gutter : 28, 48),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: MarkdownBody(
+                data: content,
+                selectable: false,
+                styleSheet: agentMarkdownStyle(context).copyWith(
+                  h1: sans(26,
+                      height: 32 / 26, spacing: -0.5, color: AppColors.fg1),
+                  h1Padding: const EdgeInsets.only(top: 4, bottom: 6),
+                  h2: sans(20,
+                      height: 26 / 20, spacing: -0.3, color: AppColors.fg1),
+                  h2Padding: const EdgeInsets.only(top: 18, bottom: 4),
+                  h3: sans(17, height: 23 / 17, color: AppColors.fg1),
+                  h3Padding: const EdgeInsets.only(top: 14, bottom: 2),
+                  h4: sans(15, height: 20 / 15, color: AppColors.fg2),
+                ),
+                builders: {'pre': PreBlockBuilder()},
+                onTapLink: (_, href, __) => openMarkdownLink(href),
+              ),
+            ),
+          ),
+        ),
+      );
   bool get _isVideo => _videoExts.contains(_ext);
   bool get _isAudio => _audioExts.contains(_ext);
   bool get _isMedia => _isImage || _isVideo || _isAudio;
@@ -232,34 +278,34 @@ class _FileViewerState extends State<FileViewer> {
           if (_isImage)
             Expanded(
               child: InteractiveViewer(
-                  minScale: 1,
-                  maxScale: 6,
-                  child: Center(
-                   child: Padding(
+                minScale: 1,
+                maxScale: 6,
+                child: Center(
+                  child: Padding(
                     padding: const EdgeInsets.all(S.s16),
                     child: ClipRRect(
-                     borderRadius: BorderRadius.circular(R.md),
-                     child: Image.network(
-                      widget.client.fileUrl(widget.path),
-                      cacheWidth: (MediaQuery.sizeOf(context).width *
-                              MediaQuery.devicePixelRatioOf(context))
-                          .round()
-                          .clamp(720, 2048),
-                      cacheHeight: (MediaQuery.sizeOf(context).height *
-                              MediaQuery.devicePixelRatioOf(context))
-                          .round()
-                          .clamp(720, 2048),
-                      filterQuality: FilterQuality.low,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (ctx, child, prog) => prog == null
-                          ? child
-                          : Center(child: DelayedSpinner(size: 22)),
-                      errorBuilder: (ctx, e, st) => EmptyState(
-                          icon: 'alert-triangle',
-                          title: "Can't load image",
-                          body: '$e'),
+                      borderRadius: BorderRadius.circular(R.md),
+                      child: Image.network(
+                        widget.client.fileUrl(widget.path),
+                        cacheWidth: (MediaQuery.sizeOf(context).width *
+                                MediaQuery.devicePixelRatioOf(context))
+                            .round()
+                            .clamp(720, 2048),
+                        cacheHeight: (MediaQuery.sizeOf(context).height *
+                                MediaQuery.devicePixelRatioOf(context))
+                            .round()
+                            .clamp(720, 2048),
+                        filterQuality: FilterQuality.low,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (ctx, child, prog) => prog == null
+                            ? child
+                            : Center(child: DelayedSpinner(size: 22)),
+                        errorBuilder: (ctx, e, st) => EmptyState(
+                            icon: 'alert-triangle',
+                            title: "Can't load image",
+                            body: '$e'),
+                      ),
                     ),
-                   ),
                   ),
                 ),
               ),
@@ -285,8 +331,7 @@ class _FileViewerState extends State<FileViewer> {
               ),
             )
           else if (_loading)
-            Expanded(
-                child: Center(child: DelayedSpinner(size: 22)))
+            Expanded(child: Center(child: DelayedSpinner(size: 22)))
           else if (_error != null)
             Expanded(
                 child: EmptyState(
@@ -312,32 +357,46 @@ class _FileViewerState extends State<FileViewer> {
           else ...[
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                  horizontal: 16, vertical: _isMarkdown ? 6 : 8),
               decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: AppColors.border))),
-              child: Text(
-                  '${f.content.split('\n').length} lines · ${formatBytes(f.size)}${f.truncated ? ' · truncated' : ''}',
-                  style: mono(10, color: AppColors.fg3)),
+              child: Row(children: [
+                if (_isMarkdown) ...[
+                  _modeTab('Preview', !_source,
+                      () => setState(() => _source = false)),
+                  const SizedBox(width: 4),
+                  _modeTab(
+                      'Source', _source, () => setState(() => _source = true)),
+                  const Spacer(),
+                ],
+                Text(
+                    '${f.content.split('\n').length} lines · ${formatBytes(f.size)}${f.truncated ? ' · truncated' : ''}',
+                    style: mono(10, color: AppColors.fg3)),
+              ]),
             ),
-            Expanded(
-              child: CodeEditor(
-                controller: _controller,
-                readOnly: true,
-                wordWrap: false,
-                style: codeEditorStyle(widget.name),
-                indicatorBuilder:
-                    (context, editingController, chunkController, notifier) {
-                  return Row(children: [
-                    DefaultCodeLineNumber(
-                        controller: editingController, notifier: notifier),
-                    DefaultCodeChunkIndicator(
-                        width: 20,
-                        controller: chunkController,
-                        notifier: notifier),
-                  ]);
-                },
+            if (_isMarkdown && !_source)
+              Expanded(child: _markdownView(f.content))
+            else
+              Expanded(
+                child: CodeEditor(
+                  controller: _controller,
+                  readOnly: true,
+                  wordWrap: false,
+                  style: codeEditorStyle(widget.name),
+                  indicatorBuilder:
+                      (context, editingController, chunkController, notifier) {
+                    return Row(children: [
+                      DefaultCodeLineNumber(
+                          controller: editingController, notifier: notifier),
+                      DefaultCodeChunkIndicator(
+                          width: 20,
+                          controller: chunkController,
+                          notifier: notifier),
+                    ]);
+                  },
+                ),
               ),
-            ),
           ],
         ]),
       ),
@@ -553,7 +612,8 @@ class _AudioViewState extends State<_AudioView> {
               maxLines: 2,
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
-              style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
+              style: sans(kMobile ? 14 : 13,
+                  weight: W.label, color: AppColors.fg1)),
           const SizedBox(height: 18),
           // Scrubber. Seek is only offered once a duration is known, so an
           // unseekable source cannot produce a dead control.
@@ -585,10 +645,8 @@ class _AudioViewState extends State<_AudioView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(_clock(_position),
-                    style: mono(10, color: AppColors.fg3)),
-                Text(_clock(_duration),
-                    style: mono(10, color: AppColors.fg3)),
+                Text(_clock(_position), style: mono(10, color: AppColors.fg3)),
+                Text(_clock(_duration), style: mono(10, color: AppColors.fg3)),
               ],
             ),
           ),
