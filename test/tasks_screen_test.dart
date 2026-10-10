@@ -86,7 +86,7 @@ void main() {
     await tester.pumpWidget(sidebar(MobileHome.tasks));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Mission Control'), findsNothing);
-    expect(find.byTooltip('Filter'), findsOneWidget);
+    expect(find.text('All 0'), findsNothing);
     expect(find.byTooltip('Add machine'), findsOneWidget);
 
     await tester.pumpWidget(sidebar(MobileHome.chats));

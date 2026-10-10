@@ -64,12 +64,14 @@ class TaskList extends StatelessWidget {
   List<Widget> _group(TaskStatus status, Iterable<TaskItem> items) {
     if (items.isEmpty) return const [];
     if (kMobile) {
+      final list = items.toList();
       return [
-        TaskStatusHeader(status: status, count: items.length),
-        ListGroup(children: [
-          for (final task in items)
-            TaskRow(task: task, onTap: () => onOpen(task)),
-        ]),
+        TaskStatusHeader(status: status, count: list.length),
+        for (var i = 0; i < list.length; i++)
+          TaskRow(
+              task: list[i],
+              onTap: () => onOpen(list[i]),
+              divider: i < list.length - 1),
       ];
     }
     return [
@@ -114,7 +116,7 @@ class TaskStatusHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: kMobile
-            ? const EdgeInsets.fromLTRB(4, 20, 4, 8)
+            ? const EdgeInsets.fromLTRB(0, 22, 0, 2)
             : const EdgeInsets.fromLTRB(12, 14, 12, 6),
         child: Row(children: [
           Container(
@@ -138,9 +140,16 @@ class TaskStatusHeader extends StatelessWidget {
 /// One task. Desktop gets a single dense line; a phone adds the first line of
 /// the description, so a row says what the work is without opening it.
 class TaskRow extends StatelessWidget {
-  const TaskRow({super.key, required this.task, required this.onTap});
+  const TaskRow(
+      {super.key,
+      required this.task,
+      required this.onTap,
+      this.divider = false});
   final TaskItem task;
   final VoidCallback onTap;
+
+  /// A hairline under the row, between rows of one status on a phone.
+  final bool divider;
 
   @override
   Widget build(BuildContext context) {
@@ -149,8 +158,13 @@ class TaskRow extends StatelessWidget {
     if (kMobile) {
       return InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            border: divider
+                ? Border(bottom: BorderSide(color: AppColors.border))
+                : null,
+          ),
           child: Row(children: [
             if (task.priority > 0) ...[
               PriorityMark(task.priority),

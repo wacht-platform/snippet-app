@@ -65,19 +65,22 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   List<InferenceProfile> _withSaving(List<InferenceProfile> all) {
     final profiles = _deletingProfiles.isEmpty
         ? all
-        : [for (final p in all) if (!_deletingProfiles.contains(p.name)) p];
+        : [
+            for (final p in all)
+              if (!_deletingProfiles.contains(p.name)) p
+          ];
     if (_saving.isEmpty) return profiles;
     final activating = _saving.values.any((p) => p.active);
     final out = [
       for (final p in profiles)
-        _saving[p.name] ??
-            (activating && p.active ? p.withActive(false) : p),
+        _saving[p.name] ?? (activating && p.active ? p.withActive(false) : p),
     ];
     for (final d in _saving.values) {
       if (!out.any((p) => p.name == d.name)) out.add(d);
     }
     return out;
   }
+
   bool get inEditor => _inEditor;
 
   @override
@@ -223,8 +226,10 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
               title: 'No inference profiles',
               body:
                   'Add an API key or a local model provider to start sessions.',
-              action: Btn('Add profile',
-                  icon: 'plus', small: true, onTap: () => _edit(null)),
+              action: kMobile
+                  ? null
+                  : Btn('Add profile',
+                      icon: 'plus', small: true, onTap: () => _edit(null)),
             )
           else ...[
             ListGroup(children: [

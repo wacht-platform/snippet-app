@@ -221,7 +221,8 @@ class RecurringScreenState extends State<RecurringScreen>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text('Schedule a goal or message',
-                        style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)),
+                        style: sans(kMobile ? 14 : 13,
+                            weight: W.label, color: AppColors.fg1)),
                     const SizedBox(height: 10),
                     Text(
                       'The first run fires immediately, then repeats per the schedule. Minimum interval is 5 minutes. A plan file is reread each fire.',
@@ -704,7 +705,7 @@ class RecurringScreenState extends State<RecurringScreen>
               title: 'No scheduled jobs',
               body:
                   'Run a prompt on a schedule, like a morning triage or a nightly audit.',
-              action: _canAdd
+              action: _canAdd && !kMobile
                   ? HeaderAction('New job', onTap: _add)
                   : null,
             )
@@ -734,8 +735,7 @@ class RecurringScreenState extends State<RecurringScreen>
                 compact: true,
                 onBack: widget.onClose ?? () => Navigator.pop(context),
                 actions: [
-                  if (_canAdd && !_adding)
-                    HeaderAction('New job', onTap: _add),
+                  if (_canAdd && !_adding) HeaderAction('New job', onTap: _add),
                 ]),
             Expanded(child: body),
           ]),
@@ -750,8 +750,7 @@ class RecurringScreenState extends State<RecurringScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         NavBackRow(title: 'Scheduled jobs', onBack: widget.onBack!, trailing: [
-          if (_canAdd && !_adding)
-            HeaderAction('New job', onTap: _add),
+          if (_canAdd && !_adding) HeaderAction('New job', onTap: _add),
         ]),
         Expanded(child: body),
       ],

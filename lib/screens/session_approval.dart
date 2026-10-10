@@ -1508,12 +1508,6 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                   ? '$runningLanes working in the background'
                   : 'Background work, finished',
               onTap: widget.onLanes),
-        if (widget.onGiveWork != null)
-          _row(
-              icon: 'send',
-              label: 'Message an agent',
-              detail: 'Ask a colleague from this chat',
-              onTap: widget.onGiveWork),
         _row(
             icon: 'scheduled',
             label: 'Scheduled',
@@ -1583,12 +1577,6 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Lanes',
             detail: 'Background work running in parallel',
             onTap: widget.onLanes),
-      if (widget.onGiveWork != null)
-        _row(
-            icon: 'send',
-            label: 'Message an agent',
-            detail: 'Send a message to an agent from this session',
-            onTap: widget.onGiveWork),
       _row(
           icon: 'scheduled',
           label: 'Scheduled',

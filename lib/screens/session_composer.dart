@@ -787,27 +787,29 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                       // Sending to an agent remains a composer action: it
                                       // changes the destination of this message without
                                       // adding another control to the session list.
-                                      Builder(
-                                        builder: (ctx) =>
-                                            _recipientAgentId == null
-                                                ? _composerChip(
-                                                    icon: 'agent',
-                                                    label: 'Send to',
-                                                    onTap: () =>
-                                                        _pickRecipient(ctx),
-                                                  )
-                                                : _composerChip(
-                                                    icon: 'agent',
-                                                    label:
-                                                        _recipientAgentName ??
-                                                            _recipientAgentId!,
-                                                    selected: true,
-                                                    onTap: () =>
-                                                        _pickRecipient(ctx),
-                                                    onClear: _clearRecipient,
-                                                  ),
-                                      ),
-                                      const SizedBox(width: 6),
+                                      if (!_isMissionControl) ...[
+                                        Builder(
+                                          builder: (ctx) =>
+                                              _recipientAgentId == null
+                                                  ? _composerChip(
+                                                      icon: 'agent',
+                                                      label: 'Send to',
+                                                      onTap: () =>
+                                                          _pickRecipient(ctx),
+                                                    )
+                                                  : _composerChip(
+                                                      icon: 'agent',
+                                                      label:
+                                                          _recipientAgentName ??
+                                                              _recipientAgentId!,
+                                                      selected: true,
+                                                      onTap: () =>
+                                                          _pickRecipient(ctx),
+                                                      onClear: _clearRecipient,
+                                                    ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                      ],
                                       // Approval mode lives here instead of the tool
                                       // band, so the setting sits next to what it
                                       // governs.

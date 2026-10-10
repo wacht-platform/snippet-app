@@ -74,6 +74,28 @@ class TasksPanelState extends State<TasksPanel> {
     if (picked != null && mounted) setState(() => _filter = picked);
   }
 
+  /// One tap narrows the list to a status; All brings everything back.
+  Widget _statusStrip() {
+    final tasks = _feed.tasks;
+    final items = <(String, String)>[
+      ('all', 'All ${tasks.length}'),
+      for (final s in TaskStatus.values)
+        if (tasks.any((t) => t.status == s))
+          (s.wire, '${s.label} ${tasks.where((t) => t.status == s).length}'),
+    ];
+    final selected = _filter.length == 1 ? _filter.first.wire : 'all';
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Pills<String>(
+        items: items,
+        selected: selected,
+        onSelect: (v) => setState(() {
+          _filter = v == 'all' ? {} : {TaskStatus.parse(v)};
+        }),
+      ),
+    );
+  }
+
   void _toggleSearch() => setState(() {
         _searchOpen = !_searchOpen;
         if (!_searchOpen) {
@@ -104,6 +126,11 @@ class TasksPanelState extends State<TasksPanel> {
                 onChanged: (v) => setState(() => _query = v),
               ),
             ),
+          if (kMobile && _feed.tasks.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 4),
+              child: _statusStrip(),
+            ),
           Expanded(child: _body()),
         ],
       ),
@@ -115,12 +142,6 @@ class TasksPanelState extends State<TasksPanel> {
         child: Row(children: [
           Text('Tasks', style: TS.pageTitle()),
           const Spacer(),
-          IconBtn('sliders',
-              size: M.minTarget,
-              iconSize: 19,
-              active: _filter.isNotEmpty,
-              tooltip: _filterTooltip,
-              onTap: _pickFilter),
           ...widget.trailing,
         ]),
       );
