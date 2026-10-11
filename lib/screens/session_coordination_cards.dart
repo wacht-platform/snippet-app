@@ -195,9 +195,15 @@ class MissionEnvelopeCard extends StatelessWidget {
     return _ThreadCard(
       icon: icon,
       tone: tone,
-      kind: envelope.isReport ? 'Task report' : 'Task from Mission Control',
+      kind: envelope.isRecurring
+          ? 'Scheduled run'
+          : envelope.isReport
+              ? 'Task report'
+              : 'Task from Mission Control',
       reference: envelope.taskId.isEmpty ? null : _short(envelope.taskId),
-      title: envelope.title.isEmpty ? 'Task' : envelope.title,
+      title: envelope.title.isEmpty
+          ? (envelope.isRecurring ? 'Scheduled run' : 'Task')
+          : envelope.title,
       status: tag,
       body: envelope.summary,
     );

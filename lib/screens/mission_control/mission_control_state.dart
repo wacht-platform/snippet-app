@@ -192,8 +192,10 @@ class MissionEnvelope {
     required this.title,
     required this.status,
     required this.summary,
+    this.isRecurring = false,
   });
   final bool isReport;
+  final bool isRecurring;
   final String taskId;
   final String title;
   final String status;
@@ -216,7 +218,8 @@ class MissionEnvelope {
 
 MissionEnvelope? parseMissionEnvelope(String text) {
   final t = text.trim();
-  final isReport = t.contains('[mission_task_report]');
+  final isRecurring = t.startsWith('[recurring_run_report]');
+  final isReport = isRecurring || t.contains('[mission_task_report]');
   final isTask = t.contains('[mission_control_task]');
   if (!isReport && !isTask) return null;
   String field(String name) {
@@ -244,8 +247,9 @@ MissionEnvelope? parseMissionEnvelope(String text) {
 
   return MissionEnvelope(
     isReport: isReport,
+    isRecurring: isRecurring,
     taskId: field('task_id'),
-    title: field('title'),
+    title: isRecurring ? field('job') : field('title'),
     status: isReport ? field('status') : 'pending',
     summary: isReport ? field('summary') : scope(),
   );
@@ -613,6 +617,7 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
         final text = (e['text'] ?? '').toString().trim();
         if (text.isEmpty) break;
         final envelope = parseMissionEnvelope(text);
+        if (envelope != null && envelope.isRecurring) break;
         if (envelope != null) {
           out.add(TaskEventItem(
             id: 'h-t-$i',
