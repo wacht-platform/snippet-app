@@ -407,6 +407,21 @@ class _ScopeViewState extends State<_ScopeView> {
     );
   }
 
+  String _emptyBody() {
+    final key = widget.scopeKey;
+    if (key.startsWith('agent:')) {
+      final name = widget.scope?.label ?? key.substring('agent:'.length);
+      return 'Filled by sessions and tasks run as $name. Lessons from your other sessions go to global and project memory.';
+    }
+    if (key.startsWith('project:')) {
+      return 'Filled by sessions working in this project.';
+    }
+    if (key.startsWith('session:')) {
+      return 'Filled as this session saves its decisions and progress.';
+    }
+    return 'Entries appear here as agents save what they learn.';
+  }
+
   Widget _memory(double side) {
     final content = _content;
     if (content == null) {
@@ -424,11 +439,11 @@ class _ScopeViewState extends State<_ScopeView> {
         .split('\n')
         .any((l) => l.trim().startsWith('- ') || l.contains('[['));
     if (!hasEntries && _trail.length < 2) {
-      return const Center(
+      return Center(
         child: EmptyState(
           icon: 'brain',
           title: 'Nothing remembered yet',
-          body: 'Entries appear here as the agent saves what it learns.',
+          body: _emptyBody(),
         ),
       );
     }
