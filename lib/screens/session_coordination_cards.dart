@@ -181,7 +181,9 @@ class MissionEnvelopeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (tone, icon, tag) = switch (envelope.eventKind) {
+    final (tone, icon, tag) = envelope.isPlan
+        ? (Tone.accent, 'list', 'Plan')
+        : switch (envelope.eventKind) {
       'working' => (Tone.run, 'activity', 'Working'),
       'done' => (Tone.ok, 'check', 'Done'),
       'blocked' => (Tone.danger, 'alert-triangle', 'Blocked'),
@@ -197,7 +199,9 @@ class MissionEnvelopeCard extends StatelessWidget {
       tone: tone,
       kind: envelope.isRecurring
           ? 'Scheduled run'
-          : envelope.isReport
+          : envelope.isPlan
+              ? 'Worker plan'
+              : envelope.isReport
               ? 'Task report'
               : 'Task from Mission Control',
       reference: envelope.taskId.isEmpty ? null : _short(envelope.taskId),

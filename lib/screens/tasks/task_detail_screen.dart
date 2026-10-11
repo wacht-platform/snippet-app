@@ -368,6 +368,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               _Description(markdown: t.description),
               const SizedBox(height: S.s12),
             ],
+            if (t.workPlan.isNotEmpty) ...[
+              _WorkPlan(steps: t.workPlan),
+              const SizedBox(height: S.s12),
+            ],
             // Column picker. The current state is always shown, so the row
             // reads as the task's position; In progress is never offered, as
             // only a dispatch starts work.
@@ -623,6 +627,58 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ]),
         ),
       );
+}
+
+/// The worker's plan for the task, as it ticks steps off.
+class _WorkPlan extends StatelessWidget {
+  const _WorkPlan({required this.steps});
+  final List<WorkStep> steps;
+
+  @override
+  Widget build(BuildContext context) {
+    final done = steps.where((s) => s.done).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Plan · $done/${steps.length}',
+            style: sans(12.5, weight: FontWeight.w500, color: AppColors.fg3)),
+        const SizedBox(height: 8),
+        for (final s in steps)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: s.done
+                    ? AppIcon('check', size: 14, color: AppColors.ok)
+                    : Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: s.current ? AppColors.accent : null,
+                          border: Border.all(
+                              color: s.current ? AppColors.accent : AppColors.fg4,
+                              width: 1.5),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(s.step,
+                    style: sans(14,
+                        height: 19 / 14,
+                        color: s.done
+                            ? AppColors.fg4
+                            : s.current
+                                ? AppColors.fg1
+                                : AppColors.fg2)),
+              ),
+            ]),
+          ),
+      ],
+    );
+  }
 }
 
 class _Description extends StatefulWidget {
