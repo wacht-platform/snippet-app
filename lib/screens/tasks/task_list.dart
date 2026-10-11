@@ -168,6 +168,18 @@ class TaskStatusHeader extends StatelessWidget {
 
 /// One task. Desktop gets a single dense line; a phone adds the first line of
 /// the description, so a row says what the work is without opening it.
+/// "Plan 3/5 · now: <step>" for an open task whose worker has laid out a plan.
+String? workPlanLine(TaskItem task) {
+  if (task.workPlan.isEmpty ||
+      const {TaskStatus.done, TaskStatus.failed, TaskStatus.cancelled}
+          .contains(task.status)) {
+    return null;
+  }
+  final done = task.workPlan.where((s) => s.done).length;
+  final now = task.workPlan.where((s) => s.current).map((s) => s.step).firstOrNull;
+  return 'Plan $done/${task.workPlan.length}${now == null ? '' : ' · now: $now'}';
+}
+
 class TaskRow extends StatelessWidget {
   const TaskRow(
       {super.key,
@@ -182,7 +194,7 @@ class TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final detail = task.description.trim().split('\n').first;
+    final detail = workPlanLine(task) ?? task.description.trim().split('\n').first;
     final age = taskAge(task);
     if (kMobile) {
       return InkWell(

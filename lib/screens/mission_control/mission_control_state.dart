@@ -193,9 +193,11 @@ class MissionEnvelope {
     required this.status,
     required this.summary,
     this.isRecurring = false,
+    this.isPlan = false,
   });
   final bool isReport;
   final bool isRecurring;
+  final bool isPlan;
   final String taskId;
   final String title;
   final String status;
@@ -219,7 +221,8 @@ class MissionEnvelope {
 MissionEnvelope? parseMissionEnvelope(String text) {
   final t = text.trim();
   final isRecurring = t.startsWith('[recurring_run_report]');
-  final isReport = isRecurring || t.contains('[mission_task_report]');
+  final isPlan = t.startsWith('[task_plan]');
+  final isReport = isRecurring || isPlan || t.contains('[mission_task_report]');
   final isTask = t.contains('[mission_control_task]');
   if (!isReport && !isTask) return null;
   String field(String name) {
@@ -245,6 +248,34 @@ MissionEnvelope? parseMissionEnvelope(String text) {
     return rest.substring(0, cut).trim();
   }
 
+  if (isPlan) {
+    final start = t.indexOf('\nplan:\n');
+    final end = t.indexOf('[/task_plan]');
+    return MissionEnvelope(
+      isReport: true,
+      isPlan: true,
+      taskId: field('task_id'),
+      title: field('title'),
+      status: 'message',
+      summary: start >= 0 && end > start
+          ? t
+              .substring(start + '\nplan:\n'.length, end)
+              .trim()
+              .split('\n')
+              .where((l) => l.trim().isNotEmpty)
+              .map((l) {
+              final m = RegExp(r'^\[(\w+)\]\s*(.*)$').firstMatch(l.trim());
+              if (m == null) return '- ${l.trim()}';
+              final step = m.group(2) ?? '';
+              return switch (m.group(1)) {
+                'done' => '- ~~$step~~',
+                'in_progress' => '- **$step** · now',
+                _ => '- $step',
+              };
+            }).join('\n')
+          : '',
+    );
+  }
   return MissionEnvelope(
     isReport: isReport,
     isRecurring: isRecurring,
@@ -617,7 +648,9 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
         final text = (e['text'] ?? '').toString().trim();
         if (text.isEmpty) break;
         final envelope = parseMissionEnvelope(text);
-        if (envelope != null && envelope.isRecurring) break;
+        if (envelope != null && (envelope.isRecurring || envelope.isPlan)) {
+          break;
+        }
         if (envelope != null) {
           out.add(TaskEventItem(
             id: 'h-t-$i',

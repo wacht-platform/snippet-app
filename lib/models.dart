@@ -1325,11 +1325,23 @@ class TaskAgent {
         removedAt = j['removed_at'] as String?;
 }
 
+/// One step of the working plan the session doing a task keeps.
+class WorkStep {
+  final String step;
+  final String status;
+  const WorkStep(this.step, this.status);
+  bool get done => status == 'done';
+  bool get current => status == 'in_progress';
+}
+
 class TaskItem {
   final String id;
   final String title;
   final String description;
   final String plan;
+
+  /// The worker's own plan, mirrored from its session as it ticks steps off.
+  final List<WorkStep> workPlan;
   final TaskStatus status;
   final int priority;
   final String createdByKind;
@@ -1347,6 +1359,12 @@ class TaskItem {
         title = j['title'] as String? ?? '',
         description = j['description'] as String? ?? '',
         plan = j['plan'] as String? ?? '',
+        workPlan = ((j['work_plan'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((e) => WorkStep(
+                (e['step'] ?? '').toString(), (e['status'] ?? '').toString()))
+            .where((s) => s.step.trim().isNotEmpty)
+            .toList(),
         status = TaskStatus.parse(j['status'] as String?),
         priority = (j['priority'] as num?)?.toInt() ?? 0,
         createdByKind = j['created_by_kind'] as String? ?? '',
@@ -1366,6 +1384,7 @@ class TaskItem {
         title = t.title,
         description = t.description,
         plan = t.plan,
+        workPlan = t.workPlan,
         status = to,
         priority = t.priority,
         createdByKind = t.createdByKind,
