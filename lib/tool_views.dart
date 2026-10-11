@@ -62,6 +62,9 @@ String toolArgSummary(String tool, dynamic args) {
     'monitor' => s('path').isNotEmpty ? s('path') : s('action'),
     'present_file' => s('path'),
     'read_file' => s('path'),
+    'view_file' => s('AbsolutePath').contains('/.gemini/antigravity-cli/')
+        ? 'saved tool output'
+        : s('AbsolutePath'),
     'ping_user' => s('title'),
     'schedule_followup' => s('note'),
     _ => '',
@@ -162,6 +165,7 @@ String toolTitle(String tool) => switch (tool) {
       'monitor' => 'Watch',
       'present_file' => 'Present',
       'read_file' => 'Read',
+      'view_file' => 'Read',
       _ => _humanizeTool(tool),
     };
 
