@@ -578,92 +578,93 @@ class _TimelineStep extends StatelessWidget {
                 ? AppColors.ok
                 : AppColors.fg4;
     final openable = toolHasDetail(step) || _hasOutput(step);
-    return IntrinsicHeight(
-      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(
-          width: 12,
-          child: Column(children: [
-            const SizedBox(height: 7),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: dotColor,
-                shape: BoxShape.circle,
-                boxShadow: step.running
-                    ? [
-                        BoxShadow(
-                            color: AppColors.run.withValues(alpha: 0.22),
-                            spreadRadius: 4)
-                      ]
-                    : null,
-              ),
-            ),
-            if (!last)
-              Expanded(
-                child: Container(
-                  width: 1,
-                  margin: const EdgeInsets.only(top: 4),
-                  color: AppColors.border2,
-                ),
-              ),
-          ]),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: last ? 0 : 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                InkWell(
-                  onTap: openable ? onToggle : null,
-                  borderRadius: BorderRadius.circular(R.sm),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: sans(15,
-                                      height: 20 / 15,
-                                      color: step.failed
-                                          ? AppColors.diffDelFg
-                                          : AppColors.fg1)),
-                            ),
-                            if (meta != null) ...[
-                              const SizedBox(width: 10),
-                              Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: meta),
-                            ],
-                          ]),
-                      if (sub.isNotEmpty && sub != title) ...[
-                        const SizedBox(height: 3),
-                        Text(sub,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: _monoSub
-                                ? mono(12, color: AppColors.fg4)
-                                : sans(12, color: AppColors.fg4)),
-                      ],
-                    ],
-                  ),
-                ),
-                if (open && openable) ...[
-                  const SizedBox(height: 10),
-                  _StepBody(step: step, onShowAll: onShowAll),
-                ],
-              ],
+    return Stack(children: [
+      Positioned(
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 12,
+        child: Column(children: [
+          const SizedBox(height: 7),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+              boxShadow: step.running
+                  ? [
+                      BoxShadow(
+                          color: AppColors.run.withValues(alpha: 0.22),
+                          spreadRadius: 4)
+                    ]
+                  : null,
             ),
           ),
+          if (!last)
+            Expanded(
+              child: Container(
+                width: 1,
+                margin: const EdgeInsets.only(top: 4),
+                color: AppColors.border2,
+              ),
+            ),
+        ]),
+      ),
+      Padding(
+        padding: const EdgeInsets.only(left: 26),
+        child: Padding(
+          padding: EdgeInsets.only(bottom: last ? 0 : 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkWell(
+                onTap: openable ? onToggle : null,
+                borderRadius: BorderRadius.circular(R.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(15,
+                                    height: 20 / 15,
+                                    color: step.failed
+                                        ? AppColors.diffDelFg
+                                        : AppColors.fg1)),
+                          ),
+                          if (meta != null) ...[
+                            const SizedBox(width: 10),
+                            Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: meta),
+                          ],
+                        ]),
+                    if (sub.isNotEmpty && sub != title) ...[
+                      const SizedBox(height: 3),
+                      Text(sub,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _monoSub
+                              ? mono(12, color: AppColors.fg4)
+                              : sans(12, color: AppColors.fg4)),
+                    ],
+                  ],
+                ),
+              ),
+              if (open && openable) ...[
+                const SizedBox(height: 10),
+                _StepBody(step: step, onShowAll: onShowAll),
+              ],
+            ],
+          ),
         ),
-      ]),
-    );
+      ),
+    ]);
   }
 }
 
