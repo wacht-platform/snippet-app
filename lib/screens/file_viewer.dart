@@ -161,12 +161,15 @@ class _FileViewerState extends State<FileViewer> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
-              child: MarkdownBody(
-                data: content,
-                selectable: false,
-                styleSheet: documentMarkdownStyle(context),
-                builders: {'pre': PreBlockBuilder()},
-                onTapLink: (_, href, __) => openMarkdownLink(href),
+              child: SizedBox(
+                width: double.infinity,
+                child: MarkdownBody(
+                  data: content,
+                  selectable: false,
+                  styleSheet: documentMarkdownStyle(context),
+                  builders: {'pre': PreBlockBuilder()},
+                  onTapLink: (_, href, __) => openMarkdownLink(href),
+                ),
               ),
             ),
           ),
