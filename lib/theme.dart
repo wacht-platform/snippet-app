@@ -822,8 +822,6 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedPlay;
     case 'pause':
       return HugeIcons.strokeRoundedPause;
-    case 'moon':
-      return HugeIcons.strokeRoundedMoon02;
     case 'git-commit':
       return HugeIcons.strokeRoundedGitCommit;
     case 'user':

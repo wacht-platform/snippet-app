@@ -1407,9 +1407,9 @@ class MemoryScope {
   final int files;
   final int? lastCommitAt;
   final String lastCommit;
-  final int? lastDream;
+  final int? lastConsolidated;
   final int pending;
-  final bool dreaming;
+  final bool consolidating;
 
   MemoryScope.fromJson(Map<String, dynamic> j)
       : key = j['key'] as String? ?? '',
@@ -1420,9 +1420,9 @@ class MemoryScope {
         files = (j['files'] as num?)?.toInt() ?? 0,
         lastCommitAt = ((j['last_commit'] as Map?)?['date'] as num?)?.toInt(),
         lastCommit = (j['last_commit'] as Map?)?['subject'] as String? ?? '',
-        lastDream = (j['last_dream'] as num?)?.toInt(),
+        lastConsolidated = (j['last_consolidated'] as num?)?.toInt(),
         pending = (j['pending'] as num?)?.toInt() ?? 0,
-        dreaming = j['dreaming'] == true;
+        consolidating = j['consolidating'] == true;
 }
 
 class MemoryCommit {
@@ -1435,5 +1435,5 @@ class MemoryCommit {
         date = (j['date'] as num?)?.toInt() ?? 0,
         subject = j['subject'] as String? ?? '';
 
-  bool get isDream => subject.startsWith('Dream:');
+  bool get isConsolidation => subject.startsWith('Consolidate:');
 }

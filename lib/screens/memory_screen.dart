@@ -10,7 +10,7 @@ import '../widgets.dart';
 import 'shell_nav.dart';
 
 /// What agents remember: one git repo per scope (you, each project, each
-/// agent, each session). Read-only here; agents write it and Dreaming keeps
+/// agent, each session). Read-only here; agents write it and consolidation keeps
 /// it tidy on its own.
 class MemoryScreen extends StatefulWidget {
   final DaemonClient client;
@@ -167,7 +167,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
             child: Text(
-                'What your agents remember, kept as files in git. Agents write it as they work; Dreaming tidies each one in the background.',
+                'What your agents remember, kept as files in git. Agents write it as they work, and it is consolidated in the background.',
                 style: sans(13, height: 19 / 13, color: AppColors.fg3)),
           ),
           group('', global),
@@ -228,16 +228,16 @@ String scopeIcon(String kind) => switch (kind) {
 
 String scopeStatus(MemoryScope s) {
   final entries = '${s.entries} ${s.entries == 1 ? 'entry' : 'entries'}';
-  if (s.dreaming) return '$entries · Dreaming now';
+  if (s.consolidating) return '$entries · consolidating now';
   if (s.kind == 'session') {
     return s.lastCommitAt == null
         ? entries
         : '$entries · updated ${relativeTime(s.lastCommitAt!)}';
   }
-  final dream = s.lastDream == null
-      ? 'not dreamed yet'
-      : 'dreamed ${relativeTime(s.lastDream!)}';
-  return '$entries · $dream';
+  final consolidated = s.lastConsolidated == null
+      ? 'not consolidated yet'
+      : 'consolidated ${relativeTime(s.lastConsolidated!)}';
+  return '$entries · $consolidated';
 }
 
 /// One scope: its MEMORY.md (or a linked topic file), its files, its history.
@@ -456,15 +456,15 @@ class _ScopeViewState extends State<_ScopeView> {
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: AppIcon(c.isDream ? 'moon' : 'git-commit',
+                child: AppIcon(c.isConsolidation ? 'layers' : 'git-commit',
                     size: 15,
-                    color: c.isDream ? AppColors.accent : AppColors.fg4),
+                    color: c.isConsolidation ? AppColors.accent : AppColors.fg4),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                    c.isDream
-                        ? c.subject.substring('Dream:'.length).trim()
+                    c.isConsolidation
+                        ? c.subject.substring('Consolidate:'.length).trim()
                         : c.subject,
                     style: sans(14, height: 19 / 14, color: AppColors.fg1)),
               ),
