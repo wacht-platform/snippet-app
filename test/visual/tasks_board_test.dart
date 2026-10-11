@@ -29,6 +29,9 @@ class _FakeDaemon extends DaemonClient {
   }
 }
 
+String _ago(Duration age) =>
+    DateTime.now().toUtc().subtract(age).toIso8601String();
+
 Map<String, dynamic> _task(String id, String title, String status,
         {int priority = 0, String description = '', String by = 'human'}) =>
     {
@@ -39,8 +42,8 @@ Map<String, dynamic> _task(String id, String title, String status,
       'priority': priority,
       'created_by_kind': by,
       'created_by_id': by == 'human' ? 'you' : 'snippet',
-      'created_at': '2026-09-15T10:00:00Z',
-      'updated_at': '2026-09-15T11:30:00Z',
+      'created_at': _ago(const Duration(days: 25, hours: 2)),
+      'updated_at': _ago(const Duration(days: 25, minutes: 30)),
     };
 
 void main() {

@@ -134,9 +134,10 @@ class _MemoryScreenState extends State<MemoryScreen> {
       ],
     );
     if (widget.embedded) {
+      final page = widget.initialKey != null;
       return Material(
-        color: widget.initialKey != null ? AppColors.bg : Colors.transparent,
-        child: content,
+        color: page ? AppColors.bg : Colors.transparent,
+        child: page ? SafeArea(bottom: false, child: content) : content,
       );
     }
     return Scaffold(body: SafeArea(bottom: false, child: content));
