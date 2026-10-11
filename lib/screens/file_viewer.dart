@@ -164,17 +164,7 @@ class _FileViewerState extends State<FileViewer> {
               child: MarkdownBody(
                 data: content,
                 selectable: false,
-                styleSheet: agentMarkdownStyle(context).copyWith(
-                  h1: sans(26,
-                      height: 32 / 26, spacing: -0.5, color: AppColors.fg1),
-                  h1Padding: const EdgeInsets.only(top: 4, bottom: 6),
-                  h2: sans(20,
-                      height: 26 / 20, spacing: -0.3, color: AppColors.fg1),
-                  h2Padding: const EdgeInsets.only(top: 18, bottom: 4),
-                  h3: sans(17, height: 23 / 17, color: AppColors.fg1),
-                  h3Padding: const EdgeInsets.only(top: 14, bottom: 2),
-                  h4: sans(15, height: 20 / 15, color: AppColors.fg2),
-                ),
+                styleSheet: documentMarkdownStyle(context),
                 builders: {'pre': PreBlockBuilder()},
                 onTapLink: (_, href, __) => openMarkdownLink(href),
               ),
