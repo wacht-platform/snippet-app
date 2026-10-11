@@ -61,6 +61,38 @@ class _MemoryScreenState extends State<MemoryScreen> {
     }
   }
 
+  /// Phones push the scope as its own screen so the system back button
+  /// returns to this list instead of leaving Memory altogether.
+  void _openScopeKey(String key) {
+    if (!kMobile) {
+      setState(() => _open = key);
+      return;
+    }
+    final scope = _scopes?.where((s) => s.key == key).firstOrNull;
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(
+          builder: (ctx) => Scaffold(
+            backgroundColor: AppColors.bg,
+            body: SafeArea(
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  NavBackRow(
+                      title: scopeTitle(scope, key),
+                      onBack: () => Navigator.of(ctx).maybePop()),
+                  Expanded(
+                    child: _ScopeView(
+                        client: widget.client, scopeKey: key, scope: scope),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ))
+        .then((_) => _load());
+  }
+
   MemoryScope? get _openScope =>
       _scopes?.where((s) => s.key == _open).firstOrNull;
 
@@ -147,7 +179,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
                     leading: IconTile(scopeIcon(s.kind)),
                     trailing: AppIcon('chevron-right',
                         size: 15, color: AppColors.fg4),
-                    onTap: () => setState(() => _open = s.key),
+                    onTap: () => _openScopeKey(s.key),
                   ),
                 if (footer != null) footer,
               ]),
@@ -320,46 +352,52 @@ class _ScopeViewState extends State<_ScopeView> {
   Widget build(BuildContext context) {
     final s = widget.scope;
     final side = kMobile ? M.gutter : 24.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (s != null)
+    return PopScope(
+      canPop: _trail.length < 2,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _backFile();
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (s != null)
+            Padding(
+              padding: EdgeInsets.fromLTRB(side + 4, 0, side, 8),
+              child: Text(scopeStatus(s),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12.5, color: AppColors.fg4)),
+            ),
           Padding(
-            padding: EdgeInsets.fromLTRB(side + 4, 0, side, 8),
-            child: Text(scopeStatus(s),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(12.5, color: AppColors.fg4)),
+            padding: EdgeInsets.fromLTRB(side, 0, side, 10),
+            child: Row(children: [
+              Pills<_Tab>(
+                items: const [
+                  (_Tab.memory, 'Memory'),
+                  (_Tab.files, 'Files'),
+                  (_Tab.history, 'History'),
+                ],
+                selected: _tab,
+                onSelect: (t) {
+                  setState(() => _tab = t);
+                  if (t == _Tab.history && _history == null) _loadHistory();
+                },
+              ),
+            ]),
           ),
-        Padding(
-          padding: EdgeInsets.fromLTRB(side, 0, side, 10),
-          child: Row(children: [
-            Pills<_Tab>(
-              items: const [
-                (_Tab.memory, 'Memory'),
-                (_Tab.files, 'Files'),
-                (_Tab.history, 'History'),
-              ],
-              selected: _tab,
-              onSelect: (t) {
-                setState(() => _tab = t);
-                if (t == _Tab.history && _history == null) _loadHistory();
+          Expanded(
+            child: Swap(
+              stateKey: '$_tab:$_path:${_content != null}',
+              fill: true,
+              child: switch (_tab) {
+                _Tab.memory => _memory(side),
+                _Tab.files => _fileList(side),
+                _Tab.history => _historyList(side),
               },
             ),
-          ]),
-        ),
-        Expanded(
-          child: Swap(
-            stateKey: '$_tab:$_path:${_content != null}',
-            fill: true,
-            child: switch (_tab) {
-              _Tab.memory => _memory(side),
-              _Tab.files => _fileList(side),
-              _Tab.history => _historyList(side),
-            },
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -458,7 +496,8 @@ class _ScopeViewState extends State<_ScopeView> {
                 padding: const EdgeInsets.only(top: 2),
                 child: AppIcon(c.isConsolidation ? 'layers' : 'git-commit',
                     size: 15,
-                    color: c.isConsolidation ? AppColors.accent : AppColors.fg4),
+                    color:
+                        c.isConsolidation ? AppColors.accent : AppColors.fg4),
               ),
               const SizedBox(width: 10),
               Expanded(
