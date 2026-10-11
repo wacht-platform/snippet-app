@@ -133,7 +133,12 @@ class _MemoryScreenState extends State<MemoryScreen> {
         Expanded(child: body),
       ],
     );
-    if (widget.embedded) return content;
+    if (widget.embedded) {
+      return Material(
+        color: widget.initialKey != null ? AppColors.bg : Colors.transparent,
+        child: content,
+      );
+    }
     return Scaffold(body: SafeArea(bottom: false, child: content));
   }
 
@@ -414,6 +419,18 @@ class _ScopeViewState extends State<_ScopeView> {
               ),
       );
     }
+    final hasEntries = content
+        .split('\n')
+        .any((l) => l.trim().startsWith('- ') || l.contains('[['));
+    if (!hasEntries && _trail.length < 2) {
+      return const Center(
+        child: EmptyState(
+          icon: 'brain',
+          title: 'Nothing remembered yet',
+          body: 'Entries appear here as the agent saves what it learns.',
+        ),
+      );
+    }
     return SelectionArea(
       child: ListView(
         padding: EdgeInsets.fromLTRB(side, 4, side, 40),
@@ -436,19 +453,22 @@ class _ScopeViewState extends State<_ScopeView> {
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
-              child: MarkdownBody(
-                data: memoryMarkdown(content),
-                selectable: false,
-                styleSheet: documentMarkdownStyle(context)
-                    .copyWith(em: sans(12, color: AppColors.fg4)),
-                builders: {'pre': PreBlockBuilder()},
-                onTapLink: (_, href, __) {
-                  if (href != null && href.startsWith('memory:')) {
-                    _openFile(href.substring('memory:'.length));
-                  } else {
-                    openMarkdownLink(href);
-                  }
-                },
+              child: SizedBox(
+                width: double.infinity,
+                child: MarkdownBody(
+                  data: memoryMarkdown(content),
+                  selectable: false,
+                  styleSheet: documentMarkdownStyle(context)
+                      .copyWith(em: sans(12, color: AppColors.fg4)),
+                  builders: {'pre': PreBlockBuilder()},
+                  onTapLink: (_, href, __) {
+                    if (href != null && href.startsWith('memory:')) {
+                      _openFile(href.substring('memory:'.length));
+                    } else {
+                      openMarkdownLink(href);
+                    }
+                  },
+                ),
               ),
             ),
           ),
