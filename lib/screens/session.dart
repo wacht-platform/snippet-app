@@ -38,6 +38,7 @@ import 'files.dart';
 import 'processes.dart';
 import 'git.dart';
 import 'lanes.dart';
+import 'memory_screen.dart';
 import 'recurring.dart';
 import 'session_panels.dart';
 import 'session_coordination_cards.dart';

@@ -18,6 +18,7 @@ import 'shell_nav.dart';
 import 'usage.dart';
 import 'vault.dart';
 import '../motion.dart';
+import 'memory_screen.dart';
 
 /// Rows for the machine popover/sheet: live dot (re-pinged on open), label,
 /// host, trailing overflow. Pops itself before invoking any callback.
@@ -154,7 +155,7 @@ class _MachineListState extends State<MachineList> {
   }
 }
 
-enum SettingsPage { general, models, usage, vault, scheduled }
+enum SettingsPage { general, models, memory, usage, vault, scheduled }
 
 /// Settings dialog: Zed-style sidebar + content pane. Models / vault /
 /// scheduled swap in-place so they never stack a second dialog.
@@ -268,6 +269,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         case SettingsPage.scheduled:
           _recurringKey.currentState?.add();
         case SettingsPage.usage:
+        case SettingsPage.memory:
           break;
       }
     });
@@ -276,6 +278,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   static const _nav = [
     (SettingsPage.general, 'server', 'General'),
     (SettingsPage.models, 'ai-chip', 'Inference profiles'),
+    (SettingsPage.memory, 'brain', 'Memory'),
     (SettingsPage.usage, 'analytics', 'Usage'),
     (SettingsPage.vault, 'lock-key', 'Vault'),
     (SettingsPage.scheduled, 'repeat', 'Scheduled jobs'),
@@ -651,6 +654,10 @@ class SettingsPanelState extends State<SettingsPanel> {
           label('Phone'),
           ListGroup(children: [_notifRow()]),
         ],
+        label('Agents'),
+        ListGroup(children: [
+          nav(SettingsPage.memory, 'Memory', 'What agents remember'),
+        ]),
         label('Machines'),
         ListGroup(children: [
           nav(SettingsPage.general, 'Manage machines', '${_instances.length}'),
@@ -674,6 +681,11 @@ class SettingsPanelState extends State<SettingsPanel> {
           ],
         ),
       SettingsPage.models => InferenceProfilesScreen(
+          client: widget.client,
+          embedded: true,
+          onBack: back,
+        ),
+      SettingsPage.memory => MemoryScreen(
           client: widget.client,
           embedded: true,
           onBack: back,
@@ -789,6 +801,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   String _pageTitle(SettingsPage page) => switch (page) {
         SettingsPage.general => 'General',
         SettingsPage.models => 'Inference profiles',
+        SettingsPage.memory => 'Memory',
         SettingsPage.usage => 'Usage',
         SettingsPage.vault => 'Vault',
         SettingsPage.scheduled => 'Scheduled jobs',
@@ -895,6 +908,10 @@ class SettingsPanelState extends State<SettingsPanel> {
           embedded: true,
           onEditingChanged: (editing) =>
               setState(() => _modelsEditing = editing),
+        ),
+      SettingsPage.memory => MemoryScreen(
+          client: widget.client,
+          embedded: true,
         ),
       SettingsPage.usage => UsageScreen(
           client: widget.client,

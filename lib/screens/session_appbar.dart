@@ -1046,6 +1046,12 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       onRecurring: () => run(_openRecurring),
       onCompact: () => run(_confirmCompact),
       onCheckpoints: () => navigate!(_showCheckpoints),
+      onMemory: () => navigate!(() => presentScreen(context,
+          builder: (_, close) => MemoryScreen(
+              client: widget.client,
+              embedded: true,
+              onBack: close,
+              initialKey: 'session:${widget.sessionId}'))),
     );
   }
 

@@ -21,6 +21,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../swr.dart';
 import '../pull_refresh.dart';
+import 'memory_screen.dart';
 
 /// Pick one agent from the directory, as an anchored DROPDOWN.
 ///
@@ -992,6 +993,18 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                 ],
               ],
             ),
+          ),
+          IconBtn(
+            'brain',
+            size: M.minTarget,
+            iconSize: 18,
+            tooltip: 'Memory',
+            onTap: () => presentScreen(context,
+                builder: (_, close) => MemoryScreen(
+                    client: widget.client,
+                    embedded: true,
+                    onBack: close,
+                    initialKey: 'agent:${widget.agentId}')),
           ),
           if (!kMobile && widget.onClose != null) ...[
             const SizedBox(width: 4),

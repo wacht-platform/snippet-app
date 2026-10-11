@@ -202,6 +202,18 @@ MarkdownStyleSheet agentMarkdownStyle(BuildContext context) {
   return _cachedAgentMarkdownStyle!;
 }
 
+/// The reading styles with a document heading scale, for whole markdown files.
+MarkdownStyleSheet documentMarkdownStyle(BuildContext context) =>
+    agentMarkdownStyle(context).copyWith(
+      h1: sans(26, height: 32 / 26, spacing: -0.5, color: AppColors.fg1),
+      h1Padding: const EdgeInsets.only(top: 4, bottom: 6),
+      h2: sans(20, height: 26 / 20, spacing: -0.3, color: AppColors.fg1),
+      h2Padding: const EdgeInsets.only(top: 18, bottom: 4),
+      h3: sans(17, height: 23 / 17, color: AppColors.fg1),
+      h3Padding: const EdgeInsets.only(top: 14, bottom: 2),
+      h4: sans(15, height: 20 / 15, color: AppColors.fg2),
+    );
+
 /// Dimmed markdown for live model thinking/reasoning — same structure as
 /// [markdownStyle], quieter palette so it reads as an aside, not the answer.
 MarkdownStyleSheet? _cachedThinkingMarkdownStyle;

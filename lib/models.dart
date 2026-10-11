@@ -1396,3 +1396,44 @@ class TaskLinks {
             .whereType<String>()
             .toList();
 }
+
+/// One memory repo: global, a project, an agent, or a session.
+class MemoryScope {
+  final String key;
+  final String kind;
+  final String label;
+  final String path;
+  final int entries;
+  final int files;
+  final int? lastCommitAt;
+  final String lastCommit;
+  final int? lastDream;
+  final int pending;
+  final bool dreaming;
+
+  MemoryScope.fromJson(Map<String, dynamic> j)
+      : key = j['key'] as String? ?? '',
+        kind = j['kind'] as String? ?? '',
+        label = j['label'] as String? ?? '',
+        path = j['path'] as String? ?? '',
+        entries = (j['entries'] as num?)?.toInt() ?? 0,
+        files = (j['files'] as num?)?.toInt() ?? 0,
+        lastCommitAt = ((j['last_commit'] as Map?)?['date'] as num?)?.toInt(),
+        lastCommit = (j['last_commit'] as Map?)?['subject'] as String? ?? '',
+        lastDream = (j['last_dream'] as num?)?.toInt(),
+        pending = (j['pending'] as num?)?.toInt() ?? 0,
+        dreaming = j['dreaming'] == true;
+}
+
+class MemoryCommit {
+  final String hash;
+  final int date;
+  final String subject;
+
+  MemoryCommit.fromJson(Map<String, dynamic> j)
+      : hash = j['hash'] as String? ?? '',
+        date = (j['date'] as num?)?.toInt() ?? 0,
+        subject = j['subject'] as String? ?? '';
+
+  bool get isDream => subject.startsWith('Dream:');
+}

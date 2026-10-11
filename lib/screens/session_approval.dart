@@ -1113,6 +1113,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onRecurring;
   final VoidCallback onCompact;
   final VoidCallback onCheckpoints;
+  final VoidCallback onMemory;
   final bool hideWorkspace;
   final bool hideGoal;
   final bool hideCheckpoints;
@@ -1132,6 +1133,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onRecurring,
     required this.onCompact,
     required this.onCheckpoints,
+    required this.onMemory,
     this.hideWorkspace = false,
     this.hideGoal = false,
     this.hideCheckpoints = false,
@@ -1483,6 +1485,11 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               detail: 'Restore the workspace to an earlier point',
               onTap: widget.onCheckpoints),
         _row(
+            icon: 'brain',
+            label: 'Memory',
+            detail: 'What this session remembers',
+            onTap: widget.onMemory),
+        _row(
             icon: 'minimize',
             label: 'Compact history',
             detail: 'Summarise older turns to free context',
@@ -1582,6 +1589,11 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Checkpoints',
             detail: 'Restore the workspace to an earlier point',
             onTap: widget.onCheckpoints),
+      _row(
+          icon: 'brain',
+          label: 'Memory',
+          detail: 'What this session remembers',
+          onTap: widget.onMemory),
     ];
 
     return Column(

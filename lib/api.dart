@@ -692,6 +692,44 @@ class DaemonClient {
 
   /// GET /mission-control/autonomy — whether Mission Control is autonomous, its rhythm
   /// and quiet hours, and when it last and next checks in.
+  /// GET /memory/scopes — every memory repo on the machine.
+  Future<List<MemoryScope>> memoryScopes() async {
+    final r = await http.get(_uri('/memory/scopes'));
+    if (r.statusCode != 200) throw _err('list memory', r);
+    _remember('memory-scopes', r.body);
+    return (jsonDecode(r.body) as List)
+        .map((e) => MemoryScope.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  List<MemoryScope>? cachedMemoryScopes() => _recall(
+      'memory-scopes',
+      (j) => (j as List)
+          .map((e) => MemoryScope.fromJson(e as Map<String, dynamic>))
+          .toList());
+
+  /// GET /memory/file — one file of a memory repo, plus the repo's file list.
+  Future<({String content, List<String> files})> memoryFile(String key,
+      {String path = 'MEMORY.md'}) async {
+    final r = await http.get(_uri('/memory/file', {'key': key, 'path': path}));
+    if (r.statusCode != 200) throw _err('read memory', r);
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    return (
+      content: j['content'] as String? ?? '',
+      files: ((j['files'] as List?) ?? const []).whereType<String>().toList(),
+    );
+  }
+
+  /// GET /memory/history — newest commits of a memory repo.
+  Future<List<MemoryCommit>> memoryHistory(String key, {int limit = 50}) async {
+    final r = await http
+        .get(_uri('/memory/history', {'key': key, 'limit': '$limit'}));
+    if (r.statusCode != 200) throw _err('memory history', r);
+    return (jsonDecode(r.body) as List)
+        .map((e) => MemoryCommit.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<Map<String, dynamic>> mcAutonomy() async {
     final r = await http.get(_uri('/mission-control/autonomy'));
     if (r.statusCode != 200) throw _err('get Mission Control autonomy', r);
