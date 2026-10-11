@@ -55,6 +55,9 @@ class _FakeDaemon extends DaemonClient {
       throw UnimplementedError('no live socket');
 }
 
+int _ago(Duration age) =>
+    DateTime.now().subtract(age).millisecondsSinceEpoch ~/ 1000;
+
 Map<String, dynamic> _task(String id, String title, String status,
         {String description = '',
         bool archived = false,
@@ -64,8 +67,8 @@ Map<String, dynamic> _task(String id, String title, String status,
       'title': title,
       'description': description,
       'status': status,
-      'created_at': 1757000000,
-      'updated_at': 1757003600,
+      'created_at': _ago(const Duration(days: 401, hours: 2)),
+      'updated_at': _ago(const Duration(days: 401, hours: 1)),
       'archived': archived,
       'notifications': notifications,
     };
