@@ -38,6 +38,7 @@ String toolVerb(String tool, {required bool running}) {
     'web_search' => ('Searched the web for', 'Searching the web for'),
     'web_read' => ('Read', 'Reading'),
     'read_file' => ('Read', 'Reading'),
+    'view_file' => ('Read', 'Reading'),
     'monitor' => ('Watched', 'Watching'),
     'present_file' => ('Shared', 'Sharing'),
     'set_session_title' => ('Titled the chat', 'Titling the chat'),
