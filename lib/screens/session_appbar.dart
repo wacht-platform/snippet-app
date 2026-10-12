@@ -1018,7 +1018,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     return [
       if (_isMissionControl) item('activity', 'Autonomous mode', _openAutonomy),
       item('edit', 'Rename session', _renameCurrent),
-      item('shield', 'Approval: Auto', () => _setApproval(false),
+      item('zap', 'Approval: YOLO', () => _setApproval(false),
           value: manual ? null : 'on'),
       item('shield', 'Approval: Ask', () => _setApproval(true),
           value: manual ? 'on' : null),

@@ -709,8 +709,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     final manual = (_state?.approvalMode ?? 'auto') == 'manual';
     return Tooltip(
       message: manual
-          ? 'Asking before changes. Switch to Auto'
-          : 'Running changes automatically. Switch to Ask',
+          ? 'Asking before changes. Switch to YOLO'
+          : 'YOLO: running changes without asking. Switch to Ask',
       child: Material(
         color: manual ? AppColors.accentBg : AppColors.surface2,
         borderRadius: BorderRadius.circular(7),
@@ -725,7 +725,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                   size: 12,
                   color: manual ? AppColors.accent : AppColors.fg3),
               const SizedBox(width: 4),
-              Text(manual ? 'Ask' : 'Auto-run',
+              Text(manual ? 'Ask' : 'YOLO',
                   style: sans(12,
                       weight: W.label,
                       color: manual ? AppColors.accent : AppColors.fg3)),

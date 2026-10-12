@@ -975,8 +975,8 @@ class _DesktopShellState extends State<DesktopShell>
             ? act('goal', 'zap', 'Cancel goal')
             : act('goal', 'zap', 'Set a goal', keywords: const ['autonomous']),
         manual
-            ? act('approval', 'zap', 'Approval: run automatically',
-                extra: 'auto', keywords: const ['auto', 'mode'])
+            ? act('approval', 'zap', 'Approval: YOLO',
+                extra: 'auto', keywords: const ['yolo', 'auto', 'mode'])
             : act('approval', 'shield', 'Approval: ask before changes',
                 extra: 'ask', keywords: const ['manual', 'mode']),
         act('rename', 'edit', 'Rename chat'),
