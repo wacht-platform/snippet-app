@@ -9,6 +9,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'git.dart';
+import 'pull_request_detail.dart' show PrSidebarList;
 import 'shell_nav.dart';
 import '../pull_refresh.dart';
 
@@ -26,7 +27,14 @@ class GitDiffSidebarPanel extends StatefulWidget {
     required this.workspacePath,
     this.sessionId,
     this.onOpenDiff,
+    this.tab = 'changes',
+    this.onTab,
+    this.onOpenPullRequest,
   });
+
+  final String tab;
+  final ValueChanged<String>? onTab;
+  final ValueChanged<int>? onOpenPullRequest;
 
   final DaemonClient client;
   final String workspacePath;
@@ -178,7 +186,12 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     final branch = _status?.branch ?? '';
     final isClean = files.isEmpty;
 
-    return LayoutBuilder(builder: (context, box) => PullToRefresh(
+    final tabbed = !kMobile &&
+        widget.onTab != null &&
+        widget.onOpenPullRequest != null &&
+        (widget.sessionId ?? '').isNotEmpty;
+    final showPrs = tabbed && widget.tab == 'prs';
+    final changes = LayoutBuilder(builder: (context, box) => PullToRefresh(
       onRefresh: refresh,
       child: Container(
         color: kMobile ? AppColors.bg : Colors.transparent,
@@ -186,9 +199,10 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
           children: [
-            ShellSectionHeader(
-              label: 'Git Diff',
-            ),
+            if (!tabbed)
+              ShellSectionHeader(
+                label: 'Git Diff',
+              ),
             _branchRow(repoName, branch, files.length),
             if (_loading && _status == null)
               const Padding(
@@ -212,6 +226,47 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
         ),
       ),
     ));
+    if (!tabbed) return changes;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const ShellSectionHeader(label: 'Git'),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        child: Row(children: [
+          _tabChip('changes', files.isEmpty ? 'Changes' : 'Changes  ${files.length}'),
+          _tabChip('prs', 'Pull requests'),
+        ]),
+      ),
+      Expanded(
+        child: showPrs
+            ? PrSidebarList(
+                client: widget.client,
+                session: widget.sessionId!,
+                onOpen: widget.onOpenPullRequest!,
+              )
+            : changes,
+      ),
+    ]);
+  }
+
+  Widget _tabChip(String key, String label) {
+    final on = widget.tab == key;
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Material(
+        color: on ? AppColors.surface3 : Colors.transparent,
+        borderRadius: BorderRadius.circular(R.pill),
+        child: InkWell(
+          onTap: () => widget.onTab?.call(key),
+          borderRadius: BorderRadius.circular(R.pill),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Text(label,
+                style: sans(12.5,
+                    weight: W.label, color: on ? AppColors.fg1 : AppColors.fg3)),
+          ),
+        ),
+      ),
+    );
   }
 
   /// Branch + change count on one flat row. Tapping the row opens the same

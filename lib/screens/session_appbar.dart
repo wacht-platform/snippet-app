@@ -342,6 +342,11 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   void _openPullRequests() {
     final status = _github;
     if (status == null) return;
+    final reveal = widget.onShowPullRequests;
+    if (reveal != null) {
+      reveal();
+      return;
+    }
     openPullRequests(context,
         client: widget.client, session: widget.sessionId, status: status);
   }
@@ -934,11 +939,16 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           _toast('Pull requests need the GitHub CLI signed in for this repo');
           return;
         }
-        openPullRequests(context,
-            client: widget.client,
-            session: widget.sessionId,
-            status: status,
-            number: int.tryParse(extra ?? ''));
+        final number = int.tryParse(extra ?? '');
+        if (number != null) {
+          openPullRequest(context,
+              client: widget.client,
+              session: widget.sessionId,
+              status: status,
+              number: number);
+        } else {
+          _openPullRequests();
+        }
         return;
       case 'artifacts':
         _openDeliverables();

@@ -93,6 +93,51 @@ class _AgentCardState extends State<AgentCard> {
         : working > 0
             ? ('Working', AppColors.run)
             : ('Available', AppColors.ok);
+    if (!kMobile) {
+      return Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: widget.onOpen,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(children: [
+                  Flexible(
+                    child: Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13, color: AppColors.fg1)),
+                  ),
+                  if (role.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(role,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(11.5, color: AppColors.fg4)),
+                    ),
+                  ],
+                ]),
+              ),
+              if (open > 0) ...[
+                const SizedBox(width: 6),
+                _pill('$open', alert: blocked > 0),
+              ],
+            ]),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: EdgeInsets.only(bottom: kMobile ? 10 : 6),
       child: Material(

@@ -47,7 +47,7 @@ class ShellPanelRequest {
         ShellPanelPurpose.agents => 'Agents',
         ShellPanelPurpose.conversation => 'Conversation',
         ShellPanelPurpose.deliverables => 'Artifacts & files',
-        ShellPanelPurpose.pullRequests => 'Pull requests',
+        ShellPanelPurpose.pullRequests => id.isEmpty ? 'Pull requests' : '#$id',
         ShellPanelPurpose.autonomy => 'Autonomous mode',
         _ => '${purpose.name[0].toUpperCase()}${purpose.name.substring(1)}',
       };

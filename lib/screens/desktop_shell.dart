@@ -179,6 +179,13 @@ class _DesktopShellState extends State<DesktopShell>
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
   final Map<String, bool> _githubReady = {};
+  String _gitTab = 'changes';
+
+  void _showPullRequests() => setState(() {
+        _section = ShellSection.git;
+        _leftCollapsed = false;
+        _gitTab = 'prs';
+      });
   final Map<String, _MacSessionControls> _macSessionControls = {};
 
   /// Terminals, bridged from each mounted `SessionScreen`.
@@ -1525,6 +1532,9 @@ class _DesktopShellState extends State<DesktopShell>
             _openFileTab(c, _active?.url ?? '', path, name);
           }
         },
+        gitTab: _gitTab,
+        onGitTab: (t) => setState(() => _gitTab = t),
+        onOpenPullRequest: (n) => _dispatchSessionAction('pull_requests', '$n'),
         topInset: topInset,
         onAfterPick: onAfterPick,
         instances: _instances,

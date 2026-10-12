@@ -38,6 +38,9 @@ class ShellSidebarHost extends StatelessWidget {
     required this.onOpenSession,
     required this.onOpenDiff,
     required this.onOpenFile,
+    this.gitTab = 'changes',
+    this.onGitTab,
+    this.onOpenPullRequest,
     required this.instances,
     required this.selectedSessionId,
     required this.sessions,
@@ -80,6 +83,9 @@ class ShellSidebarHost extends StatelessWidget {
   final ValueChanged<CoordinationAgent> onOpenRightAgent;
   final void Function(String id, String title, String? profile) onOpenSession;
   final ValueChanged<GitFile> onOpenDiff;
+  final String gitTab;
+  final ValueChanged<String>? onGitTab;
+  final ValueChanged<int>? onOpenPullRequest;
   final void Function(String path, String name) onOpenFile;
 
   // Sidebar props:
@@ -164,6 +170,9 @@ class ShellSidebarHost extends StatelessWidget {
               workspacePath: activeWorkspaceFolder ?? '',
               sessionId: activeTab?.sessionId,
               onOpenDiff: onOpenDiff,
+              tab: gitTab,
+              onTab: onGitTab,
+              onOpenPullRequest: onOpenPullRequest,
             );
     }
 

@@ -857,8 +857,8 @@ class SidebarState extends State<Sidebar> {
       if (label != day) {
         day = label;
         rows.add(Padding(
-          padding: EdgeInsets.fromLTRB(10, rows.isEmpty ? 4 : 14, 10, 4),
-          child: Text(label, style: sans(12, color: AppColors.fg4)),
+          padding: EdgeInsets.fromLTRB(10, rows.isEmpty ? 4 : 12, 10, 3),
+          child: Text(label, style: sans(11.5, color: AppColors.fg4)),
         ));
       }
       _chatsShownAt ??= DateTime.now();
@@ -976,53 +976,63 @@ class SidebarState extends State<Sidebar> {
         ? ''
         : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
     final draft = _hasDraft(s);
+    final running = sessionIsActive(s.status);
+    final waiting = s.status == 'waiting_for_input';
     final on = _selecting ? checked : selected;
     return Material(
       color: on ? AppColors.surface2 : Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         onTap: _selecting
             ? () => _toggleSelected(s.id)
             : () => widget.onOpenSession(s.id, s.title, s.profile),
         onSecondaryTapDown: _selecting
             ? null
             : (d) => _sessionActions(s, position: d.globalPosition),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(children: [
             if (_selecting) ...[
               SelectCheck(checked, size: 14),
               const SizedBox(width: 10),
             ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(children: [
-                    Expanded(
-                      child: Text(
-                          s.title.trim().isEmpty ? '(untitled)' : s.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(14,
-                              height: 19 / 14,
-                              color: selected ? AppColors.fg1 : AppColors.fg2)),
-                    ),
-                    if (draft) ...[
-                      const SizedBox(width: 8),
-                      Text('Draft', style: sans(12, color: AppColors.accent)),
-                    ],
-                  ]),
-                  const SizedBox(height: 2),
-                  DefaultTextStyle.merge(
-                    style: const TextStyle(fontSize: 12),
-                    child: _sessionStatusLine(s, folderName, compact: true),
-                  ),
-                ],
+            if (running || waiting) ...[
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: running ? AppColors.run : Colors.transparent,
+                  border: waiting
+                      ? Border.all(color: AppColors.accent, width: 1.5)
+                      : null,
+                ),
               ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13,
+                      color: selected ? AppColors.fg1 : AppColors.fg2)),
             ),
+            if (draft) ...[
+              const SizedBox(width: 6),
+              Text('Draft', style: sans(11.5, color: AppColors.accent)),
+            ],
+            if (folderName.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 96),
+                child: Text(folderName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(11.5, color: AppColors.fg4)),
+              ),
+            ],
           ]),
         ),
       ),

@@ -19,38 +19,49 @@ Widget _prDot(Color c, {double size = 7}) => Container(
       decoration: BoxDecoration(color: c, shape: BoxShape.circle),
     );
 
-class DesktopPullRequests extends StatefulWidget {
-  const DesktopPullRequests({
+class PrListPanel extends StatefulWidget {
+  const PrListPanel({
     super.key,
     required this.client,
     required this.session,
     required this.status,
-    this.openNumber,
+    required this.selected,
+    required this.onSelect,
+    this.showTitle = true,
+    this.onLoaded,
+    this.refreshTick,
   });
 
   final DaemonClient client;
   final String session;
   final GithubStatus status;
-  final int? openNumber;
+  final int? selected;
+  final ValueChanged<int> onSelect;
+  final bool showTitle;
+  final ValueChanged<List<PrSummary>>? onLoaded;
+  final int? refreshTick;
 
   @override
-  State<DesktopPullRequests> createState() => _DesktopPullRequestsState();
+  State<PrListPanel> createState() => _PrListPanelState();
 }
 
-class _DesktopPullRequestsState extends State<DesktopPullRequests> {
+class _PrListPanelState extends State<PrListPanel> {
   String _filter = 'open';
   List<PrSummary>? _prs;
   String? _error;
-  int? _selected;
   String _query = '';
-  bool _listHidden = false;
   final _search = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _selected = widget.openNumber;
     _load();
+  }
+
+  @override
+  void didUpdateWidget(PrListPanel old) {
+    super.didUpdateWidget(old);
+    if (old.refreshTick != widget.refreshTick || old.session != widget.session) _load();
   }
 
   @override
@@ -65,10 +76,8 @@ class _DesktopPullRequestsState extends State<DesktopPullRequests> {
     try {
       final prs = await widget.client.githubPrs(widget.session, filter);
       if (!mounted || filter != _filter) return;
-      setState(() {
-        _prs = prs;
-        _selected ??= prs.isEmpty ? null : prs.first.number;
-      });
+      setState(() => _prs = prs);
+      widget.onLoaded?.call(prs);
     } catch (e) {
       if (mounted && filter == _filter) setState(() => _error = '$e');
     }
@@ -118,7 +127,7 @@ class _DesktopPullRequestsState extends State<DesktopPullRequests> {
   }
 
   Widget _row(PrSummary pr) {
-    final selected = pr.number == _selected;
+    final selected = pr.number == widget.selected;
     final (icon, ink) = _prStateIcon(pr);
     final checks = rollup(pr.checks);
     return Padding(
@@ -127,10 +136,12 @@ class _DesktopPullRequestsState extends State<DesktopPullRequests> {
         color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.md),
         child: InkWell(
-          onTap: () => setState(() => _selected = pr.number),
+          onTap: () => widget.onSelect(pr.number),
           borderRadius: BorderRadius.circular(R.md),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+            padding: widget.showTitle
+                ? const EdgeInsets.fromLTRB(10, 9, 10, 9)
+                : const EdgeInsets.fromLTRB(10, 6, 10, 6),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Padding(
                 padding: const EdgeInsets.only(top: 2),
@@ -140,11 +151,11 @@ class _DesktopPullRequestsState extends State<DesktopPullRequests> {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(pr.title,
-                      maxLines: 2,
+                      maxLines: widget.showTitle ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13.5,
+                      style: sans(13,
                           weight: W.label, height: 1.35, color: AppColors.fg1)),
-                  const SizedBox(height: 4),
+                  SizedBox(height: widget.showTitle ? 4 : 2),
                   Row(children: [
                     Flexible(
                       child: Text(
@@ -204,12 +215,12 @@ class _DesktopPullRequestsState extends State<DesktopPullRequests> {
     ];
   }
 
-  Widget _list() {
+  @override
+  Widget build(BuildContext context) {
     final prs = _prs;
     final visible = _visible;
-    return Container(
-      color: AppColors.surface1,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (widget.showTitle)
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 12, 10),
           child: Row(children: [
@@ -220,73 +231,216 @@ class _DesktopPullRequestsState extends State<DesktopPullRequests> {
             IconBtn('refresh', size: 28, iconSize: 14, tooltip: 'Refresh', onTap: _load),
           ]),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          child: Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.md),
-            ),
-            child: Row(children: [
-              AppIcon('search', size: 13, color: AppColors.fg4),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _search,
-                  onChanged: (v) => setState(() => _query = v),
-                  style: sans(12.5, color: AppColors.fg1),
-                  cursorColor: AppColors.accent,
-                  decoration: InputDecoration(
-                    isCollapsed: true,
-                    border: InputBorder.none,
-                    hintText: 'Filter by title, number, author',
-                    hintStyle: sans(12.5, color: AppColors.fg4),
-                  ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(R.md),
+          ),
+          child: Row(children: [
+            AppIcon('search', size: 13, color: AppColors.fg4),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _search,
+                onChanged: (v) => setState(() => _query = v),
+                style: sans(12.5, color: AppColors.fg1),
+                cursorColor: AppColors.accent,
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: 'Filter by title, number, author',
+                  hintStyle: sans(12.5, color: AppColors.fg4),
                 ),
               ),
-            ]),
-          ),
+            ),
+          ]),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              for (final (key, label) in _prFilters) _filterChip(key, label),
-            ]),
-          ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (final (key, label) in _prFilters) _filterChip(key, label),
+          ]),
         ),
-        Expanded(
-          child: _error != null
-              ? prMessage(_error!)
-              : prs == null
-                  ? Center(child: Spinner(size: 16, color: AppColors.fg3))
-                  : visible.isEmpty
-                      ? prMessage(_query.trim().isNotEmpty
-                          ? 'Nothing matches.'
-                          : switch (_filter) {
-                              'review' => 'Nothing waiting on your review.',
-                              'mine' => 'You have no open pull requests.',
-                              'closed' => 'No closed pull requests.',
-                              _ => 'No open pull requests.',
-                            })
-                      : RefreshIndicator(
-                          onRefresh: _load,
-                          child: ListView(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            children: _rows(visible),
-                          ),
+      ),
+      Expanded(
+        child: _error != null
+            ? prMessage(_error!)
+            : prs == null
+                ? Center(child: Spinner(size: 16, color: AppColors.fg3))
+                : visible.isEmpty
+                    ? prMessage(_query.trim().isNotEmpty
+                        ? 'Nothing matches.'
+                        : switch (_filter) {
+                            'review' => 'Nothing waiting on your review.',
+                            'mine' => 'You have no open pull requests.',
+                            'closed' => 'No closed pull requests.',
+                            _ => 'No open pull requests.',
+                          })
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: ListView(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          children: _rows(visible),
                         ),
-        ),
-      ]),
+                      ),
+      ),
+    ]);
+  }
+}
+
+class PrSidebarList extends StatefulWidget {
+  const PrSidebarList({
+    super.key,
+    required this.client,
+    required this.session,
+    required this.onOpen,
+  });
+
+  final DaemonClient client;
+  final String session;
+  final ValueChanged<int> onOpen;
+
+  @override
+  State<PrSidebarList> createState() => _PrSidebarListState();
+}
+
+class _PrSidebarListState extends State<PrSidebarList> {
+  GithubStatus? _status;
+  bool _checked = false;
+  int? _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  @override
+  void didUpdateWidget(PrSidebarList old) {
+    super.didUpdateWidget(old);
+    if (old.session != widget.session) {
+      setState(() {
+        _status = null;
+        _checked = false;
+        _selected = null;
+      });
+      _check();
+    }
+  }
+
+  Future<void> _check() async {
+    final session = widget.session;
+    final status = await widget.client.githubStatus(session);
+    if (!mounted || session != widget.session) return;
+    setState(() {
+      _status = status != null && status.available ? status : null;
+      _checked = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _status;
+    if (!_checked) return Center(child: Spinner(size: 16, color: AppColors.fg3));
+    if (status == null) {
+      return prMessage('Pull requests need the GitHub CLI installed and signed in, in a GitHub repository.');
+    }
+    return PrListPanel(
+      client: widget.client,
+      session: widget.session,
+      status: status,
+      selected: _selected,
+      showTitle: false,
+      onSelect: (n) {
+        setState(() => _selected = n);
+        widget.onOpen(n);
+      },
     );
+  }
+}
+
+class DesktopPrDetailScreen extends StatelessWidget {
+  const DesktopPrDetailScreen({
+    super.key,
+    required this.client,
+    required this.session,
+    required this.number,
+    required this.status,
+  });
+
+  final DaemonClient client;
+  final String session;
+  final int number;
+  final GithubStatus status;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: AppColors.bg,
+        child: _DesktopPrDetail(
+          client: client,
+          session: session,
+          number: number,
+          status: status,
+          listHidden: false,
+          onToggleList: null,
+          onChanged: () async {},
+        ),
+      );
+}
+
+class DesktopPullRequests extends StatefulWidget {
+  const DesktopPullRequests({
+    super.key,
+    required this.client,
+    required this.session,
+    required this.status,
+    this.openNumber,
+  });
+
+  final DaemonClient client;
+  final String session;
+  final GithubStatus status;
+  final int? openNumber;
+
+  @override
+  State<DesktopPullRequests> createState() => _DesktopPullRequestsState();
+}
+
+class _DesktopPullRequestsState extends State<DesktopPullRequests> {
+  int? _selected;
+  bool _listHidden = false;
+  int _tick = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.openNumber;
   }
 
   @override
   Widget build(BuildContext context) {
     final selected = _selected;
+    final list = Container(
+      color: AppColors.surface1,
+      child: PrListPanel(
+        client: widget.client,
+        session: widget.session,
+        status: widget.status,
+        selected: selected,
+        refreshTick: _tick,
+        onSelect: (n) => setState(() => _selected = n),
+        onLoaded: (prs) {
+          if (_selected == null && prs.isNotEmpty) setState(() => _selected = prs.first.number);
+        },
+      ),
+    );
     return Material(
       color: AppColors.bg,
       child: LayoutBuilder(builder: (context, box) {
@@ -312,11 +466,11 @@ class _DesktopPullRequestsState extends State<DesktopPullRequests> {
                     _listHidden = !_listHidden;
                   }
                 }),
-                onChanged: _load,
+                onChanged: () async => setState(() => _tick++),
               );
-        if (narrow) return showList ? _list() : detail;
+        if (narrow) return showList ? list : detail;
         return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (showList) SizedBox(width: box.maxWidth >= 1200 ? 340 : 300, child: _list()),
+          if (showList) SizedBox(width: box.maxWidth >= 1200 ? 340 : 300, child: list),
           Expanded(child: detail),
         ]);
       }),
@@ -341,7 +495,7 @@ class _DesktopPrDetail extends StatefulWidget {
   final int number;
   final GithubStatus status;
   final bool listHidden;
-  final VoidCallback onToggleList;
+  final VoidCallback? onToggleList;
   final Future<void> Function() onChanged;
 
   @override
@@ -513,7 +667,7 @@ class _DesktopPrDetailState extends State<_DesktopPrDetail> {
       padding: const EdgeInsets.fromLTRB(20, 16, 14, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (widget.listHidden) ...[
+          if (widget.listHidden && widget.onToggleList != null) ...[
             IconBtn('sidebar', size: 30, iconSize: 15, tooltip: 'Show list', onTap: widget.onToggleList),
             const SizedBox(width: 6),
           ],
@@ -547,7 +701,7 @@ class _DesktopPrDetailState extends State<_DesktopPrDetail> {
             builder: (anchor) => IconBtn('more-horizontal',
                 size: 32, iconSize: 16, tooltip: 'More', onTap: _busy ? null : () => _menu(anchor)),
           ),
-          if (!widget.listHidden)
+          if (!widget.listHidden && widget.onToggleList != null)
             IconBtn('sidebar', size: 32, iconSize: 15, tooltip: 'Hide list', onTap: widget.onToggleList),
         ]),
         const SizedBox(height: 10),

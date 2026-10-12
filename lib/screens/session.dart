@@ -103,6 +103,8 @@ class SessionScreen extends StatefulWidget {
 
   final ValueChanged<bool>? onGithubReady;
 
+  final VoidCallback? onShowPullRequests;
+
   /// Publishes this session's terminals to the shell as a render host. Called
   /// only when the terminal set or focus changes, never on output.
   ///
@@ -159,6 +161,7 @@ class SessionScreen extends StatefulWidget {
       this.onMacStatus,
       this.onMacControls,
       this.onGithubReady,
+      this.onShowPullRequests,
       this.onTerminalHost,
       this.onOpenScheduled,
       this.acceptDrops = true,

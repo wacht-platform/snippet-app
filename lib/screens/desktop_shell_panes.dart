@@ -88,6 +88,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
               _setMacSessionControls(t.key, stop, performAction)
           : null,
       onGithubReady: !kMobile ? (ok) => _setGithubReady(t.key, ok) : null,
+      onShowPullRequests: !kMobile ? _showPullRequests : null,
       onTerminalHost:
           !kMobile ? (host, open) => _setTerminalHost(t.key, host, open) : null,
       onOpenScheduled:
