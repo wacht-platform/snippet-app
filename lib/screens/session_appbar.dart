@@ -794,6 +794,15 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   }
 
   void _openAutonomy() {
+    if (!kMobile) {
+      presentScreen(context,
+          style: PanelStyle.drawer,
+          purpose: ShellPanelPurpose.autonomy,
+          originClient: widget.client,
+          originSessionId: widget.sessionId,
+          builder: (_, close) => AutonomyPanel(client: widget.client));
+      return;
+    }
     showAppSheet(context,
         title: 'Autonomous mode',
         maxWidth: 440,
@@ -915,6 +924,9 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         return;
       case 'actions':
         _openActions(_state);
+        return;
+      case 'autonomy':
+        if (_isMissionControl) _openAutonomy();
         return;
       case 'pull_requests':
         final status = _github;

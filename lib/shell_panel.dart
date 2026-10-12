@@ -22,6 +22,7 @@ enum ShellPanelPurpose {
   artifact,
   deliverables,
   pullRequests,
+  autonomy,
   generic,
 }
 
@@ -47,6 +48,7 @@ class ShellPanelRequest {
         ShellPanelPurpose.conversation => 'Conversation',
         ShellPanelPurpose.deliverables => 'Artifacts & files',
         ShellPanelPurpose.pullRequests => 'Pull requests',
+        ShellPanelPurpose.autonomy => 'Autonomous mode',
         _ => '${purpose.name[0].toUpperCase()}${purpose.name.substring(1)}',
       };
   void complete() {
