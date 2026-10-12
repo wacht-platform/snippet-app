@@ -49,7 +49,7 @@ class ShellPanelRequest {
         ShellPanelPurpose.deliverables => 'Artifacts & files',
         ShellPanelPurpose.pullRequests => id.isEmpty ? 'Pull requests' : '#$id',
         ShellPanelPurpose.autonomy => 'Autonomous mode',
-        ShellPanelPurpose.lanes => 'Delegated lanes',
+        ShellPanelPurpose.lanes => id.isEmpty ? 'Delegated lanes' : 'Lane',
         ShellPanelPurpose.recurring => 'Scheduled jobs',
         _ => '${purpose.name[0].toUpperCase()}${purpose.name.substring(1)}',
       };

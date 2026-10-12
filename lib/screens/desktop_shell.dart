@@ -431,8 +431,6 @@ class _DesktopShellState extends State<DesktopShell>
         onToggleRightPanel: _toggleRightPanel,
         onSessionAction: _dispatchSessionAction,
         onOpenGoalPopover: _openGoalPopover,
-        githubReady:
-            _activeTab != null && (_githubReady[_activeTab!.key] ?? false),
       );
 
   Future<void> _openGoalPopover(BuildContext btnCtx) => showGoalPopover(

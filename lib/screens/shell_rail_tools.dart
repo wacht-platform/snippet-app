@@ -60,7 +60,6 @@ List<Widget> buildShellRailTools({
   required void Function(RightPanel panel) onToggleRightPanel,
   required void Function(String action, [String? extra]) onSessionAction,
   required void Function(BuildContext ctx) onOpenGoalPopover,
-  bool githubReady = false,
 }) {
   final tab = activeTab;
   final mc = tab?.isMissionControl ?? false;
@@ -140,12 +139,6 @@ List<Widget> buildShellRailTools({
           tab == null ? null : () => onToggleRightPanel(RightPanel.recurring),
     ),
     if (kMacOS) ...[
-      if (githubReady)
-        railTool(
-          'git-branch',
-          tooltip: 'Pull requests',
-          onTap: tab == null ? null : () => onSessionAction('pull_requests'),
-        ),
       railTool(
         'clipboard',
         tooltip: 'Artifacts & files',
