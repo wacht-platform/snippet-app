@@ -84,33 +84,7 @@ class _SessionTermViewState extends State<SessionTermView> {
     searchHitForeground: const Color(0xff121110),
   );
 
-  static TerminalTheme get _theme => kMobile ? _emberTheme : _graphiteTheme;
-
-  static final _graphiteTheme = TerminalTheme(
-    cursor: const Color(0xffffffff),
-    selection: const Color(0x66ffffff),
-    foreground: const Color(0xffe5e5e5),
-    background: const Color(0xff0a0a0a),
-    black: const Color(0xff000000),
-    red: const Color(0xffcd3131),
-    green: const Color(0xff0dbc79),
-    yellow: const Color(0xffe5e510),
-    blue: const Color(0xff2472c8),
-    magenta: const Color(0xffbc3fbc),
-    cyan: const Color(0xff11a8cd),
-    white: const Color(0xffe5e5e5),
-    brightBlack: const Color(0xff666666),
-    brightRed: const Color(0xfff14c4c),
-    brightGreen: const Color(0xff23d18b),
-    brightYellow: const Color(0xfff5f543),
-    brightBlue: const Color(0xff3b8eea),
-    brightMagenta: const Color(0xffd670d6),
-    brightCyan: const Color(0xff29b8db),
-    brightWhite: const Color(0xffffffff),
-    searchHitBackground: const Color(0xffe5e510),
-    searchHitBackgroundCurrent: const Color(0xfff5f543),
-    searchHitForeground: const Color(0xff000000),
-  );
+  static TerminalTheme get _theme => _emberTheme;
 
   @override
   void initState() {
@@ -316,13 +290,8 @@ class _SessionTermViewState extends State<SessionTermView> {
           keyboardType: TextInputType.visiblePassword,
           padding: kMobile
               ? const EdgeInsets.fromLTRB(14, 8, 12, 8)
-              : const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          textStyle: kMobile
-              ? TerminalStyle(fontSize: 13, fontFamily: kMonoFamily)
-              : const TerminalStyle(
-                  fontSize: 13,
-                  fontFamily: 'monospace',
-                ),
+              : const EdgeInsets.fromLTRB(16, 12, 14, 12),
+          textStyle: TerminalStyle(fontSize: 13, fontFamily: kMonoFamily),
         ),
       ),
       if (widget.mobileKeys)
