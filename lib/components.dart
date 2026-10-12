@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'platform.dart';
 import 'theme.dart';
-import 'widgets.dart' show AppIcon, StatusDot;
+import 'widgets.dart' show AppIcon, ShellPanelRoot, StatusDot;
 
 enum Tone { neutral, accent, ok, run, danger }
 
@@ -186,7 +186,9 @@ class SheetHeader extends StatelessWidget {
   final VoidCallback onClose;
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) => ShellPanelRoot.inPanel(context)
+      ? const SizedBox.shrink()
+      : Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

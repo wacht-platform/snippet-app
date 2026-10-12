@@ -802,6 +802,7 @@ class _SessionDeliverablesState extends State<SessionDeliverables> {
                 ),
               ),
             ),
+          if (!ShellPanelRoot.inPanel(context))
           Container(
             padding: EdgeInsets.fromLTRB(16, kMobile ? 8 : 12, 8, 10),
             child: Row(children: [

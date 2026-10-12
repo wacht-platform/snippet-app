@@ -158,9 +158,11 @@ class _CoordinationAgentDirectoryState
       );
     }
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Agents'),
-      ),
+      appBar: ShellPanelRoot.inPanel(context)
+          ? null
+          : AppBar(
+              title: const Text('Agents'),
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _create,
         icon: AppIcon('plus', size: 18, color: AppColors.accentFg),

@@ -49,6 +49,8 @@ class ShellPanelRequest {
         ShellPanelPurpose.deliverables => 'Artifacts & files',
         ShellPanelPurpose.pullRequests => id.isEmpty ? 'Pull requests' : '#$id',
         ShellPanelPurpose.autonomy => 'Autonomous mode',
+        ShellPanelPurpose.lanes => 'Delegated lanes',
+        ShellPanelPurpose.recurring => 'Scheduled jobs',
         _ => '${purpose.name[0].toUpperCase()}${purpose.name.substring(1)}',
       };
   void complete() {
@@ -100,6 +102,6 @@ class ShellPanelBody extends StatelessWidget {
         open: host.open,
         client: client,
         sessionId: request.sessionId,
-        child: ShellPanelRoot(child: body));
+        child: ShellPanelRoot(label: request.label, child: body));
   }
 }

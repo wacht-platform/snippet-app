@@ -321,7 +321,10 @@ class _FileExplorerState extends State<FileExplorer> {
                 }
               },
               child: Column(children: [
-                if (!kMobile)
+                if (!kMobile &&
+                    !(ShellPanelRoot.inPanel(context) &&
+                        segs.isEmpty &&
+                        !_selecting))
                   Container(
                     height: 52,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
