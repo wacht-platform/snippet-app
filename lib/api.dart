@@ -693,11 +693,17 @@ class DaemonClient {
 
   /// GET /mission-control/autonomy — whether Mission Control is autonomous, its rhythm
   /// and quiet hours, and when it last and next checks in.
-  /// GET /github/status — whether pull request review is available here.
-  Future<GithubStatus> githubStatus(String session) async {
-    final r = await http.get(_uri('/github/status', {'session': session}));
-    if (r.statusCode != 200) return const GithubStatus(available: false);
-    return GithubStatus.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  /// GET /github/status — whether pull request review is available here, or
+  /// null when the daemon couldn't be asked (so the caller can retry rather
+  /// than treat a hiccup as "not on GitHub").
+  Future<GithubStatus?> githubStatus(String session) async {
+    try {
+      final r = await http.get(_uri('/github/status', {'session': session}));
+      if (r.statusCode != 200) return null;
+      return GithubStatus.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
   }
 
   String _ghError(http.Response r) {
@@ -749,6 +755,36 @@ class DaemonClient {
           'comments': [for (final c in comments) c.toJson()],
         }));
     if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  Future<void> replyToThread(
+      String session, int number, int commentId, String body) async {
+    final r = await http.post(_uri('/github/pr/reply'),
+        headers: _json,
+        body: jsonEncode({
+          'session': session,
+          'number': number,
+          'comment_id': commentId,
+          'body': body,
+        }));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  Future<void> resolveThread(
+      String session, String threadId, bool resolved) async {
+    final r = await http.post(_uri('/github/pr/thread'),
+        headers: _json,
+        body: jsonEncode(
+            {'session': session, 'thread_id': threadId, 'resolved': resolved}));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  Future<String> githubCommitDiff(String session, String sha) async {
+    final r = await http.get(
+        _uri('/github/commit/diff', {'session': session, 'sha': sha}));
+    if (r.statusCode != 200) throw _ghError(r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['diff'] as String? ??
+        '';
   }
 
   Future<void> commentOnPr(String session, int number, String body) async {

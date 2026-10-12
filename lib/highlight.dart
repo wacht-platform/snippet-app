@@ -9,12 +9,13 @@ import 'theme.dart';
 final Highlight _hl = Highlight()..registerLanguages(builtinAllLanguages);
 
 /// Highlight a fenced markdown block. [language] is the ``` tag (or empty).
-TextSpan highlightedCodeSpan(String code, {String language = ''}) {
+TextSpan highlightedCodeSpan(String code,
+    {String language = '', double fontSize = 13, double height = 1.55}) {
   final base = TextStyle(
     fontFamily: monoFamily,
     fontFamilyFallback: const ['Menlo', 'Consolas', 'monospace'],
-    fontSize: 13,
-    height: 1.55,
+    fontSize: fontSize,
+    height: height,
     color: AppColors.fg1,
   );
   final lang = language.trim().toLowerCase();

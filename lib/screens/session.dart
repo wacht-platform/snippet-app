@@ -236,6 +236,22 @@ class _SessionScreenState extends State<SessionScreen>
   SharedInbound? _consumedShare;
   HarnessState? _state;
   GithubStatus? _github;
+  int _githubGen = 0;
+  bool _githubKnown = false;
+
+  void _loadGithubStatus() {
+    final gen = ++_githubGen;
+    _github = null;
+    _githubKnown = false;
+    if (_isMissionControl) return;
+    widget.client.githubStatus(widget.sessionId).then((status) {
+      if (!mounted || gen != _githubGen || status == null) return;
+      setState(() {
+        _githubKnown = true;
+        _github = status.available ? status : null;
+      });
+    });
+  }
   String _liveText = '';
   String _liveThinking = '';
   bool _liveTextVisible = false;
@@ -633,11 +649,7 @@ class _SessionScreenState extends State<SessionScreen>
   void initState() {
     super.initState();
     _title = _isMissionControl ? 'Mission Control' : widget.title;
-    if (!_isMissionControl) {
-      widget.client.githubStatus(widget.sessionId).then((status) {
-        if (mounted && status.available) setState(() => _github = status);
-      }).catchError((Object _) {});
-    }
+    _loadGithubStatus();
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
     _restoreDraft();
@@ -801,6 +813,7 @@ class _SessionScreenState extends State<SessionScreen>
       _unpark();
     }
     if (!sameSession) {
+      _loadGithubStatus();
       // Keep what was typed and attached as the previous session's draft,
       // before anything below clears it.
       Drafts.instance.save(
@@ -850,6 +863,7 @@ class _SessionScreenState extends State<SessionScreen>
       return;
     }
     if (state == AppLifecycleState.resumed && !_closed) {
+      if (!_githubKnown) _loadGithubStatus();
       if (widget.acceptDrops) {
         _unpark();
         _loadModel();
