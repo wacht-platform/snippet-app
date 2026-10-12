@@ -178,7 +178,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     final branch = _status?.branch ?? '';
     final isClean = files.isEmpty;
 
-    return PullToRefresh(
+    return LayoutBuilder(builder: (context, box) => PullToRefresh(
       onRefresh: refresh,
       child: Container(
         color: kMobile ? AppColors.bg : Colors.transparent,
@@ -200,7 +200,10 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             else if (_error != null)
               _errorState()
             else if (isClean)
-              _cleanState()
+              SizedBox(
+                height: (box.maxHeight - 120).clamp(240.0, 640.0),
+                child: _cleanState(),
+              )
             else ...[
               const SizedBox(height: 6),
               for (final f in files) _fileRow(f),
@@ -208,7 +211,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   /// Branch + change count on one flat row. Tapping the row opens the same
@@ -319,21 +322,10 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     );
   }
 
-  Widget _cleanState() => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            AppIcon('check', size: 14, color: AppColors.ok),
-            const SizedBox(width: 8),
-            Text('No changes', style: sans(13, color: AppColors.fg2)),
-          ]),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(left: 22),
-            child: Text('Working tree clean · ${_timeAgo(_lastUpdated)}',
-                style: sans(12, color: AppColors.fg4)),
-          ),
-        ]),
+  Widget _cleanState() => EmptyState(
+        icon: 'check-check',
+        title: 'Working tree clean',
+        body: 'No changes to commit · updated ${_timeAgo(_lastUpdated)}',
       );
 
   Widget _errorState() => Padding(

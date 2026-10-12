@@ -1331,22 +1331,24 @@ class _PrMergeBoxState extends State<PrMergeBox> {
             ? AppColors.accentFg
             : Colors.white;
     final bg = enabled ? color : AppColors.surface2;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Material(
+    return Row(children: [
+      Expanded(
+        child: Material(
         color: bg,
         borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
         child: InkWell(
           onTap: enabled ? onTap : null,
           borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
           child: Container(
-            height: 40,
+            height: 44,
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Text(label, style: sans(13.5, weight: W.label, color: fg)),
+            child: Text(label, style: sans(14, weight: W.label, color: fg)),
           ),
         ),
       ),
-      Container(width: 1, height: 40, color: AppColors.bg.withValues(alpha: 0.35)),
+      ),
+      Container(width: 1, height: 44, color: AppColors.bg.withValues(alpha: 0.35)),
       Builder(
         builder: (anchor) => Material(
           color: bg,
@@ -1355,9 +1357,9 @@ class _PrMergeBoxState extends State<PrMergeBox> {
             onTap: _busy ? null : () => _pickMethod(anchor),
             borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
             child: SizedBox(
-              width: 38,
-              height: 40,
-              child: Center(child: AppIcon('chevron-down', size: 14, color: fg)),
+              width: 46,
+              height: 44,
+              child: Center(child: AppIcon('chevron-down', size: 15, color: fg)),
             ),
           ),
         ),
@@ -1422,7 +1424,10 @@ class _PrMergeBoxState extends State<PrMergeBox> {
           ]),
           if (actions.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Wrap(spacing: 8, runSpacing: 8, children: actions),
+            for (var i = 0; i < actions.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              actions[i],
+            ],
           ],
         ],
       );
@@ -1430,7 +1435,7 @@ class _PrMergeBoxState extends State<PrMergeBox> {
   Widget _secondary(String label, VoidCallback? onTap) => OutlinedButton(
         onPressed: _busy ? null : onTap,
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 40),
+          minimumSize: const Size.fromHeight(44),
           side: BorderSide(color: AppColors.border2),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1494,55 +1499,49 @@ class _PrMergeBoxState extends State<PrMergeBox> {
         if (blocked && widget.status.isAdmin)
           _check(_admin, 'Merge without waiting for requirements to be met (bypass branch protections)',
               (v) => setState(() => _admin = v)),
-        const SizedBox(height: 10),
-        Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 8, children: [
-          TextButton(
-            style: TextButton.styleFrom(minimumSize: const Size(0, 40)),
-            onPressed: _busy ? null : () => setState(() => _confirming = false),
-            child: Text('Cancel', style: sans(13.5, weight: W.label, color: AppColors.fg3)),
-          ),
-          if (blocked && widget.status.autoMerge && !_admin)
-            FilledButton(
-              onPressed: _busy ? null : _enableAuto,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 40),
-                backgroundColor: AppColors.accentFill,
-                foregroundColor: AppColors.accentFg,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: Text('Enable auto-merge', style: sans(13.5, weight: W.label, color: AppColors.accentFg)),
-            )
-          else
-            FilledButton(
-              onPressed: _busy || (blocked && !_admin) ? null : _merge,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 40),
-                backgroundColor: blocked ? AppColors.danger : AppColors.ok,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: Text('Confirm ${_short(_method)}', style: sans(13.5, weight: W.label, color: Colors.white)),
+        const SizedBox(height: 12),
+        if (blocked && widget.status.autoMerge && !_admin)
+          FilledButton(
+            onPressed: _busy ? null : _enableAuto,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: AppColors.accentFill,
+              foregroundColor: AppColors.accentFg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-        ]),
+            child: Text('Enable auto-merge', style: sans(14, weight: W.label, color: AppColors.accentFg)),
+          )
+        else
+          FilledButton(
+            onPressed: _busy || (blocked && !_admin) ? null : _merge,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              backgroundColor: blocked ? AppColors.danger : AppColors.ok,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Confirm ${_short(_method)}', style: sans(14, weight: W.label, color: Colors.white)),
+          ),
+        const SizedBox(height: 6),
+        TextButton(
+          style: TextButton.styleFrom(minimumSize: const Size.fromHeight(40)),
+          onPressed: _busy ? null : () => setState(() => _confirming = false),
+          child: Text('Cancel', style: sans(13.5, weight: W.label, color: AppColors.fg3)),
+        ),
       ]);
     } else {
       final canMerge = _ready || widget.status.isAdmin;
       final canAuto = blocked && widget.status.autoMerge;
-      children.add(Row(children: [
-        _splitButton(
-          label: canAuto && !widget.status.isAdmin ? 'Enable auto-merge' : _label(_method),
-          color: blocked ? (widget.status.isAdmin ? AppColors.danger : AppColors.accentFill) : AppColors.ok,
-          onTap: canMerge || canAuto
-              ? () => setState(() {
-                    _prefill();
-                    _confirming = true;
-                  })
-              : null,
-        ),
-        const SizedBox(width: 10),
-        if (blocked && !canMerge && !canAuto)
-          Expanded(child: Text('Waiting on required reviews or checks', style: TS.meta(AppColors.fg3))),
-      ]));
+      children.add(_splitButton(
+        label: canAuto && !widget.status.isAdmin ? 'Enable auto-merge' : _label(_method),
+        color: blocked ? (widget.status.isAdmin ? AppColors.danger : AppColors.accentFill) : AppColors.ok,
+        onTap: canMerge || canAuto
+            ? () => setState(() {
+                  _prefill();
+                  _confirming = true;
+                })
+            : null,
+      ));
       children.add(const SizedBox(height: 8));
       children.add(Text(
         blocked
@@ -1551,7 +1550,7 @@ class _PrMergeBoxState extends State<PrMergeBox> {
                 : canAuto
                     ? 'It will merge with a ${_short(_method)} once requirements are met.'
                     : 'Merging is disabled until requirements are met.')
-            : 'Merges with a ${_short(_method)} into ${_s.base}. Use the arrow to choose another method.',
+            : 'Merges with a ${_short(_method)} into ${_s.base}. The arrow picks another method.',
         style: TS.meta(AppColors.fg4),
       ));
     }
@@ -1560,14 +1559,8 @@ class _PrMergeBoxState extends State<PrMergeBox> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border2),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
       child: _content(),
     );
   }
