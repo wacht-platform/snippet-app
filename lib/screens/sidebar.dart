@@ -1432,7 +1432,9 @@ class SidebarState extends State<Sidebar> {
         ? ''
         : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
     final draft = !renaming && _hasDraft(s);
-    return Material(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
       color: _selecting && checked ? AppColors.accentBg : Colors.transparent,
       borderRadius: BorderRadius.circular(R.md),
       child: InkWell(
@@ -1456,9 +1458,9 @@ class SidebarState extends State<Sidebar> {
                 }
               },
         child: Container(
-          constraints: const BoxConstraints(minHeight: M.rowHeight + 10),
+          constraints: const BoxConstraints(minHeight: M.rowHeight),
           padding: EdgeInsets.symmetric(
-              horizontal: _selecting ? M.rowPadH : 0, vertical: 12),
+              horizontal: _selecting ? M.rowPadH : 0, vertical: 8),
           decoration: BoxDecoration(
             border: divider && !_selecting
                 ? Border(bottom: BorderSide(color: AppColors.border))
@@ -1500,6 +1502,7 @@ class SidebarState extends State<Sidebar> {
             ),
           ]),
         ),
+      ),
       ),
     );
   }

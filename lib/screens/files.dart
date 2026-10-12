@@ -453,14 +453,6 @@ class _FileExplorerState extends State<FileExplorer> {
                                   ? null
                                   : () => _newFolder(listing.path)),
                         ],
-                        if (widget.onClose != null) ...[
-                          const SizedBox(width: 4),
-                          IconBtn('x',
-                              size: 28,
-                              iconSize: 14,
-                              tooltip: 'Close',
-                              onTap: widget.onClose),
-                        ],
                       ],
                     ]),
                   )

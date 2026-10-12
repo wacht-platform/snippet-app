@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api.dart';
 import '../../coordination/coordination_thread_state.dart';
 import '../../models.dart';
+import '../../platform.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import 'task_common.dart' show statusColor;
@@ -324,7 +325,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           SnAppBar(
             title: t?.title ?? 'Task',
             compact: true,
-            onBack: widget.onClose ?? () => Navigator.of(context).pop(),
+            bordered: false,
+            onBack: kMobile
+                ? widget.onClose ?? () => Navigator.of(context).pop()
+                : null,
           ),
           Expanded(child: _body(t)),
         ]),

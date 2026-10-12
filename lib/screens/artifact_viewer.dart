@@ -2,16 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../api.dart';
-import '../menu_widgets.dart';
 import '../models.dart';
 import '../panel.dart';
 import '../platform.dart';
-import '../shell_panel.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'file_viewer.dart';
@@ -190,7 +187,6 @@ class ArtifactRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
-      side: BorderSide(color: AppColors.border2),
     );
     final body = kMobile
         ? Padding(
@@ -502,9 +498,6 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
     final v = _version;
     return Container(
       padding: EdgeInsets.fromLTRB(16, kMobile ? 8 : 12, 8, 10),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
       child: Row(children: [
         if (a != null)
           Padding(
@@ -811,8 +804,6 @@ class _SessionDeliverablesState extends State<SessionDeliverables> {
             ),
           Container(
             padding: EdgeInsets.fromLTRB(16, kMobile ? 8 : 12, 8, 10),
-            decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.border))),
             child: Row(children: [
               Expanded(
                 child: Text('Artifacts & files',
@@ -827,43 +818,44 @@ class _SessionDeliverablesState extends State<SessionDeliverables> {
             ]),
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              children: [
-                _section('Artifacts'),
-                if (_error != null)
-                  Text(_error!, style: TS.meta(AppColors.danger))
-                else if (artifacts == null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Spinner(size: 14, color: AppColors.fg3),
-                  )
-                else if (artifacts.isEmpty)
-                  Text('None yet.', style: TS.meta(AppColors.fg4))
-                else
-                  for (final a in artifacts)
-                    ArtifactRow(
-                      client: widget.client,
-                      session: widget.session,
-                      id: a.id,
-                      version: a.latest?.n ?? 1,
-                      title: a.title,
-                      kind: a.kind,
-                      caption: a.caption,
-                    ),
-                _section('Files'),
-                if (files.isEmpty)
-                  Text('None yet.', style: TS.meta(AppColors.fg4))
-                else
-                  for (final f in files)
-                    PresentedFileCard(
-                      client: widget.client,
-                      path: f.path,
-                      caption: f.caption,
-                      onOpenFileTab: widget.onOpenFileTab,
-                    ),
-              ],
-            ),
+            child: _error != null
+                ? EmptyState(icon: 'alert-triangle', title: 'Couldn\'t load artifacts', body: _error)
+                : artifacts == null
+                    ? Center(child: Spinner(size: 16, color: AppColors.fg3))
+                    : artifacts.isEmpty && files.isEmpty
+                        ? const EmptyState(
+                            icon: 'layers',
+                            title: 'Nothing shared yet',
+                            body: 'Artifacts and files the agent hands over in this chat collect here.',
+                          )
+                        : ListView(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                            children: [
+                              if (artifacts.isNotEmpty) ...[
+                                _section('Artifacts · ${artifacts.length}'),
+                                for (final a in artifacts)
+                                  ArtifactRow(
+                                    client: widget.client,
+                                    session: widget.session,
+                                    id: a.id,
+                                    version: a.latest?.n ?? 1,
+                                    title: a.title,
+                                    kind: a.kind,
+                                    caption: a.caption,
+                                  ),
+                              ],
+                              if (files.isNotEmpty) ...[
+                                _section('Files · ${files.length}'),
+                                for (final f in files)
+                                  PresentedFileCard(
+                                    client: widget.client,
+                                    path: f.path,
+                                    caption: f.caption,
+                                    onOpenFileTab: widget.onOpenFileTab,
+                                  ),
+                              ],
+                            ],
+                          ),
           ),
         ]),
       ),

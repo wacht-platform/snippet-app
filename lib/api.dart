@@ -10,6 +10,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'response_cache.dart';
 import 'swr.dart';
 import 'models.dart';
+import 'github_models.dart';
 
 class DownloadCancelled implements Exception {
   const DownloadCancelled();
@@ -692,6 +693,146 @@ class DaemonClient {
 
   /// GET /mission-control/autonomy — whether Mission Control is autonomous, its rhythm
   /// and quiet hours, and when it last and next checks in.
+  /// GET /github/status — whether pull request review is available here, or
+  /// null when the daemon couldn't be asked (so the caller can retry rather
+  /// than treat a hiccup as "not on GitHub").
+  Future<GithubStatus?> githubStatus(String session) async {
+    try {
+      final r = await http.get(_uri('/github/status', {'session': session}));
+      if (r.statusCode != 200) return null;
+      return GithubStatus.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _ghError(http.Response r) {
+    try {
+      return (jsonDecode(r.body) as Map<String, dynamic>)['error']?.toString() ??
+          r.body;
+    } catch (_) {
+      return r.body;
+    }
+  }
+
+  /// GET /github/prs — open, mine, review or closed.
+  Future<List<PrSummary>> githubPrs(String session, String filter) async {
+    final r = await http
+        .get(_uri('/github/prs', {'session': session, 'filter': filter}));
+    if (r.statusCode != 200) throw _ghError(r);
+    return ((jsonDecode(r.body) as Map<String, dynamic>)['prs'] as List)
+        .map((e) => PrSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<PrDetail> githubPr(String session, int number) async {
+    final r = await http.get(
+        _uri('/github/pr', {'session': session, 'number': '$number'}));
+    if (r.statusCode != 200) throw _ghError(r);
+    return PrDetail.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<String> githubPrDiff(String session, int number) async {
+    final r = await http.get(
+        _uri('/github/pr/diff', {'session': session, 'number': '$number'}));
+    if (r.statusCode != 200) throw _ghError(r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['diff'] as String? ??
+        '';
+  }
+
+  /// POST /github/pr/review — APPROVE, REQUEST_CHANGES or COMMENT.
+  Future<void> submitPrReview(String session, int number,
+      {required String event,
+      required String body,
+      required List<PendingComment> comments}) async {
+    final r = await http.post(_uri('/github/pr/review'),
+        headers: _json,
+        body: jsonEncode({
+          'session': session,
+          'number': number,
+          'event': event,
+          'body': body,
+          'comments': [for (final c in comments) c.toJson()],
+        }));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  Future<void> replyToThread(
+      String session, int number, int commentId, String body) async {
+    final r = await http.post(_uri('/github/pr/reply'),
+        headers: _json,
+        body: jsonEncode({
+          'session': session,
+          'number': number,
+          'comment_id': commentId,
+          'body': body,
+        }));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  Future<void> resolveThread(
+      String session, String threadId, bool resolved) async {
+    final r = await http.post(_uri('/github/pr/thread'),
+        headers: _json,
+        body: jsonEncode(
+            {'session': session, 'thread_id': threadId, 'resolved': resolved}));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  Future<String> githubCommitDiff(String session, String sha) async {
+    final r = await http.get(
+        _uri('/github/commit/diff', {'session': session, 'sha': sha}));
+    if (r.statusCode != 200) throw _ghError(r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['diff'] as String? ??
+        '';
+  }
+
+  Future<void> commentOnPr(String session, int number, String body) async {
+    final r = await http.post(_uri('/github/pr/comment'),
+        headers: _json,
+        body: jsonEncode({'session': session, 'number': number, 'body': body}));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  /// POST /github/pr/merge. [auto] queues the merge until requirements are
+  /// met; [admin] merges past them; [head] refuses if new commits landed.
+  Future<void> mergePr(String session, int number,
+      {String method = 'merge',
+      String? subject,
+      String? body,
+      String? head,
+      bool auto = false,
+      bool disableAuto = false,
+      bool admin = false,
+      bool deleteBranch = false,
+      String? branch}) async {
+    final r = await http.post(_uri('/github/pr/merge'),
+        headers: _json,
+        body: jsonEncode({
+          'session': session,
+          'number': number,
+          'method': method,
+          if (subject != null) 'subject': subject,
+          if (body != null) 'body': body,
+          if (head != null) 'head': head,
+          'auto': auto,
+          'disable_auto': disableAuto,
+          'admin': admin,
+          'delete_branch': deleteBranch,
+          if (branch != null) 'branch': branch,
+        }));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  /// POST /github/pr/state — ready, draft, close, reopen, update or
+  /// update_rebase.
+  Future<void> prState(String session, int number, String action) async {
+    final r = await http.post(_uri('/github/pr/state'),
+        headers: _json,
+        body: jsonEncode({'session': session, 'number': number, 'action': action}));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
   /// GET /artifacts — a session's artifacts, each version with a signed link.
   Future<List<ArtifactInfo>> artifacts(String session) async {
     final r = await http.get(_uri('/artifacts', {'session': session}));
