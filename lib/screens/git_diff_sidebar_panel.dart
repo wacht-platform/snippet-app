@@ -228,9 +228,9 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     ));
     if (!tabbed) return changes;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const ShellSectionHeader(label: 'Git'),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      Container(
+        height: 38,
+        padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
         child: Row(children: [
           _tabChip('changes', files.isEmpty ? 'Changes' : 'Changes  ${files.length}'),
           _tabChip('prs', 'Pull requests'),
@@ -251,18 +251,18 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   Widget _tabChip(String key, String label) {
     final on = widget.tab == key;
     return Padding(
-      padding: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.only(right: 2),
       child: Material(
-        color: on ? AppColors.surface3 : Colors.transparent,
-        borderRadius: BorderRadius.circular(R.pill),
+        color: on ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(7),
         child: InkWell(
           onTap: () => widget.onTab?.call(key),
-          borderRadius: BorderRadius.circular(R.pill),
+          borderRadius: BorderRadius.circular(7),
+          hoverColor: AppColors.surface2.withValues(alpha: 0.5),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Text(label,
-                style: sans(12.5,
-                    weight: W.label, color: on ? AppColors.fg1 : AppColors.fg3)),
+                style: sans(13, color: on ? AppColors.fg1 : AppColors.fg3)),
           ),
         ),
       ),
@@ -272,26 +272,28 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   /// Branch + change count on one flat row. Tapping the row opens the same
   /// local/remote branch picker used by the full Git screen.
   Widget _branchRow(String repoName, String branch, int changes) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+        padding: kMobile
+            ? const EdgeInsets.fromLTRB(12, 4, 12, 6)
+            : const EdgeInsets.fromLTRB(8, 2, 8, 4),
         child: Builder(
           builder: (anchor) => Material(
             color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(kMobile ? 10 : 8),
             child: InkWell(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(kMobile ? 10 : 8),
               onTap: _branchBusy ? null : () => _branchSheet(anchor),
               child: Container(
-                height: 36,
+                height: kMobile ? 36 : 30,
                 padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
                 child: Row(children: [
-                  AppIcon('git-branch', size: 14, color: AppColors.accent),
+                  AppIcon('git-branch', size: kMobile ? 14 : 13, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       branch.isEmpty ? repoName : branch,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TS.label(AppColors.fg1),
+                      style: kMobile ? TS.label(AppColors.fg1) : sans(13, color: AppColors.fg1),
                     ),
                   ),
                   if (changes > 0) ...[
@@ -322,15 +324,17 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             child: InkWell(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
               onTap: widget.onOpenDiff == null
                   ? null
                   : () => widget.onOpenDiff!(f),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+                padding: kMobile
+                    ? const EdgeInsets.fromLTRB(10, 7, 10, 7)
+                    : const EdgeInsets.fromLTRB(10, 5, 10, 5),
                 child: Row(children: [
                   _statusLetter(f),
-                  const SizedBox(width: 10),
+                  SizedBox(width: kMobile ? 10 : 8),
                   Expanded(
                     child: Text.rich(
                       TextSpan(children: [
@@ -342,7 +346,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                       ]),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13.5, color: AppColors.fg1),
+                      style: sans(kMobile ? 13.5 : 13, color: AppColors.fg1),
                     ),
                   ),
                 ]),
@@ -365,14 +369,14 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     return Tooltip(
       message: f.staged ? 'staged' : (f.untracked ? 'untracked' : 'unstaged'),
       child: Container(
-        width: 20,
-        height: 20,
+        width: kMobile ? 20 : 16,
+        height: kMobile ? 20 : 16,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(kMobile ? 6 : 4),
         ),
-        child: Text(letter, style: mono(11, color: color)),
+        child: Text(letter, style: mono(kMobile ? 11 : 10, color: color)),
       ),
     );
   }
