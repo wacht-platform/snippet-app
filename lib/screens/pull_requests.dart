@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
-import '../components.dart';
-import '../dialog_widgets.dart';
 import '../github_models.dart';
-import '../menu_widgets.dart';
 import '../panel.dart';
 import '../platform.dart';
-import '../shell_panel.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -87,20 +82,6 @@ Widget _screenHeader(
   );
 }
 
-Widget _checksTag(List<PrCheck> checks) {
-  final passed = checks.where((c) => c.state == ChecksState.passing).length;
-  return switch (rollup(checks)) {
-    ChecksState.none => const SizedBox.shrink(),
-    ChecksState.passing =>
-      Tag('Checks $passed/${checks.length}', tone: Tone.ok, icon: 'check'),
-    ChecksState.failing => Tag(
-        '${checks.where((c) => c.state == ChecksState.failing).length} failing',
-        tone: Tone.danger,
-        icon: 'x-circle'),
-    ChecksState.pending => const Tag('Checks running', tone: Tone.run, dot: true),
-  };
-}
-
 Widget? _decisionTag(String decision) => switch (decision) {
       'APPROVED' => const Tag('Approved', tone: Tone.ok),
       'CHANGES_REQUESTED' => const Tag('Changes requested', tone: Tone.danger),
@@ -142,7 +123,7 @@ class PullRequestsScreen extends StatefulWidget {
 class _PullRequestsScreenState extends State<PullRequestsScreen> {
   static const _filters = [
     ('open', 'Open'),
-    ('review', 'Needs my review'),
+    ('review', 'Needs review'),
     ('mine', 'Mine'),
     ('closed', 'Closed'),
   ];
@@ -167,8 +148,17 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     }
   }
 
-  void _open(PrSummary pr) {
-    Navigator.of(context).push(MaterialPageRoute<void>(
+  void _pick(String key) {
+    if (key == _filter) return;
+    setState(() {
+      _filter = key;
+      _prs = null;
+    });
+    _load();
+  }
+
+  Future<void> _open(PrSummary pr) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => PullRequestScreen(
         client: widget.client,
         session: widget.session,
@@ -176,50 +166,175 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
         status: widget.status,
       ),
     ));
+    if (mounted) _load();
   }
 
-  Widget _row(PrSummary pr) {
-    final decision = _decisionTag(pr.reviewDecision);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _open(pr),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: kMobile ? 14 : 11),
-          decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.border))),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(
-                  child: Text(pr.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(kMobile ? 15 : 14,
-                          weight: W.label, height: 1.35, color: AppColors.fg1)),
+  Widget _tabs() => Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.border))),
+        child: ListView(scrollDirection: Axis.horizontal, children: [
+          for (final (key, label) in _filters)
+            InkWell(
+              onTap: () => _pick(key),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                        color: _filter == key ? AppColors.accent : Colors.transparent,
+                        width: 2),
+                  ),
                 ),
-                const SizedBox(width: 10),
-                _size(pr.additions, pr.deletions),
-              ]),
-              const SizedBox(height: 4),
-              Text(
-                  '#${pr.number} · ${pr.author} · ${pr.head} → ${pr.base} · ${_ago(pr.updatedAt)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TS.meta(AppColors.fg3)),
-              const SizedBox(height: 8),
-              Wrap(spacing: 6, runSpacing: 6, children: [
-                _stateTag(pr),
-                if (pr.checks.isNotEmpty) _checksTag(pr.checks),
-                if (decision != null) decision,
-              ]),
-            ],
+                child: Text(label,
+                    style: sans(13,
+                        weight: W.label,
+                        color: _filter == key ? AppColors.fg1 : AppColors.fg3)),
+              ),
+            ),
+        ]),
+      );
+
+  (String, Color) _stateIcon(PrSummary pr) => switch (pr.state) {
+        'MERGED' => ('git-commit', AppColors.accent),
+        'CLOSED' => ('x-circle', AppColors.fg4),
+        _ => pr.draft ? ('git-branch', AppColors.fg4) : ('git-branch', AppColors.ok),
+      };
+
+  Widget _avatar(String login) {
+    const tints = [0xFF7C8CF8, 0xFF5BC0A0, 0xFFE0A050, 0xFFD27AA8, 0xFF62A8E0, 0xFFB59A6A];
+    final tint = Color(tints[login.codeUnits.fold<int>(0, (a, b) => a + b) % tints.length]);
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: tint.withValues(alpha: 0.18), shape: BoxShape.circle),
+      child: Text(login.isEmpty ? '?' : login[0].toUpperCase(),
+          style: sans(11, weight: W.strong, color: tint)),
+    );
+  }
+
+  Widget? _checksIcon(PrSummary pr) => switch (rollup(pr.checks)) {
+        ChecksState.passing => Tooltip(
+            message: 'Checks passed',
+            child: AppIcon('check', size: 13, color: AppColors.ok)),
+        ChecksState.failing => Tooltip(
+            message: 'Checks failing',
+            child: AppIcon('x-circle', size: 13, color: AppColors.danger)),
+        ChecksState.pending => Tooltip(
+            message: 'Checks running',
+            child: Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: AppColors.run, shape: BoxShape.circle))),
+        ChecksState.none => null,
+      };
+
+  Widget? _reviewIcon(PrSummary pr) => switch (pr.reviewDecision) {
+        'APPROVED' => Tooltip(
+            message: 'Approved',
+            child: AppIcon('check-check', size: 14, color: AppColors.ok)),
+        'CHANGES_REQUESTED' => Tooltip(
+            message: 'Changes requested',
+            child: AppIcon('alert-circle', size: 13, color: AppColors.danger)),
+        _ => null,
+      };
+
+  Widget _row(PrSummary pr) {
+    final (icon, ink) = _stateIcon(pr);
+    final indicators = [
+      for (final w in [_checksIcon(pr), _reviewIcon(pr)])
+        if (w != null) w,
+    ];
+    return InkWell(
+      onTap: () => _open(pr),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, kMobile ? 12 : 9, 14, kMobile ? 12 : 9),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: AppIcon(icon, size: 15, color: ink),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(pr.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(kMobile ? 15 : 14,
+                        weight: W.label, height: 1.35, color: AppColors.fg1)),
+                const SizedBox(height: 3),
+                Row(children: [
+                  Flexible(
+                    child: Text(
+                        '#${pr.number} · ${pr.author} · ${_ago(pr.updatedAt)}${pr.draft ? ' · draft' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TS.meta(AppColors.fg3)),
+                  ),
+                  for (final w in indicators) ...[const SizedBox(width: 8), w],
+                  const SizedBox(width: 8),
+                  _size(pr.additions, pr.deletions),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          _avatar(pr.author),
+        ]),
       ),
     );
   }
+
+  Widget _sectionHeader(String label, int count) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+        child: Row(children: [
+          Text(label, style: sans(12.5, weight: W.label, color: AppColors.fg2)),
+          const SizedBox(width: 6),
+          Text('$count', style: TS.meta(AppColors.fg4)),
+        ]),
+      );
+
+  List<Widget> _body(List<PrSummary> prs) {
+    if (_filter != 'open') return [for (final p in prs) _row(p)];
+    final me = widget.status.viewer;
+    final review = prs.where((p) => p.author != me && p.reviewers.contains(me)).toList();
+    final mine = prs.where((p) => p.author == me).toList();
+    final others = prs.where((p) => !review.contains(p) && !mine.contains(p)).toList();
+    return [
+      for (final (label, list) in [
+        ('Needs your review', review),
+        ('Yours', mine),
+        ('Others', others),
+      ])
+        if (list.isNotEmpty) ...[
+          _sectionHeader(label, list.length),
+          for (final p in list) _row(p),
+        ],
+    ];
+  }
+
+  Widget _empty() => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            AppIcon('git-branch', size: 22, color: AppColors.fg4),
+            const SizedBox(height: 10),
+            Text(
+                switch (_filter) {
+                  'review' => 'Nothing waiting on your review.',
+                  'mine' => 'You have no open pull requests.',
+                  'closed' => 'No closed pull requests.',
+                  _ => 'No open pull requests.',
+                },
+                style: sans(13, color: AppColors.fg3)),
+          ]),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -232,60 +347,21 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
           _screenHeader(context,
               title: 'Pull requests',
               subtitle: widget.status.repo,
-              onClose: widget.onClose,
-              actions: [
-                IconBtn('refresh',
-                    size: kMobile ? M.minTarget : 32,
-                    iconSize: 15,
-                    tooltip: 'Refresh',
-                    onTap: _load),
-              ]),
-          SizedBox(
-            height: 48,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-              children: [
-                for (final (key, label) in _filters)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text(label,
-                          style: sans(12.5,
-                              weight: W.label,
-                              color: _filter == key
-                                  ? AppColors.accentFg
-                                  : AppColors.fg2)),
-                      selected: _filter == key,
-                      showCheckmark: false,
-                      selectedColor: AppColors.accentFill,
-                      backgroundColor: AppColors.surface1,
-                      side: BorderSide(color: AppColors.border2),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(R.pill)),
-                      onSelected: (_) {
-                        setState(() {
-                          _filter = key;
-                          _prs = null;
-                        });
-                        _load();
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Container(height: 1, color: AppColors.border),
+              onClose: widget.onClose),
+          _tabs(),
           Expanded(
             child: _error != null
                 ? _message(_error!)
                 : prs == null
                     ? Center(child: Spinner(size: 16, color: AppColors.fg3))
                     : prs.isEmpty
-                        ? _message('No pull requests here.')
+                        ? _empty()
                         : RefreshIndicator(
                             onRefresh: _load,
-                            child: ListView(children: [for (final p in prs) _row(p)]),
+                            child: ListView(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              children: _body(prs),
+                            ),
                           ),
           ),
         ]),

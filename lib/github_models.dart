@@ -1,4 +1,4 @@
-/// Pull request data as the daemon returns it from the GitHub CLI.
+// Pull request data as the daemon returns it from the GitHub CLI.
 
 String _s(dynamic v) => v?.toString() ?? '';
 int _i(dynamic v) => (v as num?)?.toInt() ?? 0;
@@ -91,6 +91,7 @@ class PrSummary {
   final int deletions;
   final String updatedAt;
   final String url;
+  final List<String> reviewers;
   const PrSummary({
     required this.number,
     required this.title,
@@ -105,6 +106,7 @@ class PrSummary {
     required this.deletions,
     required this.updatedAt,
     required this.url,
+    this.reviewers = const [],
   });
   factory PrSummary.fromJson(Map<String, dynamic> j) => PrSummary(
         number: _i(j['number']),
@@ -120,6 +122,10 @@ class PrSummary {
         deletions: _i(j['deletions']),
         updatedAt: _s(j['updatedAt']),
         url: _s(j['url']),
+        reviewers: [
+          for (final r in (j['reviewRequests'] as List?) ?? const [])
+            if (r is Map) _s(r['login'] ?? r['name']),
+        ],
       );
 }
 
