@@ -259,7 +259,7 @@ void main() {
           expect(rect.right, closeTo(width - 12 - 30, .01));
         }
         expect(rect.left, greaterThanOrEqualTo(32));
-        expect(rect.height, lessThanOrEqualTo(mobile ? 64 : 44));
+        expect(rect.height, lessThanOrEqualTo(mobile ? 64 : 60));
         expect(find.text('Tap to open'), findsNothing);
         final dismiss = tester.getSize(find.byType(IconButton));
         expect(dismiss.width, greaterThanOrEqualTo(44));

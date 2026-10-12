@@ -771,8 +771,6 @@ class SidebarState extends State<Sidebar> {
         mobileChildren.add(MissionControlCard(
           client: client,
           session: mc.first,
-          waitingChats:
-              allSorted.where((s) => s.status == 'waiting_for_input').length,
           onOpen: widget.onOpenMissionControl,
         ));
       }
@@ -972,8 +970,6 @@ class SidebarState extends State<Sidebar> {
                 child: MissionControlCard(
                   client: client,
                   session: mc.first,
-                  waitingChats:
-                      list.where((s) => s.status == 'waiting_for_input').length,
                   onOpen: widget.onOpenMissionControl,
                 ),
               ),

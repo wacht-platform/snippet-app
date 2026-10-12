@@ -58,9 +58,7 @@ class _ThreadCardState extends State<_ThreadCard> {
     final ref = widget.reference?.trim() ?? '';
     final footer = widget.footer?.trim() ?? '';
     final long = body.length > 280 || '\n'.allMatches(body).length > 4;
-    final text = kMobile
-        ? sans(14, height: 21 / 14, color: AppColors.fg2)
-        : sans(13, height: 1.45, color: AppColors.fg2);
+    final text = sans(14, height: 21 / 14, color: AppColors.fg2);
     final base = markdownStyle(context);
     final sheet = base.copyWith(
       p: text,
@@ -70,20 +68,15 @@ class _ThreadCardState extends State<_ThreadCard> {
       em: text.copyWith(fontStyle: FontStyle.italic),
       a: text.copyWith(color: AppColors.accent),
     );
-    final meta = kMobile
-        ? sans(12, height: 16 / 12, color: AppColors.fg3)
-        : mono(10, color: AppColors.fg3);
+    final meta = sans(12, height: 16 / 12, color: AppColors.fg3);
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: kMobile ? 6 : 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Container(
         width: double.infinity,
-        padding: kMobile
-            ? const EdgeInsets.fromLTRB(16, 13, 16, 14)
-            : const EdgeInsets.fromLTRB(12, 9, 12, 10),
+        padding: const EdgeInsets.fromLTRB(16, 13, 16, 14),
         decoration: BoxDecoration(
           color: AppColors.surface1,
-          border: kMobile ? null : Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(kMobile ? R.lg : R.md),
+          borderRadius: BorderRadius.circular(R.lg),
         ),
         child: AnimatedSize(
           duration: Motion.base,
@@ -105,21 +98,15 @@ class _ThreadCardState extends State<_ThreadCard> {
                 ),
                 const SizedBox(width: S.s8),
                 Text(widget.status,
-                    style: kMobile
-                        ? sans(12, weight: W.label, color: toneFg)
-                        : mono(10, color: toneFg)),
+                    style: sans(12, weight: W.label, color: toneFg)),
               ]),
               if (title.isNotEmpty) ...[
                 const SizedBox(height: 5),
                 Text(title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: kMobile
-                        ? sans(15,
-                            weight: W.label,
-                            height: 20 / 15,
-                            color: AppColors.fg1)
-                        : sans(13, weight: W.label, color: AppColors.fg1)),
+                    style: sans(15,
+                        weight: W.label, height: 20 / 15, color: AppColors.fg1)),
               ],
               if (body.isNotEmpty) ...[
                 SizedBox(height: title.isEmpty ? 5 : 3),

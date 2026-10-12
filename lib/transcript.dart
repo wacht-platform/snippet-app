@@ -664,6 +664,26 @@ class SystemRow extends StatelessWidget {
   }
 }
 
+class _WatchTile extends StatelessWidget {
+  const _WatchTile(this.icon, {required this.fill, required this.ink});
+
+  final String icon;
+  final Color fill;
+  final Color ink;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: AppIcon(icon, size: 14, color: ink),
+      );
+}
+
 class _WatchLine extends StatelessWidget {
   const _WatchLine({
     required this.icon,
@@ -679,88 +699,70 @@ class _WatchLine extends StatelessWidget {
   final String? path;
   final bool muted;
 
-  Widget _mobile() {
-    if (muted) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(children: [
-          AppIcon(icon, size: 14, color: AppColors.fg4),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text('$verb $subject',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(13, color: AppColors.fg4)),
-          ),
-        ]),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(17),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            AppIcon(icon, size: 14, color: AppColors.accent),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text('$verb $subject',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, color: AppColors.fg2)),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return _mobile();
-    final strong = muted ? AppColors.fg3 : AppColors.fg2;
+    final hasPath = path != null && path!.isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(children: [
-        SizedBox(
-            width: 16,
-            child: Center(
-                child: AppIcon(icon,
-                    size: 16,
-                    color: muted ? AppColors.fg4 : AppColors.accent))),
-        const SizedBox(width: S.s8),
-        Text(verb,
-            style: TS.label(strong).copyWith(fontWeight: weightFor(W.body))),
-        const SizedBox(width: S.s6),
-        Flexible(
-          flex: 0,
-          child: Text(subject,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TS.label(muted ? AppColors.fg3 : AppColors.fg1)),
-        ),
-        if (path != null && path!.isNotEmpty) ...[
-          const SizedBox(width: S.s8),
-          Expanded(
-            child: Text(path!,
+        _WatchTile(icon,
+            fill: muted ? AppColors.surface1 : AppColors.accentBg,
+            ink: muted ? AppColors.fg4 : AppColors.accent),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text.rich(
+                TextSpan(children: [
+                  TextSpan(
+                      text: '$verb ',
+                      style: sans(14, color: muted ? AppColors.fg4 : AppColors.fg3)),
+                  TextSpan(
+                      text: subject,
+                      style: sans(14,
+                          weight: W.label,
+                          color: muted ? AppColors.fg3 : AppColors.fg1)),
+                ]),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TS.codeSmall(AppColors.fg4)),
+              ),
+              if (hasPath && !muted) ...[
+                const SizedBox(height: 2),
+                Text(path!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(11.5, color: AppColors.fg4)),
+              ],
+            ],
           ),
-        ] else
-          const Spacer(),
+        ),
       ]),
     );
   }
 }
 
-class _WatchFired extends StatefulWidget {
+/// What a watched file's new lines say: the readable lines, and the exit code
+/// when the command appended a `__DONE__ exit=N` style sentinel.
+({List<String> lines, int? exit}) _readWatchPreview(String preview) {
+  final sentinel = RegExp(r'^__[A-Z_]+__(?:\s+exit=(-?\d+))?');
+  int? exit;
+  final lines = <String>[];
+  for (final raw in preview.split('\n')) {
+    final line = raw.trimRight();
+    if (line.trim().isEmpty) continue;
+    final m = sentinel.firstMatch(line.trim());
+    if (m != null) {
+      if (m.group(1) != null) exit = int.tryParse(m.group(1)!);
+      continue;
+    }
+    lines.add(line);
+  }
+  return (lines: lines, exit: exit);
+}
+
+class _WatchFired extends StatelessWidget {
   const _WatchFired(
       {required this.subject, required this.path, required this.preview});
 
@@ -768,18 +770,9 @@ class _WatchFired extends StatefulWidget {
   final String path;
   final String preview;
 
-  @override
-  State<_WatchFired> createState() => _WatchFiredState();
-}
-
-class _WatchFiredState extends State<_WatchFired> {
-  String get subject => widget.subject;
-  String get path => widget.path;
-  String get preview => widget.preview;
-
-  void _openTail() {
+  void _openTail(BuildContext context) {
     showAppSheet(context,
-        title: '$subject changed',
+        title: subject,
         maxHeight: 640,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -807,105 +800,84 @@ class _WatchFiredState extends State<_WatchFired> {
         ));
   }
 
-  Widget _mobile() {
-    final last = preview
-        .split('\n')
-        .map((l) => l.trim())
-        .lastWhere((l) => l.isNotEmpty, orElse: () => '');
+  @override
+  Widget build(BuildContext context) {
+    final read = _readWatchPreview(preview);
+    final exit = read.exit;
+    final (fill, ink, status) = switch (exit) {
+      null => (AppColors.accentBg, AppColors.accent, 'Updated'),
+      0 => (AppColors.okBg, AppColors.ok, 'Finished · exit 0'),
+      _ => (AppColors.dangerBg, AppColors.danger, 'Failed · exit $exit'),
+    };
+    final tail = read.lines.length > 3
+        ? read.lines.sublist(read.lines.length - 3)
+        : read.lines;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Material(
         color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(22),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: AppColors.border2),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: preview.isEmpty ? null : _openTail,
-          child: SizedBox(
-            height: 44,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 12, 0),
-              child: Row(children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                      color: AppColors.accent, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 10),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(subject,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(14, color: AppColors.fg1)),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(last,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(12, color: AppColors.fg3)),
-                ),
-                if (preview.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+          onTap: preview.isEmpty ? null : () => _openTail(context),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(children: [
+                  _WatchTile(exit == null ? 'activity' : (exit == 0 ? 'check-circle' : 'alert-triangle'),
+                      fill: fill, ink: ink),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(subject,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(14, weight: W.label, color: AppColors.fg1)),
+                        if (path.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(path,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: mono(11.5, color: AppColors.fg4)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(status, style: sans(12, weight: W.label, color: ink)),
+                  if (preview.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+                  ],
+                ]),
+                if (tail.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.bg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(tail.join('\n'),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: mono(12, height: 1.5, color: AppColors.fg2)),
+                  ),
                 ],
-              ]),
+              ],
             ),
           ),
         ),
       ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _mobile();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s6),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          SizedBox(
-              width: 16,
-              child: Center(
-                  child:
-                      AppIcon('activity', size: 16, color: AppColors.accent))),
-          const SizedBox(width: S.s8),
-          Flexible(
-            flex: 0,
-            child: Text('$subject changed',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TS.label(AppColors.fg1)),
-          ),
-          if (path.isNotEmpty) ...[
-            const SizedBox(width: S.s8),
-            Expanded(
-              child: Text(path,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TS.codeSmall(AppColors.fg4)),
-            ),
-          ] else
-            const Spacer(),
-        ]),
-        if (preview.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, S.s4, 0, 0),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s6),
-              decoration: BoxDecoration(
-                color: AppColors.raised,
-                borderRadius: BorderRadius.circular(R.sm + 2),
-              ),
-              child: Text(preview,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(12, height: 1.4, color: AppColors.fg2)),
-            ),
-          ),
-      ]),
     );
   }
 }
