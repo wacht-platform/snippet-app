@@ -1113,8 +1113,6 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${widget.status.repo} #${s.number}', style: TS.meta(AppColors.fg3)),
-            const SizedBox(height: 6),
             Text(s.title,
                 style: sans(kMobile ? 22 : 20, weight: W.strong, height: 1.25, color: AppColors.fg1)),
             const SizedBox(height: 12),
@@ -1866,6 +1864,79 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
     if (path != null) _jump(path);
   }
 
+  Widget _statsPill(int adds, int dels, int viewed) {
+    final total = widget.files.length;
+    final progress = total == 0 ? 0.0 : viewed / total;
+    final done = viewed == total && total > 0;
+    final pending = widget.pending.length;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(R.pill),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 6))],
+          ),
+          child: Material(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.pill),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 5, pending > 0 ? 5 : 16, 5),
+              child: Row(children: [
+                prSize(adds, dels, size: 13),
+                Container(
+                  width: 1,
+                  height: 14,
+                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  color: AppColors.fg4.withValues(alpha: 0.5),
+                ),
+                if (done)
+                  AppIcon('check-circle', size: 15, color: AppColors.ok)
+                else
+                  SizedBox(
+                    width: 15,
+                    height: 15,
+                    child: CircularProgressIndicator(
+                      value: progress,
+                      strokeWidth: 2.2,
+                      color: AppColors.accent,
+                      backgroundColor: AppColors.fg4.withValues(alpha: 0.35),
+                    ),
+                  ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text('$viewed/$total viewed',
+                      maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: W.label, color: AppColors.fg2)),
+                ),
+                if (pending > 0)
+                  Material(
+                    color: AppColors.accentFill,
+                    borderRadius: BorderRadius.circular(R.pill),
+                    child: InkWell(
+                      onTap: _finish,
+                      borderRadius: BorderRadius.circular(R.pill),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          AppIcon('check-circle', size: 14, color: AppColors.accentFg),
+                          const SizedBox(width: 6),
+                          Text('Finish review ($pending)',
+                              style: sans(13, weight: W.label, color: AppColors.accentFg)),
+                        ]),
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(height: 36),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _fileTree() {
     return ListView(padding: const EdgeInsets.symmetric(vertical: 6), children: [
       for (final f in widget.files)
@@ -1932,7 +2003,6 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           prHeader(context,
               title: 'Files changed',
-              subtitle: '+$adds −$dels · $viewed/${widget.files.length} viewed',
               onBack: () => Navigator.of(context).maybePop(),
               actions: [
                 if (kMobile)
@@ -1952,23 +2022,12 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
                         Expanded(child: settled ? diff : _diffPlaceholder()),
                       ]),
               ),
-              if (widget.pending.isNotEmpty)
-                Positioned(
-                  right: 16,
-                  bottom: 16 + MediaQuery.of(context).padding.bottom,
-                  child: FilledButton.icon(
-                    onPressed: _finish,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.ok,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.pill)),
-                    ),
-                    icon: AppIcon('check-circle', size: 15, color: Colors.white),
-                    label: Text('Finish your review (${widget.pending.length})',
-                        style: sans(13.5, weight: W.label, color: Colors.white)),
-                  ),
-                ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16 + MediaQuery.of(context).padding.bottom,
+                child: _statsPill(adds, dels, viewed),
+              ),
             ]),
           ),
         ]),
