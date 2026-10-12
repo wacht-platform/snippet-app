@@ -1322,7 +1322,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           ]),
           const SizedBox(height: 4),
           Text(goal.text,
-              style: serif(15, height: 23 / 15, color: AppColors.fg2)
+              style: sans(15, height: 23 / 15, color: AppColors.fg2)
                   .copyWith(fontStyle: FontStyle.italic)),
           const SizedBox(height: 10),
           Btn(goal.paused ? 'Resume goal' : 'Cancel goal',
