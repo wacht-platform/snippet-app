@@ -100,6 +100,13 @@ class DaemonClient {
     return FsListing.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
+  Future<List<String>> fsFiles(String root) async {
+    final r = await http.get(_uri('/fs/files', {'path': root}));
+    if (r.statusCode != 200) throw _err('list files', r);
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    return [for (final f in (j['files'] as List? ?? const [])) '$f'];
+  }
+
   Future<FileContent> readFile(String path) async {
     final r = await http.get(_uri('/fs/file', {'path': path}));
     if (r.statusCode != 200) throw _err('read file', r);

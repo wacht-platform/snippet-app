@@ -916,6 +916,53 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       case 'actions':
         _openActions(_state);
         return;
+      case 'pull_requests':
+        final status = _github;
+        if (status == null) {
+          _toast('Pull requests need the GitHub CLI signed in for this repo');
+          return;
+        }
+        openPullRequests(context,
+            client: widget.client,
+            session: widget.sessionId,
+            status: status,
+            number: int.tryParse(extra ?? ''));
+        return;
+      case 'artifacts':
+        _openDeliverables();
+        return;
+      case 'artifact':
+        if (extra != null && extra.isNotEmpty) {
+          openArtifact(context,
+              client: widget.client, session: widget.sessionId, id: extra);
+        }
+        return;
+      case 'task':
+        if (extra != null && extra.isNotEmpty) {
+          openTaskDetail(context, widget.client, extra);
+        }
+        return;
+      case 'memory':
+        presentScreen(context,
+            builder: (_, close) => MemoryScreen(
+                client: widget.client,
+                embedded: true,
+                onBack: close,
+                initialKey: 'session:${widget.sessionId}'));
+        return;
+      case 'recurring':
+        _openRecurring();
+        return;
+      case 'approval':
+        _setApproval(extra == 'ask');
+        return;
+      case 'git':
+        presentScreen(context,
+            builder: (_, close) => GitScreen(
+                client: widget.client,
+                sessionId: widget.sessionId,
+                onClose: close));
+        return;
       case 'compact':
         _confirmCompact();
         return;

@@ -182,6 +182,7 @@ class SettingsPanel extends StatefulWidget {
 
   final SettingsPage? createOnOpen;
   final VoidCallback? onCreateHandled;
+  final SettingsPage? initialPage;
 
   const SettingsPanel({
     super.key,
@@ -198,6 +199,7 @@ class SettingsPanel extends StatefulWidget {
     this.onSection,
     this.createOnOpen,
     this.onCreateHandled,
+    this.initialPage,
   });
 
   @override
@@ -232,7 +234,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   String? _renamingUrl;
   final TextEditingController _renameController = TextEditingController();
 
-  SettingsPage _page = SettingsPage.general;
+  late SettingsPage _page = widget.initialPage ?? SettingsPage.general;
 
   /// Phone drill-down, read from the shell. Desktop uses `_page` + the chip
   /// strip instead, so this is only consulted when `kMobile && embedded`.
