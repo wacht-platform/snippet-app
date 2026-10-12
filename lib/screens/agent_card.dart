@@ -94,7 +94,9 @@ class _AgentCardState extends State<AgentCard> {
             ? ('Working', AppColors.run)
             : ('Available', AppColors.ok);
     if (!kMobile) {
-      return Material(
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 3),
+        child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
@@ -113,6 +115,7 @@ class _AgentCardState extends State<AgentCard> {
               Expanded(
                 child: Row(children: [
                   Flexible(
+                    flex: 3,
                     child: Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -121,6 +124,7 @@ class _AgentCardState extends State<AgentCard> {
                   if (role.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Flexible(
+                      flex: 2,
                       child: Text(role,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -135,6 +139,7 @@ class _AgentCardState extends State<AgentCard> {
               ],
             ]),
           ),
+        ),
         ),
       );
     }

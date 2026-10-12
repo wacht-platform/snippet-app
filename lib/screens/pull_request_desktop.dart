@@ -734,12 +734,14 @@ class _DesktopPrDetailState extends State<_DesktopPrDetail> {
 
   Widget _tabButton(int index, String label, {int? count}) {
     final on = _tab == index;
-    return InkWell(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() {
         _tab = index;
         _scrollTo = null;
       }),
-      borderRadius: BorderRadius.circular(6),
       child: Container(
         padding: const EdgeInsets.fromLTRB(2, 6, 2, 8),
         margin: const EdgeInsets.only(right: 18),
@@ -762,6 +764,7 @@ class _DesktopPrDetailState extends State<_DesktopPrDetail> {
             ),
           ],
         ]),
+      ),
       ),
     );
   }
@@ -1264,7 +1267,6 @@ class _DesktopFiles extends StatefulWidget {
 class _DesktopFilesState extends State<_DesktopFiles> {
   late final Map<String, List<DiffLine>> _parsed = parseUnifiedDiff(widget.diff);
   final Map<String, GlobalKey> _keys = {};
-  String? _current;
 
   @override
   void initState() {
@@ -1276,70 +1278,68 @@ class _DesktopFilesState extends State<_DesktopFiles> {
   }
 
   void _jump(String path) {
-    setState(() => _current = path);
     final ctx = _keys[path]?.currentContext;
     if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 220));
   }
 
-  Widget _tree() {
+  Future<void> _jumpMenu(BuildContext anchor) async {
+    final path = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 300,
+      items: [
+        for (final f in widget.pr.files)
+          appMenuRow<String>(
+            value: f.path,
+            icon: widget.viewed.contains(f.path) ? 'check-circle' : 'file-code',
+            label: f.path.split('/').last,
+            description: f.path.contains('/') ? f.path.substring(0, f.path.lastIndexOf('/')) : null,
+            trailing: '+${f.additions} −${f.deletions}',
+          ),
+      ],
+    );
+    if (path != null) _jump(path);
+  }
+
+  Widget _bar() {
     final files = widget.pr.files;
     final viewed = files.where((f) => widget.viewed.contains(f.path)).length;
-    return Container(
-      color: AppColors.surface1,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-          child: Row(children: [
-            SizedBox(
-              width: 14,
-              height: 14,
-              child: viewed == files.length && files.isNotEmpty
-                  ? AppIcon('check-circle', size: 14, color: AppColors.ok)
-                  : CircularProgressIndicator(
-                      value: files.isEmpty ? 0 : viewed / files.length,
-                      strokeWidth: 2,
-                      color: AppColors.accent,
-                      backgroundColor: AppColors.fg4.withValues(alpha: 0.3),
-                    ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(child: Text('$viewed of ${files.length} viewed', style: sans(12.5, color: AppColors.fg2))),
-          ]),
-        ),
-        Expanded(
-          child: ListView(padding: const EdgeInsets.fromLTRB(6, 0, 6, 12), children: [
-            for (final f in files)
-              Material(
-                color: _current == f.path ? AppColors.surface2 : Colors.transparent,
-                borderRadius: BorderRadius.circular(R.sm),
-                child: InkWell(
-                  onTap: () => _jump(f.path),
-                  borderRadius: BorderRadius.circular(R.sm),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    child: Row(children: [
-                      AppIcon(widget.viewed.contains(f.path) ? 'check-circle' : 'file-code',
-                          size: 13, color: widget.viewed.contains(f.path) ? AppColors.ok : AppColors.fg4),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(f.path.split('/').last,
-                              maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(12, color: AppColors.fg1)),
-                          if (f.path.contains('/'))
-                            Text(f.path.substring(0, f.path.lastIndexOf('/')),
-                                maxLines: 1, overflow: TextOverflow.ellipsis, style: TS.meta(AppColors.fg4)),
-                        ]),
-                      ),
-                      if (widget.pending.any((c) => c.path == f.path)) ...[
-                        AppIcon('message', size: 11, color: AppColors.accent),
-                        const SizedBox(width: 6),
-                      ],
-                      prSize(f.additions, f.deletions, size: 11),
-                    ]),
-                  ),
+    final pending = widget.pending.length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 6, 14, 6),
+      child: Row(children: [
+        SizedBox(
+          width: 14,
+          height: 14,
+          child: viewed == files.length && files.isNotEmpty
+              ? AppIcon('check-circle', size: 14, color: AppColors.ok)
+              : CircularProgressIndicator(
+                  value: files.isEmpty ? 0 : viewed / files.length,
+                  strokeWidth: 2,
+                  color: AppColors.accent,
+                  backgroundColor: AppColors.fg4.withValues(alpha: 0.3),
                 ),
-              ),
-          ]),
+        ),
+        const SizedBox(width: 8),
+        Text('$viewed of ${files.length} viewed', style: sans(12.5, color: AppColors.fg3)),
+        if (pending > 0) ...[
+          const SizedBox(width: 12),
+          AppIcon('message', size: 12, color: AppColors.accent),
+          const SizedBox(width: 5),
+          Text('$pending pending', style: sans(12.5, color: AppColors.accent)),
+        ],
+        const Spacer(),
+        Builder(
+          builder: (anchor) => TextButton.icon(
+            onPressed: () => _jumpMenu(anchor),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 28),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm)),
+            ),
+            icon: AppIcon('folder-open', size: 13, color: AppColors.fg3),
+            label: Text('Jump to file', style: sans(12.5, color: AppColors.fg2)),
+          ),
         ),
       ]),
     );
@@ -1350,7 +1350,7 @@ class _DesktopFilesState extends State<_DesktopFiles> {
     final files = widget.pr.files;
     if (files.isEmpty) return prMessage('No files changed.');
     final diffs = SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(12, 0, 16, 40),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         for (final f in files)
           KeyedSubtree(
@@ -1375,12 +1375,9 @@ class _DesktopFilesState extends State<_DesktopFiles> {
           ),
       ]),
     );
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        SizedBox(width: 260, child: _tree()),
-        Expanded(child: diffs),
-      ]),
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _bar(),
+      Expanded(child: diffs),
+    ]);
   }
 }
