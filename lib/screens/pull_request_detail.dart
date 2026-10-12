@@ -1222,7 +1222,6 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
           prHeader(context,
               title: '#${widget.number}',
               subtitle: pr?.summary.title ?? '',
-              onBack: () => Navigator.of(context).maybePop(),
               actions: [
                 if (pr != null)
                   Builder(
@@ -1870,7 +1869,10 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
     final done = viewed == total && total > 0;
     final pending = widget.pending.length;
     return Center(
-      child: ConstrainedBox(
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+        child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -1883,7 +1885,7 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
           clipBehavior: Clip.antiAlias,
           child: Padding(
               padding: EdgeInsets.fromLTRB(16, 5, pending > 0 ? 5 : 16, 5),
-              child: Row(children: [
+              child: Row(mainAxisSize: pending > 0 ? MainAxisSize.max : MainAxisSize.min, children: [
                 prSize(adds, dels, size: 13),
                 Container(
                   width: 1,
@@ -1905,10 +1907,13 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
                     ),
                   ),
                 const SizedBox(width: 7),
-                Expanded(
-                  child: Text('$viewed/$total viewed',
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: W.label, color: AppColors.fg2)),
-                ),
+                if (pending > 0)
+                  Expanded(
+                    child: Text('$viewed/$total viewed',
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(13, weight: W.label, color: AppColors.fg2)),
+                  )
+                else
+                  Text('$viewed/$total viewed', style: sans(13, weight: W.label, color: AppColors.fg2)),
                 if (pending > 0)
                   Material(
                     color: AppColors.accentFill,
@@ -1933,6 +1938,7 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -2003,7 +2009,6 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           prHeader(context,
               title: 'Files changed',
-              onBack: () => Navigator.of(context).maybePop(),
               actions: [
                 if (kMobile)
                   Builder(
@@ -2649,8 +2654,7 @@ class PrCommitsScreen extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           prHeader(context,
               title: 'Commits',
-              subtitle: '${commits.length} commit${commits.length == 1 ? '' : 's'}',
-              onBack: () => Navigator.of(context).maybePop()),
+              subtitle: '${commits.length} commit${commits.length == 1 ? '' : 's'}'),
           Expanded(
             child: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
               for (final entry in groups.entries) ...[
@@ -2798,8 +2802,7 @@ class _CommitDiffScreenState extends State<CommitDiffScreen> with _AfterTransiti
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           prHeader(context,
               title: c.headline,
-              subtitle: '${c.oid.length > 7 ? c.oid.substring(0, 7) : c.oid} · ${c.author} · ${prAgo(c.date)}',
-              onBack: () => Navigator.of(context).maybePop()),
+              subtitle: '${c.oid.length > 7 ? c.oid.substring(0, 7) : c.oid} · ${c.author} · ${prAgo(c.date)}'),
           Expanded(
             child: _error != null
                 ? prMessage(_error!)

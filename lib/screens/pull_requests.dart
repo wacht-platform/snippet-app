@@ -326,8 +326,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
         bottom: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _screenHeader(context,
-              title: 'Pull requests',
-              onClose: widget.onClose),
+              title: 'Pull requests'),
           _tabs(),
           Expanded(
             child: RefreshIndicator(
