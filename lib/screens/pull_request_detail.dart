@@ -419,7 +419,7 @@ class _PrMarkdownComposerState extends State<PrMarkdownComposer> {
                   _tool(glyph: 'I', style: sans(14).copyWith(fontStyle: FontStyle.italic), tip: 'Italic', onTap: () => _wrap('_')),
                   _tool(icon: 'code', tip: 'Code', onTap: _code),
                   _tool(glyph: '\u2022', style: sans(18, weight: W.strong), tip: 'List', onTap: () => _prefixLines('- ')),
-                  _tool(glyph: '\u201C', style: sans(17, weight: W.strong), tip: 'Quote', onTap: () => _prefixLines('> ')),
+                  _tool(glyph: '>', style: mono(15, weight: W.strong), tip: 'Quote', onTap: () => _prefixLines('> ')),
                 ]),
               ),
             ),
@@ -654,31 +654,39 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
     }
   }
 
-  Future<void> _merge(BuildContext anchor) async {
-    final pr = _pr!.summary;
-    final method = await showAppMenu<String>(
+  Future<void> _menu(BuildContext anchor) async {
+    final s = _pr!.summary;
+    final open = s.state == 'OPEN';
+    final action = await showAppMenu<String>(
       context,
       anchor: anchor,
-      minWidth: 240,
+      minWidth: 230,
       items: [
-        appMenuHeading<String>('Merge #${pr.number}'),
-        appMenuRow<String>(value: 'merge', icon: 'git-commit', label: 'Create a merge commit'),
-        appMenuRow<String>(value: 'squash', icon: 'minimize', label: 'Squash and merge'),
-        appMenuRow<String>(value: 'rebase', icon: 'git-branch', label: 'Rebase and merge'),
+        if (open && !s.draft)
+          appMenuRow<String>(value: 'draft', icon: 'git-branch', label: 'Convert to draft'),
+        if (open && s.draft)
+          appMenuRow<String>(value: 'ready', icon: 'eye', label: 'Ready for review'),
+        if (open) appMenuRow<String>(value: 'close', icon: 'x-circle', label: 'Close pull request'),
+        if (s.state == 'CLOSED')
+          appMenuRow<String>(value: 'reopen', icon: 'refresh', label: 'Reopen pull request'),
+        appMenuRow<String>(value: 'github', icon: 'globe', label: 'Open on GitHub'),
       ],
     );
-    if (method == null || !mounted) return;
-    final ok = await confirmAction(context,
-        title: 'Merge #${pr.number}?',
-        body: '${pr.title}\n\n${pr.head} → ${pr.base}',
-        confirmLabel: 'Merge',
-        danger: false);
-    if (!ok || !mounted) return;
+    if (action == null || !mounted) return;
+    if (action == 'github') {
+      launchUrl(Uri.parse(s.url), mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (action == 'close') {
+      final ok = await confirmAction(context,
+          title: 'Close #${s.number}?',
+          body: 'It can be reopened later; the branch stays.',
+          confirmLabel: 'Close pull request');
+      if (!ok || !mounted) return;
+    }
     setState(() => _busy = true);
     try {
-      await widget.client.mergePr(widget.session, widget.number, method: method);
-      if (!mounted) return;
-      toast(context, 'Merged #${pr.number}');
+      await widget.client.prState(widget.session, widget.number, action);
       await _load();
     } catch (e) {
       if (mounted) toast(context, '$e', danger: true);
@@ -818,7 +826,16 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
               ]),
             ),
           ),
-      if (_open) _row(icon: merge.$1, ink: merge.$2, label: merge.$3, detail: merge.$4),
+      if (_open && pr.autoMergeMethod.isEmpty && !s.draft)
+        _row(icon: merge.$1, ink: merge.$2, label: merge.$3, detail: merge.$4),
+      if (_open)
+        PrMergeBox(
+          client: widget.client,
+          session: widget.session,
+          pr: pr,
+          status: widget.status,
+          onDone: _load,
+        ),
     ];
   }
 
@@ -1122,13 +1139,13 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
                       iconSize: 15,
                       tooltip: 'Open on GitHub',
                       onTap: () => launchUrl(Uri.parse(pr.summary.url), mode: LaunchMode.externalApplication)),
-                if (pr != null && _open)
+                if (pr != null && pr.summary.state != 'MERGED')
                   Builder(
                     builder: (anchor) => IconBtn('more-horizontal',
                         size: kMobile ? M.minTarget : 32,
                         iconSize: 16,
-                        tooltip: 'Merge',
-                        onTap: _busy ? null : () => _merge(anchor)),
+                        tooltip: 'More',
+                        onTap: _busy ? null : () => _menu(anchor)),
                   ),
               ]),
           Expanded(
@@ -1145,6 +1162,413 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
           ),
         ]),
       ),
+    );
+  }
+}
+
+/// GitHub's merge box: the methods the repo allows as a split button, a
+/// confirm step with the commit title and message and branch deletion,
+/// auto-merge when requirements aren't met yet, an admin bypass, updating an
+/// out-of-date branch, and marking a draft ready.
+class PrMergeBox extends StatefulWidget {
+  const PrMergeBox({
+    super.key,
+    required this.client,
+    required this.session,
+    required this.pr,
+    required this.status,
+    required this.onDone,
+  });
+
+  final DaemonClient client;
+  final String session;
+  final PrDetail pr;
+  final GithubStatus status;
+  final Future<void> Function() onDone;
+
+  @override
+  State<PrMergeBox> createState() => _PrMergeBoxState();
+}
+
+class _PrMergeBoxState extends State<PrMergeBox> {
+  static const _order = ['merge', 'squash', 'rebase'];
+  late String _method = _order.firstWhere(widget.status.mergeMethods.contains, orElse: () => 'merge');
+  bool _confirming = false;
+  bool _admin = false;
+  bool _busy = false;
+  late bool _deleteBranch = widget.status.deleteBranchOnMerge;
+  final _subject = TextEditingController();
+  final _body = TextEditingController();
+
+  @override
+  void dispose() {
+    _subject.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  PrSummary get _s => widget.pr.summary;
+
+  String _label(String m) => switch (m) {
+        'squash' => 'Squash and merge',
+        'rebase' => 'Rebase and merge',
+        _ => 'Create a merge commit',
+      };
+
+  String _short(String m) => switch (m) {
+        'squash' => 'squash',
+        'rebase' => 'rebase',
+        _ => 'merge commit',
+      };
+
+  bool get _ready => const {'CLEAN', 'HAS_HOOKS', 'UNSTABLE'}.contains(widget.pr.mergeState);
+
+  void _prefill() {
+    final owner = widget.status.repo.split('/').first;
+    switch (_method) {
+      case 'squash':
+        _subject.text = '${_s.title} (#${_s.number})';
+        _body.text = [for (final c in widget.pr.commits) '* ${c.headline}'].join('\n');
+      case 'merge':
+        _subject.text = 'Merge pull request #${_s.number} from $owner/${_s.head}';
+        _body.text = _s.title;
+      default:
+        _subject.clear();
+        _body.clear();
+    }
+  }
+
+  Future<void> _pickMethod(BuildContext anchor) async {
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 300,
+      items: [
+        for (final m in _order)
+          if (widget.status.mergeMethods.contains(m))
+            appMenuRow<String>(
+              value: m,
+              icon: switch (m) {
+                'squash' => 'minimize',
+                'rebase' => 'git-branch',
+                _ => 'git-commit',
+              },
+              label: _label(m),
+              description: switch (m) {
+                'squash' => 'The ${widget.pr.commits.length} commits are combined into one on ${_s.base}',
+                'rebase' => 'The commits are rebased and added to ${_s.base}',
+                _ => 'All commits are added to ${_s.base} with a merge commit',
+              },
+              selected: m == _method,
+            ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _method = picked;
+      if (_confirming) _prefill();
+    });
+  }
+
+  Future<void> _run(Future<void> Function() action, String done) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+      if (!mounted) return;
+      toast(context, done);
+      setState(() => _confirming = false);
+      await widget.onDone();
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _merge() => _run(
+        () => widget.client.mergePr(widget.session, _s.number,
+            method: _method,
+            subject: _method == 'rebase' ? null : _subject.text,
+            body: _method == 'rebase' ? null : _body.text,
+            head: widget.pr.headOid.isEmpty ? null : widget.pr.headOid,
+            admin: _admin && !_ready,
+            deleteBranch: _deleteBranch,
+            branch: _s.head),
+        'Merged #${_s.number}',
+      );
+
+  Future<void> _enableAuto() => _run(
+        () => widget.client.mergePr(widget.session, _s.number,
+            method: _method,
+            subject: _method == 'rebase' ? null : _subject.text,
+            body: _method == 'rebase' ? null : _body.text,
+            head: widget.pr.headOid.isEmpty ? null : widget.pr.headOid,
+            auto: true),
+        'Auto-merge enabled',
+      );
+
+  Future<void> _update(BuildContext anchor) async {
+    final how = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 260,
+      items: [
+        appMenuRow<String>(
+            value: 'update', icon: 'git-commit', label: 'Update with merge commit', description: 'Merge ${_s.base} into ${_s.head}'),
+        appMenuRow<String>(
+            value: 'update_rebase', icon: 'git-branch', label: 'Update with rebase', description: 'Rebase ${_s.head} onto ${_s.base}'),
+      ],
+    );
+    if (how == null || !mounted) return;
+    await _run(() => widget.client.prState(widget.session, _s.number, how), 'Branch updated');
+  }
+
+  Widget _splitButton({required String label, required VoidCallback? onTap, required Color color}) {
+    final enabled = onTap != null && !_busy;
+    final fg = !enabled
+        ? AppColors.fg4
+        : color == AppColors.accentFill
+            ? AppColors.accentFg
+            : Colors.white;
+    final bg = enabled ? color : AppColors.surface2;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Material(
+        color: bg,
+        borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+          child: Container(
+            height: 40,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Text(label, style: sans(13.5, weight: W.label, color: fg)),
+          ),
+        ),
+      ),
+      Container(width: 1, height: 40, color: AppColors.bg.withValues(alpha: 0.35)),
+      Builder(
+        builder: (anchor) => Material(
+          color: bg,
+          borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+          child: InkWell(
+            onTap: _busy ? null : () => _pickMethod(anchor),
+            borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+            child: SizedBox(
+              width: 38,
+              height: 40,
+              child: Center(child: AppIcon('chevron-down', size: 14, color: fg)),
+            ),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _field(TextEditingController c, String hint, {int lines = 1}) => TextField(
+        controller: c,
+        minLines: lines,
+        maxLines: lines == 1 ? 1 : 10,
+        style: lines == 1 ? sans(14, weight: W.label, color: AppColors.fg1) : mono(12.5, height: 1.5, color: AppColors.fg1),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TS.body(AppColors.fg4),
+          isDense: true,
+          filled: true,
+          fillColor: AppColors.surface2,
+          contentPadding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border2)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.border2)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.accent)),
+        ),
+      );
+
+  Widget _check(bool value, String label, ValueChanged<bool> onChanged) => InkWell(
+        onTap: () => onChanged(!value),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: value,
+                onChanged: (v) => onChanged(v ?? false),
+                activeColor: AppColors.accent,
+                side: BorderSide(color: AppColors.fg4, width: 1.5),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(label, style: sans(13, color: AppColors.fg2))),
+          ]),
+        ),
+      );
+
+  Widget _notice(String icon, Color ink, String title, String detail, {List<Widget> actions = const []}) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            AppIcon(icon, size: 17, color: ink),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: sans(14.5, weight: W.label, color: AppColors.fg1)),
+                if (detail.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(detail, style: sans(13, height: 1.4, color: AppColors.fg3)),
+                ],
+              ]),
+            ),
+          ]),
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(spacing: 8, runSpacing: 8, children: actions),
+          ],
+        ],
+      );
+
+  Widget _secondary(String label, VoidCallback? onTap) => OutlinedButton(
+        onPressed: _busy ? null : onTap,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 40),
+          side: BorderSide(color: AppColors.border2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+        ),
+        child: Text(label, style: sans(13.5, weight: W.label, color: AppColors.fg1)),
+      );
+
+  Widget _content() {
+    final pr = widget.pr;
+    if (pr.autoMergeMethod.isNotEmpty) {
+      final how = switch (pr.autoMergeMethod) {
+        'SQUASH' => 'squash',
+        'REBASE' => 'rebase',
+        _ => 'merge commit',
+      };
+      return _notice('zap', AppColors.accent, 'Auto-merge enabled',
+          'Merges with a $how once every requirement is met${pr.autoMergeBy.isEmpty ? '' : ' · enabled by ${pr.autoMergeBy}'}',
+          actions: [
+            _secondary('Disable auto-merge',
+                () => _run(() => widget.client.mergePr(widget.session, _s.number, disableAuto: true), 'Auto-merge disabled')),
+          ]);
+    }
+    if (_s.draft) {
+      return _notice('git-branch', AppColors.fg3, 'This pull request is still a draft',
+          'It can be merged once it is marked ready for review.',
+          actions: [
+            _secondary('Ready for review',
+                () => _run(() => widget.client.prState(widget.session, _s.number, 'ready'), 'Marked ready for review')),
+          ]);
+    }
+    if (pr.mergeState == 'DIRTY') {
+      return _notice('alert-triangle', AppColors.danger, 'This branch has conflicts that must be resolved',
+          'Resolve them locally or on GitHub, then push.',
+          actions: [
+            _secondary('Resolve on GitHub',
+                () => launchUrl(Uri.parse('${_s.url}/conflicts'), mode: LaunchMode.externalApplication)),
+          ]);
+    }
+    final children = <Widget>[];
+    if (pr.mergeState == 'BEHIND') {
+      children.add(_notice('alert-triangle', AppColors.run, 'This branch is out of date with ${_s.base}',
+          'Update it so the merge uses the latest ${_s.base}.',
+          actions: [Builder(builder: (anchor) => _secondary('Update branch', () => _update(anchor)))]));
+      children.add(const SizedBox(height: 14));
+    }
+    final blocked = !_ready;
+    if (_confirming) {
+      children.addAll([
+        Text(_label(_method), style: sans(14.5, weight: W.strong, color: AppColors.fg1)),
+        const SizedBox(height: 10),
+        if (_method == 'rebase')
+          Text('The ${pr.commits.length} commit${pr.commits.length == 1 ? '' : 's'} from ${_s.head} will be rebased onto ${_s.base}.',
+              style: sans(13, height: 1.4, color: AppColors.fg3))
+        else ...[
+          _field(_subject, 'Commit message'),
+          const SizedBox(height: 8),
+          _field(_body, 'Extended description', lines: 4),
+        ],
+        const SizedBox(height: 8),
+        _check(_deleteBranch, 'Delete ${_s.head} after merging', (v) => setState(() => _deleteBranch = v)),
+        if (blocked && widget.status.isAdmin)
+          _check(_admin, 'Merge without waiting for requirements to be met (bypass branch protections)',
+              (v) => setState(() => _admin = v)),
+        const SizedBox(height: 10),
+        Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 8, children: [
+          TextButton(
+            style: TextButton.styleFrom(minimumSize: const Size(0, 40)),
+            onPressed: _busy ? null : () => setState(() => _confirming = false),
+            child: Text('Cancel', style: sans(13.5, weight: W.label, color: AppColors.fg3)),
+          ),
+          if (blocked && widget.status.autoMerge && !_admin)
+            FilledButton(
+              onPressed: _busy ? null : _enableAuto,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                backgroundColor: AppColors.accentFill,
+                foregroundColor: AppColors.accentFg,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text('Enable auto-merge', style: sans(13.5, weight: W.label, color: AppColors.accentFg)),
+            )
+          else
+            FilledButton(
+              onPressed: _busy || (blocked && !_admin) ? null : _merge,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                backgroundColor: blocked ? AppColors.danger : AppColors.ok,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text('Confirm ${_short(_method)}', style: sans(13.5, weight: W.label, color: Colors.white)),
+            ),
+        ]),
+      ]);
+    } else {
+      final canMerge = _ready || widget.status.isAdmin;
+      final canAuto = blocked && widget.status.autoMerge;
+      children.add(Row(children: [
+        _splitButton(
+          label: canAuto && !widget.status.isAdmin ? 'Enable auto-merge' : _label(_method),
+          color: blocked ? (widget.status.isAdmin ? AppColors.danger : AppColors.accentFill) : AppColors.ok,
+          onTap: canMerge || canAuto
+              ? () => setState(() {
+                    _prefill();
+                    _confirming = true;
+                  })
+              : null,
+        ),
+        const SizedBox(width: 10),
+        if (blocked && !canMerge && !canAuto)
+          Expanded(child: Text('Waiting on required reviews or checks', style: TS.meta(AppColors.fg3))),
+      ]));
+      children.add(const SizedBox(height: 8));
+      children.add(Text(
+        blocked
+            ? (widget.status.isAdmin
+                ? 'Requirements aren\'t met; as an admin you can still merge.'
+                : canAuto
+                    ? 'It will merge with a ${_short(_method)} once requirements are met.'
+                    : 'Merging is disabled until requirements are met.')
+            : 'Merges with a ${_short(_method)} into ${_s.base}. Use the arrow to choose another method.',
+        style: TS.meta(AppColors.fg4),
+      ));
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border2),
+      ),
+      child: _content(),
     );
   }
 }

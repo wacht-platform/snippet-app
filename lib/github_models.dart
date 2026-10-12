@@ -12,6 +12,9 @@ class GithubStatus {
   final String url;
   final String viewer;
   final String permission;
+  final Set<String> mergeMethods;
+  final bool autoMerge;
+  final bool deleteBranchOnMerge;
   const GithubStatus({
     required this.available,
     this.reason = '',
@@ -19,7 +22,11 @@ class GithubStatus {
     this.url = '',
     this.viewer = '',
     this.permission = '',
+    this.mergeMethods = const {'merge', 'squash', 'rebase'},
+    this.autoMerge = false,
+    this.deleteBranchOnMerge = false,
   });
+  bool get isAdmin => permission == 'ADMIN';
   factory GithubStatus.fromJson(Map<String, dynamic> j) => GithubStatus(
         available: j['available'] == true,
         reason: _s(j['reason']),
@@ -27,6 +34,14 @@ class GithubStatus {
         url: _s(j['url']),
         viewer: _s(j['viewer']),
         permission: _s(j['permission']),
+        mergeMethods: j['merge_methods'] is Map
+            ? {
+                for (final e in (j['merge_methods'] as Map).entries)
+                  if (e.value == true) e.key.toString(),
+              }
+            : const {'merge', 'squash', 'rebase'},
+        autoMerge: j['auto_merge'] == true,
+        deleteBranchOnMerge: j['delete_branch_on_merge'] == true,
       );
 }
 
@@ -259,6 +274,9 @@ class PrDetail {
   final String mergeable;
   final String mergeState;
   final String createdAt;
+  final String headOid;
+  final String autoMergeMethod;
+  final String autoMergeBy;
   final List<PrFile> files;
   final List<PrCommit> commits;
   final List<PrEvent> timeline;
@@ -269,6 +287,9 @@ class PrDetail {
     required this.mergeable,
     required this.mergeState,
     required this.createdAt,
+    this.headOid = '',
+    this.autoMergeMethod = '',
+    this.autoMergeBy = '',
     required this.files,
     required this.commits,
     required this.timeline,
@@ -312,6 +333,13 @@ class PrDetail {
       mergeable: _s(j['mergeable']),
       mergeState: _s(j['mergeStateStatus']),
       createdAt: _s(j['createdAt']),
+      headOid: _s(j['headRefOid']),
+      autoMergeMethod: j['autoMergeRequest'] is Map
+          ? _s((j['autoMergeRequest'] as Map)['mergeMethod'])
+          : '',
+      autoMergeBy: j['autoMergeRequest'] is Map
+          ? _login((j['autoMergeRequest'] as Map)['enabledBy'])
+          : '',
       files: maps(j['files']).map(PrFile.fromJson).toList(),
       commits: commits,
       timeline: timeline,

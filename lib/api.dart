@@ -794,16 +794,42 @@ class DaemonClient {
     if (r.statusCode != 200) throw _ghError(r);
   }
 
+  /// POST /github/pr/merge. [auto] queues the merge until requirements are
+  /// met; [admin] merges past them; [head] refuses if new commits landed.
   Future<void> mergePr(String session, int number,
-      {required String method, bool deleteBranch = false}) async {
+      {String method = 'merge',
+      String? subject,
+      String? body,
+      String? head,
+      bool auto = false,
+      bool disableAuto = false,
+      bool admin = false,
+      bool deleteBranch = false,
+      String? branch}) async {
     final r = await http.post(_uri('/github/pr/merge'),
         headers: _json,
         body: jsonEncode({
           'session': session,
           'number': number,
           'method': method,
+          if (subject != null) 'subject': subject,
+          if (body != null) 'body': body,
+          if (head != null) 'head': head,
+          'auto': auto,
+          'disable_auto': disableAuto,
+          'admin': admin,
           'delete_branch': deleteBranch,
+          if (branch != null) 'branch': branch,
         }));
+    if (r.statusCode != 200) throw _ghError(r);
+  }
+
+  /// POST /github/pr/state — ready, draft, close, reopen, update or
+  /// update_rebase.
+  Future<void> prState(String session, int number, String action) async {
+    final r = await http.post(_uri('/github/pr/state'),
+        headers: _json,
+        body: jsonEncode({'session': session, 'number': number, 'action': action}));
     if (r.statusCode != 200) throw _ghError(r);
   }
 
