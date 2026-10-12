@@ -9,6 +9,8 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
+part 'pull_request_desktop.dart';
+
 // ---------------------------------------------------------------------------
 // Shared pieces
 // ---------------------------------------------------------------------------
@@ -1262,8 +1264,10 @@ class PrMergeBox extends StatefulWidget {
     required this.pr,
     required this.status,
     required this.onDone,
+    this.padding = const EdgeInsets.fromLTRB(16, 6, 16, 10),
   });
 
+  final EdgeInsets padding;
   final DaemonClient client;
   final String session;
   final PrDetail pr;
@@ -1629,7 +1633,7 @@ class _PrMergeBoxState extends State<PrMergeBox> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+      padding: widget.padding,
       child: _content(),
     );
   }
