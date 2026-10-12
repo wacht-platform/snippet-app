@@ -110,7 +110,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
         ),
         if (_open && canExpand)
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, S.s2, 0, S.s8),
+            padding: const EdgeInsets.fromLTRB(0, S.s2, 0, S.s8),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 360),
               child: SingleChildScrollView(
@@ -679,7 +679,7 @@ class _WatchLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasPath = path != null && path!.isNotEmpty;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, S.s4, 0, S.s4),
+      padding: const EdgeInsets.symmetric(vertical: S.s4),
       child: Row(children: [
         Flexible(
           child: Text.rich(
@@ -760,7 +760,7 @@ class _WatchFiredState extends State<_WatchFired> {
           behavior: HitTestBehavior.opaque,
           onTap: canExpand ? () => setState(() => _open = !_open) : null,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, S.s4, 0, S.s4),
+            padding: const EdgeInsets.symmetric(vertical: S.s4),
             child: Row(children: [
               Expanded(
                 child: Text.rich(
@@ -782,7 +782,7 @@ class _WatchFiredState extends State<_WatchFired> {
         ),
         if (_open && canExpand)
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, S.s2, 0, S.s8),
+            padding: const EdgeInsets.fromLTRB(0, S.s2, 0, S.s8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
