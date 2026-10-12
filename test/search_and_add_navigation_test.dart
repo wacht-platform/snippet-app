@@ -123,7 +123,7 @@ void main() {
         );
       }
 
-      // 1. Chats: the four tabs, Mission Control pinned at the top, and a New
+      // 1. Chats: the four tabs and a New
       // that starts a chat.
       await tester.pumpWidget(buildTestWidget(home: MobileHome.chats));
       await tester.pumpAndSettle();
@@ -131,7 +131,7 @@ void main() {
       for (final label in ['Chats', 'Tasks', 'Agents', 'Settings']) {
         expect(_tab(label), findsOneWidget);
       }
-      expect(find.byType(MissionControlCard), findsOneWidget);
+      expect(find.byType(MissionControlCard), findsNothing);
       await tester.tap(find.byTooltip('New chat'));
       await tester.pumpAndSettle();
       expect(newSessionCalled, isTrue);

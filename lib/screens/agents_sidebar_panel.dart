@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'agent_card.dart';
 import 'create_agent_form.dart';
+import 'mission_control_card.dart';
 import 'shell_nav.dart';
 import '../pull_refresh.dart';
 import '../motion.dart';
@@ -119,6 +120,7 @@ class AgentsSidebarPanel extends StatefulWidget {
     required this.client,
     this.onOpenAgent,
     this.onOpenMissionControl,
+    this.missionControl,
     this.trailingHeader,
     this.searchQuery,
     this.onSearchChanged,
@@ -131,6 +133,8 @@ class AgentsSidebarPanel extends StatefulWidget {
 
   /// Open Mission Control chat when tapped.
   final VoidCallback? onOpenMissionControl;
+
+  final SessionInfo? missionControl;
 
   /// Rendered in the top mobile header on the right (e.g. machine avatar switcher).
   final Widget? trailingHeader;
@@ -260,7 +264,19 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading && agents.isEmpty) {
+    final q = effectiveQuery.toLowerCase();
+    final mc = widget.missionControl;
+    final onOpenMc = widget.onOpenMissionControl;
+    final mcCard = mc != null && onOpenMc != null && q.isEmpty
+        ? MissionControlCard(
+            key: const ValueKey('agents-mc-card'),
+            client: widget.client,
+            session: mc,
+            onOpen: onOpenMc,
+          )
+        : null;
+
+    if (loading && agents.isEmpty && mcCard == null) {
       return Container(
         color: kMobile ? AppColors.bg : Colors.transparent,
         alignment: Alignment.center,
@@ -269,7 +285,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             : Spinner(size: 20, color: AppColors.fg3),
       );
     }
-    if (error != null && agents.isEmpty) {
+    if (error != null && agents.isEmpty && mcCard == null) {
       if (kMobile) {
         return Material(
           color: kMobile ? AppColors.bg : Colors.transparent,
@@ -311,7 +327,6 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
       ),
     );
 
-    final q = effectiveQuery.toLowerCase();
     if (agents.isNotEmpty) _shownAt ??= DateTime.now();
     final ordered = (q.isEmpty
         ? [...agents]
@@ -320,6 +335,21 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
         if (a.available != b.available) return a.available ? -1 : 1;
         return a.displayName.compareTo(b.displayName);
       });
+    final Widget? emptyState = ordered.isNotEmpty || (loading && agents.isEmpty)
+        ? null
+        : error != null && agents.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Column(children: [
+                  Text('Could not load agents',
+                      style: sans(13, color: AppColors.fg2)),
+                  const SizedBox(height: 10),
+                  Btn('Retry', small: true, onTap: refresh),
+                ]),
+              )
+            : q.isNotEmpty
+                ? const _EmptySearch()
+                : _EmptyTeam();
 
     if (kMobile) {
       return PullToRefresh(
@@ -328,6 +358,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 88),
           children: [
+            if (mcCard != null) mcCard,
             for (var i = 0; i < ordered.length; i++)
               Appear(
                 key: ValueKey('appear-agent-${ordered[i].id}'),
@@ -340,8 +371,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                   onOpen: () => widget.onOpenAgent?.call(ordered[i]),
                 ),
               ),
-            if (ordered.isEmpty)
-              q.isNotEmpty ? const _EmptySearch() : _EmptyTeam(),
+            if (emptyState != null) emptyState,
           ],
         ),
       );
@@ -404,9 +434,9 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 18),
                 children: [
+                  if (mcCard != null) mcCard,
                   ...desktopChildren,
-                  if (ordered.isEmpty && desktopChildren.isEmpty)
-                    q.isNotEmpty ? const _EmptySearch() : _EmptyTeam(),
+                  if (emptyState != null) emptyState,
                 ],
               ),
             ),

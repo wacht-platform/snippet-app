@@ -54,28 +54,26 @@ class _AgentCardState extends State<AgentCard> {
           ? widget.agent.tasksIn(keys)
           : _tasks.where((t) => statuses.contains(t.status)).length;
 
-  Widget _chip(String label, {Color? dot, bool accent = false}) => Container(
-        height: kMobile ? 26 : 22,
-        padding: EdgeInsets.symmetric(horizontal: kMobile ? 10 : 8),
+  Widget _pill(String label, {bool alert = false}) => Container(
+        height: kMobile ? 24 : 20,
+        padding: EdgeInsets.symmetric(horizontal: kMobile ? 9 : 7),
         decoration: BoxDecoration(
-          color: accent
-              ? AppColors.accentBg
-              : (kMobile ? AppColors.surface2 : AppColors.surface3),
+          color: kMobile ? AppColors.surface2 : AppColors.surface3,
           borderRadius: BorderRadius.circular(R.pill),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (dot != null) ...[
+          if (alert) ...[
             Container(
               width: 6,
               height: 6,
-              decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: AppColors.danger, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
           ],
           SwapText(label,
-              style: sans(kMobile ? 12 : 11.5,
-                  height: 16 / 12,
-                  color: accent ? AppColors.accent : AppColors.fg2)),
+              style: sans(kMobile ? 12 : 11,
+                  height: 16 / 12, color: AppColors.fg2)),
         ]),
       );
 
@@ -88,93 +86,66 @@ class _AgentCardState extends State<AgentCard> {
     final queued = _count({TaskStatus.todo}, {'todo'});
     final blocked =
         _count({TaskStatus.blocked, TaskStatus.failed}, {'blocked', 'failed'});
-    final done = _count({TaskStatus.done}, {'done'});
+    final open = working + queued + blocked;
     final role = agent.role.trim();
     final (status, dot) = !agent.available
         ? ('Paused', AppColors.fg4)
         : working > 0
-            ? (
-                'Working on $working ${working == 1 ? 'task' : 'tasks'}',
-                AppColors.run
-              )
+            ? ('Working', AppColors.run)
             : ('Available', AppColors.ok);
-    final chips = <Widget>[
-      if (queued > 0) _chip('$queued queued'),
-      if (blocked > 0) _chip('$blocked blocked', dot: AppColors.danger),
-      if (done > 0)
-        _chip(agent.taskCounts != null ? '$done done this week' : '$done done'),
-    ];
     return Padding(
       padding: EdgeInsets.only(bottom: kMobile ? 10 : 6),
       child: Material(
         color: kMobile ? AppColors.surface1 : AppColors.surface2,
-        borderRadius: BorderRadius.circular(kMobile ? 18 : 16),
+        borderRadius: BorderRadius.circular(kMobile ? 18 : 14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: widget.onOpen,
-          child: AnimatedSize(
-            duration: Motion.base,
-            curve: Motion.enter,
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: EdgeInsets.all(kMobile ? 16 : 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Container(
-                      width: kMobile ? 36 : 28,
-                      height: kMobile ? 36 : 28,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color:
-                            kMobile ? AppColors.surface2 : AppColors.surface3,
-                        borderRadius: BorderRadius.circular(11),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+                kMobile ? 18 : 14, kMobile ? 14 : 11, kMobile ? 12 : 10,
+                kMobile ? 14 : 11),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(kMobile ? 16 : 14,
+                            spacing: -0.2,
+                            height: kMobile ? 21 / 16 : 19 / 14,
+                            color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Row(children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration:
+                            BoxDecoration(color: dot, shape: BoxShape.circle),
                       ),
-                      child: Text(name.characters.first.toUpperCase(),
-                          style: sans(kMobile ? 16 : 13, color: AppColors.fg1)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(kMobile ? 16 : 14,
-                                  spacing: -0.2,
-                                  height: kMobile ? 21 / 16 : 19 / 14,
-                                  color: AppColors.fg1)),
-                          Row(children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                  color: dot, shape: BoxShape.circle),
-                            ),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: SwapText(
-                                  role.isEmpty ? status : '$status · $role',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: sans(12,
-                                      height: 16 / 12, color: AppColors.fg3)),
-                            ),
-                          ]),
-                        ],
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: SwapText(
+                            role.isEmpty ? status : '$status · $role',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(12,
+                                height: 16 / 12, color: AppColors.fg3)),
                       ),
-                    ),
-                    AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-                  ]),
-                  if (chips.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(spacing: 6, runSpacing: 6, children: chips),
+                    ]),
                   ],
-                ],
+                ),
               ),
-            ),
+              if (open > 0) ...[
+                const SizedBox(width: 10),
+                _pill('$open ${open == 1 ? 'task' : 'tasks'}',
+                    alert: blocked > 0),
+              ],
+              const SizedBox(width: 6),
+              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+            ]),
           ),
         ),
       ),

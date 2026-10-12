@@ -9,6 +9,7 @@ import 'agents_sidebar_panel.dart';
 import 'file_tree_sidebar_panel.dart';
 import 'git.dart';
 import 'git_diff_sidebar_panel.dart';
+import 'mission_control/mission_control_state.dart' show isDedicatedMcSession;
 import 'session.dart' show TerminalInfo;
 import 'settings_panel.dart' show SettingsPage;
 import 'shell_models.dart';
@@ -148,6 +149,9 @@ class ShellSidebarHost extends StatelessWidget {
               client: c,
               onOpenAgent: onOpenRightAgent,
               onOpenMissionControl: onOpenMissionControl,
+              missionControl: sessions
+                  ?.where((s) => isDedicatedMcSession(s.id))
+                  .firstOrNull,
             );
     }
 
