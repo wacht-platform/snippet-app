@@ -463,13 +463,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     await _ingest(files);
   }
 
-  /// Approval mode as shown in the composer.
-  ///
-  /// The daemon models exactly two modes (`auto` / `manual`), so the pill names
-  /// those rather than inventing a third the backend cannot honor.
-  String get _approvalLabel =>
-      (_state?.approvalMode ?? 'auto') == 'manual' ? 'Ask' : 'Auto';
-
   /// Context still free, as a whole percent of the model's window. Null until
   /// the daemon has reported both a window size and a prompt size.
   int? get _contextLeftPct {
@@ -511,9 +504,14 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                     size: 13.5,
                     color: selected ? AppColors.accent : AppColors.fg3),
                 const SizedBox(width: 6),
-                Text(label,
-                    style: sans(12,
-                        color: selected ? AppColors.accent : AppColors.fg3)),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: kMobile ? 110 : 140),
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12,
+                          color: selected ? AppColors.accent : AppColors.fg3)),
+                ),
                 if (onClear != null)
                   IconBtn('x',
                       size: 22, iconSize: 12, tooltip: 'Clear', onTap: onClear)
@@ -611,37 +609,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     );
   }
 
-  /// Approval picker, anchored under its composer chip.
-  Future<void> _switchApproval([BuildContext? anchor]) async {
-    final current = _state?.approvalMode ?? 'auto';
-    final picked = await showAppMenu<String>(
-      context,
-      anchor: anchor ?? context,
-      verticalAnchor: _composerCardKey.currentContext,
-      minWidth: 260,
-      maxWidth: 320,
-      items: [
-        appMenuRow(
-          value: 'auto',
-          icon: 'zap',
-          label: 'Auto',
-          description: 'Run shell and file edits without asking',
-          selected: current != 'manual',
-        ),
-        appMenuRow(
-          value: 'manual',
-          icon: 'shield',
-          label: 'Ask',
-          description: 'Pause for approval on each change',
-          selected: current == 'manual',
-        ),
-      ],
-    );
-    if (picked == null || picked == current) return;
-    _setApproval(picked == 'manual');
-  }
-
-
   Widget _goalBanner() => Container(
   margin:
       const EdgeInsets.only(bottom: 10),
@@ -682,9 +649,24 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   Map<ShortcutActivator, VoidCallback> get _composerShortcuts => {
         const SingleActivator(
             LogicalKeyboardKey.enter): () {
-          if (!kMobile && _canSend)
+          if (_mentionMatches.isNotEmpty) {
+            _applyMention(_mentionMatches[_mentionIndex]);
+          } else if (!kMobile && _canSend) {
             _sendMessage();
+          }
         },
+        if (_mentionMatches.isNotEmpty) ...{
+          const SingleActivator(LogicalKeyboardKey.tab): () =>
+              _applyMention(_mentionMatches[_mentionIndex]),
+          const SingleActivator(LogicalKeyboardKey.arrowDown): () => _setState(
+              () => _mentionIndex = (_mentionIndex + 1) % _mentionMatches.length),
+          const SingleActivator(LogicalKeyboardKey.arrowUp): () => _setState(() =>
+              _mentionIndex = (_mentionIndex - 1 + _mentionMatches.length) %
+                  _mentionMatches.length),
+        },
+        if (_mentionQuery != null)
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              _setState(() => _mentionQuery = null),
         const SingleActivator(
             LogicalKeyboardKey.enter,
             meta: true): () {
@@ -698,49 +680,18 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       };
 
   List<Widget> _composerChips() => [
-        if (!_isMissionControl) ...[
+        if (!_isMissionControl && _recipientAgentId != null) ...[
           Builder(
-            builder: (ctx) =>
-                _recipientAgentId ==
-                        null
-                    ? _composerChip(
-                        icon:
-                            'agent',
-                        label:
-                            'Send to',
-                        onTap: () =>
-                            _pickRecipient(
-                                ctx),
-                      )
-                    : _composerChip(
-                        icon:
-                            'agent',
-                        label: _recipientAgentName ??
-                            _recipientAgentId!,
-                        selected:
-                            true,
-                        onTap: () =>
-                            _pickRecipient(
-                                ctx),
-                        onClear:
-                            _clearRecipient,
-                      ),
+            builder: (ctx) => _composerChip(
+              icon: 'agent',
+              label: _recipientAgentName ?? _recipientAgentId!,
+              selected: true,
+              onTap: () => _pickRecipient(ctx),
+              onClear: _clearRecipient,
+            ),
           ),
           const SizedBox(width: 6),
         ],
-        // Approval mode lives here instead of the tool
-        // band, so the setting sits next to what it
-        // governs.
-        Builder(
-          builder: (ctx) =>
-              _composerChip(
-            icon: 'shield',
-            label: _approvalLabel,
-            onTap: () =>
-                _switchApproval(
-                    ctx),
-          ),
-        ),
         const SizedBox(width: 6),
         Builder(builder: (chipCtx) {
           return _composerChip(
@@ -753,6 +704,176 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           );
         }),
       ];
+
+  Widget _approvalToggle() {
+    final manual = (_state?.approvalMode ?? 'auto') == 'manual';
+    return Tooltip(
+      message: manual
+          ? 'Asking before changes. Switch to Auto'
+          : 'Running changes automatically. Switch to Ask',
+      child: Material(
+        color: manual ? AppColors.accentBg : AppColors.surface2,
+        borderRadius: BorderRadius.circular(7),
+        child: InkWell(
+          onTap: () => _setApproval(!manual),
+          borderRadius: BorderRadius.circular(7),
+          child: Container(
+            height: kMobile ? 28 : 24,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon(manual ? 'shield' : 'zap',
+                  size: 12,
+                  color: manual ? AppColors.accent : AppColors.fg3),
+              const SizedBox(width: 4),
+              Text(manual ? 'Ask' : 'Auto-run',
+                  style: sans(12,
+                      weight: W.label,
+                      color: manual ? AppColors.accent : AppColors.fg3)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _trackMention() {
+    if (_isMissionControl) return;
+    final v = _input.value;
+    final sel = v.selection;
+    String? query;
+    if (sel.isValid && sel.isCollapsed && sel.baseOffset <= v.text.length) {
+      query = RegExp(r'(?:^|\s)@([\w.\-]*)$')
+          .firstMatch(v.text.substring(0, sel.baseOffset))
+          ?.group(1);
+    }
+    if (query == _mentionQuery) return;
+    _setState(() {
+      _mentionQuery = query;
+      _mentionIndex = 0;
+    });
+    if (query != null && _mentionAgents == null && !_mentionLoading) {
+      _loadMentionAgents();
+    }
+  }
+
+  Future<void> _loadMentionAgents() async {
+    _mentionLoading = true;
+    try {
+      final agents = (await widget.client.coordinationAgents())
+          .where((a) => !a.isMissionControl)
+          .toList()
+        ..sort((a, b) => a.displayName.compareTo(b.displayName));
+      if (mounted) _setState(() => _mentionAgents = agents);
+    } catch (_) {
+    } finally {
+      _mentionLoading = false;
+      if (mounted) _setState(() {});
+    }
+  }
+
+  List<CoordinationAgent> get _mentionMatches {
+    final q = _mentionQuery?.toLowerCase();
+    if (q == null || _isMissionControl) return const [];
+    return (_mentionAgents ?? const <CoordinationAgent>[])
+        .where((a) =>
+            a.displayName.toLowerCase().contains(q) ||
+            a.handle.toLowerCase().contains(q) ||
+            a.id.toLowerCase().contains(q))
+        .take(6)
+        .toList();
+  }
+
+  void _applyMention(CoordinationAgent agent) {
+    final v = _input.value;
+    final cut = v.selection.baseOffset.clamp(0, v.text.length);
+    final m = RegExp(r'@([\w.\-]*)$').firstMatch(v.text.substring(0, cut));
+    final start = m?.start ?? cut;
+    _input.value = TextEditingValue(
+      text: v.text.replaceRange(start, cut, ''),
+      selection: TextSelection.collapsed(offset: start),
+    );
+    _setState(() {
+      _mentionQuery = null;
+      _recipientAgentId = agent.id;
+      _recipientAgentName =
+          agent.displayName.trim().isEmpty ? agent.id : agent.displayName;
+    });
+    _pinSessionAgent(agent.id);
+    _inputFocus.requestFocus();
+  }
+
+  Widget _mentionList() {
+    final matches = _mentionMatches;
+    final loading = _mentionAgents == null && _mentionLoading;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.raised,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: matches.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              child: Text(
+                  loading
+                      ? 'Loading agents…'
+                      : _mentionAgents == null
+                          ? 'Could not load agents'
+                          : 'No agent matches @${_mentionQuery ?? ''}',
+                  style: sans(13, color: AppColors.fg4)),
+            )
+          : Column(mainAxisSize: MainAxisSize.min, children: [
+              for (var i = 0; i < matches.length; i++)
+                Material(
+                  color: i == _mentionIndex && !kMobile
+                      ? AppColors.surface2
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _applyMention(matches[i]),
+                    child: Container(
+                      height: kMobile ? 44 : 34,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: matches[i].status == 'disabled'
+                                ? AppColors.fg4
+                                : AppColors.ok,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                              matches[i].displayName.trim().isEmpty
+                                  ? matches[i].id
+                                  : matches[i].displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(13.5, color: AppColors.fg1)),
+                        ),
+                        if (matches[i].role.trim().isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(matches[i].role,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(12, color: AppColors.fg4)),
+                          ),
+                        ],
+                      ]),
+                    ),
+                  ),
+                ),
+            ]),
+    );
+  }
 
   Widget _composerStrip(bool running) {
     final left = _contextLeftPct;
@@ -830,11 +951,17 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                       isCollapsed: true,
                       contentPadding: const EdgeInsets.fromLTRB(0, 10, 8, 10),
                       border: InputBorder.none,
-                      hintText: 'Reply to Snippet',
+                      hintText: _isMissionControl
+                          ? 'Reply to Snippet'
+                          : 'Reply to Snippet, or @ an agent',
                       hintStyle: TS.body(AppColors.fg4),
                     ),
                   ),
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8, right: 6),
+                child: _approvalToggle(),
               ),
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -865,27 +992,14 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             const SizedBox(width: 4),
             Expanded(
               child: Row(children: [
-                Builder(
-                  builder: (ctx) => hit(
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        AppIcon('shield', size: 13, color: AppColors.fg3),
-                        const SizedBox(width: 5),
-                        Text(_approvalLabel,
-                            style: sans(13, color: AppColors.fg3)),
-                      ]),
-                      () => _switchApproval(ctx),
-                      tip: 'Approval mode'),
-                ),
-                if (!_isMissionControl)
+                if (!_isMissionControl && _recipientAgentId != null)
                   Flexible(
                     child: Builder(
-                      builder: (ctx) => _recipientAgentId == null
-                          ? label('Send to', () => _pickRecipient(ctx))
-                          : label(
-                              'To ${_recipientAgentName ?? _recipientAgentId!}',
-                              () => _pickRecipient(ctx),
-                              selected: true,
-                              onClear: _clearRecipient),
+                      builder: (ctx) => label(
+                          'To ${_recipientAgentName ?? _recipientAgentId!}',
+                          () => _pickRecipient(ctx),
+                          selected: true,
+                          onClear: _clearRecipient),
                     ),
                   ),
               ]),
@@ -940,6 +1054,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             children: [
               if (_heldQueue.isNotEmpty) _queuedCard(),
               if (_attachments.isNotEmpty) _attachmentBar(),
+              if (_mentionQuery != null && !_isMissionControl) _mentionList(),
               Swap(
                 stateKey: (_isRecording || _recordingPath != null)
                     ? 'recorder'
@@ -1025,6 +1140,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                             ),
                                           ),
                                           const SizedBox(width: 4),
+                                          _approvalToggle(),
+                                          const SizedBox(width: 6),
                                           // The chip group SCROLLS and the mic/send controls are
                                           // pinned outside it. Three chips plus two buttons
                                           // overflowed a narrow phone, which pushed Send off the
