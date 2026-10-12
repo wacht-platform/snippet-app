@@ -12,7 +12,6 @@ import '../widgets.dart';
 import 'agents_sidebar_panel.dart';
 import 'list_search_field.dart';
 import 'mission_control.dart';
-import 'mission_control_card.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'settings_panel.dart';
 import 'shell_components.dart';
@@ -394,6 +393,9 @@ class SidebarState extends State<Sidebar> {
                         }),
                         onOpenAgent: (a) => widget.onAgent(a),
                         onOpenMissionControl: widget.onOpenMissionControl,
+                        missionControl: _sessions
+                            ?.where((s) => isDedicatedMcSession(s.id))
+                            .firstOrNull,
                       ),
                     ),
                   ],
@@ -763,17 +765,6 @@ class SidebarState extends State<Sidebar> {
     if (kMobile) {
       final allSorted = _sortSessionsByRecency(list);
       final mobileChildren = <Widget>[];
-      final client = widget.client;
-      if (client != null &&
-          mc.isNotEmpty &&
-          !_selecting &&
-          _filterQuery.trim().isEmpty) {
-        mobileChildren.add(MissionControlCard(
-          client: client,
-          session: mc.first,
-          onOpen: widget.onOpenMissionControl,
-        ));
-      }
       String? section;
       for (var i = 0; i < allSorted.length; i++) {
         final session = allSorted[i];
@@ -859,8 +850,6 @@ class SidebarState extends State<Sidebar> {
         !isInboxSessionRow(s) &&
         _matchesQuery(s)));
 
-    final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
-    final client = widget.client;
     final rows = <Widget>[];
     String? day;
     for (final s in list) {
@@ -961,18 +950,6 @@ class SidebarState extends State<Sidebar> {
                 ? 'No chats match the search.'
                 : 'No chats yet.')
           else ...[
-            if (client != null &&
-                mc.isNotEmpty &&
-                !_selecting &&
-                _filterQuery.trim().isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 2, 12, 4),
-                child: MissionControlCard(
-                  client: client,
-                  session: mc.first,
-                  onOpen: widget.onOpenMissionControl,
-                ),
-              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Column(

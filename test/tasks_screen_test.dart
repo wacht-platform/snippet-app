@@ -90,6 +90,9 @@ void main() {
 
     await tester.pumpWidget(sidebar(MobileHome.chats));
     await tester.pumpAndSettle();
+    expect(find.byType(MissionControlCard), findsNothing);
+    await tester.pumpWidget(sidebar(MobileHome.agents));
+    await tester.pumpAndSettle();
     expect(find.byType(MissionControlCard), findsOneWidget);
     await tester.tap(find.byType(MissionControlCard));
     expect(openedMissionControl, isTrue);

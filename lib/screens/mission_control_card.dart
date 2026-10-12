@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../motion.dart';
@@ -79,62 +80,55 @@ class _MissionControlCardState extends State<MissionControlCard> {
 
   @override
   Widget build(BuildContext context) {
+    final status = widget.session.status;
+    final dot = status == 'running' ? AppColors.run : AppColors.accent;
     return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 4),
+      padding: EdgeInsets.only(bottom: kMobile ? 10 : 6),
       child: Material(
-        color: AppColors.surface1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: AppColors.border2),
-        ),
+        color: kMobile ? AppColors.surface1 : AppColors.surface2,
+        borderRadius: BorderRadius.circular(kMobile ? 18 : 14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: widget.onOpen,
-          child: AnimatedSize(
-            duration: Motion.base,
-            curve: Motion.enter,
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.accentBg,
-                        borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+                kMobile ? 18 : 14, kMobile ? 14 : 11, kMobile ? 12 : 10,
+                kMobile ? 14 : 11),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Mission Control',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(kMobile ? 16 : 14,
+                            spacing: -0.2,
+                            height: kMobile ? 21 / 16 : 19 / 14,
+                            color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Row(children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration:
+                            BoxDecoration(color: dot, shape: BoxShape.circle),
                       ),
-                      child: Center(
-                          child: AppIcon('layers',
-                              size: 17, color: AppColors.accent)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Mission Control',
-                              style: sans(16,
-                                  weight: FontWeight.w700,
-                                  spacing: -0.2,
-                                  height: 20 / 16,
-                                  color: AppColors.fg1)),
-                          SwapText(_statusLine(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(12,
-                                  height: 16 / 12, color: AppColors.fg3)),
-                        ],
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: SwapText(_statusLine(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(12,
+                                height: 16 / 12, color: AppColors.fg3)),
                       ),
-                    ),
-                    AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-                  ]),
-                ],
+                    ]),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(width: 6),
+              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+            ]),
           ),
         ),
       ),
