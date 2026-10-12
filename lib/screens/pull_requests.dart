@@ -124,6 +124,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
   @override
   void initState() {
     super.initState();
+    if (!kMobile) return;
     _load();
     final n = widget.openNumber;
     if (n != null) {
@@ -334,6 +335,14 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!kMobile) {
+      return DesktopPullRequests(
+        client: widget.client,
+        session: widget.session,
+        status: widget.status,
+        openNumber: widget.openNumber,
+      );
+    }
     final prs = _prs;
     return Material(
       color: AppColors.bg,
