@@ -654,10 +654,12 @@ class _WebPreview extends StatefulWidget {
 }
 
 class _WebPreviewState extends State<_WebPreview> {
-  late final WebViewController _controller = WebViewController()
-    ..setJavaScriptMode(JavaScriptMode.unrestricted)
-    ..setBackgroundColor(Colors.white)
-    ..loadRequest(widget.uri);
+  late final WebViewController _controller = () {
+    final c = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+    if (!kMacOS) c.setBackgroundColor(Colors.white);
+    return c..loadRequest(widget.uri);
+  }();
 
   @override
   Widget build(BuildContext context) => WebViewWidget(controller: _controller);
