@@ -34,7 +34,28 @@ String artifactIcon(String kind) => switch (kind) {
       _ => 'file',
     };
 
-/// Open an artifact: a side drawer on desktop, a full screen on a phone.
+/// A tall sheet on a phone, for the artifact viewer and the shared list.
+Future<void> showArtifactSheet(
+    BuildContext context, Widget Function(VoidCallback close) builder) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    enableDrag: false,
+    backgroundColor: AppColors.bg,
+    sheetAnimationStyle: sheetMotion,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    builder: (sheet) => FractionallySizedBox(
+      heightFactor: 0.94,
+      child: builder(() => Navigator.of(sheet).pop()),
+    ),
+  );
+}
+
+/// Open an artifact: a side-pane tab on desktop, a tall sheet on a phone.
 Future<void> openArtifact(
   BuildContext context, {
   required DaemonClient client,
@@ -42,6 +63,17 @@ Future<void> openArtifact(
   required String id,
   int? version,
 }) {
+  if (kMobile) {
+    return showArtifactSheet(
+      context,
+      (close) => ArtifactViewer(
+          client: client,
+          session: session,
+          id: id,
+          version: version,
+          onClose: close),
+    );
+  }
   return presentScreen<void>(
     context,
     style: PanelStyle.drawer,
@@ -248,7 +280,85 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
         mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _more(BuildContext anchor) async {
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 220,
+      items: [
+        if (_hasSource)
+          appMenuRow<String>(
+              value: 'source',
+              icon: _source ? 'eye' : 'code',
+              label: _source ? 'Preview' : 'Source'),
+        appMenuRow<String>(
+            value: 'browser', icon: 'globe', label: 'Open in browser'),
+        appMenuRow<String>(
+            value: 'latest', icon: 'refresh', label: 'Latest version'),
+      ],
+    );
+    if (!mounted) return;
+    switch (picked) {
+      case 'source':
+        setState(() => _source = !_source);
+      case 'browser':
+        _openInBrowser();
+      case 'latest':
+        _load(latest: true);
+    }
+  }
+
+  Widget _mobileHeader() {
+    final a = _artifact;
+    final v = _version;
+    final versions = a?.versions.length ?? 0;
+    return Container(
+      color: AppColors.surface1,
+      padding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
+      child: Row(children: [
+        IconBtn('x',
+            size: M.minTarget,
+            iconSize: 20,
+            tooltip: 'Close',
+            onTap: widget.onClose),
+        Expanded(
+          child: Builder(
+            builder: (anchor) => GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: versions > 1 ? () => _pickVersion(anchor) : null,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(a?.title ?? 'Artifact',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: sans(17, weight: W.strong, color: AppColors.fg1)),
+                if (v != null)
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('Version ${v.n}', style: TS.meta(AppColors.fg3)),
+                    if (versions > 1) ...[
+                      const SizedBox(width: 2),
+                      AppIcon('chevron-down', size: 12, color: AppColors.fg3),
+                    ],
+                  ]),
+              ]),
+            ),
+          ),
+        ),
+        IconBtn('download',
+            size: M.minTarget, iconSize: 19, tooltip: 'Download', onTap: _download),
+        Builder(
+          builder: (anchor) => IconBtn('more-horizontal',
+              size: M.minTarget,
+              iconSize: 19,
+              tooltip: 'More',
+              onTap: () => _more(anchor)),
+        ),
+      ]),
+    );
+  }
+
   Widget _header() {
+    if (kMobile) return _mobileHeader();
     final a = _artifact;
     final v = _version;
     return Container(

@@ -367,6 +367,18 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         if (e['kind'] == 'file_presented')
           (path: e['path']?.toString() ?? '', caption: e['caption']?.toString() ?? ''),
     ];
+    if (kMobile) {
+      showArtifactSheet(
+          context,
+          (close) => SessionDeliverables(
+                client: widget.client,
+                session: widget.sessionId,
+                files: files,
+                onOpenFileTab: widget.onOpenFileTab,
+                onClose: close,
+              ));
+      return;
+    }
     presentScreen(context,
         style: PanelStyle.drawer,
         maxWidth: 560,
