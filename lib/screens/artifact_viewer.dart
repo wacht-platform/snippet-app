@@ -41,7 +41,7 @@ Future<void> showArtifactSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    enableDrag: false,
+    enableDrag: true,
     backgroundColor: AppColors.bg,
     sheetAnimationStyle: sheetMotion,
     shape: const RoundedRectangleBorder(
@@ -373,45 +373,66 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
     final versions = a?.versions.length ?? 0;
     return Container(
       color: AppColors.surface1,
-      padding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
-      child: Row(children: [
-        IconBtn('x',
-            size: M.minTarget,
-            iconSize: 20,
-            tooltip: 'Close',
-            onTap: widget.onClose),
-        Expanded(
-          child: Builder(
-            builder: (anchor) => GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: versions > 1 ? () => _pickVersion(anchor) : null,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(a?.title ?? 'Artifact',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: sans(17, weight: W.strong, color: AppColors.fg1)),
-                if (v != null)
-                  Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text('Version ${v.n}', style: TS.meta(AppColors.fg3)),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 36,
+          height: 4,
+          margin: const EdgeInsets.only(bottom: 6),
+          decoration: BoxDecoration(
+            color: AppColors.border2,
+            borderRadius: BorderRadius.circular(R.pill),
+          ),
+        ),
+        Row(children: [
+          IconBtn('x',
+              size: M.minTarget,
+              iconSize: 20,
+              tooltip: 'Close',
+              onTap: widget.onClose),
+          const SizedBox(width: 2),
+          Expanded(
+            child: Text(a?.title ?? 'Artifact',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(17, weight: W.strong, color: AppColors.fg1)),
+          ),
+          if (v != null)
+            Builder(
+              builder: (anchor) => GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: versions > 1 ? () => _pickVersion(anchor) : null,
+                child: Container(
+                  height: 30,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  margin: const EdgeInsets.only(left: 6, right: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(R.pill),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('v${v.n}', style: TS.meta(AppColors.fg2)),
                     if (versions > 1) ...[
-                      const SizedBox(width: 2),
+                      const SizedBox(width: 3),
                       AppIcon('chevron-down', size: 12, color: AppColors.fg3),
                     ],
                   ]),
-              ]),
+                ),
+              ),
             ),
-          ),
-        ),
-        IconBtn('download',
-            size: M.minTarget, iconSize: 19, tooltip: 'Download', onTap: _download),
-        Builder(
-          builder: (anchor) => IconBtn('more-horizontal',
+          IconBtn('download',
               size: M.minTarget,
               iconSize: 19,
-              tooltip: 'More',
-              onTap: () => _more(anchor)),
-        ),
+              tooltip: 'Download',
+              onTap: _download),
+          Builder(
+            builder: (anchor) => IconBtn('more-horizontal',
+                size: M.minTarget,
+                iconSize: 19,
+                tooltip: 'More',
+                onTap: () => _more(anchor)),
+          ),
+        ]),
       ]),
     );
   }
@@ -717,6 +738,18 @@ class _SessionDeliverablesState extends State<SessionDeliverables> {
       child: SafeArea(
         bottom: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (kMobile)
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(top: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.border2,
+                  borderRadius: BorderRadius.circular(R.pill),
+                ),
+              ),
+            ),
           Container(
             padding: EdgeInsets.fromLTRB(16, kMobile ? 8 : 12, 8, 10),
             decoration: BoxDecoration(
