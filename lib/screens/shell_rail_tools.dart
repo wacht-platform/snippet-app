@@ -87,6 +87,11 @@ List<Widget> buildShellRailTools({
     final enabled = tab != null;
     return [
       railTool(
+        'activity',
+        tooltip: 'Autonomous mode',
+        onTap: enabled ? () => onSessionAction('autonomy') : null,
+      ),
+      railTool(
         'minimize',
         tooltip: 'Compact history',
         onTap: enabled ? () => onSessionAction('compact') : null,

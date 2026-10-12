@@ -197,8 +197,9 @@ class ShellSectionTabs extends StatelessWidget {
     final items = shown.isEmpty ? ShellSection.values : shown;
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      child: Row(children: [
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         for (final item in items) ...[
+          if (item != items.first) const SizedBox(width: 2),
           Tooltip(
             message: item.label,
             waitDuration: const Duration(milliseconds: 400),
@@ -219,7 +220,6 @@ class ShellSectionTabs extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 2),
         ],
       ]),
     );

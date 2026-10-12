@@ -345,9 +345,13 @@ class _DesktopShellState extends State<DesktopShell>
   Future<Object?> _openShellPanel(ShellPanelRequest request) {
     final existing = _rightTabs.where((t) => t.key == request.key).firstOrNull;
     final tab = existing ?? _RightTab.request(request);
+    if (existing == null &&
+        request.purpose == ShellPanelPurpose.pullRequests) {
+      tab.pane = _Pane.left;
+    }
     setState(() {
       if (existing == null) _rightTabs.add(tab);
-      _rightCollapsed = false;
+      if (tab.pane == _Pane.right) _rightCollapsed = false;
       _activePane = tab.pane;
       _activeKey[tab.pane] = tab.key;
     });
@@ -981,7 +985,9 @@ class _DesktopShellState extends State<DesktopShell>
         act('focus_composer', 'edit', 'Focus the composer', shortcut: '⌘ L'),
       ],
       if (inSession && mc) ...[
-        act('compact', 'minimize', 'Compact history'),
+        act('autonomy', 'activity', 'Autonomous mode',
+            keywords: const ['mission control', 'settings', 'quiet hours']),
+        act('compact', 'wrap', 'Compact history'),
         act('memory', 'brain', 'Mission Control memory'),
       ],
       cmd('new-session', 'plus', 'New chat', _newSessionFlow,
