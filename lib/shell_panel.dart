@@ -18,6 +18,8 @@ enum ShellPanelPurpose {
   agent,
   conversation,
   inbox,
+  artifact,
+  deliverables,
   generic,
 }
 
@@ -41,6 +43,7 @@ class ShellPanelRequest {
         ShellPanelPurpose.task => 'Task',
         ShellPanelPurpose.agents => 'Agents',
         ShellPanelPurpose.conversation => 'Conversation',
+        ShellPanelPurpose.deliverables => 'Artifacts & files',
         _ => '${purpose.name[0].toUpperCase()}${purpose.name.substring(1)}',
       };
   void complete() {

@@ -361,6 +361,39 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     ]);
   }
 
+  void _openDeliverables() {
+    final files = <({String path, String caption})>[
+      for (final e in _state?.events ?? const <Map<String, dynamic>>[])
+        if (e['kind'] == 'file_presented')
+          (path: e['path']?.toString() ?? '', caption: e['caption']?.toString() ?? ''),
+    ];
+    if (kMobile) {
+      showArtifactSheet(
+          context,
+          (close) => SessionDeliverables(
+                client: widget.client,
+                session: widget.sessionId,
+                files: files,
+                onOpenFileTab: widget.onOpenFileTab,
+                onClose: close,
+              ));
+      return;
+    }
+    presentScreen(context,
+        style: PanelStyle.drawer,
+        maxWidth: 560,
+        purpose: ShellPanelPurpose.deliverables,
+        originClient: widget.client,
+        originSessionId: widget.sessionId,
+        builder: (_, close) => SessionDeliverables(
+              client: widget.client,
+              session: widget.sessionId,
+              files: files,
+              onOpenFileTab: widget.onOpenFileTab,
+              onClose: close,
+            ));
+  }
+
   Widget _mobileHeader(HarnessState? s) {
     return Container(
       height: M.appBarHeight,
@@ -954,6 +987,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                   client: widget.client,
                   sessionId: widget.sessionId,
                   onClose: close))),
+      item('layers', 'Artifacts & files', _openDeliverables),
       item('folder', 'Browse', () {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
@@ -1022,6 +1056,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               client: widget.client,
               sessionId: widget.sessionId,
               onClose: close))),
+      onDeliverables: () => navigate!(_openDeliverables),
       onFiles: () => navigate!(() {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,

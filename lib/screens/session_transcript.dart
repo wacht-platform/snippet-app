@@ -32,6 +32,9 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       return 'transcript-event-${fingerprint.hashCode}-$occurrence';
     }
 
+    List<({String path, String caption})>? openFiles;
+    var openFilesAt = -1;
+
     void addEvent(String key, Widget child) {
       out.add(KeyedSubtree(
         key: ValueKey(key),
@@ -271,13 +274,34 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               SystemRow(step: _s(e['step']), reasoning: _s(e['reasoning'])));
         case 'file_presented':
           endTools(key);
+          final file = (path: _s(e['path']), caption: _s(e['caption']));
+          final group = openFiles;
+          if (group != null && openFilesAt == out.length) {
+            group.add(file);
+            break;
+          }
+          final files = [file];
+          openFiles = files;
           addEvent(
               key,
-              PresentedFileCard(
+              PresentedFiles(
                 client: widget.client,
-                path: _s(e['path']),
-                caption: _s(e['caption']),
+                files: files,
                 onOpenFileTab: widget.onOpenFileTab,
+              ));
+          openFilesAt = out.length;
+        case 'artifact_presented':
+          endTools(key);
+          addEvent(
+              key,
+              ArtifactRow(
+                client: widget.client,
+                session: widget.sessionId,
+                id: _s(e['id']),
+                version: (e['version'] as num?)?.toInt() ?? 1,
+                title: _s(e['title']),
+                kind: _s(e['artifact_kind']),
+                caption: _s(e['caption']),
               ));
         case 'lane_spawned':
           endTools(key);
@@ -366,6 +390,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         case 'invalid_tool_call':
         case 'plan_updated':
         case 'file_presented':
+        case 'artifact_presented':
         case 'user_question':
         case 'approval_request':
         case 'lane_spawned':

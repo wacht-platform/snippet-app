@@ -692,6 +692,48 @@ class DaemonClient {
 
   /// GET /mission-control/autonomy — whether Mission Control is autonomous, its rhythm
   /// and quiet hours, and when it last and next checks in.
+  /// GET /artifacts — a session's artifacts, each version with a signed link.
+  Future<List<ArtifactInfo>> artifacts(String session) async {
+    final r = await http.get(_uri('/artifacts', {'session': session}));
+    if (r.statusCode != 200) throw _err('list artifacts', r);
+    return ((jsonDecode(r.body) as Map<String, dynamic>)['artifacts'] as List)
+        .map((e) => ArtifactInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// POST /artifacts/zip — zip one version of an artifact; returns the zip's
+  /// path for [downloadToFile].
+  Future<String> zipArtifact(String session, String id, {int? version}) async {
+    final r = await http.post(_uri('/artifacts/zip'),
+        headers: _json,
+        body: jsonEncode({
+          'session': session,
+          'id': id,
+          if (version != null) 'version': version,
+        }));
+    if (r.statusCode != 200) throw _err('zip artifact', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['path'] as String;
+  }
+
+  /// POST /zip — zip files or folders on the daemon; returns the zip's path.
+  Future<String> zipFiles(String name, List<String> paths) async {
+    final r = await http.post(_uri('/zip'),
+        headers: _json, body: jsonEncode({'name': name, 'paths': paths}));
+    if (r.statusCode != 200) throw _err('zip files', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['path'] as String;
+  }
+
+  /// An absolute URL for a signed artifact link from [artifacts].
+  Uri artifactUri(String signedPath) => Uri.parse(baseUrl).replace(path: signedPath);
+
+  /// The text behind a signed artifact link, for Source views and native
+  /// renderers.
+  Future<String> artifactText(String signedPath) async {
+    final r = await http.get(artifactUri(signedPath));
+    if (r.statusCode != 200) throw _err('read artifact', r);
+    return utf8.decode(r.bodyBytes, allowMalformed: true);
+  }
+
   /// GET /memory/scopes — every memory repo on the machine.
   Future<List<MemoryScope>> memoryScopes() async {
     final r = await http.get(_uri('/memory/scopes'));

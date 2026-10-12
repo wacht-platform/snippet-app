@@ -1109,6 +1109,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onTerm;
   final VoidCallback onGit;
   final VoidCallback onFiles;
+  final VoidCallback onDeliverables;
   final VoidCallback onProcesses;
   final VoidCallback onRecurring;
   final VoidCallback onCompact;
@@ -1129,6 +1130,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onTerm,
     required this.onGit,
     required this.onFiles,
+    required this.onDeliverables,
     required this.onProcesses,
     required this.onRecurring,
     required this.onCompact,
@@ -1407,6 +1409,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     final tiles = <Widget>[
       _tile('git-branch', 'Git', 'Diffs and commits', widget.onGit),
       _tile('folder', 'Files', 'Browse the workspace', widget.onFiles),
+      _tile('layers', 'Shared', 'Artifacts and files', widget.onDeliverables),
       if (!widget.hideShell)
         _tile('terminal', 'Shell', 'A terminal here', widget.onTerm),
       _tile('list', 'Processes', 'What is running', widget.onProcesses),
@@ -1564,6 +1567,11 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           label: 'Files',
           detail: 'Browse the workspace',
           onTap: widget.onFiles),
+      _row(
+          icon: 'layers',
+          label: 'Artifacts & files',
+          detail: 'What the agent handed over',
+          onTap: widget.onDeliverables),
       if (!widget.hideShell)
         _row(
             icon: 'terminal',

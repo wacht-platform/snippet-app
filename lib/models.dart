@@ -1456,3 +1456,60 @@ class MemoryCommit {
 
   bool get isConsolidation => subject.startsWith('Consolidate:');
 }
+
+/// One version of an artifact, with a signed link to its page.
+class ArtifactVersion {
+  final int n;
+  final int createdAt;
+  final String entry;
+  final String source;
+  final String url;
+  const ArtifactVersion({
+    required this.n,
+    required this.createdAt,
+    required this.entry,
+    required this.source,
+    required this.url,
+  });
+  factory ArtifactVersion.fromJson(Map<String, dynamic> j) => ArtifactVersion(
+        n: (j['n'] as num?)?.toInt() ?? 0,
+        createdAt: (j['created_at'] as num?)?.toInt() ?? 0,
+        entry: j['entry'] as String? ?? '',
+        source: j['source'] as String? ?? '',
+        url: j['url'] as String? ?? '',
+      );
+}
+
+/// A deliverable the agent iterates on: html, markdown, image, svg, csv,
+/// pdf, code, collection or file.
+class ArtifactInfo {
+  final String id;
+  final String title;
+  final String kind;
+  final String caption;
+  final List<ArtifactVersion> versions;
+  const ArtifactInfo({
+    required this.id,
+    required this.title,
+    required this.kind,
+    required this.caption,
+    required this.versions,
+  });
+  ArtifactVersion? get latest => versions.isEmpty ? null : versions.last;
+  ArtifactVersion? version(int n) {
+    for (final v in versions) {
+      if (v.n == n) return v;
+    }
+    return latest;
+  }
+
+  factory ArtifactInfo.fromJson(Map<String, dynamic> j) => ArtifactInfo(
+        id: j['id'] as String? ?? '',
+        title: j['title'] as String? ?? '',
+        kind: j['kind'] as String? ?? 'file',
+        caption: j['caption'] as String? ?? '',
+        versions: ((j['versions'] as List?) ?? const [])
+            .map((v) => ArtifactVersion.fromJson(v as Map<String, dynamic>))
+            .toList(),
+      );
+}
