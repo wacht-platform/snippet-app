@@ -772,9 +772,9 @@ class SidebarState extends State<Sidebar> {
         if (label != section) {
           section = label;
           mobileChildren.add(Padding(
-            padding: EdgeInsets.only(top: i == 0 ? 10 : 22, bottom: 4),
+            padding: EdgeInsets.fromLTRB(8, i == 0 ? 8 : 18, 8, 4),
             child: Text(label,
-                style: sans(12, weight: W.strong, color: AppColors.fg4)),
+                style: sans(12.5, weight: W.label, color: AppColors.fg3)),
           ));
         }
         final next = i + 1 < allSorted.length ? allSorted[i + 1] : null;
@@ -802,7 +802,7 @@ class SidebarState extends State<Sidebar> {
       return PullToRefresh(
         onRefresh: () async => widget.onRefreshSessions(),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 16),
+          padding: const EdgeInsets.fromLTRB(M.gutter - 8, 2, M.gutter - 8, 16),
           children: mobileChildren,
         ),
       );
@@ -1240,52 +1240,6 @@ class SidebarState extends State<Sidebar> {
     return 'Older';
   }
 
-  Widget _sessionStatusLine(SessionInfo s, String folderName,
-      {bool compact = false}) {
-    final running = sessionIsActive(s.status);
-    final waiting = s.status == 'waiting_for_input';
-    final color =
-        waiting ? AppColors.accent : (running ? AppColors.fg3 : AppColors.fg3);
-    final label = waiting
-        ? 'Waiting for your answer'
-        : running
-            ? (folderName.isEmpty ? 'Working' : 'Working · $folderName')
-            : folderName;
-    return Row(children: [
-      if (running || waiting) ...[
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: running ? AppColors.run : Colors.transparent,
-            border: waiting
-                ? Border.all(color: AppColors.accent, width: 1.5)
-                : null,
-          ),
-        ),
-        const SizedBox(width: 6),
-      ],
-      if (!running && !waiting && s.inWorktree) ...[
-        AppIcon('git-branch', size: 12, color: AppColors.fg4),
-        const SizedBox(width: 4),
-      ],
-      Flexible(
-        child: Text(
-            label.isEmpty && compact ? relativeTime(s.lastActive) : label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: sans(compact ? 12 : 13,
-                height: compact ? 16 / 12 : 18 / 13,
-                color: compact && !waiting ? AppColors.fg4 : color)),
-      ),
-      if (s.displayAgentId != null && s.displayAgentId!.trim().isNotEmpty) ...[
-        const SizedBox(width: 8),
-        AgentBadge(agentId: s.displayAgentId!, working: running),
-      ],
-    ]);
-  }
-
   Widget _sessionCard(SessionInfo s, {bool divider = false}) {
     if (kMobile) return _mobileSessionRow(s, divider: divider);
     final checked = _selected.contains(s.id);
@@ -1419,13 +1373,18 @@ class SidebarState extends State<Sidebar> {
         ? ''
         : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
     final draft = !renaming && _hasDraft(s);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Material(
+    final running = sessionIsActive(s.status);
+    final waiting = s.status == 'waiting_for_input';
+    final status = waiting
+        ? 'Waiting for your answer'
+        : running
+            ? (folderName.isEmpty ? 'Working' : 'Working · $folderName')
+            : (folderName.isEmpty ? 'No project' : folderName);
+    return Material(
       color: _selecting && checked ? AppColors.accentBg : Colors.transparent,
-      borderRadius: BorderRadius.circular(R.md),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(R.md),
+        borderRadius: BorderRadius.circular(14),
         onTap: renaming
             ? null
             : () {
@@ -1444,19 +1403,12 @@ class SidebarState extends State<Sidebar> {
                   _sessionActions(s);
                 }
               },
-        child: Container(
-          constraints: const BoxConstraints(minHeight: M.rowHeight),
-          padding: EdgeInsets.symmetric(
-              horizontal: _selecting ? M.rowPadH : 0, vertical: 8),
-          decoration: BoxDecoration(
-            border: divider && !_selecting
-                ? Border(bottom: BorderSide(color: AppColors.border))
-                : null,
-          ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
           child: Row(children: [
             if (_selecting) ...[
               SelectCheck(checked, size: 20),
-              const SizedBox(width: S.s12),
+              const SizedBox(width: 12),
             ],
             Expanded(
               child: Column(
@@ -1473,9 +1425,12 @@ class SidebarState extends State<Sidebar> {
                               : Text(s.title.isEmpty ? '(untitled)' : s.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TS.rowTitle()),
+                                  style: sans(15.5,
+                                      weight: W.label,
+                                      height: 20 / 15.5,
+                                      color: AppColors.fg1)),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Text(draft ? 'Draft' : relativeTime(s.lastActive),
                             style: sans(12,
                                 weight: draft ? W.label : W.body,
@@ -1483,13 +1438,45 @@ class SidebarState extends State<Sidebar> {
                                 tabular: true)),
                       ]),
                   const SizedBox(height: 3),
-                  _sessionStatusLine(s, folderName),
+                  Row(children: [
+                    if (running || waiting) ...[
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: running ? AppColors.run : AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    if (!running && !waiting && s.inWorktree) ...[
+                      AppIcon('git-branch', size: 12, color: AppColors.fg4),
+                      const SizedBox(width: 4),
+                    ],
+                    Flexible(
+                      child: Text(status,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(13,
+                              height: 18 / 13,
+                              color: waiting
+                                  ? AppColors.accent
+                                  : (folderName.isEmpty && !running
+                                      ? AppColors.fg4
+                                      : AppColors.fg3))),
+                    ),
+                    if (s.displayAgentId != null &&
+                        s.displayAgentId!.trim().isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      AgentBadge(agentId: s.displayAgentId!, working: running),
+                    ],
+                  ]),
                 ],
               ),
             ),
           ]),
         ),
-      ),
       ),
     );
   }
