@@ -196,7 +196,7 @@ class _MissionControlCardState extends State<MissionControlCard> {
                     Text(note,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: serif(15, height: 23 / 15, color: AppColors.fg2)
+                        style: sans(15, height: 23 / 15, color: AppColors.fg2)
                             .copyWith(fontStyle: FontStyle.italic)),
                   ],
                   if (chips.isNotEmpty) ...[

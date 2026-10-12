@@ -346,7 +346,7 @@ class AgentMessageCard extends StatelessWidget {
             Text(body.trim(),
                 style: outbound
                     ? sans(15, height: 22 / 15, color: AppColors.fg2)
-                    : serif(16, height: 26 / 16, color: AppColors.fg2)
+                    : sans(15, height: 24 / 15, color: AppColors.fg2)
                         .copyWith(fontStyle: FontStyle.italic)),
           ],
         ),

@@ -624,10 +624,10 @@ class TS {
   static TextStyle overline([Color? c]) =>
       caps(11, color: c ?? AppColors.fg3).copyWith(height: 14 / 11);
 
-  /// The agent's prose: Literata on a phone, the body sans elsewhere.
+  /// The agent's prose: the body sans a step up, with reading line height.
   static TextStyle reading([Color? c]) => kMobile
-      ? serif(17.5, height: 28 / 17.5, color: c ?? AppColors.fg1)
-      : serif(16.5, height: 27 / 16.5, color: c ?? AppColors.fg1);
+      ? sans(16, height: 26 / 16, color: c ?? AppColors.fg1)
+      : sans(15, height: 24 / 15, color: c ?? AppColors.fg1);
   static TextStyle code([Color? c]) =>
       mono(13, height: 20 / 13, color: c ?? AppColors.fg2);
   static TextStyle codeSmall([Color? c]) =>
