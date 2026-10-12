@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'media_views.dart';
+import 'widgets.dart' show ShellPanelRoot;
 
 enum ShellPanelPurpose {
   lanes,
@@ -97,6 +98,6 @@ class ShellPanelBody extends StatelessWidget {
         open: host.open,
         client: client,
         sessionId: request.sessionId,
-        child: body);
+        child: ShellPanelRoot(child: body));
   }
 }

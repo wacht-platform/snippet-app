@@ -310,6 +310,7 @@ class AgentThreadScreen extends StatefulWidget {
     this.subtitle,
     this.onClose,
     this.embedded = false,
+    this.showBack = true,
   });
 
   final DaemonClient client;
@@ -324,6 +325,8 @@ class AgentThreadScreen extends StatefulWidget {
 
   /// Nested under a host that already draws `NavBackRow`.
   final bool embedded;
+
+  final bool showBack;
 
   @override
   State<AgentThreadScreen> createState() => _AgentThreadScreenState();
@@ -948,7 +951,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   Widget _header() {
     final subtitle = widget.subtitle?.trim() ?? '';
-    final canGoBack = widget.onClose != null || Navigator.of(context).canPop();
+    final canGoBack = widget.showBack &&
+        (widget.onClose != null || Navigator.of(context).canPop());
     return Container(
       height: M.appBarHeight,
       padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -1490,6 +1494,7 @@ void openAgentThread(
       agentId: agentId,
       agentName: agentName,
       onClose: close,
+      showBack: false,
     ),
   );
 }
