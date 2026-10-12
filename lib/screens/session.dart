@@ -288,6 +288,10 @@ class _SessionScreenState extends State<SessionScreen>
   /// Agent ids pinned to THIS session from the directory, so the composer shows
   /// who can be reached here without re-reading the whole directory.
   final Set<String> _sessionAgentIds = {};
+  List<CoordinationAgent>? _mentionAgents;
+  String? _mentionQuery;
+  int _mentionIndex = 0;
+  bool _mentionLoading = false;
 
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
@@ -663,6 +667,7 @@ class _SessionScreenState extends State<SessionScreen>
     _input.addListener(_interceptBigPaste);
     _restoreDraft();
     _input.addListener(_saveDraft);
+    _input.addListener(_trackMention);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
