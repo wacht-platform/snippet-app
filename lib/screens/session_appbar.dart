@@ -303,11 +303,14 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       padding: const EdgeInsets.symmetric(horizontal: 6),
       color: AppColors.bg,
       child: Row(children: [
-        IconBtn('chevron-left',
-            size: kMobile ? M.minTarget : 32,
-            iconSize: 20,
-            tooltip: 'Back',
-            onTap: () => Navigator.of(context).maybePop()),
+        if (kMobile || Navigator.of(context).canPop())
+          IconBtn('chevron-left',
+              size: kMobile ? M.minTarget : 32,
+              iconSize: 20,
+              tooltip: 'Back',
+              onTap: () => Navigator.of(context).maybePop())
+        else
+          const SizedBox(width: 6),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6),
