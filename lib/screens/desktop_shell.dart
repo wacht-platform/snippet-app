@@ -178,6 +178,7 @@ class _DesktopShellState extends State<DesktopShell>
   // url → reachable, from a short /health ping (drives the machine status dots).
   final Map<String, bool> _health = {};
   final Map<String, _MacSessionStatus> _macSessionStatuses = {};
+  final Map<String, bool> _githubReady = {};
   final Map<String, _MacSessionControls> _macSessionControls = {};
 
   /// Terminals, bridged from each mounted `SessionScreen`.
@@ -419,6 +420,8 @@ class _DesktopShellState extends State<DesktopShell>
         onToggleRightPanel: _toggleRightPanel,
         onSessionAction: _dispatchSessionAction,
         onOpenGoalPopover: _openGoalPopover,
+        githubReady:
+            _activeTab != null && (_githubReady[_activeTab!.key] ?? false),
       );
 
   Future<void> _openGoalPopover(BuildContext btnCtx) => showGoalPopover(
@@ -765,6 +768,14 @@ class _DesktopShellState extends State<DesktopShell>
     });
   }
 
+  void _setGithubReady(String key, bool ok) {
+    if ((_githubReady[key] ?? false) == ok) return;
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _githubReady[key] = ok);
+    });
+  }
+
   void _setMacSessionControls(String key, VoidCallback stop,
       void Function(String action, [String? extra]) performAction) {
     _macSessionControls[key] = _MacSessionControls(stop, performAction);
@@ -884,91 +895,261 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _openCommandPalette() {
-    showCommandPalette(
-      context,
-      sessions: _sessions ?? const <SessionInfo>[],
-      onOpenChat: (s) => _openSession(s.id, s.title, s.profile),
-      commands: [
-        PaletteCommand(
-          'plus',
-          'New Session',
-          '⌘/Ctrl T',
-          _newSessionFlow,
-        ),
-        PaletteCommand(
-          'sidebar',
-          'Toggle Primary Sidebar',
-          '⌘/Ctrl B',
-          _toggleSidebar,
-        ),
-        PaletteCommand(
-          'layout-sidebar-right',
-          'Toggle Secondary Panel',
-          '⌘/Ctrl \\',
-          _toggleSecondaryPane,
-        ),
-        PaletteCommand(
-          'file',
-          'Open File Tree',
-          '⌘/Ctrl ⇧ E',
-          _openActiveFiles,
-        ),
-        PaletteCommand(
-          'git-branch',
-          'Open Git Diff',
-          '⌘/Ctrl ⇧ G',
-          _openMacGit,
-        ),
-        PaletteCommand(
-          'terminal',
-          'Open Terminals',
-          '',
-          () => setState(() {
-            _section = ShellSection.terminal;
-            _leftCollapsed = false;
-          }),
-        ),
-        PaletteCommand(
-          'task',
-          'Open Tasks',
-          '',
-          () => setState(() {
-            _section = ShellSection.tasks;
-            _leftCollapsed = false;
-          }),
-        ),
-        PaletteCommand(
-          'agent',
-          'Open Agents',
-          '',
-          () => setState(() {
-            _section = ShellSection.agents;
-            _leftCollapsed = false;
-          }),
-        ),
-        PaletteCommand(
-          'message-text',
-          'Open Chats List',
-          '',
-          () => setState(() {
-            _section = ShellSection.sessions;
-            _leftCollapsed = false;
-          }),
-        ),
-        PaletteCommand(
-          'help-circle',
-          'Keyboard Shortcuts',
-          '⌘/Ctrl /',
-          _showDesktopShortcuts,
-        ),
-        PaletteCommand(
-          'stop-circle',
-          'Stop Active Run',
-          '⌘/Ctrl .',
-          () => _macSessionControls[_activeTab?.key]?.stop(),
-        ),
+    final tab = _activeTab;
+    final client = _client;
+    final url = _active?.url ?? '';
+    final sessionId = tab?.sessionId;
+    final inSession = tab != null && sessionId != null;
+    final mc = tab?.isMissionControl ?? false;
+    final state = tab == null ? null : _macSessionStatuses[tab.key]?.state;
+    final workspace = state?.workspace ?? '';
+    final running = tab == null
+        ? false
+        : (_macSessionStatuses[tab.key]?.running ?? false);
+
+    PaletteItem cmd(String id, String icon, String title, VoidCallback run,
+            {String shortcut = '',
+            List<String> keywords = const [],
+            PaletteKind kind = PaletteKind.command,
+            String subtitle = ''}) =>
+        PaletteItem(
+            id: '${kind.name}:$id',
+            kind: kind,
+            icon: icon,
+            title: title,
+            subtitle: subtitle,
+            shortcut: shortcut,
+            keywords: keywords,
+            run: run);
+
+    PaletteItem act(String id, String icon, String title,
+            {String? extra,
+            String shortcut = '',
+            List<String> keywords = const []}) =>
+        cmd(id, icon, title, () => _dispatchSessionAction(id, extra),
+            kind: PaletteKind.session, shortcut: shortcut, keywords: keywords);
+
+    void section(ShellSection s) => setState(() {
+          _section = s;
+          _leftCollapsed = false;
+        });
+
+    final goalOn = state?.goal?.ongoing ?? false;
+    final manual = state?.approvalMode == 'manual';
+    final github = tab != null && (_githubReady[tab.key] ?? false);
+    final openSessionIds = {
+      for (final t in _mainTabs)
+        if (t.sessionId != null) t.sessionId!,
+    };
+
+    final items = <PaletteItem>[
+      if (inSession && running)
+        cmd('stop', 'stop', 'Stop the run',
+            () => _macSessionControls[tab.key]?.stop(),
+            kind: PaletteKind.session, shortcut: '⌘ .'),
+      if (inSession && !mc) ...[
+        act('compact', 'wrap', 'Compact history',
+            keywords: const ['summarise', 'context']),
+        if (github)
+          act('pull_requests', 'git-branch', 'Pull requests',
+              keywords: const ['pr', 'github', 'review', 'merge']),
+        act('artifacts', 'clipboard', 'Artifacts & files',
+            keywords: const ['deliverables', 'shared']),
+        cmd('lanes', 'layers', 'Lanes',
+            () => _toggleRightPanel(_RightPanel.lanes),
+            kind: PaletteKind.session, keywords: const ['delegated']),
+        cmd('checkpoints', 'history', 'Checkpoints',
+            () => _toggleRightPanel(_RightPanel.checkpoints),
+            kind: PaletteKind.session,
+            keywords: const ['rewind', 'restore', 'fork']),
+        goalOn
+            ? act('goal', 'zap', 'Cancel goal')
+            : act('goal', 'zap', 'Set a goal', keywords: const ['autonomous']),
+        manual
+            ? act('approval', 'zap', 'Approval: run automatically',
+                extra: 'auto', keywords: const ['auto', 'mode'])
+            : act('approval', 'shield', 'Approval: ask before changes',
+                extra: 'ask', keywords: const ['manual', 'mode']),
+        act('rename', 'edit', 'Rename chat'),
+        act('model', 'cpu', 'Switch model',
+            keywords: const ['profile', 'inference']),
+        act('memory', 'brain', 'Chat memory', keywords: const ['remember']),
+        act('files', 'folder', 'Browse files', keywords: const ['explorer']),
+        act('processes', 'list', 'Processes'),
+        act('shell_new', 'terminal', 'New session shell',
+            keywords: const ['terminal']),
+        act('focus_composer', 'edit', 'Focus the composer', shortcut: '⌘ L'),
       ],
-    );
+      if (inSession && mc) ...[
+        act('compact', 'minimize', 'Compact history'),
+        act('memory', 'brain', 'Mission Control memory'),
+      ],
+      cmd('new-session', 'plus', 'New chat', _newSessionFlow,
+          shortcut: '⌘ T', keywords: const ['session', 'create']),
+      cmd('sidebar', 'sidebar', 'Toggle sidebar', _toggleSidebar,
+          shortcut: '⌘ B'),
+      cmd('right-pane', 'sidebar', 'Toggle right panel',
+          _toggleSecondaryPane,
+          shortcut: '⌘ \\'),
+      cmd('file-tree', 'file', 'File tree', _openActiveFiles,
+          shortcut: '⌘ ⇧ E', keywords: const ['explorer']),
+      cmd('git', 'git-branch', 'Git changes', _openMacGit,
+          shortcut: '⌘ ⇧ G', keywords: const ['diff', 'commit', 'stage']),
+      cmd('scheduled', 'scheduled', 'Scheduled jobs',
+          () => _toggleRightPanel(_RightPanel.recurring),
+          keywords: const ['recurring', 'cron']),
+      cmd('chats', 'message-text', 'Chats',
+          () => section(ShellSection.sessions)),
+      cmd('tasks', 'task', 'Tasks', () => section(ShellSection.tasks),
+          keywords: const ['board']),
+      cmd('agents', 'agent', 'Agents', () => section(ShellSection.agents)),
+      cmd('terminals', 'terminal', 'Terminals',
+          () => section(ShellSection.terminal)),
+      cmd('new-terminal', 'terminal', 'New terminal', _newGlobalShell),
+      cmd('shortcuts', 'keyboard', 'Keyboard shortcuts',
+          _showDesktopShortcuts,
+          shortcut: '⌘ /'),
+      for (final (page, icon, title, keys) in const [
+        (SettingsPage.general, 'settings', 'Settings: General & machines',
+            ['machines', 'connection', 'notifications']),
+        (SettingsPage.models, 'cpu', 'Settings: Models',
+            ['inference', 'profiles', 'providers']),
+        (SettingsPage.memory, 'brain', 'Settings: Memory', ['remember']),
+        (SettingsPage.usage, 'activity', 'Settings: Usage',
+            ['tokens', 'cost', 'billing']),
+        (SettingsPage.vault, 'key', 'Settings: Vault',
+            ['secrets', 'keys', 'credentials']),
+        (SettingsPage.scheduled, 'scheduled', 'Settings: Scheduled jobs',
+            ['recurring', 'cron']),
+      ])
+        cmd(page.name, icon, title, () => _openShellSettings(page),
+            kind: PaletteKind.setting, keywords: keys),
+      for (final t in _mainTabs)
+        if (t != tab)
+          PaletteItem(
+            id: 'tab:${t.key}',
+            kind: PaletteKind.tab,
+            icon: t.isMissionControl ? 'activity' : 'message-text',
+            title: t.title.isEmpty ? 'Untitled' : t.title,
+            run: () => _activateTabAt(t),
+          ),
+      for (final s in _sessions ?? const <SessionInfo>[])
+        if (!openSessionIds.contains(s.id))
+          PaletteItem(
+            id: 'chat:${s.id}',
+            kind: PaletteKind.chat,
+            icon: 'message-text',
+            title: s.title.isEmpty ? 'Untitled' : s.title,
+            subtitle: s.inWorktree
+                ? '${lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder)} · ${s.branch ?? 'worktree'}'
+                : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder),
+            run: () => _openSession(s.id, s.title, s.profile),
+          ),
+      for (final sh in _shells.shells)
+        PaletteItem(
+          id: 'terminal:${sh.id}',
+          kind: PaletteKind.terminal,
+          icon: 'terminal',
+          title: sh.title,
+          keywords: const ['terminal', 'shell'],
+          run: () => _focusGlobalShell(sh.id),
+        ),
+    ];
+
+    final sources = <PaletteSource>[
+      if (client != null && inSession && !mc && workspace.isNotEmpty)
+        PaletteSource(PaletteKind.file, () async {
+          final files = await client.fsFiles(workspace);
+          return [
+            for (final rel in files)
+              PaletteItem(
+                id: 'file:$workspace/$rel',
+                kind: PaletteKind.file,
+                icon: 'file',
+                title: lastPathSegment(rel, ifEmpty: rel),
+                subtitle: rel.contains('/')
+                    ? rel.substring(0, rel.lastIndexOf('/'))
+                    : '',
+                keywords: [rel],
+                run: () => _openFileTab(client, url, '$workspace/$rel',
+                    lastPathSegment(rel, ifEmpty: rel)),
+              ),
+          ];
+        }),
+      if (client != null && inSession && !mc && github)
+        PaletteSource(PaletteKind.pr, () async {
+          final status = await client.githubStatus(sessionId);
+          if (status == null) return const <PaletteItem>[];
+          final prs = await client.githubPrs(sessionId, 'open');
+          return [
+            for (final pr in prs)
+              PaletteItem(
+                id: 'pr:$sessionId:${pr.number}',
+                kind: PaletteKind.pr,
+                icon: 'git-branch',
+                title: pr.title,
+                subtitle: '#${pr.number} · ${pr.author}',
+                keywords: ['${pr.number}', pr.head],
+                run: () =>
+                    _dispatchSessionAction('pull_requests', '${pr.number}'),
+              ),
+          ];
+        }),
+      if (client != null && inSession && !mc)
+        PaletteSource(PaletteKind.artifact, () async {
+          final list = await client.artifacts(sessionId);
+          return [
+            for (final a in list)
+              PaletteItem(
+                id: 'artifact:$sessionId:${a.id}',
+                kind: PaletteKind.artifact,
+                icon: 'clipboard',
+                title: a.title.isEmpty ? a.id : a.title,
+                subtitle: a.caption,
+                keywords: [a.kind],
+                run: () => _dispatchSessionAction('artifact', a.id),
+              ),
+          ];
+        }),
+      if (client != null)
+        PaletteSource(PaletteKind.task, () async {
+          final tasks = await client.tasks();
+          return [
+            for (final t in tasks)
+              PaletteItem(
+                id: 'task:${t.id}',
+                kind: PaletteKind.task,
+                icon: 'task',
+                title: t.title,
+                subtitle: t.status.label,
+                run: () => inSession
+                    ? _dispatchSessionAction('task', t.id)
+                    : openTaskDetail(context, client, t.id),
+              ),
+          ];
+        }),
+      if (client != null)
+        PaletteSource(PaletteKind.agent, () async {
+          final agents = await client.coordinationAgents();
+          return [
+            for (final a in agents)
+              PaletteItem(
+                id: 'agent:${a.id}',
+                kind: PaletteKind.agent,
+                icon: 'agent',
+                title: a.displayName.trim().isEmpty ? a.id : a.displayName,
+                subtitle: [
+                  if (a.handle.isNotEmpty) '@${a.handle}',
+                  if (a.role.isNotEmpty) a.role,
+                ].join(' · '),
+                keywords: [a.handle],
+                run: () => _openRightAgent(a),
+              ),
+          ];
+        }),
+    ];
+
+    showCommandPalette(context, items: items, sources: sources);
   }
 
   void _showDesktopShortcuts() => showDesktopShortcutsDialog(context);

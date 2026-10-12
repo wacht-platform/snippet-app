@@ -60,6 +60,7 @@ List<Widget> buildShellRailTools({
   required void Function(RightPanel panel) onToggleRightPanel,
   required void Function(String action, [String? extra]) onSessionAction,
   required void Function(BuildContext ctx) onOpenGoalPopover,
+  bool githubReady = false,
 }) {
   final tab = activeTab;
   final mc = tab?.isMissionControl ?? false;
@@ -133,11 +134,23 @@ List<Widget> buildShellRailTools({
       onTap:
           tab == null ? null : () => onToggleRightPanel(RightPanel.recurring),
     ),
-    if (kMacOS)
+    if (kMacOS) ...[
+      if (githubReady)
+        railTool(
+          'git-branch',
+          tooltip: 'Pull requests',
+          onTap: tab == null ? null : () => onSessionAction('pull_requests'),
+        ),
       railTool(
-        'more-vertical',
-        tooltip: 'Session actions',
-        onTap: tab == null ? null : () => onSessionAction('actions'),
+        'clipboard',
+        tooltip: 'Artifacts & files',
+        onTap: tab == null ? null : () => onSessionAction('artifacts'),
       ),
+      railTool(
+        'wrap',
+        tooltip: 'Compact history',
+        onTap: tab == null ? null : () => onSessionAction('compact'),
+      ),
+    ],
   ];
 }

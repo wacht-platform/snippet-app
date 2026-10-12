@@ -31,6 +31,7 @@ import '../panel.dart';
 import '../share_inbound.dart';
 import '../widgets.dart';
 import 'artifact_viewer.dart';
+import 'tasks/task_common.dart' show openTaskDetail;
 import 'pull_requests.dart';
 import '../github_models.dart';
 import 'presented_file_card.dart';
@@ -100,6 +101,8 @@ class SessionScreen extends StatefulWidget {
           void Function(String action, [String? extra]) performAction)?
       onMacControls;
 
+  final ValueChanged<bool>? onGithubReady;
+
   /// Publishes this session's terminals to the shell as a render host. Called
   /// only when the terminal set or focus changes, never on output.
   ///
@@ -155,6 +158,7 @@ class SessionScreen extends StatefulWidget {
       this.onOpenSession,
       this.onMacStatus,
       this.onMacControls,
+      this.onGithubReady,
       this.onTerminalHost,
       this.onOpenScheduled,
       this.acceptDrops = true,
@@ -243,6 +247,7 @@ class _SessionScreenState extends State<SessionScreen>
     final gen = ++_githubGen;
     _github = null;
     _githubKnown = false;
+    widget.onGithubReady?.call(false);
     if (_isMissionControl) return;
     widget.client.githubStatus(widget.sessionId).then((status) {
       if (!mounted || gen != _githubGen || status == null) return;
@@ -250,6 +255,7 @@ class _SessionScreenState extends State<SessionScreen>
         _githubKnown = true;
         _github = status.available ? status : null;
       });
+      widget.onGithubReady?.call(_github != null);
     });
   }
   String _liveText = '';

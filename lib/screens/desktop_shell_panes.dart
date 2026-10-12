@@ -87,6 +87,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
           ? (stop, performAction) =>
               _setMacSessionControls(t.key, stop, performAction)
           : null,
+      onGithubReady: !kMobile ? (ok) => _setGithubReady(t.key, ok) : null,
       onTerminalHost:
           !kMobile ? (host, open) => _setTerminalHost(t.key, host, open) : null,
       onOpenScheduled:
@@ -426,7 +427,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         onMenu: onMenu,
       );
 
-  void _openShellSettings() {
+  void _openShellSettings([SettingsPage? page]) {
     final c = _client;
     if (c == null) return;
     final inst = _active;
@@ -442,6 +443,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
               onSelect: _selectInstance,
               onAdd: _onInstanceAdded,
               onClose: close,
+              initialPage: page,
             ));
   }
 

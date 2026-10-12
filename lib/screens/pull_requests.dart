@@ -15,6 +15,7 @@ Future<void> openPullRequests(
   required DaemonClient client,
   required String session,
   required GithubStatus status,
+  int? number,
 }) {
   return presentScreen<void>(
     context,
@@ -24,7 +25,11 @@ Future<void> openPullRequests(
     originClient: client,
     originSessionId: session,
     builder: (_, close) => PullRequestsScreen(
-        client: client, session: session, status: status, onClose: close),
+        client: client,
+        session: session,
+        status: status,
+        openNumber: number,
+        onClose: close),
   );
 }
 
@@ -92,12 +97,14 @@ class PullRequestsScreen extends StatefulWidget {
     required this.session,
     required this.status,
     this.onClose,
+    this.openNumber,
   });
 
   final DaemonClient client;
   final String session;
   final GithubStatus status;
   final VoidCallback? onClose;
+  final int? openNumber;
 
   @override
   State<PullRequestsScreen> createState() => _PullRequestsScreenState();
@@ -118,6 +125,12 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
   void initState() {
     super.initState();
     _load();
+    final n = widget.openNumber;
+    if (n != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openNumber(n);
+      });
+    }
   }
 
   Future<void> _load() async {
@@ -140,12 +153,14 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     _load();
   }
 
-  Future<void> _open(PrSummary pr) async {
+  Future<void> _open(PrSummary pr) => _openNumber(pr.number);
+
+  Future<void> _openNumber(int number) async {
     await Navigator.of(context).push(PrRoute<void>(
       builder: (_) => PullRequestScreen(
         client: widget.client,
         session: widget.session,
-        number: pr.number,
+        number: number,
         status: widget.status,
       ),
     ));
