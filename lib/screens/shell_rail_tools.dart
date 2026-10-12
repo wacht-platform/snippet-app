@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../platform.dart';
 import '../theme.dart';
 import 'shell_components.dart';
 import 'shell_models.dart';
@@ -132,5 +133,11 @@ List<Widget> buildShellRailTools({
       onTap:
           tab == null ? null : () => onToggleRightPanel(RightPanel.recurring),
     ),
+    if (kMacOS)
+      railTool(
+        'more-vertical',
+        tooltip: 'Session actions',
+        onTap: tab == null ? null : () => onSessionAction('actions'),
+      ),
   ];
 }
