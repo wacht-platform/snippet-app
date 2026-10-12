@@ -4,14 +4,13 @@ import '../api.dart';
 import '../media_views.dart';
 import '../menu_widgets.dart';
 import '../panel.dart';
-import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'editor.dart';
 import 'file_viewer.dart';
 
-/// A file the agent handed over with `present_file`: what it is, the agent's
-/// caption, and where it lives, with Open and Download.
+/// A file the agent handed over with `present_file`: one line with its name
+/// and the agent's caption that opens it, and a download button.
 class PresentedFileCard extends StatelessWidget {
   const PresentedFileCard({
     super.key,
@@ -27,11 +26,6 @@ class PresentedFileCard extends StatelessWidget {
   final void Function(String path, String name)? onOpenFileTab;
 
   String get _name => path.split('/').last;
-
-  String get _folder {
-    final cut = path.lastIndexOf('/');
-    return cut > 0 ? path.substring(0, cut) : '';
-  }
 
   String get _ext {
     final dot = _name.lastIndexOf('.');
@@ -78,91 +72,52 @@ class PresentedFileCard extends StatelessWidget {
     }
   }
 
-  Widget _downloadButton(BuildContext context) => IconBtn('download',
-      size: 32,
-      iconSize: 16,
-      tooltip: 'Download',
-      onTap: () => _download(context));
+  Widget _downloadButton(BuildContext context) => Tooltip(
+        message: 'Download',
+        child: InkWell(
+          onTap: () => _download(context),
+          borderRadius: BorderRadius.circular(R.xs),
+          child: SizedBox(
+            width: 30,
+            height: 26,
+            child: Center(
+                child: AppIcon('download', size: 14, color: AppColors.fg3)),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     if (mediaKindOf(path) == MediaKind.image) return _image(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Material(
-        color: AppColors.surface1,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: AppColors.border2),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => _open(context),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-            child: Row(children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.accentBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: AppIcon(_icon, size: 18, color: AppColors.accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(14, weight: W.label, color: AppColors.fg1)),
-                    if (caption.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(caption,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(13, height: 18 / 13, color: AppColors.fg2)),
-                    ],
-                    if (_folder.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                          _ext.isEmpty
-                              ? _folder
-                              : '${_ext.toUpperCase()} · $_folder',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: mono(11.5, color: AppColors.fg4)),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (!kMobile) ...[
-                TextButton(
-                  onPressed: () => _open(context),
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 0),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    backgroundColor: AppColors.surface2,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(R.sm)),
-                  ),
-                  child: Text('Open',
-                      style: sans(12.5, weight: W.label, color: AppColors.fg1)),
-                ),
-                const SizedBox(width: 4),
-              ],
-              _downloadButton(context),
-            ]),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _open(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: S.s2),
+        child: Row(children: [
+          SizedBox(
+            width: 16,
+            child: Center(child: AppIcon(_icon, size: 14, color: AppColors.accent)),
           ),
-        ),
+          const SizedBox(width: S.s8),
+          Expanded(
+            child: Tooltip(
+              message: path,
+              waitDuration: const Duration(milliseconds: 600),
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: _name, style: TS.ui(AppColors.fg1)),
+                  if (caption.isNotEmpty)
+                    TextSpan(text: '  $caption', style: TS.ui(AppColors.fg3)),
+                ]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          const SizedBox(width: S.s4),
+          _downloadButton(context),
+        ]),
       ),
     );
   }
@@ -174,22 +129,13 @@ class PresentedFileCard extends StatelessWidget {
         width: double.infinity,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SingleImage(client: client, path: path),
-          const SizedBox(height: 6),
+          const SizedBox(height: S.s4),
           Row(children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (caption.isNotEmpty)
-                    Text(caption,
-                        style: sans(13, height: 18 / 13, color: AppColors.fg2)),
-                  Text(_name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(11.5, color: AppColors.fg4)),
-                ],
-              ),
+              child: Text(caption.isNotEmpty ? caption : _name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TS.meta(AppColors.fg3)),
             ),
             _downloadButton(context),
           ]),
