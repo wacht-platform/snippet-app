@@ -471,6 +471,22 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       _showLanes();
       return;
     }
+    if (!kMobile) {
+      presentScreen(
+        context,
+        style: PanelStyle.drawer,
+        purpose: ShellPanelPurpose.lanes,
+        panelId: id,
+        originClient: widget.client,
+        originSessionId: widget.sessionId,
+        builder: (_, close) => LaneTranscriptScreen(
+          client: widget.client,
+          laneId: id,
+          liveLanes: () => _state?.lanes ?? const <LaneInfo>[],
+        ),
+      );
+      return;
+    }
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => LaneTranscriptScreen(
         client: widget.client,
