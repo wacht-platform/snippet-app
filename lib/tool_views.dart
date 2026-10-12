@@ -54,7 +54,7 @@ String toolArgSummary(String tool, dynamic args) {
       ].join(' '),
     'web_search' => s('query'),
     'web_read' => s('url'),
-    'change_files' => _changesSummary(args['changes']),
+    'change_files' => _changesSummary(normalizeChanges(args)),
     'view_image' => s('path'),
     'set_session_title' => s('title'),
     'search_skills' => s('query'),
@@ -129,8 +129,7 @@ bool toolHasDetail(ToolStep step) {
 
   switch (tool) {
     case 'change_files':
-      final changes = args is Map ? args['changes'] : null;
-      return changes is List && changes.isNotEmpty;
+      return normalizeChanges(args).isNotEmpty;
     case 'view_image':
     case 'present_file':
       return arg('path').trim().isNotEmpty ||
@@ -309,8 +308,8 @@ String _changesSummary(dynamic changes) {
 }
 
 List<Widget> _changeFilesView(Map? a, Map? d, {bool failed = false}) {
-  final changes = a?['changes'];
-  if (changes is! List) return const [];
+  final changes = normalizeChanges(a);
+  if (changes.isEmpty) return const [];
   final out = <Widget>[];
   for (final raw in changes.whereType<Map>()) {
     String field(String key) => raw[key]?.toString() ?? '';

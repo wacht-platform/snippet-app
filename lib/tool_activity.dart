@@ -1,4 +1,57 @@
+import 'dart:convert';
+
 import 'tool_views.dart';
+
+List<Map<String, dynamic>> normalizeChanges(dynamic args) {
+  if (args is! Map) return const [];
+  dynamic raw = args['changes'];
+  if (raw is String) {
+    try {
+      raw = jsonDecode(raw);
+    } catch (_) {
+      raw = null;
+    }
+  }
+  if (raw == null && args['path'] != null) raw = [args];
+  if (raw is! List) return const [];
+  final shared = args['path'];
+  dynamic pick(Map m, List<String> keys) {
+    for (final k in keys) {
+      if (m[k] != null) return m[k];
+    }
+    return null;
+  }
+
+  const actions = {'create', 'replace', 'delete', 'move'};
+  return [
+    for (final c in raw.whereType<Map>())
+      () {
+        final find = pick(c, const ['find', 'old_string', 'old', 'search']);
+        final to = pick(c, const ['to', 'new_path', 'destination']);
+        final content = pick(c, const ['content', 'text']);
+        final declared = (c['action'] ?? c['type'])?.toString();
+        final action = actions.contains(declared)
+            ? declared!
+            : find != null
+                ? 'replace'
+                : to != null
+                    ? 'move'
+                    : content != null
+                        ? 'create'
+                        : declared ?? '';
+        return <String, dynamic>{
+          'path': (c['path'] ?? shared ?? '').toString(),
+          'action': action,
+          if (find != null) 'find': find.toString(),
+          'with': (pick(c, const ['with', 'new_string', 'new', 'replace', 'replacement']) ?? '').toString(),
+          if (c['all'] != null) 'all': c['all'],
+          if (content != null) 'content': content.toString(),
+          if (c['overwrite'] != null) 'overwrite': c['overwrite'],
+          if (to != null) 'to': to.toString(),
+        };
+      }(),
+  ];
+}
 
 class ToolStep {
   const ToolStep({required this.tool, this.args, this.result});
@@ -12,10 +65,7 @@ class ToolStep {
   bool get failed =>
       result is Map && (result['status'] ?? '').toString() == 'error';
 
-  List<Map> get changes {
-    final raw = args is Map ? (args as Map)['changes'] : null;
-    return raw is List ? raw.whereType<Map>().toList() : const [];
-  }
+  List<Map> get changes => normalizeChanges(args);
 }
 
 enum ToolKind { change, run, web, other }
