@@ -144,3 +144,62 @@ class PresentedFileCard extends StatelessWidget {
     );
   }
 }
+
+/// Files sent in one go: a single file is its own row; several share a header
+/// and show the first few, with the rest a tap away.
+class PresentedFiles extends StatefulWidget {
+  const PresentedFiles({
+    super.key,
+    required this.client,
+    required this.files,
+    this.onOpenFileTab,
+  });
+
+  final DaemonClient client;
+  final List<({String path, String caption})> files;
+  final void Function(String path, String name)? onOpenFileTab;
+
+  @override
+  State<PresentedFiles> createState() => _PresentedFilesState();
+}
+
+class _PresentedFilesState extends State<PresentedFiles> {
+  static const _shown = 3;
+  bool _all = false;
+
+  Widget _row(({String path, String caption}) f) => PresentedFileCard(
+        client: widget.client,
+        path: f.path,
+        caption: f.caption,
+        onOpenFileTab: widget.onOpenFileTab,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final files = widget.files;
+    if (files.length == 1) return _row(files.first);
+    final visible = _all ? files : files.take(_shown).toList();
+    final hidden = files.length - visible.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, S.s4, 0, S.s2),
+          child: Text('Shared ${files.length} files',
+              style: TS.meta(AppColors.fg3)),
+        ),
+        for (final f in visible) _row(f),
+        if (hidden > 0 || (_all && files.length > _shown))
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _all = !_all),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, S.s4, 0, S.s4),
+              child: Text(_all ? 'Show fewer' : 'Show $hidden more',
+                  style: TS.meta(AppColors.accent)),
+            ),
+          ),
+      ],
+    );
+  }
+}

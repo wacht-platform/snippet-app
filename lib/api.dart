@@ -692,6 +692,26 @@ class DaemonClient {
 
   /// GET /mission-control/autonomy — whether Mission Control is autonomous, its rhythm
   /// and quiet hours, and when it last and next checks in.
+  /// GET /artifacts — a session's artifacts, each version with a signed link.
+  Future<List<ArtifactInfo>> artifacts(String session) async {
+    final r = await http.get(_uri('/artifacts', {'session': session}));
+    if (r.statusCode != 200) throw _err('list artifacts', r);
+    return ((jsonDecode(r.body) as Map<String, dynamic>)['artifacts'] as List)
+        .map((e) => ArtifactInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// An absolute URL for a signed artifact link from [artifacts].
+  Uri artifactUri(String signedPath) => Uri.parse(baseUrl).replace(path: signedPath);
+
+  /// The text behind a signed artifact link, for Source views and native
+  /// renderers.
+  Future<String> artifactText(String signedPath) async {
+    final r = await http.get(artifactUri(signedPath));
+    if (r.statusCode != 200) throw _err('read artifact', r);
+    return utf8.decode(r.bodyBytes, allowMalformed: true);
+  }
+
   /// GET /memory/scopes — every memory repo on the machine.
   Future<List<MemoryScope>> memoryScopes() async {
     final r = await http.get(_uri('/memory/scopes'));
