@@ -82,6 +82,39 @@ class _MissionControlCardState extends State<MissionControlCard> {
   Widget build(BuildContext context) {
     final status = widget.session.status;
     final dot = status == 'running' ? AppColors.run : AppColors.accent;
+    if (!kMobile) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: widget.onOpen,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 8),
+                Text('Mission Control', style: sans(13, color: AppColors.fg1)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SwapText(_statusLine(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(11.5, color: AppColors.fg4)),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: EdgeInsets.only(bottom: kMobile ? 10 : 6),
       child: Material(

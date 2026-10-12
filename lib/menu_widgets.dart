@@ -20,7 +20,7 @@ PopupMenuItem<T> appMenuItem<T>({
   String? detail,
   bool danger = false,
   bool selected = false,
-  double height = 36,
+  double height = 32,
 }) {
   final color = danger ? AppColors.danger : AppColors.fg1;
   return PopupMenuItem<T>(
@@ -34,9 +34,9 @@ PopupMenuItem<T> appMenuItem<T>({
       child: Row(children: [
         if (icon != null) ...[
           AppIcon(icon,
-              size: kMobile ? 19 : 16,
+              size: kMobile ? 19 : 15,
               color: danger ? AppColors.danger : AppColors.fg3),
-          SizedBox(width: kMobile ? 14 : S.s12),
+          SizedBox(width: kMobile ? 14 : 10),
         ],
         Expanded(
           child: Text(label,
@@ -68,7 +68,7 @@ PopupMenuItem<T> appMenuRow<T>({
   String? description,
   String? trailing,
   bool selected = false,
-  double height = 56,
+  double? height,
 }) {
   if (kMobile) {
     return PopupMenuItem<T>(
@@ -116,31 +116,18 @@ PopupMenuItem<T> appMenuRow<T>({
   }
   return PopupMenuItem<T>(
     value: value,
-    height: height,
-    // Deliberately small: the row draws its own rounded, filled hit area, so a
-    // large outer padding would double up and inset the fill too far.
+    height: height ?? (description != null ? 44 : 32),
     padding: const EdgeInsets.symmetric(horizontal: 4),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),
       ),
       child: Row(children: [
-        // Icon in a tinted tile. A bare 15px glyph floating beside two lines of
-        // text had no visual anchor, which is most of why these menus read flat.
-        Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? AppColors.accentBg : AppColors.surface3,
-            borderRadius: BorderRadius.circular(R.sm),
-          ),
-          child: AppIcon(icon,
-              size: 16, color: selected ? AppColors.accent : AppColors.fg3),
-        ),
-        const SizedBox(width: 12),
+        AppIcon(icon,
+            size: 15, color: selected ? AppColors.accent : AppColors.fg3),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,27 +136,24 @@ PopupMenuItem<T> appMenuRow<T>({
               Text(label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TS.label(AppColors.fg1)),
+                  style: sans(13, color: AppColors.fg1)),
               if (description != null) ...[
-                const SizedBox(height: 2.5),
+                const SizedBox(height: 1),
                 Text(description,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TS.meta()),
+                    style: sans(11.5, color: AppColors.fg4)),
               ],
             ],
           ),
         ),
         if (trailing != null) ...[
           const SizedBox(width: 8),
-          Text(trailing, style: TS.caption()),
+          Text(trailing, style: sans(12, color: AppColors.fg4)),
         ],
-        // The check is the one saturated mark in the row, so "this is the
-        // current setting" is legible at a glance rather than one grey glyph
-        // among four.
         if (selected) ...[
           const SizedBox(width: 8),
-          AppIcon('check', size: 15, color: AppColors.accent),
+          AppIcon('check', size: 14, color: AppColors.accent),
         ],
       ]),
     ),

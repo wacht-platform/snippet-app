@@ -33,6 +33,30 @@ Future<void> openPullRequests(
   );
 }
 
+Future<void> openPullRequest(
+  BuildContext context, {
+  required DaemonClient client,
+  required String session,
+  required GithubStatus status,
+  required int number,
+}) {
+  if (kMobile) {
+    return openPullRequests(context,
+        client: client, session: session, status: status, number: number);
+  }
+  return presentScreen<void>(
+    context,
+    style: PanelStyle.drawer,
+    maxWidth: 1100,
+    purpose: ShellPanelPurpose.pullRequests,
+    panelId: '$number',
+    originClient: client,
+    originSessionId: session,
+    builder: (_, close) => DesktopPrDetailScreen(
+        client: client, session: session, number: number, status: status),
+  );
+}
+
 String _ago(String iso) {
   final t = DateTime.tryParse(iso);
   if (t == null) return '';

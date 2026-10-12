@@ -432,7 +432,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
               onRefresh: refresh,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 18),
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 18),
                 children: [
                   if (mcCard != null) mcCard,
                   ...desktopChildren,
