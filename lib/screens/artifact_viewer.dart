@@ -41,18 +41,77 @@ Future<void> showArtifactSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    enableDrag: true,
+    enableDrag: false,
     backgroundColor: AppColors.bg,
     sheetAnimationStyle: sheetMotion,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
     ),
     clipBehavior: Clip.antiAlias,
-    builder: (sheet) => FractionallySizedBox(
-      heightFactor: 0.94,
-      child: builder(() => Navigator.of(sheet).pop()),
-    ),
+    builder: (sheet) {
+      void close() => Navigator.of(sheet).pop();
+      return FractionallySizedBox(
+        heightFactor: 0.94,
+        child: _HeaderDragSheet(onClose: close, child: builder(close)),
+      );
+    },
   );
+}
+
+/// Lets the sheet be dragged down by its header only, so the page inside keeps
+/// its own scrolling. Past a threshold or on a quick flick it closes.
+class _HeaderDragSheet extends StatefulWidget {
+  const _HeaderDragSheet({required this.onClose, required this.child});
+  final VoidCallback onClose;
+  final Widget child;
+
+  @override
+  State<_HeaderDragSheet> createState() => _HeaderDragSheetState();
+}
+
+class _HeaderDragSheetState extends State<_HeaderDragSheet> {
+  static const _headerHeight = 76.0;
+  double _dy = 0;
+  bool _dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: _dragging ? Duration.zero : const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      transform: Matrix4.translationValues(0, _dy, 0),
+      child: Stack(children: [
+        Positioned.fill(child: widget.child),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: _headerHeight,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onVerticalDragStart: (_) => setState(() => _dragging = true),
+            onVerticalDragUpdate: (d) =>
+                setState(() => _dy = (_dy + d.delta.dy).clamp(0.0, double.infinity)),
+            onVerticalDragEnd: (d) {
+              final flick = (d.primaryVelocity ?? 0) > 700;
+              if (flick || _dy > 140) {
+                widget.onClose();
+              } else {
+                setState(() {
+                  _dragging = false;
+                  _dy = 0;
+                });
+              }
+            },
+            onVerticalDragCancel: () => setState(() {
+              _dragging = false;
+              _dy = 0;
+            }),
+          ),
+        ),
+      ]),
+    );
+  }
 }
 
 /// Open an artifact: a side-pane tab on desktop, a tall sheet on a phone.
