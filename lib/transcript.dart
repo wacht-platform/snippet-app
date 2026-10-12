@@ -110,7 +110,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
         ),
         if (_open && canExpand)
           Padding(
-            padding: const EdgeInsets.fromLTRB(0, S.s2, 0, S.s8),
+            padding: const EdgeInsets.fromLTRB(24, S.s2, 0, S.s8),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 360),
               child: SingleChildScrollView(
