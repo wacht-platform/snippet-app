@@ -56,7 +56,6 @@ Widget prHeader(
 }) {
   return Container(
     padding: EdgeInsets.fromLTRB(onBack == null ? 16 : 6, kMobile ? 8 : 10, 6, 10),
-    decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border))),
     child: Row(children: [
       if (onBack != null)
         IconBtn('chevron-left',
@@ -207,7 +206,6 @@ class PrCommentBody extends StatelessWidget {
   Widget _suggestion(String code) => Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.border2),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -399,7 +397,7 @@ class _PrMarkdownComposerState extends State<PrMarkdownComposer> {
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: focused ? AppColors.accent : AppColors.border2, width: focused ? 1.4 : 1),
+        border: Border.all(color: focused ? AppColors.accent : Colors.transparent, width: 1.4),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
@@ -532,6 +530,108 @@ class _CommentSheetState extends State<_CommentSheet> {
   }
 }
 
+/// The push between pull request pages: the new page slides in from the
+/// right over the old one, which drifts left and dims, and back reverses it.
+class PrRoute<T> extends PageRoute<T> {
+  PrRoute({required this.builder});
+  final WidgetBuilder builder;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 320);
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 260);
+  @override
+  bool get opaque => true;
+  @override
+  bool get maintainState => true;
+  @override
+  Color? get barrierColor => null;
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) =>
+      builder(context);
+
+  @override
+  Widget buildTransitions(
+      BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
+    final secondary = secondaryAnimation;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return FadeTransition(opacity: animation, child: child);
+    }
+    final incoming = CurvedAnimation(
+        parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    final outgoing = CurvedAnimation(
+        parent: secondary, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    return SlideTransition(
+      position: Tween(begin: Offset.zero, end: const Offset(-0.25, 0)).animate(outgoing),
+      child: AnimatedBuilder(
+        animation: outgoing,
+        builder: (context, page) => Stack(children: [
+          page!,
+          if (outgoing.value > 0)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ColoredBox(color: Colors.black.withValues(alpha: 0.28 * outgoing.value)),
+              ),
+            ),
+        ]),
+        child: SlideTransition(
+          position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(incoming),
+          child: DecoratedBox(
+            decoration: BoxDecoration(boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 24),
+            ]),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// True once the page's push transition has had time to finish, so a heavy
+/// body can wait for it and the slide stays smooth.
+mixin _AfterTransition<W extends StatefulWidget> on State<W> {
+  bool settled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 340), () {
+      if (mounted) setState(() => settled = true);
+    });
+  }
+}
+
+Widget _diffPlaceholder() => ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 0),
+      children: [
+        for (var i = 0; i < 3; i++) ...[
+          Container(
+            height: 34,
+            decoration: BoxDecoration(color: AppColors.surface1, borderRadius: BorderRadius.circular(6)),
+          ),
+          const SizedBox(height: 8),
+          for (final w in const [0.7, 0.5, 0.85, 0.4, 0.6])
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8, left: 46),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: w,
+                child: Container(
+                  height: 10,
+                  decoration: BoxDecoration(color: AppColors.surface1, borderRadius: BorderRadius.circular(3)),
+                ),
+              ),
+            ),
+          const SizedBox(height: 14),
+        ],
+      ],
+    );
+
 /// Pending review comments and viewed files, kept for the life of the app so
 /// leaving a pull request doesn't lose them.
 final Map<String, List<PendingComment>> _pendingByPr = {};
@@ -600,7 +700,7 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
   Future<void> _openFiles({String? path}) async {
     final pr = _pr;
     if (pr == null) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
+    await Navigator.of(context).push(PrRoute<void>(
       builder: (_) => PrFilesScreen(
         client: widget.client,
         session: widget.session,
@@ -622,7 +722,7 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
   Future<void> _openCommits() async {
     final pr = _pr;
     if (pr == null) return;
-    await Navigator.of(context).push(MaterialPageRoute<void>(
+    await Navigator.of(context).push(PrRoute<void>(
       builder: (_) => PrCommitsScreen(client: widget.client, session: widget.session, commits: pr.commits),
     ));
   }
@@ -723,9 +823,8 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
 
   Widget _section(String label) => Container(
         width: double.infinity,
-        margin: const EdgeInsets.only(top: 20),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-        decoration: BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
+        margin: const EdgeInsets.only(top: 22),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
         child: Text(label, style: sans(15, weight: W.strong, color: AppColors.fg1)),
       );
 
@@ -925,12 +1024,7 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
 
   Widget _card(Widget child) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border2),
-        ),
+        padding: const EdgeInsets.only(top: 2),
         child: child,
       );
 
@@ -952,9 +1046,8 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
                       height: 24,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: AppColors.bg,
+                        color: AppColors.surface2,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.border2),
                       ),
                       child: AppIcon(icon ?? 'git-commit', size: 12, color: ink ?? AppColors.fg3),
                     ),
@@ -1134,12 +1227,6 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
               onBack: () => Navigator.of(context).maybePop(),
               actions: [
                 if (pr != null)
-                  IconBtn('globe',
-                      size: kMobile ? M.minTarget : 32,
-                      iconSize: 15,
-                      tooltip: 'Open on GitHub',
-                      onTap: () => launchUrl(Uri.parse(pr.summary.url), mode: LaunchMode.externalApplication)),
-                if (pr != null && pr.summary.state != 'MERGED')
                   Builder(
                     builder: (anchor) => IconBtn('more-horizontal',
                         size: kMobile ? M.minTarget : 32,
@@ -1323,48 +1410,34 @@ class _PrMergeBoxState extends State<PrMergeBox> {
     await _run(() => widget.client.prState(widget.session, _s.number, how), 'Branch updated');
   }
 
-  Widget _splitButton({required String label, required VoidCallback? onTap, required Color color}) {
+  Widget _mergeButton({required String label, required VoidCallback? onTap}) {
     final enabled = onTap != null && !_busy;
-    final fg = !enabled
-        ? AppColors.fg4
-        : color == AppColors.accentFill
-            ? AppColors.accentFg
-            : Colors.white;
-    final bg = enabled ? color : AppColors.surface2;
-    return Row(children: [
-      Expanded(
+    return Builder(
+      builder: (anchor) => GestureDetector(
+        onSecondaryTap: _busy ? null : () => _pickMethod(anchor),
         child: Material(
-        color: bg,
-        borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-          child: Container(
-            height: 44,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Text(label, style: sans(14, weight: W.label, color: fg)),
-          ),
-        ),
-      ),
-      ),
-      Container(width: 1, height: 44, color: AppColors.bg.withValues(alpha: 0.35)),
-      Builder(
-        builder: (anchor) => Material(
-          color: bg,
-          borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+          color: enabled ? AppColors.accentFill : AppColors.surface2,
+          borderRadius: BorderRadius.circular(8),
           child: InkWell(
-            onTap: _busy ? null : () => _pickMethod(anchor),
-            borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
-            child: SizedBox(
-              width: 46,
+            onTap: enabled ? onTap : null,
+            onLongPress: _busy
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    _pickMethod(anchor);
+                  },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
               height: 44,
-              child: Center(child: AppIcon('chevron-down', size: 15, color: fg)),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Text(label,
+                  style: sans(14, weight: W.label, color: enabled ? AppColors.accentFg : AppColors.fg4)),
             ),
           ),
         ),
       ),
-    ]);
+    );
   }
 
   Widget _field(TextEditingController c, String hint, {int lines = 1}) => TextField(
@@ -1432,11 +1505,11 @@ class _PrMergeBoxState extends State<PrMergeBox> {
         ],
       );
 
-  Widget _secondary(String label, VoidCallback? onTap) => OutlinedButton(
+  Widget _secondary(String label, VoidCallback? onTap) => TextButton(
         onPressed: _busy ? null : onTap,
-        style: OutlinedButton.styleFrom(
+        style: TextButton.styleFrom(
           minimumSize: const Size.fromHeight(44),
-          side: BorderSide(color: AppColors.border2),
+          backgroundColor: AppColors.surface2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
         ),
@@ -1516,11 +1589,11 @@ class _PrMergeBoxState extends State<PrMergeBox> {
             onPressed: _busy || (blocked && !_admin) ? null : _merge,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
-              backgroundColor: blocked ? AppColors.danger : AppColors.ok,
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.accentFill,
+              foregroundColor: AppColors.accentFg,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text('Confirm ${_short(_method)}', style: sans(14, weight: W.label, color: Colors.white)),
+            child: Text('Confirm ${_short(_method)}', style: sans(14, weight: W.label, color: AppColors.accentFg)),
           ),
         const SizedBox(height: 6),
         TextButton(
@@ -1532,9 +1605,8 @@ class _PrMergeBoxState extends State<PrMergeBox> {
     } else {
       final canMerge = _ready || widget.status.isAdmin;
       final canAuto = blocked && widget.status.autoMerge;
-      children.add(_splitButton(
+      children.add(_mergeButton(
         label: canAuto && !widget.status.isAdmin ? 'Enable auto-merge' : _label(_method),
-        color: blocked ? (widget.status.isAdmin ? AppColors.danger : AppColors.accentFill) : AppColors.ok,
         onTap: canMerge || canAuto
             ? () => setState(() {
                   _prefill();
@@ -1546,11 +1618,11 @@ class _PrMergeBoxState extends State<PrMergeBox> {
       children.add(Text(
         blocked
             ? (widget.status.isAdmin
-                ? 'Requirements aren\'t met; as an admin you can still merge.'
+                ? 'Requirements aren\'t met; as an admin you can still merge. Long-press to choose the method.'
                 : canAuto
                     ? 'It will merge with a ${_short(_method)} once requirements are met.'
                     : 'Merging is disabled until requirements are met.')
-            : 'Merges with a ${_short(_method)} into ${_s.base}. The arrow picks another method.',
+            : 'Merges with a ${_short(_method)} into ${_s.base}.${widget.status.mergeMethods.length > 1 ? ' Long-press to choose another method.' : ''}',
         style: TS.meta(AppColors.fg4),
       ));
     }
@@ -1627,9 +1699,8 @@ class _ReviewSheetState extends State<_ReviewSheet> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.accentBg : AppColors.surface2,
+          color: selected ? AppColors.accentBg : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? AppColors.accent : AppColors.border2),
         ),
         child: Row(children: [
           Container(
@@ -1736,15 +1807,16 @@ class PrFilesScreen extends StatefulWidget {
   State<PrFilesScreen> createState() => _PrFilesScreenState();
 }
 
-class _PrFilesScreenState extends State<PrFilesScreen> {
+class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
   late final Map<String, List<DiffLine>> _parsed = parseUnifiedDiff(widget.diff);
   late List<PrThread> _threads = widget.threads;
   final Map<String, GlobalKey> _fileKeys = {};
 
   @override
-  void initState() {
-    super.initState();
-    if (widget.scrollTo != null) {
+  void setState(VoidCallback fn) {
+    final wasSettled = settled;
+    super.setState(fn);
+    if (!wasSettled && settled && widget.scrollTo != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _jump(widget.scrollTo!));
     }
   }
@@ -1865,7 +1937,7 @@ class _PrFilesScreenState extends State<PrFilesScreen> {
               actions: [
                 if (kMobile)
                   Builder(
-                    builder: (anchor) => IconBtn('list',
+                    builder: (anchor) => IconBtn('folder-open',
                         size: M.minTarget, iconSize: 16, tooltip: 'Jump to file', onTap: () => _jumpMenu(anchor)),
                   ),
               ]),
@@ -1873,11 +1945,11 @@ class _PrFilesScreenState extends State<PrFilesScreen> {
             child: Stack(children: [
               Positioned.fill(
                 child: kMobile
-                    ? diff
+                    ? (settled ? diff : _diffPlaceholder())
                     : Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                         SizedBox(width: 260, child: _fileTree()),
                         Container(width: 1, color: AppColors.border),
-                        Expanded(child: diff),
+                        Expanded(child: settled ? diff : _diffPlaceholder()),
                       ]),
               ),
               if (widget.pending.isNotEmpty)
@@ -2079,13 +2151,8 @@ class _PrFileDiffState extends State<PrFileDiff> {
       child: InkWell(
         onTap: () => setState(() => _collapsed = !_collapsed),
         child: Container(
+          margin: const EdgeInsets.only(top: 8),
           padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(color: AppColors.border),
-              bottom: BorderSide(color: AppColors.border),
-            ),
-          ),
           child: Row(children: [
             AppIcon(_collapsed ? 'chevron-right' : 'chevron-down', size: 14, color: AppColors.fg3),
             const SizedBox(width: 6),
@@ -2291,9 +2358,8 @@ class _PendingBox extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 6, 12, 8),
       padding: const EdgeInsets.fromLTRB(12, 8, 6, 10),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
+        color: AppColors.accentBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.6)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
@@ -2403,7 +2469,6 @@ class _PrThreadBoxState extends State<PrThreadBox> {
       decoration: BoxDecoration(
         color: AppColors.surface1,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border2),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -2538,21 +2603,11 @@ class PrCommitsScreen extends StatelessWidget {
                     Text('Commits on ${entry.key}', style: sans(13, weight: W.label, color: AppColors.fg2)),
                   ]),
                 ),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface1,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border2),
+                for (final c in entry.value)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: _CommitRow(commit: c, client: client, session: session),
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(children: [
-                    for (var i = 0; i < entry.value.length; i++) ...[
-                      if (i > 0) Container(height: 1, color: AppColors.border),
-                      _CommitRow(commit: entry.value[i], client: client, session: session),
-                    ],
-                  ]),
-                ),
               ],
             ]),
           ),
@@ -2580,7 +2635,7 @@ class _CommitRowState extends State<_CommitRow> {
     final c = widget.commit;
     final short = c.oid.length > 7 ? c.oid.substring(0, 7) : c.oid;
     return InkWell(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+      onTap: () => Navigator.of(context).push(PrRoute<void>(
         builder: (_) => CommitDiffScreen(client: widget.client, session: widget.session, commit: c),
       )),
       child: Padding(
@@ -2634,7 +2689,7 @@ class _CommitRowState extends State<_CommitRow> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border2),
+              color: AppColors.surface2,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(short, style: mono(11.5, color: AppColors.fg2)),
@@ -2659,7 +2714,7 @@ class CommitDiffScreen extends StatefulWidget {
   State<CommitDiffScreen> createState() => _CommitDiffScreenState();
 }
 
-class _CommitDiffScreenState extends State<CommitDiffScreen> {
+class _CommitDiffScreenState extends State<CommitDiffScreen> with _AfterTransition {
   Map<String, List<DiffLine>>? _files;
   String? _error;
 
@@ -2689,8 +2744,8 @@ class _CommitDiffScreenState extends State<CommitDiffScreen> {
           Expanded(
             child: _error != null
                 ? prMessage(_error!)
-                : files == null
-                    ? Center(child: Spinner(size: 16, color: AppColors.fg3))
+                : files == null || !settled
+                    ? _diffPlaceholder()
                     : ListView(padding: const EdgeInsets.only(bottom: 32), children: [
                         for (final e in files.entries)
                           PrFileDiff(

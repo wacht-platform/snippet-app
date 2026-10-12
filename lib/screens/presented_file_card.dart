@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../media_views.dart';
-import '../menu_widgets.dart';
 import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
@@ -167,7 +166,6 @@ class PresentedFileCard extends StatelessWidget {
           color: AppColors.surface1,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
-            side: BorderSide(color: AppColors.border2),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(onTap: () => _open(context), child: body),

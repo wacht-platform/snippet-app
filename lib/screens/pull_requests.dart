@@ -44,8 +44,6 @@ Widget _screenHeader(
 }) {
   return Container(
     padding: EdgeInsets.fromLTRB(onBack == null ? 16 : 6, kMobile ? 8 : 10, 6, 10),
-    decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border))),
     child: Row(children: [
       if (onBack != null)
         IconBtn('chevron-left',
@@ -143,7 +141,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
   }
 
   Future<void> _open(PrSummary pr) async {
-    await Navigator.of(context).push(MaterialPageRoute<void>(
+    await Navigator.of(context).push(PrRoute<void>(
       builder: (_) => PullRequestScreen(
         client: widget.client,
         session: widget.session,
@@ -157,8 +155,6 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
   Widget _tabs() => Container(
         height: 42,
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.border))),
         child: ListView(scrollDirection: Axis.horizontal, children: [
           for (final (key, label) in _filters)
             InkWell(
