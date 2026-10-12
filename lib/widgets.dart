@@ -693,6 +693,9 @@ class IconBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    if (ShellPanelRoot.hides(context, name, tooltip)) {
+      return const SizedBox.shrink();
+    }
     // A touch target may not be smaller than a fingertip just because the ink
     // is small: on a phone the layout box grows to [M.minTarget] while the glyph
     // keeps its size, so a 22px clear button is still comfortably tappable. On
@@ -1500,11 +1503,31 @@ class HeaderAction extends StatelessWidget {
 }
 
 class ShellPanelRoot extends InheritedWidget {
-  const ShellPanelRoot({super.key, required super.child});
+  const ShellPanelRoot({super.key, this.label = '', required super.child});
 
-  static bool isRoot(BuildContext context) =>
-      context.getInheritedWidgetOfExactType<ShellPanelRoot>() != null &&
-      !Navigator.of(context).canPop();
+  final String label;
+
+  static ShellPanelRoot? of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<ShellPanelRoot>();
+
+  static bool inPanel(BuildContext context) => !kMobile && of(context) != null;
+
+  static bool isRoot(BuildContext context) {
+    if (of(context) == null) return false;
+    final route = ModalRoute.of(context);
+    return route != null ? route.isFirst : !Navigator.of(context).canPop();
+  }
+
+  static bool repeatsLabel(BuildContext context, String title) {
+    final label = of(context)?.label.trim().toLowerCase() ?? '';
+    return !kMobile &&
+        label.isNotEmpty &&
+        title.trim().toLowerCase() == label &&
+        isRoot(context);
+  }
+
+  static bool hides(BuildContext context, String name, String? tooltip) =>
+      !kMobile && of(context) != null && name == 'x' && tooltip == 'Close';
 
   @override
   bool updateShouldNotify(ShellPanelRoot old) => false;
@@ -1551,8 +1574,19 @@ class SnAppBar extends StatelessWidget {
             ShellPanelRoot.isRoot(context)
         ? null
         : this.onBack;
+    final actions = ShellPanelRoot.inPanel(context)
+        ? this
+            .actions
+            .where((a) => !(a is IconBtn && ShellPanelRoot.hides(context, a.name, a.tooltip)))
+            .toList()
+        : this.actions;
+    final repeats = subtitle == null &&
+        onBack == null &&
+        leading == null &&
+        ShellPanelRoot.repeatsLabel(context, title);
+    if (repeats && actions.isEmpty) return const SizedBox.shrink();
     return Container(
-      height: compact ? 52 : 64,
+      height: repeats ? 44 : (compact ? 52 : 64),
       padding: EdgeInsets.fromLTRB(
           onBack != null || leading != null
               ? (kMobile ? 6 : S.s4)
@@ -1583,6 +1617,7 @@ class SnAppBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                if (!repeats)
                 Text(title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

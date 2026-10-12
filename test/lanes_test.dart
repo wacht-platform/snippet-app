@@ -55,7 +55,7 @@ void main() {
         return LanesScreen(liveLanes: () => lanes);
       }));
       await tester.pumpAndSettle();
-      expect(find.text('Delegated lanes'), findsOneWidget);
+      expect(find.text('Delegated lanes'), mode == 'hosted desktop' ? findsNothing : findsOneWidget);
       expect(find.textContaining(RegExp('^in progress\$', caseSensitive: false)), findsOneWidget);
       expect(find.text('In progress · 1'), findsNothing);
       expect(find.text('Handoff'), findsNothing);
@@ -87,12 +87,18 @@ void main() {
       expect(find.text('Restored worker'), findsWidgets);
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('Delegated lanes'), findsOneWidget);
+      expect(find.text('Delegated lanes'), mode == 'hosted desktop' ? findsNothing : findsOneWidget);
       expect(find.byType(LaneDetailScreen), findsNothing);
       expect(find.textContaining(RegExp('^completed\$', caseSensitive: false)), findsOneWidget);
       expect(find.text('done'), findsOneWidget);
       expect(closed, isFalse);
       if (mode != 'mobile') expect(nested.currentState!.canPop(), isFalse);
+      if (mode == 'hosted desktop') {
+        expect(find.byTooltip('Back'), findsNothing);
+        await tester.pumpWidget(const SizedBox());
+        debugDefaultTargetPlatformOverride = null;
+        return;
+      }
       await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
       if (mode == 'mobile') {
