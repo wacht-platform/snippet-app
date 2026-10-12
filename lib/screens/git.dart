@@ -900,6 +900,22 @@ class _GitBranchPickerState extends State<GitBranchPicker> {
 
 enum _DiffLineType { meta, hunk, add, del, context }
 
+const _patchHeaders = [
+  'index ',
+  '--- ',
+  '+++ ',
+  'new file mode',
+  'deleted file mode',
+  'old mode',
+  'new mode',
+  'similarity index',
+  'dissimilarity index',
+  'rename from',
+  'rename to',
+  'copy from',
+  'copy to',
+];
+
 class _DiffLineData {
   final int? oldLine;
   final int? newLine;
@@ -998,30 +1014,31 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
     final hunkRe = RegExp(r'^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)');
 
     for (final raw in rawLines) {
-      if (raw.isEmpty) continue;
+      if (raw.isEmpty || raw.startsWith('\\')) continue;
       final match = hunkRe.firstMatch(raw);
       if (match != null) {
-        inHunk = true;
         oldLine = int.parse(match.group(1)!);
         newLine = int.parse(match.group(2)!);
+        final context = match.group(3)!.trim();
+        if (inHunk || context.isNotEmpty) {
+          result.add(_DiffLineData(
+            oldLine: null,
+            newLine: null,
+            text: context,
+            type: _DiffLineType.hunk,
+          ));
+        }
+        inHunk = true;
+      } else if (raw.startsWith('diff ')) {
+        inHunk = false;
+      } else if (!inHunk && raw.startsWith('Binary files')) {
         result.add(_DiffLineData(
           oldLine: null,
           newLine: null,
-          text: raw,
-          type: _DiffLineType.hunk,
-        ));
-      } else if (raw.startsWith('diff ') ||
-          (!inHunk &&
-              (raw.startsWith('+++') ||
-                  raw.startsWith('---') ||
-                  raw.startsWith('index ')))) {
-        if (raw.startsWith('diff ')) inHunk = false;
-        result.add(_DiffLineData(
-          oldLine: null,
-          newLine: null,
-          text: raw,
+          text: 'Binary file changed',
           type: _DiffLineType.meta,
         ));
+      } else if (!inHunk && _patchHeaders.any(raw.startsWith)) {
       } else if (raw.startsWith('+')) {
         adds++;
         result.add(_DiffLineData(
@@ -1151,10 +1168,12 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
     if (line.type == _DiffLineType.hunk) {
       return Container(
         width: double.infinity,
-        margin: const EdgeInsets.symmetric(vertical: S.s4),
-        padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s4),
-        color: AppColors.raised,
-        child: Text(line.text, style: TS.codeSmall(AppColors.accent)),
+        margin: const EdgeInsets.symmetric(vertical: S.s8),
+        padding: const EdgeInsets.symmetric(horizontal: S.s12, vertical: 2),
+        child: Text(line.text.isEmpty ? '⋯' : line.text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TS.codeSmall(AppColors.fg4)),
       );
     }
 
