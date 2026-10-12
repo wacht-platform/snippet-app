@@ -437,7 +437,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
 
   void _openFileTab(DaemonClient client, String url, String path, String name) {
     final pane = _focusedPane;
-    final group = _activeGroupKeyFor(pane);
+    final group = _activeGroupKeyFor(pane) ?? _activeTab?.key;
     if (group == null) return;
     final existing = _tabs.indexWhere(
         (t) => t.isFile && t.instanceUrl == url && t.filePath == path);
@@ -471,7 +471,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     GitFile f,
   ) {
     final pane = _focusedPane;
-    final group = _activeGroupKeyFor(pane);
+    final group = _activeGroupKeyFor(pane) ?? _activeTab?.key;
     if (group == null) return;
     final staged = f.staged && !f.unstaged;
     final name = lastPathSegment(f.path, ifEmpty: f.path);
