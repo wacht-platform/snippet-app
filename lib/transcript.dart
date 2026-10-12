@@ -747,10 +747,10 @@ class _WatchFiredState extends State<_WatchFired> {
   Widget build(BuildContext context) {
     final read = _readWatchPreview(widget.preview);
     final exit = read.exit;
-    final (icon, ink, status) = switch (exit) {
-      null => ('activity', AppColors.accent, 'updated'),
-      0 => ('check-circle', AppColors.ok, 'finished · exit 0'),
-      _ => ('alert-triangle', AppColors.danger, 'failed · exit $exit'),
+    final status = switch (exit) {
+      null => 'updated',
+      0 => 'finished · exit 0',
+      _ => 'failed · exit $exit',
     };
     final canExpand = read.lines.isNotEmpty;
     return Column(
@@ -760,18 +760,13 @@ class _WatchFiredState extends State<_WatchFired> {
           behavior: HitTestBehavior.opaque,
           onTap: canExpand ? () => setState(() => _open = !_open) : null,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: S.s4),
+            padding: const EdgeInsets.fromLTRB(24, S.s4, 0, S.s4),
             child: Row(children: [
-              SizedBox(
-                width: 16,
-                child: Center(child: AppIcon(icon, size: 14, color: ink)),
-              ),
-              const SizedBox(width: S.s8),
               Expanded(
                 child: Text.rich(
                   TextSpan(children: [
                     TextSpan(text: widget.subject, style: TS.ui(AppColors.fg2)),
-                    TextSpan(text: '  $status', style: TS.meta(ink)),
+                    TextSpan(text: '  $status', style: TS.meta(AppColors.fg4)),
                   ]),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
