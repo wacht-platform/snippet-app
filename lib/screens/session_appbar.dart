@@ -336,6 +336,13 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
+  void _openPullRequests() {
+    final status = _github;
+    if (status == null) return;
+    openPullRequests(context,
+        client: widget.client, session: widget.sessionId, status: status);
+  }
+
   void _openDeliverables() {
     final files = <({String path, String caption})>[
       for (final e in _state?.events ?? const <Map<String, dynamic>>[])
@@ -959,6 +966,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                   sessionId: widget.sessionId,
                   onClose: close))),
       item('layers', 'Artifacts & files', _openDeliverables),
+      if (_github != null) item('git-branch', 'Pull requests', _openPullRequests),
       item('folder', 'Browse', () {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
@@ -1028,6 +1036,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               sessionId: widget.sessionId,
               onClose: close))),
       onDeliverables: () => navigate!(_openDeliverables),
+      onPullRequests: _github == null ? null : () => navigate!(_openPullRequests),
       onFiles: () => navigate!(() {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,

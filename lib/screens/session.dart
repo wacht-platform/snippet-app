@@ -31,6 +31,8 @@ import '../panel.dart';
 import '../share_inbound.dart';
 import '../widgets.dart';
 import 'artifact_viewer.dart';
+import 'pull_requests.dart';
+import '../github_models.dart';
 import 'presented_file_card.dart';
 import '../media_views.dart';
 import 'agent_messaging.dart';
@@ -233,6 +235,7 @@ class _SessionScreenState extends State<SessionScreen>
   bool _confirmingRecording = false;
   SharedInbound? _consumedShare;
   HarnessState? _state;
+  GithubStatus? _github;
   String _liveText = '';
   String _liveThinking = '';
   bool _liveTextVisible = false;
@@ -630,6 +633,11 @@ class _SessionScreenState extends State<SessionScreen>
   void initState() {
     super.initState();
     _title = _isMissionControl ? 'Mission Control' : widget.title;
+    if (!_isMissionControl) {
+      widget.client.githubStatus(widget.sessionId).then((status) {
+        if (mounted && status.available) setState(() => _github = status);
+      }).catchError((Object _) {});
+    }
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
     _restoreDraft();

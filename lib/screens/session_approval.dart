@@ -1110,6 +1110,7 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onGit;
   final VoidCallback onFiles;
   final VoidCallback onDeliverables;
+  final VoidCallback? onPullRequests;
   final VoidCallback onProcesses;
   final VoidCallback onRecurring;
   final VoidCallback onCompact;
@@ -1131,6 +1132,7 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onGit,
     required this.onFiles,
     required this.onDeliverables,
+    this.onPullRequests,
     required this.onProcesses,
     required this.onRecurring,
     required this.onCompact,
@@ -1410,6 +1412,9 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
       _tile('git-branch', 'Git', 'Diffs and commits', widget.onGit),
       _tile('folder', 'Files', 'Browse the workspace', widget.onFiles),
       _tile('layers', 'Shared', 'Artifacts and files', widget.onDeliverables),
+      if (widget.onPullRequests != null)
+        _tile('git-branch', 'Pull requests', 'Review on GitHub',
+            widget.onPullRequests!),
       if (!widget.hideShell)
         _tile('terminal', 'Shell', 'A terminal here', widget.onTerm),
       _tile('list', 'Processes', 'What is running', widget.onProcesses),
@@ -1572,6 +1577,12 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           label: 'Artifacts & files',
           detail: 'What the agent handed over',
           onTap: widget.onDeliverables),
+      if (widget.onPullRequests != null)
+        _row(
+            icon: 'git-branch',
+            label: 'Pull requests',
+            detail: 'Review and merge on GitHub',
+            onTap: widget.onPullRequests!),
       if (!widget.hideShell)
         _row(
             icon: 'terminal',
