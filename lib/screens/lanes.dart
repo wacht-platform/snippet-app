@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../api.dart';
 import '../media_views.dart';
 import '../models.dart';
+import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -242,13 +243,23 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     final client = widget.client ?? DaemonScope.maybeOf(context);
     final live = widget.liveLanes ?? () => [widget.lane];
     final transcript = lane.transcript;
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) =>
-          client != null && transcript != null && transcript.isNotEmpty
-              ? LaneTranscriptScreen(
-                  client: client, laneId: lane.id, liveLanes: live)
-              : LaneDetailScreen(laneId: lane.id, liveLanes: live),
-    ));
+    Widget screen() =>
+        client != null && transcript != null && transcript.isNotEmpty
+            ? LaneTranscriptScreen(
+                client: client, laneId: lane.id, liveLanes: live)
+            : LaneDetailScreen(laneId: lane.id, liveLanes: live);
+    if (!kMobile &&
+        ShellPanelRoot.of(context) == null &&
+        ShellPanelScope.maybeOf(context) != null) {
+      presentScreen(context,
+          style: PanelStyle.drawer,
+          purpose: ShellPanelPurpose.lanes,
+          panelId: lane.id,
+          originClient: client,
+          builder: (_, __) => screen());
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen()));
   }
 
   Widget _details(BuildContext context) {

@@ -27,7 +27,7 @@ void main() {
       final rootKey = GlobalKey<NavigatorState>();
       final localKey = GlobalKey<NavigatorState>();
       final request = ShellPanelRequest(
-        purpose: ShellPanelPurpose.lanes, id: 'lanes', client: null,
+        purpose: ShellPanelPurpose.lanes, id: '', client: null,
         builder: (_, close) => LanesScreen(liveLanes: () => lanes, onClose: close),
       );
       late BuildContext entry;
