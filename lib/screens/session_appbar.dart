@@ -336,31 +336,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
-  Widget _headerStatusLine(HarnessState s) {
-    final (label, dot) = switch (s.status) {
-      'running' => ('Working', AppColors.run),
-      'waiting_for_input' => ('Waiting for you', AppColors.accent),
-      'failed' => ('Stopped on an error', AppColors.danger),
-      'connecting' => ('Connecting', AppColors.fg4),
-      _ => ('Idle', AppColors.fg4),
-    };
-    final folder = lastPathSegment(s.workspace, ifEmpty: '');
-    return Row(children: [
-      Container(
-        width: 6,
-        height: 6,
-        decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-      ),
-      const SizedBox(width: 6),
-      Flexible(
-        child: Text(folder.isEmpty ? label : '$label · $folder',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: sans(12, height: 16 / 12, color: AppColors.fg3)),
-      ),
-    ]);
-  }
-
   void _openDeliverables() {
     final files = <({String path, String caption})>[
       for (final e in _state?.events ?? const <Map<String, dynamic>>[])
@@ -426,10 +401,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                     overflow: TextOverflow.ellipsis,
                     style: TS.sectionTitle().copyWith(fontSize: 17),
                   ),
-                  if (s != null) ...[
-                    const SizedBox(height: 1),
-                    _headerStatusLine(s),
-                  ],
                 ],
               ),
             ),
@@ -1285,10 +1256,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                           spacing: -0.7,
                           height: 31 / 26,
                           color: AppColors.fg1)),
-                  if (s != null) ...[
-                    const SizedBox(height: 6),
-                    _headerStatusLine(s),
-                  ],
                 ],
               ),
             ),
