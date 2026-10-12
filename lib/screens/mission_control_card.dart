@@ -8,8 +8,8 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../motion.dart';
 
-/// Mission Control pinned at the top of the Chats list: what it is doing and
-/// what it last noted, one tap from opening it.
+/// Mission Control pinned at the top of the Chats list: what it is doing, one
+/// tap from opening it.
 class MissionControlCard extends StatefulWidget {
   final DaemonClient client;
   final SessionInfo session;
@@ -79,7 +79,6 @@ class _MissionControlCardState extends State<MissionControlCard> {
 
   @override
   Widget build(BuildContext context) {
-    final note = (_autonomy?['last_round_summary'] as String?)?.trim() ?? '';
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 4),
       child: Material(
@@ -133,14 +132,6 @@ class _MissionControlCardState extends State<MissionControlCard> {
                     ),
                     AppIcon('chevron-right', size: 16, color: AppColors.fg4),
                   ]),
-                  if (note.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(note,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(15, height: 23 / 15, color: AppColors.fg2)
-                            .copyWith(fontStyle: FontStyle.italic)),
-                  ],
                 ],
               ),
             ),
