@@ -1010,7 +1010,11 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       f();
     }
 
-    showAppSheet(context, title: 'Actions', child: _actionsPanel(s, run));
+    showAppSheet(context,
+        title: 'Actions',
+        maxWidth: 420,
+        maxHeight: 680,
+        child: _actionsPanel(s, run));
   }
 
   /// The action list, shared by the mobile end-drawer and the pull-up sheet so

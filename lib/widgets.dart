@@ -1499,6 +1499,17 @@ class HeaderAction extends StatelessWidget {
           icon: icon, small: true, variant: BtnVariant.secondary, onTap: onTap);
 }
 
+class ShellPanelRoot extends InheritedWidget {
+  const ShellPanelRoot({super.key, required super.child});
+
+  static bool isRoot(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<ShellPanelRoot>() != null &&
+      !Navigator.of(context).canPop();
+
+  @override
+  bool updateShouldNotify(ShellPanelRoot old) => false;
+}
+
 class SnAppBar extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -1535,6 +1546,11 @@ class SnAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    final onBack = this.onBack != null &&
+            !kMobile &&
+            ShellPanelRoot.isRoot(context)
+        ? null
+        : this.onBack;
     return Container(
       height: compact ? 52 : 64,
       padding: EdgeInsets.fromLTRB(
