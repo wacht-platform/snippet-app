@@ -113,37 +113,96 @@ class ArtifactRow extends StatelessWidget {
   final String kind;
   final String caption;
 
+  String get _kindLabel => switch (kind) {
+        'html' => 'Web page',
+        'markdown' => 'Document',
+        'image' || 'svg' => 'Image',
+        'csv' => 'Table',
+        'pdf' => 'PDF',
+        'code' => 'Code',
+        'collection' => 'Collection',
+        _ => 'File',
+      };
+
+  void _open(BuildContext context) => openArtifact(context,
+      client: client, session: session, id: id, version: version);
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => openArtifact(context,
-          client: client, session: session, id: id, version: version),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: S.s4),
-        child: Row(children: [
-          SizedBox(
-            width: 16,
-            child: Center(
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
+      side: BorderSide(color: AppColors.border2),
+    );
+    final body = kMobile
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+            child: Row(children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.accentBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: AppIcon(artifactIcon(kind),
-                    size: 14, color: AppColors.accent)),
-          ),
-          const SizedBox(width: S.s8),
-          Expanded(
-            child: Text.rich(
-              TextSpan(children: [
-                TextSpan(text: title, style: TS.ui(AppColors.fg1)),
-                TextSpan(text: '  v$version', style: TS.meta(AppColors.fg4)),
-                if (caption.isNotEmpty)
-                  TextSpan(text: '  $caption', style: TS.ui(AppColors.fg3)),
-              ]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: S.s6),
-          AppIcon('chevron-right', size: 12, color: AppColors.fg4),
-        ]),
+                    size: 18, color: AppColors.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(15, weight: W.label, color: AppColors.fg1)),
+                    const SizedBox(height: 2),
+                    Text(
+                        caption.isNotEmpty
+                            ? caption
+                            : '$_kindLabel · Version $version',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13, color: AppColors.fg3)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+            ]),
+          )
+        : Padding(
+            padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+            child: Row(children: [
+              AppIcon(artifactIcon(kind), size: 14, color: AppColors.accent),
+              const SizedBox(width: S.s8),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: title, style: TS.ui(AppColors.fg1)),
+                    TextSpan(
+                        text: '  $_kindLabel · v$version',
+                        style: TS.meta(AppColors.fg4)),
+                    if (caption.isNotEmpty)
+                      TextSpan(text: '  $caption', style: TS.ui(AppColors.fg3)),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: S.s6),
+              AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+            ]),
+          );
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: kMobile ? 6 : 4),
+      child: Material(
+        color: AppColors.surface1,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: () => _open(context), child: body),
       ),
     );
   }
