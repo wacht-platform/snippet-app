@@ -842,17 +842,17 @@ class _PanelCommand extends StatelessWidget {
   final String command;
 
   @override
-  Widget build(BuildContext context) =>
-      NotificationListener<ScrollNotification>(
-        onNotification: (_) => true,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SelectableText.rich(TextSpan(children: [
-            TextSpan(text: '\$ ', style: _panelCode(AppColors.accent)),
-            TextSpan(text: command, style: _panelCode(AppColors.fg1)),
-          ])),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final text = SelectableText.rich(TextSpan(children: [
+      TextSpan(text: '\$ ', style: _panelCode(AppColors.accent)),
+      TextSpan(text: command, style: _panelCode(AppColors.fg1)),
+    ]));
+    if (!kMobile) return text;
+    return NotificationListener<ScrollNotification>(
+      onNotification: (_) => true,
+      child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: text),
+    );
+  }
 }
 
 class _PanelText extends StatelessWidget {
@@ -862,14 +862,14 @@ class _PanelText extends StatelessWidget {
   final Color? color;
 
   @override
-  Widget build(BuildContext context) =>
-      NotificationListener<ScrollNotification>(
-        onNotification: (_) => true,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SelectableText(text, style: _panelCode(color)),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final body = SelectableText(text, style: _panelCode(color));
+    if (!kMobile) return body;
+    return NotificationListener<ScrollNotification>(
+      onNotification: (_) => true,
+      child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: body),
+    );
+  }
 }
 
 class _PanelPath extends StatelessWidget {

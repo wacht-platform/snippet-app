@@ -266,7 +266,7 @@ class _StepDetail extends StatelessWidget {
     final title = step.tool == 'bash'
         ? (object.isEmpty ? verb : 'Command')
         : (object.isEmpty ? verb : '$verb $object');
-    return Column(children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (kMobile)
         _SheetHeader(
           leading: IconBtn('chevron-left',
