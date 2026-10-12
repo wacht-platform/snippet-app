@@ -734,10 +734,12 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               iconSize: 16,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
-        if (!mac && !_isMissionControl)
-          IconBtn('terminal',
-              size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
-        if (!_isMissionControl) _menu(s),
+        if (!mac) ...[
+          if (!_isMissionControl)
+            IconBtn('terminal',
+                size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
+          if (!_isMissionControl) _menu(s),
+        ],
       ]),
     );
   }
@@ -758,9 +760,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       constraints: const BoxConstraints(minWidth: 220, maxWidth: 260),
       menuPadding: const EdgeInsets.symmetric(vertical: 6),
       shape: appMenuShape,
-      icon: AppIcon('more-vertical',
-          size: kMacOS ? 15 : 18, color: AppColors.fg2),
-      padding: EdgeInsets.all(kMacOS ? 4 : 8),
+      icon: AppIcon('more-vertical', color: AppColors.fg2),
       tooltip: 'Actions',
       onSelected: (fn) => fn(),
       itemBuilder: (_) => _actionItems(s),
@@ -912,6 +912,9 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                 client: widget.client,
                 sessionId: widget.sessionId,
                 onClose: close));
+        return;
+      case 'actions':
+        _openActions(_state);
         return;
       case 'compact':
         _confirmCompact();
