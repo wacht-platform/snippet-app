@@ -35,7 +35,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     _expiry?.cancel();
     final payload = _timedPayload;
     if (payload == null || _pressed) return;
-    _expiry = Timer(const Duration(seconds: 5), () {
+    _expiry = Timer(Duration(seconds: kMobile ? 5 : 7), () {
       if (mounted && identical(_pending.firstOrNull, payload)) {
         _remove(payload);
       }
@@ -75,8 +75,8 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
               key: ValueKey('notification-backing-$layer'),
               decoration: BoxDecoration(
                 color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(kMobile ? 18 : R.sm),
-                border: kMobile ? null : Border.all(color: AppColors.line),
+                borderRadius: BorderRadius.circular(kMobile ? 18 : 14),
+                border: kMobile ? null : Border.all(color: AppColors.border2),
               ),
             ),
           ),
@@ -89,7 +89,6 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
   }
 
   Widget _leadingIcon(Map<String, dynamic> payload) {
-    if (!kMobile) return const SizedBox.shrink();
     final kind = payload['kind']?.toString();
     final (fill, ink) = switch (kind) {
       'done' || 'completed' => (AppColors.okBg, AppColors.ok),
@@ -98,12 +97,12 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
       _ => (AppColors.accentBg, AppColors.accent),
     };
     return Container(
-      width: 36,
-      height: 36,
+      width: kMobile ? 36 : 32,
+      height: kMobile ? 36 : 32,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: fill,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(kMobile ? 11 : 9),
       ),
       child: AppIcon(
         switch ((payload['destination'] as Map?)?['type']) {
@@ -204,8 +203,17 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                 ),
                 child: payload == null
                     ? const SizedBox.shrink()
-                    : Listener(
+                    : MouseRegion(
                         key: ObjectKey(payload),
+                        onEnter: (_) {
+                          _pressed = true;
+                          _expiry?.cancel();
+                        },
+                        onExit: (_) {
+                          _pressed = false;
+                          _armExpiry();
+                        },
+                        child: Listener(
                         onPointerDown: (_) {
                           _pressed = true;
                           _expiry?.cancel();
@@ -241,15 +249,13 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                             ),
                             child: _stackedCard(
                                 child: Material(
-                              color: kMobile
-                                  ? AppColors.surface3
-                                  : AppColors.surface2,
+                              color: AppColors.surface3,
                               shape: RoundedRectangleBorder(
                                 borderRadius:
-                                    BorderRadius.circular(kMobile ? 18 : R.sm),
+                                    BorderRadius.circular(kMobile ? 18 : 14),
                                 side: kMobile
                                     ? BorderSide.none
-                                    : BorderSide(color: AppColors.line),
+                                    : BorderSide(color: AppColors.border2),
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
@@ -259,30 +265,10 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                 },
                                 child: Padding(
                                   padding: EdgeInsetsDirectional.fromSTEB(
-                                      kMobile ? 12 : S.s8,
-                                      kMobile ? 12 : S.s4,
-                                      kMobile ? 4 : 0,
-                                      kMobile ? 12 : S.s4),
+                                      12, kMobile ? 12 : 10, 4, kMobile ? 12 : 10),
                                   child: Row(children: [
                                     _leadingIcon(payload),
-                                    if (!kMobile)
-                                      AppIcon(
-                                        switch ((payload['destination']
-                                            as Map?)?['type']) {
-                                          'session' => 'terminal',
-                                          'task' => 'check-circle',
-                                          'conversation' => 'message-circle',
-                                          _ => 'info',
-                                        },
-                                        size: 16,
-                                        color: switch (payload['kind']) {
-                                          'waiting' => AppColors.fg1,
-                                          'done' => AppColors.ok,
-                                          'error' => AppColors.danger,
-                                          _ => AppColors.fg3,
-                                        },
-                                      ),
-                                    SizedBox(width: kMobile ? 12 : S.s8),
+                                    const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
@@ -301,10 +287,11 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                                   'New notification',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: sans(kMobile ? 15 : 13,
+                                              style: sans(kMobile ? 15 : 14,
+                                                  weight: W.label,
                                                   height: kMobile
                                                       ? 20 / 15
-                                                      : 16 / 13,
+                                                      : 19 / 14,
                                                   color: AppColors.fg1),
                                             ),
                                           ),
@@ -312,13 +299,45 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                               .isNotEmpty) ...[
                                             const SizedBox(height: S.s2),
                                             Text(_contextLabel(payload),
-                                                maxLines: kMobile ? 2 : 1,
+                                                maxLines: 2,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: kMobile
-                                                    ? sans(13,
-                                                        height: 18 / 13,
-                                                        color: AppColors.fg3)
-                                                    : TS.caption()),
+                                                style: sans(kMobile ? 13 : 12.5,
+                                                    height: kMobile
+                                                        ? 18 / 13
+                                                        : 17 / 12.5,
+                                                    color: AppColors.fg3)),
+                                          ],
+                                          if (!kMobile &&
+                                              _pending.length > 1) ...[
+                                            const SizedBox(height: 6),
+                                            Wrap(
+                                                spacing: 10,
+                                                crossAxisAlignment:
+                                                    WrapCrossAlignment.center,
+                                                children: [
+                                              Text(
+                                                  '+${_pending.length - 1} more',
+                                                  style: sans(12,
+                                                      color: AppColors.fg4)),
+                                              InkWell(
+                                                onTap: () =>
+                                                    _clearAll(payload),
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        R.xs),
+                                                child: Padding(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 2),
+                                                  child: Text('Clear all',
+                                                      style: sans(12,
+                                                          weight: W.label,
+                                                          color: AppColors
+                                                              .accent)),
+                                                ),
+                                              ),
+                                            ]),
                                           ],
                                         ],
                                       ),
@@ -344,6 +363,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                             )),
                           ),
                         ),
+                      ),
                       ),
               ),
             ),

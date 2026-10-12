@@ -271,7 +271,14 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               SystemRow(step: _s(e['step']), reasoning: _s(e['reasoning'])));
         case 'file_presented':
           endTools(key);
-          addEvent(key, _presentedFileCard(_s(e['path']), _s(e['caption'])));
+          addEvent(
+              key,
+              PresentedFileCard(
+                client: widget.client,
+                path: _s(e['path']),
+                caption: _s(e['caption']),
+                onOpenFileTab: widget.onOpenFileTab,
+              ));
         case 'lane_spawned':
           endTools(key);
           final id = _s(e['id']);
@@ -343,119 +350,6 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       out.add(_agentEventRow(_agentEvents[i], i));
     }
     return out;
-  }
-
-  /// A file the agent handed over (`present_file`): open in the editor, or
-  /// download to the device.
-  Widget _presentedFileCard(String path, String caption) {
-    final name = path.split('/').last;
-    if (mediaKindOf(path) == MediaKind.image) {
-      // Full width and left-aligned: a shrink-wrapped column was centred by
-      // its parent, so a long caption pushed the image off the text's edge.
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: SizedBox(
-          width: double.infinity,
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SingleImage(client: widget.client, path: path),
-            if (caption.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(caption, style: sans(12, height: 1.4, color: AppColors.fg3)),
-            ],
-          ]),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: AppCard(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Row(children: [
-          // The icon is INSIDE the tap target. It was outside, so tapping the
-          // most obviously tappable part of the card did nothing.
-          Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                // ON PHONES: a full-screen route, exactly as the browser does.
-                // `onOpenFileTab` creates a shell TAB, which the phone shell
-                // never draws (see `openFileForViewing`), so calling it here
-                // made the card inert — tapping did nothing at all.
-                if (openFileForViewing(context,
-                    client: widget.client, path: path, name: name)) {
-                  return;
-                }
-                if (widget.onOpenFileTab != null) {
-                  widget.onOpenFileTab!(path, name);
-                } else {
-                  presentScreen(
-                    context,
-                    builder: (_, close) => EditorScreen(
-                        client: widget.client,
-                        path: path,
-                        name: name,
-                        onClose: close),
-                  );
-                }
-              },
-              child: Row(children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                      color: AppColors.accentBg,
-                      borderRadius: BorderRadius.circular(R.sm)),
-                  child: AppIcon('file', size: 16, color: AppColors.accent),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: mono(13, color: AppColors.fg1)),
-                        const SizedBox(height: 2),
-                        Text(caption.isNotEmpty ? caption : path,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TS.caption()),
-                      ]),
-                ),
-              ]),
-            ),
-          ),
-          const SizedBox(width: 6),
-          TextButton(
-            onPressed: () async {
-              try {
-                toast(context, 'Downloading $name…');
-                final msg = await downloadRemoteFileWithCancel(
-                    context, widget.client,
-                    path: path, name: name);
-                if (msg != null && mounted) toast(context, msg);
-              } catch (e) {
-                if (mounted) toast(context, '$e', danger: true);
-              }
-            },
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, 0),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              foregroundColor: AppColors.accentFg,
-              backgroundColor: AppColors.accentFill,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(R.xs)),
-            ),
-            child: Text('Download',
-                style: sans(12, weight: W.label, color: AppColors.accentFg)),
-          ),
-        ]),
-      ),
-    );
   }
 
   String _s(dynamic v) => v?.toString() ?? '';

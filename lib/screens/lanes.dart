@@ -160,10 +160,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     final summary = lane.summary?.trim();
     final error = lane.error?.trim();
     final dense = !kMobile;
-    final meta = kMobile
-        ? sans(13, color: AppColors.fg4)
-        : mono(10, color: AppColors.fg3);
-    final body = sans(dense ? 12 : 14, height: 1.45, color: AppColors.fg2);
+    final meta = sans(dense ? 12 : 13, color: AppColors.fg4);
+    final body = sans(dense ? 13 : 14, height: 1.45, color: AppColors.fg2);
     // Everything under the header lines up with the title, past the dot.
     Widget indented(Widget child, {double top = 6}) =>
         Padding(padding: EdgeInsets.only(left: 16, top: top), child: child);
@@ -171,8 +169,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: kMobile ? null : Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(kMobile ? R.lg : R.md),
+        borderRadius: BorderRadius.circular(R.lg),
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -208,9 +205,7 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
                   Padding(
                     padding: EdgeInsets.only(top: dense ? 3 : 4),
                     child: Text(status,
-                        style: kMobile
-                            ? sans(12, color: toneFg)
-                            : mono(10, color: toneFg)),
+                        style: sans(12, weight: W.label, color: toneFg)),
                   ),
                 ]),
                 if (activity != null && activity.isNotEmpty && lane.running)
@@ -458,8 +453,7 @@ class _TimelineEntryRow extends StatelessWidget {
                         if (entry.kind.isNotEmpty) entry.kind,
                         if (entry.at.isNotEmpty) _formatTime(entry.at),
                       ].join(' · '),
-                      style:
-                          kMobile ? TS.meta() : mono(10, color: AppColors.fg3),
+                      style: TS.meta(),
                     ),
                   Text(entry.text, style: TS.codeSmall(AppColors.fg2)),
                 ],

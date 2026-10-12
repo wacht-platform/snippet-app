@@ -30,6 +30,7 @@ import '../term.dart';
 import '../panel.dart';
 import '../share_inbound.dart';
 import '../widgets.dart';
+import 'presented_file_card.dart';
 import '../media_views.dart';
 import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';

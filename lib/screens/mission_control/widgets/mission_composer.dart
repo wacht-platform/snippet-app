@@ -76,13 +76,13 @@ class _MissionComposerState extends State<MissionComposer> {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: kMobile ? AppColors.raised : AppColors.bg,
-          borderRadius: BorderRadius.circular(kMobile ? 18 : R.card),
-          border: kMobile ? Border.all(color: AppColors.border) : null,
+          color: AppColors.raised,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
         ),
         padding: kMobile
             ? const EdgeInsets.fromLTRB(14, 14, 12, 12)
-            : const EdgeInsets.fromLTRB(18, 20, 12, 14),
+            : const EdgeInsets.fromLTRB(14, 12, 12, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -106,56 +106,41 @@ class _MissionComposerState extends State<MissionComposer> {
                 focusNode: _focus,
                 minLines: 1,
                 maxLines: 8,
-                cursorColor: AppColors.fg1,
+                cursorColor: AppColors.accent,
                 onSubmitted: (_) => _send(),
                 onChanged: (_) => setState(() {}),
-                style:
-                    sans(kMobile ? 16 : 14, height: 1.45, color: AppColors.fg1),
+                style: TS.body(AppColors.fg1),
                 decoration: InputDecoration(
                   isCollapsed: true,
                   contentPadding: const EdgeInsets.fromLTRB(2, 4, 8, 14),
                   border: InputBorder.none,
                   hintText: 'Ask anything',
-                  hintStyle: sans(kMobile ? 16 : 14,
-                      height: 1.45, color: AppColors.fg4),
+                  hintStyle: TS.body(AppColors.fg4),
                 ),
               ),
             ),
             Row(children: [
               const Spacer(),
               Material(
-                color: kMobile
-                    ? (_canSend || sending
-                        ? AppColors.accentFill
-                        : AppColors.hover)
-                    : (_canSend || sending
-                        ? AppColors.fg1
-                        : AppColors.surface2),
-                shape: kMobile
-                    ? RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12))
-                    : const CircleBorder(),
+                color: _canSend || sending
+                    ? AppColors.accentFill
+                    : AppColors.hover,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 child: InkWell(
-                  customBorder: kMobile
-                      ? RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))
-                      : const CircleBorder(),
+                  customBorder: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   onTap: sending || !_canSend ? null : _send,
                   child: SizedBox(
                     width: kMobile ? 40 : 36,
                     height: kMobile ? 40 : 36,
                     child: Center(
                       child: sending
-                          ? Spinner(
-                              size: 14,
-                              color:
-                                  kMobile ? AppColors.accentFg : AppColors.bg)
+                          ? Spinner(size: 14, color: AppColors.accentFg)
                           : AppIcon('arrow-up',
                               size: 16,
                               color: _canSend
-                                  ? (kMobile
-                                      ? AppColors.accentFg
-                                      : AppColors.bg)
+                                  ? AppColors.accentFg
                                   : AppColors.fg4),
                     ),
                   ),

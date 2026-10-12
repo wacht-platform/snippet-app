@@ -1291,15 +1291,12 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               ? _mobileRecorder()
               : Container(
                   decoration: BoxDecoration(
-                    color: kMobile ? AppColors.raised : AppColors.bg,
-                    borderRadius: BorderRadius.circular(kMobile ? 18 : R.md),
-                    border:
-                        kMobile ? Border.all(color: AppColors.border) : null,
+                    color: AppColors.raised,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.border),
                   ),
-                  padding: kMobile
-                      ? const EdgeInsets.symmetric(horizontal: 12, vertical: 14)
-                      : const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 12),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 12, vertical: kMobile ? 14 : 12),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1324,22 +1321,20 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                         },
                         child: TextField(
                           controller: _input,
-                          minLines: kMobile ? 1 : 2,
+                          minLines: 1,
                           maxLines: 8,
-                          cursorColor: AppColors.fg1,
+                          cursorColor: AppColors.accent,
                           onSubmitted: (_) {
                             if (!kMobile) _send();
                           },
-                          style: sans(kMobile ? M.body : 16,
-                              height: 1.45, color: AppColors.fg1),
+                          style: TS.body(AppColors.fg1),
                           decoration: InputDecoration(
                             isCollapsed: true,
                             contentPadding:
                                 const EdgeInsets.fromLTRB(2, 2, 8, 10),
                             border: InputBorder.none,
                             hintText: 'Message ${widget.agentName}…',
-                            hintStyle: sans(kMobile ? M.body : 16,
-                                height: 1.45, color: AppColors.fg4),
+                            hintStyle: TS.body(AppColors.fg4),
                           ),
                         ),
                       ),
@@ -1359,27 +1354,6 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                               ),
                             ),
                           ),
-                          if (!kMobile) ...[
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface2,
-                                borderRadius: BorderRadius.circular(R.sm),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  AppIcon('agent',
-                                      size: 12, color: AppColors.fg3),
-                                  const SizedBox(width: 5),
-                                  Text(widget.agentName,
-                                      style: mono(11, color: AppColors.fg2)),
-                                ],
-                              ),
-                            ),
-                          ],
                           const Spacer(),
                           if (kCanRecord) ...[
                             Material(
@@ -1436,10 +1410,9 @@ class _SendBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = kMobile ? 40.0 : 32.0;
-    final ShapeBorder shape = kMobile
-        ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-        : const CircleBorder();
+    final size = kMobile ? 40.0 : 36.0;
+    final ShapeBorder shape =
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
     return Material(
       color: enabled ? AppColors.accentFill : AppColors.hover,
       shape: shape,
