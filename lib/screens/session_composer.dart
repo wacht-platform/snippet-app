@@ -705,31 +705,59 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         }),
       ];
 
+  Future<void> _switchApproval(BuildContext anchor) async {
+    final current = _state?.approvalMode ?? 'auto';
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      verticalAnchor: _composerCardKey.currentContext,
+      minWidth: 260,
+      maxWidth: 320,
+      items: [
+        appMenuRow(
+          value: 'auto',
+          icon: 'zap',
+          label: 'YOLO',
+          description: 'Run shell and file edits without asking',
+          selected: current != 'manual',
+        ),
+        appMenuRow(
+          value: 'manual',
+          icon: 'shield',
+          label: 'Ask',
+          description: 'Pause for approval on each change',
+          selected: current == 'manual',
+        ),
+      ],
+    );
+    if (picked == null || picked == current) return;
+    _setApproval(picked == 'manual');
+  }
+
   Widget _approvalToggle() {
     final manual = (_state?.approvalMode ?? 'auto') == 'manual';
-    return Tooltip(
-      message: manual
-          ? 'Asking before changes. Switch to YOLO'
-          : 'YOLO: running changes without asking. Switch to Ask',
-      child: Material(
-        color: manual ? AppColors.accentBg : AppColors.surface2,
-        borderRadius: BorderRadius.circular(7),
-        child: InkWell(
-          onTap: () => _setApproval(!manual),
+    final ink = manual ? AppColors.accent : AppColors.fg3;
+    return Builder(
+      builder: (ctx) => Tooltip(
+        message: 'Approval mode',
+        child: Material(
+          color: manual ? AppColors.accentBg : AppColors.surface2,
           borderRadius: BorderRadius.circular(7),
-          child: Container(
-            height: kMobile ? 28 : 24,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon(manual ? 'shield' : 'zap',
-                  size: 12,
-                  color: manual ? AppColors.accent : AppColors.fg3),
-              const SizedBox(width: 4),
-              Text(manual ? 'Ask' : 'YOLO',
-                  style: sans(12,
-                      weight: W.label,
-                      color: manual ? AppColors.accent : AppColors.fg3)),
-            ]),
+          child: InkWell(
+            onTap: () => _switchApproval(ctx),
+            borderRadius: BorderRadius.circular(7),
+            child: Container(
+              height: kMobile ? 28 : 24,
+              padding: const EdgeInsets.fromLTRB(8, 0, 6, 0),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                AppIcon(manual ? 'shield' : 'zap', size: 12, color: ink),
+                const SizedBox(width: 4),
+                Text(manual ? 'Ask' : 'YOLO',
+                    style: sans(12, weight: W.label, color: ink)),
+                const SizedBox(width: 3),
+                AppIcon('chevron-down', size: 11, color: ink),
+              ]),
+            ),
           ),
         ),
       ),
