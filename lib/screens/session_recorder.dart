@@ -378,9 +378,12 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       child: Builder(
         builder: (tileContext) => Material(
           color: SurfaceScope.groupOf(tileContext),
-          borderRadius: BorderRadius.circular(R.md),
-          child: InkWell(
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(R.md),
+            side: BorderSide(color: AppColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
             onTap: () => Navigator.pop(tileContext, value),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: S.s12),

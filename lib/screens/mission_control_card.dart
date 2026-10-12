@@ -84,7 +84,7 @@ class _MissionControlCardState extends State<MissionControlCard> {
     final dot = status == 'running' ? AppColors.run : AppColors.accent;
     if (!kMobile) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 3),
+        padding: const EdgeInsets.only(bottom: 8),
         child: Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),

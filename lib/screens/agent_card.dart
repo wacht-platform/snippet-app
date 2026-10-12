@@ -95,7 +95,7 @@ class _AgentCardState extends State<AgentCard> {
             : ('Available', AppColors.ok);
     if (!kMobile) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 3),
+        padding: const EdgeInsets.only(bottom: 8),
         child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(8),
