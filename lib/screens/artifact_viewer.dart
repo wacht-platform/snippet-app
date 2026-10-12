@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -9,8 +11,10 @@ import '../menu_widgets.dart';
 import '../models.dart';
 import '../panel.dart';
 import '../platform.dart';
+import '../shell_panel.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'file_viewer.dart';
 import 'presented_file_card.dart';
 
 bool get _canEmbedWeb =>
@@ -42,6 +46,10 @@ Future<void> openArtifact(
     context,
     style: PanelStyle.drawer,
     maxWidth: 820,
+    purpose: ShellPanelPurpose.artifact,
+    panelId: id,
+    originClient: client,
+    originSessionId: session,
     builder: (_, close) => ArtifactViewer(
       client: client,
       session: session,
@@ -136,27 +144,55 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
   String? _error;
   Future<String>? _text;
   String? _textFor;
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
     _n = widget.version;
     _load();
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) => _load(quiet: true));
   }
 
-  Future<void> _load({bool latest = false}) async {
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool latest = false, bool quiet = false}) async {
     try {
       final all = await widget.client.artifacts(widget.session);
       final found = all.where((a) => a.id == widget.id).firstOrNull;
       if (!mounted) return;
+      final before = _artifact?.latest?.n;
+      final after = found?.latest?.n;
+      if (quiet && found != null && before == after) return;
+      final follow = latest || _n == null || _n == before;
       setState(() {
         _artifact = found;
         _error = found == null ? 'This artifact is no longer available.' : null;
-        if (latest || _n == null) _n = found?.latest?.n;
+        if (follow) _n = after;
         _textFor = null;
       });
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted && !quiet) setState(() => _error = '$e');
+    }
+  }
+
+  Future<void> _download() async {
+    final a = _artifact;
+    final v = _version;
+    if (a == null || v == null) return;
+    try {
+      toast(context, 'Preparing ${a.title}…');
+      final path = await widget.client.zipArtifact(widget.session, a.id, version: v.n);
+      if (!mounted) return;
+      final msg = await downloadRemoteFileWithCancel(context, widget.client,
+          path: path, name: '${a.id}-v${v.n}.zip');
+      if (msg != null && mounted) toast(context, msg);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
     }
   }
 
@@ -263,6 +299,8 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
             iconSize: 15,
             tooltip: 'Open in browser',
             onTap: _openInBrowser),
+        IconBtn('download',
+            size: 32, iconSize: 15, tooltip: 'Download', onTap: _download),
         IconBtn('refresh',
             size: 32,
             iconSize: 15,

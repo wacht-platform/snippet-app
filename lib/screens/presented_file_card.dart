@@ -167,6 +167,20 @@ class _PresentedFilesState extends State<PresentedFiles> {
   static const _shown = 3;
   bool _all = false;
 
+  Future<void> _downloadAll() async {
+    try {
+      toast(context, 'Preparing ${widget.files.length} files…');
+      final path = await widget.client
+          .zipFiles('files', [for (final f in widget.files) f.path]);
+      if (!mounted) return;
+      final msg = await downloadRemoteFileWithCancel(context, widget.client,
+          path: path, name: 'files.zip');
+      if (msg != null && mounted) toast(context, msg);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
   Widget _row(({String path, String caption}) f) => PresentedFileCard(
         client: widget.client,
         path: f.path,
@@ -185,8 +199,20 @@ class _PresentedFilesState extends State<PresentedFiles> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(24, S.s4, 0, S.s2),
-          child: Text('Shared ${files.length} files',
-              style: TS.meta(AppColors.fg3)),
+          child: Row(children: [
+            Expanded(
+              child: Text('Shared ${files.length} files',
+                  style: TS.meta(AppColors.fg3)),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _downloadAll,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                child: Text('Download all', style: TS.meta(AppColors.accent)),
+              ),
+            ),
+          ]),
         ),
         for (final f in visible) _row(f),
         if (hidden > 0 || (_all && files.length > _shown))

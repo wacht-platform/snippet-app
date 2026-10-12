@@ -701,6 +701,28 @@ class DaemonClient {
         .toList();
   }
 
+  /// POST /artifacts/zip — zip one version of an artifact; returns the zip's
+  /// path for [downloadToFile].
+  Future<String> zipArtifact(String session, String id, {int? version}) async {
+    final r = await http.post(_uri('/artifacts/zip'),
+        headers: _json,
+        body: jsonEncode({
+          'session': session,
+          'id': id,
+          if (version != null) 'version': version,
+        }));
+    if (r.statusCode != 200) throw _err('zip artifact', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['path'] as String;
+  }
+
+  /// POST /zip — zip files or folders on the daemon; returns the zip's path.
+  Future<String> zipFiles(String name, List<String> paths) async {
+    final r = await http.post(_uri('/zip'),
+        headers: _json, body: jsonEncode({'name': name, 'paths': paths}));
+    if (r.statusCode != 200) throw _err('zip files', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['path'] as String;
+  }
+
   /// An absolute URL for a signed artifact link from [artifacts].
   Uri artifactUri(String signedPath) => Uri.parse(baseUrl).replace(path: signedPath);
 

@@ -370,6 +370,9 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     presentScreen(context,
         style: PanelStyle.drawer,
         maxWidth: 560,
+        purpose: ShellPanelPurpose.deliverables,
+        originClient: widget.client,
+        originSessionId: widget.sessionId,
         builder: (_, close) => SessionDeliverables(
               client: widget.client,
               session: widget.sessionId,
