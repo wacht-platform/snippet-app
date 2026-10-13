@@ -12,7 +12,6 @@ enum ShellPanelPurpose {
   recurring,
   processes,
   files,
-  browser,
   task,
   tasks,
   agents,
