@@ -809,7 +809,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       return;
     }
     showAppSheet(context,
-        title: 'Autonomous mode',
+        title: 'Automated wakes',
         maxWidth: 440,
         maxHeight: 680,
         child: AutonomyPanel(client: widget.client, embedded: true));
@@ -1016,7 +1016,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           detail: value,
         );
     return [
-      if (_isMissionControl) item('activity', 'Autonomous mode', _openAutonomy),
+      if (_isMissionControl) item('activity', 'Automated wakes', _openAutonomy),
       item('edit', 'Rename session', _renameCurrent),
       item('zap', 'Approval: Yolo', () => _setApproval(false),
           value: manual ? null : 'on'),
