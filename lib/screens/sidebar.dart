@@ -1081,13 +1081,8 @@ class SidebarState extends State<Sidebar> {
     required String folder,
     required int lastActive,
   }) {
-    final (lead, leadColor) = waiting
-        ? ('Needs you', AppColors.accent)
-        : running
-            ? ('Running', AppColors.run)
-            : draft
-                ? ('Draft', AppColors.accent)
-                : (null, AppColors.fg4);
+    final (lead, leadColor) =
+        draft ? ('Draft', AppColors.accent) : (null, AppColors.fg4);
     final parts = <InlineSpan>[];
     void add(String text, Color color, {bool tabular = false}) {
       if (parts.isNotEmpty) {
@@ -1100,7 +1095,9 @@ class SidebarState extends State<Sidebar> {
 
     if (lead != null) add(lead, leadColor);
     if (folder.isNotEmpty) add(folder, AppColors.fg4);
-    if (lead == null) add(relativeTime(lastActive), AppColors.fg4, tabular: true);
+    if (lead == null && !running && !waiting) {
+      add(relativeTime(lastActive), AppColors.fg4, tabular: true);
+    }
     return Text.rich(TextSpan(children: parts),
         maxLines: 1, overflow: TextOverflow.ellipsis);
   }
@@ -1490,22 +1487,18 @@ class SidebarState extends State<Sidebar> {
                   ]),
                   const SizedBox(height: 4),
                   Row(children: [
+                    const SizedBox(width: 14),
                     Flexible(
                       child: Text.rich(
                         TextSpan(children: [
                           TextSpan(
-                              text: waiting
-                                  ? 'Waiting for your answer'
-                                  : 'Working',
-                              style: sans(13, color: color)),
-                          if (folderName.isNotEmpty) ...[
-                            TextSpan(
-                                text: '  ·  ',
-                                style: sans(13, color: AppColors.border2)),
-                            TextSpan(
-                                text: folderName,
-                                style: sans(13, color: AppColors.fg3)),
-                          ],
+                              text: folderName.isEmpty
+                                  ? 'No project'
+                                  : folderName,
+                              style: sans(13,
+                                  color: folderName.isEmpty
+                                      ? AppColors.fg4
+                                      : AppColors.fg3)),
                         ]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
