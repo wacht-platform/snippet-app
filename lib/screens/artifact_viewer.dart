@@ -340,12 +340,16 @@ class _ArtifactInlineState extends State<ArtifactInline>
         return _textBody(
             v,
             (text) => MarkdownBody(
-                data: text, styleSheet: markdownStyle(context)));
+                data: text,
+                styleSheet: markdownStyle(context),
+                builders: {'pre': PreBlockBuilder()}));
       case 'csv':
         return _textBody(
             v,
             (text) => MarkdownBody(
-                data: _csvMarkdown(text), styleSheet: markdownStyle(context)));
+                data: _csvMarkdown(text),
+                styleSheet: markdownStyle(context),
+                builders: {'pre': PreBlockBuilder()}));
       case 'code':
         return _textBody(
             v,
@@ -532,9 +536,53 @@ class _ArtifactSkeletonState extends State<ArtifactSkeleton>
   }
 }
 
+bool get canRenderMermaid => _canEmbedWeb;
+
+class MermaidDiagram extends StatelessWidget {
+  const MermaidDiagram({super.key, required this.code});
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final escaped = const HtmlEscape(HtmlEscapeMode.element).convert(code);
+    final vars = jsonEncode({
+      'darkMode': dark,
+      'background': 'transparent',
+      'fontFamily': "Geist, -apple-system, system-ui, sans-serif",
+      'fontSize': '14px',
+      'primaryColor': _cssHex(AppColors.surface2),
+      'primaryTextColor': _cssHex(AppColors.fg1),
+      'primaryBorderColor': _cssHex(AppColors.border2),
+      'secondaryColor': _cssHex(AppColors.surface3),
+      'tertiaryColor': _cssHex(AppColors.surface1),
+      'lineColor': _cssHex(AppColors.fg3),
+      'textColor': _cssHex(AppColors.fg2),
+      'clusterBkg': _cssHex(AppColors.surface1),
+      'clusterBorder': _cssHex(AppColors.border2),
+      'edgeLabelBackground': _cssHex(AppColors.surface1),
+      'noteBkgColor': _cssHex(AppColors.surface3),
+      'noteTextColor': _cssHex(AppColors.fg1),
+    });
+    final html = '''<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;padding:0;background:transparent}
+.mermaid{display:flex;justify-content:center;margin:0;padding:4px 0}
+.mermaid svg{max-width:100%;height:auto}</style></head>
+<body><pre class="mermaid">$escaped</pre>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,securityLevel:'strict',theme:'base',themeVariables:$vars});</script>
+</body></html>''';
+    return _InlineWebPage(key: ValueKey('mermaid:${code.hashCode}'), html: html);
+  }
+}
+
 class _InlineWebPage extends StatefulWidget {
-  const _InlineWebPage({super.key, required this.uri});
-  final Uri uri;
+  const _InlineWebPage({super.key, this.uri, this.html});
+  final Uri? uri;
+  final String? html;
+
+  String get cacheKey => uri?.toString() ?? 'html:${html.hashCode}';
 
   @override
   State<_InlineWebPage> createState() => _InlineWebPageState();
@@ -560,7 +608,7 @@ class _InlineWebPageState extends State<_InlineWebPage> {
 
   static final _knownHeights = <String, double>{};
 
-  late double _height = _knownHeights[widget.uri.toString()] ?? 180;
+  late double _height = _knownHeights[widget.cacheKey] ?? 180;
   bool _ready = false;
   bool _finished = false;
   bool _measured = false;
@@ -579,7 +627,7 @@ class _InlineWebPageState extends State<_InlineWebPage> {
         if (h == null || !mounted) return;
         final next = h.clamp(40.0, 6000.0);
         _measured = true;
-        _knownHeights[widget.uri.toString()] = next;
+        _knownHeights[widget.cacheKey] = next;
         if ((next - _height).abs() > 1) setState(() => _height = next);
         _scheduleReveal();
       })
@@ -593,7 +641,9 @@ class _InlineWebPageState extends State<_InlineWebPage> {
         },
       ));
     if (!kMacOS) c.setBackgroundColor(Colors.transparent);
-    return c..loadRequest(widget.uri);
+    final html = widget.html;
+    if (html != null) return c..loadHtmlString(html);
+    return c..loadRequest(widget.uri!);
   }();
 
   void _scheduleReveal() {
@@ -978,7 +1028,10 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             child: SelectionArea(
               child: MarkdownBody(
-                  data: text, styleSheet: markdownStyle(context)),
+                  data: text,
+                  styleSheet: markdownStyle(context),
+                  builders: {'pre': PreBlockBuilder()},
+                  onTapLink: (_, href, __) => openMarkdownLink(href, context)),
             ),
           ),
         );
