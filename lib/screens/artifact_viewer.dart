@@ -614,6 +614,33 @@ class _InlineWebPageState extends State<_InlineWebPage> {
   bool _measured = false;
   Timer? _settle;
   Timer? _giveUp;
+  Timer? _heightThrottle;
+  double? _pendingHeight;
+  bool _onScreen = true;
+  ScrollPosition? _position;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final position = Scrollable.maybeOf(context)?.position;
+    if (!identical(position, _position)) {
+      _position?.removeListener(_checkOnScreen);
+      _position = position;
+      _position?.addListener(_checkOnScreen);
+    }
+  }
+
+  void _checkOnScreen() {
+    final box = context.findRenderObject();
+    final viewport = _position?.context.notificationContext?.findRenderObject();
+    if (box is! RenderBox || viewport is! RenderBox || !box.attached || !viewport.attached) return;
+    final top = box.localToGlobal(Offset.zero).dy;
+    final viewTop = viewport.localToGlobal(Offset.zero).dy;
+    const margin = 600.0;
+    final visible = top + box.size.height > viewTop - margin &&
+        top < viewTop + viewport.size.height + margin;
+    if (visible != _onScreen) setState(() => _onScreen = visible);
+  }
   String _bg = '#000000';
   bool _dark = true;
 
@@ -628,8 +655,19 @@ class _InlineWebPageState extends State<_InlineWebPage> {
         final next = h.clamp(40.0, 6000.0);
         _measured = true;
         _knownHeights[widget.cacheKey] = next;
-        if ((next - _height).abs() > 1) setState(() => _height = next);
-        _scheduleReveal();
+        _pendingHeight = next;
+        if (!_ready) {
+          if ((next - _height).abs() > 1) setState(() => _height = next);
+          _scheduleReveal();
+          return;
+        }
+        _heightThrottle ??= Timer(const Duration(milliseconds: 250), () {
+          _heightThrottle = null;
+          final target = _pendingHeight;
+          if (mounted && target != null && (target - _height).abs() > 1) {
+            setState(() => _height = target);
+          }
+        });
       })
       ..setNavigationDelegate(NavigationDelegate(
         onPageFinished: (_) {
@@ -663,6 +701,8 @@ class _InlineWebPageState extends State<_InlineWebPage> {
   void dispose() {
     _settle?.cancel();
     _giveUp?.cancel();
+    _heightThrottle?.cancel();
+    _position?.removeListener(_checkOnScreen);
     super.dispose();
   }
 
@@ -676,7 +716,8 @@ class _InlineWebPageState extends State<_InlineWebPage> {
       curve: Curves.easeOut,
       height: _height,
       child: Stack(children: [
-        Positioned.fill(child: WebViewWidget(controller: _controller)),
+        if (_onScreen)
+          Positioned.fill(child: WebViewWidget(controller: _controller)),
         Positioned.fill(
           child: IgnorePointer(
             ignoring: _ready,
