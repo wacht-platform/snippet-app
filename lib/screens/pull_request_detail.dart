@@ -198,7 +198,7 @@ class PrCommentBody extends StatelessWidget {
         out.add(MarkdownBody(
           data: part.trim(),
           styleSheet: _compactMarkdown(context),
-          onTapLink: (_, href, __) => openMarkdownLink(href),
+          onTapLink: (_, href, __) => openMarkdownLink(href, context),
         ));
       }
     }

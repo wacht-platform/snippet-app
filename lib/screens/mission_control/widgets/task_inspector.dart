@@ -52,7 +52,7 @@ class TaskInspector extends StatelessWidget {
                 selectable: true,
                 styleSheet: markdownStyle(context),
                 builders: {'pre': PreBlockBuilder()},
-                onTapLink: (txt, href, title) => openMarkdownLink(href)),
+                onTapLink: (txt, href, title) => openMarkdownLink(href, context)),
             const SizedBox(height: 12),
           ],
           if (state != null) ...[

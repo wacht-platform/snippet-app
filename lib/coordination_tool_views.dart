@@ -387,7 +387,7 @@ class _Markdown extends StatelessWidget {
         a: text.copyWith(color: AppColors.accent),
       ),
       builders: {'pre': PreBlockBuilder()},
-      onTapLink: (_, href, __) => openMarkdownLink(href),
+      onTapLink: (_, href, __) => openMarkdownLink(href, context),
     );
   }
 }

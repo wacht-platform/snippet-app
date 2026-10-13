@@ -15,6 +15,7 @@ import 'components.dart';
 import 'dialog_widgets.dart';
 import 'markdown_widgets.dart';
 import 'menu_widgets.dart';
+import 'screens/artifact_viewer.dart' show openArtifact;
 
 export 'components.dart';
 export 'dialog_widgets.dart';
@@ -116,11 +117,33 @@ class Pills<T> extends StatelessWidget {
         ]);
 }
 
-void openMarkdownLink(String? href) {
+void openMarkdownLink(String? href, [BuildContext? context]) {
   if (href == null || href.isEmpty) return;
   final uri = Uri.tryParse(href);
   if (uri == null) return;
+  if (uri.scheme == 'artifact') {
+    if (context != null) _openArtifactLink(context, uri);
+    return;
+  }
   launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
+void _openArtifactLink(BuildContext context, Uri uri) {
+  final path = Uri.decodeComponent(uri.path);
+  final cut = path.lastIndexOf('/');
+  if (cut <= 0) return;
+  final session = path.substring(0, cut);
+  final tail = path.substring(cut + 1);
+  final at = tail.lastIndexOf('@');
+  final id = at > 0 ? tail.substring(0, at) : tail;
+  final version = at > 0 ? int.tryParse(tail.substring(at + 1)) : null;
+  final client = DaemonScope.maybeOf(context) ?? DaemonScope.current;
+  if (client == null || id.isEmpty) {
+    toast(context, 'Connect to the machine to open this artifact.', danger: true);
+    return;
+  }
+  openArtifact(context,
+      client: client, session: session, id: id, version: version);
 }
 
 /// Themed markdown stylesheet for agent messages.
@@ -1068,7 +1091,7 @@ class Bubble extends StatelessWidget {
             selectable: false,
             styleSheet: markdownStyle(context),
             builders: {'pre': PreBlockBuilder()},
-            onTapLink: (txt, href, title) => openMarkdownLink(href),
+            onTapLink: (txt, href, title) => openMarkdownLink(href, context),
           )
         : null;
     final voice = <Widget>[
@@ -1095,7 +1118,7 @@ class Bubble extends StatelessWidget {
       selectable: false,
       styleSheet: agentMarkdownStyle(context),
       builders: {'pre': PreBlockBuilder()},
-      onTapLink: (txt, href, title) => openMarkdownLink(href),
+      onTapLink: (txt, href, title) => openMarkdownLink(href, context),
     );
 
     final agent =
