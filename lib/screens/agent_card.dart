@@ -83,29 +83,6 @@ class _AgentCardState extends State<AgentCard> {
           ? widget.agent.tasksIn(keys)
           : _tasks.where((t) => statuses.contains(t.status)).length;
 
-  Widget _pill(String label, {bool alert = false}) => Container(
-        height: kMobile ? 24 : 20,
-        padding: EdgeInsets.symmetric(horizontal: kMobile ? 9 : 7),
-        decoration: BoxDecoration(
-          color: kMobile ? AppColors.surface2 : AppColors.surface3,
-          borderRadius: BorderRadius.circular(R.pill),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (alert) ...[
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                  color: AppColors.danger, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 5),
-          ],
-          SwapText(label,
-              style: sans(kMobile ? 12 : 11,
-                  height: 16 / 12, color: AppColors.fg2)),
-        ]),
-      );
-
   @override
   Widget build(BuildContext context) {
     final agent = widget.agent;
@@ -116,122 +93,105 @@ class _AgentCardState extends State<AgentCard> {
     final blocked =
         _count({TaskStatus.blocked, TaskStatus.failed}, {'blocked', 'failed'});
     final open = working + queued + blocked;
+    final done = _count({TaskStatus.done}, {'done'});
     final role = agent.role.trim();
     final (status, dot) = !agent.available
         ? ('Paused', AppColors.fg4)
         : working > 0
             ? ('Working', AppColors.run)
             : ('Available', AppColors.ok);
-    if (!kMobile) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        child: GestureDetector(
-          onSecondaryTapUp: widget.onDelete == null
-              ? null
-              : (d) => _actions(d.globalPosition),
-          child: InkWell(
-          onTap: widget.onOpen,
-          onLongPress: widget.onDelete == null ? null : () => _actions(null),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            height: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Row(children: [
-                  Expanded(
-                    child: Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13, color: AppColors.fg1)),
-                  ),
-                  if (role.isNotEmpty) ...[
-                    const SizedBox(width: 12),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 120),
-                      child: Text(role,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: sans(11.5, color: AppColors.fg4)),
-                    ),
-                  ],
-                ]),
-              ),
-              if (open > 0) ...[
-                const SizedBox(width: 6),
-                _pill('$open', alert: blocked > 0),
-              ],
-            ]),
-          ),
-        ),
-        ),
-        ),
-      );
-    }
-    return Padding(
-      padding: EdgeInsets.only(bottom: kMobile ? 10 : 6),
+    final (summary, summaryColor) = !agent.available
+        ? ('Paused', AppColors.fg4)
+        : blocked > 0
+            ? ('$blocked blocked', AppColors.danger)
+            : open > 0
+                ? ('$open open', AppColors.fg3)
+                : ('No tasks', AppColors.fg4);
+    final nameSize = kMobile ? 15.5 : 13.0;
+    final metaSize = kMobile ? 13.0 : 11.5;
+    final segments = [
+      (working, AppColors.run),
+      (queued, AppColors.surface3),
+      (blocked, AppColors.danger),
+      (done, AppColors.ok.withValues(alpha: 0.55)),
+    ].where((e) => e.$1 > 0).toList();
+    final barHeight = kMobile ? 4.0 : 3.0;
+    return GestureDetector(
+      onSecondaryTapUp: widget.onDelete == null || kMobile
+          ? null
+          : (d) => _actions(d.globalPosition),
       child: Material(
-        color: kMobile ? AppColors.surface1 : AppColors.surface2,
-        borderRadius: BorderRadius.circular(kMobile ? 18 : 14),
-        clipBehavior: Clip.antiAlias,
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(kMobile ? 0 : 8),
         child: InkWell(
           onTap: widget.onOpen,
           onLongPress: widget.onDelete == null ? null : () => _actions(null),
+          borderRadius: BorderRadius.circular(kMobile ? 0 : 8),
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-                kMobile ? 18 : 14, kMobile ? 14 : 11, kMobile ? 12 : 10,
-                kMobile ? 14 : 11),
-            child: Row(children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            padding: kMobile
+                ? const EdgeInsets.fromLTRB(16, 13, 16, 13)
+                : const EdgeInsets.fromLTRB(10, 8, 10, 9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(kMobile ? 16 : 14,
-                            spacing: -0.2,
-                            height: kMobile ? 21 / 16 : 19 / 14,
-                            color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Row(children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration:
-                            BoxDecoration(color: dot, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: SwapText(
-                            role.isEmpty ? status : '$status · $role',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(12,
-                                height: 16 / 12, color: AppColors.fg3)),
-                      ),
-                    ]),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration:
+                          BoxDecoration(color: dot, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      flex: 0,
+                      child: Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(nameSize,
+                              weight: kMobile ? W.label : W.body,
+                              color: agent.available
+                                  ? AppColors.fg1
+                                  : AppColors.fg3)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(role.isEmpty ? status : role,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(metaSize, color: AppColors.fg4)),
+                    ),
+                    const SizedBox(width: 8),
+                    SwapText(summary,
+                        style: sans(metaSize,
+                            color: summaryColor, tabular: true)),
                   ],
                 ),
-              ),
-              if (open > 0) ...[
-                const SizedBox(width: 10),
-                _pill('$open ${open == 1 ? 'task' : 'tasks'}',
-                    alert: blocked > 0),
+                SizedBox(height: kMobile ? 9 : 7),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(barHeight),
+                  child: SizedBox(
+                    height: barHeight,
+                    child: segments.isEmpty
+                        ? ColoredBox(
+                            color: AppColors.surface2,
+                            child: const SizedBox.expand())
+                        : Row(children: [
+                            for (var j = 0; j < segments.length; j++) ...[
+                              if (j > 0) const SizedBox(width: 2),
+                              Expanded(
+                                flex: segments[j].$1,
+                                child: ColoredBox(
+                                    color: segments[j].$2,
+                                    child: const SizedBox.expand()),
+                              ),
+                            ],
+                          ]),
+                  ),
+                ),
               ],
-              const SizedBox(width: 6),
-              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
-            ]),
+            ),
           ),
         ),
       ),

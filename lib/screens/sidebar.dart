@@ -763,8 +763,32 @@ class SidebarState extends State<Sidebar> {
         _matchesQuery(s)));
     // Phone chats are one flat, chronological surface.
     if (kMobile) {
-      final allSorted = _sortSessionsByRecency(list);
+      bool isActive(SessionInfo s) =>
+          sessionIsActive(s.status) || s.status == 'waiting_for_input';
+      final active = _filterQuery.trim().isEmpty
+          ? (_sortSessionsByRecency(list.where(isActive))
+            ..sort((a, b) {
+              final aw = a.status == 'waiting_for_input' ? 0 : 1;
+              final bw = b.status == 'waiting_for_input' ? 0 : 1;
+              return aw.compareTo(bw);
+            }))
+          : <SessionInfo>[];
+      final activeIds = {for (final s in active) s.id};
+      final allSorted = _sortSessionsByRecency(
+          list.where((s) => !activeIds.contains(s.id)));
       final mobileChildren = <Widget>[];
+      _chatsShownAt ??= DateTime.now();
+      for (var i = 0; i < active.length; i++) {
+        mobileChildren.add(Appear(
+          key: ValueKey('chat-${active[i].id}'),
+          index: i,
+          since: _chatsShownAt,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(8, i == 0 ? 8 : 0, 8, 8),
+            child: _mobileActiveCard(active[i]),
+          ),
+        ));
+      }
       String? section;
       for (var i = 0; i < allSorted.length; i++) {
         final session = allSorted[i];
@@ -772,7 +796,8 @@ class SidebarState extends State<Sidebar> {
         if (label != section) {
           section = label;
           mobileChildren.add(Padding(
-            padding: EdgeInsets.fromLTRB(8, i == 0 ? 8 : 18, 8, 4),
+            padding: EdgeInsets.fromLTRB(
+              8, i == 0 && active.isEmpty ? 8 : 18, 8, 4),
             child: Text(label,
                 style: sans(12.5, weight: W.label, color: AppColors.fg3)),
           ));
@@ -783,7 +808,7 @@ class SidebarState extends State<Sidebar> {
         _chatsShownAt ??= DateTime.now();
         mobileChildren.add(Appear(
           key: ValueKey('chat-${session.id}'),
-          index: i,
+          index: active.length + i,
           since: _chatsShownAt,
           child: _sessionCard(session, divider: !lastInSection),
         ));
@@ -990,53 +1015,94 @@ class SidebarState extends State<Sidebar> {
         onSecondaryTapDown: _selecting
             ? null
             : (d) => _sessionActions(s, position: d.globalPosition),
-        child: Container(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
           child: Row(children: [
             if (_selecting) ...[
               SelectCheck(checked, size: 14),
               const SizedBox(width: 10),
             ],
-            if (running || waiting) ...[
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: running ? AppColors.run : Colors.transparent,
-                  border: waiting
-                      ? Border.all(color: AppColors.accent, width: 1.5)
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
             Expanded(
-              child: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13,
-                      color: selected ? AppColors.fg1 : AppColors.fg2)),
-            ),
-            if (draft) ...[
-              const SizedBox(width: 6),
-              Text('Draft', style: sans(11.5, color: AppColors.accent)),
-            ],
-            if (folderName.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 96),
-                child: Text(folderName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(11.5, color: AppColors.fg4)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: running
+                            ? AppColors.run
+                            : waiting
+                                ? Colors.transparent
+                                : AppColors.border2,
+                        border: waiting
+                            ? Border.all(color: AppColors.accent, width: 1.5)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                          s.title.trim().isEmpty ? '(untitled)' : s.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(13,
+                              color: selected
+                                  ? AppColors.fg1
+                                  : AppColors.fg2)),
+                    ),
+                  ]),
+                  const SizedBox(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 14),
+                    child: _desktopChatMeta(
+                        running: running,
+                        waiting: waiting,
+                        draft: draft,
+                        folder: folderName,
+                        lastActive: s.lastActive),
+                  ),
+                ],
               ),
-            ],
+            ),
           ]),
         ),
       ),
     );
+  }
+
+  Widget _desktopChatMeta({
+    required bool running,
+    required bool waiting,
+    required bool draft,
+    required String folder,
+    required int lastActive,
+  }) {
+    final (lead, leadColor) = waiting
+        ? ('Needs you', AppColors.accent)
+        : running
+            ? ('Running', AppColors.run)
+            : draft
+                ? ('Draft', AppColors.accent)
+                : (null, AppColors.fg4);
+    final parts = <InlineSpan>[];
+    void add(String text, Color color, {bool tabular = false}) {
+      if (parts.isNotEmpty) {
+        parts.add(TextSpan(
+            text: '  ·  ', style: sans(11.5, color: AppColors.border2)));
+      }
+      parts.add(TextSpan(
+          text: text, style: sans(11.5, color: color, tabular: tabular)));
+    }
+
+    if (lead != null) add(lead, leadColor);
+    if (folder.isNotEmpty) add(folder, AppColors.fg4);
+    if (lead == null) add(relativeTime(lastActive), AppColors.fg4, tabular: true);
+    return Text.rich(TextSpan(children: parts),
+        maxLines: 1, overflow: TextOverflow.ellipsis);
   }
 
   Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
@@ -1366,6 +1432,102 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
+  Widget _mobileActiveCard(SessionInfo s) {
+    final checked = _selected.contains(s.id);
+    final folderName = s.projectFolder.trim().isEmpty
+        ? ''
+        : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
+    final waiting = s.status == 'waiting_for_input';
+    final color = waiting ? AppColors.accent : AppColors.run;
+    return Material(
+      color: _selecting && checked ? AppColors.accentBg : AppColors.surface1,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          if (_selecting) {
+            _toggleSelected(s.id);
+          } else {
+            widget.onOpenSession(s.id, s.title, s.profile);
+          }
+        },
+        onLongPress: () {
+          if (_selecting) {
+            _toggleSelected(s.id);
+          } else {
+            _sessionActions(s);
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Row(children: [
+            if (_selecting) ...[
+              SelectCheck(checked, size: 20),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration:
+                          BoxDecoration(shape: BoxShape.circle, color: color),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(s.title.isEmpty ? '(untitled)' : s.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(15.5,
+                              weight: W.label,
+                              height: 20 / 15.5,
+                              color: AppColors.fg1)),
+                    ),
+                  ]),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    Flexible(
+                      child: Text.rich(
+                        TextSpan(children: [
+                          TextSpan(
+                              text: waiting
+                                  ? 'Waiting for your answer'
+                                  : 'Working',
+                              style: sans(13, color: color)),
+                          if (folderName.isNotEmpty) ...[
+                            TextSpan(
+                                text: '  ·  ',
+                                style: sans(13, color: AppColors.border2)),
+                            TextSpan(
+                                text: folderName,
+                                style: sans(13, color: AppColors.fg3)),
+                          ],
+                        ]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (s.displayAgentId != null &&
+                        s.displayAgentId!.trim().isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      AgentBadge(
+                          agentId: s.displayAgentId!,
+                          working: sessionIsActive(s.status)),
+                    ],
+                  ]),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Widget _mobileSessionRow(SessionInfo s, {required bool divider}) {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
@@ -1416,9 +1578,22 @@ class SidebarState extends State<Sidebar> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
                       children: [
+                        if (!renaming) ...[
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: running
+                                  ? AppColors.run
+                                  : waiting
+                                      ? AppColors.accent
+                                      : AppColors.fg4.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         Expanded(
                           child: renaming
                               ? _inlineRenameField(s, compact: false)
@@ -1439,17 +1614,7 @@ class SidebarState extends State<Sidebar> {
                       ]),
                   const SizedBox(height: 3),
                   Row(children: [
-                    if (running || waiting) ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: running ? AppColors.run : AppColors.accent,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
+                    if (!renaming) const SizedBox(width: 14),
                     if (!running && !waiting && s.inWorktree) ...[
                       AppIcon('git-branch', size: 12, color: AppColors.fg4),
                       const SizedBox(width: 4),

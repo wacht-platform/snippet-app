@@ -104,8 +104,9 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         await tester.pump(const Duration(milliseconds: 400));
         expect(tester.takeException(), isNull);
-        expect(find.text('Available · Code reviewer'), findsOneWidget);
-        expect(find.text('Paused · Research and planning'), findsOneWidget);
+        expect(find.text('Code reviewer'), findsOneWidget);
+        expect(find.text('Research and planning'), findsOneWidget);
+        expect(find.text('Paused'), findsOneWidget);
         expect(find.text('Hidden inbox'), findsNothing);
         final group = find.byKey(const ValueKey('agent-card-ada'));
         expect(tester.getTopLeft(group).dx, M.gutter);
