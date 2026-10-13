@@ -8,6 +8,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -991,11 +992,18 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   // Update the stick flag from a user-driven scroll (drag or settle).
+  bool _userScrolling = false;
+
   bool _onScroll(ScrollNotification n) {
     final was = _stickToBottom;
-    if (n is ScrollUpdateNotification && n.dragDetails != null) {
-      _stickToBottom = _atBottom();
+    if (n is ScrollStartNotification && n.dragDetails != null) {
+      _userScrolling = true;
+    } else if (n is ScrollUpdateNotification && n.dragDetails != null) {
+      _userScrolling = true;
+      final delta = n.scrollDelta ?? 0;
+      _stickToBottom = delta > 0 ? false : _atBottom();
     } else if (n is ScrollEndNotification) {
+      _userScrolling = false;
       _stickToBottom = _atBottom();
     }
     // User scrolling only updates pinning; history pages are not fetched from
@@ -1008,12 +1016,26 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   void _scheduleBottom({bool settle = false, bool smooth = false}) {
-    if (!_scroll.hasClients) return;
+    if (!_scroll.hasClients || _userScrolling) return;
     if (smooth) {
       _scroll.animateTo(0, duration: Motion.base, curve: Motion.enter);
     } else if (_scroll.offset != 0) {
       _scroll.jumpTo(0);
     }
+  }
+
+  void _rowResized(RenderBox row, double delta) {
+    if (_stickToBottom || _userScrolling || delta == 0 || !_scroll.hasClients) {
+      return;
+    }
+    final viewport = RenderAbstractViewport.maybeOf(row);
+    if (viewport is! RenderBox || !row.attached) return;
+    final viewportTop = (viewport as RenderBox).localToGlobal(Offset.zero).dy;
+    final rowBottom = row.localToGlobal(Offset(0, row.size.height)).dy;
+    if (rowBottom <= viewportTop) return;
+    final pos = _scroll.position;
+    pos.jumpTo(
+        (pos.pixels + delta).clamp(pos.minScrollExtent, pos.maxScrollExtent));
   }
 
   // Send now, or queue for the reconnect flush — never silently drop.
@@ -1265,10 +1287,14 @@ class _SessionScreenState extends State<SessionScreen>
                                                         Alignment.centerLeft,
                                                     child: SizedBox(
                                                       width: double.infinity,
-                                                      child: Appear(
-                                                        enabled: fresh,
-                                                        child: RepaintBoundary(
-                                                            child: child),
+                                                      child: _RowSizeWatch(
+                                                        onResize: _rowResized,
+                                                        child: Appear(
+                                                          enabled: fresh,
+                                                          child:
+                                                              RepaintBoundary(
+                                                                  child: child),
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
@@ -1420,5 +1446,41 @@ class _SessionScreenState extends State<SessionScreen>
             child: guardedScaffold,
           )
         : guardedScaffold;
+  }
+}
+
+class _RowSizeWatch extends SingleChildRenderObjectWidget {
+  const _RowSizeWatch({required this.onResize, super.child});
+
+  final void Function(RenderBox row, double delta) onResize;
+
+  @override
+  _RenderRowSizeWatch createRenderObject(BuildContext context) =>
+      _RenderRowSizeWatch(onResize);
+
+  @override
+  void updateRenderObject(
+          BuildContext context, _RenderRowSizeWatch renderObject) =>
+      renderObject.onResize = onResize;
+}
+
+class _RenderRowSizeWatch extends RenderProxyBox {
+  _RenderRowSizeWatch(this.onResize);
+
+  void Function(RenderBox row, double delta) onResize;
+  double? _height;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final height = size.height;
+    final previous = _height;
+    _height = height;
+    if (previous != null && previous != height) {
+      final delta = height - previous;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (attached) onResize(this, delta);
+      });
+    }
   }
 }
