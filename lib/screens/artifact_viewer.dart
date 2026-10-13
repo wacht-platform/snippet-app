@@ -312,8 +312,7 @@ class _ArtifactInlineState extends State<ArtifactInline> {
   Future<String> _textOf(ArtifactVersion v) =>
       _text ??= widget.client.artifactText(v.url);
 
-  Widget _loading() => SizedBox(
-      height: 48, child: Center(child: Spinner(size: 14, color: AppColors.fg3)));
+  Widget _loading() => const ArtifactSkeleton();
 
   Widget _note(String text) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -362,7 +361,19 @@ class _ArtifactInlineState extends State<ArtifactInline> {
       case 'image':
         return ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: Image.network(uri.toString(), fit: BoxFit.contain),
+          child: Image.network(
+            uri.toString(),
+            fit: BoxFit.contain,
+            frameBuilder: (context, child, frame, sync) {
+              if (sync) return child;
+              return AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: frame == null
+                    ? const ArtifactSkeleton(key: ValueKey('loading'))
+                    : KeyedSubtree(key: const ValueKey('loaded'), child: child),
+              );
+            },
+          ),
         );
       default:
         return _InlineWebPage(key: ValueKey(uri.toString()), uri: uri);
@@ -447,6 +458,73 @@ String snippetPageTheme(bool dark, String bg) {
 ''';
 }
 
+class ArtifactSkeleton extends StatefulWidget {
+  const ArtifactSkeleton({super.key, this.fill = false});
+
+  final bool fill;
+
+  @override
+  State<ArtifactSkeleton> createState() => _ArtifactSkeletonState();
+}
+
+class _ArtifactSkeletonState extends State<ArtifactSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1100));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (reduceMotion(context)) {
+      _pulse.value = 1;
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final block = AppColors.surface2;
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: widget.fill ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        Skeleton(width: 140, height: 14, radius: 6, color: block),
+        const SizedBox(height: 14),
+        Skeleton(height: 10, radius: 5, color: block),
+        const SizedBox(height: 8),
+        FractionallySizedBox(
+            widthFactor: 0.8,
+            child: Skeleton(height: 10, radius: 5, color: block)),
+        const SizedBox(height: 16),
+        if (widget.fill)
+          Expanded(
+              child: Skeleton(
+                  height: double.infinity, radius: 12, color: AppColors.surface1))
+        else
+          Skeleton(height: 96, radius: 12, color: AppColors.surface1),
+      ],
+    );
+    return Semantics(
+      label: 'Loading',
+      child: FadeTransition(
+        opacity: Tween(begin: 0.55, end: 1.0).animate(
+            CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: ClipRect(child: body),
+        ),
+      ),
+    );
+  }
+}
+
 class _InlineWebPage extends StatefulWidget {
   const _InlineWebPage({super.key, required this.uri});
   final Uri uri;
@@ -473,7 +551,14 @@ class _InlineWebPageState extends State<_InlineWebPage> {
 })();
 """;
 
-  double _height = 160;
+  static final _knownHeights = <String, double>{};
+
+  late double _height = _knownHeights[widget.uri.toString()] ?? 180;
+  bool _ready = false;
+  bool _finished = false;
+  bool _measured = false;
+  Timer? _settle;
+  Timer? _giveUp;
   String _bg = '#000000';
   bool _dark = true;
 
@@ -486,17 +571,43 @@ class _InlineWebPageState extends State<_InlineWebPage> {
         final h = double.tryParse(m.message);
         if (h == null || !mounted) return;
         final next = h.clamp(40.0, 6000.0);
+        _measured = true;
+        _knownHeights[widget.uri.toString()] = next;
         if ((next - _height).abs() > 1) setState(() => _height = next);
+        _scheduleReveal();
       })
       ..setNavigationDelegate(NavigationDelegate(
         onPageFinished: (_) {
           _controller.runJavaScript(_theme);
           _controller.runJavaScript(_report);
+          _finished = true;
+          _giveUp ??= Timer(const Duration(milliseconds: 2500), _reveal);
+          _scheduleReveal();
         },
       ));
     if (!kMacOS) c.setBackgroundColor(Colors.transparent);
     return c..loadRequest(widget.uri);
   }();
+
+  void _scheduleReveal() {
+    if (_ready || !_finished || !_measured) return;
+    _settle?.cancel();
+    _settle = Timer(const Duration(milliseconds: 250), _reveal);
+  }
+
+  void _reveal() {
+    if (_ready || !mounted) return;
+    _settle?.cancel();
+    _giveUp?.cancel();
+    setState(() => _ready = true);
+  }
+
+  @override
+  void dispose() {
+    _settle?.cancel();
+    _giveUp?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -504,9 +615,25 @@ class _InlineWebPageState extends State<_InlineWebPage> {
     _bg = _cssHex(theme.scaffoldBackgroundColor);
     _dark = theme.brightness == Brightness.dark;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOut,
       height: _height,
-      child: WebViewWidget(controller: _controller),
+      child: Stack(children: [
+        Positioned.fill(child: WebViewWidget(controller: _controller)),
+        Positioned.fill(
+          child: IgnorePointer(
+            ignoring: _ready,
+            child: AnimatedOpacity(
+              opacity: _ready ? 0 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: ColoredBox(
+                color: theme.scaffoldBackgroundColor,
+                child: const ArtifactSkeleton(fill: true),
+              ),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }
