@@ -90,6 +90,7 @@ class ServerConfig {
   /// Profile that delegated lanes run on; null → they use the active model.
   final String? delegate;
   final bool manualApproval;
+  final bool keepTaskProfile;
   final String hostname;
 
   ServerConfig.fromJson(Map<String, dynamic> j)
@@ -99,6 +100,7 @@ class ServerConfig {
         active = j['active'] as String?,
         delegate = j['delegate'] as String?,
         manualApproval = j['manual_approval'] == true,
+        keepTaskProfile = j['keep_task_profile'] != false,
         hostname = j['hostname'] as String? ?? '';
 }
 
