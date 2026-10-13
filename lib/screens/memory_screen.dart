@@ -481,7 +481,7 @@ class _ScopeViewState extends State<_ScopeView> {
                     if (href != null && href.startsWith('memory:')) {
                       _openFile(href.substring('memory:'.length));
                     } else {
-                      openMarkdownLink(href);
+                      openMarkdownLink(href, context);
                     }
                   },
                 ),

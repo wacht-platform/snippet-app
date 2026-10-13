@@ -120,7 +120,7 @@ class _ThreadCardState extends State<_ThreadCard> {
                           selectable: true,
                           styleSheet: sheet,
                           builders: {'pre': PreBlockBuilder()},
-                          onTapLink: (_, href, __) => openMarkdownLink(href),
+                          onTapLink: (_, href, __) => openMarkdownLink(href, context),
                         )
                       : widget.preview != null
                           ? Text(widget.preview!,

@@ -35,6 +35,8 @@ class DaemonScope extends InheritedWidget {
     required super.child,
   });
 
+  static DaemonClient? current;
+
   static DaemonClient? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<DaemonScope>()?.client;
 

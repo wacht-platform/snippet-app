@@ -597,7 +597,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       selectable: true,
                       styleSheet: markdownStyle(context),
                       builders: {'pre': PreBlockBuilder()},
-                      onTapLink: (txt, href, title) => openMarkdownLink(href),
+                      onTapLink: (txt, href, title) => openMarkdownLink(href, context),
                     ),
                   ],
                 ),
@@ -709,7 +709,7 @@ class _DescriptionState extends State<_Description> {
       selectable: true,
       styleSheet: markdownStyle(context),
       builders: {'pre': PreBlockBuilder()},
-      onTapLink: (txt, href, title) => openMarkdownLink(href),
+      onTapLink: (txt, href, title) => openMarkdownLink(href, context),
     );
     if (!_long) return body;
     return Column(

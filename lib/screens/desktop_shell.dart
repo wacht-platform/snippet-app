@@ -25,6 +25,7 @@ import '../store.dart';
 import '../term.dart' show SessionTermView;
 import '../theme.dart';
 import '../tool_sheet.dart';
+import '../media_views.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
 import 'editor.dart';
@@ -1606,6 +1607,7 @@ class _DesktopShellState extends State<DesktopShell>
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    DaemonScope.current = _client;
     if (_loading) {
       return Scaffold(
         backgroundColor: Colors.transparent,

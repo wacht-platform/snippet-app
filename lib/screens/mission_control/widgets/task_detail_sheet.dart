@@ -107,7 +107,7 @@ class TaskDetailSheet extends StatelessWidget {
                         styleSheet: markdownStyle(context),
                         builders: {'pre': PreBlockBuilder()},
                         onTapLink: (txt, href, title) =>
-                            openMarkdownLink(href)),
+                            openMarkdownLink(href, context)),
                   ),
                 ],
                 const SizedBox(height: 18),

@@ -168,7 +168,7 @@ class _FileViewerState extends State<FileViewer> {
                   selectable: false,
                   styleSheet: documentMarkdownStyle(context),
                   builders: {'pre': PreBlockBuilder()},
-                  onTapLink: (_, href, __) => openMarkdownLink(href),
+                  onTapLink: (_, href, __) => openMarkdownLink(href, context),
                 ),
               ),
             ),
