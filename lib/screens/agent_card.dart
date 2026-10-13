@@ -114,20 +114,20 @@ class _AgentCardState extends State<AgentCard> {
               const SizedBox(width: 8),
               Expanded(
                 child: Row(children: [
-                  Flexible(
-                    flex: 3,
+                  Expanded(
                     child: Text(name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: sans(13, color: AppColors.fg1)),
                   ),
                   if (role.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Flexible(
-                      flex: 2,
+                    const SizedBox(width: 12),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 120),
                       child: Text(role,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
                           style: sans(11.5, color: AppColors.fg4)),
                     ),
                   ],
