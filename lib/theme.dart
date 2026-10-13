@@ -853,6 +853,8 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedFile01;
     case 'git-branch':
       return HugeIcons.strokeRoundedGitBranch;
+    case 'worktree':
+      return HugeIcons.strokeRoundedCopy01;
     case 'terminal':
       return HugeIcons.strokeRoundedComputerTerminal01;
     case 'grip':

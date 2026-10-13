@@ -1488,6 +1488,11 @@ class SidebarState extends State<Sidebar> {
                   const SizedBox(height: 4),
                   Row(children: [
                     const SizedBox(width: 14),
+                    if (folderName.isNotEmpty) ...[
+                      AppIcon(s.inWorktree ? 'worktree' : 'folder',
+                          size: 12, color: AppColors.fg4),
+                      const SizedBox(width: 4),
+                    ],
                     Flexible(
                       child: Text.rich(
                         TextSpan(children: [
@@ -1608,8 +1613,9 @@ class SidebarState extends State<Sidebar> {
                   const SizedBox(height: 3),
                   Row(children: [
                     if (!renaming) const SizedBox(width: 14),
-                    if (!running && !waiting && s.inWorktree) ...[
-                      AppIcon('git-branch', size: 12, color: AppColors.fg4),
+                    if (!running && !waiting && folderName.isNotEmpty) ...[
+                      AppIcon(s.inWorktree ? 'worktree' : 'folder',
+                          size: 12, color: AppColors.fg4),
                       const SizedBox(width: 4),
                     ],
                     Flexible(
