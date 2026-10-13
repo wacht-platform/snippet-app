@@ -695,7 +695,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         const SizedBox(width: 6),
         Builder(builder: (chipCtx) {
           return _composerChip(
-            icon: 'sparkles',
+            icon: 'cpu',
             label: _modelLabel ??
                 'Auto',
             onTap: () =>
@@ -741,7 +741,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       builder: (ctx) => Tooltip(
         message: 'Approval mode',
         child: Material(
-          color: manual ? AppColors.accentBg : AppColors.surface2,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(7),
           child: InkWell(
             onTap: () => _switchApproval(ctx),
