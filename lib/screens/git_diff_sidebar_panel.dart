@@ -52,6 +52,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   GitStatus? _status;
   bool _loading = true;
   String? _error;
+  bool _initing = false;
   DateTime _lastUpdated = DateTime.now();
   Swr<GitStatus>? _git;
   bool _branchBusy = false;
@@ -185,6 +186,9 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     final files = _status?.files ?? const <GitFile>[];
     final branch = _status?.branch ?? '';
     final isClean = files.isEmpty;
+    final notRepo = _status != null &&
+        !_status!.ok &&
+        (_status!.error ?? '').trim().isNotEmpty;
 
     final tabbed = !kMobile &&
         widget.onTab != null &&
@@ -203,6 +207,12 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
               ShellSectionHeader(
                 label: 'Git Diff',
               ),
+            if (notRepo)
+              SizedBox(
+                height: (box.maxHeight - 80).clamp(260.0, 640.0),
+                child: _notRepoState(repoName),
+              )
+            else ...[
             _branchRow(repoName, branch, files.length),
             if (_loading && _status == null)
               const Padding(
@@ -221,6 +231,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             else ...[
               const SizedBox(height: 6),
               for (final f in files) _fileRow(f),
+            ],
             ],
           ],
         ),
@@ -380,6 +391,39 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
       ),
     );
   }
+
+  Future<void> _initRepo() async {
+    if (_initing) return;
+    setState(() => _initing = true);
+    try {
+      final r = await widget.client.gitInit(_repo);
+      if (!mounted) return;
+      if (r['ok'] != true) {
+        final err = (r['stderr'] as String?)?.trim();
+        toast(context, err == null || err.isEmpty ? 'git init failed' : err,
+            danger: true);
+      } else {
+        toast(context, 'Git initialized');
+      }
+      await refresh();
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    } finally {
+      if (mounted) setState(() => _initing = false);
+    }
+  }
+
+  Widget _notRepoState(String repoName) => EmptyState(
+        icon: 'git-branch',
+        title: 'Not a Git repository',
+        body:
+            'Initialize Git in $repoName to track changes, branches and pull requests here.',
+        action: Btn(_initing ? 'Initializing…' : 'Initialize Git',
+            small: true,
+            icon: 'git-branch',
+            disabled: _initing,
+            onTap: _initRepo),
+      );
 
   Widget _cleanState() => EmptyState(
         icon: 'check-check',

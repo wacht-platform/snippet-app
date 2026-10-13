@@ -45,11 +45,8 @@ class TerminalsSidebarPanel extends StatelessWidget {
     final displayPath =
         workspacePath.trim().isEmpty ? '~/workspace' : workspacePath;
 
-    return Container(
-      color: kMobile ? AppColors.bg : Colors.transparent,
-      child: ListView(
-        padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
-        children: [
+    final folder = lastPathSegment(displayPath, ifEmpty: displayPath);
+    final head = <Widget>[
           ShellSectionHeader(
             label: 'Terminals',
             actions: [
@@ -80,12 +77,34 @@ class TerminalsSidebarPanel extends StatelessWidget {
               ]),
             ),
           ),
-          if (terminals.isEmpty)
-            const _SidebarEmpty('No terminals yet. Open one with the + button.')
-          else ...[
-            const SizedBox(height: 6),
-            for (var i = 0; i < terminals.length; i++) _row(i),
-          ],
+    ];
+    if (terminals.isEmpty) {
+      return Container(
+        color: kMobile ? AppColors.bg : Colors.transparent,
+        padding: EdgeInsets.only(top: kMobile ? 8 : 0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          ...head,
+          Expanded(
+            child: EmptyState(
+              icon: 'terminal',
+              title: 'No terminals open',
+              body:
+                  'Shells start in $folder and keep running until you close them here.',
+              action: Btn('New terminal',
+                  small: true, icon: 'plus', onTap: onNewTerminal),
+            ),
+          ),
+        ]),
+      );
+    }
+    return Container(
+      color: kMobile ? AppColors.bg : Colors.transparent,
+      child: ListView(
+        padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
+        children: [
+          ...head,
+          const SizedBox(height: 6),
+          for (var i = 0; i < terminals.length; i++) _row(i),
         ],
       ),
     );
@@ -120,18 +139,4 @@ class TerminalsSidebarPanel extends StatelessWidget {
       ]),
     );
   }
-}
-
-/// Quiet empty state, matching the chat and file-tree panels.
-class _SidebarEmpty extends StatelessWidget {
-  const _SidebarEmpty(this.message);
-  final String message;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-        child: Text(message,
-            textAlign: TextAlign.center,
-            style: sans(12, color: AppColors.fg3, height: 1.45)),
-      );
 }

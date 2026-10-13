@@ -677,6 +677,9 @@ class DaemonClient {
   Future<Map<String, dynamic>> gitStash(String session, String op) =>
       _gitPost('stash', {'session': session, 'op': op});
 
+  Future<Map<String, dynamic>> gitInit(String session) =>
+      _gitPost('init', {'session': session});
+
   // ---- Mission Control ----
 
   /// GET /mission-control/settings — notification routing policy.

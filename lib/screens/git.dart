@@ -71,6 +71,29 @@ class _GitScreenState extends State<GitScreen> {
     super.dispose();
   }
 
+  bool _initing = false;
+
+  Future<void> _initRepo() async {
+    if (_initing) return;
+    setState(() => _initing = true);
+    try {
+      final r = await widget.client.gitInit(_repo);
+      if (!mounted) return;
+      if (r['ok'] != true) {
+        final err = (r['stderr'] as String?)?.trim();
+        toast(context, err == null || err.isEmpty ? 'git init failed' : err,
+            danger: true);
+      } else {
+        toast(context, 'Git initialized');
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    } finally {
+      if (mounted) setState(() => _initing = false);
+    }
+  }
+
   Future<void> _load() async {
     if (!mounted) return;
     setState(() {
@@ -271,11 +294,23 @@ class _GitScreenState extends State<GitScreen> {
         )
       else if (_error != null && (st == null || !st.ok))
         Expanded(
-          child: EmptyState(
-            icon: 'git-branch',
-            title: 'No git here',
-            body: _error!,
-          ),
+          child: st == null
+              ? EmptyState(
+                  icon: 'alert-triangle',
+                  title: 'Couldn\'t read Git status',
+                  body: _error!,
+                )
+              : EmptyState(
+                  icon: 'git-branch',
+                  title: 'Not a Git repository',
+                  body:
+                      'Initialize Git here to track changes, branches and pull requests.',
+                  action: Btn(_initing ? 'Initializing…' : 'Initialize Git',
+                      small: true,
+                      icon: 'git-branch',
+                      disabled: _initing,
+                      onTap: _initRepo),
+                ),
         )
       else
         Expanded(child: _body(st!)),
