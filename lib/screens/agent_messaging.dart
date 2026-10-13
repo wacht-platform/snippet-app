@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
 import '../api.dart';
+import '../composer_strip.dart';
 import '../media_views.dart';
 import '../motion.dart';
 import '../desktop_pick.dart';
@@ -1272,6 +1273,61 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     ]);
   }
 
+  Widget _desktopStrip() => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_attachments.isNotEmpty) ...[
+            _attachmentBar(),
+            const SizedBox(height: 6),
+          ],
+          DesktopComposerStrip(
+            field: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.enter): _send,
+                const SingleActivator(LogicalKeyboardKey.enter, meta: true):
+                    _send,
+                const SingleActivator(LogicalKeyboardKey.enter, control: true):
+                    _send,
+              },
+              child: TextField(
+                controller: _input,
+                minLines: 1,
+                maxLines: 8,
+                cursorColor: AppColors.accent,
+                onSubmitted: (_) => _send(),
+                style: TS.body(AppColors.fg1),
+                decoration: DesktopComposerStrip.decoration(
+                    'Message ${widget.agentName}…'),
+              ),
+            ),
+            send: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _input,
+              builder: (_, val, __) {
+                final canSend = (val.text.trim().isNotEmpty ||
+                        _attachments.isNotEmpty ||
+                        _isRecording ||
+                        _recordingPath != null) &&
+                    !_sending;
+                return StripSendButton(
+                  enabled: canSend,
+                  sending: _sending,
+                  onTap: canSend ? _send : null,
+                );
+              },
+            ),
+            footer: [
+              StripIcon('plus', tooltip: 'Attach', onTap: _onAttachTap),
+              if (kCanRecord)
+                StripIcon(_isRecording ? 'mic-off' : 'mic',
+                    tooltip: 'Record',
+                    onTap: _onMicTap,
+                    color: _isRecording ? AppColors.danger : null),
+            ],
+          ),
+        ],
+      );
+
   Widget _composer() {
     final mq = MediaQuery.of(context);
     final keyboard = mq.viewInsets.bottom;
@@ -1293,7 +1349,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           alignment: Alignment.bottomCenter,
           child: (_isRecording || _recordingPath != null)
               ? _mobileRecorder()
-              : Container(
+              : !kMobile
+                  ? _desktopStrip()
+                  : Container(
                   decoration: BoxDecoration(
                     color: AppColors.raised,
                     borderRadius: BorderRadius.circular(18),

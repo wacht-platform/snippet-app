@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../composer_strip.dart';
 import '../../../drafts.dart';
 import '../../../platform.dart';
 import '../../../theme.dart';
@@ -64,9 +65,48 @@ class _MissionComposerState extends State<MissionComposer> {
     setState(() {});
   }
 
+  Widget _desktopStrip() => DesktopComposerStrip(
+        field: CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.enter): () {
+              if (_canSend) _send();
+            },
+            const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+              if (_canSend) _send();
+            },
+            const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
+              if (_canSend) _send();
+            },
+          },
+          child: TextField(
+            controller: _controller,
+            focusNode: _focus,
+            minLines: 1,
+            maxLines: 8,
+            cursorColor: AppColors.accent,
+            onSubmitted: (_) => _send(),
+            onChanged: (_) => setState(() {}),
+            style: TS.body(AppColors.fg1),
+            decoration: DesktopComposerStrip.decoration('Ask anything'),
+          ),
+        ),
+        send: StripSendButton(
+          enabled: _canSend || widget.state.sending,
+          sending: widget.state.sending,
+          onTap: widget.state.sending || !_canSend ? null : _send,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final sending = widget.state.sending;
+    if (!kMobile) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+            20, 8, 20, 10 + MediaQuery.of(context).padding.bottom),
+        child: _desktopStrip(),
+      );
+    }
     return Container(
       padding: EdgeInsets.fromLTRB(
         kMobile ? M.gutter : 20,
