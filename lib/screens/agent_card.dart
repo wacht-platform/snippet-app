@@ -13,12 +13,14 @@ class AgentCard extends StatefulWidget {
   final DaemonClient client;
   final CoordinationAgent agent;
   final VoidCallback onOpen;
+  final VoidCallback? onDelete;
 
   const AgentCard({
     super.key,
     required this.client,
     required this.agent,
     required this.onOpen,
+    this.onDelete,
   });
 
   @override
@@ -26,6 +28,33 @@ class AgentCard extends StatefulWidget {
 }
 
 class _AgentCardState extends State<AgentCard> {
+  Future<void> _actions(Offset? point) async {
+    final name = widget.agent.displayName.trim().isEmpty
+        ? widget.agent.id
+        : widget.agent.displayName.trim();
+    if (kMobile) {
+      showAppSheet(context,
+          title: name,
+          child: SheetActions([
+            SheetAction('trash', 'Delete agent', () {
+              Navigator.pop(context);
+              widget.onDelete?.call();
+            }, danger: true),
+          ]));
+      return;
+    }
+    final picked = await showAppMenu<String>(
+      context,
+      point: point,
+      anchor: point == null ? context : null,
+      items: [
+        appMenuItem(
+            value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
+      ],
+    );
+    if (picked == 'delete') widget.onDelete?.call();
+  }
+
   List<TaskItem> _tasks = const [];
 
   @override
@@ -99,8 +128,13 @@ class _AgentCardState extends State<AgentCard> {
         child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(8),
-        child: InkWell(
+        child: GestureDetector(
+          onSecondaryTapUp: widget.onDelete == null
+              ? null
+              : (d) => _actions(d.globalPosition),
+          child: InkWell(
           onTap: widget.onOpen,
+          onLongPress: widget.onDelete == null ? null : () => _actions(null),
           borderRadius: BorderRadius.circular(8),
           child: Container(
             height: 32,
@@ -141,6 +175,7 @@ class _AgentCardState extends State<AgentCard> {
           ),
         ),
         ),
+        ),
       );
     }
     return Padding(
@@ -151,6 +186,7 @@ class _AgentCardState extends State<AgentCard> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: widget.onOpen,
+          onLongPress: widget.onDelete == null ? null : () => _actions(null),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
                 kMobile ? 18 : 14, kMobile ? 14 : 11, kMobile ? 12 : 10,

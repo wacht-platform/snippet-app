@@ -167,6 +167,26 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
     refresh();
   }
 
+  Future<void> _deleteAgent(CoordinationAgent agent) async {
+    final name =
+        agent.displayName.trim().isEmpty ? agent.id : agent.displayName.trim();
+    final ok = await confirmAction(context,
+        title: 'Delete $name?',
+        body:
+            'This removes the agent, its identity and its notes. Its past task history loses it too. This can\'t be undone.',
+        confirmLabel: 'Delete agent');
+    if (!ok || !mounted) return;
+    try {
+      await widget.client.deleteAgent(agent.id);
+      if (!mounted) return;
+      setState(() => agents = agents.where((a) => a.id != agent.id).toList());
+      toast(context, 'Deleted $name');
+      refresh();
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
   Future<void> refresh() async {
     if (mounted) {
       setState(() {
@@ -369,6 +389,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                   client: widget.client,
                   agent: ordered[i],
                   onOpen: () => widget.onOpenAgent?.call(ordered[i]),
+                  onDelete: () => _deleteAgent(ordered[i]),
                 ),
               ),
             if (emptyState != null) emptyState,
@@ -388,6 +409,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             client: widget.client,
             agent: ordered[i],
             onOpen: () => widget.onOpenAgent?.call(ordered[i]),
+            onDelete: () => _deleteAgent(ordered[i]),
           ),
         ),
     ];

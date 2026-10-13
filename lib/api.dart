@@ -1131,6 +1131,13 @@ class DaemonClient {
   // ---- Coordination agents ----
 
   /// GET /agents — list specialized agent identities.
+  Future<void> deleteAgent(String id) async {
+    final r = await http.delete(_uri('/agents/${Uri.encodeComponent(id)}'));
+    if (r.statusCode != 200) {
+      throw r.body.trim().isEmpty ? 'Couldn\'t delete agent (${r.statusCode})' : r.body.trim();
+    }
+  }
+
   Future<List<CoordinationAgent>> coordinationAgents() async {
     final r = await http.get(_uri('/agents'));
     if (r.statusCode != 200) throw _err('list coordination agents', r);
