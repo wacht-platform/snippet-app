@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -397,6 +398,55 @@ String _csvMarkdown(String text) {
   ].join('\n');
 }
 
+String _cssHex(Color c) =>
+    '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+
+String _cssRgba(Color c) =>
+    'rgba(${(c.r * 255).round()},${(c.g * 255).round()},${(c.b * 255).round()},${c.a.toStringAsFixed(3)})';
+
+String snippetPageTheme(bool dark, String bg) {
+  final vars = {
+    '--sn-bg': bg,
+    '--sn-surface': _cssHex(AppColors.surface1),
+    '--sn-surface-2': _cssHex(AppColors.surface2),
+    '--sn-surface-3': _cssHex(AppColors.surface3),
+    '--sn-text': _cssHex(AppColors.fg1),
+    '--sn-text-2': _cssHex(AppColors.fg2),
+    '--sn-muted': _cssHex(AppColors.fg3),
+    '--sn-faint': _cssHex(AppColors.fg4),
+    '--sn-border': _cssHex(AppColors.border),
+    '--sn-border-strong': _cssHex(AppColors.border2),
+    '--sn-accent': _cssHex(AppColors.accent),
+    '--sn-accent-text': _cssHex(AppColors.accentFg),
+    '--sn-accent-bg': _cssRgba(AppColors.accentBg),
+    '--sn-ok': _cssHex(AppColors.ok),
+    '--sn-warn': _cssHex(AppColors.run),
+    '--sn-danger': _cssHex(AppColors.danger),
+    '--sn-radius': '12px',
+    '--sn-font': "'Geist', -apple-system, system-ui, sans-serif",
+    '--sn-mono': "'JetBrains Mono', ui-monospace, monospace",
+  };
+  final css = ':root{${vars.entries.map((e) => '${e.key}:${e.value}').join(';')}}';
+  return '''
+(function () {
+  var d = document, h = d.head || d.documentElement;
+  var v = d.createElement('style'); v.textContent = ${jsonEncode(css)}; h.insertBefore(v, h.firstChild);
+  if (!d.querySelector('link[data-sn-fonts]')) {
+    var l = d.createElement('link'); l.rel = 'stylesheet'; l.setAttribute('data-sn-fonts', '');
+    l.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap';
+    h.appendChild(l);
+  }
+  var b = d.body; if (!b) return;
+  var clear = function (c) { return c === 'rgba(0, 0, 0, 0)' || c === 'transparent'; };
+  if (clear(getComputedStyle(b).backgroundColor) && clear(getComputedStyle(d.documentElement).backgroundColor)) {
+    var s = d.createElement('style');
+    s.textContent = ':root{color-scheme:${dark ? 'dark' : 'light'}}html,body{background:var(--sn-bg);color:var(--sn-text);margin:0}';
+    h.appendChild(s);
+  }
+})();
+''';
+}
+
 class _InlineWebPage extends StatefulWidget {
   const _InlineWebPage({super.key, required this.uri});
   final Uri uri;
@@ -425,24 +475,9 @@ class _InlineWebPageState extends State<_InlineWebPage> {
 
   double _height = 160;
   String _bg = '#000000';
-  String _fg = '#ffffff';
   bool _dark = true;
 
-  static String _hex(Color c) =>
-      '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
-
-  String get _theme => """
-(function () {
-  var b = document.body; if (!b) return;
-  var bg = getComputedStyle(b).backgroundColor, hb = getComputedStyle(document.documentElement).backgroundColor;
-  var clear = function (c) { return c === 'rgba(0, 0, 0, 0)' || c === 'transparent'; };
-  if (clear(bg) && clear(hb)) {
-    var s = document.createElement('style');
-    s.textContent = ':root{color-scheme:${_dark ? 'dark' : 'light'}}html,body{background:$_bg;color:$_fg;margin:0}';
-    document.head.appendChild(s);
-  }
-})();
-""";
+  String get _theme => snippetPageTheme(_dark, _bg);
 
   late final WebViewController _controller = () {
     final c = WebViewController()
@@ -466,8 +501,7 @@ class _InlineWebPageState extends State<_InlineWebPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    _bg = _hex(theme.scaffoldBackgroundColor);
-    _fg = _hex(AppColors.fg1);
+    _bg = _cssHex(theme.scaffoldBackgroundColor);
     _dark = theme.brightness == Brightness.dark;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
@@ -868,15 +902,24 @@ class _WebPreview extends StatefulWidget {
 }
 
 class _WebPreviewState extends State<_WebPreview> {
+  String _page = '';
   late final WebViewController _controller = () {
     final c = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted);
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) => _controller.runJavaScript(_page),
+      ));
     if (!kMacOS) c.setBackgroundColor(Colors.white);
     return c..loadRequest(widget.uri);
   }();
 
   @override
-  Widget build(BuildContext context) => WebViewWidget(controller: _controller);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    _page = snippetPageTheme(theme.brightness == Brightness.dark,
+        _cssHex(theme.scaffoldBackgroundColor));
+    return WebViewWidget(controller: _controller);
+  }
 }
 
 class _CsvTable extends StatelessWidget {
