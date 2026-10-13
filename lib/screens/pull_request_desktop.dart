@@ -1119,12 +1119,25 @@ class _DesktopCommitsState extends State<_DesktopCommits> {
   Map<String, List<DiffLine>>? _files;
   String? _error;
 
-  Future<void> _show(PrCommit c) async {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.commits.isNotEmpty) {
+      _open = widget.commits.last;
+      _load(_open!);
+    }
+  }
+
+  void _show(PrCommit c) {
     setState(() {
       _open = c;
       _files = null;
       _error = null;
     });
+    _load(c);
+  }
+
+  Future<void> _load(PrCommit c) async {
     try {
       final d = await widget.client.githubCommitDiff(widget.session, c.oid);
       if (mounted && _open == c) setState(() => _files = parseUnifiedDiff(d));
@@ -1177,7 +1190,7 @@ class _DesktopCommitsState extends State<_DesktopCommits> {
           Text(c.headline, style: sans(15, weight: W.strong, color: AppColors.fg1)),
           if (c.body.trim().isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(c.body.trim(), style: mono(12, height: 1.5, color: AppColors.fg2)),
+            Text(c.body.trim(), style: sans(13, height: 1.5, color: AppColors.fg3)),
           ],
         ]),
       ),
@@ -1219,14 +1232,10 @@ class _DesktopCommitsState extends State<_DesktopCommits> {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
       children: [for (final c in widget.commits.reversed) _row(c)],
     );
-    if (_open == null) {
-      return Align(
-        alignment: Alignment.topLeft,
-        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 820), child: list),
-      );
-    }
+    if (_open == null) return list;
     return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SizedBox(width: 300, child: list),
+      SizedBox(width: 320, child: list),
+      Container(width: 1, color: AppColors.border),
       Expanded(child: _diff()),
     ]);
   }
