@@ -717,7 +717,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         appMenuRow(
           value: 'auto',
           icon: 'zap',
-          label: 'YOLO',
+          label: 'Yolo',
           description: 'Run shell and file edits without asking',
           selected: current != 'manual',
         ),
@@ -752,7 +752,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 AppIcon(manual ? 'shield' : 'zap', size: 12, color: ink),
                 const SizedBox(width: 4),
-                Text(manual ? 'Ask' : 'YOLO',
+                Text(manual ? 'Ask' : 'Yolo',
                     style: sans(12, weight: W.label, color: ink)),
                 const SizedBox(width: 3),
                 AppIcon('chevron-down', size: 11, color: ink),
