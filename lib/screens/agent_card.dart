@@ -106,7 +106,9 @@ class _AgentCardState extends State<AgentCard> {
             ? ('$blocked blocked', AppColors.danger)
             : open > 0
                 ? ('$open open', AppColors.fg3)
-                : ('No tasks', AppColors.fg4);
+                : done > 0
+                    ? ('$done done', AppColors.fg4)
+                    : ('No tasks', AppColors.fg4);
     final nameSize = kMobile ? 15.5 : 13.0;
     final metaSize = kMobile ? 13.0 : 11.5;
     final segments = [
