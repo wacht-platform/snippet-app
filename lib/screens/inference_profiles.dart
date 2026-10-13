@@ -253,8 +253,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
             AppToggle(
               on: _keepTaskProfile ?? cfg?.keepTaskProfile ?? true,
               label: "Keep a task's model",
-              sub:
-                  'When a task runs a chat on another model, the chat stays on it afterwards, so that model\'s cache stays warm.',
+              sub: 'Chats stay on the model a task used.',
               onChanged: _setKeepTaskProfile,
             ),
           ],
