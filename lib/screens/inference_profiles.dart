@@ -40,6 +40,18 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   bool _inEditor = false;
   InferenceProfile? _editProfile;
   String? _delegate;
+  bool? _keepTaskProfile;
+
+  Future<void> _setKeepTaskProfile(bool on) async {
+    setState(() => _keepTaskProfile = on);
+    try {
+      await widget.client.setKeepTaskProfile(on);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _keepTaskProfile = !on);
+      toast(context, "Couldn't change it: $e", danger: true);
+    }
+  }
 
   final Map<String, InferenceProfile> _saving = {};
   final Set<String> _deletingProfiles = {};
@@ -237,6 +249,14 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
             ]),
             const SettingsNote(
                 'New chats use the active profile. Parallel lanes use the delegate.'),
+            const SizedBox(height: S.s16),
+            AppToggle(
+              on: _keepTaskProfile ?? cfg?.keepTaskProfile ?? true,
+              label: "Keep a task's model",
+              sub:
+                  'When a task runs a chat on another model, the chat stays on it afterwards, so that model\'s cache stays warm.',
+              onChanged: _setKeepTaskProfile,
+            ),
           ],
         ]);
       },

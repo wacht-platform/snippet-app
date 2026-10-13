@@ -428,6 +428,13 @@ class DaemonClient {
     invalidateConfig();
   }
 
+  Future<void> setKeepTaskProfile(bool on) async {
+    final r = await http.post(_uri('/config/keep_task_profile'),
+        headers: _json, body: jsonEncode({'on': on}));
+    if (r.statusCode != 200) throw _err('set keep task profile', r);
+    invalidateConfig();
+  }
+
   Future<void> deleteProfile(String name) async {
     final r = await http.delete(_uri('/config/profile', {'name': name}));
     if (r.statusCode != 200) throw _err('delete profile', r);
