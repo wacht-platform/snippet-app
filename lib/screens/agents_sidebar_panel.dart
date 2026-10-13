@@ -379,18 +379,32 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
           padding: const EdgeInsets.fromLTRB(M.gutter, 8, M.gutter, 88),
           children: [
             if (mcCard != null) mcCard,
-            for (var i = 0; i < ordered.length; i++)
-              Appear(
-                key: ValueKey('appear-agent-${ordered[i].id}'),
-                index: i,
-                since: _shownAt,
-                child: AgentCard(
-                  key: ValueKey('agent-card-${ordered[i].id}'),
-                  client: widget.client,
-                  agent: ordered[i],
-                  onOpen: () => widget.onOpenAgent?.call(ordered[i]),
-                  onDelete: () => _deleteAgent(ordered[i]),
-                ),
+            if (ordered.isNotEmpty)
+              Material(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(16),
+                clipBehavior: Clip.antiAlias,
+                child: Column(children: [
+                  for (var i = 0; i < ordered.length; i++) ...[
+                    if (i > 0)
+                      Container(
+                          height: 1,
+                          margin: const EdgeInsets.only(left: 16),
+                          color: AppColors.border),
+                    Appear(
+                      key: ValueKey('appear-agent-${ordered[i].id}'),
+                      index: i,
+                      since: _shownAt,
+                      child: AgentCard(
+                        key: ValueKey('agent-card-${ordered[i].id}'),
+                        client: widget.client,
+                        agent: ordered[i],
+                        onOpen: () => widget.onOpenAgent?.call(ordered[i]),
+                        onDelete: () => _deleteAgent(ordered[i]),
+                      ),
+                    ),
+                  ],
+                ]),
               ),
             if (emptyState != null) emptyState,
           ],

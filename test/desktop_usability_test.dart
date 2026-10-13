@@ -334,9 +334,9 @@ void main() {
             reason: 'Beta (2000) should be above Alpha Old (1000)');
 
         // The folder is per-row metadata, never a group header.
-        expect(find.text('repo-alpha'), findsNWidgets(2));
-        expect(find.text('repo-beta'), findsOneWidget);
-        expect(find.text('repo-gamma'), findsOneWidget);
+        expect(find.textContaining('repo-alpha', findRichText: true), findsNWidgets(2));
+        expect(find.textContaining('repo-beta', findRichText: true), findsOneWidget);
+        expect(find.textContaining('repo-gamma', findRichText: true), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
