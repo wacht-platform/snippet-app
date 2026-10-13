@@ -441,6 +441,8 @@ class SidebarState extends State<Sidebar> {
                   instances: widget.instances,
                   active: widget.active,
                   onRemove: widget.onRemoveInstance,
+                  onSelect: widget.onSelectInstance,
+                  onRename: widget.onRenameInstance,
                   section: section,
                   onSection: widget.onSettingsSection,
                   onClose: () => widget.onSettingsSection(null),
@@ -462,6 +464,8 @@ class SidebarState extends State<Sidebar> {
                         instances: widget.instances,
                         active: widget.active,
                         onRemove: widget.onRemoveInstance,
+                        onSelect: widget.onSelectInstance,
+                        onRename: widget.onRenameInstance,
                         section: widget.settingsSection,
                         onSection: widget.onSettingsSection,
                         onClose: () {
