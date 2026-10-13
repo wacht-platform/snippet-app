@@ -34,6 +34,13 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
 
     List<({String path, String caption})>? openFiles;
     var openFilesAt = -1;
+    final newestArtifact = <String, int>{};
+    for (final e in events) {
+      if (e['kind'] != 'artifact_presented') continue;
+      final id = _s(e['id']);
+      final v = (e['version'] as num?)?.toInt() ?? 1;
+      if (v >= (newestArtifact[id] ?? 0)) newestArtifact[id] = v;
+    }
 
     void addEvent(String key, Widget child) {
       out.add(KeyedSubtree(
@@ -292,17 +299,33 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           openFilesAt = out.length;
         case 'artifact_presented':
           endTools(key);
+          final artifactId = _s(e['id']);
+          final artifactVersion = (e['version'] as num?)?.toInt() ?? 1;
+          final artifactKind = _s(e['artifact_kind']);
+          final display = e['display'] as String?;
           addEvent(
               key,
-              ArtifactRow(
-                client: widget.client,
-                session: widget.sessionId,
-                id: _s(e['id']),
-                version: (e['version'] as num?)?.toInt() ?? 1,
-                title: _s(e['title']),
-                kind: _s(e['artifact_kind']),
-                caption: _s(e['caption']),
-              ));
+              artifactVersion == newestArtifact[artifactId] &&
+                      artifactShowsInline(artifactKind, display)
+                  ? ArtifactInline(
+                      key: ValueKey('artifact-inline-$artifactId-$artifactVersion'),
+                      client: widget.client,
+                      session: widget.sessionId,
+                      id: artifactId,
+                      version: artifactVersion,
+                      title: _s(e['title']),
+                      kind: artifactKind,
+                      caption: _s(e['caption']),
+                    )
+                  : ArtifactRow(
+                      client: widget.client,
+                      session: widget.sessionId,
+                      id: artifactId,
+                      version: artifactVersion,
+                      title: _s(e['title']),
+                      kind: artifactKind,
+                      caption: _s(e['caption']),
+                    ));
         case 'lane_spawned':
           endTools(key);
           final id = _s(e['id']);

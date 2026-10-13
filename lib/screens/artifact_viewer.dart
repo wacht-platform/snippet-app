@@ -263,6 +263,220 @@ class ArtifactRow extends StatelessWidget {
   }
 }
 
+bool artifactShowsInline(String kind, String? display) {
+  final wanted = display == 'inline' ||
+      (display == null && (kind == 'markdown' || kind == 'csv' || kind == 'image'));
+  if (!wanted) return false;
+  return switch (kind) {
+    'markdown' || 'csv' || 'code' || 'image' => true,
+    'html' || 'svg' => _canEmbedWeb,
+    _ => false,
+  };
+}
+
+class ArtifactInline extends StatefulWidget {
+  const ArtifactInline({
+    super.key,
+    required this.client,
+    required this.session,
+    required this.id,
+    required this.version,
+    required this.title,
+    required this.kind,
+    required this.caption,
+  });
+
+  final DaemonClient client;
+  final String session;
+  final String id;
+  final int version;
+  final String title;
+  final String kind;
+  final String caption;
+
+  @override
+  State<ArtifactInline> createState() => _ArtifactInlineState();
+}
+
+class _ArtifactInlineState extends State<ArtifactInline> {
+  late final Future<ArtifactVersion?> _version = _load();
+  Future<String>? _text;
+
+  Future<ArtifactVersion?> _load() async {
+    final all = await widget.client.artifacts(widget.session);
+    final a = all.where((a) => a.id == widget.id).firstOrNull;
+    return a?.version(widget.version) ?? a?.latest;
+  }
+
+  Future<String> _textOf(ArtifactVersion v) =>
+      _text ??= widget.client.artifactText(v.url);
+
+  Widget _loading() => SizedBox(
+      height: 48, child: Center(child: Spinner(size: 14, color: AppColors.fg3)));
+
+  Widget _note(String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(text, style: sans(12.5, color: AppColors.fg3)),
+      );
+
+  Widget _textBody(ArtifactVersion v, Widget Function(String) render) =>
+      FutureBuilder<String>(
+        future: _textOf(v),
+        builder: (context, snap) {
+          if (snap.hasError) return _note('${snap.error}');
+          if (!snap.hasData) return _loading();
+          return render(snap.data!);
+        },
+      );
+
+  Widget _body(ArtifactVersion v) {
+    final uri = widget.client.artifactUri(v.url);
+    switch (widget.kind) {
+      case 'markdown':
+        return _textBody(
+            v,
+            (text) => MarkdownBody(
+                data: text, styleSheet: markdownStyle(context)));
+      case 'csv':
+        return _textBody(
+            v,
+            (text) => MarkdownBody(
+                data: _csvMarkdown(text), styleSheet: markdownStyle(context)));
+      case 'code':
+        return _textBody(
+            v,
+            (text) => Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface1,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Text(text,
+                        style: mono(12, height: 1.5, color: AppColors.fg2)),
+                  ),
+                ));
+      case 'image':
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.network(uri.toString(), fit: BoxFit.contain),
+        );
+      default:
+        return _InlineWebPage(key: ValueKey(uri.toString()), uri: uri);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: FutureBuilder<ArtifactVersion?>(
+          future: _version,
+          builder: (context, snap) {
+            if (snap.hasError) return _note('${snap.error}');
+            if (snap.connectionState != ConnectionState.done) return _loading();
+            final v = snap.data;
+            if (v == null) return _note('This artifact is no longer available.');
+            return _body(v);
+          },
+        ),
+      );
+}
+
+String _csvMarkdown(String text) {
+  final rows = _CsvTable(text: text)._rows().take(201).toList();
+  if (rows.isEmpty) return '';
+  final width = rows.map((r) => r.length).reduce((a, b) => a > b ? a : b);
+  String line(List<String> r) =>
+      '| ${List.generate(width, (i) => (i < r.length ? r[i] : '').replaceAll('|', '\\|')).join(' | ')} |';
+  return [
+    line(rows.first),
+    '|${List.filled(width, '---').join('|')}|',
+    for (final r in rows.skip(1)) line(r),
+  ].join('\n');
+}
+
+class _InlineWebPage extends StatefulWidget {
+  const _InlineWebPage({super.key, required this.uri});
+  final Uri uri;
+
+  @override
+  State<_InlineWebPage> createState() => _InlineWebPageState();
+}
+
+class _InlineWebPageState extends State<_InlineWebPage> {
+  static const _report = """
+(function () {
+  if (window.__snippetHeight) return;
+  window.__snippetHeight = true;
+  var last = 0;
+  function send() {
+    var d = document.documentElement, b = document.body;
+    var h = Math.ceil(Math.max(d.scrollHeight, b ? b.scrollHeight : 0, d.offsetHeight));
+    if (h !== last) { last = h; SnippetHeight.postMessage(String(h)); }
+  }
+  new ResizeObserver(send).observe(document.documentElement);
+  if (document.body) new ResizeObserver(send).observe(document.body);
+  window.addEventListener('load', send);
+  send();
+})();
+""";
+
+  double _height = 160;
+  String _bg = '#000000';
+  String _fg = '#ffffff';
+  bool _dark = true;
+
+  static String _hex(Color c) =>
+      '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+
+  String get _theme => """
+(function () {
+  var b = document.body; if (!b) return;
+  var bg = getComputedStyle(b).backgroundColor, hb = getComputedStyle(document.documentElement).backgroundColor;
+  var clear = function (c) { return c === 'rgba(0, 0, 0, 0)' || c === 'transparent'; };
+  if (clear(bg) && clear(hb)) {
+    var s = document.createElement('style');
+    s.textContent = ':root{color-scheme:${_dark ? 'dark' : 'light'}}html,body{background:$_bg;color:$_fg;margin:0}';
+    document.head.appendChild(s);
+  }
+})();
+""";
+
+  late final WebViewController _controller = () {
+    final c = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel('SnippetHeight', onMessageReceived: (m) {
+        final h = double.tryParse(m.message);
+        if (h == null || !mounted) return;
+        final next = h.clamp(40.0, 6000.0);
+        if ((next - _height).abs() > 1) setState(() => _height = next);
+      })
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) {
+          _controller.runJavaScript(_theme);
+          _controller.runJavaScript(_report);
+        },
+      ));
+    if (!kMacOS) c.setBackgroundColor(Colors.transparent);
+    return c..loadRequest(widget.uri);
+  }();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    _bg = _hex(theme.scaffoldBackgroundColor);
+    _fg = _hex(AppColors.fg1);
+    _dark = theme.brightness == Brightness.dark;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      height: _height,
+      child: WebViewWidget(controller: _controller),
+    );
+  }
+}
+
 class ArtifactViewer extends StatefulWidget {
   const ArtifactViewer({
     super.key,
