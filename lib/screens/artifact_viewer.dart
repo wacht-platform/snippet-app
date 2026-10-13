@@ -299,7 +299,11 @@ class ArtifactInline extends StatefulWidget {
   State<ArtifactInline> createState() => _ArtifactInlineState();
 }
 
-class _ArtifactInlineState extends State<ArtifactInline> {
+class _ArtifactInlineState extends State<ArtifactInline>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   late final Future<ArtifactVersion?> _version = _load();
   Future<String>? _text;
 
@@ -381,7 +385,9 @@ class _ArtifactInlineState extends State<ArtifactInline> {
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: FutureBuilder<ArtifactVersion?>(
           future: _version,
@@ -394,6 +400,7 @@ class _ArtifactInlineState extends State<ArtifactInline> {
           },
         ),
       );
+  }
 }
 
 String _csvMarkdown(String text) {
