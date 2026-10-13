@@ -1392,7 +1392,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Autonomous mode',
+                  Text('Automated wakes',
                       style: sans(15,
                           weight: W.strong,
                           height: 20 / 15,
@@ -1510,9 +1510,9 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
       if (widget.onAutonomy != null)
         _row(
             icon: 'activity',
-            label: 'Autonomous mode',
+            label: 'Automated wakes',
             detail:
-                'Checks in, keeps work moving and pings you while you are away',
+                'Wakes on a schedule, keeps work moving and pings you while you are away',
             onTap: widget.onAutonomy),
       if (!widget.hideGoal)
         _row(

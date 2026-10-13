@@ -87,7 +87,7 @@ List<Widget> buildShellRailTools({
     return [
       railTool(
         'activity',
-        tooltip: 'Autonomous mode',
+        tooltip: 'Automated wakes',
         onTap: enabled ? () => onSessionAction('autonomy') : null,
       ),
       railTool(

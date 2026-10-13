@@ -94,7 +94,7 @@ String toolVerb(String tool, {required bool running}) {
     'set_session_title' => ('Titled the chat', 'Titling the chat'),
     'ping_user' => ('Pinged you', 'Pinging you'),
     'update_brief' => ('Updated its brief', 'Updating its brief'),
-    'schedule_followup' => ('Scheduled a check', 'Scheduling a check'),
+    'schedule_wake' || 'schedule_followup' => ('Scheduled a wake-up', 'Scheduling a wake-up'),
     _ => (
         'Used ${toolTitle(tool).toLowerCase()}',
         'Using ${toolTitle(tool).toLowerCase()}'

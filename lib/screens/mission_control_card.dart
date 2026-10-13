@@ -65,15 +65,22 @@ class _MissionControlCardState extends State<MissionControlCard> {
     if (status == 'waiting_for_input') return 'Waiting for you';
     final a = _autonomy;
     if (a != null && a['on'] == true) {
-      if (a['in_quiet_hours'] == true) return 'Autonomous · quiet hours';
+      if (a['in_quiet_hours'] == true) return 'Wakes on · quiet hours';
       final next = (a['next_round_at'] as num?)?.toInt();
       if (next != null && next > 0) {
-        final t = DateTime.fromMillisecondsSinceEpoch(next * 1000);
+        final offset = (a['utc_offset_minutes'] as num?)?.toInt() ??
+            DateTime.now().timeZoneOffset.inMinutes;
+        final t = DateTime.fromMillisecondsSinceEpoch(next * 1000, isUtc: true)
+            .add(Duration(minutes: offset));
         final hh = t.hour.toString().padLeft(2, '0');
         final mm = t.minute.toString().padLeft(2, '0');
-        return 'Autonomous · next round $hh:$mm';
+        final sign = offset < 0 ? '−' : '+';
+        final oh = offset.abs() ~/ 60;
+        final om = offset.abs() % 60;
+        final tz = om == 0 ? 'UTC$sign$oh' : 'UTC$sign$oh:${om.toString().padLeft(2, '0')}';
+        return 'Next wake $hh:$mm $tz';
       }
-      return 'Autonomous';
+      return 'Wakes on';
     }
     return 'Plans, routes and follows up on your work';
   }

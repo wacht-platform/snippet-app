@@ -308,11 +308,11 @@ class AutonomousRound {
 
   String get headline {
     final parts = <String>[
-      if (firstRound) 'Autonomy switched on',
+      if (firstRound) 'Automated wakes switched on',
       '${open.length} open',
       if (changed.isNotEmpty) '${changed.length} changed',
       if (due.isNotEmpty)
-        '${due.length} follow-up${due.length == 1 ? '' : 's'} due',
+        '${due.length} wake-up${due.length == 1 ? '' : 's'} due',
     ];
     return parts.join(' · ');
   }
@@ -328,8 +328,8 @@ class AutonomousRound {
       out.writeln();
     }
 
-    section('Follow-ups due', due);
-    section('Changed since last round', changed);
+    section('Wake-ups due', due);
+    section('Changed since last wake', changed);
     section('Open work', open);
     section('Scheduled', scheduled);
     if (quiet)
@@ -359,7 +359,9 @@ String _roundTime(String raw) {
 
 AutonomousRound? parseAutonomousRound(String text) {
   final t = text.trim();
-  if (!t.startsWith('[autonomous_round]')) return null;
+  if (!t.startsWith('[automated_wake]') && !t.startsWith('[autonomous_round]')) {
+    return null;
+  }
   final lines = t.split('\n');
   String field(String name) {
     for (final l in lines) {
@@ -374,7 +376,9 @@ AutonomousRound? parseAutonomousRound(String text) {
     final items = <String>[];
     for (final l in lines.skip(start + 1)) {
       final line = l.trim();
-      if (line.startsWith('## ') || line.startsWith('[/autonomous_round]'))
+      if (line.startsWith('## ') ||
+          line.startsWith('[/automated_wake]') ||
+          line.startsWith('[/autonomous_round]'))
         break;
       if (line.startsWith('- ')) items.add(line.substring(2));
     }
@@ -383,12 +387,16 @@ AutonomousRound? parseAutonomousRound(String text) {
 
   return AutonomousRound(
     time: _roundTime(field('time')),
-    firstRound: field('last round').startsWith('never'),
+    firstRound: (field('last wake').isEmpty ? field('last round') : field('last wake'))
+        .startsWith('never'),
     quiet: field('quiet hours').startsWith('yes'),
-    changed: section('Changed since last round').map(_taskLine).toList(),
+    changed: [
+      ...section('Changed since last wake'),
+      ...section('Changed since last round'),
+    ].map(_taskLine).toList(),
     open: section('Open work').map(_taskLine).toList(),
-    due: section('Follow-ups due now'),
-    scheduled: section('Follow-ups scheduled'),
+    due: [...section('Wake-ups due now'), ...section('Follow-ups due now')],
+    scheduled: [...section('Wake-ups scheduled'), ...section('Follow-ups scheduled')],
   );
 }
 

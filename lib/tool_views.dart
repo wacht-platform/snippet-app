@@ -66,7 +66,7 @@ String toolArgSummary(String tool, dynamic args) {
         ? 'saved tool output'
         : s('AbsolutePath'),
     'ping_user' => s('title'),
-    'schedule_followup' => s('note'),
+    'schedule_wake' || 'schedule_followup' => s('note'),
     _ => '',
   };
   if (v.isNotEmpty) return first(v);

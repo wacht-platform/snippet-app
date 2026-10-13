@@ -990,8 +990,8 @@ class _DesktopShellState extends State<DesktopShell>
         act('focus_composer', 'edit', 'Focus the composer', shortcut: '⌘ L'),
       ],
       if (inSession && mc) ...[
-        act('autonomy', 'activity', 'Autonomous mode',
-            keywords: const ['mission control', 'settings', 'quiet hours']),
+        act('autonomy', 'activity', 'Automated wakes',
+            keywords: const ['mission control', 'settings', 'quiet hours', 'autonomous', 'wake']),
         act('compact', 'wrap', 'Compact history'),
         act('memory', 'brain', 'Mission Control memory'),
       ],

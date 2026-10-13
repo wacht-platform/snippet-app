@@ -258,7 +258,7 @@ class AutonomousRoundCard extends StatelessWidget {
   Widget build(BuildContext context) => _ThreadCard(
         icon: 'activity',
         tone: round.due.isNotEmpty ? Tone.run : Tone.neutral,
-        kind: 'Autonomous round',
+        kind: 'Automated wake',
         title: round.headline,
         status: _roundTime(round.time),
         body: round.markdown,
@@ -268,7 +268,7 @@ class AutonomousRoundCard extends StatelessWidget {
 
 String _roundTime(String time) {
   final parts = time.trim().split(RegExp(r'\s+'));
-  if (parts.length < 2) return time.isEmpty ? 'Round' : time;
+  if (parts.length < 2) return time.isEmpty ? 'Wake' : time;
   return '${parts.first} ${parts.last}';
 }
 

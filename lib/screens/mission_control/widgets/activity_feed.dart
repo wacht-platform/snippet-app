@@ -78,7 +78,7 @@ class _FeedRow extends StatelessWidget {
       BoardMessageItem b => _BoardMessageRow(message: b.message),
       AutonomousRoundItem r => _EnvelopeRow(
           color: r.round.due.isNotEmpty ? AppColors.run : AppColors.fg4,
-          title: 'Autonomous round',
+          title: 'Automated wake',
           meta: r.round.time,
           body: r.round.headline),
       WorkerQuestionItem w => _EnvelopeRow(
