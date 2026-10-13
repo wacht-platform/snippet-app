@@ -4,6 +4,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import 'highlight.dart';
+import 'screens/artifact_viewer.dart' show MermaidDiagram, canRenderMermaid;
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -109,6 +110,9 @@ class PreBlockBuilder extends MarkdownElementBuilder {
         if (cls.startsWith('language-')) lang = cls.substring(9);
         break;
       }
+    }
+    if (lang.trim().toLowerCase() == 'mermaid' && canRenderMermaid) {
+      return MermaidDiagram(code: code);
     }
     return _MdCodeBlock(code: code, language: lang);
   }
