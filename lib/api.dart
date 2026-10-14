@@ -268,6 +268,7 @@ class DaemonClient {
     String? reasoningEffort,
     bool? supportsImages,
     int? contextWindow,
+    int? compactAtPct,
     bool? stream,
     bool? xSearch,
     bool setActive = false,
@@ -286,6 +287,9 @@ class DaemonClient {
       body['reasoning_effort'] = reasoningEffort;
     }
     if (supportsImages != null) body['supports_images'] = supportsImages;
+    if (compactAtPct != null && compactAtPct >= 10 && compactAtPct <= 100) {
+      body['compact_at_pct'] = compactAtPct;
+    }
     if (contextWindow != null && contextWindow > 0) {
       body['context_window'] = contextWindow;
     }

@@ -40,6 +40,7 @@ class InferenceProfile {
   final bool hasKey;
   final bool active;
   final int contextWindow;
+  final int compactAtPct;
   final String reasoningEffort; // '' = provider default
   final bool stream; // force the streaming wire protocol (stream-only models)
   final bool? supportsImages; // null on daemons that don't report it yet
@@ -53,6 +54,7 @@ class InferenceProfile {
         'has_key': hasKey,
         'active': value,
         'context_window': contextWindow,
+        'compact_at_pct': compactAtPct,
         'reasoning_effort': reasoningEffort,
         'stream': stream,
         'supports_images': supportsImages,
@@ -67,6 +69,7 @@ class InferenceProfile {
         hasKey = j['has_key'] == true,
         active = j['active'] == true,
         contextWindow = (j['context_window'] as num?)?.toInt() ?? 0,
+        compactAtPct = (j['compact_at_pct'] as num?)?.toInt() ?? 90,
         reasoningEffort = j['reasoning_effort'] as String? ?? '',
         stream = j['stream'] == true,
         supportsImages =
