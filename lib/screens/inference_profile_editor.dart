@@ -78,6 +78,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   late final TextEditingController _baseUrl;
   late final TextEditingController _model;
   late final TextEditingController _ctx;
+  late final TextEditingController _compact;
   final _key = TextEditingController();
   bool _showKey = false;
   late bool _images;
@@ -117,6 +118,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     _model = TextEditingController(text: e?.model ?? '');
     _ctx = TextEditingController(
         text: (e?.contextWindow ?? 0) > 0 ? '${e!.contextWindow}' : '');
+    _compact = TextEditingController(text: '${e?.compactAtPct ?? 90}');
     // Editing keeps the profile's actual flag — falling back to the provider
     // default silently reset it on every unrelated edit.
     _images = e?.supportsImages ?? _defaultImages(_provider);
@@ -193,6 +195,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     _baseUrl.dispose();
     _model.dispose();
     _ctx.dispose();
+    _compact.dispose();
     _key.dispose();
     _modelSearch.dispose();
     _reasoningDebounce?.cancel();
@@ -444,6 +447,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             _key.text.trim().isNotEmpty || (widget.existing?.hasKey ?? false),
         'active': _active || (widget.existing?.active ?? false),
         'context_window': int.tryParse(_ctx.text.trim()) ?? 0,
+        'compact_at_pct': int.tryParse(_compact.text.trim()) ?? 90,
         'reasoning_effort': _effortToSave,
         'stream': _stream,
         'supports_images': _images,
@@ -480,6 +484,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       reasoningEffort: _effortToSave,
       supportsImages: _images,
       contextWindow: int.tryParse(_ctx.text.trim()),
+      compactAtPct: int.tryParse(_compact.text.trim()),
       stream: _stream,
       xSearch: _isXai ? _xSearch : null,
       setActive: _active,
@@ -585,6 +590,16 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             hint: 'e.g. 200000 — blank keeps the default',
             helper:
                 'Sets the % context gauge and the point where the agent compacts history.',
+          ),
+          const SizedBox(height: 16),
+          AppField(
+            label: 'Compact at (% of context window)',
+            controller: _compact,
+            mono: true,
+            keyboardType: TextInputType.number,
+            hint: '10–100, e.g. 75',
+            helper:
+                'Lower keeps each step cheaper; the agent saves its working state to memory first.',
           ),
           const SizedBox(height: 16),
           Text('${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort',
@@ -924,6 +939,13 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             controller: _ctx,
             keyboardType: TextInputType.number,
             hint: 'Tokens, e.g. 200000',
+          ),
+          _gap(),
+          AppField(
+            label: 'Compact at',
+            controller: _compact,
+            keyboardType: TextInputType.number,
+            hint: '% of the context window, e.g. 75',
           ),
         ]),
         _section(

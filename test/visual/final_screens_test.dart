@@ -77,6 +77,7 @@ class _FakeDaemon extends DaemonClient {
     String? reasoningEffort,
     bool? supportsImages,
     int? contextWindow,
+    int? compactAtPct,
     bool? stream,
     bool? xSearch,
     bool setActive = false,
