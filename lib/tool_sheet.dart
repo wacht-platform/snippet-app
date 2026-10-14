@@ -520,6 +520,14 @@ class _TimelineStep extends StatelessWidget {
     }
   }
 
+  String? _imagePath(BuildContext context) {
+    if (step.tool != 'view_image' || step.running || step.failed) return null;
+    if (DaemonScope.maybeOf(context) == null) return null;
+    final a = step.args is Map ? step.args as Map : const {};
+    final path = (_data(step)['path'] ?? a['path'] ?? '').toString().trim();
+    return path.startsWith('/') ? path : null;
+  }
+
   bool get _monoSub => step.tool == 'bash' || step.tool == 'change_files';
 
   Widget? _meta() {
@@ -664,6 +672,19 @@ class _TimelineStep extends StatelessWidget {
               if (open && openable) ...[
                 const SizedBox(height: 10),
                 _StepBody(step: step, onShowAll: onShowAll),
+              ] else if (_imagePath(context) case final path?) ...[
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(R.sm),
+                    child: ImageThumb(
+                        client: DaemonScope.maybeOf(context)!,
+                        path: path,
+                        width: 160,
+                        height: 100),
+                  ),
+                ),
               ],
             ],
           ),
