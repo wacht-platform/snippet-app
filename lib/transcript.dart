@@ -547,6 +547,9 @@ class SystemRow extends StatelessWidget {
     if (step == 'history_compacted') {
       return _SystemDivider(label: 'context compacted');
     }
+    if (step == 'idle_memory_save') {
+      return _SystemDivider(label: 'saved memory while you were away');
+    }
     if (step == 'history_compaction_pass' ||
         step == 'history_compaction_skipped') {
       return const SizedBox.shrink();
