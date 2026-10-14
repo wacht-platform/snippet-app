@@ -36,6 +36,7 @@ import 'tasks/task_common.dart' show openTaskDetail;
 import 'pull_requests.dart';
 import '../github_models.dart';
 import 'presented_file_card.dart';
+import '../composer_strip.dart';
 import '../media_views.dart';
 import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';
@@ -319,7 +320,7 @@ class _SessionScreenState extends State<SessionScreen>
   final ValueNotifier<int> _recorderTick = ValueNotifier(0);
   Duration _playbackPosition = Duration.zero;
   Duration _playbackDuration = Duration.zero;
-  final List<double> _waveform = [];
+  final WaveBuffer _waveform = WaveBuffer();
   // Queue frames already sent but not yet in `state.queuedInputs` (the daemon
   // parks them until the in-flight step ends). Shown immediately so the
   // composer doesn't sit empty for a whole tool call.

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -690,6 +691,140 @@ class _VoiceNoteState extends State<VoiceNote> {
       ),
     );
   }
+}
+
+class WaveBuffer {
+  final List<double> samples = [];
+  int total = 0;
+
+  void add(double level) {
+    samples.add(level);
+    total++;
+    if (samples.length > 180) samples.removeAt(0);
+  }
+
+  void clear() {
+    samples.clear();
+    total = 0;
+  }
+}
+
+class LiveRecordingWave extends StatefulWidget {
+  const LiveRecordingWave(
+      {super.key,
+      required this.buffer,
+      this.live = true,
+      this.progress,
+      this.interval = const Duration(milliseconds: 120)});
+
+  final WaveBuffer buffer;
+  final bool live;
+  final double? progress;
+  final Duration interval;
+
+  @override
+  State<LiveRecordingWave> createState() => _LiveRecordingWaveState();
+}
+
+class _LiveRecordingWaveState extends State<LiveRecordingWave>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker;
+  final _phase = ValueNotifier<double>(1);
+  int _seen = -1;
+  Duration _stamp = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker(_tick);
+    if (widget.live) _ticker.start();
+  }
+
+  @override
+  void didUpdateWidget(LiveRecordingWave old) {
+    super.didUpdateWidget(old);
+    if (widget.live && !_ticker.isActive) {
+      _seen = -1;
+      _ticker.start();
+    } else if (!widget.live && _ticker.isActive) {
+      _ticker.stop();
+      _phase.value = 1;
+    }
+  }
+
+  void _tick(Duration elapsed) {
+    final total = widget.buffer.total;
+    if (total != _seen) {
+      _seen = total;
+      _stamp = elapsed;
+    }
+    _phase.value = ((elapsed - _stamp).inMicroseconds /
+            widget.interval.inMicroseconds)
+        .clamp(0.0, 1.0);
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    _phase.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: _SmoothWave(widget.buffer, _phase,
+              live: widget.live, progress: widget.progress),
+        ),
+      );
+}
+
+class _SmoothWave extends CustomPainter {
+  _SmoothWave(this.buffer, this.phase, {required this.live, this.progress})
+      : total = buffer.total,
+        super(repaint: phase);
+
+  final WaveBuffer buffer;
+  final ValueNotifier<double> phase;
+  final bool live;
+  final double? progress;
+  final int total;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const step = 5.0;
+    final samples = buffer.samples;
+    if (samples.isEmpty || size.width <= 0) return;
+    canvas.clipRect(Offset.zero & size);
+    final f = live ? phase.value : 1.0;
+    final eased = Curves.easeOutCubic.transform(f);
+    final count = (size.width / step).ceil() + 1;
+    final start = math.max(0, samples.length - count);
+    final n = samples.length - start;
+    final shift = (1 - eased) * step;
+    final paint = Paint()
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    final mid = size.height / 2;
+    for (var i = 0; i < n; i++) {
+      final x = size.width - (n - 1 - i) * step - step / 2 + shift;
+      if (x < -step) continue;
+      var level = samples[start + i].clamp(0.06, 1.0);
+      if (live && i == n - 1) level = 0.06 + (level - 0.06) * eased;
+      final half = (size.height * 0.48 * level).clamp(1.5, size.height * 0.48);
+      final played = progress == null || (i / n) <= progress!;
+      paint.color = played ? AppColors.accent : AppColors.fg4;
+      canvas.drawLine(Offset(x, mid - half), Offset(x, mid + half), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SmoothWave old) =>
+      old.total != total ||
+      old.progress != progress ||
+      old.live != live ||
+      old.buffer != buffer;
 }
 
 class LiveWave extends CustomPainter {

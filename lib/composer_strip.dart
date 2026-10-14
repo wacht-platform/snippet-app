@@ -136,3 +136,71 @@ class StripIcon extends StatelessWidget {
         ),
       );
 }
+
+class DesktopRecorderStrip extends StatelessWidget {
+  const DesktopRecorderStrip({
+    super.key,
+    required this.recording,
+    required this.time,
+    required this.wave,
+    required this.playing,
+    required this.onDiscard,
+    required this.onPlay,
+    required this.onStop,
+    required this.onSend,
+  });
+
+  final bool recording;
+  final String time;
+  final Widget wave;
+  final bool playing;
+  final VoidCallback onDiscard;
+  final VoidCallback onPlay;
+  final VoidCallback onStop;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 40,
+            padding: EdgeInsets.fromLTRB(recording ? 14 : 6, 0, 6, 0),
+            decoration: BoxDecoration(
+              color: AppColors.raised,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(children: [
+              if (recording)
+                StatusDot(status: 'running', size: 8, color: AppColors.danger)
+              else ...[
+                StripIcon('trash', tooltip: 'Discard', onTap: onDiscard),
+                StripIcon(playing ? 'pause' : 'play',
+                    tooltip: playing ? 'Pause' : 'Play', onTap: onPlay),
+              ],
+              const SizedBox(width: 10),
+              Expanded(child: SizedBox(height: 22, child: wave)),
+              const SizedBox(width: 10),
+              Text(time,
+                  style: sans(12,
+                      tabular: true,
+                      color: recording ? AppColors.danger : AppColors.fg3)),
+              const SizedBox(width: 8),
+              recording
+                  ? StripSendButton(enabled: true, stop: true, onTap: onStop)
+                  : StripSendButton(enabled: true, onTap: onSend),
+            ]),
+          ),
+          Container(
+            height: 30,
+            padding: const EdgeInsets.only(left: 6, top: 4),
+            alignment: Alignment.centerLeft,
+            child: Text(
+                recording ? 'Recording' : 'Voice note ready to send',
+                style: sans(12, color: AppColors.fg4)),
+          ),
+        ],
+      );
+}

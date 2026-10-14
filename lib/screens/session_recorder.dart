@@ -95,10 +95,6 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
         final level = ((a.current + 60) / 60).clamp(0.04, 1.0).toDouble();
         if (!mounted) return;
         _waveform.add(level);
-        // Keep a denser rolling waveform so the bars stay close together
-        // when the strip spans the full composer width.
-        if (_waveform.length > 180) _waveform.removeAt(0);
-        _recorderTick.value++;
       });
       _recordingTimer?.cancel();
       _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -294,6 +290,19 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
     final progress = !reviewing || total <= 0
         ? null
         : (_playbackPosition.inMilliseconds / total).clamp(0.0, 1.0);
+    if (!kMobile) {
+      return DesktopRecorderStrip(
+        recording: _isRecording,
+        time: _audioTime(position),
+        wave: LiveRecordingWave(
+            buffer: _waveform, live: _isRecording, progress: progress),
+        playing: _isPlayingRecording,
+        onDiscard: () => unawaited(_discardRecording()),
+        onPlay: () => unawaited(_toggleRecordingPlayback()),
+        onStop: () => unawaited(_stopRecording()),
+        onSend: () => unawaited(_sendMessage()),
+      );
+    }
     Widget roundBtn(String icon, String tip, VoidCallback onTap,
             {Color? fill, Color? ink}) =>
         Tooltip(
@@ -354,9 +363,8 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
               SizedBox(
                 height: 30,
                 width: double.infinity,
-                child: CustomPaint(
-                    painter: LiveWave(List<double>.of(_waveform),
-                        progress: progress)),
+                child: LiveRecordingWave(
+                    buffer: _waveform, live: _isRecording, progress: progress),
               ),
             ],
           ),

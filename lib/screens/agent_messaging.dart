@@ -377,7 +377,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   Duration _recordingElapsed = Duration.zero;
   Duration _playbackPosition = Duration.zero;
   bool _isPlayingRecording = false;
-  final List<double> _waveform = [];
+  final WaveBuffer _waveform = WaveBuffer();
 
   @override
   void initState() {
@@ -528,10 +528,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           .listen((a) {
         final level = ((a.current + 60) / 60).clamp(0.04, 1.0).toDouble();
         if (!mounted) return;
-        setState(() {
-          _waveform.add(level);
-          if (_waveform.length > 180) _waveform.removeAt(0);
-        });
+        _waveform.add(level);
       });
       _recordingTimer?.cancel();
       _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -1121,6 +1118,18 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   Widget _mobileRecorder() {
     final reviewing = !_isRecording && _recordingPath != null;
     final position = reviewing ? _playbackPosition : _recordingElapsed;
+    if (!kMobile) {
+      return DesktopRecorderStrip(
+        recording: _isRecording,
+        time: _audioTime(position),
+        wave: LiveRecordingWave(buffer: _waveform, live: _isRecording),
+        playing: _isPlayingRecording,
+        onDiscard: () => unawaited(_discardRecording()),
+        onPlay: () => unawaited(_toggleRecordingPlayback()),
+        onStop: () => unawaited(_stopRecording()),
+        onSend: () => unawaited(_send()),
+      );
+    }
     Widget roundBtn(String icon, String tip, VoidCallback onTap,
             {Color? fill, Color? ink}) =>
         Tooltip(
@@ -1181,8 +1190,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               SizedBox(
                 height: 30,
                 width: double.infinity,
-                child:
-                    CustomPaint(painter: LiveWave(List<double>.of(_waveform))),
+                child: LiveRecordingWave(
+                    buffer: _waveform, live: _isRecording),
               ),
             ],
           ),
@@ -1273,6 +1282,12 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     ]);
   }
 
+  Widget _wideCap(Widget child) => kMobile
+      ? child
+      : Center(
+          child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 740), child: child));
+
   Widget _desktopStrip() => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1318,6 +1333,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
             ),
             footer: [
               StripIcon('plus', tooltip: 'Attach', onTap: _onAttachTap),
+              const Spacer(),
               if (kCanRecord)
                 StripIcon(_isRecording ? 'mic-off' : 'mic',
                     tooltip: 'Record',
@@ -1348,9 +1364,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               : 'composer',
           alignment: Alignment.bottomCenter,
           child: (_isRecording || _recordingPath != null)
-              ? _mobileRecorder()
+              ? _wideCap(_mobileRecorder())
               : !kMobile
-                  ? _desktopStrip()
+                  ? _wideCap(_desktopStrip())
                   : Container(
                   decoration: BoxDecoration(
                     color: AppColors.raised,
