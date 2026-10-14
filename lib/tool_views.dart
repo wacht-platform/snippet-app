@@ -395,8 +395,9 @@ String _previewLines(String text, {int maxLines = 6}) {
 
 List<Widget> _bashView(Map? a, Map? d) {
   final cmd = _displayText(a?['command']?.toString() ?? '').trimRight();
-  final stdout =
-      _previewLines(_displayText(d?['stdout']?.toString() ?? '').trimRight());
+  final stdout = _previewLines(_displayText(
+          (d?['stdout'] ?? d?['output_so_far'])?.toString() ?? '')
+      .trimRight());
   final stderr =
       _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
   final exit = (d?['exit_code'] as num?)?.toInt();
@@ -410,6 +411,8 @@ List<Widget> _bashView(Map? a, Map? d) {
         stdout: stdout,
         stderr: stderr,
         exitCode: exit,
+        background: d?['background'] == true,
+        movedAfter: (d?['moved_after_secs'] as num?)?.toInt(),
         showCommand: labelled)
   ];
 }
@@ -770,6 +773,8 @@ class _ShellPanel extends StatelessWidget {
   final String stderr;
   final int? exitCode;
   final bool failed;
+  final bool background;
+  final int? movedAfter;
   final bool showCommand;
   const _ShellPanel(
       {required this.command,
@@ -777,6 +782,8 @@ class _ShellPanel extends StatelessWidget {
       required this.stderr,
       this.exitCode,
       this.failed = false,
+      this.background = false,
+      this.movedAfter,
       this.showCommand = false});
 
   @override
@@ -804,7 +811,12 @@ class _ShellPanel extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
       trailing: [
-        if (exitCode != null)
+        if (background)
+          Tag(movedAfter != null
+                  ? 'Background after ${movedAfter}s'
+                  : 'Background',
+              tone: Tone.run)
+        else if (exitCode != null)
           Tag('exit $exitCode',
               tone: exitCode == 0 ? Tone.ok : Tone.danger, mono: true)
         else if (failed)

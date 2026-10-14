@@ -541,6 +541,11 @@ class _TimelineStep extends StatelessWidget {
     }
     final d = _data(step);
     final exit = (d['exit_code'] as num?)?.toInt();
+    if (step.tool == 'bash' && d['background'] == true) {
+      final moved = (d['moved_after_secs'] as num?)?.toInt();
+      return Text(moved != null ? 'background after ${moved}s' : 'background',
+          style: sans(12, color: AppColors.run, tabular: true));
+    }
     if (step.tool == 'bash' && exit != null) {
       return Text('exit $exit',
           style: sans(12,
