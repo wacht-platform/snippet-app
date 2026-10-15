@@ -598,16 +598,16 @@ class SettingsPanelState extends State<SettingsPanel> {
         ),
         label('Models'),
         ListGroup(children: [
-          nav(SettingsPage.models, 'Profiles', 'Models and keys', 'ai-chip'),
-          nav(SettingsPage.routing, 'Routing', 'Fallback models', 'transfer'),
-          nav(SettingsPage.usage, 'Usage', 'Tokens and spend', 'analytics'),
+          nav(SettingsPage.models, 'Profiles', 'Models and keys', 'sparkles'),
+          nav(SettingsPage.routing, 'Routing', 'Fallback models', 'route'),
+          nav(SettingsPage.usage, 'Usage', 'Tokens and spend', 'gauge'),
         ]),
         label('Work'),
         ListGroup(children: [
-          nav(SettingsPage.memory, 'Memory', 'What agents remember', 'brain'),
+          nav(SettingsPage.memory, 'Memory', 'What agents remember', 'book-marked'),
           ApprovalsRow(client: widget.client),
-          nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock-key'),
-          nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'repeat'),
+          nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock'),
+          nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'calendar-clock'),
         ]),
         if (kCanNotify) ...[
           label('Phone'),
@@ -1103,6 +1103,9 @@ class SettingsPanelState extends State<SettingsPanel> {
         if (!kMobile) ...[
           const IconTile('bell'),
           const SizedBox(width: S.s12),
+        ] else ...[
+          AppIcon('bell', size: 19, color: AppColors.fg3),
+          const SizedBox(width: S.s12),
         ],
         Expanded(
           child: Column(
@@ -1231,7 +1234,8 @@ class _ApprovalsRowState extends State<ApprovalsRow> {
       builder: (anchor) => ListRow(
         title: 'Approvals',
         subtitle: kMobile ? null : 'Applies to every session on this machine',
-        leading: AppIcon('shield', size: 19, color: AppColors.fg3),
+        leading: AppIcon(kMobile ? 'shield-check' : 'shield',
+            size: 19, color: AppColors.fg3),
         onTap: () => _pick(anchor),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           Text(manual == null ? '' : (manual ? 'Ask' : 'Yolo'),
