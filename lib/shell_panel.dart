@@ -12,6 +12,7 @@ enum ShellPanelPurpose {
   recurring,
   processes,
   files,
+  file,
   task,
   tasks,
   agents,
@@ -50,6 +51,7 @@ class ShellPanelRequest {
         ShellPanelPurpose.autonomy => 'Automated wakes',
         ShellPanelPurpose.lanes => id.isEmpty ? 'Delegated lanes' : 'Lane',
         ShellPanelPurpose.recurring => 'Scheduled jobs',
+        ShellPanelPurpose.file => id.split('/').last,
         _ => '${purpose.name[0].toUpperCase()}${purpose.name.substring(1)}',
       };
   void complete() {

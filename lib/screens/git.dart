@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -203,18 +204,27 @@ class _GitScreenState extends State<GitScreen> {
   }
 
   void _openDiff(GitFile f) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => GitFileDiffView(
+    Widget view() => GitFileDiffView(
           client: widget.client,
           sessionId: _repo,
           file: f.path,
           staged: f.staged && !f.unstaged, // staged-only files show index diff
           untracked: f.untracked,
-        ),
-      ),
-    );
+        );
+    if (!kMobile && ShellPanelRoot.of(context) == null) {
+      presentScreen<void>(
+        context,
+        style: PanelStyle.drawer,
+        purpose: ShellPanelPurpose.file,
+        panelId: 'diff:${f.path}',
+        originClient: widget.client,
+        maxWidth: 1060,
+        maxHeight: 760,
+        builder: (_, __) => view(),
+      );
+      return;
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => view()));
   }
 
   Future<void> _branchSheet([BuildContext? anchor]) async {

@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../media_views.dart';
-import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'editor.dart';
 import 'file_viewer.dart';
 
 /// A file the agent handed over with `present_file`: a card on a phone and a
@@ -54,11 +52,7 @@ class PresentedFileCard extends StatelessWidget {
       onOpenFileTab!(path, _name);
       return;
     }
-    presentScreen(
-      context,
-      builder: (_, close) =>
-          EditorScreen(client: client, path: path, name: _name, onClose: close),
-    );
+    presentFileOnDesktop(context, client: client, path: path, name: _name);
   }
 
   Future<void> _download(BuildContext context) async {

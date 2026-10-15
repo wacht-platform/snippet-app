@@ -89,6 +89,25 @@ bool openFileForViewing(
   return true;
 }
 
+Future<void> presentFileOnDesktop(
+  BuildContext context, {
+  required DaemonClient client,
+  required String path,
+  required String name,
+}) {
+  return presentScreen<void>(
+    context,
+    style: PanelStyle.drawer,
+    purpose: ShellPanelPurpose.file,
+    panelId: path,
+    originClient: client,
+    maxWidth: 1060,
+    maxHeight: 760,
+    builder: (_, close) =>
+        FileViewer(client: client, path: path, name: name, onClose: close),
+  );
+}
+
 /// Read-only viewer for one file.
 class FileViewer extends StatefulWidget {
   final DaemonClient client;
