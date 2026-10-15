@@ -103,7 +103,6 @@ class _RoutingScreenState extends State<RoutingScreen> {
       ListRow(
         title: title,
         subtitle: summary,
-        selected: open,
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           if (chosen.any(limited.containsKey))
             const Padding(
@@ -141,7 +140,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
       return Container(
         key: ValueKey('$key-$name'),
         height: kMobile ? 48 : 36,
-        padding: const EdgeInsets.only(left: S.s16, right: S.s8),
+        padding: EdgeInsets.only(left: kMobile ? S.s16 : S.s12, right: S.s8),
         child: Row(children: [
           Expanded(
             child: GestureDetector(
@@ -193,7 +192,8 @@ class _RoutingScreenState extends State<RoutingScreen> {
       padding: const EdgeInsets.only(bottom: S.s8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(S.s16, 0, S.s16, S.s8),
+          padding: EdgeInsets.fromLTRB(
+              kMobile ? S.s16 : S.s12, 0, kMobile ? S.s16 : S.s12, S.s8),
           child: Text(about, style: TS.meta()),
         ),
         ReorderableListView(
@@ -234,14 +234,35 @@ class _RoutingScreenState extends State<RoutingScreen> {
                   Btn('Retry', small: true, onTap: () => _load(force: true)),
             );
     } else {
-      body = PageBody(children: [
-        ListGroup(children: [
-          for (final (key, title, about) in _routeDefs)
-            _routeRow(key, title, about),
-        ]),
-        const SettingsNote(
-            'The first model in a route does the work. When it hits a usage limit, the work moves to the next one and stays there. Chats you are in ask you before switching.'),
-      ]);
+      final side = kMobile ? S.s4 : S.s12;
+      body = Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 720 + side * 2),
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(side, S.s8, side, S.s40),
+            children: [
+              for (var i = 0; i < _routeDefs.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: kMobile ? S.s16 : S.s12,
+                      endIndent: kMobile ? S.s16 : S.s12,
+                      color: AppColors.line),
+                _routeRow(
+                    _routeDefs[i].$1, _routeDefs[i].$2, _routeDefs[i].$3),
+              ],
+              Padding(
+                padding:
+                    EdgeInsets.symmetric(horizontal: kMobile ? S.s12 : S.s8),
+                child: const SettingsNote(
+                    'The first model in a route does the work. When it hits a usage limit, the work moves to the next one and stays there. Chats you are in ask you before switching.'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     if (widget.embedded && widget.onBack != null) {
       return Column(
