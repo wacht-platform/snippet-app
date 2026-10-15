@@ -133,6 +133,29 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     _load();
   }
 
+  Future<void> _pickFilter(BuildContext anchor) async {
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 240,
+      items: [
+        for (final (key, label) in _filters)
+          appMenuRow<String>(
+            value: key,
+            icon: switch (key) {
+              'review' => 'eye',
+              'mine' => 'user',
+              'closed' => 'check-circle',
+              _ => 'git-branch',
+            },
+            label: label,
+            selected: key == _filter,
+          ),
+      ],
+    );
+    if (picked != null && picked != _filter) _pick(picked);
+  }
+
   Future<void> _open(PrSummary pr) => _openNumber(pr.number);
 
   Future<void> _openNumber(int number) async {
@@ -302,17 +325,17 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
       child: SafeArea(
         bottom: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          MobileBackBar(
-            title: 'Pull requests',
-            subtitle: widget.status.repo,
-            onBack: widget.onClose ?? () => Navigator.maybePop(context),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Pills<String>(
-                  items: _filters, selected: _filter, onSelect: _pick),
+          Builder(
+            builder: (anchor) => MobileBackBar(
+              title: switch (_filter) {
+                'review' => 'Needs your review',
+                'mine' => 'My pull requests',
+                'closed' => 'Closed pull requests',
+                _ => 'Open pull requests',
+              },
+              subtitle: widget.status.repo,
+              chevron: true,
+              onTitleTap: () => _pickFilter(anchor),
             ),
           ),
           Expanded(

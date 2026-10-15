@@ -1260,7 +1260,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             MobileBackBar(
               title: title,
               subtitle: 'Actions',
-              onBack: () => _scaffoldKey.currentState?.closeEndDrawer(),
               onTitleTap: () {},
             ),
             const SizedBox(height: 8),
