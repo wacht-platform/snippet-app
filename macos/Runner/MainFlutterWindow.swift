@@ -9,14 +9,9 @@ class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     self.contentViewController = flutterViewController
-    // Floor for resizing. Below this the three-pane desktop layout
-    // (sidebar 300 + chat + secondary pane 280) has no room and the chrome
-    // starts clipping, so the window refuses to go smaller.
-    //
-    // Deliberately BELOW the Flutter desktop breakpoint (900) so the
-    // narrow-desktop drawer layout stays reachable between 800 and 900 —
-    // pinning the floor at 900 would make that path dead code on macOS.
-    self.minSize = NSSize(width: 800, height: 600)
+    // Floor for resizing: sidebar, a readable chat column and the session's
+    // file tree side by side. Below this the desktop layout clips.
+    self.minSize = NSSize(width: 1100, height: 700)
     let shellColor = NSColor(srgbRed: 0x15 / 255.0, green: 0x15 / 255.0, blue: 0x16 / 255.0, alpha: 1)
     self.isOpaque = true
     self.backgroundColor = shellColor

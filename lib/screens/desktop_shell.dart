@@ -570,61 +570,24 @@ class _DesktopShellState extends State<DesktopShell>
         ].any((x) => x);
 
     _termHosts[key] = host;
-    // Capture BEFORE assigning: the un-minimize check below compares against
-    // the previous value, and assigning first made it permanently false.
-    final wasOpen = _termPaneOpen[key] ?? false;
     _termPaneOpen[key] = open;
 
     // A terminal is a TAB like anything else: reconcile the strip against the
     // session's live list so a new pty gets a tab and an exited one loses it.
     final tabsChanged = _reconcileTermTabs(key, host);
 
-    // A terminal created from the SIDEBAR must reveal its pane: creating is the
-    // sidebar's job, showing the result is the shell's.
-    if (prevTerms.isEmpty && hostTerms.isNotEmpty) {
-      _rightCollapsed = false;
-      _showTabPane(key, host);
-    }
-    // An explicit open from the sidebar un-minimizes. Without this, tapping a
-    // terminal in the sidebar would flip the session's flag while the shell kept
-    // showing nothing.
-    if (open && !wasOpen && hostTerms.isNotEmpty) {
-      _rightCollapsed = false;
-      _showTabPane(key, host);
-    }
     if ((changed || tabsChanged) && mounted) setState(() {});
   }
 
-  /// Reveal the pane holding a session's terminal tab.
-  void _showTabPane(String sessionKey, TerminalHost host) {
-    final id = host.activeId;
-    if (id == null) return;
-    for (final t in _tabs) {
-      if (t.isTerminal && t.termSessionKey == sessionKey && t.termId == id) {
-        // A terminal is AUXILIARY: selecting it docks it in its pane without
-        // moving the window bar's selection.
-        _dockAux(t.pane, t.key);
-        return;
-      }
-    }
-  }
-
-  /// Add tabs for new terminals and drop tabs whose pty is gone.
+  /// Session terminals live in the session's own dock; drop any tab for one.
   ///
   /// Returns true when the tab list changed, so the caller can repaint.
   bool _reconcileTermTabs(String sessionKey, TerminalHost host) {
-    final live = {for (final t in host.terms) t.id: t};
     var changed = false;
 
-    // Gone: the pty exited or the sidebar destroyed it. Remove the TAB only —
-    // never `_clearTabState`, which is keyed by session and would wipe the host
-    // shared with this session's other terminals.
     final stale = [
       for (final t in _tabs)
-        if (t.isTerminal &&
-            t.termSessionKey == sessionKey &&
-            !live.containsKey(t.termId))
-          t,
+        if (t.isTerminal && t.termSessionKey == sessionKey) t,
     ];
     for (final t in stale) {
       final i = _tabs.indexOf(t);
@@ -638,51 +601,6 @@ class _DesktopShellState extends State<DesktopShell>
         _activeIndex--;
       }
       changed = true;
-    }
-
-    // New: give each live pty a tab, docked where it was requested.
-    _ShellTab? owner;
-    for (final t in _tabs) {
-      if (t.key == sessionKey) {
-        owner = t;
-        break;
-      }
-    }
-    if (owner == null) return changed;
-    for (final info in host.terms) {
-      final exists = _tabs.any((t) =>
-          t.isTerminal &&
-          t.termSessionKey == sessionKey &&
-          t.termId == info.id);
-      if (exists) continue;
-      // A session terminal is a sibling of its one locked conversation root.
-      // Selecting another session hides it but leaves the session-owned pty
-      // untouched; returning to the session restores the tab and scrollback.
-      final target = owner.pane;
-      _tabs.add(_ShellTab.terminal(
-        client: owner.client,
-        instanceUrl: owner.instanceUrl,
-        termSessionKey: sessionKey,
-        termId: info.id,
-        title: info.title,
-        pane: target,
-        groupSessionKey: owner.key,
-      ));
-      if (_groupRootFor(target) == owner.key) {
-        _activeKey[target] = _tabs.last.key;
-      }
-      changed = true;
-    }
-
-    // Renames: the sidebar can retitle a terminal, and the tab follows.
-    for (final t in _tabs) {
-      if (t.isTerminal && t.termSessionKey == sessionKey) {
-        final info = live[t.termId];
-        if (info != null && info.title != t.title) {
-          t.title = info.title;
-          changed = true;
-        }
-      }
     }
     return changed;
   }

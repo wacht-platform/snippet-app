@@ -433,62 +433,164 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
-  /// Desktop terminal pane: a resizable split BESIDE the chat.
-  ///
-  /// Replaces the bottom drawer. The drawer stacked under the transcript and
-  /// competed with it for height, hiding the composer; a side pane keeps both
-  /// usable and is the same shape as the reference's chat/split arrangement.
-  Widget _desktopTermPane() {
-    final i = _termFocus.clamp(0, _terms.length - 1);
-    final t = _terms[i];
-    final maxW = MediaQuery.sizeOf(context).width * 0.72;
-    return Row(
-      // Sized to content: this is a non-flex child of the chat Row, so it must
-      // not try to expand.
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // 6px grab zone carrying a 1px rule. A chunky grab bar would eat
-        // transcript width for no benefit.
-        MouseRegion(
-          cursor: SystemMouseCursors.resizeColumn,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragUpdate: (d) {
-              _setState(() {
-                _termWidth = (_termWidth - d.delta.dx).clamp(280.0, maxW);
-              });
-            },
-            child: Container(
-              width: 6,
-              decoration: BoxDecoration(
-                border: Border(left: BorderSide(color: AppColors.border2)),
-              ),
+  bool get _hasTermDock =>
+      !kMobile && !_isMissionControl && !widget.readOnly;
+
+  Widget _withTermDock(Widget chat) {
+    if (!_hasTermDock) return chat;
+    const bar = 33.0;
+    final open = _termOpen && _terms.isNotEmpty;
+    return LayoutBuilder(builder: (context, box) {
+      final maxH = (box.maxHeight - 120).clamp(bar, double.infinity);
+      final height = !open
+          ? bar
+          : _termMax
+              ? box.maxHeight
+              : _termHeight.clamp(120.0, maxH);
+      return Stack(children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: open && !_termMax ? height : bar,
+          child: chat,
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: height,
+          child: _desktopTermDock(open, maxH),
+        ),
+      ]);
+    });
+  }
+
+  Widget _desktopTermDock(bool open, double maxH) {
+    final i = _terms.isEmpty ? 0 : _termFocus.clamp(0, _terms.length - 1);
+    final header = SizedBox(
+      height: 32,
+      child: Row(children: [
+        Expanded(
+          child: open
+              ? _termTabStrip(i, compact: true, withNew: false)
+              : InkWell(
+                  onTap: _openTerm,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(children: [
+                      AppIcon('terminal', size: 13, color: AppColors.fg3),
+                      const SizedBox(width: 8),
+                      Text('Terminal', style: sans(12, color: AppColors.fg3)),
+                      if (_terms.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Text('${_terms.length}',
+                            style: sans(11.5, color: AppColors.fg4, tabular: true)),
+                      ],
+                      const Spacer(),
+                    ]),
+                  ),
+                ),
+        ),
+        IconBtn('plus',
+            size: 28, iconSize: 13, tooltip: 'New terminal',
+            onTap: () => _openTerm(fresh: true)),
+        if (open)
+          IconBtn(_termMax ? 'shrink' : 'expand',
+              size: 28,
+              iconSize: 13,
+              tooltip: _termMax ? 'Restore' : 'Maximize',
+              onTap: () => _setState(() => _termMax = !_termMax)),
+        IconBtn(open ? 'chevron-down' : 'chevron-up',
+            size: 28,
+            iconSize: 14,
+            tooltip: open ? 'Hide terminal' : 'Show terminal',
+            onTap: () {
+              if (open) {
+                _setState(() {
+                  _termOpen = false;
+                  _termMax = false;
+                });
+                _publishTerminals();
+              } else {
+                _openTerm();
+              }
+            }),
+        const SizedBox(width: 4),
+      ]),
+    );
+    return Container(
+      decoration: BoxDecoration(
+        color: open ? const Color(0xff0a0a0a) : AppColors.surface1,
+        border: Border(top: BorderSide(color: AppColors.border2)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (open && !_termMax)
+          MouseRegion(
+            cursor: SystemMouseCursors.resizeRow,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragUpdate: (d) => _setState(() {
+                _termHeight = (_termHeight - d.delta.dy).clamp(120.0, maxH);
+              }),
+              onDoubleTap: () => _setState(() => _termMax = true),
+              child: const SizedBox(height: 4),
             ),
           ),
-        ),
-        Container(
-          width: _termWidth,
-          color: const Color(0xff0a0a0a),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _termTabStrip(i, compact: true),
-              Expanded(
-                child: SessionTermView(
-                  alive: t.alive,
-                  terminal: t.terminal,
-                  onInput: _termIn,
-                  onResize: _termResize,
-                  onClose: () => _closeTerm(t.id),
-                  mobileKeys: false,
-                  showChrome: false,
-                ),
-              ),
-            ],
+        header,
+        if (open)
+          Expanded(
+            child: SessionTermView(
+              key: ValueKey('dock-term-${_terms[i].id}'),
+              alive: _terms[i].alive,
+              terminal: _terms[i].terminal,
+              onInput: _termIn,
+              onResize: _termResize,
+              onClose: () => _closeTerm(_terms[i].id),
+              mobileKeys: false,
+              showChrome: false,
+            ),
           ),
+      ]),
+    );
+  }
+
+  bool _showFilesColumn(double width) =>
+      !kMobile &&
+      !_isMissionControl &&
+      !widget.readOnly &&
+      widget.onOpenFileTab != null &&
+      (_state?.workspace ?? '').isNotEmpty &&
+      width >= 820;
+
+  Widget _filesColumn() {
+    if (!_SessionScreenState._filesOpen) {
+      return Container(
+        width: 36,
+        decoration: BoxDecoration(
+          border: Border(left: BorderSide(color: AppColors.border)),
         ),
-      ],
+        alignment: Alignment.topCenter,
+        padding: const EdgeInsets.only(top: 8),
+        child: IconBtn('file',
+            size: 28,
+            iconSize: 14,
+            tooltip: 'Show files',
+            onTap: () => _setState(() => _SessionScreenState._filesOpen = true)),
+      );
+    }
+    return Container(
+      width: 260,
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: AppColors.border)),
+      ),
+      child: FileTreeSidebarPanel(
+        key: ValueKey('files-${_state?.workspace}'),
+        client: widget.client,
+        workspacePath: _state?.workspace ?? '',
+        onOpenFile: widget.onOpenFileTab!,
+        onHide: () => _setState(() => _SessionScreenState._filesOpen = false),
+      ),
     );
   }
 
@@ -633,7 +735,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
-  Widget _termTabStrip(int focus, {required bool compact}) {
+  Widget _termTabStrip(int focus,
+      {required bool compact, bool withNew = true}) {
     return SizedBox(
       height: compact ? 30 : 36,
       child: Row(children: [
@@ -690,11 +793,12 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             },
           ),
         ),
-        IconBtn('plus',
-            size: compact ? 28 : 32,
-            iconSize: compact ? 13 : 16,
-            tooltip: 'New shell',
-            onTap: () => _openTerm(fresh: true)),
+        if (withNew)
+          IconBtn('plus',
+              size: compact ? 28 : 32,
+              iconSize: compact ? 13 : 16,
+              tooltip: 'New shell',
+              onTap: () => _openTerm(fresh: true)),
       ]),
     );
   }
