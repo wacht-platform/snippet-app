@@ -19,6 +19,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
       if (!mounted) return;
       _store.saveOpenTabs(
         _tabs
+            .where((t) => !t.isPrs)
             .map((t) => OpenTabDescriptor(
                   instanceUrl: t.instanceUrl,
                   sessionId: t.sessionId,
@@ -433,6 +434,35 @@ extension _DesktopShellTabsExt on _DesktopShellState {
         : 0;
     final target = mains[nextIndex < 0 ? nextIndex + mains.length : nextIndex];
     _activateTabAt(target);
+  }
+
+  void _openPrsTab(GithubStatus status) {
+    final root = _activeTab;
+    if (root == null || root.sessionId == null) return;
+    final pane = _focusedPane;
+    final group = _activeGroupKeyFor(pane) ?? root.key;
+    final existing =
+        _tabs.indexWhere((t) => t.isPrs && t.instanceUrl == root.instanceUrl);
+    _setState(() {
+      if (existing >= 0) {
+        final t = _tabs[existing];
+        t
+          ..pane = pane
+          ..groupSessionKey = group;
+        _dockAux(pane, t.key);
+      } else {
+        _tabs.add(_ShellTab.prs(
+          client: root.client,
+          instanceUrl: root.instanceUrl,
+          session: root.sessionId!,
+          github: status,
+          pane: pane,
+          groupSessionKey: group,
+        ));
+        _dockAux(pane, _tabs.last.key);
+      }
+    });
+    _syncPage();
   }
 
   void _openFileTab(DaemonClient client, String url, String path, String name) {

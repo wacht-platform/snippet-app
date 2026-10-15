@@ -344,7 +344,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     if (status == null) return;
     final reveal = widget.onShowPullRequests;
     if (reveal != null) {
-      reveal();
+      reveal(status);
       return;
     }
     openPullRequests(context,
