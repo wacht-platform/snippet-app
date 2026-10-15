@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../mochi.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
@@ -87,8 +88,6 @@ class _MissionControlCardState extends State<MissionControlCard> {
 
   @override
   Widget build(BuildContext context) {
-    final status = widget.session.status;
-    final dot = status == 'running' ? AppColors.run : AppColors.accent;
     if (!kMobile) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -102,11 +101,7 @@ class _MissionControlCardState extends State<MissionControlCard> {
               height: 32,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-                ),
+                const AgentMochi('mission-control', size: 18),
                 const SizedBox(width: 8),
                 Text('Mission Control', style: sans(13, color: AppColors.fg1)),
                 const SizedBox(width: 12),
@@ -138,6 +133,8 @@ class _MissionControlCardState extends State<MissionControlCard> {
                 kMobile ? 18 : 14, kMobile ? 14 : 11, kMobile ? 12 : 10,
                 kMobile ? 14 : 11),
             child: Row(children: [
+              const AgentMochi('mission-control', size: 30),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,13 +148,6 @@ class _MissionControlCardState extends State<MissionControlCard> {
                             color: AppColors.fg1)),
                     const SizedBox(height: 2),
                     Row(children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration:
-                            BoxDecoration(color: dot, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 6),
                       Flexible(
                         child: SwapText(_statusLine(),
                             maxLines: 1,

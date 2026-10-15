@@ -10,6 +10,7 @@ import '../create_agent_form.dart';
 import 'coordination_agent_detail.dart';
 import '../../platform.dart';
 import '../../pull_refresh.dart';
+import '../../mochi.dart';
 
 class CoordinationAgentDirectory extends StatefulWidget {
   const CoordinationAgentDirectory({
@@ -200,10 +201,7 @@ class _AgentCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(children: [
-                Avatar(agent.displayName,
-                    size: 40,
-                    presence: agent.available,
-                    ring: AppColors.raised),
+                AgentMochi(agent.id, size: 40),
                 const SizedBox(width: S.s12),
                 Expanded(
                   child: Column(
