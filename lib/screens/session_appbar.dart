@@ -438,12 +438,11 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
 
   Widget _withTermDock(Widget chat) {
     if (!_hasTermDock) return chat;
-    const bar = 33.0;
     final open = _termOpen && _terms.isNotEmpty;
     return LayoutBuilder(builder: (context, box) {
-      final maxH = (box.maxHeight - 120).clamp(bar, double.infinity);
+      final maxH = (box.maxHeight - 120).clamp(120.0, double.infinity);
       final height = !open
-          ? bar
+          ? 0.0
           : _termMax
               ? box.maxHeight
               : _termHeight.clamp(120.0, maxH);
@@ -452,80 +451,30 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           left: 0,
           right: 0,
           top: 0,
-          bottom: open && !_termMax ? height : bar,
+          bottom: _termMax ? 0 : height,
           child: chat,
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: height,
-          child: _desktopTermDock(open, maxH),
-        ),
+        if (open)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: height,
+            child: _desktopTermDock(maxH),
+          ),
       ]);
     });
   }
 
-  Widget _desktopTermDock(bool open, double maxH) {
-    final i = _terms.isEmpty ? 0 : _termFocus.clamp(0, _terms.length - 1);
-    final header = SizedBox(
-      height: 32,
-      child: Row(children: [
-        Expanded(
-          child: open
-              ? _termTabStrip(i, compact: true, withNew: false)
-              : InkWell(
-                  onTap: _openTerm,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(children: [
-                      AppIcon('terminal', size: 13, color: AppColors.fg3),
-                      const SizedBox(width: 8),
-                      Text('Terminal', style: sans(12, color: AppColors.fg3)),
-                      if (_terms.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Text('${_terms.length}',
-                            style: sans(11.5, color: AppColors.fg4, tabular: true)),
-                      ],
-                      const Spacer(),
-                    ]),
-                  ),
-                ),
-        ),
-        IconBtn('plus',
-            size: 28, iconSize: 13, tooltip: 'New terminal',
-            onTap: () => _openTerm(fresh: true)),
-        if (open)
-          IconBtn(_termMax ? 'shrink' : 'expand',
-              size: 28,
-              iconSize: 13,
-              tooltip: _termMax ? 'Restore' : 'Maximize',
-              onTap: () => _setState(() => _termMax = !_termMax)),
-        IconBtn(open ? 'chevron-down' : 'chevron-up',
-            size: 28,
-            iconSize: 14,
-            tooltip: open ? 'Hide terminal' : 'Show terminal',
-            onTap: () {
-              if (open) {
-                _setState(() {
-                  _termOpen = false;
-                  _termMax = false;
-                });
-                _publishTerminals();
-              } else {
-                _openTerm();
-              }
-            }),
-        const SizedBox(width: 4),
-      ]),
-    );
+  Widget _desktopTermDock(double maxH) {
+    final i = _termFocus.clamp(0, _terms.length - 1);
     return Container(
       decoration: BoxDecoration(
-        color: open ? const Color(0xff0a0a0a) : AppColors.surface1,
+        color: const Color(0xff0a0a0a),
         border: Border(top: BorderSide(color: AppColors.border2)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (open && !_termMax)
+        if (!_termMax)
           MouseRegion(
             cursor: SystemMouseCursors.resizeRow,
             child: GestureDetector(
@@ -537,20 +486,41 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               child: const SizedBox(height: 4),
             ),
           ),
-        header,
-        if (open)
-          Expanded(
-            child: SessionTermView(
-              key: ValueKey('dock-term-${_terms[i].id}'),
-              alive: _terms[i].alive,
-              terminal: _terms[i].terminal,
-              onInput: _termIn,
-              onResize: _termResize,
-              onClose: () => _closeTerm(_terms[i].id),
-              mobileKeys: false,
-              showChrome: false,
-            ),
+        SizedBox(
+          height: 32,
+          child: Row(children: [
+            Expanded(child: _termTabStrip(i, compact: true, withNew: false)),
+            IconBtn(_termMax ? 'shrink' : 'expand',
+                size: 28,
+                iconSize: 13,
+                tooltip: _termMax ? 'Restore' : 'Maximize',
+                onTap: () => _setState(() => _termMax = !_termMax)),
+            IconBtn('chevron-down',
+                size: 28,
+                iconSize: 14,
+                tooltip: 'Hide terminal',
+                onTap: () {
+                  _setState(() {
+                    _termOpen = false;
+                    _termMax = false;
+                  });
+                  _publishTerminals();
+                }),
+            const SizedBox(width: 4),
+          ]),
+        ),
+        Expanded(
+          child: SessionTermView(
+            key: ValueKey('dock-term-${_terms[i].id}'),
+            alive: _terms[i].alive,
+            terminal: _terms[i].terminal,
+            onInput: _termIn,
+            onResize: _termResize,
+            onClose: () => _closeTerm(_terms[i].id),
+            mobileKeys: false,
+            showChrome: false,
           ),
+        ),
       ]),
     );
   }
@@ -804,12 +774,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               iconSize: 16,
               tooltip: 'Stop',
               onTap: () => _send({'kind': 'interrupt'})),
-        if (!mac) ...[
-          if (!_isMissionControl)
-            IconBtn('terminal',
-                size: 32, iconSize: 16, tooltip: 'Shell', onTap: _openTerm),
-          if (!_isMissionControl) _menu(s),
-        ],
+        if (!mac && !_isMissionControl) _menu(s),
       ]),
     );
   }
@@ -1096,7 +1061,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         item('layers', 'Lanes', _showLanes,
             value: '${s!.lanes.where((l) => l.running).length} running'),
       const PopupMenuDivider(),
-      item('terminal', 'Session shell', _openTerm),
       item(
           'git-branch',
           'Git',

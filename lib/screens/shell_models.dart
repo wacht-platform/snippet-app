@@ -216,6 +216,7 @@ class MacSessionControls {
 /// conversation.
 enum RightPanel {
   none('', ''),
+  files('Files', 'file'),
   lanes('Lanes', 'layers'),
   recurring('Scheduled', 'scheduled'),
   checkpoints('Checkpoints', 'history');

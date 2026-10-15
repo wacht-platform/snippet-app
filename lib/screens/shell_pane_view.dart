@@ -197,6 +197,8 @@ class ReadoutChip extends StatelessWidget {
   final VoidCallback onDragStarted;
   final void Function(DraggableDetails) onDragEnd;
 
+  bool get pinned => tab.panel == RightPanel.files;
+
   const ReadoutChip({
     super.key,
     required this.pane,
@@ -236,20 +238,25 @@ class ReadoutChip extends StatelessWidget {
                 style: sans(13, color: active ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: onClose,
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.all(3),
-                child: AppIcon('x', size: 11, color: AppColors.fg4),
+            if (pinned)
+              const SizedBox(width: 6)
+            else ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: onClose,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.all(3),
+                  child: AppIcon('x', size: 11, color: AppColors.fg4),
+                ),
               ),
-            ),
+            ],
           ]),
         ),
       ),
     );
 
+    if (pinned) return chip;
     if (kMobile) {
       return LongPressDraggable<RightTab>(
         data: tab,
@@ -516,7 +523,7 @@ class RightTabBody extends StatelessWidget {
           onRewind: (c) => controls?.performAction('rewind', c.id),
           onFork: (c) => controls?.performAction('fork', c.id),
         ),
-      RightPanel.none => const SizedBox.shrink(),
+      RightPanel.none || RightPanel.files => const SizedBox.shrink(),
     };
   }
 }
