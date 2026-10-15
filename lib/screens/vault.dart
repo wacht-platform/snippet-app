@@ -367,13 +367,15 @@ class _AddSecretFormState extends State<_AddSecretForm> {
         ],
         SizedBox(height: widget.inline ? 14 : 18),
         Row(children: [
-          Expanded(
-            child: Btn('Cancel',
-                variant: BtnVariant.ghost,
-                full: true,
-                onTap: _busy ? null : widget.onCancel),
-          ),
-          const SizedBox(width: 8),
+          if (!kMobile) ...[
+            Expanded(
+              child: Btn('Cancel',
+                  variant: BtnVariant.ghost,
+                  full: true,
+                  onTap: _busy ? null : widget.onCancel),
+            ),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: Btn(
               _busy ? 'Saving…' : 'Save',

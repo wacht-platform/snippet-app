@@ -893,10 +893,10 @@ class _DesktopShellState extends State<DesktopShell>
             kind: PaletteKind.session,
             keywords: const ['rewind', 'restore', 'fork']),
         goalOn
-            ? act('goal', 'zap', 'Cancel goal')
-            : act('goal', 'zap', 'Set a goal', keywords: const ['autonomous']),
+            ? act('goal', 'goal', 'Cancel goal')
+            : act('goal', 'goal', 'Set a goal', keywords: const ['autonomous']),
         manual
-            ? act('approval', 'zap', 'Approval: Yolo',
+            ? act('approval', 'check-circle', 'Approval: Yolo',
                 extra: 'auto', keywords: const ['yolo', 'auto', 'mode'])
             : act('approval', 'shield', 'Approval: ask before changes',
                 extra: 'ask', keywords: const ['manual', 'mode']),
@@ -1186,6 +1186,7 @@ class _DesktopShellState extends State<DesktopShell>
       return;
     }
     final statusRevision = _liveStatus.revision;
+    unawaited(c.coordinationAgents().then((_) {}, onError: (_) {}));
     setState(() => _sessionsLoading = true);
     try {
       final s = await c.sessions(limit: 60);

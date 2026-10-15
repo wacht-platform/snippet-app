@@ -5,6 +5,7 @@ import 'package:markdown/markdown.dart' as md;
 
 import 'highlight.dart';
 import 'screens/artifact_viewer.dart' show MermaidDiagram, canRenderMermaid;
+import 'platform.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -133,14 +134,21 @@ class _MdCodeBlock extends StatelessWidget {
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.sm),
+          color: kMobile
+              ? Color.lerp(AppColors.bg, Colors.black, 0.35)
+              : AppColors.surface2,
+          borderRadius: BorderRadius.circular(kMobile ? 14 : R.sm),
+          border: kMobile
+              ? Border.all(color: AppColors.fg1.withValues(alpha: 0.07))
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+              padding: kMobile
+                  ? const EdgeInsets.fromLTRB(14, 6, 6, 6)
+                  : const EdgeInsets.fromLTRB(12, 8, 6, 8),
               child: Row(children: [
                 Text(lang, style: mono(11, color: AppColors.fg3)),
                 const Spacer(),
@@ -156,7 +164,9 @@ class _MdCodeBlock extends StatelessWidget {
                 ),
               ]),
             ),
-            Divider(height: 1, color: AppColors.border),
+            Divider(
+                height: 1,
+                color: kMobile ? AppColors.line : AppColors.border),
             NotificationListener<ScrollNotification>(
               onNotification: (_) => true,
               child: SingleChildScrollView(

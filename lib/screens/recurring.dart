@@ -634,11 +634,6 @@ class RecurringScreenState extends State<RecurringScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Btn('Cancel', small: true, variant: BtnVariant.ghost, onTap: () {
-                setState(() => _adding = false);
-                widget.onAddingChanged?.call(false);
-              }),
-              const SizedBox(width: 8),
               Btn('Save job',
                   small: true, disabled: _submitting, onTap: _saveInline),
             ],

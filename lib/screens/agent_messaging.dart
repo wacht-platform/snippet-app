@@ -281,14 +281,16 @@ class _AgentWorkSheetState extends State<AgentWorkSheet> {
         ],
         const SizedBox(height: 18),
         Row(children: [
-          Expanded(
-            child: Btn('Cancel',
-                variant: BtnVariant.ghost,
-                full: true,
-                disabled: _sending,
-                onTap: () => Navigator.of(context).pop(false)),
-          ),
-          const SizedBox(width: 10),
+          if (!kMobile) ...[
+            Expanded(
+              child: Btn('Cancel',
+                  variant: BtnVariant.ghost,
+                  full: true,
+                  disabled: _sending,
+                  onTap: () => Navigator.of(context).pop(false)),
+            ),
+            const SizedBox(width: 10),
+          ],
           Expanded(
             child: Btn(_sending ? 'Sending…' : 'Send',
                 full: true, disabled: _sending, onTap: _submit),

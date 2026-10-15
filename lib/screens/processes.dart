@@ -130,11 +130,11 @@ class _ProcessesScreenState extends State<ProcessesScreen> {
           else if (_error != null)
             Expanded(
                 child: EmptyState(
-                    icon: 'zap', title: "Couldn't load", body: _error!))
+                    icon: 'alert-triangle', title: "Couldn't load", body: _error!))
           else if (procs.isEmpty)
             const Expanded(
                 child: EmptyState(
-                    icon: 'zap',
+                    icon: 'processes',
                     title: 'No background processes',
                     body:
                         'Long-running jobs the agent starts (servers, tunnels) show up here.'))

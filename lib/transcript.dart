@@ -5,6 +5,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'mochi.dart';
 import 'models.dart';
 import 'platform.dart';
 import 'theme.dart';
@@ -60,6 +61,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
     final canExpand = toolHasDetail(step);
     final failed = step.failed;
     final (verb, object) = toolSentenceParts(step);
+    if (kMobile) return _phone(context, step, canExpand, failed, verb, object);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -121,6 +123,102 @@ class _DenseToolRowState extends State<DenseToolRow> {
                       args: widget.args,
                       result: widget.result),
                 ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _phone(BuildContext context, ToolStep step, bool canExpand,
+      bool failed, String verb, String object) {
+    final command = verb == 'Ran' || verb == 'Running';
+    final dot = widget.result == null
+        ? AppColors.run
+        : failed
+            ? AppColors.danger
+            : AppColors.ok;
+    final Widget line = command
+        ? Container(
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+            decoration: BoxDecoration(
+              color: Color.lerp(AppColors.bg, Colors.black, 0.35),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(children: [
+              Text('\$ ', style: mono(12.5, color: AppColors.fg4)),
+              Expanded(
+                child: Text(object,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(12.5, color: AppColors.fg2)),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+              ),
+            ]),
+          )
+        : Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(children: [
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(
+                        text: verb,
+                        style: mono(12.5,
+                            color: failed ? AppColors.danger : AppColors.fg4)),
+                    if (object.isNotEmpty)
+                      TextSpan(
+                          text: '  $object',
+                          style: mono(12.5, color: AppColors.fg2)),
+                  ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              ..._metaWidgets(),
+              if (widget.result == null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration:
+                      BoxDecoration(color: dot, shape: BoxShape.circle),
+                ),
+              ],
+            ]),
+          );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: canExpand ? _toggle : null,
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: command ? 3 : 0),
+            child: line,
+          ),
+        ),
+        if (_open && canExpand)
+          Container(
+            margin: const EdgeInsets.only(top: 6, bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(14),
+              border:
+                  Border.all(color: AppColors.fg1.withValues(alpha: 0.08)),
+            ),
+            constraints: const BoxConstraints(maxHeight: 360),
+            child: SingleChildScrollView(
+              child: DefaultTextStyle(
+                style: mono(11.5, height: 1.45, color: AppColors.fg3),
+                child: safeToolDetailView(context,
+                    tool: widget.tool, args: widget.args, result: widget.result),
               ),
             ),
           ),
@@ -249,14 +347,29 @@ class _ToolRunState extends State<ToolRun> {
               children: [...previous, if (current != null) current],
             ),
             child: widget.open && widget.batch == null
-                ? Padding(
-                    key: const ValueKey('steps'),
-                    padding: const EdgeInsets.only(left: 24, top: S.s4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: widget.rows,
-                    ),
-                  )
+                ? kMobile
+                    ? Container(
+                        key: const ValueKey('steps'),
+                        margin: const EdgeInsets.only(left: 7, top: 8),
+                        padding: const EdgeInsets.only(left: 16),
+                        decoration: BoxDecoration(
+                          border: Border(
+                              left: BorderSide(
+                                  color: AppColors.fg1.withValues(alpha: 0.09))),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: widget.rows,
+                        ),
+                      )
+                    : Padding(
+                        key: const ValueKey('steps'),
+                        padding: const EdgeInsets.only(left: 24, top: S.s4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: widget.rows,
+                        ),
+                      )
                 : changes.isNotEmpty
                     ? Padding(
                         key: const ValueKey('changes'),
@@ -395,6 +508,72 @@ class LaneNotice extends StatelessWidget {
         return '${d.inHours}h ${d.inMinutes % 60}m';
       }
 
+      if (kMobile) {
+        final line = running
+            ? (activity?.isNotEmpty == true ? activity! : 'Working')
+            : (displaySummary?.isNotEmpty == true ? displaySummary! : status);
+        return Semantics(
+          button: true,
+          label: '$title, ${status.toLowerCase()}. Open the lane.',
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Material(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(14),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onOpen,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+                  child: Row(children: [
+                    running
+                        ? WorkingMochi(
+                            size: 22,
+                            color: agent.isEmpty
+                                ? mochiPalette.first.$2
+                                : mochiColorFor(agent))
+                        : MochiIcon(
+                            color: failed
+                                ? AppColors.danger
+                                : (agent.isEmpty
+                                    ? AppColors.ok
+                                    : mochiColorFor(agent)),
+                            size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(14.5,
+                                  weight: W.label, color: AppColors.fg1)),
+                          const SizedBox(height: 1),
+                          Text(line,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(12.5, color: AppColors.fg3)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(running ? elapsed() : status,
+                        style: sans(12,
+                            tabular: true,
+                            color: running
+                                ? AppColors.accent
+                                : failed
+                                    ? AppColors.danger
+                                    : AppColors.ok)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
       final meta = sans(12, height: 16 / 12, color: AppColors.fg3);
       return Semantics(
         button: true,

@@ -70,6 +70,49 @@ class _QuestionRecord extends StatelessWidget {
     final answers = _answers;
     final ctx = _context;
     final answered = answers.isNotEmpty;
+    if (kMobile) {
+      final rows = <(String, String?)>[
+        for (final q in qs)
+          (
+            q['text']?.toString() ?? '',
+            answers[q['id']?.toString() ?? ''] ?? answers['0'],
+          ),
+        if (qs.isEmpty && event['text'] != null)
+          (event['text'].toString(), answers['0']),
+      ];
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: MochiIcon(
+                color: answered ? mochiPalette.first.$2 : AppColors.fg4,
+                size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final (q, a) in rows) ...[
+                  Text(q,
+                      style: sans(14.5, height: 20 / 14.5, color: AppColors.fg2)),
+                  const SizedBox(height: 3),
+                  Text(a == null || a.isEmpty ? 'Not answered' : a,
+                      style: sans(14.5,
+                          weight: W.label,
+                          height: 20 / 14.5,
+                          color: a == null || a.isEmpty
+                              ? AppColors.fg4
+                              : AppColors.accent)),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          ),
+        ]),
+      );
+    }
     Widget answer(String text) => Container(
           margin: const EdgeInsets.only(top: S.s6),
           padding: const EdgeInsets.only(left: S.s8),
@@ -83,26 +126,34 @@ class _QuestionRecord extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+        padding: kMobile
+            ? const EdgeInsets.fromLTRB(14, 12, 14, 13)
+            : const EdgeInsets.fromLTRB(12, 9, 12, 10),
         decoration: BoxDecoration(
           color: AppColors.surface1,
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(R.md),
+          border: Border.all(
+              color: kMobile
+                  ? AppColors.fg1.withValues(alpha: 0.08)
+                  : AppColors.border),
+          borderRadius: BorderRadius.circular(kMobile ? 16 : R.md),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              AppIcon('message', size: 12, color: AppColors.fg3),
+              AppIcon('message', size: kMobile ? 14 : 12, color: AppColors.fg3),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                     qs.length > 1 ? 'Questions · ${qs.length}' : 'Question',
-                    style: mono(10, color: AppColors.fg3)),
+                    style: kMobile
+                        ? sans(13, color: AppColors.fg3)
+                        : mono(10, color: AppColors.fg3)),
               ),
               Text(answered ? 'answered' : 'no answer',
-                  style:
-                      mono(10, color: answered ? AppColors.ok : AppColors.fg3)),
+                  style: kMobile
+                      ? sans(13, color: answered ? AppColors.ok : AppColors.fg4)
+                      : mono(10, color: answered ? AppColors.ok : AppColors.fg3)),
             ]),
             if (ctx != null) ...[
               const SizedBox(height: 5),
@@ -328,7 +379,71 @@ class _PlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final done = steps.where((s) => s['status'] == 'done').length;
+    final done = steps
+        .where((s) => s['status'] == 'done' || s['status'] == 'completed')
+        .length;
+    if (kMobile) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('PLAN  ·  $done/${steps.length}',
+                style: sans(12,
+                    weight: W.label, spacing: 0.7, color: AppColors.fg4)),
+            if (explanation.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(explanation, style: sans(14, color: AppColors.fg3)),
+            ],
+            const SizedBox(height: 8),
+            for (final step in steps)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: switch (step['status']?.toString()) {
+                        'done' || 'completed' =>
+                          AppIcon('check', size: 14, color: AppColors.ok),
+                        'in_progress' => Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                shape: BoxShape.circle),
+                          ),
+                        _ => Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppColors.fg4, width: 1.5),
+                            ),
+                          ),
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(step['step']?.toString() ?? '',
+                          style: sans(15,
+                              height: 20 / 15,
+                              color: const {'done', 'completed'}
+                                      .contains(step['status'])
+                                  ? AppColors.fg4
+                                  : step['status'] == 'in_progress'
+                                      ? AppColors.fg1
+                                      : AppColors.fg2)),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
@@ -703,20 +818,25 @@ class QuestionBarState extends State<QuestionBar> {
           )
         : SelectCheck(sel, size: 16);
     return Material(
-      color: sel ? AppColors.accentBg : Colors.transparent,
+      color: sel
+          ? AppColors.accentBg
+          : (kMobile ? AppColors.surface2 : Colors.transparent),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(R.md),
+        borderRadius: BorderRadius.circular(kMobile ? 16 : R.md),
         side: BorderSide(
-          color: sel ? AppColors.accent : AppColors.border2,
+          color: sel
+              ? AppColors.accent
+              : (kMobile ? Colors.transparent : AppColors.border2),
           width: sel ? 1.2 : 1,
         ),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(R.md),
+        borderRadius: BorderRadius.circular(kMobile ? 16 : R.md),
         child: Padding(
-          padding:
-              EdgeInsets.fromLTRB(12, kMobile ? 11 : 9, 12, kMobile ? 11 : 9),
+          padding: kMobile
+              ? const EdgeInsets.fromLTRB(14, 13, 14, 13)
+              : const EdgeInsets.fromLTRB(12, 9, 12, 9),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Padding(padding: const EdgeInsets.only(top: 2), child: mark),
             const SizedBox(width: 10),
@@ -748,7 +868,7 @@ class QuestionBarState extends State<QuestionBar> {
             ),
             if (!kMobile && index < 9) ...[
               const SizedBox(width: 8),
-              Text('${index + 1}', style: mono(10, color: AppColors.fg4)),
+              Text('${index + 1}', style: (kMobile ? sans(13, color: AppColors.fg4) : mono(10, color: AppColors.fg4))),
             ],
           ]),
         ),
@@ -872,7 +992,7 @@ class QuestionBarState extends State<QuestionBar> {
                       style: sans(13, height: 1.4, color: AppColors.fg1)),
                 ),
                 const SizedBox(width: 8),
-                Text('Edit', style: mono(10, color: AppColors.accent)),
+                Text('Edit', style: (kMobile ? sans(13, color: AppColors.accent) : mono(10, color: AppColors.accent))),
               ]),
             ),
           ),
@@ -897,18 +1017,42 @@ class QuestionBarState extends State<QuestionBar> {
         padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-          // Same card as the transcript's, outlined in accent: it is the one
-          // thing waiting on you.
+          padding: kMobile
+              ? const EdgeInsets.fromLTRB(16, 14, 16, 14)
+              : const EdgeInsets.fromLTRB(12, 10, 12, 12),
           decoration: BoxDecoration(
             color: AppColors.surface1,
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.45)),
-            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(
+                color: AppColors.accent.withValues(alpha: kMobile ? 0.3 : 0.45)),
+            borderRadius: BorderRadius.circular(kMobile ? 22 : R.md),
           ),
           child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (kMobile)
+                  Row(children: [
+                    MochiIcon(color: mochiPalette.first.$2, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(_sent ? 'Sending…' : 'Snippet asks',
+                          style: sans(13.5, color: AppColors.fg3)),
+                    ),
+                    if (total > 1)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                            _review ? 'Review' : '${_step + 1} of $total',
+                            style: sans(12.5,
+                                tabular: true, color: AppColors.fg2)),
+                      ),
+                  ])
+                else
                 Row(children: [
                   AppIcon('message', size: 12, color: AppColors.accent),
                   const SizedBox(width: 6),
@@ -919,13 +1063,13 @@ class QuestionBarState extends State<QuestionBar> {
                             : total > 1
                                 ? 'Questions'
                                 : 'Question',
-                        style: mono(10, color: AppColors.fg3)),
+                        style: (kMobile ? sans(13, color: AppColors.fg3) : mono(10, color: AppColors.fg3))),
                   ),
                   Text(
                       total > 1
                           ? (_review ? 'review' : '${_step + 1} of $total')
                           : 'waiting on you',
-                      style: mono(10, color: AppColors.accent)),
+                      style: (kMobile ? sans(13, color: AppColors.accent) : mono(10, color: AppColors.accent))),
                 ]),
                 if (total > 1) ...[
                   const SizedBox(height: 8),
@@ -954,11 +1098,11 @@ class QuestionBarState extends State<QuestionBar> {
                             return <Widget>[
                               const SizedBox(height: 8),
                               Text(q['text']?.toString() ?? '',
-                                  style: sans(kMobile ? 15 : 14,
-                                      height: 1.4,
+                                  style: sans(kMobile ? 17 : 14,
+                                      height: kMobile ? 1.35 : 1.4,
                                       weight: W.label,
                                       color: AppColors.fg1)),
-                              const SizedBox(height: 10),
+                              SizedBox(height: kMobile ? 14 : 10),
                               ..._inputFor(q),
                             ];
                           }(),
@@ -969,7 +1113,12 @@ class QuestionBarState extends State<QuestionBar> {
                 ),
                 const SizedBox(height: S.s8),
                 Row(children: [
-                  if (!_review)
+                  if (!_review && kMobile)
+                    Btn('Skip',
+                        small: true,
+                        variant: BtnVariant.ghost,
+                        onTap: _sent ? null : _skip)
+                  else if (!_review)
                     TextButton(
                       onPressed: _sent ? null : _skip,
                       style: TextButton.styleFrom(
@@ -1517,7 +1666,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             onTap: widget.onAutonomy),
       if (!widget.hideGoal)
         _row(
-          icon: 'zap',
+          icon: 'goal',
           label: goalOn ? 'Goal' : 'Set a goal',
           detail: goalOn
               ? 'The agent is driving toward this autonomously'
