@@ -139,8 +139,30 @@ List<Widget> buildShellRailTools({
                       Text('${k(used)} / ${k(win)}',
                           style: mono(11, color: AppColors.fg4)),
                     ]),
-                    const SizedBox(height: 8),
-                    dots(24, 6, 3),
+                    const SizedBox(height: 10),
+                    LayoutBuilder(
+                      builder: (_, c) {
+                        final n = ((c.maxWidth + 3) / 9).floor();
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            for (var i = 0; i < n; i++)
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: i < (frac * n).round()
+                                      ? (frac > 0.8
+                                          ? AppColors.danger
+                                          : AppColors.fg3)
+                                      : AppColors.line,
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
                   ]),
             ),
           ),

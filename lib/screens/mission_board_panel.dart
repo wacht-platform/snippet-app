@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../mochi.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -77,7 +78,7 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
   }
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
         child: Text(text.toUpperCase(),
             style: sans(11, spacing: 0.9, color: AppColors.fg4)),
       );
@@ -130,10 +131,6 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
         .toList();
     final done =
         _tasks.where((t) => t.status == 'done' && today(t.updatedAt)).toList();
-    Widget empty(String s) => Padding(
-          padding: const EdgeInsets.fromLTRB(18, 2, 18, 4),
-          child: Text(s, style: sans(12.5, color: AppColors.fg4)),
-        );
     return Container(
       color: AppColors.windowBg,
       child: !_loaded
@@ -147,41 +144,61 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
                   alignment: Alignment.centerLeft,
                   child: Text('Board', style: sans(12.5, color: AppColors.fg3)),
                 ),
-                _label('Working now'),
-                if (doing.isEmpty) empty('Nothing running.'),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Column(children: [
-                    for (final t in doing) _taskRow(t, done: false),
-                  ]),
-                ),
-                _label('Up next'),
-                if (_jobs.isEmpty) empty('Nothing scheduled.'),
-                for (final j in _jobs.take(6))
+                if (doing.isEmpty && _jobs.isEmpty && done.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
-                    child: Row(children: [
-                      SizedBox(
-                        width: 48,
-                        child: Text(_at(j.nextRunAt),
-                            style: mono(11.5, color: AppColors.fg3)),
-                      ),
-                      Expanded(
-                        child: Text(j.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(13, color: AppColors.fg2)),
-                      ),
+                    padding: const EdgeInsets.fromLTRB(24, 120, 24, 0),
+                    child: Column(children: [
+                      const DottedMochi(width: 120),
+                      const SizedBox(height: 18),
+                      Text('All quiet',
+                          style: sans(15, color: AppColors.fg1)),
+                      const SizedBox(height: 6),
+                      Text(
+                          'Work your agents pick up, scheduled runs and '
+                          'what finished today land here.',
+                          textAlign: TextAlign.center,
+                          style: sans(12.5,
+                              height: 1.5, color: AppColors.fg4)),
                     ]),
                   ),
-                _label('Done today'),
-                if (done.isEmpty) empty('Nothing finished yet today.'),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Column(children: [
-                    for (final t in done.take(8)) _taskRow(t, done: true),
-                  ]),
-                ),
+                if (doing.isNotEmpty) ...[
+                  _label('Working now'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(children: [
+                      for (final t in doing) _taskRow(t, done: false),
+                    ]),
+                  ),
+                ],
+                if (_jobs.isNotEmpty) ...[
+                  _label('Up next'),
+                  for (final j in _jobs.take(6))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 6, 18, 6),
+                      child: Row(children: [
+                        SizedBox(
+                          width: 48,
+                          child: Text(_at(j.nextRunAt),
+                              style: mono(11.5, color: AppColors.fg3)),
+                        ),
+                        Expanded(
+                          child: Text(j.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(13, color: AppColors.fg2)),
+                        ),
+                      ]),
+                    ),
+                ],
+                if (done.isNotEmpty) ...[
+                  _label('Done today'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(children: [
+                      for (final t in done.take(8)) _taskRow(t, done: true),
+                    ]),
+                  ),
+                ],
               ],
             ),
     );
