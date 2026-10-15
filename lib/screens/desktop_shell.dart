@@ -424,7 +424,26 @@ class _DesktopShellState extends State<DesktopShell>
   ShellSection get _effectiveSection =>
       _hiddenSections.contains(_section) ? ShellSection.sessions : _section;
 
-  List<Widget> _railTools() => buildShellRailTools(
+  bool _sidePanelHidden = false;
+  Map<String, String> _tabProviders = const {};
+  String? _tabProvidersFor;
+
+  Future<void> _loadTabProviders(DaemonClient c) async {
+    if (_tabProvidersFor == c.baseUrl) return;
+    _tabProvidersFor = c.baseUrl;
+    try {
+      final cfg = await c.getConfig();
+      if (!mounted) return;
+      setState(() => _tabProviders = {
+            for (final p in cfg.profiles) p.name: p.provider,
+          });
+    } catch (_) {
+      _tabProvidersFor = null;
+    }
+  }
+
+  List<Widget> _railTools() => [
+        ...buildShellRailTools(
         activeTab: _activeTab,
         macSessionStatus:
             _activeTab == null ? null : _macSessionStatuses[_activeTab!.key],
@@ -432,7 +451,32 @@ class _DesktopShellState extends State<DesktopShell>
         onToggleRightPanel: _toggleRightPanel,
         onSessionAction: _dispatchSessionAction,
         onOpenGoalPopover: _openGoalPopover,
-      );
+      ),
+        if (_activeTab?.sessionId != null)
+          Tooltip(
+            message: _sidePanelHidden ? 'Show panel' : 'Hide panel',
+            child: Material(
+              color:
+                  _sidePanelHidden ? Colors.transparent : AppColors.surface2,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () =>
+                    setState(() => _sidePanelHidden = !_sidePanelHidden),
+                child: SizedBox.square(
+                  dimension: 30,
+                  child: Center(
+                    child: AppIcon('panel-right',
+                        size: 16,
+                        color: _sidePanelHidden
+                            ? AppColors.fg3
+                            : AppColors.fg1),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ];
 
   Future<void> _openGoalPopover(BuildContext btnCtx) => showGoalPopover(
         context: context,
@@ -1183,6 +1227,7 @@ class _DesktopShellState extends State<DesktopShell>
       setState(() => _sessions = <SessionInfo>[]);
       return;
     }
+    _loadTabProviders(c);
     final statusRevision = _liveStatus.revision;
     unawaited(c.coordinationAgents().then((_) {}, onError: (_) {}));
     setState(() => _sessionsLoading = true);

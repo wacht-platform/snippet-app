@@ -573,6 +573,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
         onCloseTab: (t) => _closeTabAt(t, force: true),
         onNewSession: _newSessionFlow,
         chipKeyFor: (key) => _chipKeys.putIfAbsent(key, () => GlobalKey()),
+        providerFor: (t) => _tabProviders[t.profile],
       );
 
   Future<void> _downloadActiveFile() async {

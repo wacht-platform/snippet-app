@@ -302,7 +302,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
 
   Widget? _sessionSidePanel() {
     final tab = _activeTab;
-    if (tab == null || tab.sessionId == null) return null;
+    if (tab == null || tab.sessionId == null || _sidePanelHidden) return null;
     if (tab.isMissionControl) {
       return MissionBoardPanel(
         key: ValueKey('board-${tab.instanceUrl}'),
@@ -637,7 +637,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
             ),
           ),
         ),
-        IconBtn('settings',
+        IconBtn('sliders',
             size: 28, iconSize: 16, tooltip: 'Settings', onTap: _openShellSettings),
       ]),
     );
