@@ -37,6 +37,7 @@ class Sidebar extends StatefulWidget {
   final VoidCallback onNewSession;
   final void Function(Instance) onSelectInstance;
   final VoidCallback onOpenMissionControl;
+  final ValueChanged<CoordinationAgent>? onOpenAgent;
   final void Function(String id, String title, String? profile) onOpenSession;
   final VoidCallback onAddInstance;
   final void Function(Instance, String) onRenameInstance;
@@ -75,6 +76,7 @@ class Sidebar extends StatefulWidget {
     required this.onNewSession,
     required this.onSelectInstance,
     required this.onOpenMissionControl,
+    this.onOpenAgent,
     required this.onOpenSession,
     required this.onAddInstance,
     required this.onRenameInstance,
@@ -142,6 +144,7 @@ class SidebarState extends State<Sidebar> {
   String? _providersFor;
 
   List<(String, RateWindow)> _meters = const [];
+  List<CoordinationAgent> _crew = const [];
   DateTime? _metersAt;
 
   Future<void> _loadMeters() async {
@@ -151,6 +154,14 @@ class SidebarState extends State<Sidebar> {
     if (_metersAt != null && now.difference(_metersAt!).inSeconds < 60) return;
     _metersAt = now;
     try {
+      try {
+        final a = await client.coordinationAgents();
+        if (mounted) {
+          setState(() => _crew = a
+              .where((x) => x.status != 'archived' && x.kind != 'mission_control')
+              .toList());
+        }
+      } catch (_) {}
       final u = await client.getUsage();
       if (!mounted) return;
       final out = <(String, RateWindow)>[];
@@ -980,6 +991,52 @@ class SidebarState extends State<Sidebar> {
           ]),
         ),
       ),
+      if (_crew.isNotEmpty) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+          child: Text('CREW',
+              style: sans(11, color: AppColors.fg4, spacing: 0.9)),
+        ),
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            children: [
+              for (final a in _crew)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Tooltip(
+                    message: a.displayName,
+                    child: Material(
+                      color: AppColors.surface1,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(11),
+                        side: BorderSide(
+                            color: (a.taskCounts?['in_progress'] ?? 0) > 0 ||
+                                    a.status == 'working' ||
+                                    a.status == 'busy'
+                                ? AppColors.accent.withValues(alpha: 0.4)
+                                : AppColors.line),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(11),
+                        onTap: widget.onOpenAgent == null
+                            ? null
+                            : () => widget.onOpenAgent!(a),
+                        child: SizedBox(
+                          width: 38,
+                          height: 38,
+                          child: Center(child: AgentMochi(a.id, size: 22)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
       Expanded(
         child: PullToRefresh(
           onRefresh: () async => widget.onRefreshSessions(),
