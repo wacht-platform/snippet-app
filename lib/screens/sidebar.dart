@@ -141,7 +141,71 @@ class SidebarState extends State<Sidebar> {
   Map<String, String> _profileProviders = const {};
   String? _providersFor;
 
+  List<(String, RateWindow)> _meters = const [];
+  DateTime? _metersAt;
+
+  Future<void> _loadMeters() async {
+    final client = widget.client;
+    if (client == null || kMobile) return;
+    final now = DateTime.now();
+    if (_metersAt != null && now.difference(_metersAt!).inSeconds < 60) return;
+    _metersAt = now;
+    try {
+      final u = await client.getUsage();
+      if (!mounted) return;
+      final out = <(String, RateWindow)>[];
+      final seen = <String>{};
+      for (final p in u.providers) {
+        final live = p.rateLimits.where((r) => !r.isExpired).toList()
+          ..sort((a, b) => b.usedPercent.compareTo(a.usedPercent));
+        if (live.isEmpty || !seen.add(p.provider)) continue;
+        out.add((p.provider, live.first));
+      }
+      setState(() => _meters = out.take(3).toList());
+    } catch (_) {}
+  }
+
+  Widget _meterRow(String provider, RateWindow r) {
+    final used = r.usedPercent.clamp(0, 100) / 100;
+    final color = r.leftPercent < 20 ? AppColors.danger : AppColors.accent;
+    final reset = rateResetLabel(r.resetsAt);
+    return Tooltip(
+      message: '${r.usedPercent.round()}% used${reset == null ? '' : ' · $reset'}',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(children: [
+          ProviderLogo(provider, size: 12),
+          const SizedBox(width: 8),
+          for (var i = 0; i < 12; i++)
+            Container(
+              width: 5,
+              height: 5,
+              margin: const EdgeInsets.only(right: 3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i < (used * 12).round() ? color : AppColors.line,
+              ),
+            ),
+          const Spacer(),
+          Text('${r.usedPercent.round()}%${_shortReset(r.resetsAt)}',
+              style: mono(10.5, color: AppColors.fg4)),
+        ]),
+      ),
+    );
+  }
+
+  String _shortReset(int at) {
+    if (at <= 0) return '';
+    final d = DateTime.fromMillisecondsSinceEpoch(at * 1000)
+        .difference(DateTime.now());
+    if (d.isNegative) return '';
+    if (d.inDays > 0) return ' · ${d.inDays}d';
+    if (d.inHours > 0) return ' · ${d.inHours}h';
+    return ' · ${d.inMinutes}m';
+  }
+
   Future<void> _loadProviders() async {
+    _loadMeters();
     final client = widget.client;
     if (client == null) return;
     final key = '${client.baseUrl}|${widget.sessions?.length}';
@@ -935,6 +999,15 @@ class SidebarState extends State<Sidebar> {
           ),
         ),
       ),
+      if (_meters.isNotEmpty)
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 14, 10),
+          decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.line))),
+          child: Column(children: [
+            for (final (p, r) in _meters) _meterRow(p, r),
+          ]),
+        ),
     ]);
   }
 
