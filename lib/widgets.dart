@@ -1909,6 +1909,7 @@ const _lucide = <String, IconData>{
   'search': LucideIcons.search,
   'settings': LucideIcons.settings,
   'sliders': LucideIcons.slidersHorizontal,
+  'panel-right': LucideIcons.panelRight,
   'wifi-off': LucideIcons.wifiOff,
   'refresh': LucideIcons.refreshCw,
   'alert-triangle': LucideIcons.triangleAlert,

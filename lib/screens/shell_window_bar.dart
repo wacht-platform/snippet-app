@@ -48,6 +48,7 @@ class TopWorkspaceTabChip extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onClose;
   final GlobalKey? chipKey;
+  final String? provider;
 
   const TopWorkspaceTabChip({
     super.key,
@@ -58,6 +59,7 @@ class TopWorkspaceTabChip extends StatelessWidget {
     required this.onTap,
     this.onClose,
     this.chipKey,
+    this.provider,
   });
 
   @override
@@ -83,6 +85,10 @@ class TopWorkspaceTabChip extends StatelessWidget {
           children: [
             if (tab.isMissionControl)
               MochiIcon(color: AppColors.accent, size: 14)
+            else if (tab.isPrs)
+              AppIcon('pull-request', size: 13, color: AppColors.ok)
+            else if (provider != null)
+              ProviderLogo(provider, size: 12)
             else
               SessionStateIcon(
                 status: working ? null : status,
@@ -270,6 +276,7 @@ class MainTabsStrip extends StatelessWidget {
   final void Function(ShellTab) onCloseTab;
   final VoidCallback onNewSession;
   final GlobalKey Function(String key) chipKeyFor;
+  final String? Function(ShellTab)? providerFor;
 
   const MainTabsStrip({
     super.key,
@@ -282,6 +289,7 @@ class MainTabsStrip extends StatelessWidget {
     required this.onCloseTab,
     required this.onNewSession,
     required this.chipKeyFor,
+    this.providerFor,
   });
 
   @override
@@ -291,16 +299,26 @@ class MainTabsStrip extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.only(right: 4),
       children: [
-        for (final t in tabs) ...[
+        for (var i = 0; i < tabs.length; i++) ...[
+          if (i > 0 && tabs[i] != activeTab && tabs[i - 1] != activeTab)
+            Center(
+              child: Container(
+                width: 1,
+                height: 14,
+                margin: const EdgeInsets.symmetric(horizontal: 1),
+                color: AppColors.line,
+              ),
+            ),
           Center(
             child: TopWorkspaceTabChip(
-              tab: t,
-              isActive: t == activeTab,
-              status: statusForTab(t),
-              canClose: canCloseTab(t),
-              onTap: () => onActivateTab(t),
-              onClose: () => onCloseTab(t),
-              chipKey: chipKeyFor(t.key),
+              tab: tabs[i],
+              provider: providerFor?.call(tabs[i]),
+              isActive: tabs[i] == activeTab,
+              status: statusForTab(tabs[i]),
+              canClose: canCloseTab(tabs[i]),
+              onTap: () => onActivateTab(tabs[i]),
+              onClose: () => onCloseTab(tabs[i]),
+              chipKey: chipKeyFor(tabs[i].key),
             ),
           ),
           const SizedBox(width: 2),
