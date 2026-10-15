@@ -14,6 +14,7 @@ import '../widgets.dart';
 import 'add_instance.dart';
 import 'inference_profiles.dart';
 import 'recurring.dart';
+import 'routing_screen.dart';
 import 'shell_nav.dart';
 import 'usage.dart';
 import 'vault.dart';
@@ -155,7 +156,7 @@ class _MachineListState extends State<MachineList> {
   }
 }
 
-enum SettingsPage { general, models, memory, usage, vault, scheduled }
+enum SettingsPage { general, models, routing, memory, usage, vault, scheduled }
 
 /// Settings dialog: Zed-style sidebar + content pane. Models / vault /
 /// scheduled swap in-place so they never stack a second dialog.
@@ -272,6 +273,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           _recurringKey.currentState?.add();
         case SettingsPage.usage:
         case SettingsPage.memory:
+        case SettingsPage.routing:
           break;
       }
     });
@@ -280,6 +282,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   static const _nav = [
     (SettingsPage.general, 'server', 'General'),
     (SettingsPage.models, 'ai-chip', 'Inference profiles'),
+    (SettingsPage.routing, 'transfer', 'Routing'),
     (SettingsPage.memory, 'brain', 'Memory'),
     (SettingsPage.usage, 'analytics', 'Usage'),
     (SettingsPage.vault, 'lock-key', 'Vault'),
@@ -658,6 +661,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         ],
         label('Agents'),
         ListGroup(children: [
+          nav(SettingsPage.routing, 'Routing', 'Fallback models'),
           nav(SettingsPage.memory, 'Memory', 'What agents remember'),
         ]),
         label('Machines'),
@@ -683,6 +687,11 @@ class SettingsPanelState extends State<SettingsPanel> {
           ],
         ),
       SettingsPage.models => InferenceProfilesScreen(
+          client: widget.client,
+          embedded: true,
+          onBack: back,
+        ),
+      SettingsPage.routing => RoutingScreen(
           client: widget.client,
           embedded: true,
           onBack: back,
@@ -803,6 +812,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   String _pageTitle(SettingsPage page) => switch (page) {
         SettingsPage.general => 'General',
         SettingsPage.models => 'Inference profiles',
+        SettingsPage.routing => 'Routing',
         SettingsPage.memory => 'Memory',
         SettingsPage.usage => 'Usage',
         SettingsPage.vault => 'Vault',
@@ -910,6 +920,10 @@ class SettingsPanelState extends State<SettingsPanel> {
           embedded: true,
           onEditingChanged: (editing) =>
               setState(() => _modelsEditing = editing),
+        ),
+      SettingsPage.routing => RoutingScreen(
+          client: widget.client,
+          embedded: true,
         ),
       SettingsPage.memory => MemoryScreen(
           client: widget.client,

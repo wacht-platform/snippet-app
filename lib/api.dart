@@ -433,6 +433,24 @@ class DaemonClient {
     invalidateConfig();
   }
 
+  Future<void> setRouting(String route, List<String> profiles) async {
+    final r = await http.post(_uri('/config/routing'),
+        headers: _json, body: jsonEncode({'route': route, 'profiles': profiles}));
+    if (r.statusCode != 200) throw _err('set routing', r);
+    invalidateConfig();
+  }
+
+  Future<void> resolveLimit(String session, String action, {String? profile}) async {
+    final r = await http.post(_uri('/session/limit'),
+        headers: _json,
+        body: jsonEncode({
+          'session': session,
+          'action': action,
+          if (profile != null) 'profile': profile,
+        }));
+    if (r.statusCode != 200) throw _err('resolve limit', r);
+  }
+
   Future<void> setKeepTaskProfile(bool on) async {
     final r = await http.post(_uri('/config/keep_task_profile'),
         headers: _json, body: jsonEncode({'on': on}));

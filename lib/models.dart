@@ -95,6 +95,8 @@ class ServerConfig {
   final bool manualApproval;
   final bool keepTaskProfile;
   final String hostname;
+  final Map<String, List<String>> routing;
+  final Map<String, int> limited;
 
   ServerConfig.fromJson(Map<String, dynamic> j)
       : profiles = ((j['profiles'] as List?) ?? const [])
@@ -104,7 +106,15 @@ class ServerConfig {
         delegate = j['delegate'] as String?,
         manualApproval = j['manual_approval'] == true,
         keepTaskProfile = j['keep_task_profile'] != false,
-        hostname = j['hostname'] as String? ?? '';
+        hostname = j['hostname'] as String? ?? '',
+        routing = {
+          for (final e in ((j['routing'] as Map?) ?? const {}).entries)
+            e.key as String: [for (final p in (e.value as List? ?? const [])) p as String],
+        },
+        limited = {
+          for (final e in ((j['limited'] as Map?) ?? const {}).entries)
+            e.key as String: (e.value as num).toInt(),
+        };
 }
 
 /// One entry from a provider's live model catalog (POST /provider/models).
