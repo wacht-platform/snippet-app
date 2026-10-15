@@ -35,6 +35,7 @@ import 'inbound_share_picker.dart';
 import 'mission_control.dart';
 import 'tasks/task_kanban.dart';
 import 'tasks/tasks_panel.dart';
+import 'mobile_chrome.dart';
 import 'mobile_shell.dart';
 import 'new_session_picker.dart';
 import 'session.dart';
@@ -1165,6 +1166,7 @@ class _DesktopShellState extends State<DesktopShell>
     _shells.setClient(_client);
     await _restoreTabs(items);
     _ensurePinnedMissionControl();
+    _startOnMission();
     _connectEventsWatch();
     _loadSessions();
     _refreshHealth();
@@ -1276,6 +1278,7 @@ class _DesktopShellState extends State<DesktopShell>
     // See `_onInboundShare`: must follow the setState block.
     _shells.setClient(_client);
     _ensurePinnedMissionControl();
+    _startOnMission();
     _connectEventsWatch();
     _loadSessions();
   }
@@ -1470,6 +1473,7 @@ class _DesktopShellState extends State<DesktopShell>
         health: _health,
         onRefreshHealth: _refreshHealth,
         mobileHome: _mobileHome,
+        mobileTopBar: kMobile ? _mobileTopBar(mission: false) : null,
         onMobileHome: (h) => setState(() {
           _mobileHome = h;
           _mobileSettingsSection = null;

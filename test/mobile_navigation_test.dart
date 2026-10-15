@@ -8,6 +8,7 @@ import 'package:snippet/api.dart';
 import 'package:snippet/notifications.dart';
 import 'package:snippet/screens/agents_sidebar_panel.dart';
 import 'package:snippet/screens/desktop_shell.dart';
+import 'package:snippet/screens/mobile_chrome.dart';
 import 'package:snippet/theme.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -17,8 +18,7 @@ const _tasks = 'Add a machine to see its tasks.';
 const _agents = 'Add a machine to see its agents.';
 const _settings = 'Add a machine to configure it.';
 
-Finder _tab(String label) => find.descendant(
-    of: find.byType(SidebarMobileBar), matching: find.text(label));
+Finder _visible(Finder f) => f.hitTestable();
 
 Future<void> _pumpShell(WidgetTester tester) async {
   tester.view.devicePixelRatio = 2.0;
@@ -41,34 +41,22 @@ void _only(String shown) {
 }
 
 void main() {
-  testWidgets('the phone starts on Chats and each tab opens its destination',
+  testWidgets('with no machine the phone starts on Sessions and Settings opens and closes',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       SharedPreferences.setMockInitialValues({});
       await _pumpShell(tester);
       _only(_chats);
+      expect(find.byType(MobileTopBar), findsOneWidget);
 
-      await tester.tap(_tab('Tasks'));
-      await tester.pumpAndSettle();
-      _only(_tasks);
-
-      await tester.tap(_tab('Agents'));
-      await tester.pumpAndSettle();
-      _only(_agents);
-
-      // Settings keeps the tab bar; with no machine there is nothing to create.
-      await tester.tap(_tab('Settings'));
+      await tester.tap(_visible(find.byTooltip('Settings')));
       await tester.pumpAndSettle();
       _only(_settings);
-      expect(find.byTooltip('Add machine'), findsOneWidget);
-      expect(_tab('Chats'), findsOneWidget);
 
-      // Back returns to the previous tab.
-      expect(find.byTooltip('Back'), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      _only(_agents);
+      _only(_chats);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
@@ -77,57 +65,23 @@ void main() {
     }
   });
 
-  testWidgets('swiping walks the tabs in order and stops at either end',
+  testWidgets('the menu opens Machines and back unwinds one step at a time',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       SharedPreferences.setMockInitialValues({});
       await _pumpShell(tester);
-      Future<void> swipe(double dx) async {
-        await tester.fling(find.byType(PageView), Offset(dx, 0), 1000);
-        await tester.pumpAndSettle();
-      }
 
-      _only(_chats);
-      await swipe(300);
-      _only(_chats);
-      for (final next in [_tasks, _agents, _settings]) {
-        await swipe(-300);
-        _only(next);
-      }
-      await swipe(-300);
-      _only(_settings);
-      for (final back in [_agents, _tasks, _chats]) {
-        await swipe(300);
-        _only(back);
-      }
-
-      // Back on the first tab leaves the app without blocking.
-      await tester.binding.handlePopRoute();
+      await tester.tap(_visible(find.byTooltip('Menu')));
       await tester.pumpAndSettle();
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
-
-  testWidgets('back unwinds tab history one step at a time', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    try {
-      SharedPreferences.setMockInitialValues({});
-      await _pumpShell(tester);
-
-      await tester.tap(_tab('Tasks'));
+      expect(find.text('Tasks'), findsNothing);
+      await tester.tap(find.text('Machines'));
       await tester.pumpAndSettle();
-      await tester.tap(_tab('Settings'));
-      await tester.pumpAndSettle();
-      _only(_settings);
+      expect(find.text('Add machine'), findsWidgets);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      _only(_tasks);
+      _only(_settings);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -214,7 +168,10 @@ void main() {
       });
       await _pumpShell(tester);
 
-      await tester.tap(_tab('Agents'));
+      await tester.tap(_visible(find.byTooltip('Menu')).first);
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('Agents').last);
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byType(AgentsSidebarPanel), findsOneWidget);

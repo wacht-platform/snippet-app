@@ -208,7 +208,9 @@ class _ToolRunState extends State<ToolRun> {
                         size: 14, color: AppColors.run)
                     : AppIcon(failures > 0 ? 'alert-triangle' : 'check',
                         size: 14,
-                        color: failures > 0 ? AppColors.danger : AppColors.fg4),
+                        color: failures > 0
+                            ? AppColors.danger
+                            : (kMobile ? AppColors.ok : AppColors.fg4)),
               ),
             ),
             const SizedBox(width: S.s8),
@@ -258,7 +260,8 @@ class _ToolRunState extends State<ToolRun> {
                 : changes.isNotEmpty
                     ? Padding(
                         key: const ValueKey('changes'),
-                        padding: const EdgeInsets.only(left: 24, top: S.s6),
+                        padding: EdgeInsets.only(
+                            left: kMobile ? 0 : 24, top: kMobile ? 10 : S.s6),
                         child: _ChangedFiles(changes: changes, onTap: _toggle),
                       )
                     : const SizedBox(
@@ -278,8 +281,13 @@ class _ChangedFiles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: AppColors.raised,
-        borderRadius: BorderRadius.circular(R.md),
+        color: kMobile ? AppColors.surface1 : AppColors.raised,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(kMobile ? 16 : R.md),
+          side: kMobile
+              ? BorderSide(color: AppColors.fg1.withValues(alpha: 0.08))
+              : BorderSide.none,
+        ),
         clipBehavior: Clip.antiAlias,
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -288,9 +296,9 @@ class _ChangedFiles extends StatelessWidget {
             InkWell(
               onTap: onTap,
               child: SizedBox(
-                height: 34,
+                height: kMobile ? 42 : 34,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: S.s12),
+                  padding: EdgeInsets.symmetric(horizontal: kMobile ? 14 : S.s12),
                   child: Row(children: [
                     AppIcon(
                         switch (changes[i].kind) {

@@ -769,13 +769,17 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             if (label.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(0, 0, 4, 6),
-                child: Text(label, style: sans(12, color: AppColors.fg4)),
+                child: Text(label.toUpperCase(),
+                    style: sans(12,
+                        weight: W.label, spacing: 0.7, color: AppColors.fg4)),
               ),
             Container(
               padding: card
-                  ? const EdgeInsets.fromLTRB(16, 4, 16, 4)
+                  ? (kMobile
+                      ? const EdgeInsets.symmetric(horizontal: 4)
+                      : const EdgeInsets.fromLTRB(16, 4, 16, 4))
                   : EdgeInsets.zero,
-              decoration: card
+              decoration: card && !kMobile
                   ? BoxDecoration(
                       color: AppColors.surface1,
                       borderRadius: BorderRadius.circular(16),

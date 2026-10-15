@@ -573,42 +573,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
 
   /// The composer's status line: where this session runs, and how much context
   /// is left. Sits under the card so the transcript keeps the full width.
-  Widget _composerMeta(HarnessState? s) {
-    final left = _contextLeftPct;
-    final ws = s?.workspace ?? '';
-    final name = ws.isEmpty ? '' : lastPathSegment(ws, ifEmpty: ws);
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, left: 2, right: 2),
-      child: Row(children: [
-        // ONE tight flex child absorbs the free space, pinning the trailing
-        // readout to the card's right edge. A loose `Flexible` beside a
-        // `Spacer` splits the free space and leaves the leftover AFTER the
-        // readout, so it stops short of the edge instead of reaching it.
-        Expanded(
-          child: name.isEmpty
-              ? const SizedBox.shrink()
-              : Row(mainAxisSize: MainAxisSize.min, children: [
-                  AppIcon('folder', size: 11, color: AppColors.fg4),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TS.caption()),
-                  ),
-                ]),
-        ),
-        if (left != null) ...[
-          const SizedBox(width: 8),
-          // Changes as the session runs, so it needs tabular figures; and it is
-          // information, not a placeholder, so `fg3` not `fg4`.
-          Text('$left% context left',
-              style: sans(11, tabular: true, color: AppColors.fg3)),
-        ],
-      ]),
-    );
-  }
-
   Widget _goalBanner() => Container(
   margin:
       const EdgeInsets.only(bottom: 10),
@@ -1102,18 +1066,20 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                             Container(
                               key: _composerCardKey,
                               decoration: BoxDecoration(
-                                color: AppColors.raised,
-                                borderRadius: BorderRadius.circular(18),
+                                color: AppColors.surface1,
+                                borderRadius: BorderRadius.circular(26),
                                 border: _draggingFiles
                                     ? Border.all(
                                         color: AppColors.accent, width: 1.5)
-                                    : Border.all(color: AppColors.border),
+                                    : Border.all(
+                                        color: AppColors.fg1
+                                            .withValues(alpha: 0.08)),
                               ),
                               // The card owns the inset and the rows sit inside it, so there is
                               // no per-row vertical padding to keep in sync. Slightly taller
                               // than it is wide-padded, so the field reads as a writing area.
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: kMobile ? 14 : 12),
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 14, 10, 10),
                               child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment:
@@ -1141,7 +1107,11 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                               const EdgeInsets.fromLTRB(
                                                   2, 2, 8, 10),
                                           border: InputBorder.none,
-                                          hintText: 'Reply to Snippet',
+                                          hintText: _isMissionControl
+                                              ? 'Ask Mission Control…'
+                                              : running
+                                                  ? 'Steer or queue a message'
+                                                  : 'Reply to Snippet',
                                           hintStyle: TS.body(AppColors.fg4),
                                         ),
                                       ),
@@ -1189,7 +1159,17 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                                   ]),
                                             ),
                                           ),
-                                          const SizedBox(width: 6),
+                                          if (_contextLeftPct != null)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                  left: 6, right: 2),
+                                              child: Text(
+                                                  '${_contextLeftPct}% left',
+                                                  style: sans(12,
+                                                      tabular: true,
+                                                      color: AppColors.fg4)),
+                                            ),
+                                          const SizedBox(width: 2),
                                           if (kCanRecord) ...[
                                             Material(
                                               color: Colors.transparent,
@@ -1237,7 +1217,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                             ),
                           ]),
               ),
-              if (kMobile) _composerMeta(_state),
             ]),
       ),
     );

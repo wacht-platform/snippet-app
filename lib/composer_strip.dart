@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'platform.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -81,14 +82,16 @@ class StripSendButton extends StatelessWidget {
     final fill = !enabled
         ? AppColors.hover
         : stop
-            ? AppColors.surface3
+            ? (kMobile ? AppColors.fg1 : AppColors.surface3)
             : AppColors.accentFill;
     final ink = !enabled
         ? AppColors.fg4
         : stop
-            ? AppColors.fg1
+            ? (kMobile ? AppColors.bg : AppColors.fg1)
             : AppColors.accentFg;
-    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(8));
+    final ShapeBorder shape = kMobile
+        ? const CircleBorder()
+        : RoundedRectangleBorder(borderRadius: BorderRadius.circular(8));
     return Material(
       color: fill,
       shape: shape,
@@ -96,7 +99,7 @@ class StripSendButton extends StatelessWidget {
         customBorder: shape,
         onTap: onTap,
         child: SizedBox.square(
-          dimension: 28,
+          dimension: kMobile ? 34 : 28,
           child: Center(
             child: sending
                 ? Spinner(size: 13, color: ink)

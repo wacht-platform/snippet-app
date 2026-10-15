@@ -740,6 +740,8 @@ TextTheme _weightedTextTheme(TextTheme t) {
 /// rounded glyph instead of a generic fallback.
 List<List<dynamic>> hugeIconFor(String name) {
   switch (name) {
+    case 'grid':
+      return HugeIcons.strokeRoundedDashboardSquare01;
     case 'chevron-left':
     case 'arrow-left':
       return HugeIcons.strokeRoundedArrowLeft01;
@@ -921,7 +923,7 @@ List<List<dynamic>> hugeIconFor(String name) {
     case 'map':
       return HugeIcons.strokeRoundedMaps;
     case 'list':
-      return HugeIcons.strokeRoundedMenuSquare;
+      return HugeIcons.strokeRoundedLeftToRightListBullet;
     case 'task':
       return HugeIcons.strokeRoundedCheckList;
     case 'kanban':

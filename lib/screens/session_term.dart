@@ -70,9 +70,7 @@ class _CompactingStatusState extends State<_CompactingStatus> {
             SizedBox(
                 width: 22,
                 child: Center(
-                    child: kMobile
-                        ? WorkingDots(color: AppColors.accent)
-                        : const WorkingMochi(size: 19, squeeze: true))),
+                    child: const WorkingMochi(size: 19, squeeze: true))),
             const SizedBox(width: 8),
             Expanded(
               child: Shimmer(
@@ -188,9 +186,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
                 SizedBox(
                     width: 22,
                     child: Center(
-                        child: kMobile
-                            ? WorkingDots(color: AppColors.accent)
-                            : const WorkingMochi(size: 19))),
+                        child: const WorkingMochi(size: 19))),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Shimmer(

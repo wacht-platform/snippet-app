@@ -318,6 +318,16 @@ class PaneLabel extends StatelessWidget {
       );
 }
 
+class FlatGroupScope extends InheritedWidget {
+  const FlatGroupScope({super.key, required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<FlatGroupScope>() != null;
+
+  @override
+  bool updateShouldNotify(FlatGroupScope oldWidget) => false;
+}
+
 class ListGroup extends StatelessWidget {
   const ListGroup({super.key, required this.children, this.header});
 
@@ -326,27 +336,33 @@ class ListGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final column = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (header != null) header!,
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0 || header != null)
+            Divider(
+                height: 1,
+                thickness: 1,
+                indent: kMobile ? 4 : 0,
+                endIndent: kMobile ? 4 : 0,
+                color: AppColors.line),
+          children[i],
+        ],
+      ],
+    );
+    if (kMobile) {
+      return FlatGroupScope(
+        child: Material(color: Colors.transparent, child: column),
+      );
+    }
     return Material(
       color: SurfaceScope.groupOf(context),
-      borderRadius: BorderRadius.circular(kMobile ? 16 : R.md),
+      borderRadius: BorderRadius.circular(R.md),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (header != null) header!,
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0 || header != null)
-              Divider(
-                  height: 1,
-                  thickness: 1,
-                  indent: kMobile ? 16 : 0,
-                  endIndent: kMobile ? 16 : 0,
-                  color: AppColors.line),
-            children[i],
-          ],
-        ],
-      ),
+      child: column,
     );
   }
 }
@@ -377,7 +393,11 @@ class ListRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: selected
-          ? (kMobile ? AppColors.surface3 : AppColors.accentBg)
+          ? (kMobile
+              ? (FlatGroupScope.of(context)
+                  ? Colors.transparent
+                  : AppColors.surface3)
+              : AppColors.accentBg)
           : Colors.transparent,
       child: InkWell(
         onTap: onTap,
@@ -386,7 +406,9 @@ class ListRow extends StatelessWidget {
           constraints: BoxConstraints(minHeight: kMobile ? M.rowHeight : 36),
           child: Padding(
             padding: kMobile
-                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 11)
+                ? EdgeInsets.symmetric(
+                    horizontal: FlatGroupScope.of(context) ? 4 : 16,
+                    vertical: 11)
                 : const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s8),
             child: Row(children: [
               if (leading != null) ...[leading!, const SizedBox(width: S.s12)],
@@ -492,9 +514,15 @@ class IconTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var (fg, bg) = toneColors(tone);
-    if (kMobile && tone == Tone.neutral) {
-      fg = AppColors.fg2;
-      bg = AppColors.surface2;
+    if (kMobile && _size == null) {
+      return SizedBox(
+        width: 24,
+        height: 24,
+        child: Center(
+            child: AppIcon(icon,
+                size: 19,
+                color: tone == Tone.neutral ? AppColors.fg3 : fg)),
+      );
     }
     final size = this.size;
     return Container(

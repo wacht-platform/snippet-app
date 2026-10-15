@@ -385,10 +385,17 @@ class _PeriodTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(S.s2),
+        padding: EdgeInsets.all(kMobile ? 4 : S.s2),
         decoration: BoxDecoration(
           color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(kMobile ? 22 : R.md),
+          boxShadow: kMobile
+              ? [
+                  BoxShadow(
+                      color: AppColors.fg1.withValues(alpha: 0.08),
+                      spreadRadius: 1),
+                ]
+              : null,
         ),
         child: Row(children: [
           for (final p in _Period.values)
@@ -402,7 +409,8 @@ class _PeriodTabs extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: p == value ? AppColors.surface3 : Colors.transparent,
-                    borderRadius: BorderRadius.circular(R.md - S.s2),
+                    borderRadius:
+                        BorderRadius.circular(kMobile ? 18 : R.md - S.s2),
                   ),
                   child: Text(p.label,
                       style:
