@@ -21,6 +21,7 @@ class SessionTermView extends StatefulWidget {
     this.onNew,
     this.mobileKeys = false,
     this.showChrome = true,
+    this.flat = false,
   });
 
   final bool alive;
@@ -31,6 +32,7 @@ class SessionTermView extends StatefulWidget {
   final VoidCallback? onNew;
   final bool mobileKeys;
   final bool showChrome;
+  final bool flat;
 
   @override
   State<SessionTermView> createState() => _SessionTermViewState();
@@ -282,15 +284,17 @@ class _SessionTermViewState extends State<SessionTermView> {
           key: _termView,
           controller: _termController,
           theme: _theme,
-          backgroundOpacity: 1,
+          backgroundOpacity: widget.flat ? 0 : 1,
           autofocus: true,
           readOnly: false,
           hardwareKeyboardOnly: false,
           deleteDetection: widget.mobileKeys,
           keyboardType: TextInputType.visiblePassword,
-          padding: kMobile
-              ? const EdgeInsets.fromLTRB(14, 8, 12, 8)
-              : const EdgeInsets.fromLTRB(16, 12, 14, 12),
+          padding: widget.flat
+              ? const EdgeInsets.fromLTRB(18, 4, 14, 10)
+              : kMobile
+                  ? const EdgeInsets.fromLTRB(14, 8, 12, 8)
+                  : const EdgeInsets.fromLTRB(16, 12, 14, 12),
           textStyle: TerminalStyle(fontSize: 13, fontFamily: kMonoFamily),
         ),
       ),

@@ -355,7 +355,10 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     final files = <({String path, String caption})>[
       for (final e in _state?.events ?? const <Map<String, dynamic>>[])
         if (e['kind'] == 'file_presented')
-          (path: e['path']?.toString() ?? '', caption: e['caption']?.toString() ?? ''),
+          (
+            path: e['path']?.toString() ?? '',
+            caption: e['caption']?.toString() ?? ''
+          ),
     ];
     if (kMobile) {
       showArtifactSheet(
@@ -433,8 +436,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
-  bool get _hasTermDock =>
-      !kMobile && !_isMissionControl && !widget.readOnly;
+  bool get _hasTermDock => !kMobile && !_isMissionControl && !widget.readOnly;
 
   Widget _withTermDock(Widget chat) {
     if (!_hasTermDock) return chat;
@@ -470,60 +472,67 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     final i = _termFocus.clamp(0, _terms.length - 1);
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xff0a0a0a),
-        border: Border(top: BorderSide(color: AppColors.border2)),
+        color: AppColors.canvas,
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (!_termMax)
-          MouseRegion(
-            cursor: SystemMouseCursors.resizeRow,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onVerticalDragUpdate: (d) => _setState(() {
-                _termHeight = (_termHeight - d.delta.dy).clamp(120.0, maxH);
+      child: Stack(children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SizedBox(
+            height: 36,
+            child: Row(children: [
+              Expanded(child: _termTabStrip(i)),
+              _dockAction('plus', 'New terminal', () => _openTerm(fresh: true)),
+              _dockAction(
+                  _termMax ? 'shrink' : 'expand',
+                  _termMax ? 'Restore' : 'Maximize',
+                  () => _setState(() => _termMax = !_termMax)),
+              _dockAction('chevron-down', 'Hide terminal', () {
+                _setState(() {
+                  _termOpen = false;
+                  _termMax = false;
+                });
+                _publishTerminals();
               }),
-              onDoubleTap: () => _setState(() => _termMax = true),
-              child: const SizedBox(height: 4),
+              const SizedBox(width: 8),
+            ]),
+          ),
+          Expanded(
+            child: SessionTermView(
+              key: ValueKey('dock-term-${_terms[i].id}'),
+              alive: _terms[i].alive,
+              terminal: _terms[i].terminal,
+              onInput: _termIn,
+              onResize: _termResize,
+              onClose: () => _closeTerm(_terms[i].id),
+              mobileKeys: false,
+              showChrome: false,
+              flat: true,
             ),
           ),
-        SizedBox(
-          height: 32,
-          child: Row(children: [
-            Expanded(child: _termTabStrip(i, compact: true, withNew: false)),
-            IconBtn(_termMax ? 'shrink' : 'expand',
-                size: 28,
-                iconSize: 13,
-                tooltip: _termMax ? 'Restore' : 'Maximize',
-                onTap: () => _setState(() => _termMax = !_termMax)),
-            IconBtn('chevron-down',
-                size: 28,
-                iconSize: 14,
-                tooltip: 'Hide terminal',
-                onTap: () {
-                  _setState(() {
-                    _termOpen = false;
-                    _termMax = false;
-                  });
-                  _publishTerminals();
+        ]),
+        if (!_termMax)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 5,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeRow,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragUpdate: (d) => _setState(() {
+                  _termHeight = (_termHeight - d.delta.dy).clamp(120.0, maxH);
                 }),
-            const SizedBox(width: 4),
-          ]),
-        ),
-        Expanded(
-          child: SessionTermView(
-            key: ValueKey('dock-term-${_terms[i].id}'),
-            alive: _terms[i].alive,
-            terminal: _terms[i].terminal,
-            onInput: _termIn,
-            onResize: _termResize,
-            onClose: () => _closeTerm(_terms[i].id),
-            mobileKeys: false,
-            showChrome: false,
+                onDoubleTap: () => _setState(() => _termMax = true),
+              ),
+            ),
           ),
-        ),
       ]),
     );
   }
+
+  Widget _dockAction(String icon, String tooltip, VoidCallback onTap) =>
+      IconBtn(icon, size: 26, iconSize: 13, tooltip: tooltip, onTap: onTap);
 
   Widget _mobileTermTab() {
     final i = _termFocus.clamp(0, _terms.length - 1);
@@ -666,71 +675,26 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
-  Widget _termTabStrip(int focus,
-      {required bool compact, bool withNew = true}) {
-    return SizedBox(
-      height: compact ? 30 : 36,
-      child: Row(children: [
-        Expanded(
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.fromLTRB(compact ? 8 : 4, 0, 4, 0),
-            itemCount: _terms.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 4),
-            itemBuilder: (_, n) {
-              final on = n == focus;
-              final pane = _terms[n];
-              return Material(
-                color: on ? AppColors.surface2 : Colors.transparent,
-                borderRadius: BorderRadius.circular(R.xs),
-                child: InkWell(
-                  onTap: () {
-                    _setState(() => _termFocus = n);
-                    _publishTerminals();
-                  },
-                  // Right-click / long-press renames. A dedicated pencil button
-                  // per tab would crowd a strip that already carries a close,
-                  // and the gesture is discoverable in the tooltip below.
-                  onSecondaryTap: () => _renameTerm(pane.id),
-                  onLongPress: () => _renameTerm(pane.id),
-                  borderRadius: BorderRadius.circular(R.xs),
-                  child: Tooltip(
-                    message: '${pane.title} — right-click to rename',
-                    waitDuration: const Duration(milliseconds: 500),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 6, 4, 6),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Text(
-                          pane.title,
-                          style: sans(compact ? 12 : 13,
-                              weight: on ? W.label : W.body,
-                              color: on ? AppColors.fg1 : AppColors.fg3),
-                        ),
-                        const SizedBox(width: 2),
-                        GestureDetector(
-                          onTap: () => _closeTerm(pane.id),
-                          behavior: HitTestBehavior.opaque,
-                          child: Padding(
-                            padding: const EdgeInsets.all(3),
-                            child: AppIcon('x',
-                                size: compact ? 10 : 12, color: AppColors.fg4),
-                          ),
-                        ),
-                      ]),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        if (withNew)
-          IconBtn('plus',
-              size: compact ? 28 : 32,
-              iconSize: compact ? 13 : 16,
-              tooltip: 'New shell',
-              onTap: () => _openTerm(fresh: true)),
-      ]),
+  Widget _termTabStrip(int focus) {
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.only(left: 10, right: 8),
+      itemCount: _terms.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 2),
+      itemBuilder: (_, n) {
+        final pane = _terms[n];
+        return _DockTab(
+          title: pane.title,
+          alive: pane.alive,
+          selected: n == focus,
+          onTap: () {
+            _setState(() => _termFocus = n);
+            _publishTerminals();
+          },
+          onRename: () => _renameTerm(pane.id),
+          onClose: () => _closeTerm(pane.id),
+        );
+      },
     );
   }
 
@@ -1070,7 +1034,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
                   sessionId: widget.sessionId,
                   onClose: close))),
       item('layers', 'Artifacts & files', _openDeliverables),
-      if (_github != null) item('git-branch', 'Pull requests', _openPullRequests),
+      if (_github != null)
+        item('git-branch', 'Pull requests', _openPullRequests),
       item('folder', 'Browse', () {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
@@ -1144,7 +1109,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               sessionId: widget.sessionId,
               onClose: close))),
       onDeliverables: () => navigate!(_openDeliverables),
-      onPullRequests: _github == null ? null : () => navigate!(_openPullRequests),
+      onPullRequests:
+          _github == null ? null : () => navigate!(_openPullRequests),
       onFiles: () => navigate!(() {
         final name = lastPathSegment(ws, ifEmpty: 'Files');
         presentScreen(context,
@@ -1384,6 +1350,86 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DockTab extends StatefulWidget {
+  const _DockTab({
+    required this.title,
+    required this.alive,
+    required this.selected,
+    required this.onTap,
+    required this.onRename,
+    required this.onClose,
+  });
+
+  final String title;
+  final bool alive;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback onRename;
+  final VoidCallback onClose;
+
+  @override
+  State<_DockTab> createState() => _DockTabState();
+}
+
+class _DockTabState extends State<_DockTab> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = widget.selected;
+    final fg = on || _hover ? AppColors.fg1 : AppColors.fg3;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        onSecondaryTap: widget.onRename,
+        onDoubleTap: widget.onRename,
+        child: Tooltip(
+          message: 'Double-click to rename',
+          waitDuration: const Duration(milliseconds: 700),
+          child: Container(
+            padding: const EdgeInsets.only(left: 8, right: 4),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  width: 1.5,
+                  color: on ? AppColors.fg2 : Colors.transparent,
+                ),
+              ),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon('terminal',
+                  size: 12, color: on ? AppColors.fg2 : AppColors.fg4),
+              const SizedBox(width: 6),
+              Text(widget.title,
+                  style: sans(12.5, weight: on ? W.label : W.body, color: fg)),
+              if (!widget.alive) ...[
+                const SizedBox(width: 6),
+                Text('exited', style: sans(11, color: AppColors.fg4)),
+              ],
+              SizedBox(
+                width: 20,
+                child: on || _hover
+                    ? GestureDetector(
+                        onTap: widget.onClose,
+                        behavior: HitTestBehavior.opaque,
+                        child: Center(
+                          child: AppIcon('x', size: 10, color: AppColors.fg3),
+                        ),
+                      )
+                    : null,
+              ),
+            ]),
+          ),
         ),
       ),
     );

@@ -11,11 +11,11 @@ const double kSidebarWidth = 300;
 /// shows; it never changes the conversation in the main pane.
 enum ShellSection {
   sessions('Chat', 'message-text'),
+  agents('Agents', 'agent'),
   tasks('Tasks', 'task'),
   terminal('Terminal', 'terminal'),
   git('Git Diff', 'git-branch'),
-  files('File Tree', 'file'),
-  agents('Agents', 'agent');
+  files('File Tree', 'file');
 
   const ShellSection(this.label, this.icon);
   final String label;
