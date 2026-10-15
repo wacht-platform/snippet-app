@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -81,11 +84,135 @@ class AgentMochi extends StatelessWidget {
       );
 }
 
+enum MochiEyes { dot, flat, happy }
+
+class WorkingMochi extends StatefulWidget {
+  const WorkingMochi({super.key, this.size = 20, this.squeeze = false, this.color});
+
+  final double size;
+  final bool squeeze;
+  final Color? color;
+
+  @override
+  State<WorkingMochi> createState() => _WorkingMochiState();
+}
+
+class _WorkingMochiState extends State<WorkingMochi>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: widget.squeeze ? 1800 : 1400),
+  );
+  final _rng = math.Random();
+  Timer? _mood;
+  MochiEyes _eyes = MochiEyes.dot;
+
+  @override
+  void initState() {
+    super.initState();
+    _c.repeat();
+    _nextMood();
+  }
+
+  void _nextMood() {
+    _mood = Timer(Duration(milliseconds: 2200 + _rng.nextInt(2600)), () {
+      if (!mounted) return;
+      final pool = widget.squeeze
+          ? const [MochiEyes.flat, MochiEyes.dot]
+          : const [MochiEyes.dot, MochiEyes.dot, MochiEyes.flat, MochiEyes.happy];
+      MochiEyes next;
+      do {
+        next = pool[_rng.nextInt(pool.length)];
+      } while (next == _eyes);
+      setState(() => _eyes = next);
+      _nextMood();
+    });
+  }
+
+  @override
+  void dispose() {
+    _mood?.cancel();
+    _c.dispose();
+    super.dispose();
+  }
+
+  static double _out(double t) => 1 - math.pow(1 - t, 3).toDouble();
+  static double _in(double t) => t * t * t;
+
+  @override
+  Widget build(BuildContext context) {
+    final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final size = widget.size;
+    final color = widget.color ?? mochiPalette.first.$2;
+    if (still) {
+      return MochiIcon(color: color, size: size);
+    }
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) {
+        final t = _c.value;
+        var dy = 0.0, sx = 1.0, sy = 1.0;
+        if (widget.squeeze) {
+          final k = math.pow(math.sin(t * math.pi), 2).toDouble();
+          sy = 1 - .2 * k;
+          sx = 1 + .14 * k;
+        } else {
+          final h = size * .3;
+          if (t < .18) {
+            final e = _out(t / .18);
+            sy = 1 - .16 * e;
+            sx = 1 + .12 * e;
+          } else if (t < .5) {
+            final p = (t - .18) / .32;
+            dy = -h * _out(p);
+            sy = 1 + .1 * (1 - p);
+            sx = 1 - .06 * (1 - p);
+          } else if (t < .72) {
+            final p = (t - .5) / .22;
+            dy = -h * (1 - _in(p));
+            sy = 1 + .06 * p;
+            sx = 1 - .04 * p;
+          } else if (t < .86) {
+            final k = math.sin((t - .72) / .14 * math.pi);
+            sy = 1 - .18 * k;
+            sx = 1 + .14 * k;
+          }
+        }
+        final blink = _eyes == MochiEyes.dot && t > .9 && t < .96 ? 1.0 : 0.0;
+        final look = math.sin(_c.lastElapsedDuration == null
+                ? 0
+                : _c.lastElapsedDuration!.inMilliseconds / 900) *
+            3;
+        return Transform.translate(
+          offset: Offset(0, dy),
+          child: Transform(
+            alignment: Alignment.bottomCenter,
+            transform: Matrix4.diagonal3Values(sx, sy, 1),
+            child: SizedBox.square(
+              dimension: size,
+              child: CustomPaint(
+                painter: _MochiPainter(color, size,
+                    eyes: _eyes,
+                    blink: blink,
+                    look: widget.squeeze ? 0 : look),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _MochiPainter extends CustomPainter {
-  _MochiPainter(this.color, this.size);
+  _MochiPainter(this.color, this.size,
+      {this.eyes = MochiEyes.dot, this.blink = 0, this.look = 0});
 
   final Color color;
   final double size;
+  final MochiEyes eyes;
+  final double blink;
+  final double look;
 
   @override
   void paint(Canvas canvas, Size s) {
@@ -115,8 +242,31 @@ class _MochiPainter extends CustomPainter {
       canvas.drawOval(Rect.fromCenter(center: const Offset(81, 81), width: 15, height: 8), blush);
     }
     final r = small ? 6.0 : 4.6;
-    canvas.drawCircle(Offset(small ? 47 : 48, 72), r, ink);
-    canvas.drawCircle(Offset(small ? 73 : 72, 72), r, ink);
+    final lx = (small ? 47.0 : 48.0) + look, rx = (small ? 73.0 : 72.0) + look;
+    final line = Paint()
+      ..color = const Color(0xFF15161C)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = small ? 4.6 : 3
+      ..strokeCap = StrokeCap.round;
+    for (final ex in [lx, rx]) {
+      switch (eyes) {
+        case MochiEyes.dot:
+          canvas.drawOval(
+              Rect.fromCenter(
+                  center: Offset(ex, 72),
+                  width: r * 2,
+                  height: r * 2 * (1 - blink * .85)),
+              ink);
+        case MochiEyes.flat:
+          canvas.drawLine(Offset(ex - r, 72), Offset(ex + r, 72), line);
+        case MochiEyes.happy:
+          canvas.drawPath(
+              Path()
+                ..moveTo(ex - r, 74)
+                ..quadraticBezierTo(ex, 64, ex + r, 74),
+              line);
+      }
+    }
     if (!small) {
       final mouth = Path()
         ..moveTo(54, 80)
@@ -135,5 +285,10 @@ class _MochiPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_MochiPainter old) => old.color != color || old.size != size;
+  bool shouldRepaint(_MochiPainter old) =>
+      old.color != color ||
+      old.size != size ||
+      old.eyes != eyes ||
+      old.blink != blink ||
+      old.look != look;
 }
