@@ -395,22 +395,25 @@ class _PaletteState extends State<_Palette> {
             Navigator.pop(context),
       },
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.line))),
           child: Row(children: [
-            AppIcon('search', size: 16, color: AppColors.fg3),
+            AppIcon('search', size: 17, color: AppColors.fg3),
             const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: _ctrl,
                 autofocus: true,
                 cursorColor: AppColors.accent,
-                style: sans(kMobile ? 15 : 14, color: AppColors.fg1),
+                style: sans(kMobile ? 15 : 16, color: AppColors.fg1),
                 decoration: InputDecoration(
                   isCollapsed: true,
                   border: InputBorder.none,
                   hintText: 'Search or jump to anything',
-                  hintStyle: sans(kMobile ? 15 : 14, color: AppColors.fg4),
+                  hintStyle: sans(kMobile ? 15 : 16, color: AppColors.fg4),
                 ),
               ),
             ),
@@ -426,6 +429,7 @@ class _PaletteState extends State<_Palette> {
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                   child: Center(
+                      heightFactor: 1,
                       child: Text(busy ? 'Searching…' : 'No matches',
                           style: TS.meta())),
                 )
@@ -451,7 +455,8 @@ class _PaletteState extends State<_Palette> {
         height: _headerHeight,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 2),
-          child: Text(k.label, style: sans(11, color: AppColors.fg4)),
+          child: Text(k.label.toUpperCase(),
+              style: sans(11, spacing: 0.9, color: AppColors.fg4)),
         ),
       );
 
@@ -510,8 +515,10 @@ class _PaletteState extends State<_Palette> {
             TextSpan(text: ' $label', style: sans(11, color: AppColors.fg4)),
           ])),
         );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.line))),
       child: Row(children: [
         hint('↑↓', 'move'),
         hint('enter', 'open'),
