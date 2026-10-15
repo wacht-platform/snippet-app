@@ -1203,76 +1203,47 @@ class Bubble extends StatelessWidget {
       );
     }
 
-    if (kMobile) {
-      return Padding(
-        padding: const EdgeInsets.only(left: 48, top: 4, bottom: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (media != null)
-              for (final m in media) ...[
-                m,
-                const SizedBox(height: 6),
-              ],
-            if (shown.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.fromLTRB(15, 10, 15, 11),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(6),
-                  ),
-                ),
-                child: mineText,
-              ),
-            if (media == null || media.isEmpty) ...[
-              for (final v in voice) ...[
-                const SizedBox(height: 6),
-                v,
-              ],
-              for (final extra in extras) ...[
-                const SizedBox(height: 6),
-                extra,
-              ],
-            ],
-            ...pastedCards,
-          ],
-        ),
-      );
-    }
-
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      padding: EdgeInsets.only(left: kMobile ? 48 : 140, top: 4, bottom: 4),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text('YOU', style: caps(11, color: AppColors.fg4, spacing: 0.8)),
-          const SizedBox(height: 4),
           if (media != null)
             for (final m in media) ...[
-              Align(alignment: Alignment.centerLeft, child: m),
-              const SizedBox(height: 8),
+              m,
+              const SizedBox(height: 6),
             ],
-          if (shown.isNotEmpty) mineText,
+          if (shown.isNotEmpty)
+            Container(
+              padding: kMobile
+                  ? const EdgeInsets.fromLTRB(15, 10, 15, 11)
+                  : const EdgeInsets.fromLTRB(14, 9, 14, 10),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(kMobile ? 20 : 16),
+                  topRight: Radius.circular(kMobile ? 20 : 16),
+                  bottomLeft: Radius.circular(kMobile ? 20 : 16),
+                  bottomRight: const Radius.circular(6),
+                ),
+              ),
+              child: mineText,
+            ),
           if (media == null || media.isEmpty) ...[
-            for (var i = 0; i < voice.length; i++) ...[
-              SizedBox(height: i == 0 && shown.isEmpty ? 0 : 8),
-              voice[i],
+            for (final v in voice) ...[
+              const SizedBox(height: 6),
+              v,
             ],
             for (final extra in extras) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               extra,
             ],
           ],
           ...pastedCards,
-          const SizedBox(height: 14),
-          Container(height: 1, color: AppColors.border),
         ],
       ),
     );
+
   }
 }
 
