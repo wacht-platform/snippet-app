@@ -39,6 +39,7 @@ import 'mobile_chrome.dart';
 import 'mobile_shell.dart';
 import 'new_session_picker.dart';
 import 'session.dart';
+import 'mission_board_panel.dart';
 import 'session_side_panel.dart';
 import 'settings_panel.dart';
 import 'shell_card_tab_strip.dart';
