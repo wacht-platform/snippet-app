@@ -160,8 +160,13 @@ List<SentAttachment> parseSentAttachments(String text) => [
 void openMedia(BuildContext context, DaemonClient client, String path,
     {List<String>? gallery}) {
   final openTab = DaemonScope.scopeOf(context)?.onOpenFile;
-  if (!kMobile && openTab != null) {
-    openTab(path, baseName(path));
+  if (!kMobile) {
+    if (openTab != null) {
+      openTab(path, baseName(path));
+    } else {
+      presentFileOnDesktop(context,
+          client: client, path: path, name: baseName(path));
+    }
     return;
   }
   if (mediaKindOf(path) == MediaKind.image) {
