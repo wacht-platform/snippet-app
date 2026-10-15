@@ -68,6 +68,8 @@ class ShellSplitView extends StatefulWidget {
 }
 
 class _ShellSplitViewState extends State<ShellSplitView> {
+  final _filesTab = RightTab.panel(RightPanel.files);
+
   ShellPane? _dragOverPane;
   bool _dragActive = false;
 
@@ -101,7 +103,9 @@ class _ShellSplitViewState extends State<ShellSplitView> {
 
   Widget _paneView(ShellPane p, {bool roundRight = false}) {
     final list = p == ShellPane.left ? widget.leftTabs : widget.rightTabs;
+    final pinned = p == ShellPane.right && widget.rightPanel != null;
     final readouts = [
+      if (pinned) _filesTab,
       for (final r in widget.readouts)
         if (r.pane == p) r
     ];
@@ -119,9 +123,7 @@ class _ShellSplitViewState extends State<ShellSplitView> {
 
     Widget content;
     if (list.isEmpty && readouts.isEmpty) {
-      content = p == ShellPane.right && widget.rightPanel != null
-          ? widget.rightPanel!
-          : widget.fallbackBuilder(p);
+      content = widget.fallbackBuilder(p);
     } else {
       content = Stack(children: [
         for (final t in list)
@@ -136,7 +138,9 @@ class _ShellSplitViewState extends State<ShellSplitView> {
           Offstage(
             key: ValueKey(readout.key),
             offstage: readout != shownReadout,
-            child: widget.readoutBodyBuilder(readout),
+            child: readout == _filesTab
+                ? widget.rightPanel!
+                : widget.readoutBodyBuilder(readout),
           ),
       ]);
     }
@@ -158,7 +162,7 @@ class _ShellSplitViewState extends State<ShellSplitView> {
                 pane: p,
                 tabs: list,
                 readouts: readouts,
-                activeKey: key,
+                activeKey: shownTab?.key ?? shownReadout?.key,
                 statusForTab: widget.statusForTab,
                 canDismissTab: (t) => widget.canCloseTab(t) || t.isTerminal,
                 onActivateTab: (t) => widget.onActivateTab(p, t),

@@ -934,8 +934,6 @@ class _DesktopShellState extends State<DesktopShell>
       cmd('tasks', 'task', 'Tasks', () => section(ShellSection.tasks),
           keywords: const ['board']),
       cmd('agents', 'agent', 'Agents', () => section(ShellSection.agents)),
-      cmd('terminals', 'terminal', 'Terminals',
-          () => section(ShellSection.terminal)),
       cmd('new-terminal', 'terminal', 'New terminal', _newGlobalShell),
       cmd('shortcuts', 'keyboard', 'Keyboard shortcuts',
           _showDesktopShortcuts,
