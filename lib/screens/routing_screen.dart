@@ -140,30 +140,9 @@ class _RoutingScreenState extends State<RoutingScreen> {
       final until = limited[name];
       return Container(
         key: ValueKey('$key-$name'),
-        height: kMobile ? 52 : 40,
-        padding: const EdgeInsets.symmetric(horizontal: S.s12),
+        height: kMobile ? 48 : 36,
+        padding: const EdgeInsets.only(left: S.s16, right: S.s8),
         child: Row(children: [
-          if (on)
-            ReorderableDragStartListener(
-              index: index,
-              child: MouseRegion(
-                cursor: SystemMouseCursors.grab,
-                child: Padding(
-                  padding: const EdgeInsets.all(S.s4),
-                  child: AppIcon('grip', size: 14, color: AppColors.fg4),
-                ),
-              ),
-            )
-          else
-            const SizedBox(width: 22),
-          const SizedBox(width: S.s6),
-          SizedBox(
-            width: 18,
-            child: on
-                ? Text('${index + 1}',
-                    style: sans(12, color: AppColors.fg3, tabular: true))
-                : null,
-          ),
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -193,6 +172,19 @@ class _RoutingScreenState extends State<RoutingScreen> {
           ),
           if (until != null)
             Tag('Limited until ${limitLabel(until)}', tone: Tone.run),
+          if (on)
+            ReorderableDragStartListener(
+              index: index,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.grab,
+                child: Padding(
+                  padding: const EdgeInsets.all(S.s8),
+                  child: AppIcon('grip', size: 14, color: AppColors.fg4),
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 30),
         ]),
       );
     }
