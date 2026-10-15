@@ -260,6 +260,41 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           endTools(key);
           addEvent(key,
               NoteLine(_s(e['message']), error: true, label: 'Model error'));
+        case 'profile_switched':
+          endTools(key);
+          addEvent(
+              key,
+              NoteLine(
+                  '${_s(e['from'])} hit its usage limit. Continuing on ${_s(e['to'])}.'));
+        case 'limit_wait':
+          endTools(key);
+          final at = (e['resets_at'] as num?)?.toInt() ?? 0;
+          addEvent(
+              key,
+              NoteLine(at > 0
+                  ? 'Waiting for ${_s(e['profile'])} to reset at ${limitLabel(at)}.'
+                  : 'Waiting for ${_s(e['profile'])} to reset.'));
+        case 'limit_reached':
+          endTools(key);
+          const later = {
+            'profile_switched',
+            'limit_wait',
+            'user_input',
+            'steer',
+            'assistant_text',
+          };
+          addEvent(
+              key,
+              LimitCard(
+                client: widget.client,
+                session: widget.sessionId,
+                profile: _s(e['profile']),
+                resetsAt: (e['resets_at'] as num?)?.toInt() ?? 0,
+                options: [
+                  for (final o in (e['options'] as List? ?? const [])) '$o'
+                ],
+                settled: events.skip(idx + 1).any((x) => later.contains(x['kind'])),
+              ));
         case 'invalid_tool_call':
           endTools(key);
           addEvent(
