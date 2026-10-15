@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../mochi.dart';
+
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
@@ -61,43 +63,66 @@ class TopWorkspaceTabChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = tab.title.isEmpty ? '(untitled)' : tab.title;
+    final working = status == 'running' || status == 'waiting_for_input';
+    final showClose = canClose && onClose != null && isActive;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: Motion.quick,
         key: chipKey,
-        height: 26,
-        padding: EdgeInsets.fromLTRB(9, 0, canClose ? 5 : 10, 0),
+        height: 30,
+        padding: EdgeInsets.fromLTRB(11, 0, showClose ? 5 : 11, 0),
         decoration: BoxDecoration(
           color: isActive ? AppColors.surface2 : Colors.transparent,
-          borderRadius: BorderRadius.circular(7),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(
+              color: isActive ? AppColors.line : Colors.transparent),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SessionStateIcon(
-              status: status,
-              icon: tabIconKind(tab),
-              size: 13,
-            ),
-            const SizedBox(width: 7),
+            if (tab.isMissionControl)
+              MochiIcon(color: AppColors.accent, size: 14)
+            else
+              SessionStateIcon(
+                status: working ? null : status,
+                icon: tabIconKind(tab),
+                size: 13,
+              ),
+            const SizedBox(width: 8),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
+              constraints: const BoxConstraints(maxWidth: 190),
               child: Text(
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(kMobile ? 14 : 12.5,
+                style: sans(kMobile ? 14 : 13,
                     color: isActive ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
-            if (canClose && onClose != null) ...[
-              const SizedBox(width: 6),
+            if (working) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: status == 'running'
+                      ? AppColors.accent
+                      : Colors.transparent,
+                  border: status == 'running'
+                      ? null
+                      : Border.all(color: AppColors.accent, width: 1.5),
+                ),
+              ),
+            ],
+            if (showClose) ...[
+              const SizedBox(width: 4),
               GestureDetector(
                 onTap: onClose,
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(5),
                   child: AppIcon('x', size: 11, color: AppColors.fg4),
                 ),
               ),
@@ -278,12 +303,12 @@ class MainTabsStrip extends StatelessWidget {
               chipKey: chipKeyFor(t.key),
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 2),
         ],
         Center(
           child: IconBtn(
             'plus',
-            size: 24,
+            size: 28,
             iconSize: 14,
             tooltip: 'New session',
             onTap: onNewSession,
