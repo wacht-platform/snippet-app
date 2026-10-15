@@ -685,7 +685,7 @@ class PaneTabStrip extends StatelessWidget {
 /// Secondary pane width. Width-driven rather than a flex ratio: a fixed flex
 /// ratio cannot be dragged, and a terminal needs a column count while a readout
 /// should not stretch to 45% of a 4K window.
-const double kPaneDefaultWidth = 420;
+const double kPaneDefaultWidth = 320;
 
 /// Smallest usable pane width. Below this a terminal loses its columns and a
 /// readout starts wrapping every label.

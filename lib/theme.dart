@@ -627,7 +627,7 @@ class TS {
   /// The agent's prose: the body sans a step up, with reading line height.
   static TextStyle reading([Color? c]) => kMobile
       ? sans(16, height: 26 / 16, color: c ?? AppColors.fg1)
-      : sans(15, height: 24 / 15, color: c ?? AppColors.fg1);
+      : sans(14, height: 22 / 14, color: c ?? AppColors.fg1);
   static TextStyle code([Color? c]) =>
       mono(13, height: 20 / 13, color: c ?? AppColors.fg2);
   static TextStyle codeSmall([Color? c]) =>
