@@ -139,10 +139,29 @@ class SidebarState extends State<Sidebar> {
     }
   }
 
+  Map<String, String> _profileProviders = const {};
+  String? _providersFor;
+
+  Future<void> _loadProviders() async {
+    final client = widget.client;
+    if (client == null) return;
+    final key = '${client.baseUrl}|${widget.sessions?.length}';
+    if (_providersFor == key) return;
+    _providersFor = key;
+    try {
+      final cfg = await client.getConfig();
+      if (!mounted) return;
+      setState(() => _profileProviders = {
+            for (final p in cfg.profiles) p.name: p.provider,
+          });
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     Drafts.instance.addListener(_onDrafts);
+    _loadProviders();
     _pageController = PageController(initialPage: widget.mobileHome.index);
     if (widget.mobileHome != MobileHome.settings) {
       _lastMainHome = widget.mobileHome;
@@ -152,6 +171,12 @@ class SidebarState extends State<Sidebar> {
   @override
   void didUpdateWidget(covariant Sidebar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.client != widget.client ||
+        (widget.sessions ?? const <SessionInfo>[]).any((s) =>
+            (s.profile ?? '').isNotEmpty &&
+            !_profileProviders.containsKey(s.profile))) {
+      _loadProviders();
+    }
     if (oldWidget.mobileHome != widget.mobileHome) {
       if (oldWidget.mobileHome != MobileHome.settings) {
         _lastMainHome = oldWidget.mobileHome;
@@ -1414,6 +1439,11 @@ class SidebarState extends State<Sidebar> {
                       AgentMochi(s.displayAgentId!, size: 14),
                     ] else if ((s.profile ?? '').isNotEmpty) ...[
                       const SizedBox(width: 8),
+                      if (_profileProviders[s.profile] != null) ...[
+                        ProviderLogo(_profileProviders[s.profile],
+                            size: 13, color: AppColors.fg3),
+                        const SizedBox(width: 5),
+                      ],
                       Text(s.profile!,
                           style: sans(13, color: AppColors.fg3)),
                     ],

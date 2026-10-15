@@ -2022,6 +2022,12 @@ const _lucide = <String, IconData>{
   'file-diff': LucideIcons.fileDiff,
   'pull-request': LucideIcons.gitPullRequest,
   'external-link': LucideIcons.externalLink,
+  'route': LucideIcons.route,
+  'gauge': LucideIcons.gauge,
+  'book-marked': LucideIcons.bookMarked,
+  'shield-check': LucideIcons.shieldCheck,
+  'lock': LucideIcons.lockKeyhole,
+  'calendar-clock': LucideIcons.calendarClock,
 };
 
 String? providerLogoAsset(String? provider) {
