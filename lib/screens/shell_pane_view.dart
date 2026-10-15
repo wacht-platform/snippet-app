@@ -209,49 +209,59 @@ class ReadoutChip extends StatelessWidget {
     required this.onClose,
     required this.onDragStarted,
     required this.onDragEnd,
+    this.compact = false,
   });
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final chip = GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: width,
+        width: compact ? null : width,
         child: AnimatedContainer(
           duration: Motion.quick,
-          height: 32,
-          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
-          padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
+          height: compact ? 26 : 32,
+          constraints: compact ? BoxConstraints(maxWidth: width) : null,
+          margin:
+              EdgeInsets.symmetric(horizontal: 2, vertical: compact ? 6 : 7),
+          padding: EdgeInsets.fromLTRB(compact ? 9 : 12, 0, compact ? 6 : 8, 0),
           decoration: BoxDecoration(
             color: active ? AppColors.surface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(compact ? 7 : 10),
           ),
-          child: Row(children: [
-            AppIcon(tab.icon,
-                size: 14, color: active ? AppColors.fg1 : AppColors.fg3),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                tab.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(13, color: active ? AppColors.fg1 : AppColors.fg3),
-              ),
-            ),
-            if (pinned)
-              const SizedBox(width: 6)
-            else ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: onClose,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(3),
-                  child: AppIcon('x', size: 11, color: AppColors.fg4),
+          child: Row(
+              mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+              children: [
+                AppIcon(tab.icon,
+                    size: compact ? 12 : 14,
+                    color: active ? AppColors.fg1 : AppColors.fg3),
+                SizedBox(width: compact ? 6 : 8),
+                Flexible(
+                  fit: compact ? FlexFit.loose : FlexFit.tight,
+                  child: Text(
+                    tab.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(compact ? 12 : 13,
+                        color: active ? AppColors.fg1 : AppColors.fg3),
+                  ),
                 ),
-              ),
-            ],
-          ]),
+                if (pinned)
+                  const SizedBox(width: 6)
+                else ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: onClose,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: AppIcon('x', size: 11, color: AppColors.fg4),
+                    ),
+                  ),
+                ],
+              ]),
         ),
       ),
     );
@@ -305,50 +315,59 @@ class PaneTabChip extends StatelessWidget {
     required this.onDismiss,
     required this.onDragStarted,
     required this.onDragEnd,
+    this.compact = false,
   });
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final chip = GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: width,
+        width: compact ? null : width,
         child: AnimatedContainer(
           duration: Motion.quick,
-          height: 32,
-          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
-          padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
+          height: compact ? 26 : 32,
+          constraints: compact ? BoxConstraints(maxWidth: width) : null,
+          margin:
+              EdgeInsets.symmetric(horizontal: 2, vertical: compact ? 6 : 7),
+          padding: EdgeInsets.fromLTRB(compact ? 9 : 12, 0, compact ? 6 : 8, 0),
           decoration: BoxDecoration(
             color: active ? AppColors.surface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(compact ? 7 : 10),
           ),
-          child: Row(children: [
-            SessionStateIcon(
-              status: status,
-              icon: tabIconKind(tab),
-              size: 14,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                tab.title.isEmpty ? '(untitled)' : tab.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(13, color: active ? AppColors.fg1 : AppColors.fg3),
-              ),
-            ),
-            if (canDismiss) ...[
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: onDismiss,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(3),
-                  child: AppIcon('x', size: 11, color: AppColors.fg4),
+          child: Row(
+              mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+              children: [
+                SessionStateIcon(
+                  status: status,
+                  icon: tabIconKind(tab),
+                  size: compact ? 12 : 14,
                 ),
-              ),
-            ],
-          ]),
+                SizedBox(width: compact ? 6 : 8),
+                Flexible(
+                  fit: compact ? FlexFit.loose : FlexFit.tight,
+                  child: Text(
+                    tab.title.isEmpty ? '(untitled)' : tab.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(compact ? 12 : 13,
+                        color: active ? AppColors.fg1 : AppColors.fg3),
+                  ),
+                ),
+                if (canDismiss) ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: onDismiss,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(3),
+                      child: AppIcon('x', size: 11, color: AppColors.fg4),
+                    ),
+                  ),
+                ],
+              ]),
         ),
       ),
     );
@@ -410,12 +429,14 @@ class PaneStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final count = tabs.length + readouts.length;
+    final compact = pane == ShellPane.right;
     return Container(
-      height: 46,
+      height: compact ? 38 : 46,
       color: readingBg,
       child: Stack(fit: StackFit.expand, children: [
         LayoutBuilder(builder: (context, c) {
-          final w = kPaneTabWidth(c.maxWidth - 12, count);
+          final fit = kPaneTabWidth(c.maxWidth - 12, count);
+          final w = compact && fit > 136 ? 136.0 : fit;
           return ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -435,6 +456,7 @@ class PaneStrip extends StatelessWidget {
                   onDismiss: () => onDismissTab(t),
                   onDragStarted: onDragStarted,
                   onDragEnd: onDragEnd,
+                  compact: compact,
                 );
               }
               final r = readouts[i - tabs.length];
@@ -447,6 +469,7 @@ class PaneStrip extends StatelessWidget {
                 onClose: () => onCloseReadout(r),
                 onDragStarted: onDragStarted,
                 onDragEnd: onDragEnd,
+                compact: compact,
               );
             },
           );

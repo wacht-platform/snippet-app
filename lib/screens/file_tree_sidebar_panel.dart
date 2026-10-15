@@ -335,6 +335,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                 // rather than at the panel's corner.
                 Builder(
                   builder: (ctx) => ShellSectionAction(
+                    small: true,
                     icon: 'search',
                     tooltip: 'Search files',
                     onTap: () => _openFileSearch(ctx),
@@ -342,6 +343,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                 ),
                 Builder(
                   builder: (ctx) => ShellSectionAction(
+                    small: true,
                     icon: 'upload',
                     tooltip: 'Upload files',
                     // Enabled before the first listing arrives: `_createDir` falls
@@ -354,6 +356,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                 ),
                 Builder(
                   builder: (ctx) => ShellSectionAction(
+                    small: true,
                     icon: 'plus',
                     tooltip: 'New file or folder',
                     onTap: _listing == null ? null : () => _openAddMenu(ctx),
@@ -361,6 +364,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                 ),
                 if (widget.onHide != null)
                   ShellSectionAction(
+                    small: true,
                     icon: 'chevron-right',
                     tooltip: 'Hide files',
                     onTap: widget.onHide,

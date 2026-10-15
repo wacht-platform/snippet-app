@@ -54,6 +54,7 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
             ],
             const Spacer(),
             ShellSectionAction(
+              small: true,
               icon: 'plus',
               tooltip: 'New terminal',
               onTap: host == null

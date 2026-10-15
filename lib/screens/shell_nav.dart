@@ -313,8 +313,10 @@ class ShellSectionAction extends StatelessWidget {
     required this.tooltip,
     this.onTap,
     this.active = false,
+    this.small = false,
   });
 
+  final bool small;
   final String icon;
   final String tooltip;
   final VoidCallback? onTap;
@@ -333,11 +335,11 @@ class ShellSectionAction extends StatelessWidget {
           borderRadius: BorderRadius.circular(kMobile ? R.md : 9),
           child: SizedBox(
             // 24px target around a 16px glyph.
-            width: kMobile ? 24 : 28,
-            height: kMobile ? 24 : 28,
+            width: kMobile ? 24 : (small ? 24 : 28),
+            height: kMobile ? 24 : (small ? 24 : 28),
             child: Center(
               child: AppIcon(icon,
-                  size: kMobile ? 16 : 15,
+                  size: kMobile ? 16 : (small ? 13 : 15),
                   color: active
                       ? AppColors.accent
                       : (onTap == null ? AppColors.fg4 : AppColors.fg3)),
