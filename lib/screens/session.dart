@@ -111,7 +111,7 @@ class SessionScreen extends StatefulWidget {
 
   final ValueChanged<bool>? onGithubReady;
 
-  final VoidCallback? onShowPullRequests;
+  final ValueChanged<GithubStatus>? onShowPullRequests;
 
   /// Publishes this session's terminals to the shell as a render host. Called
   /// only when the terminal set or focus changes, never on output.

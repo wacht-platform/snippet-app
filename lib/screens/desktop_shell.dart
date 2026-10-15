@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api.dart';
+import '../github_models.dart';
 import '../swr.dart';
 import '../session_status_updates.dart';
 import '../command_palette.dart';
@@ -40,6 +41,7 @@ import 'mobile_shell.dart';
 import 'new_session_picker.dart';
 import 'session.dart';
 import 'mission_board_panel.dart';
+import 'pull_requests.dart';
 import 'session_side_panel.dart';
 import 'settings_panel.dart';
 import 'shell_card_tab_strip.dart';
@@ -185,11 +187,6 @@ class _DesktopShellState extends State<DesktopShell>
   final Map<String, bool> _githubReady = {};
   String _gitTab = 'changes';
 
-  void _showPullRequests() => setState(() {
-        _section = ShellSection.git;
-        _leftCollapsed = false;
-        _gitTab = 'prs';
-      });
   final Map<String, _MacSessionControls> _macSessionControls = {};
 
   /// Terminals, bridged from each mounted `SessionScreen`.

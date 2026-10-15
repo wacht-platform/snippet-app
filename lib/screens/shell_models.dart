@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../api.dart';
+import '../github_models.dart';
 import '../store.dart';
 import '../shell_panel.dart';
 import '../models.dart';
@@ -75,6 +76,8 @@ class ShellTab {
 
   /// The Kanban task board for the machine.
   final bool isBoard;
+  final String? prSession;
+  final GithubStatus? github;
 
   ShellTab.session({
     required this.client,
@@ -91,7 +94,9 @@ class ShellTab {
         diffUntracked = false,
         termId = null,
         termSessionKey = null,
-        isBoard = false;
+        isBoard = false,
+        prSession = null,
+        github = null;
 
   ShellTab.file({
     required this.client,
@@ -107,7 +112,9 @@ class ShellTab {
         diffUntracked = false,
         termId = null,
         termSessionKey = null,
-        isBoard = false;
+        isBoard = false,
+        prSession = null,
+        github = null;
 
   ShellTab.diff({
     required this.client,
@@ -123,7 +130,9 @@ class ShellTab {
         profile = null,
         termId = null,
         termSessionKey = null,
-        isBoard = false;
+        isBoard = false,
+        prSession = null,
+        github = null;
 
   ShellTab.terminal({
     required this.client,
@@ -139,7 +148,9 @@ class ShellTab {
         diffPath = null,
         diffStaged = false,
         diffUntracked = false,
-        isBoard = false;
+        isBoard = false,
+        prSession = null,
+        github = null;
 
   ShellTab.board({
     required this.client,
@@ -155,18 +166,43 @@ class ShellTab {
         diffUntracked = false,
         termId = null,
         termSessionKey = null,
-        isBoard = true;
+        isBoard = true,
+        prSession = null,
+        github = null;
 
+  ShellTab.prs({
+    required this.client,
+    required this.instanceUrl,
+    required String session,
+    required GithubStatus this.github,
+    this.pane = ShellPane.left,
+    this.groupSessionKey,
+  })  : title = 'Pull requests',
+        prSession = session,
+        sessionId = null,
+        filePath = null,
+        profile = null,
+        diffPath = null,
+        diffStaged = false,
+        diffUntracked = false,
+        termId = null,
+        termSessionKey = null,
+        isBoard = false;
+
+  bool get isPrs => prSession != null;
   bool get isFile => filePath != null;
   bool get isDiff => diffPath != null;
   bool get isTerminal => termId != null;
   bool get isMissionControl =>
       !isBoard &&
+      !isPrs &&
       !isFile &&
       !isDiff &&
       !isTerminal &&
       isMissionControlTab(sessionId: sessionId, title: title);
-  String get key => isBoard
+  String get key => isPrs
+      ? '$instanceUrl|prs'
+      : isBoard
       ? '$instanceUrl|tasks-board'
       : isTerminal
           ? '$instanceUrl|term|${termSessionKey ?? 'global'}|$termId'
@@ -181,7 +217,9 @@ class ShellTab {
 
 /// Icon for a tab, by kind. One helper so the four call sites that render a
 /// tab (top bar, desktop strip, split header, tab menu) cannot drift.
-String tabIconKind(ShellTab t) => t.isBoard
+String tabIconKind(ShellTab t) => t.isPrs
+    ? 'pull-request'
+    : t.isBoard
     ? 'kanban'
     : t.isMissionControl
         ? 'layers'

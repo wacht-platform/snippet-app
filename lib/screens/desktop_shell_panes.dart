@@ -12,6 +12,15 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         );
 
   Widget _originTabBody(_ShellTab t, {required bool primary}) {
+    if (t.isPrs) {
+      return PullRequestsScreen(
+        key: ValueKey('body-${t.key}'),
+        client: t.client,
+        session: t.prSession!,
+        status: t.github!,
+        onClose: () => _closePaneTab(t),
+      );
+    }
     if (t.isBoard) {
       return kMobile
           ? TaskKanban(key: ValueKey('body-${t.key}'), client: t.client)
@@ -91,7 +100,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
               _setMacSessionControls(t.key, stop, performAction)
           : null,
       onGithubReady: !kMobile ? (ok) => _setGithubReady(t.key, ok) : null,
-      onShowPullRequests: !kMobile ? _showPullRequests : null,
+      onShowPullRequests: !kMobile ? _openPrsTab : null,
       onTerminalHost:
           !kMobile ? (host, open) => _setTerminalHost(t.key, host, open) : null,
       onOpenScheduled:
@@ -100,7 +109,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   bool _isAuxiliary(_ShellTab t) =>
-      t.isTerminal || t.isFile || t.isDiff || t.isBoard;
+      t.isTerminal || t.isFile || t.isDiff || t.isBoard || t.isPrs;
 
   List<_ShellTab> get _mainTabs => [
         for (final t in _tabs)
