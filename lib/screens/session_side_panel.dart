@@ -27,21 +27,23 @@ class SessionSidePanel extends StatefulWidget {
 
 class _SessionSidePanelState extends State<SessionSidePanel> {
   static bool _termsOpen = true;
+  static const _rowInset = 12.0 + 13 + 6;
 
   @override
   Widget build(BuildContext context) {
     final host = widget.host;
     final terms = host?.terms ?? const [];
+    final open = _termsOpen && terms.isNotEmpty;
     final header = MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _termsOpen = !_termsOpen),
+        onTap: terms.isEmpty ? null : () => setState(() => _termsOpen = !open),
         child: Container(
           height: 38,
           padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
           child: Row(children: [
-            AppIcon(_termsOpen ? 'chevron-down' : 'chevron-right',
+            AppIcon(open ? 'chevron-down' : 'chevron-right',
                 size: 13, color: AppColors.fg3),
             const SizedBox(width: 6),
             Text('Terminals', style: sans(13, color: AppColors.fg3)),
@@ -54,7 +56,12 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
             ShellSectionAction(
               icon: 'plus',
               tooltip: 'New terminal',
-              onTap: host?.newTerminal,
+              onTap: host == null
+                  ? null
+                  : () {
+                      setState(() => _termsOpen = true);
+                      host.newTerminal();
+                    },
             ),
           ]),
         ),
@@ -75,44 +82,39 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
         ),
         Container(height: 1, color: AppColors.border),
         header,
-        if (_termsOpen)
+        if (open)
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 220),
-            child: terms.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(30, 0, 12, 12),
-                    child: Text('No terminals yet.',
-                        style: sans(12, color: AppColors.fg4)),
-                  )
-                : ListView(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.only(bottom: 8),
-                    children: [
-                      for (var i = 0; i < terms.length; i++)
-                        ShellNavRow(
-                          id: terms[i].id,
-                          label: terms[i].title,
-                          icon: 'terminal',
-                          tone: ShellTone.neutral,
-                          selected: i == host!.focus,
-                          onTap: () => host.focusTerm(terms[i].id),
-                          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                            if (terms[i].alive) ...[
-                              const StatusDot(status: 'online', size: 7),
-                              const SizedBox(width: 6),
-                            ],
-                            GestureDetector(
-                              onTap: () => host.closeTerm(terms[i].id),
-                              behavior: HitTestBehavior.opaque,
-                              child: Padding(
-                                padding: const EdgeInsets.all(3),
-                                child: AppIcon('x', size: 12, color: AppColors.fg4),
-                              ),
-                            ),
-                          ]),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(bottom: 8),
+              children: [
+                for (var i = 0; i < terms.length; i++)
+                  ShellNavRow(
+                    id: terms[i].id,
+                    indent: _rowInset,
+                    label: terms[i].title,
+                    icon: 'terminal',
+                    tone: ShellTone.neutral,
+                    selected: i == host!.focus,
+                    onTap: () => host.focusTerm(terms[i].id),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (terms[i].alive) ...[
+                        const StatusDot(status: 'online', size: 7),
+                        const SizedBox(width: 6),
+                      ],
+                      GestureDetector(
+                        onTap: () => host.closeTerm(terms[i].id),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.all(3),
+                          child: AppIcon('x', size: 12, color: AppColors.fg4),
                         ),
-                    ],
+                      ),
+                    ]),
                   ),
+              ],
+            ),
           ),
       ],
     );
