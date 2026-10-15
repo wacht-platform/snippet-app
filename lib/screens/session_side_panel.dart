@@ -86,38 +86,104 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
         if (open)
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 220),
-            child: ListView(
-              shrinkWrap: true,
+            child: SingleChildScrollView(
               padding: const EdgeInsets.only(bottom: 8),
-              children: [
-                for (var i = 0; i < terms.length; i++)
-                  ShellNavRow(
-                    id: terms[i].id,
-                    indent: _rowInset,
-                    label: terms[i].title,
-                    icon: 'terminal',
-                    tone: ShellTone.neutral,
-                    selected: i == host!.focus,
-                    onTap: () => host.focusTerm(terms[i].id),
-                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                      if (terms[i].alive) ...[
-                        const StatusDot(status: 'online', size: 7),
-                        const SizedBox(width: 6),
-                      ],
-                      GestureDetector(
-                        onTap: () => host.closeTerm(terms[i].id),
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding: const EdgeInsets.all(3),
-                          child: AppIcon('x', size: 12, color: AppColors.fg4),
-                        ),
-                      ),
-                    ]),
-                  ),
-              ],
+              child: Stack(children: [
+                Positioned(
+                  left: 18,
+                  top: 0,
+                  bottom: 4,
+                  child: Container(width: 1, color: AppColors.border),
+                ),
+                Column(children: [
+                  for (var i = 0; i < terms.length; i++)
+                    _TermTreeRow(
+                      title: terms[i].title,
+                      alive: terms[i].alive,
+                      selected: i == host!.focus,
+                      onTap: () => host.focusTerm(terms[i].id),
+                      onClose: () => host.closeTerm(terms[i].id),
+                    ),
+                ]),
+              ]),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _TermTreeRow extends StatefulWidget {
+  const _TermTreeRow({
+    required this.title,
+    required this.alive,
+    required this.selected,
+    required this.onTap,
+    required this.onClose,
+  });
+
+  final String title;
+  final bool alive;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback onClose;
+
+  @override
+  State<_TermTreeRow> createState() => _TermTreeRowState();
+}
+
+class _TermTreeRowState extends State<_TermTreeRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = widget.selected;
+    return Padding(
+      padding: const EdgeInsets.only(
+          left: _SessionSidePanelState._rowInset - 6,
+          right: kSidebarContentInset),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: Container(
+            height: kNavRowHeight,
+            padding: const EdgeInsets.only(left: 6, right: 4),
+            decoration: BoxDecoration(
+              color: on || _hover ? AppColors.surface2 : Colors.transparent,
+              borderRadius: BorderRadius.circular(R.md),
+            ),
+            child: Row(children: [
+              AppIcon('terminal',
+                  size: 14, color: on ? AppColors.fg1 : AppColors.fg3),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, color: on ? AppColors.fg1 : AppColors.fg2)),
+              ),
+              if (widget.alive && !_hover)
+                const Padding(
+                  padding: EdgeInsets.only(right: 6),
+                  child: StatusDot(status: 'online', size: 6),
+                ),
+              if (_hover)
+                GestureDetector(
+                  onTap: widget.onClose,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: AppIcon('x', size: 11, color: AppColors.fg3),
+                  ),
+                ),
+            ]),
+          ),
+        ),
+      ),
     );
   }
 }

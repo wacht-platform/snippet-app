@@ -429,7 +429,7 @@ class PaneStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final count = tabs.length + readouts.length;
-    final compact = pane == ShellPane.right;
+    final compact = !kMobile;
     return Container(
       height: compact ? 38 : 46,
       color: readingBg,

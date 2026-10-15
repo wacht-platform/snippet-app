@@ -66,11 +66,11 @@ class TopWorkspaceTabChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: Motion.quick,
         key: chipKey,
-        height: 30,
-        padding: EdgeInsets.fromLTRB(10, 0, canClose ? 6 : 12, 0),
+        height: 26,
+        padding: EdgeInsets.fromLTRB(9, 0, canClose ? 5 : 10, 0),
         decoration: BoxDecoration(
           color: isActive ? AppColors.surface2 : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(7),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -78,16 +78,16 @@ class TopWorkspaceTabChip extends StatelessWidget {
             SessionStateIcon(
               status: status,
               icon: tabIconKind(tab),
-              size: 15,
+              size: 13,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 7),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 180),
               child: Text(
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(kMobile ? 14 : 13,
+                style: sans(kMobile ? 14 : 12.5,
                     color: isActive ? AppColors.fg1 : AppColors.fg3),
               ),
             ),
@@ -98,7 +98,7 @@ class TopWorkspaceTabChip extends StatelessWidget {
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
                   padding: const EdgeInsets.all(4),
-                  child: AppIcon('x', size: 13, color: AppColors.fg4),
+                  child: AppIcon('x', size: 11, color: AppColors.fg4),
                 ),
               ),
             ],
@@ -284,7 +284,7 @@ class MainTabsStrip extends StatelessWidget {
           child: IconBtn(
             'plus',
             size: 24,
-            iconSize: 16,
+            iconSize: 14,
             tooltip: 'New session',
             onTap: onNewSession,
           ),
