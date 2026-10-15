@@ -170,19 +170,12 @@ void main() {
       await tester.tap(find.byTooltip('Close'));
       await tester.pumpAndSettle();
 
-      // 4. Settings keeps the tabs, and its New offers what Settings makes.
+      // 4. Settings has no New of its own.
       await tester.pumpWidget(buildTestWidget(home: MobileHome.settings));
       await tester.pumpAndSettle();
-      for (final tip in ['New session', 'New task', 'New agent']) {
+      for (final tip in ['New session', 'New task', 'New agent', 'Create']) {
         expect(find.byTooltip(tip).hitTestable(), findsNothing);
       }
-      await tester.tap(find.byTooltip('Create').hitTestable());
-      await tester.pumpAndSettle();
-      for (final item in ['Connect another computer running snippet', 'Inference profile', 'Vault secret', 'Scheduled job']) {
-        expect(find.text(item), findsOneWidget);
-      }
-      await tester.tapAt(const Offset(195, 40));
-      await tester.pumpAndSettle();
       expect(find.text('WORKSPACE'), findsNothing);
     } finally {
       debugDefaultTargetPlatformOverride = null;

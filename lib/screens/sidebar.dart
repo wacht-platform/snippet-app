@@ -51,6 +51,7 @@ class Sidebar extends StatefulWidget {
   /// return to Chats; passed down because the phone home IS this widget.
   final MobileHome mobileHome;
   final Widget? mobileTopBar;
+  final VoidCallback? onMobileMenu;
   final ValueChanged<MobileHome> onMobileHome;
 
   /// Phone drill-down state + setters. Also shell-owned, for the same reason:
@@ -85,6 +86,7 @@ class Sidebar extends StatefulWidget {
     this.onSessionAction,
     required this.mobileHome,
     this.mobileTopBar,
+    this.onMobileMenu,
     required this.onMobileHome,
     required this.settingsSection,
     required this.onSettingsSection,
@@ -334,7 +336,8 @@ class SidebarState extends State<Sidebar> {
           children: [
             MobileBackBar(
               title: 'Tasks',
-              onBack: () => Navigator.maybePop(context),
+              menu: widget.onMobileMenu != null,
+              onBack: widget.onMobileMenu ?? () => Navigator.maybePop(context),
               trailing: [
                 RoundBtn(
                     icon: 'plus',
@@ -550,7 +553,8 @@ class SidebarState extends State<Sidebar> {
 
   Widget _mobileAgentsHeader(bool hasClient) => MobileBackBar(
         title: 'Agents',
-        onBack: () => Navigator.maybePop(context),
+        menu: widget.onMobileMenu != null,
+        onBack: widget.onMobileMenu ?? () => Navigator.maybePop(context),
         trailing: [
           if (hasClient)
             RoundBtn(
@@ -574,9 +578,6 @@ class SidebarState extends State<Sidebar> {
   Widget _mobileSettingsHeader() => MobileBackBar(
         title: 'Settings',
         onBack: () => Navigator.maybePop(context),
-        trailing: [
-          RoundBtn(icon: 'plus', tooltip: 'Create', onTap: _openSettingsCreate),
-        ],
       );
 
   /// Machine switcher, as a small round button: the machine's initial plus a
@@ -635,59 +636,6 @@ class SidebarState extends State<Sidebar> {
         ),
       ),
     );
-  }
-
-  Future<void> _openSettingsCreate() async {
-    if (widget.client == null) {
-      widget.onAddInstance();
-      return;
-    }
-    const items = [
-      (
-        SettingsPage.general,
-        'server',
-        'Machine',
-        'Connect another computer running snippet'
-      ),
-      (
-        SettingsPage.models,
-        'ai-chip',
-        'Inference profile',
-        'A model and provider chats can run on'
-      ),
-      (
-        SettingsPage.vault,
-        'lock-key',
-        'Vault secret',
-        'A key or token your agents can use'
-      ),
-      (
-        SettingsPage.scheduled,
-        'repeat',
-        'Scheduled job',
-        'A prompt that runs on a schedule'
-      ),
-    ];
-    final picked = await showAppSheet<SettingsPage>(
-      context,
-      title: 'Create',
-      child: Builder(
-        builder: (sheetContext) => ListGroup(children: [
-          for (final (page, icon, title, subtitle) in items)
-            ListRow(
-              leading: IconTile(icon),
-              title: title,
-              subtitle: subtitle,
-              trailing:
-                  AppIcon('chevron-right', size: 14, color: AppColors.fg4),
-              onTap: () => Navigator.of(sheetContext).pop(page),
-            ),
-        ]),
-      ),
-    );
-    if (picked == null || !mounted) return;
-    setState(() => _pendingSettingsCreate = picked);
-    widget.onSettingsSection(picked);
   }
 
   bool _matchesQuery(SessionInfo s) {
@@ -1429,7 +1377,7 @@ class SidebarState extends State<Sidebar> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: sans(16,
-                                  weight: W.label,
+                                  weight: W.strong,
                                   height: 21 / 16,
                                   color: AppColors.fg1)),
                     ),

@@ -138,7 +138,7 @@ class MobileTopBar extends StatelessWidget {
             if (active) ...[
               const SizedBox(width: 8),
               Text(label,
-                  style: sans(15, weight: W.label, color: AppColors.fg1)),
+                  style: sans(15, weight: W.strong, color: AppColors.fg1)),
             ],
           ]),
         ),
@@ -153,12 +153,7 @@ class MobileTopBar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
-          RoundBtn(
-              tooltip: 'Menu',
-              onTap: onMenu,
-              child: CustomPaint(
-                  size: const Size.square(18),
-                  painter: _GridGlyph(AppColors.fg2))),
+          RoundBtn(icon: 'menu', tooltip: 'Menu', onTap: onMenu),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(4),
@@ -199,10 +194,12 @@ class MobileBackBar extends StatelessWidget {
     this.subtitle,
     this.onTitleTap,
     this.trailing = const [],
+    this.menu = false,
   });
 
   final String title;
   final String? subtitle;
+  final bool menu;
   final VoidCallback onBack;
   final VoidCallback? onTitleTap;
   final List<Widget> trailing;
@@ -218,7 +215,7 @@ class MobileBackBar extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: sans(pill ? 14.5 : 16, weight: W.label, color: AppColors.fg1)),
+            style: sans(pill ? 14.5 : 16, weight: W.strong, color: AppColors.fg1)),
         if (subtitle != null && subtitle!.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 1),
@@ -234,7 +231,11 @@ class MobileBackBar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
-          RoundBtn(icon: 'chevron-left', tooltip: 'Back', onTap: onBack),
+          RoundBtn(
+              icon: menu ? 'menu' : 'chevron-left',
+              tooltip: menu ? 'Menu' : 'Back',
+              onTap: onBack),
+          if (trailing.length == 2) const SizedBox(width: 44),
           const SizedBox(width: 10),
           Expanded(
             child: pill
@@ -251,11 +252,8 @@ class MobileBackBar extends StatelessWidget {
                   )
                 : Center(child: label),
           ),
-          if (trailing.isNotEmpty) ...[
-            const SizedBox(width: 10),
-            ...trailing,
-          ] else if (!pill)
-            const SizedBox(width: 54),
+          const SizedBox(width: 10),
+          if (trailing.isEmpty) const SizedBox(width: 44) else ...trailing,
         ]),
       ),
     );
@@ -511,7 +509,7 @@ class _MobileMenuState extends State<_MobileMenu> {
                             children: [
                               Text('New session',
                                   style: sans(16,
-                                      weight: W.label, color: AppColors.fg1)),
+                                      weight: W.strong, color: AppColors.fg1)),
                               if (widget.newSessionSubtitle.isNotEmpty)
                                 Text(widget.newSessionSubtitle,
                                     maxLines: 1,
@@ -587,28 +585,4 @@ class _MobileMenuState extends State<_MobileMenu> {
       ),
     );
   }
-}
-
-class _GridGlyph extends CustomPainter {
-  _GridGlyph(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final u = size.width / 24;
-    final p = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8 * u;
-    for (final (x, y) in const [(4.0, 4.0), (13.5, 4.0), (4.0, 13.5), (13.5, 13.5)]) {
-      canvas.drawRRect(
-          RRect.fromRectAndRadius(
-              Rect.fromLTWH(x * u, y * u, 6.5 * u, 6.5 * u), Radius.circular(2 * u)),
-          p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_GridGlyph old) => old.color != color;
 }

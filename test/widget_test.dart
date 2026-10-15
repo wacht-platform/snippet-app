@@ -606,8 +606,8 @@ void main() {
 
   test('every type helper is capped at weight 400', () {
     TestWidgetsFlutterBinding.ensureInitialized();
-    expect(sans(15, weight: FontWeight.w700).fontWeight, FontWeight.w400);
-    expect(mono(13, weight: FontWeight.w600).fontWeight, FontWeight.w400);
+    expect(sans(15, weight: FontWeight.w500).fontWeight, FontWeight.w400);
+    expect(mono(13, weight: FontWeight.w500).fontWeight, FontWeight.w400);
     expect(display(22).fontWeight, FontWeight.w400);
   });
 

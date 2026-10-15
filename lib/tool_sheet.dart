@@ -66,21 +66,32 @@ Future<void> showToolBatchSheet(
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: false,
-    backgroundColor: AppColors.surface1,
+    backgroundColor: Colors.transparent,
+    barrierColor: AppColors.scrim,
     sheetAnimationStyle: sheetMotion,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop)),
-    ),
-    clipBehavior: Clip.antiAlias,
-    builder: (sheetContext) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.62,
-      minChildSize: 0.35,
-      maxChildSize: 0.95,
-      snap: true,
-      snapSizes: const [0.62],
-      builder: (_, scroll) =>
-          body(() => Navigator.of(sheetContext).pop(), scroll: scroll),
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.fromLTRB(
+          8, 0, 8, 8 + MediaQuery.paddingOf(sheetContext).bottom),
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.62,
+        minChildSize: 0.35,
+        maxChildSize: 0.95,
+        snap: true,
+        snapSizes: const [0.62],
+        builder: (_, scroll) => Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: AppColors.fg1.withValues(alpha: 0.08)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: Colors.transparent,
+            child: body(() => Navigator.of(sheetContext).pop(), scroll: scroll),
+          ),
+        ),
+      ),
     ),
   );
 }

@@ -562,7 +562,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: sans(17,
-                          weight: W.label,
+                          weight: W.strong,
                           height: 22 / 17,
                           color: AppColors.fg1)),
                   const SizedBox(height: 2),
@@ -605,6 +605,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         label('Work'),
         ListGroup(children: [
           nav(SettingsPage.memory, 'Memory', 'What agents remember', 'brain'),
+          ApprovalsRow(client: widget.client),
           nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock-key'),
           nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'repeat'),
         ]),
@@ -909,6 +910,12 @@ class SettingsPanelState extends State<SettingsPanel> {
         )
       else
         ListGroup(children: [for (final i in _instances) _instanceRow(i)]),
+      if (includeNotifications) ...[
+        const SizedBox(height: S.s24),
+        const SectionHeader('Approvals',
+            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+        ListGroup(children: [ApprovalsRow(client: widget.client)]),
+      ],
       if (includeNotifications && kCanNotify) ...[
         const SizedBox(height: S.s24),
         const SectionHeader('Notifications',
@@ -1161,4 +1168,78 @@ Future<void> showManageMachineSheet({
       }, danger: true),
     ]),
   );
+}
+
+class ApprovalsRow extends StatefulWidget {
+  const ApprovalsRow({super.key, required this.client});
+  final DaemonClient client;
+
+  @override
+  State<ApprovalsRow> createState() => _ApprovalsRowState();
+}
+
+class _ApprovalsRowState extends State<ApprovalsRow> {
+  bool? _manual;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.client.getConfig().then((c) {
+      if (mounted) setState(() => _manual = c.manualApproval);
+    }).catchError((_) {});
+  }
+
+  Future<void> _pick(BuildContext anchor) async {
+    final current = _manual ?? false;
+    final picked = await showAppMenu<bool>(
+      context,
+      anchor: anchor,
+      minWidth: 260,
+      maxWidth: 320,
+      items: [
+        appMenuRow(
+          value: false,
+          icon: 'check-circle',
+          label: 'Yolo',
+          description: 'Run shell and file edits without asking',
+          selected: !current,
+        ),
+        appMenuRow(
+          value: true,
+          icon: 'shield',
+          label: 'Ask',
+          description: 'Pause for approval on each change',
+          selected: current,
+        ),
+      ],
+    );
+    if (picked == null || picked == current || !mounted) return;
+    setState(() => _manual = picked);
+    try {
+      await widget.client.setManualApproval(picked);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _manual = current);
+      toast(context, '$e', danger: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final manual = _manual;
+    return Builder(
+      builder: (anchor) => ListRow(
+        title: 'Approvals',
+        subtitle: kMobile ? null : 'Applies to every session on this machine',
+        leading: AppIcon('shield', size: 19, color: AppColors.fg3),
+        onTap: () => _pick(anchor),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(manual == null ? '' : (manual ? 'Ask' : 'Yolo'),
+              style: sans(13, color: AppColors.fg3)),
+          const SizedBox(width: S.s6),
+          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+        ]),
+      ),
+    );
+  }
 }

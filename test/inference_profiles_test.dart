@@ -26,7 +26,7 @@ class _FakeDaemon extends DaemonClient {
 }
 
 void main() {
-  testWidgets('profile card has ai-chip icon and does not show token or session count',
+  testWidgets('profile card has its provider logo and does not show token or session count',
       (tester) async {
     final client = _FakeDaemon()
       ..config = {
@@ -58,13 +58,12 @@ void main() {
     expect(find.textContaining('session'), findsNothing);
     expect(find.textContaining('tok'), findsNothing);
 
-    // Icon is ai-chip, not cpu
     final iconFinder = find.byType(AppIcon);
     expect(iconFinder, findsWidgets);
     final icons = tester.widgetList<AppIcon>(iconFinder);
-    expect(icons.any((icon) => icon.name == 'ai-chip'), isTrue);
+    expect(icons.any((icon) => icon.name == 'provider:openai'), isTrue);
     expect(icons.any((icon) => icon.name == 'cpu'), isFalse);
-    final chipIcon = icons.firstWhere((icon) => icon.name == 'ai-chip');
+    final chipIcon = icons.firstWhere((icon) => icon.name == 'provider:openai');
     expect(chipIcon.size, greaterThanOrEqualTo(18));
   });
 

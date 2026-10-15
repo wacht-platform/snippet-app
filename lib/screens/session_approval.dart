@@ -970,7 +970,7 @@ class QuestionBarState extends State<QuestionBar> {
         const SizedBox(height: 8),
         Text('Check your answers',
             style:
-                sans(kMobile ? 15 : 14, weight: W.label, color: AppColors.fg1)),
+                sans(kMobile ? 15 : 14, weight: W.strong, color: AppColors.fg1)),
         const SizedBox(height: 6),
         for (var i = 0; i < _questions.length; i++)
           InkWell(
@@ -1266,6 +1266,8 @@ class _SessionActionsPanel extends StatefulWidget {
   final VoidCallback onCompact;
   final VoidCallback onCheckpoints;
   final VoidCallback onMemory;
+  final VoidCallback? onFileChanges;
+  final int fileChangeCount;
   final bool hideWorkspace;
   final bool hideGoal;
   final bool hideCheckpoints;
@@ -1288,6 +1290,8 @@ class _SessionActionsPanel extends StatefulWidget {
     required this.onCompact,
     required this.onCheckpoints,
     required this.onMemory,
+    this.onFileChanges,
+    this.fileChangeCount = 0,
     this.hideWorkspace = false,
     this.hideGoal = false,
     this.hideCheckpoints = false,
@@ -1311,6 +1315,27 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
 
   Widget _group(String label, List<Widget> rows) {
     if (rows.isEmpty) return const SizedBox.shrink();
+    if (kMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 24, 4, 2),
+            child: Text(label.toUpperCase(),
+                style: sans(12,
+                    weight: W.label, spacing: 0.7, color: AppColors.fg4)),
+          ),
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0)
+              Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  color: AppColors.line),
+            rows[i],
+          ],
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1320,7 +1345,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               : const EdgeInsets.fromLTRB(4, 16, 4, 8),
           child: Text(kMobile ? label : label.toUpperCase(),
               style: kMobile
-                  ? sans(12, weight: W.strong, color: AppColors.fg4)
+                  ? sans(12, color: AppColors.fg4)
                   : caps(10, color: AppColors.fg3)),
         ),
         Container(
@@ -1369,12 +1394,11 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             child: Container(
               constraints: const BoxConstraints(minHeight: M.minTarget + 8),
               padding: EdgeInsets.symmetric(
-                  horizontal: kMobile ? 16 : 14, vertical: kMobile ? 10 : 0),
+                  horizontal: kMobile ? 4 : 14, vertical: kMobile ? 11 : 0),
               child: Row(children: [
-                if (!kMobile) ...[
-                  AppIcon(icon, size: 17, color: AppColors.fg3),
-                  const SizedBox(width: 12),
-                ],
+                AppIcon(icon,
+                    size: kMobile ? 19 : 17, color: AppColors.fg3),
+                SizedBox(width: kMobile ? 14 : 12),
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1382,16 +1406,15 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                     children: [
                       Text(label,
                           style: kMobile
-                              ? sans(15,
-                                  weight: W.label,
-                                  height: 20 / 15,
+                              ? sans(15.5,
+                                  height: 20 / 15.5,
                                   color: AppColors.fg1)
                               : sans(13,
                                   weight: W.label, color: AppColors.fg1)),
                       if (detail != null) ...[
                         const SizedBox(height: 2),
                         Text(detail,
-                            maxLines: 2,
+                            maxLines: kMobile ? 1 : 2,
                             overflow: TextOverflow.ellipsis,
                             style: kMobile
                                 ? sans(13,
@@ -1422,192 +1445,118 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
         ),
         if (open && child != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            padding: kMobile
+                ? const EdgeInsets.fromLTRB(4, 0, 4, 14)
+                : const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: child,
           ),
       ],
     );
   }
 
-  Widget _tile(String icon, String label, String detail, VoidCallback onTap) =>
-      Material(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(R.lg),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
+  Widget _shortcut(String icon, String label, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(
+          width: 72,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppIcon(icon, size: 20, color: AppColors.fg3),
-                const SizedBox(height: 10),
-                Text(label,
-                    style: sans(15,
-                        weight: W.strong,
-                        height: 20 / 15,
-                        color: AppColors.fg1)),
-                Text(detail,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12, height: 16 / 12, color: AppColors.fg3)),
-              ],
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: AppColors.fg1.withValues(alpha: 0.08)),
+                ),
+                alignment: Alignment.center,
+                child: AppIcon(icon, size: 21, color: AppColors.fg1),
+              ),
+              const SizedBox(height: 8),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12.5, color: AppColors.fg2)),
+            ]),
           ),
         ),
       );
 
-  Widget _mobileGoal(HarnessState? s, bool goalOn) {
+  Widget _mobileGoalRow(HarnessState? s, bool goalOn) {
     final goal = s?.goal;
     if (goalOn && goal != null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Expanded(
-              child: Text('Goal',
-                  style: sans(15,
-                      weight: W.strong, height: 20 / 15, color: AppColors.fg1)),
-            ),
-            Text(goal.paused ? 'Paused' : 'Working on it',
-                style: sans(12,
-                    color: goal.paused ? AppColors.fg3 : AppColors.run)),
-          ]),
-          const SizedBox(height: 4),
-          Text(goal.text,
-              style: sans(15, height: 23 / 15, color: AppColors.fg2)
-                  .copyWith(fontStyle: FontStyle.italic)),
-          const SizedBox(height: 10),
-          Btn(goal.paused ? 'Resume goal' : 'Cancel goal',
+      return _row(
+        icon: 'goal',
+        label: 'Goal',
+        detail: goal.text,
+        value: goal.paused ? 'Paused' : 'Working',
+        id: 'goal',
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Btn(goal.paused ? 'Resume goal' : 'Cancel goal',
               small: true,
               variant: BtnVariant.secondary,
               onTap: goal.paused ? widget.onResumeGoal : widget.onCancelGoal),
-        ],
+        ),
       );
     }
-    final open = _open == 'goal';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        InkWell(
-          onTap: () => _toggle('goal'),
-          child: Row(children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Set a goal',
-                      style: sans(15,
-                          weight: W.strong,
-                          height: 20 / 15,
-                          color: AppColors.fg1)),
-                  const SizedBox(height: 2),
-                  Text('Something for the agent to work toward on its own',
-                      style: sans(13, height: 18 / 13, color: AppColors.fg3)),
-                ],
-              ),
-            ),
-            AppIcon(open ? 'chevron-down' : 'chevron-right',
-                size: 15, color: AppColors.fg4),
-          ]),
-        ),
-        if (open) ...[
-          const SizedBox(height: 12),
+    return _row(
+      icon: 'goal',
+      label: 'Set a goal',
+      detail: 'Something to work toward on its own',
+      id: 'goal',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           AppField(
               controller: _goalCtl,
               hint: 'What should the agent work toward?',
               minLines: 2,
               maxLines: 4),
-          const SizedBox(height: 8),
-          Btn('Set goal', onTap: () {
+          const SizedBox(height: 10),
+          Btn('Set goal', full: true, onTap: () {
             final t = _goalCtl.text.trim();
             if (t.isEmpty) return;
             widget.onSetGoal(t);
             _goalCtl.clear();
           }),
         ],
-      ],
+      ),
     );
   }
 
   Widget _mobileBuild(HarnessState? s, bool goalOn, List<Widget> workRows,
       List<Widget> historyRows) {
-    final hero = <Widget>[
+    final sessionRows = <Widget>[
+      if (!widget.hideGoal) _mobileGoalRow(s, goalOn),
       if (widget.onAutonomy != null)
-        InkWell(
-          onTap: widget.onAutonomy,
-          child: Row(children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Automated wakes',
-                      style: sans(15,
-                          weight: W.strong,
-                          height: 20 / 15,
-                          color: AppColors.fg1)),
-                  const SizedBox(height: 2),
-                  Text('Keeps the work moving while you are away',
-                      style: sans(13, height: 18 / 13, color: AppColors.fg3)),
-                ],
-              ),
-            ),
-            AppIcon('chevron-right', size: 15, color: AppColors.fg4),
-          ]),
-        ),
-      if (!widget.hideGoal) _mobileGoal(s, goalOn),
+        _row(
+            icon: 'activity',
+            label: 'Automated wakes',
+            detail: 'Keeps the work moving while you are away',
+            onTap: widget.onAutonomy),
     ];
-    final tiles = <Widget>[
-      _tile('git-branch', 'Git', 'Diffs and commits', widget.onGit),
-      _tile('folder', 'Files', 'Browse the workspace', widget.onFiles),
-      _tile('layers', 'Shared', 'Artifacts and files', widget.onDeliverables),
+    final shortcuts = <Widget>[
+      _shortcut('git-branch', 'Git', widget.onGit),
+      _shortcut('folder', 'Files', widget.onFiles),
+      _shortcut('layers', 'Shared', widget.onDeliverables),
       if (widget.onPullRequests != null)
-        _tile('git-branch', 'Pull requests', 'Review on GitHub',
-            widget.onPullRequests!),
-      if (!widget.hideShell)
-        _tile('terminal', 'Shell', 'A terminal here', widget.onTerm),
-      _tile('list', 'Processes', 'What is running', widget.onProcesses),
+        _shortcut('git-commit', 'PRs', widget.onPullRequests!),
+      if (!widget.hideShell) _shortcut('terminal', 'Shell', widget.onTerm),
+      _shortcut('processes', 'Processes', widget.onProcesses),
     ];
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (hero.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            decoration: BoxDecoration(
-              color: AppColors.surface1,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < hero.length; i++) ...[
-                  if (i > 0)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Container(height: 1, color: AppColors.border),
-                    ),
-                  hero[i],
-                ],
-              ],
-            ),
+        if (!widget.hideWorkspace)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: shortcuts),
           ),
-        if (!widget.hideWorkspace) ...[
-          const SizedBox(height: 12),
-          for (var i = 0; i < tiles.length; i += 2) ...[
-            if (i > 0) const SizedBox(height: 10),
-            Row(children: [
-              Expanded(child: tiles[i]),
-              const SizedBox(width: 10),
-              Expanded(
-                  child: i + 1 < tiles.length
-                      ? tiles[i + 1]
-                      : const SizedBox.shrink()),
-            ]),
-          ],
-        ],
+        _group('Session', sessionRows),
         _group('Work', workRows),
         _group('History', historyRows),
       ],
@@ -1621,6 +1570,14 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     if (kMobile) {
       final runningLanes = s?.lanes.where((l) => l.running).length ?? 0;
       final workRows = <Widget>[
+        if (widget.onFileChanges != null && !widget.hideWorkspace)
+          _row(
+              icon: 'file-code',
+              label: 'File changes',
+              detail: widget.fileChangeCount == 0
+                  ? 'Nothing edited yet'
+                  : '${widget.fileChangeCount} file${widget.fileChangeCount == 1 ? '' : 's'} changed in this session',
+              onTap: widget.onFileChanges),
         if (!widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
           _row(
               icon: 'layers',

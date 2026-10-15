@@ -247,7 +247,7 @@ class TaskRow extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: sans(16,
-                              weight: W.label,
+                              weight: W.strong,
                               height: 21 / 16,
                               color: finished ? AppColors.fg3 : AppColors.fg1)),
                     ),

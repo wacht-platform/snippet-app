@@ -1475,6 +1475,7 @@ class _DesktopShellState extends State<DesktopShell>
         onRefreshHealth: _refreshHealth,
         mobileHome: _mobileHome,
         mobileTopBar: kMobile ? _mobileTopBar(mission: false) : null,
+        onMobileMenu: kMobile ? _openMobileMenu : null,
         onMobileHome: (h) => setState(() {
           _mobileHome = h;
           _mobileSettingsSection = null;

@@ -6,6 +6,7 @@ import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'mobile_chrome.dart';
 import 'pull_request_detail.dart';
 
 /// Open a session repository's pull requests: a side-pane tab on desktop, a
@@ -61,52 +62,6 @@ String _ago(String iso) {
   final t = DateTime.tryParse(iso);
   if (t == null) return '';
   return relativeTime(t.millisecondsSinceEpoch ~/ 1000);
-}
-
-Widget _screenHeader(
-  BuildContext context, {
-  required String title,
-  String subtitle = '',
-  VoidCallback? onBack,
-  VoidCallback? onClose,
-  List<Widget> actions = const [],
-}) {
-  return Container(
-    padding: EdgeInsets.fromLTRB(onBack == null ? 16 : 6, kMobile ? 8 : 10, 6, 10),
-    child: Row(children: [
-      if (onBack != null)
-        IconBtn('chevron-left',
-            size: kMobile ? M.minTarget : 32,
-            iconSize: 18,
-            tooltip: 'Back',
-            onTap: onBack),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(kMobile ? 17 : 15,
-                    weight: W.strong, color: AppColors.fg1)),
-            if (subtitle.isNotEmpty)
-              Text(subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TS.meta(AppColors.fg3)),
-          ],
-        ),
-      ),
-      ...actions,
-      if (onClose != null)
-        IconBtn('x',
-            size: kMobile ? M.minTarget : 32,
-            iconSize: 16,
-            tooltip: 'Close',
-            onTap: onClose),
-    ]),
-  );
 }
 
 Widget _size(int add, int del) => Text.rich(TextSpan(children: [
@@ -192,32 +147,6 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     if (mounted) _load();
   }
 
-  Widget _tabs() => Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: ListView(scrollDirection: Axis.horizontal, children: [
-          for (final (key, label) in _filters)
-            InkWell(
-              onTap: () => _pick(key),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                        color: _filter == key ? AppColors.accent : Colors.transparent,
-                        width: 2),
-                  ),
-                ),
-                child: Text(label,
-                    style: sans(13,
-                        weight: W.label,
-                        color: _filter == key ? AppColors.fg1 : AppColors.fg3)),
-              ),
-            ),
-        ]),
-      );
-
   (String, Color) _stateIcon(PrSummary pr) => switch (pr.state) {
         'MERGED' => ('git-commit', AppColors.accent),
         'CLOSED' => ('x-circle', AppColors.fg4),
@@ -287,7 +216,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: sans(kMobile ? 15 : 14,
-                        weight: W.label, height: 1.35, color: AppColors.fg1)),
+                        weight: W.strong, height: 1.35, color: AppColors.fg1)),
                 const SizedBox(height: 3),
                 Row(children: [
                   Flexible(
@@ -373,9 +302,19 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
       child: SafeArea(
         bottom: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          _screenHeader(context,
-              title: 'Pull requests'),
-          _tabs(),
+          MobileBackBar(
+            title: 'Pull requests',
+            subtitle: widget.status.repo,
+            onBack: widget.onClose ?? () => Navigator.maybePop(context),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Pills<String>(
+                  items: _filters, selected: _filter, onSelect: _pick),
+            ),
+          ),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _load,

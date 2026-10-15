@@ -7,6 +7,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../pull_refresh.dart';
+import 'mobile_chrome.dart';
 
 /// Open a folder to start a new conversation in.
 ///
@@ -367,7 +368,12 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
     );
   }
 
-  Widget _header() => Padding(
+  Widget _header() => kMobile
+      ? MobileBackBar(
+          title: 'New session',
+          onBack: widget.onClose ?? () => Navigator.maybePop(context),
+        )
+      : Padding(
         padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 16, 12, 10, 8),
         child: Row(children: [
           Expanded(
@@ -393,11 +399,12 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
       margin: kMobile
           ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 8)
           : EdgeInsets.zero,
-      padding: EdgeInsets.symmetric(horizontal: kMobile ? 12 : 16),
+      padding: EdgeInsets.only(left: kMobile ? 14 : 16, right: kMobile ? 4 : 16),
       decoration: kMobile
           ? BoxDecoration(
               color: AppColors.surface1,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.fg1.withValues(alpha: 0.08)),
             )
           : BoxDecoration(
               border: Border(
@@ -431,7 +438,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                 return Center(
                   child: Material(
                     color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(R.sm),
+                    borderRadius: BorderRadius.circular(kMobile ? 18 : R.sm),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(R.sm),
                       onTap: last ? null : () => _go(c.path),
@@ -488,7 +495,9 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
       for (final f in files) _fileRow(f),
     ];
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+      padding: kMobile
+          ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 10)
+          : const EdgeInsets.fromLTRB(10, 6, 10, 10),
       itemCount: rows.length,
       itemBuilder: (_, i) => rows[i],
     );
@@ -501,7 +510,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   Widget _fileRow(FsEntry e) {
     return Container(
       height: kMobile ? 40 : 32,
-      padding: const EdgeInsets.symmetric(horizontal: S.s8),
+      padding: EdgeInsets.symmetric(horizontal: kMobile ? 4 : S.s8),
       child: Row(children: [
         SizedBox(
             width: 22,
@@ -531,13 +540,18 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           cursor: SystemMouseCursors.click,
           child: Container(
             height: kMobile ? M.rowHeight : 40,
-            padding: const EdgeInsets.symmetric(horizontal: S.s8),
+            padding: EdgeInsets.symmetric(horizontal: kMobile ? 4 : S.s8),
+            decoration: kMobile
+                ? BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.line)))
+                : null,
             child: Row(children: [
               SizedBox(
                   width: 22,
                   child: Center(
                       child: AppIcon('folder',
-                          size: 18, color: AppColors.accent))),
+                          size: kMobile ? 19 : 18,
+                          color: kMobile ? AppColors.fg3 : AppColors.accent))),
               const SizedBox(width: S.s12),
               Expanded(
                 child: Text(e.name,
@@ -578,14 +592,14 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   Widget _actionBar() => Container(
         padding: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 16, 8, kMobile ? M.gutter : 16, 10),
-        color: AppColors.base,
+        color: kMobile ? AppColors.bg : AppColors.base,
         child: Row(children: [
           // Phones get one labelled "+" menu: tooltips don't exist on touch,
           // so three bare glyphs left you guessing.
           if (kMobile)
-            IconBtn('plus',
-                size: 40,
-                iconSize: 18,
+            RoundBtn(
+                icon: 'plus',
+                size: 48,
                 tooltip: 'Add here',
                 onTap: (_listing == null || _busy != null) ? null : _addMenu)
           else ...[
@@ -611,12 +625,12 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           Expanded(
             child: Material(
               color: AppColors.accentFill,
-              borderRadius: BorderRadius.circular(R.md),
+              borderRadius: BorderRadius.circular(kMobile ? 24 : R.md),
               child: InkWell(
-                borderRadius: BorderRadius.circular(R.md),
+                borderRadius: BorderRadius.circular(kMobile ? 24 : R.md),
                 onTap: _busy != null ? null : _open,
                 child: Container(
-                  height: kMobile ? 40 : 34,
+                  height: kMobile ? 48 : 34,
                   alignment: Alignment.center,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -670,7 +684,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
             message: tooltip ?? '',
             child: Material(
               color: selected ? AppColors.surface3 : Colors.transparent,
-              borderRadius: BorderRadius.circular(R.sm),
+              borderRadius: BorderRadius.circular(kMobile ? 18 : R.sm),
               child: InkWell(
                 borderRadius: BorderRadius.circular(R.sm),
                 onTap: _busy != null ? null : onTap,
@@ -701,7 +715,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           ),
         );
     return Container(
-      color: AppColors.base,
+      color: kMobile ? AppColors.bg : AppColors.base,
       padding: EdgeInsets.fromLTRB(
           kMobile ? M.gutter : 16, 10, kMobile ? M.gutter : 16, 0),
       child: Column(
@@ -710,10 +724,13 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           Text('Works in', style: TS.caption()),
           const SizedBox(height: 6),
           Container(
-            padding: const EdgeInsets.all(3),
+            padding: EdgeInsets.all(kMobile ? 4 : 3),
             decoration: BoxDecoration(
               color: AppColors.surface1,
-              borderRadius: BorderRadius.circular(R.md),
+              borderRadius: BorderRadius.circular(kMobile ? 22 : R.md),
+              border: kMobile
+                  ? Border.all(color: AppColors.fg1.withValues(alpha: 0.08))
+                  : null,
             ),
             child: Row(children: [
               option(

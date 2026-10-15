@@ -4,6 +4,7 @@ export 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
 
@@ -17,6 +18,7 @@ import 'markdown_widgets.dart';
 import 'menu_widgets.dart';
 import 'screens/artifact_viewer.dart' show openArtifact;
 import 'screens/mobile_chrome.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 export 'components.dart';
 export 'dialog_widgets.dart';
@@ -36,8 +38,25 @@ class Pills<T> extends StatelessWidget {
   final List<(T, String)> items;
   final T selected;
   final ValueChanged<T>? onSelect;
+  final String? Function(T)? iconFor;
   const Pills(
-      {super.key, required this.items, required this.selected, this.onSelect});
+      {super.key,
+      required this.items,
+      required this.selected,
+      this.onSelect,
+      this.iconFor});
+
+  Widget _label(T val, String label, TextStyle style) {
+    final icon = iconFor?.call(val);
+    final text = Text(label, style: style);
+    if (icon == null) return text;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      AppIcon(icon, size: (style.fontSize ?? 13) + 1, color: style.color),
+      const SizedBox(width: 6),
+      text,
+    ]);
+  }
+
   Widget _segmented() => Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
@@ -69,8 +88,10 @@ class Pills<T> extends StatelessWidget {
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: Text(label,
-                      style: sans(14,
+                  child: _label(
+                      val,
+                      label,
+                      sans(14,
                           color:
                               selected == val ? AppColors.fg1 : AppColors.fg3)),
                 ),
@@ -111,8 +132,10 @@ class Pills<T> extends StatelessWidget {
                             ? AppColors.border2
                             : AppColors.border),
                   ),
-                  child: Text(label,
-                      style: sans(12,
+                  child: _label(
+                      val,
+                      label,
+                      sans(12,
                           weight: W.label,
                           color:
                               selected == val ? AppColors.fg1 : AppColors.fg2)),
@@ -308,7 +331,25 @@ class AppIcon extends StatelessWidget {
       {super.key, this.size = 18, this.color, this.visualScale = 1.0});
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(
+  Widget build(BuildContext context) {
+    if (name.startsWith('provider:')) {
+      return ProviderLogo(name.substring(9),
+          size: size * visualScale, color: color ?? AppColors.fg2);
+    }
+    final line = kMobile ? _lucide[name] : null;
+    if (line != null) {
+      return SizedBox.square(
+        dimension: size,
+        child: Center(
+          child: Icon(line,
+              size: size * visualScale, color: color ?? AppColors.fg2),
+        ),
+      );
+    }
+    return _huge(context);
+  }
+
+  Widget _huge(BuildContext context) => SizedBox.square(
         dimension: size,
         child: name == 'check'
             ? CustomPaint(
@@ -1855,6 +1896,170 @@ class AppToggle extends StatelessWidget {
             const SizedBox(width: 12),
             AppSwitch(on: on, onChanged: onChanged),
           ]),
+        ),
+      ),
+    );
+  }
+}
+
+const _lucide = <String, IconData>{
+  'chevron-left': LucideIcons.chevronLeft,
+  'arrow-left': LucideIcons.arrowLeft,
+  'chevron-right': LucideIcons.chevronRight,
+  'arrow-right': LucideIcons.arrowRight,
+  'chevron-down': LucideIcons.chevronDown,
+  'chevron-up': LucideIcons.chevronUp,
+  'arrow-up': LucideIcons.arrowUp,
+  'send': LucideIcons.send,
+  'bell': LucideIcons.bell,
+  'alert-circle': LucideIcons.circleAlert,
+  'message': LucideIcons.messageSquare,
+  'message-text': LucideIcons.messageSquareText,
+  'chat-thread': LucideIcons.messagesSquare,
+  'users': LucideIcons.users,
+  'agent': LucideIcons.bot,
+  'bot': LucideIcons.bot,
+  'brain': LucideIcons.brain,
+  'archive': LucideIcons.archive,
+  'plus': LucideIcons.plus,
+  'add': LucideIcons.plus,
+  'minus': LucideIcons.minus,
+  'x': LucideIcons.x,
+  'undo': LucideIcons.undo2,
+  'redo': LucideIcons.redo2,
+  'wrap': LucideIcons.wrapText,
+  'keyboard': LucideIcons.keyboard,
+  'file-code': LucideIcons.fileCode,
+  'x-circle': LucideIcons.circleX,
+  'check-circle': LucideIcons.circleCheck,
+  'file-text': LucideIcons.fileText,
+  'more-horizontal': LucideIcons.ellipsis,
+  'more-vertical': LucideIcons.ellipsisVertical,
+  'search': LucideIcons.search,
+  'settings': LucideIcons.settings,
+  'sliders': LucideIcons.slidersHorizontal,
+  'wifi-off': LucideIcons.wifiOff,
+  'refresh': LucideIcons.refreshCw,
+  'alert-triangle': LucideIcons.triangleAlert,
+  'check-check': LucideIcons.checkCheck,
+  'stop': LucideIcons.square,
+  'play': LucideIcons.play,
+  'pause': LucideIcons.pause,
+  'git-commit': LucideIcons.gitCommitHorizontal,
+  'user': LucideIcons.user,
+  'sparkles': LucideIcons.sparkles,
+  'mic': LucideIcons.mic,
+  'mic-off': LucideIcons.micOff,
+  'shield': LucideIcons.shield,
+  'goal': LucideIcons.goal,
+  'folder': LucideIcons.folder,
+  'folder-open': LucideIcons.folderOpen,
+  'folder-plus': LucideIcons.folderPlus,
+  'upload': LucideIcons.upload,
+  'download': LucideIcons.download,
+  'share': LucideIcons.share,
+  'file': LucideIcons.file,
+  'git-branch': LucideIcons.gitBranch,
+  'worktree': LucideIcons.gitFork,
+  'terminal': LucideIcons.terminal,
+  'grip': LucideIcons.gripVertical,
+  'sidebar': LucideIcons.panelLeft,
+  'menu': LucideIcons.menu,
+  'edit': LucideIcons.pencil,
+  'eye': LucideIcons.eye,
+  'eye-off': LucideIcons.eyeOff,
+  'code': LucideIcons.code,
+  'book': LucideIcons.bookOpen,
+  'trash': LucideIcons.trash2,
+  'copy': LucideIcons.copy,
+  'cube': LucideIcons.box,
+  'inbox': LucideIcons.inbox,
+  'transfer': LucideIcons.arrowLeftRight,
+  'key': LucideIcons.key,
+  'cpu': LucideIcons.cpu,
+  'layers': LucideIcons.layers,
+  'activity': LucideIcons.activity,
+  'image': LucideIcons.image,
+  'film': LucideIcons.film,
+  'music': LucideIcons.music,
+  'scan': LucideIcons.scan,
+  'camera': LucideIcons.camera,
+  'camera-off': LucideIcons.cameraOff,
+  'clipboard': LucideIcons.clipboard,
+  'history': LucideIcons.history,
+  'clock': LucideIcons.clock,
+  'minimize': LucideIcons.minimize2,
+  'expand': LucideIcons.maximize2,
+  'shrink': LucideIcons.shrink,
+  'rotate': LucideIcons.rotateCw,
+  'globe': LucideIcons.globe,
+  'map': LucideIcons.map,
+  'list': LucideIcons.list,
+  'task': LucideIcons.listChecks,
+  'kanban': LucideIcons.squareKanban,
+  'file-plus': LucideIcons.filePlus,
+  'corner-down-right': LucideIcons.cornerDownRight,
+  'home': LucideIcons.house,
+  'scheduled': LucideIcons.calendarClock,
+  'coordination': LucideIcons.network,
+  'split': LucideIcons.split,
+  'processes': LucideIcons.cog,
+  'server': LucideIcons.server,
+  'ai-chip': LucideIcons.cpu,
+  'analytics': LucideIcons.chartColumn,
+  'lock-key': LucideIcons.keyRound,
+  'repeat': LucideIcons.repeat,
+  'check': LucideIcons.check,
+  'chat': LucideIcons.messageSquare,
+  'grid': LucideIcons.layoutGrid,
+  'pdf': LucideIcons.fileText,
+  'file-image': LucideIcons.fileImage,
+  'file-video': LucideIcons.fileVideoCamera,
+  'file-audio': LucideIcons.fileMusic,
+  'file-json': LucideIcons.fileBraces,
+  'file-archive': LucideIcons.fileArchive,
+  'file-terminal': LucideIcons.fileTerminal,
+  'file-diff': LucideIcons.fileDiff,
+  'pull-request': LucideIcons.gitPullRequest,
+  'external-link': LucideIcons.externalLink,
+};
+
+String? providerLogoAsset(String? provider) {
+  final p = (provider ?? '').toLowerCase();
+  final key = switch (p) {
+    'claude-code' || 'claude' => 'claude',
+    'anthropic' || 'anthropic-compatible' => 'anthropic',
+    'openai' || 'chatgpt' || 'codex' || 'openai-compatible' => 'openai',
+    'gemini' || 'google' => 'gemini',
+    'antigravity' => 'antigravity',
+    'xai' || 'grok' => 'xai',
+    'openrouter' => 'openrouter',
+    'opencode-zen' || 'opencode-go' || 'opencode' => 'opencode',
+    _ => null,
+  };
+  return key == null ? null : 'assets/providers/$key.svg';
+}
+
+class ProviderLogo extends StatelessWidget {
+  const ProviderLogo(this.provider, {super.key, this.size = 16, this.color});
+
+  final String? provider;
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = providerLogoAsset(provider);
+    final tint = color ?? AppColors.fg2;
+    if (asset == null) return AppIcon('cpu', size: size, color: tint);
+    return SizedBox.square(
+      dimension: size,
+      child: Center(
+        child: SvgPicture.asset(
+          asset,
+          width: size * 0.86,
+          height: size * 0.86,
+          colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
         ),
       ),
     );

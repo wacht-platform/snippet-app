@@ -50,6 +50,7 @@ import 'git.dart';
 import 'lanes.dart';
 import 'memory_screen.dart';
 import 'recurring.dart';
+import 'file_changes.dart';
 import 'mobile_chrome.dart';
 import 'session_panels.dart';
 import 'session_coordination_cards.dart';
@@ -285,6 +286,7 @@ class _SessionScreenState extends State<SessionScreen>
   bool _termMax = false;
   int _modelLoadGeneration = 0;
   String? _modelLabel;
+  String? _modelProvider;
   String? _currentProfile;
 
   /// When set, the composer sends a DIRECT MESSAGE to this agent instead of a
@@ -951,7 +953,10 @@ class _SessionScreenState extends State<SessionScreen>
 
       if (!mounted || generation != _modelLoadGeneration) return;
       if (mounted) {
-        setState(() => _modelLabel = p?.name);
+        setState(() {
+          _modelLabel = p?.name;
+          _modelProvider = p?.provider;
+        });
       }
     } catch (_) {}
   }

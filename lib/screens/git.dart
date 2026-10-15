@@ -1243,6 +1243,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
   }
 
   Widget _diffBody() {
+    _gutterWidth = _measureGutter();
     return LayoutBuilder(builder: (context, c) {
       final paneWidth = c.maxWidth.isFinite ? c.maxWidth : 0.0;
       return SingleChildScrollView(
@@ -1262,6 +1263,17 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
         ),
       );
     });
+  }
+
+  double _gutterWidth = 14;
+
+  double _measureGutter() {
+    var max = 0;
+    for (final l in _parsedLines) {
+      final v = l.newLine ?? l.oldLine ?? 0;
+      if (v > max) max = v;
+    }
+    return 7.0 * max.toString().length;
   }
 
   Widget _renderDiffLine(_DiffLineData line) {
@@ -1307,6 +1319,37 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
 
     final oldStr = line.oldLine?.toString() ?? '';
     final newStr = line.newLine?.toString() ?? '';
+
+    if (kMobile) {
+      final n = (line.newLine ?? line.oldLine)?.toString() ?? '';
+      return Container(
+        width: double.infinity,
+        color: bg,
+        padding: const EdgeInsets.symmetric(vertical: 1),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(width: 8),
+          SizedBox(
+            width: _gutterWidth,
+            child: Text(n,
+                textAlign: TextAlign.right,
+                style: mono(10.5, height: 1.5, color: gutterFg)),
+          ),
+          SizedBox(
+            width: 16,
+            child: Text(sign,
+                textAlign: TextAlign.center,
+                style: mono(12, height: 1.4, weight: W.label, color: fg)),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Text(
+              line.text.isEmpty ? ' ' : line.text,
+              style: mono(12, height: 1.4, color: fg),
+            ),
+          ),
+        ]),
+      );
+    }
 
     return Container(
       width: double.infinity,

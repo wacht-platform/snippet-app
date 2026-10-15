@@ -659,7 +659,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         const SizedBox(width: 6),
         Builder(builder: (chipCtx) {
           return _composerChip(
-            icon: 'cpu',
+            icon: _modelProvider == null ? 'cpu' : 'provider:$_modelProvider',
             label: _modelLabel ??
                 'Auto',
             onTap: () =>
@@ -668,63 +668,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           );
         }),
       ];
-
-  Future<void> _switchApproval(BuildContext anchor) async {
-    final current = _state?.approvalMode ?? 'auto';
-    final picked = await showAppMenu<String>(
-      context,
-      anchor: anchor,
-      verticalAnchor: _composerCardKey.currentContext,
-      minWidth: 260,
-      maxWidth: 320,
-      items: [
-        appMenuRow(
-          value: 'auto',
-          icon: 'check-circle',
-          label: 'Yolo',
-          description: 'Run shell and file edits without asking',
-          selected: current != 'manual',
-        ),
-        appMenuRow(
-          value: 'manual',
-          icon: 'shield',
-          label: 'Ask',
-          description: 'Pause for approval on each change',
-          selected: current == 'manual',
-        ),
-      ],
-    );
-    if (picked == null || picked == current) return;
-    _setApproval(picked == 'manual');
-  }
-
-  Widget _approvalToggle() {
-    final manual = (_state?.approvalMode ?? 'auto') == 'manual';
-    final ink = manual ? AppColors.accent : AppColors.fg3;
-    return Builder(
-      builder: (ctx) => Tooltip(
-        message: 'Approval mode',
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(7),
-          child: InkWell(
-            onTap: () => _switchApproval(ctx),
-            borderRadius: BorderRadius.circular(7),
-            child: Container(
-              height: kMobile ? 28 : 24,
-              padding: const EdgeInsets.fromLTRB(8, 0, 6, 0),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(manual ? 'Ask' : 'Yolo',
-                    style: sans(12, weight: W.label, color: ink)),
-                const SizedBox(width: 3),
-                AppIcon('chevron-down', size: 11, color: ink),
-              ]),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   void _trackMention() {
     if (_isMissionControl) return;
@@ -950,10 +893,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.only(bottom: 8, right: 6),
-                child: _approvalToggle(),
-              ),
-              Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: ValueListenableBuilder<TextEditingValue>(
                   valueListenable: _input,
@@ -1135,8 +1074,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                               ),
                                             ),
                                           ),
-                                          const SizedBox(width: 4),
-                                          _approvalToggle(),
                                           const SizedBox(width: 6),
                                           // The chip group SCROLLS and the mic/send controls are
                                           // pinned outside it. Three chips plus two buttons

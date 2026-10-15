@@ -549,7 +549,7 @@ class LaneNotice extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: sans(14.5,
-                                  weight: W.label, color: AppColors.fg1)),
+                                  weight: W.strong, color: AppColors.fg1)),
                           const SizedBox(height: 1),
                           Text(line,
                               maxLines: 1,
@@ -616,7 +616,7 @@ class LaneNotice extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: sans(15,
-                            weight: W.label,
+                            weight: W.strong,
                             height: 20 / 15,
                             color: AppColors.fg1)),
                     if (running && activity != null && activity.isNotEmpty) ...[

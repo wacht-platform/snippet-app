@@ -502,12 +502,18 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
               style: sans(12, weight: W.label, color: AppColors.fg2)),
           const SizedBox(height: 7),
           if (_isEdit)
-            Text(_providerLabel(_provider),
-                style: sans(kMobile ? 16 : 14, color: AppColors.fg1))
+            Row(children: [
+              ProviderLogo(_provider, size: 18, color: AppColors.fg1),
+              const SizedBox(width: 8),
+              Text(_providerLabel(_provider),
+                  style: sans(kMobile ? 16 : 14, color: AppColors.fg1)),
+            ])
           else
             Pills<String>(
               items: pills,
               selected: _provider,
+              iconFor: (v) =>
+                  providerLogoAsset(v) == null ? null : 'provider:$v',
               onSelect: (val) => setState(() {
                 _provider = val;
                 _images = _defaultImages(val);
@@ -825,8 +831,12 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_providerLabel(_provider),
-                  style: sans(12, color: AppColors.fg4)),
+              Row(children: [
+                ProviderLogo(_provider, size: 13, color: AppColors.fg4),
+                const SizedBox(width: 5),
+                Text(_providerLabel(_provider),
+                    style: sans(12, color: AppColors.fg4)),
+              ]),
               const SizedBox(height: 2),
               Text(
                   modelName.isEmpty
@@ -860,6 +870,8 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             Pills<String>(
               items: pills,
               selected: _provider,
+              iconFor: (v) =>
+                  providerLogoAsset(v) == null ? null : 'provider:$v',
               onSelect: (val) => setState(() {
                 _provider = val;
                 _images = _defaultImages(val);
