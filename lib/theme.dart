@@ -496,7 +496,10 @@ class W {
 
 /// Phones keep every face at its regular weight: hierarchy comes from size,
 /// ink and space rather than from heavier strokes.
-FontWeight weightFor(FontWeight w) => FontWeight.w400;
+FontWeight weightFor(FontWeight w) =>
+    kMobile && w.index >= FontWeight.w600.index
+        ? FontWeight.w500
+        : FontWeight.w400;
 
 /// Optical tracking. The reference sits slightly tight at every size
 /// (-0.05px at 12–13px, -0.3px at 20px).

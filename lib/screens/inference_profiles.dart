@@ -289,7 +289,8 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     return ListRow(
       title: p.name,
       onTap: () => _edit(p),
-      leading: IconTile('ai-chip', tone: p.active ? Tone.accent : Tone.neutral),
+      leading: IconTile('provider:${p.provider}',
+          tone: p.active ? Tone.accent : Tone.neutral),
       titleWidget: Row(children: [
         Flexible(
           child: Text(p.name,

@@ -15,6 +15,31 @@ import '../widgets.dart';
 import 'file_viewer.dart';
 import 'presented_file_card.dart';
 
+const _textExts = {
+  'txt', 'log', 'md', 'json', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf',
+  'env', 'xml', 'css', 'scss', 'js', 'ts', 'tsx', 'jsx', 'dart', 'rs', 'py',
+  'go', 'c', 'h', 'cpp', 'hpp', 'java', 'kt', 'swift', 'rb', 'lua', 'sh',
+  'sql', 'diff', 'patch', 'lock', 'vue', 'svelte', 'gradle', 'properties',
+};
+
+const _webExts = {
+  'html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'css',
+  'js', 'mjs', 'json', 'txt', 'md', 'woff', 'woff2', 'ttf', 'otf', 'ico',
+};
+
+String _ext(String path) {
+  final name = path.split('/').last;
+  final dot = name.lastIndexOf('.');
+  return dot > 0 ? name.substring(dot + 1).toLowerCase() : '';
+}
+
+bool _isText(String entry) {
+  final e = _ext(entry);
+  return e.isEmpty || _textExts.contains(e);
+}
+
+const _maxTextChars = 200000;
+
 bool get _canEmbedWeb =>
     !kIsWeb &&
     (defaultTargetPlatform == TargetPlatform.android ||
@@ -213,7 +238,7 @@ class ArtifactRow extends StatelessWidget {
                     Text(title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: sans(15, weight: W.label, color: AppColors.fg1)),
+                        style: sans(15, weight: W.strong, color: AppColors.fg1)),
                     const SizedBox(height: 2),
                     Text(
                         caption.isNotEmpty
@@ -700,6 +725,19 @@ class _InlineWebPageState extends State<_InlineWebPage> {
         if (next != p.pixels) p.jumpTo(next);
       })
       ..setNavigationDelegate(NavigationDelegate(
+        onNavigationRequest: (r) {
+          if (!_finished || !r.isMainFrame) return NavigationDecision.navigate;
+          final u = Uri.tryParse(r.url);
+          if (u == null || u.scheme == 'about' || u.scheme == 'data') {
+            return NavigationDecision.navigate;
+          }
+          final same = widget.uri != null &&
+              u.replace(fragment: '').toString() ==
+                  widget.uri!.replace(fragment: '').toString();
+          if (same) return NavigationDecision.navigate;
+          launchUrl(u, mode: LaunchMode.externalApplication);
+          return NavigationDecision.prevent;
+        },
         onPageFinished: (_) {
           _controller.runJavaScript(_theme);
           _controller.runJavaScript(_report);
@@ -834,6 +872,17 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
     final a = _artifact;
     final v = _version;
     if (a == null || v == null) return;
+    if (a.kind != 'html' && a.kind != 'collection' && v.source.isNotEmpty) {
+      final name = v.source.split('/').last;
+      try {
+        final msg = await downloadRemoteFileWithCancel(context, widget.client,
+            path: v.source, name: name);
+        if (msg != null && mounted) toast(context, msg);
+        return;
+      } catch (_) {
+        if (!mounted) return;
+      }
+    }
     try {
       toast(context, 'Preparing ${a.title}…');
       final path = await widget.client.zipArtifact(widget.session, a.id, version: v.n);
@@ -850,13 +899,17 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
 
   bool get _hasSource => switch (_artifact?.kind) {
         'html' || 'markdown' || 'csv' || 'code' || 'svg' => true,
+        'file' => _isText(_version?.entry ?? ''),
         _ => false,
       };
 
   Future<String> _textOf(ArtifactVersion v) {
     if (_textFor != v.url || _text == null) {
       _textFor = v.url;
-      _text = widget.client.artifactText(v.url);
+      _text = widget.client.artifactText(v.url).then((t) => t.length >
+              _maxTextChars
+          ? '${t.substring(0, _maxTextChars)}\n\n… truncated, download for the full file'
+          : t);
     }
     return _text!;
   }
@@ -1071,6 +1124,51 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
         ),
       );
 
+  Widget _fileCard(ArtifactInfo a, ArtifactVersion v) {
+    final name = (v.source.isNotEmpty ? v.source : v.entry).split('/').last;
+    final ext = _ext(name);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 64,
+            height: 64,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: AppIcon(
+                ext == 'pdf'
+                    ? 'file-text'
+                    : ext == 'apk' || ext == 'zip' || ext == 'gz'
+                        ? 'file-archive'
+                        : 'file',
+                size: 28,
+                color: AppColors.fg2),
+          ),
+          const SizedBox(height: 16),
+          Text(name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: sans(16, weight: W.label, color: AppColors.fg1)),
+          const SizedBox(height: 4),
+          Text(ext.isEmpty ? 'File' : '${ext.toUpperCase()} file',
+              style: sans(13, color: AppColors.fg3)),
+          const SizedBox(height: 22),
+          Btn('Download', icon: 'download', onTap: _download),
+          const SizedBox(height: 8),
+          Btn('Open in browser',
+              icon: 'external-link',
+              variant: BtnVariant.ghost,
+              onTap: _openInBrowser),
+        ]),
+      ),
+    );
+  }
+
   Widget _textBody(ArtifactVersion v, Widget Function(String text) render) =>
       FutureBuilder<String>(
         future: _textOf(v),
@@ -1115,8 +1213,16 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
       case 'csv':
         return _textBody(v, (text) => _CsvTable(text: text));
       case 'code':
-      case 'file':
         return _sourceView(v);
+      case 'file':
+        if (_isText(v.entry)) return _sourceView(v);
+        return _fileCard(a, v);
+      case 'pdf':
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          return _fileCard(a, v);
+        }
+        continue web;
+      web:
       default:
         if (!_canEmbedWeb) {
           return _centered('This page opens in your browser.',
@@ -1162,22 +1268,114 @@ class _WebPreview extends StatefulWidget {
 
 class _WebPreviewState extends State<_WebPreview> {
   String _page = '';
+  int _progress = 0;
+  String? _failed;
+  Timer? _slow;
   late final WebViewController _controller = () {
     final c = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: (_) => _controller.runJavaScript(_page),
+        onNavigationRequest: _route,
+        onProgress: (p) {
+          if (mounted) setState(() => _progress = p);
+        },
+        onPageFinished: (_) {
+          _slow?.cancel();
+          if (mounted) setState(() => _progress = 100);
+          _controller.runJavaScript(_page);
+        },
+        onWebResourceError: (e) {
+          if (e.isForMainFrame == false || !mounted) return;
+          setState(() => _failed = e.description);
+        },
       ));
     if (!kMacOS) c.setBackgroundColor(Colors.white);
     return c..loadRequest(widget.uri);
   }();
 
   @override
+  void initState() {
+    super.initState();
+    _slow = Timer(const Duration(seconds: 20), () {
+      if (mounted && _progress < 100) {
+        setState(() => _failed = 'This page is taking too long to load.');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _slow?.cancel();
+    super.dispose();
+  }
+
+  NavigationDecision _route(NavigationRequest r) {
+    final u = Uri.tryParse(r.url);
+    if (u == null) return NavigationDecision.prevent;
+    if (u.scheme == 'about' || u.scheme == 'data' || u.scheme == 'blob') {
+      return NavigationDecision.navigate;
+    }
+    final sameOrigin = u.scheme == widget.uri.scheme &&
+        u.host == widget.uri.host &&
+        u.port == widget.uri.port;
+    final ext = _ext(u.path);
+    if (sameOrigin && (ext.isEmpty || _webExts.contains(ext))) {
+      return NavigationDecision.navigate;
+    }
+    if (!r.isMainFrame) return NavigationDecision.navigate;
+    launchUrl(u, mode: LaunchMode.externalApplication);
+    return NavigationDecision.prevent;
+  }
+
+  void _retry() {
+    setState(() {
+      _failed = null;
+      _progress = 0;
+    });
+    _controller.loadRequest(widget.uri);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     _page = snippetPageTheme(theme.brightness == Brightness.dark,
         _cssHex(theme.scaffoldBackgroundColor));
-    return WebViewWidget(controller: _controller);
+    if (_failed != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(_failed!,
+                textAlign: TextAlign.center,
+                style: sans(13, color: AppColors.fg3, height: 1.5)),
+            const SizedBox(height: 14),
+            Btn('Retry', icon: 'refresh', small: true, onTap: _retry),
+            const SizedBox(height: 6),
+            Btn('Open in browser',
+                icon: 'external-link',
+                small: true,
+                variant: BtnVariant.ghost,
+                onTap: () => launchUrl(widget.uri,
+                    mode: LaunchMode.externalApplication)),
+          ]),
+        ),
+      );
+    }
+    return Stack(children: [
+      Positioned.fill(child: WebViewWidget(controller: _controller)),
+      if (_progress < 100)
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          child: LinearProgressIndicator(
+            value: _progress == 0 ? null : _progress / 100,
+            minHeight: 2,
+            backgroundColor: Colors.transparent,
+            color: AppColors.accent,
+          ),
+        ),
+    ]);
   }
 }
 

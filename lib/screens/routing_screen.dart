@@ -149,6 +149,9 @@ class _RoutingScreenState extends State<RoutingScreen> {
                   key, on ? ([...chosen]..remove(name)) : [...chosen, name]),
               child: Row(children: [
                 SelectCheck(on, size: 16),
+                const SizedBox(width: 10),
+                ProviderLogo(p?.provider,
+                    size: 15, color: on ? AppColors.fg2 : AppColors.fg4),
                 const SizedBox(width: S.s8),
                 Flexible(
                   child: Text(name,

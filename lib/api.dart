@@ -442,6 +442,13 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('resolve limit', r);
   }
 
+  Future<void> setManualApproval(bool on) async {
+    final r = await http.post(_uri('/config/manual_approval'),
+        headers: _json, body: jsonEncode({'on': on}));
+    if (r.statusCode != 200) throw _err('set approvals', r);
+    invalidateConfig();
+  }
+
   Future<void> setKeepTaskProfile(bool on) async {
     final r = await http.post(_uri('/config/keep_task_profile'),
         headers: _json, body: jsonEncode({'on': on}));

@@ -607,7 +607,9 @@ class _FileExplorerState extends State<FileExplorer> {
                 style: TS.ui(AppColors.fg3)),
           ),
         ...entries.map((e) => _Row(
-              icon: _entryIcon(e.name, e.isDir),
+              icon: kMobile
+                  ? _mobileIcon(_entryIcon(e.name, e.isDir), e.name)
+                  : _entryIcon(e.name, e.isDir),
               name: e.name,
               git: e.git,
               chevron: e.isDir && kMobile && !_selecting,
@@ -701,6 +703,28 @@ class _FileExplorerState extends State<FileExplorer> {
           ),
       ]),
     );
+  }
+
+  static String _mobileIcon(String icon, String name) {
+    final l = name.toLowerCase();
+    if (l.endsWith('.zip') ||
+        l.endsWith('.tar') ||
+        l.endsWith('.gz') ||
+        l.endsWith('.apk') ||
+        l.endsWith('.7z')) {
+      return 'file-archive';
+    }
+    if (l.endsWith('.sh')) return 'file-terminal';
+    if (l.endsWith('.md') || l.endsWith('.txt')) return 'file-text';
+    return switch (icon) {
+      'code' => 'file-code',
+      'image' => 'file-image',
+      'film' => 'file-video',
+      'music' => 'file-audio',
+      'settings' => 'file-json',
+      'pdf' => 'file-text',
+      _ => icon,
+    };
   }
 
   static String _entryIcon(String name, bool isDir) {
@@ -820,12 +844,14 @@ class _Row extends StatelessWidget {
                   color: isFolder && kMobile ? AppColors.accent : iconColor),
               SizedBox(width: kMobile ? S.s12 : 10),
               Expanded(
-                  child: Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(kMobile ? M.rowTitle : 13,
-                          weight: isFolder && kMobile ? W.label : W.body,
-                          color: muted ? AppColors.fg3 : AppColors.fg1))),
+                  child: kMobile && !isFolder && !muted
+                      ? _fileName()
+                      : Text(name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(kMobile ? M.rowTitle : 13,
+                              weight: isFolder && kMobile ? W.label : W.body,
+                              color: muted ? AppColors.fg3 : AppColors.fg1))),
               if (git) ...[
                 const Tag('git', tone: Tone.ok, icon: 'git-branch'),
                 const SizedBox(width: S.s8),
@@ -836,6 +862,21 @@ class _Row extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _fileName() {
+    final dot = name.lastIndexOf('.');
+    final stem = dot > 0 ? name.substring(0, dot) : name;
+    final ext = dot > 0 ? name.substring(dot) : '';
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(text: stem, style: sans(M.rowTitle, color: AppColors.fg1)),
+        if (ext.isNotEmpty)
+          TextSpan(text: ext, style: sans(M.rowTitle, color: AppColors.fg4)),
+      ]),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 

@@ -496,7 +496,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         for (final p in cfg.profiles)
           appMenuRow<String>(
             value: p.name,
-            icon: 'sparkles',
+            icon: 'provider:${p.provider}',
             label: p.name,
             description: '${p.provider} · ${p.model}',
             selected: p.name == current,

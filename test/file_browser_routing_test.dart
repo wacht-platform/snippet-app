@@ -148,11 +148,10 @@ void main() {
       // Media must not render as the generic fallback. `file-text` used to be
       // returned for unrecognised names and has no case in the icon map, so
       // every such file silently drew the map's fallback circle.
-      expect(iconNamesFor('clip.mp4'), contains('film'));
-      expect(iconNamesFor('song.mp3'), contains('music'));
-      expect(iconNamesFor('notes.pdf'), contains('pdf'));
-      expect(iconNamesFor('notes.txt'), contains('file'));
-      expect(iconNamesFor('notes.txt'), isNot(contains('file-text')));
+      expect(iconNamesFor('clip.mp4'), contains('file-video'));
+      expect(iconNamesFor('song.mp3'), contains('file-audio'));
+      expect(iconNamesFor('notes.pdf'), contains('file-text'));
+      expect(iconNamesFor('notes.txt'), contains('file-text'));
       expect(iconNamesFor('lib'), contains('folder'));
     });
   });

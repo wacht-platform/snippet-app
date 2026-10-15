@@ -125,7 +125,7 @@ class _ThreadCardState extends State<_ThreadCard> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: sans(14.5,
-                                        weight: W.label,
+                                        weight: W.strong,
                                         color: AppColors.fg1)),
                               ),
                               const SizedBox(width: 8),
@@ -208,7 +208,7 @@ class _ThreadCardState extends State<_ThreadCard> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: sans(15,
-                        weight: W.label, height: 20 / 15, color: AppColors.fg1)),
+                        weight: W.strong, height: 20 / 15, color: AppColors.fg1)),
               ],
               if (body.isNotEmpty) ...[
                 SizedBox(height: title.isEmpty ? 5 : 3),

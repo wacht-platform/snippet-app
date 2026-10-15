@@ -519,62 +519,19 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   Widget _mobileTermTab() {
     final i = _termFocus.clamp(0, _terms.length - 1);
     final t = _terms[i];
-    final folder = lastPathSegment(_state?.workspace ?? '', ifEmpty: '');
     return Material(
       color: AppColors.canvas,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(6, 6, 10, 0),
-          child: Row(children: [
-            IconBtn('chevron-left',
-                size: M.minTarget,
-                iconSize: 20,
-                tooltip: 'Back to chat',
-                onTap: () => _setState(() => _termOpen = false)),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Shell',
-                      style: TS.sectionTitle().copyWith(fontSize: 17)),
-                  const SizedBox(height: 1),
-                  Row(children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                          color: t.alive ? AppColors.ok : AppColors.fg4,
-                          shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                          [
-                            t.alive ? 'Running' : 'Starting',
-                            if (folder.isNotEmpty) folder
-                          ].join(' · '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12, color: AppColors.fg3)),
-                    ),
-                  ]),
-                ],
-              ),
-            ),
-            Material(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => _openTerm(fresh: true),
-                child: SizedBox.square(
-                  dimension: 38,
-                  child: Center(
-                      child: AppIcon('plus', size: 18, color: AppColors.fg1)),
-                ),
-              ),
-            ),
-          ]),
+        MobileBackBar(
+          title: _terms.length > 1 ? 'Shell ${i + 1}' : 'Shell',
+          subtitle: t.alive ? null : 'Starting…',
+          onBack: () => _setState(() => _termOpen = false),
+          trailing: [
+            RoundBtn(
+                icon: 'plus',
+                tooltip: 'New shell',
+                onTap: () => _openTerm(fresh: true)),
+          ],
         ),
         if (_terms.length > 1)
           Padding(
@@ -1069,8 +1026,13 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       {void Function(VoidCallback)? navigate}) {
     navigate ??= run;
     final ws = s?.workspace ?? '';
+    final changeSteps = sessionChangeSteps(s?.events ?? const []);
     return _SessionActionsPanel(
       session: s,
+      fileChangeCount: fileChanges(changeSteps).length,
+      onFileChanges: () => navigate!(() => Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: (_) => FileChangesScreen(steps: changeSteps)))),
       hideWorkspace: _isMissionControl,
       hideGoal: _isMissionControl,
       hideCheckpoints: _isMissionControl,
@@ -1295,35 +1257,13 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-              child: Row(children: [
-                IconBtn('x',
-                    size: M.minTarget,
-                    iconSize: 20,
-                    tooltip: 'Close',
-                    onTap: () => _scaffoldKey.currentState?.closeEndDrawer()),
-              ]),
+            MobileBackBar(
+              title: title,
+              subtitle: 'Actions',
+              onBack: () => _scaffoldKey.currentState?.closeEndDrawer(),
+              onTitleTap: () {},
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(M.gutter + 8, 0, M.gutter, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Actions',
-                      style: sans(12, weight: W.strong, color: AppColors.fg4)),
-                  const SizedBox(height: 2),
-                  Text(title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(26,
-                          weight: FontWeight.w700,
-                          spacing: -0.7,
-                          height: 31 / 26,
-                          color: AppColors.fg1)),
-                ],
-              ),
-            ),
+            const SizedBox(height: 8),
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter,

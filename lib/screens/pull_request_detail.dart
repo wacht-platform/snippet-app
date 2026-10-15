@@ -8,6 +8,7 @@ import '../highlight.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'mobile_chrome.dart';
 
 part 'pull_request_desktop.dart';
 
@@ -56,6 +57,14 @@ Widget prHeader(
   VoidCallback? onClose,
   List<Widget> actions = const [],
 }) {
+  if (kMobile) {
+    return MobileBackBar(
+      title: title,
+      subtitle: subtitle.isEmpty ? null : subtitle,
+      onBack: onBack ?? onClose ?? () => Navigator.maybePop(context),
+      trailing: actions,
+    );
+  }
   return Container(
     padding: EdgeInsets.fromLTRB(onBack == null ? 16 : 6, kMobile ? 8 : 10, 6, 10),
     child: Row(children: [
@@ -521,7 +530,7 @@ class _CommentSheetState extends State<_CommentSheet> {
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.accentFill,
                 foregroundColor: AppColors.accentFg,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm)),
               ),
               child: Text(widget.action, style: sans(13, weight: W.label, color: AppColors.accentFg)),
             ),
@@ -803,6 +812,20 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
       'CLOSED' => ('Closed', 'x-circle', AppColors.danger),
       _ => s.draft ? ('Draft', 'git-branch', AppColors.fg4) : ('Open', 'git-branch', AppColors.ok),
     };
+    if (kMobile) {
+      return Container(
+        height: 28,
+        padding: const EdgeInsets.fromLTRB(9, 0, 12, 0),
+        decoration: BoxDecoration(
+            color: bg.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(R.pill)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          AppIcon(icon, size: 13, color: bg),
+          const SizedBox(width: 5),
+          Text(label, style: sans(13, color: bg)),
+        ]),
+      );
+    }
     return Container(
       padding: const EdgeInsets.fromLTRB(9, 4, 11, 4),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(R.pill)),
@@ -814,7 +837,19 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
     );
   }
 
-  Widget _branch(String name) => Container(
+  Widget _branch(String name) => kMobile
+      ? Container(
+          height: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 11),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(R.pill),
+          ),
+          child: Center(
+              widthFactor: 1,
+              child: Text(name, style: mono(12, color: AppColors.fg2))),
+        )
+      : Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
           color: AppColors.accentBg,
@@ -992,7 +1027,7 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
                     onPressed: () => _openFiles(path: threads.first.path),
                     style: TextButton.styleFrom(
                       backgroundColor: AppColors.surface1,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm)),
                     ),
                     child: Text('${threads.length} comment${threads.length == 1 ? '' : 's'}',
                         style: sans(13, weight: W.label, color: AppColors.accent)),
@@ -1110,7 +1145,7 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
     final s = pr.summary;
     final lastCommit = pr.commits.isEmpty ? '' : prAgo(pr.commits.last.date);
     return ListView(
-      padding: const EdgeInsets.only(bottom: 96),
+      padding: EdgeInsets.only(bottom: kMobile ? 24 : 96),
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -1168,6 +1203,32 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
     );
   }
 
+  Widget _dockedBar() {
+    final pending = _pending.length;
+    return Container(
+      color: AppColors.bg,
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 10 + MediaQuery.of(context).padding.bottom),
+      child: Row(children: [
+        Expanded(
+          child: Btn('Comment',
+              icon: 'message',
+              variant: BtnVariant.surface,
+              full: true,
+              disabled: _busy,
+              onTap: _comment),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Btn(pending == 0 ? 'Review' : 'Finish review ($pending)',
+              icon: 'check-circle',
+              full: true,
+              disabled: _busy,
+              onTap: _review),
+        ),
+      ]),
+    );
+  }
+
   Widget _floatingBar() {
     final pending = _pending.length;
     return Positioned(
@@ -1221,6 +1282,22 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
       child: SafeArea(
         bottom: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (kMobile)
+            MobileBackBar(
+              title: '#${widget.number}',
+              subtitle: widget.status.repo,
+              onBack: () => Navigator.maybePop(context),
+              trailing: [
+                if (pr != null)
+                  Builder(
+                    builder: (anchor) => RoundBtn(
+                        icon: 'more-horizontal',
+                        tooltip: 'More',
+                        onTap: _busy ? null : () => _menu(anchor)),
+                  ),
+              ],
+            )
+          else
           prHeader(context,
               title: '#${widget.number}',
               subtitle: pr?.summary.title ?? '',
@@ -1239,13 +1316,16 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
                 ? prMessage(_error!)
                 : pr == null
                     ? Center(child: Spinner(size: 16, color: AppColors.fg3))
-                    : Stack(children: [
-                        Positioned.fill(
-                          child: RefreshIndicator(onRefresh: _load, child: _overview(pr)),
-                        ),
-                        if (_open) _floatingBar(),
-                      ]),
+                    : kMobile
+                        ? RefreshIndicator(onRefresh: _load, child: _overview(pr))
+                        : Stack(children: [
+                            Positioned.fill(
+                              child: RefreshIndicator(onRefresh: _load, child: _overview(pr)),
+                            ),
+                            if (_open) _floatingBar(),
+                          ]),
           ),
+          if (kMobile && pr != null && _open) _dockedBar(),
         ]),
       ),
     );
@@ -1418,7 +1498,7 @@ class _PrMergeBoxState extends State<PrMergeBox> {
         onSecondaryTap: _busy ? null : () => _pickMethod(anchor),
         child: Material(
           color: enabled ? AppColors.accentFill : AppColors.surface2,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(kMobile ? R.pill : 8),
           child: InkWell(
             onTap: enabled ? onTap : null,
             onLongPress: _busy
@@ -1427,13 +1507,13 @@ class _PrMergeBoxState extends State<PrMergeBox> {
                     HapticFeedback.selectionClick();
                     _pickMethod(anchor);
                   },
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(kMobile ? R.pill : 8),
             child: Container(
-              height: 44,
+              height: kMobile ? 48 : 44,
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Text(label,
-                  style: sans(14, weight: W.label, color: enabled ? AppColors.accentFg : AppColors.fg4)),
+                  style: sans(14.5, weight: W.strong, color: enabled ? AppColors.accentFg : AppColors.fg4)),
             ),
           ),
         ),
@@ -1511,7 +1591,7 @@ class _PrMergeBoxState extends State<PrMergeBox> {
         style: TextButton.styleFrom(
           minimumSize: const Size.fromHeight(44),
           backgroundColor: AppColors.surface2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kMobile ? R.pill : 8)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
         ),
         child: Text(label, style: sans(13.5, weight: W.label, color: AppColors.fg1)),
@@ -1581,7 +1661,7 @@ class _PrMergeBoxState extends State<PrMergeBox> {
               minimumSize: const Size.fromHeight(44),
               backgroundColor: AppColors.accentFill,
               foregroundColor: AppColors.accentFg,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kMobile ? R.pill : 8)),
             ),
             child: Text('Enable auto-merge', style: sans(14, weight: W.label, color: AppColors.accentFg)),
           )
@@ -1592,7 +1672,7 @@ class _PrMergeBoxState extends State<PrMergeBox> {
               minimumSize: const Size.fromHeight(44),
               backgroundColor: AppColors.accentFill,
               foregroundColor: AppColors.accentFg,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kMobile ? R.pill : 8)),
             ),
             child: Text('Confirm ${_short(_method)}', style: sans(14, weight: W.label, color: AppColors.accentFg)),
           ),
@@ -1760,7 +1840,7 @@ class _ReviewSheetState extends State<_ReviewSheet> {
               minimumSize: const Size.fromHeight(46),
               backgroundColor: AppColors.accentFill,
               foregroundColor: AppColors.accentFg,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm)),
             ),
             child: Text('Submit review', style: sans(14, weight: W.label, color: AppColors.accentFg)),
           ),
@@ -2016,8 +2096,8 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
               actions: [
                 if (kMobile)
                   Builder(
-                    builder: (anchor) => IconBtn('folder-open',
-                        size: M.minTarget, iconSize: 16, tooltip: 'Jump to file', onTap: () => _jumpMenu(anchor)),
+                    builder: (anchor) => RoundBtn(
+                        icon: 'folder-open', tooltip: 'Jump to file', onTap: () => _jumpMenu(anchor)),
                   ),
               ]),
           Expanded(
@@ -2234,7 +2314,16 @@ class _PrFileDiffState extends State<PrFileDiff> {
               const SizedBox(width: 6),
               Tooltip(
                 message: 'Viewed',
-                child: Checkbox(
+                child: kMobile
+                    ? GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => widget.onViewed!(!widget.viewed),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: SelectCheck(widget.viewed, size: 20),
+                        ),
+                      )
+                    : Checkbox(
                   value: widget.viewed,
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -2360,7 +2449,7 @@ class _PrFileDiffState extends State<PrFileDiff> {
               minimumSize: const Size(0, 32),
               backgroundColor: AppColors.accentFill,
               foregroundColor: AppColors.accentFg,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm)),
             ),
             child: Text(widget.pending.isEmpty ? 'Start a review' : 'Add to review',
                 style: sans(13, weight: W.label, color: AppColors.accentFg)),
@@ -2595,7 +2684,7 @@ class _PrThreadBoxState extends State<PrThreadBox> {
                       minimumSize: const Size(0, 32),
                       backgroundColor: AppColors.accentFill,
                       foregroundColor: AppColors.accentFg,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm)),
                     ),
                     child: Text('Reply', style: sans(13, weight: W.label, color: AppColors.accentFg)),
                   ),
