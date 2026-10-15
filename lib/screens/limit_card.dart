@@ -70,16 +70,17 @@ class _LimitCardState extends State<LimitCard> {
             live
                 ? (reset == null
                     ? 'Continue on another model now, or wait for it to reset.'
-                    : 'It resets at $reset. Continue on another model now, or wait and I pick up then.')
+                    : 'It resets at $reset. Continue on another model now, or wait and this chat picks up then.')
                 : (reset == null ? 'Handled.' : 'Resets at $reset.'),
             style: sans(12.5, height: 1.45, color: AppColors.fg3),
           ),
           if (live) ...[
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final p in widget.options.take(3))
+              for (final (i, p) in widget.options.take(3).indexed)
                 Btn(_busy == p ? 'Switching…' : 'Continue on $p',
                     small: true,
+                    variant: i == 0 ? BtnVariant.primary : BtnVariant.secondary,
                     disabled: _busy != null,
                     onTap: () => _act('switch', profile: p)),
               Btn(reset == null ? 'Wait' : 'Wait until $reset',
