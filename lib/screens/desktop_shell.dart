@@ -1465,6 +1465,8 @@ class _DesktopShellState extends State<DesktopShell>
         onNewSession: _newSessionFlow,
         onSelectInstance: _selectInstance,
         onOpenMissionControl: _openMissionControlTab,
+        onOpenPalette: kMobile ? null : _openCommandPalette,
+        desktopFooter: kMobile ? null : _sidebarFooter(),
         onAddInstance: _addInstanceFlow,
         onRenameInstance: _renameInstance,
         onRemoveInstance: _removeInstance,
@@ -1616,7 +1618,6 @@ class _DesktopShellState extends State<DesktopShell>
               backgroundColor: Colors.transparent,
               body: SafeArea(
                 child: Column(children: [
-                  _macWindowBar(),
                   _bodyRow(topInset: false),
                 ]),
               ),
@@ -1627,7 +1628,6 @@ class _DesktopShellState extends State<DesktopShell>
             backgroundColor: Colors.transparent,
             body: SafeArea(
               child: Column(children: [
-                _macWindowBar(),
                 _bodyRow(topInset: false),
               ]),
             ),

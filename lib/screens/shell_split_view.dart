@@ -12,6 +12,8 @@ class ShellSplitView extends StatefulWidget {
     super.key,
     required this.sidebar,
     this.sidebarHeader,
+    this.sidebarTop,
+    this.mainHeader,
     required this.paneWidth,
     required this.leftCollapsed,
     required this.rightCollapsed,
@@ -39,6 +41,8 @@ class ShellSplitView extends StatefulWidget {
 
   final Widget sidebar;
   final Widget? sidebarHeader;
+  final Widget? sidebarTop;
+  final Widget? mainHeader;
   final double paneWidth;
   final bool leftCollapsed;
   final bool rightCollapsed;
@@ -156,7 +160,8 @@ class _ShellSplitViewState extends State<ShellSplitView> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (p == ShellPane.right
-                ? list.isNotEmpty || readouts.isNotEmpty
+                ? list.isNotEmpty ||
+                    readouts.any((r) => r != _filesTab)
                 : list.length + readouts.length > 1)
               PaneStrip(
                 pane: p,
@@ -195,56 +200,62 @@ class _ShellSplitViewState extends State<ShellSplitView> {
                 widget.readouts.any((r) => r.pane == ShellPane.right)));
     final showLeft = !(widget.leftCollapsed && widget.leftTabs.isNotEmpty);
 
+    final line = BorderSide(color: AppColors.line);
     return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        child: Row(children: [
-          SizedBox(
-            width: kSidebarWidth,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: ColoredBox(
-                color: AppColors.sidebarPanel,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (widget.sidebarHeader != null) widget.sidebarHeader!,
-                    Expanded(child: widget.sidebar),
-                  ],
-                ),
-              ),
-            ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Container(
+          width: kSidebarWidth,
+          decoration: BoxDecoration(
+            color: AppColors.windowBg,
+            border: Border(right: line),
           ),
-          const SizedBox(width: 8),
-          if (showLeft)
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.sidebarTop != null) widget.sidebarTop!,
+              if (widget.sidebarHeader != null) widget.sidebarHeader!,
+              Expanded(child: widget.sidebar),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (widget.mainHeader != null) widget.mainHeader!,
             Expanded(
-              child: _dropOn(
-                ShellPane.left,
-                _paneView(ShellPane.left, roundRight: !showRight),
-              ),
-            )
-          else
-            Expanded(
-              child: CollapsedPaneStub(
-                pane: ShellPane.left,
-                onExpand: () => widget.onExpandPane(ShellPane.left),
-              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (showLeft)
+                  Expanded(
+                    child: _dropOn(
+                      ShellPane.left,
+                      _paneView(ShellPane.left, roundRight: !showRight),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: CollapsedPaneStub(
+                      pane: ShellPane.left,
+                      onExpand: () => widget.onExpandPane(ShellPane.left),
+                    ),
+                  ),
+                if (showRight) ...[
+                  PaneResizeHandle(
+                    joinBaseline: showLeft,
+                    onResize: widget.onPaneResize,
+                  ),
+                  SizedBox(
+                    width:
+                        widget.paneWidth.clamp(kPaneMinWidth, double.infinity),
+                    child: _dropOn(
+                      ShellPane.right,
+                      _paneView(ShellPane.right, roundRight: true),
+                    ),
+                  ),
+                ],
+              ]),
             ),
-          if (showRight) ...[
-            PaneResizeHandle(
-              joinBaseline: showLeft,
-              onResize: widget.onPaneResize,
-            ),
-            SizedBox(
-              width: widget.paneWidth.clamp(kPaneMinWidth, double.infinity),
-              child: _dropOn(
-                ShellPane.right,
-                _paneView(ShellPane.right, roundRight: true),
-              ),
-            ),
-          ],
-        ]),
-      ),
+          ]),
+        ),
+      ]),
     );
   }
 }

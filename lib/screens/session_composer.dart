@@ -858,17 +858,19 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         Container(
           key: _composerCardKey,
           constraints: const BoxConstraints(minHeight: 40),
-          padding: const EdgeInsets.fromLTRB(12, 0, 6, 0),
+          padding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
           decoration: BoxDecoration(
             color: AppColors.raised,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             border: _draggingFiles
                 ? Border.all(color: AppColors.accent, width: 1.5)
                 : Border.all(color: AppColors.border),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Row(children: [
               Expanded(
                 child: CallbackShortcuts(
                   bindings: _composerShortcuts,
@@ -882,7 +884,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                     style: TS.body(AppColors.fg1),
                     decoration: InputDecoration(
                       isCollapsed: true,
-                      contentPadding: const EdgeInsets.fromLTRB(0, 10, 8, 10),
+                      contentPadding: kMobile
+                          ? const EdgeInsets.fromLTRB(0, 10, 8, 10)
+                          : const EdgeInsets.fromLTRB(4, 12, 4, 6),
                       border: InputBorder.none,
                       hintText: _isMissionControl
                           ? 'Reply to Snippet'
@@ -892,28 +896,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _input,
-                  builder: (_, __, ___) {
-                    final queue = running && _canSend;
-                    final stop = running && !queue;
-                    return _SendBtn(
-                        enabled: stop || _canSend,
-                        running: stop,
-                        onTap: stop
-                            ? () => _send({'kind': 'interrupt'})
-                            : (_canSend ? _sendMessage : null));
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Row(children: [
+              ]),
+              Row(children: [
             icon('plus', 'Attach', _onAttachTap),
             if (kCanRecord)
               icon(_isRecording ? 'mic-off' : 'mic', 'Record', _onMicTap,
@@ -934,9 +918,17 @@ extension _SessionScreenComposerExt on _SessionScreenState {
               ]),
             ),
             Builder(
-              builder: (ctx) =>
-                  label(_modelLabel ?? 'Auto', () => _switchModel(ctx),
-                      tip: 'Model'),
+              builder: (ctx) => hit(
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (_modelProvider != null) ...[
+                      ProviderLogo(_modelProvider, size: 12),
+                      const SizedBox(width: 7),
+                    ],
+                    Text(_modelLabel ?? 'Auto',
+                        style: sans(12.5, color: AppColors.fg2)),
+                  ]),
+                  () => _switchModel(ctx),
+                  tip: 'Model'),
             ),
             if (left != null)
               Tooltip(
@@ -956,7 +948,25 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                   ),
                 ),
               ),
-          ]),
+              Padding(
+                padding: EdgeInsets.zero,
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _input,
+                  builder: (_, __, ___) {
+                    final queue = running && _canSend;
+                    final stop = running && !queue;
+                    return _SendBtn(
+                        enabled: stop || _canSend,
+                        running: stop,
+                        onTap: stop
+                            ? () => _send({'kind': 'interrupt'})
+                            : (_canSend ? _sendMessage : null));
+                  },
+                ),
+              ),
+              ]),
+            ],
+          ),
         ),
       ],
     );

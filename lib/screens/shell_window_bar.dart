@@ -346,82 +346,31 @@ class MacWindowBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: macOSIsFullscreen(),
-      builder: (context, snapshot) {
-        final hasWindowControls =
-            reserveWindowControls && snapshot.data != true;
-        return SizedBox(
-          height: kTitleBarHeight,
-          child: ColoredBox(
-            color: AppColors.windowBg,
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: hasWindowControls ? kTrafficLightReserve : 16,
-                right: 20,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconBtn(
-                          'chevron-left',
-                          size: 24,
-                          iconSize: 16,
-                          tooltip: 'Back',
-                          onTap: canNavigateBack ? onNavigateBack : null,
-                        ),
-                        IconBtn(
-                          'chevron-right',
-                          size: 24,
-                          iconSize: 16,
-                          tooltip: 'Forward',
-                          onTap: canNavigateForward ? onNavigateForward : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Center(child: tabsRow),
-                  ),
-                  const SizedBox(width: 8),
-                  Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final tool in tools) ...[
-                          tool,
-                          const SizedBox(width: 4),
-                        ],
-                        if (tools.isNotEmpty)
-                          Container(
-                            width: 1,
-                            height: 16,
-                            margin: const EdgeInsets.symmetric(horizontal: 8),
-                            color: AppColors.border2,
-                          ),
-                        IconBtn(
-                          'settings',
-                          size: 24,
-                          iconSize: 16,
-                          tooltip: 'Settings',
-                          onTap: onOpenSettings,
-                        ),
-                        const SizedBox(width: 10),
-                        machineSwitcher,
-                      ],
-                    ),
-                  ),
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.fromLTRB(8, 0, 10, 0),
+      decoration: BoxDecoration(
+        color: readingBg,
+        border: Border(bottom: BorderSide(color: AppColors.line)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: Align(alignment: Alignment.centerLeft, child: tabsRow)),
+          const SizedBox(width: 8),
+          Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final tool in tools) ...[
+                  tool,
+                  const SizedBox(width: 2),
                 ],
-              ),
+              ],
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

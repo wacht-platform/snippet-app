@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api.dart';
 import '../swr.dart';
@@ -8,6 +9,7 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'file_tree_sidebar_panel.dart' show fileTint;
 import 'git.dart';
 import 'pull_request_detail.dart' show PrSidebarList;
 import 'shell_nav.dart';
@@ -30,11 +32,13 @@ class GitDiffSidebarPanel extends StatefulWidget {
     this.tab = 'changes',
     this.onTab,
     this.onOpenPullRequest,
+    this.header,
   });
 
   final String tab;
   final ValueChanged<String>? onTab;
   final ValueChanged<int>? onOpenPullRequest;
+  final Widget? header;
 
   final DaemonClient client;
   final String workspacePath;
@@ -49,6 +53,9 @@ class GitDiffSidebarPanel extends StatefulWidget {
 }
 
 class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
+  final _commitCtl = TextEditingController();
+  bool _committing = false;
+  bool _pushing = false;
   GitStatus? _status;
   bool _loading = true;
   String? _error;
@@ -70,6 +77,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
 
   @override
   void dispose() {
+    _commitCtl.dispose();
     _git?.dispose();
     super.dispose();
   }
@@ -206,6 +214,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             if (!tabbed)
               ShellSectionHeader(
                 label: 'Git Diff',
+                leading: widget.header,
               ),
             if (notRepo)
               SizedBox(
@@ -229,6 +238,8 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                 child: _cleanState(),
               )
             else ...[
+              if (!kMobile && (widget.sessionId ?? '').isNotEmpty)
+                _commitBox(files.length),
               const SizedBox(height: 6),
               for (final f in files) _fileRow(f),
             ],
@@ -258,6 +269,99 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
       ),
     ]);
   }
+
+  Future<void> _commit() async {
+    final msg = _commitCtl.text.trim();
+    final sid = widget.sessionId;
+    if (msg.isEmpty || sid == null || _committing) return;
+    setState(() => _committing = true);
+    try {
+      await widget.client.gitStage(sid, all: true);
+      await widget.client.gitCommit(sid, msg);
+      _commitCtl.clear();
+      await refresh(background: true);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    } finally {
+      if (mounted) setState(() => _committing = false);
+    }
+  }
+
+  Future<void> _push() async {
+    final sid = widget.sessionId;
+    if (sid == null || _pushing) return;
+    setState(() => _pushing = true);
+    try {
+      await widget.client.gitPush(sid);
+      if (mounted) toast(context, 'Pushed');
+      await refresh(background: true);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    } finally {
+      if (mounted) setState(() => _pushing = false);
+    }
+  }
+
+  Widget _commitBox(int count) => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.line),
+            ),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CallbackShortcuts(
+                    bindings: {
+                      const SingleActivator(LogicalKeyboardKey.enter,
+                          meta: true): _commit,
+                      const SingleActivator(LogicalKeyboardKey.enter,
+                          control: true): _commit,
+                    },
+                    child: TextField(
+                      controller: _commitCtl,
+                      minLines: 2,
+                      maxLines: 5,
+                      onChanged: (_) => setState(() {}),
+                      style: sans(13, color: AppColors.fg1),
+                      decoration: InputDecoration(
+                        isCollapsed: true,
+                        border: InputBorder.none,
+                        hintText: 'Commit message',
+                        hintStyle: sans(13, color: AppColors.fg4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('⌘↵ to commit', style: sans(11.5, color: AppColors.fg4)),
+                ]),
+          ),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: Btn(
+                _committing
+                    ? 'Committing…'
+                    : 'Commit $count file${count == 1 ? '' : 's'}',
+                variant: BtnVariant.primary,
+                full: true,
+                disabled: _commitCtl.text.trim().isEmpty || _committing,
+                onTap: _commit,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Btn(_pushing ? 'Pushing…' : 'Push',
+                variant: BtnVariant.secondary,
+                icon: 'upload',
+                disabled: _pushing,
+                onTap: _push),
+          ]),
+        ]),
+      );
 
   Widget _tabChip(String key, String label) {
     final on = widget.tab == key;
@@ -344,8 +448,20 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                     ? const EdgeInsets.fromLTRB(10, 7, 10, 7)
                     : const EdgeInsets.fromLTRB(10, 5, 10, 5),
                 child: Row(children: [
-                  _statusLetter(f),
-                  SizedBox(width: kMobile ? 10 : 8),
+                  if (kMobile) ...[
+                    _statusLetter(f),
+                    const SizedBox(width: 10),
+                  ] else ...[
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: fileTint(name),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 9),
+                  ],
                   Expanded(
                     child: Text.rich(
                       TextSpan(children: [
@@ -360,6 +476,10 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                       style: sans(kMobile ? 13.5 : 13, color: AppColors.fg1),
                     ),
                   ),
+                  if (!kMobile) ...[
+                    const SizedBox(width: 8),
+                    _statusMark(f),
+                  ],
                 ]),
               ),
             ),
@@ -372,6 +492,18 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
   /// The git status character, matching how the full Git screen derives it:
   /// the index char for a staged file, `?` for untracked, else the worktree
   /// char. Colour is the only state signal in the panel.
+  Widget _statusMark(GitFile f) {
+    final raw = f.staged ? f.x : (f.untracked ? '?' : f.y);
+    final l = raw.trim().isEmpty ? 'M' : raw.trim();
+    final letter = l == '?' ? 'A' : l;
+    final color = switch (letter) {
+      'A' => AppColors.ok,
+      'D' => AppColors.danger,
+      _ => AppColors.run,
+    };
+    return Text(letter, style: mono(11, color: color));
+  }
+
   Widget _statusLetter(GitFile f) {
     final raw = f.staged ? f.x : (f.untracked ? '?' : f.y);
     final letter = raw.trim().isEmpty ? 'M' : raw.trim();

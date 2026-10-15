@@ -38,6 +38,8 @@ class Sidebar extends StatefulWidget {
   final void Function(Instance) onSelectInstance;
   final VoidCallback onOpenMissionControl;
   final ValueChanged<CoordinationAgent>? onOpenAgent;
+  final VoidCallback? onOpenPalette;
+  final Widget? desktopFooter;
   final void Function(String id, String title, String? profile) onOpenSession;
   final VoidCallback onAddInstance;
   final void Function(Instance, String) onRenameInstance;
@@ -77,6 +79,8 @@ class Sidebar extends StatefulWidget {
     required this.onSelectInstance,
     required this.onOpenMissionControl,
     this.onOpenAgent,
+    this.onOpenPalette,
+    this.desktopFooter,
     required this.onOpenSession,
     required this.onAddInstance,
     required this.onRenameInstance,
@@ -178,23 +182,35 @@ class SidebarState extends State<Sidebar> {
 
   Widget _meterRow(String provider, RateWindow r) {
     final used = r.usedPercent.clamp(0, 100) / 100;
-    final color = r.leftPercent < 20 ? AppColors.danger : AppColors.accent;
+    final color = r.leftPercent < 20
+        ? AppColors.danger
+        : switch (_providerName(provider)) {
+            'Claude' => const Color(0xFFD97757),
+            'Gemini' || 'Antigravity' => const Color(0xFF8AB4F8),
+            'ChatGPT' => AppColors.fg2,
+            _ => AppColors.accent,
+          };
     final reset = rateResetLabel(r.resetsAt);
     return Tooltip(
       message: '${r.usedPercent.round()}% used${reset == null ? '' : ' · $reset'}',
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(children: [
-          ProviderLogo(provider, size: 12),
-          const SizedBox(width: 8),
-          for (var i = 0; i < 12; i++)
+          SizedBox(
+            width: 70,
+            child: Text(_providerName(provider),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(11.5, color: AppColors.fg3)),
+          ),
+          for (var i = 0; i < 10; i++)
             Container(
               width: 5,
               height: 5,
               margin: const EdgeInsets.only(right: 3),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: i < (used * 12).round() ? color : AppColors.line,
+                color: i < (used * 10).round() ? color : AppColors.line,
               ),
             ),
           const Spacer(),
@@ -203,6 +219,19 @@ class SidebarState extends State<Sidebar> {
         ]),
       ),
     );
+  }
+
+  String _providerName(String p) {
+    final l = p.toLowerCase();
+    if (l.contains('claude') || l.contains('anthropic')) return 'Claude';
+    if (l.contains('openai') || l.contains('codex') || l.contains('gpt')) {
+      return 'ChatGPT';
+    }
+    if (l.contains('antigravity')) return 'Antigravity';
+    if (l.contains('gemini') || l.contains('google')) return 'Gemini';
+    if (l.contains('xai') || l.contains('grok')) return 'Grok';
+    if (l.contains('openrouter')) return 'OpenRouter';
+    return p.isEmpty ? p : p[0].toUpperCase() + p.substring(1);
   }
 
   String _shortReset(int at) {
@@ -894,7 +923,7 @@ class SidebarState extends State<Sidebar> {
     final rows = <Widget>[];
     for (final e in groups.entries) {
       rows.add(Padding(
-        padding: const EdgeInsets.fromLTRB(10, 14, 6, 4),
+        padding: const EdgeInsets.fromLTRB(8, 12, 2, 4),
         child: Row(children: [
           Expanded(
             child: Text(e.key.toUpperCase(),
@@ -924,7 +953,7 @@ class SidebarState extends State<Sidebar> {
         (sessionIsActive(mc.status) || mc.status == 'waiting_for_input');
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
         child: Material(
           color: mcSelected ? AppColors.surface2 : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -956,6 +985,37 @@ class SidebarState extends State<Sidebar> {
           ),
         ),
       ),
+      if (widget.onOpenPalette != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+          child: Material(
+            color: AppColors.surface1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(color: AppColors.line),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: widget.onOpenPalette,
+              child: SizedBox(
+                height: 32,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(children: [
+                    AppIcon('search', size: 15, color: AppColors.fg4),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('Search or jump',
+                          style: sans(13, color: AppColors.fg4)),
+                    ),
+                    Text('⌘K', style: mono(11, color: AppColors.fg4)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        )
+      else
       Padding(
         padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
         child: Container(
@@ -993,7 +1053,7 @@ class SidebarState extends State<Sidebar> {
       ),
       if (_crew.isNotEmpty) ...[
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
           child: Text('CREW',
               style: sans(11, color: AppColors.fg4, spacing: 0.9)),
         ),
@@ -1042,7 +1102,7 @@ class SidebarState extends State<Sidebar> {
           onRefresh: () async => widget.onRefreshSessions(),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
             children: [
               if (!hasClient)
                 const SidebarEmpty('Add a machine to begin.')
@@ -1056,15 +1116,20 @@ class SidebarState extends State<Sidebar> {
           ),
         ),
       ),
-      if (_meters.isNotEmpty)
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 14, 10),
-          decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: AppColors.line))),
-          child: Column(children: [
-            for (final (p, r) in _meters) _meterRow(p, r),
-          ]),
-        ),
+      Container(
+        decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: AppColors.line))),
+        child: Column(children: [
+          if (_meters.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+              child: Column(children: [
+                for (final (p, r) in _meters) _meterRow(p, r),
+              ]),
+            ),
+          if (widget.desktopFooter != null) widget.desktopFooter!,
+        ]),
+      ),
     ]);
   }
 
@@ -1083,17 +1148,18 @@ class SidebarState extends State<Sidebar> {
     final on = _selecting ? checked : selected;
     return Material(
       color: on ? AppColors.surface2 : Colors.transparent,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(7),
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(7),
         onTap: _selecting
             ? () => _toggleSelected(s.id)
             : () => widget.onOpenSession(s.id, s.title, s.profile),
         onSecondaryTapDown: _selecting
             ? null
             : (d) => _sessionActions(s, position: d.globalPosition),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(children: [
             if (_selecting) ...[
               SelectCheck(checked, size: 14),
@@ -1105,13 +1171,13 @@ class SidebarState extends State<Sidebar> {
                   ? ProviderLogo(_profileProviders[s.profile], size: 13)
                   : AppIcon('chat', size: 13, color: AppColors.fg4),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 9),
             Expanded(
               child: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(13,
-                      color: selected ? AppColors.fg1 : AppColors.fg2)),
+                      color: selected ? AppColors.fg1 : AppColors.fg3)),
             ),
             const SizedBox(width: 10),
             ConstrainedBox(

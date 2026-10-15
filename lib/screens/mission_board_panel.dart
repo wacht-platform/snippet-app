@@ -77,7 +77,7 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
   }
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
         child: Text(text.toUpperCase(),
             style: sans(11, spacing: 0.9, color: AppColors.fg4)),
       );
@@ -141,6 +141,12 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
           : ListView(
               padding: const EdgeInsets.only(bottom: 24),
               children: [
+                Container(
+                  height: 46,
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  alignment: Alignment.centerLeft,
+                  child: Text('Board', style: sans(12.5, color: AppColors.fg3)),
+                ),
                 _label('Working now'),
                 if (doing.isEmpty) empty('Nothing running.'),
                 Padding(

@@ -83,28 +83,6 @@ List<Widget> buildShellRailTools({
         onTap: onTap,
       );
 
-  if (mc) {
-    final enabled = tab != null;
-    return [
-      railTool(
-        'activity',
-        tooltip: 'Automated wakes',
-        onTap: enabled ? () => onSessionAction('autonomy') : null,
-      ),
-      railTool(
-        'minimize',
-        tooltip: 'Compact history',
-        onTap: enabled ? () => onSessionAction('compact') : null,
-      ),
-      railTool(
-        'scheduled',
-        tooltip: 'Scheduled',
-        active: isRightPanelActive(RightPanel.recurring),
-        onTap: enabled ? () => onToggleRightPanel(RightPanel.recurring) : null,
-      ),
-    ];
-  }
-
   final win = s?.contextWindow ?? 0;
   final used = s?.lastPromptTokens ?? 0;
   final frac = win > 0 ? (used / win).clamp(0.0, 1.0) : 0.0;
@@ -169,15 +147,19 @@ List<Widget> buildShellRailTools({
           item('wrap', 'Compact now', () => onSessionAction('compact')),
           const PopupMenuDivider(),
         ],
-        goalRunning
-            ? item('goal', 'Cancel goal', () => onSessionAction('goal'))
-            : item('goal', 'Set goal', () => onOpenGoalPopover(ctx)),
-        item('layers', 'Lanes', () => onToggleRightPanel(RightPanel.lanes),
-            detail: lanes > 0 ? '$lanes running' : null),
-        item('clipboard', 'Artifacts & files',
-            () => onSessionAction('artifacts')),
-        item('history', 'Checkpoints',
-            () => onToggleRightPanel(RightPanel.checkpoints)),
+        if (mc)
+          item('activity', 'Automated wakes', () => onSessionAction('autonomy'))
+        else ...[
+          goalRunning
+              ? item('goal', 'Cancel goal', () => onSessionAction('goal'))
+              : item('goal', 'Set goal', () => onOpenGoalPopover(ctx)),
+          item('layers', 'Lanes', () => onToggleRightPanel(RightPanel.lanes),
+              detail: lanes > 0 ? '$lanes running' : null),
+          item('clipboard', 'Artifacts & files',
+              () => onSessionAction('artifacts')),
+          item('history', 'Checkpoints',
+              () => onToggleRightPanel(RightPanel.checkpoints)),
+        ],
         item('scheduled', 'Scheduled',
             () => onToggleRightPanel(RightPanel.recurring)),
         if (win <= 0 || used <= 0)

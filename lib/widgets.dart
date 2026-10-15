@@ -598,7 +598,7 @@ class Btn extends StatelessWidget {
     // composer and every dialog footer. Desktop keeps the compact 28/34 so a
     // mouse-sized toolbar does not grow.
     final h = small ? (kMobile ? 36.0 : 28.0) : (kMobile ? 46.0 : 34.0);
-    final radius = kMobile ? 999.0 : R.sm;
+    const radius = 999.0;
     final child = Row(
       mainAxisSize: full ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,

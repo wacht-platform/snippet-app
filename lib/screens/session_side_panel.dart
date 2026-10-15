@@ -35,7 +35,11 @@ class SessionSidePanel extends StatefulWidget {
 class _SessionSidePanelState extends State<SessionSidePanel> {
   static bool _termsOpen = true;
   static bool _changes = false;
-  String _gitTab = 'changes';
+
+  Widget _segs() => Row(children: [
+        _seg('Files', !_changes, () => setState(() => _changes = false)),
+        _seg('Changes', _changes, () => setState(() => _changes = true)),
+      ]);
 
   Widget _seg(String label, bool on, VoidCallback tap) => Padding(
         padding: const EdgeInsets.only(right: 2),
@@ -97,13 +101,6 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-          child: Row(children: [
-            _seg('Files', !_changes, () => setState(() => _changes = false)),
-            _seg('Changes', _changes, () => setState(() => _changes = true)),
-          ]),
-        ),
         Expanded(
           child: widget.workspacePath.isEmpty
               ? const SizedBox()
@@ -114,14 +111,14 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
                   workspacePath: widget.workspacePath,
                   sessionId: widget.sessionId,
                   onOpenDiff: widget.onOpenDiff,
-                  tab: _gitTab,
-                  onTab: (t) => setState(() => _gitTab = t),
+                  header: _segs(),
                 )
               : FileTreeSidebarPanel(
                   key: ValueKey('files-${widget.workspacePath}'),
                   client: widget.client,
                   workspacePath: widget.workspacePath,
                   onOpenFile: widget.onOpenFile,
+                  header: _segs(),
                 ),
         ),
         Container(height: 1, color: AppColors.border),

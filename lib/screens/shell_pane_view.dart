@@ -32,10 +32,9 @@ class PaneSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+    return ClipRect(
       child: ColoredBox(
-        color: readingBg,
+        color: pane == ShellPane.right ? AppColors.windowBg : readingBg,
         child: Stack(fit: StackFit.expand, children: [
           child,
           if (droppable)
@@ -43,7 +42,6 @@ class PaneSurface extends StatelessWidget {
               child: IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                         color: AppColors.accent, width: kPaneActiveStroke),
                   ),
