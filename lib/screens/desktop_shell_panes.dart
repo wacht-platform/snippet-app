@@ -453,8 +453,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     if (c == null) return;
     final inst = _active;
     presentScreen(context,
-        maxWidth: 860,
-        maxHeight: 600,
+        maxWidth: 1080,
+        maxHeight: 720,
         builder: (_, close) => _SettingsPanel(
               client: c,
               instances: _instances,

@@ -281,13 +281,18 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   static const _nav = [
     (SettingsPage.general, 'server', 'General'),
-    (SettingsPage.models, 'ai-chip', 'Inference profiles'),
-    (SettingsPage.routing, 'transfer', 'Routing'),
-    (SettingsPage.memory, 'brain', 'Memory'),
-    (SettingsPage.usage, 'analytics', 'Usage'),
-    (SettingsPage.vault, 'lock-key', 'Vault'),
-    (SettingsPage.scheduled, 'repeat', 'Scheduled jobs'),
+    (SettingsPage.models, 'sparkles', 'Profiles'),
+    (SettingsPage.routing, 'route', 'Routing'),
+    (SettingsPage.usage, 'gauge', 'Usage'),
+    (SettingsPage.memory, 'book-marked', 'Memory'),
+    (SettingsPage.scheduled, 'calendar-clock', 'Scheduled'),
+    (SettingsPage.vault, 'lock', 'Vault'),
   ];
+
+  static const _navGroups = {
+    SettingsPage.general: 'Work',
+    SettingsPage.memory: 'Agents',
+  };
 
   @override
   void initState() {
@@ -409,8 +414,18 @@ class SettingsPanelState extends State<SettingsPanel> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           children: [
-                            for (final (page, icon, label) in _nav)
+                            for (final (page, icon, label) in _nav) ...[
+                              if (_navGroups[page] != null)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                      10, 14, 10, 4),
+                                  child: Text(_navGroups[page]!.toUpperCase(),
+                                      style: sans(11,
+                                          spacing: 0.9,
+                                          color: AppColors.fg4)),
+                                ),
                               _settingsNavRow(page, icon, label),
+                            ],
                           ],
                         ),
                       ),
@@ -756,12 +771,12 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   String _pageTitle(SettingsPage page) => switch (page) {
         SettingsPage.general => 'General',
-        SettingsPage.models => 'Inference profiles',
+        SettingsPage.models => 'Profiles',
         SettingsPage.routing => 'Routing',
         SettingsPage.memory => 'Memory',
         SettingsPage.usage => 'Usage',
         SettingsPage.vault => 'Vault',
-        SettingsPage.scheduled => 'Scheduled jobs',
+        SettingsPage.scheduled => 'Scheduled',
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {

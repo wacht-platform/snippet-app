@@ -336,7 +336,7 @@ class AppIcon extends StatelessWidget {
       return ProviderLogo(name.substring(9),
           size: size * visualScale, color: color ?? AppColors.fg2);
     }
-    final line = kMobile ? _lucide[name] : null;
+    final line = _lucide[name];
     if (line != null) {
       return SizedBox.square(
         dimension: size,
