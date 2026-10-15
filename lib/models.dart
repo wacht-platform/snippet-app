@@ -971,8 +971,11 @@ class CoordinationAgent {
   /// finished work from the last 7 days. Null when the daemon predates it.
   final Map<String, int>? taskCounts;
 
+  final String? color;
+
   CoordinationAgent.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
+        color = j['color'] as String?,
         displayName = j['display_name'] as String? ?? '',
         handle = j['handle'] as String? ?? '',
         kind = j['kind'] as String? ?? 'worker',

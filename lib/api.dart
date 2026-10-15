@@ -9,6 +9,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'response_cache.dart';
 import 'swr.dart';
+import 'mochi.dart';
 import 'models.dart';
 import 'github_models.dart';
 
@@ -1154,9 +1155,21 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('list coordination agents', r);
     _remember('agents', r.body);
     final list = jsonDecode(r.body) as List;
-    return list
+    final agents = list
         .map((e) => CoordinationAgent.fromJson(e as Map<String, dynamic>))
         .toList();
+    rememberAgentColors(agents.map((a) => (a.id, a.color)));
+    return agents;
+  }
+
+  /// POST /agents/{id}/color — the agent's Mochi colour, or null for the default.
+  Future<void> setAgentColor(String agentId, String? color) async {
+    final r = await http.post(
+        _uri('/agents/${Uri.encodeComponent(agentId)}/color'),
+        headers: _json,
+        body: jsonEncode({'color': color}));
+    if (r.statusCode != 200) throw _err('set agent colour', r);
+    setRememberedAgentColor(agentId, color);
   }
 
   /// GET /agents/{id}/board — this agent's coordination memory, newest first.

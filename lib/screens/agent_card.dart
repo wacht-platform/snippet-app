@@ -6,6 +6,8 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../motion.dart';
+import '../mochi.dart';
+import 'mochi_color_picker.dart';
 
 /// One agent on the phone's Agents page, in the Mission Control card's shape:
 /// who it is, whether it is working, and its task counts.
@@ -36,10 +38,15 @@ class _AgentCardState extends State<AgentCard> {
       showAppSheet(context,
           title: name,
           child: SheetActions([
-            SheetAction('trash', 'Delete agent', () {
+            SheetAction('sparkles', 'Change colour', () {
               Navigator.pop(context);
-              widget.onDelete?.call();
-            }, danger: true),
+              showMochiColorPicker(context, widget.client, widget.agent.id, name);
+            }),
+            if (widget.onDelete != null)
+              SheetAction('trash', 'Delete agent', () {
+                Navigator.pop(context);
+                widget.onDelete?.call();
+              }, danger: true),
           ]));
       return;
     }
@@ -48,11 +55,16 @@ class _AgentCardState extends State<AgentCard> {
       point: point,
       anchor: point == null ? context : null,
       items: [
-        appMenuItem(
-            value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
+        appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
+        if (widget.onDelete != null)
+          appMenuItem(
+              value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
       ],
     );
     if (picked == 'delete') widget.onDelete?.call();
+    if (picked == 'color' && mounted) {
+      showMochiColorPicker(context, widget.client, widget.agent.id, name);
+    }
   }
 
   List<TaskItem> _tasks = const [];
@@ -95,11 +107,11 @@ class _AgentCardState extends State<AgentCard> {
     final open = working + queued + blocked;
     final done = _count({TaskStatus.done}, {'done'});
     final role = agent.role.trim();
-    final (status, dot) = !agent.available
-        ? ('Paused', AppColors.fg4)
+    final status = !agent.available
+        ? 'Paused'
         : working > 0
-            ? ('Working', AppColors.run)
-            : ('Available', AppColors.ok);
+            ? 'Working'
+            : 'Available';
     final (summary, summaryColor) = !agent.available
         ? ('Paused', AppColors.fg4)
         : blocked > 0
@@ -119,15 +131,13 @@ class _AgentCardState extends State<AgentCard> {
     ].where((e) => e.$1 > 0).toList();
     final barHeight = kMobile ? 4.0 : 3.0;
     return GestureDetector(
-      onSecondaryTapUp: widget.onDelete == null || kMobile
-          ? null
-          : (d) => _actions(d.globalPosition),
+      onSecondaryTapUp: kMobile ? null : (d) => _actions(d.globalPosition),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(kMobile ? 0 : 8),
         child: InkWell(
           onTap: widget.onOpen,
-          onLongPress: widget.onDelete == null ? null : () => _actions(null),
+          onLongPress: () => _actions(null),
           borderRadius: BorderRadius.circular(kMobile ? 0 : 8),
           child: Padding(
             padding: kMobile
@@ -139,13 +149,11 @@ class _AgentCardState extends State<AgentCard> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration:
-                          BoxDecoration(color: dot, shape: BoxShape.circle),
+                    Opacity(
+                      opacity: agent.available ? 1 : 0.5,
+                      child: AgentMochi(agent.id, size: kMobile ? 22 : 18),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: kMobile ? 10 : 8),
                     Flexible(
                       flex: 0,
                       child: Text(name,

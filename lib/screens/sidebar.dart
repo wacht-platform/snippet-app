@@ -1020,57 +1020,44 @@ class SidebarState extends State<Sidebar> {
             ? null
             : (d) => _sessionActions(s, position: d.globalPosition),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+          padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
           child: Row(children: [
             if (_selecting) ...[
               SelectCheck(checked, size: 14),
               const SizedBox(width: 10),
             ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: running
-                            ? AppColors.run
-                            : waiting
-                                ? Colors.transparent
-                                : AppColors.border2,
-                        border: waiting
-                            ? Border.all(color: AppColors.accent, width: 1.5)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                          s.title.trim().isEmpty ? '(untitled)' : s.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(13,
-                              color: selected
-                                  ? AppColors.fg1
-                                  : AppColors.fg2)),
-                    ),
-                  ]),
-                  const SizedBox(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 14),
-                    child: _desktopChatMeta(
-                        running: running,
-                        waiting: waiting,
-                        draft: draft,
-                        folder: folderName,
-                        lastActive: s.lastActive),
-                  ),
-                ],
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: running
+                    ? AppColors.run
+                    : waiting
+                        ? Colors.transparent
+                        : AppColors.border2,
+                border: waiting
+                    ? Border.all(color: AppColors.accent, width: 1.5)
+                    : null,
               ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13,
+                      color: selected ? AppColors.fg1 : AppColors.fg2)),
+            ),
+            const SizedBox(width: 10),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 110),
+              child: _desktopChatMeta(
+                  running: running,
+                  waiting: waiting,
+                  draft: draft,
+                  folder: folderName,
+                  lastActive: s.lastActive),
             ),
           ]),
         ),
@@ -1099,7 +1086,7 @@ class SidebarState extends State<Sidebar> {
 
     if (lead != null) add(lead, leadColor);
     if (folder.isNotEmpty) add(folder, AppColors.fg4);
-    if (lead == null && !running && !waiting) {
+    if (lead == null && folder.isEmpty && !running && !waiting) {
       add(relativeTime(lastActive), AppColors.fg4, tabular: true);
     }
     return Text.rich(TextSpan(children: parts),

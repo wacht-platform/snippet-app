@@ -23,6 +23,8 @@ import '../widgets.dart';
 import '../swr.dart';
 import '../pull_refresh.dart';
 import 'memory_screen.dart';
+import '../mochi.dart';
+import 'mochi_color_picker.dart';
 
 /// Pick one agent from the directory, as an anchored DROPDOWN.
 ///
@@ -972,6 +974,19 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               },
             ),
           SizedBox(width: canGoBack ? 4 : 10),
+          Tooltip(
+            message: 'Change colour',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => showMochiColorPicker(
+                  context, widget.client, widget.agentId, widget.agentName),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: AgentMochi(widget.agentId, size: kMobile ? 28 : 24),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1100,7 +1115,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AppIcon('agent', size: 12, color: AppColors.accent),
+                AgentMochi(widget.agentId, size: 15),
                 const SizedBox(width: 5),
                 Text(
                   widget.agentName,
