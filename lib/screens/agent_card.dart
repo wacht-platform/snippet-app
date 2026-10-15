@@ -63,7 +63,8 @@ class _AgentCardState extends State<AgentCard> {
     );
     if (picked == 'delete') widget.onDelete?.call();
     if (picked == 'color' && mounted) {
-      showMochiColorPicker(context, widget.client, widget.agent.id, name);
+      showMochiColorPicker(context, widget.client, widget.agent.id, name,
+          point: point);
     }
   }
 

@@ -7,25 +7,80 @@ import '../theme.dart';
 import '../widgets.dart';
 
 Future<void> showMochiColorPicker(
-    BuildContext context, DaemonClient client, String agentId, String name) {
-  return showAppSheet<void>(
-    context,
-    title: '$name colour',
-    child: _Picker(client: client, agentId: agentId),
+    BuildContext context, DaemonClient client, String agentId, String name,
+    {Offset? point}) {
+  final picker = _Picker(client: client, agentId: agentId);
+  if (kMobile) {
+    return showAppSheet<void>(context, title: '$name colour', child: picker);
+  }
+  final overlay =
+      Overlay.of(context, rootOverlay: true).context.findRenderObject() as RenderBox?;
+  final box = context.findRenderObject() as RenderBox?;
+  if (overlay == null) return Future.value();
+  final screen = overlay.size;
+  final at = point != null
+      ? overlay.globalToLocal(point)
+      : box != null
+          ? box.localToGlobal(Offset(0, box.size.height + 6), ancestor: overlay)
+          : screen.center(Offset.zero);
+  const w = _Picker.desktopWidth;
+  final left = at.dx.clamp(8.0, screen.width - w - 8);
+  final top = at.dy.clamp(8.0, screen.height - 140);
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Dismiss',
+    barrierColor: Colors.transparent,
+    transitionDuration: Motion.fast,
+    pageBuilder: (ctx, _, __) => Stack(children: [
+      Positioned(
+        left: left,
+        top: top,
+        width: w,
+        child: Material(
+          color: AppColors.surface2,
+          elevation: 6,
+          shadowColor: Colors.black.withValues(alpha: 0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppColors.border2),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: picker,
+        ),
+      ),
+    ]),
+    transitionBuilder: (_, animation, __, child) {
+      final curve = CurvedAnimation(parent: animation, curve: Motion.enter);
+      return FadeTransition(
+        opacity: curve,
+        child: ScaleTransition(
+          alignment: Alignment.topLeft,
+          scale: Tween(begin: 0.96, end: 1.0).animate(curve),
+          child: child,
+        ),
+      );
+    },
   );
 }
 
 class _Picker extends StatelessWidget {
   const _Picker({required this.client, required this.agentId});
 
+  static const desktopWidth = 4 * 40.0 + 3 * 2 + 16;
+
   final DaemonClient client;
   final String agentId;
 
   Future<void> _pick(BuildContext context, Color? color) async {
+    final before = agentColors.value[agentId];
+    final hex = color == null ? null : colorHex(color);
+    setRememberedAgentColor(agentId, hex);
+    Navigator.pop(context);
     try {
-      await client.setAgentColor(agentId, color == null ? null : colorHex(color));
-      if (context.mounted) Navigator.pop(context);
-    } catch (e) {
+      await client.setAgentColor(agentId, hex);
+    } catch (_) {
+      setRememberedAgentColor(agentId, before);
       if (context.mounted) toast(context, 'Could not change colour', danger: true);
     }
   }
@@ -33,40 +88,72 @@ class _Picker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final current = mochiColorFor(agentId);
-    final size = kMobile ? 44.0 : 36.0;
+    final custom = agentColors.value.containsKey(agentId);
+    final cell = kMobile ? 56.0 : 40.0;
+    final icon = kMobile ? 40.0 : 26.0;
+    final grid = Wrap(
+      spacing: kMobile ? 6 : 2,
+      runSpacing: kMobile ? 6 : 2,
+      children: [
+        for (final (label, color) in mochiPalette)
+          Tooltip(
+            message: label,
+            waitDuration: const Duration(milliseconds: 400),
+            child: Material(
+              color: color == current ? AppColors.surface3 : Colors.transparent,
+              borderRadius: BorderRadius.circular(kMobile ? 12 : 8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(kMobile ? 12 : 8),
+                hoverColor: AppColors.surface3,
+                onTap: () => _pick(context, color),
+                child: SizedBox.square(
+                  dimension: cell,
+                  child: Center(child: MochiIcon(color: color, size: icon)),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+    if (kMobile) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            grid,
+            if (custom) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Btn('Use default', small: true, onTap: () => _pick(context, null)),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
     return Padding(
-      padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 16, 4, kMobile ? M.gutter : 16, 12),
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final (label, color) in mochiPalette)
-                Tooltip(
-                  message: label,
-                  child: Material(
-                    color: color == current ? AppColors.surface3 : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _pick(context, color),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: MochiIcon(color: color, size: size),
-                      ),
-                    ),
-                  ),
+          grid,
+          if (custom) ...[
+            const SizedBox(height: 4),
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: () => _pick(context, null),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  child: Text('Use default', style: sans(12, color: AppColors.fg3)),
                 ),
-            ],
-          ),
-          if (agentColors.value.containsKey(agentId)) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Btn('Use default', small: true, onTap: () => _pick(context, null)),
+              ),
             ),
           ],
         ],
