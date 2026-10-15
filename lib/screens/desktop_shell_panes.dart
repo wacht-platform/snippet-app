@@ -314,6 +314,9 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       onOpenFile: (path, name) =>
           _openFileTab(tab.client, tab.instanceUrl, path, name),
       host: _termHosts[tab.key],
+      sessionId: tab.sessionId,
+      onOpenDiff: (f) =>
+          _openDiffTab(tab.client, tab.instanceUrl, tab.sessionId!, f),
     );
   }
 
