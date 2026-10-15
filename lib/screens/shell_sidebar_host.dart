@@ -58,6 +58,7 @@ class ShellSidebarHost extends StatelessWidget {
     required this.health,
     required this.onRefreshHealth,
     required this.mobileHome,
+    this.mobileTopBar,
     required this.onMobileHome,
     required this.mobileSettingsSection,
     required this.onSettingsSection,
@@ -108,6 +109,7 @@ class ShellSidebarHost extends StatelessWidget {
   final Map<String, bool> health;
   final VoidCallback onRefreshHealth;
   final MobileHome mobileHome;
+  final Widget? mobileTopBar;
   final ValueChanged<MobileHome> onMobileHome;
   final SettingsPage? mobileSettingsSection;
   final ValueChanged<SettingsPage?> onSettingsSection;
@@ -236,6 +238,7 @@ class ShellSidebarHost extends StatelessWidget {
       health: health,
       onRefreshHealth: onRefreshHealth,
       mobileHome: mobileHome,
+      mobileTopBar: mobileTopBar,
       onMobileHome: onMobileHome,
       settingsSection: mobileSettingsSection,
       onSettingsSection: onSettingsSection,

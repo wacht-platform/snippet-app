@@ -10,6 +10,7 @@ import '../shell_nav.dart' show kNavPadH, kNavRowHeight;
 import 'task_common.dart';
 import '../../pull_refresh.dart';
 import '../../motion.dart';
+import '../../mochi.dart';
 
 /// Tasks grouped by status, in board order, narrowed by a search and a status
 /// filter. The phone tab, the desktop sidebar and the standalone screen all
@@ -143,10 +144,15 @@ class TaskStatusHeader extends StatelessWidget {
   final int count;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: kMobile
-            ? const EdgeInsets.fromLTRB(0, 22, 0, 2)
-            : const EdgeInsets.fromLTRB(12, 14, 12, 6),
+  Widget build(BuildContext context) => kMobile
+      ? Padding(
+          padding: const EdgeInsets.fromLTRB(4, 22, 4, 2),
+          child: Text('${status.label.toUpperCase()}  ·  $count',
+              style: sans(12,
+                  weight: W.label, spacing: 0.7, color: AppColors.fg4)),
+        )
+      : Padding(
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
         child: Row(children: [
           Container(
             width: 6,
@@ -197,42 +203,80 @@ class TaskRow extends StatelessWidget {
     final detail = workPlanLine(task) ?? task.description.trim().split('\n').first;
     final age = taskAge(task);
     if (kMobile) {
+      final Widget glyph = switch (task.status) {
+        TaskStatus.inProgress =>
+          WorkingMochi(size: 18, color: mochiPalette.first.$2),
+        TaskStatus.blocked => MochiIcon(color: AppColors.run, size: 18),
+        TaskStatus.done => AppIcon('check-circle', size: 18, color: AppColors.ok),
+        TaskStatus.failed =>
+          AppIcon('alert-triangle', size: 17, color: AppColors.danger),
+        TaskStatus.cancelled => AppIcon('x-circle', size: 18, color: AppColors.fg4),
+        TaskStatus.todo => Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.fg4, width: 1.5),
+            ),
+          ),
+      };
+      final finished = const {TaskStatus.done, TaskStatus.cancelled}
+          .contains(task.status);
       return InkWell(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.fromLTRB(4, 13, 4, 13),
           decoration: BoxDecoration(
-            border: divider
-                ? Border(bottom: BorderSide(color: AppColors.border))
-                : null,
+            border: Border(
+                bottom: BorderSide(
+                    color: divider ? AppColors.line : Colors.transparent)),
           ),
-          child: Row(children: [
-            if (task.priority > 0) ...[
-              PriorityMark(task.priority),
-              const SizedBox(width: 10),
-            ],
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(
+                width: 22,
+                height: 21,
+                child: Align(alignment: Alignment.centerLeft, child: glyph)),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(task.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(16, height: 21 / 16, color: AppColors.fg1)),
-                  if (detail.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(detail,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13, height: 18 / 13, color: AppColors.fg3)),
+                  Row(children: [
+                    Expanded(
+                      child: Text(task.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(16,
+                              weight: W.label,
+                              height: 21 / 16,
+                              color: finished ? AppColors.fg3 : AppColors.fg1)),
+                    ),
+                    if (age.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Text(age,
+                          style:
+                              sans(13, color: AppColors.fg4, tabular: true)),
+                    ],
+                  ]),
+                  if (detail.isNotEmpty || task.priority > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      if (task.priority > 0) ...[
+                        PriorityMark(task.priority),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: Text(detail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(13,
+                                height: 18 / 13, color: AppColors.fg3)),
+                      ),
+                    ]),
                   ],
                 ],
               ),
             ),
-            if (age.isNotEmpty) ...[
-              const SizedBox(width: 12),
-              Text(age, style: sans(12, color: AppColors.fg4, tabular: true)),
-            ],
           ]),
         ),
       );

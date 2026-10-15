@@ -8,6 +8,8 @@ import '../../models.dart';
 import '../../platform.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
+import '../../mochi.dart';
+import '../mobile_chrome.dart';
 import 'task_common.dart' show statusColor;
 
 /// One task: its state, its roster, its links, and its own message room.
@@ -322,14 +324,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          SnAppBar(
-            title: t?.title ?? 'Task',
-            compact: true,
-            bordered: false,
-            onBack: kMobile
-                ? widget.onClose ?? () => Navigator.of(context).pop()
-                : null,
-          ),
+          if (kMobile)
+            MobileBackBar(
+              title: t?.title ?? 'Task',
+              subtitle: t?.status.label,
+              onBack: widget.onClose ?? () => Navigator.of(context).pop(),
+              onTitleTap: () {},
+            )
+          else
+            SnAppBar(
+              title: t?.title ?? 'Task',
+              compact: true,
+              bordered: false,
+            ),
           Expanded(child: _body(t)),
         ]),
       ),
@@ -364,7 +371,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Widget _meta(TaskItem t) => Padding(
-        padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s16, S.s12),
+        padding: kMobile
+            ? const EdgeInsets.fromLTRB(20, 8, 20, 16)
+            : const EdgeInsets.fromLTRB(S.s16, S.s12, S.s16, S.s12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -379,8 +388,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             // Column picker. The current state is always shown, so the row
             // reads as the task's position; In progress is never offered, as
             // only a dispatch starts work.
-            SizedBox(
-              height: 32,
+            Container(
+              height: kMobile ? 44 : 32,
+              padding: kMobile ? const EdgeInsets.all(4) : EdgeInsets.zero,
+              decoration: kMobile
+                  ? BoxDecoration(
+                      color: AppColors.surface1,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(
+                            color: AppColors.fg1.withValues(alpha: 0.08),
+                            spreadRadius: 1),
+                      ],
+                    )
+                  : null,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
@@ -401,17 +422,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           onTap: busy || s == t.status
                               ? null
                               : () => _setStatus(s),
-                          borderRadius: BorderRadius.circular(R.chip),
+                          borderRadius:
+                              BorderRadius.circular(kMobile ? 18 : R.chip),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: kMobile ? 13 : 10),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               // Same chip rule as the board's filter bar: the
                               // surface STEP separates, never a hairline.
                               color: s == t.status
-                                  ? AppColors.surface2
-                                  : AppColors.surface3,
-                              borderRadius: BorderRadius.circular(R.chip),
+                                  ? (kMobile ? AppColors.surface3 : AppColors.surface2)
+                                  : (kMobile ? Colors.transparent : AppColors.surface3),
+                              borderRadius:
+                                  BorderRadius.circular(kMobile ? 18 : R.chip),
                             ),
                             child: Row(mainAxisSize: MainAxisSize.min, children: [
                               if (s == t.status) ...[
@@ -425,7 +449,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                 const SizedBox(width: S.s6),
                               ],
                               Text(s.label,
-                                  style: sans(12,
+                                  style: sans(kMobile ? 14 : 12,
                                       weight: s == t.status ? W.label : W.body,
                                       color: s == t.status
                                           ? AppColors.fg1
@@ -442,6 +466,41 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             _section('Agents', onAdd: _addAgent),
             if (roster.isEmpty)
               Text('Nobody assigned yet.', style: TS.meta())
+            else if (kMobile)
+              Column(children: [
+                for (final a in roster)
+                  InkWell(
+                    onTap: (a.active && !a.hasSessionLease)
+                        ? () => _transferLeaseTo(a)
+                        : null,
+                    child: SizedBox(
+                      height: 48,
+                      child: Row(children: [
+                        a.hasSessionLease
+                            ? WorkingMochi(size: 22, color: mochiColorFor(a.agentId))
+                            : AgentMochi(a.agentId, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(a.agentId,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(15.5,
+                                  color: a.active
+                                      ? AppColors.fg1
+                                      : AppColors.fg3)),
+                        ),
+                        Text(
+                            a.hasSessionLease
+                                ? 'working'
+                                : (a.active ? 'waiting' : 'left'),
+                            style: sans(13,
+                                color: a.hasSessionLease
+                                    ? AppColors.accent
+                                    : AppColors.fg4)),
+                      ]),
+                    ),
+                  ),
+              ])
             else
               Wrap(
                 spacing: 6,
@@ -519,14 +578,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Widget _section(String label, {required VoidCallback onAdd}) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Row(children: [
-          Text(label.toUpperCase(), style: caps(11, color: AppColors.fg3)),
+          Text(label.toUpperCase(),
+              style: kMobile
+                  ? sans(12, weight: W.label, spacing: 0.7, color: AppColors.fg4)
+                  : caps(11, color: AppColors.fg3)),
           const Spacer(),
           GestureDetector(
             onTap: onAdd,
             behavior: HitTestBehavior.opaque,
             child: Padding(
-              padding: const EdgeInsets.all(2),
-              child: AppIcon('plus', size: 14, color: AppColors.fg3),
+              padding: kMobile
+                  ? const EdgeInsets.fromLTRB(12, 8, 0, 8)
+                  : const EdgeInsets.all(2),
+              child: AppIcon('plus',
+                  size: kMobile ? 16 : 14, color: AppColors.fg3),
             ),
           ),
         ]),
@@ -564,7 +629,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     }
     return [
       SliverPadding(
-        padding: const EdgeInsets.all(S.s12),
+        padding: kMobile
+            ? const EdgeInsets.fromLTRB(20, 18, 20, 12)
+            : const EdgeInsets.all(S.s12),
         sliver: SliverList.builder(
           itemCount: room.events.length,
           itemBuilder: (_, i) {
@@ -572,6 +639,52 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             final mine = e.actorKind == 'human';
             final body = e.payload['body']?.toString() ?? '';
             if (body.trim().isEmpty) return const SizedBox.shrink();
+            if (kMobile) {
+              final md = MarkdownBody(
+                data: body,
+                selectable: true,
+                styleSheet: mine ? markdownStyle(context) : agentMarkdownStyle(context),
+                builders: {'pre': PreBlockBuilder()},
+                onTapLink: (txt, href, title) => openMarkdownLink(href, context),
+              );
+              if (mine) {
+                return Padding(
+                  padding: const EdgeInsets.only(left: 48, bottom: 14),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(15, 10, 15, 11),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface2,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                          bottomLeft: Radius.circular(20),
+                          bottomRight: Radius.circular(6),
+                        ),
+                      ),
+                      child: md,
+                    ),
+                  ),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      AgentMochi(e.actorId, size: 18),
+                      const SizedBox(width: 8),
+                      Text(e.actorId,
+                          style: sans(13, weight: W.label, color: AppColors.fg2)),
+                    ]),
+                    const SizedBox(height: 6),
+                    md,
+                  ],
+                ),
+              );
+            }
             return Align(
               alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
@@ -609,7 +722,54 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     ];
   }
 
-  Widget _composerBar() => SafeArea(
+  Widget _composerBar() => kMobile
+      ? SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(18, 4, 6, 4),
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.fg1.withValues(alpha: 0.08),
+                      spreadRadius: 1),
+                ],
+              ),
+              child: Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _composer,
+                    minLines: 1,
+                    maxLines: 4,
+                    onSubmitted: (_) => _send(),
+                    style: sans(16, color: AppColors.fg1),
+                    cursorColor: AppColors.accent,
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'Message this task…',
+                      hintStyle: sans(16, color: AppColors.fg4),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: (room?.sending ?? false) ? null : _send,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                        color: AppColors.accentFill, shape: BoxShape.circle),
+                    alignment: Alignment.center,
+                    child: AppIcon('arrow-up',
+                        size: 16, color: AppColors.accentFg),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        )
+      : SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
           child: Row(children: [

@@ -16,6 +16,7 @@ import 'dialog_widgets.dart';
 import 'markdown_widgets.dart';
 import 'menu_widgets.dart';
 import 'screens/artifact_viewer.dart' show openArtifact;
+import 'screens/mobile_chrome.dart';
 
 export 'components.dart';
 export 'dialog_widgets.dart';
@@ -38,10 +39,14 @@ class Pills<T> extends StatelessWidget {
   const Pills(
       {super.key, required this.items, required this.selected, this.onSelect});
   Widget _segmented() => Container(
-        padding: const EdgeInsets.all(3),
+        padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(12),
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+                color: AppColors.fg1.withValues(alpha: 0.08), spreadRadius: 1),
+          ],
         ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -62,7 +67,7 @@ class Pills<T> extends StatelessWidget {
                     color: selected == val
                         ? AppColors.surface3
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Text(label,
                       style: sans(14,
@@ -219,8 +224,11 @@ MarkdownStyleSheet agentMarkdownStyle(BuildContext context) {
     listBullet: prose.copyWith(color: AppColors.fg3),
     blockquote:
         prose.copyWith(color: AppColors.fg3, fontStyle: FontStyle.italic),
-    code: TS.code(AppColors.fg1).copyWith(
-        fontSize: kMobile ? 14 : 13, backgroundColor: AppColors.surface1),
+    code: kMobile
+        ? TS.code(Color.lerp(AppColors.fg1, AppColors.run, 0.3)).copyWith(
+            fontSize: 13.5, backgroundColor: AppColors.surface2)
+        : TS.code(AppColors.fg1)
+            .copyWith(fontSize: 13, backgroundColor: AppColors.surface1),
   );
   return _cachedAgentMarkdownStyle!;
 }
@@ -549,7 +557,7 @@ class Btn extends StatelessWidget {
     // composer and every dialog footer. Desktop keeps the compact 28/34 so a
     // mouse-sized toolbar does not grow.
     final h = small ? (kMobile ? 36.0 : 28.0) : (kMobile ? 46.0 : 34.0);
-    final radius = kMobile ? (small ? 10.0 : 14.0) : R.sm;
+    final radius = kMobile ? 999.0 : R.sm;
     final child = Row(
       mainAxisSize: full ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -1154,6 +1162,47 @@ class Bubble extends StatelessWidget {
       );
     }
 
+    if (kMobile) {
+      return Padding(
+        padding: const EdgeInsets.only(left: 48, top: 4, bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (media != null)
+              for (final m in media) ...[
+                m,
+                const SizedBox(height: 6),
+              ],
+            if (shown.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.fromLTRB(15, 10, 15, 11),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(6),
+                  ),
+                ),
+                child: mineText,
+              ),
+            if (media == null || media.isEmpty) ...[
+              for (final v in voice) ...[
+                const SizedBox(height: 6),
+                v,
+              ],
+              for (final extra in extras) ...[
+                const SizedBox(height: 6),
+                extra,
+              ],
+            ],
+            ...pastedCards,
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 4),
       child: Column(
@@ -1474,8 +1523,7 @@ class HeaderAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => kMobile
-      ? IconBtn(icon,
-          size: M.minTarget, iconSize: 20, tooltip: label, onTap: onTap)
+      ? RoundBtn(icon: icon, tooltip: label, onTap: onTap)
       : Btn(label,
           icon: icon, small: true, variant: BtnVariant.secondary, onTap: onTap);
 }
@@ -1563,6 +1611,24 @@ class SnAppBar extends StatelessWidget {
         leading == null &&
         ShellPanelRoot.repeatsLabel(context, title);
     if (repeats && actions.isEmpty) return const SizedBox.shrink();
+    if (kMobile && onBack != null && leading == null) {
+      return MobileBackBar(
+        title: title,
+        subtitle: subtitle,
+        onBack: onBack,
+        trailing: [
+          for (final a in actions)
+            if (a is IconBtn)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: RoundBtn(
+                    icon: a.name, tooltip: a.tooltip ?? a.name, onTap: a.onTap),
+              )
+            else
+              a,
+        ],
+      );
+    }
     return Container(
       height: repeats ? 44 : (compact ? 52 : 64),
       padding: EdgeInsets.fromLTRB(
@@ -1721,8 +1787,10 @@ class AppToggle extends StatelessWidget {
         child: Container(
           padding: flat
               ? const EdgeInsets.symmetric(vertical: 10)
-              : const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: flat
+              : kMobile
+                  ? const EdgeInsets.symmetric(horizontal: 4, vertical: 12)
+                  : const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: flat || kMobile
               ? null
               : BoxDecoration(
                   color: AppColors.surface2,

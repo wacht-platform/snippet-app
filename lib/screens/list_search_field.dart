@@ -23,18 +23,25 @@ class ListSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final height = kMobile ? 40.0 : 28.0;
-    final text = kMobile ? 15.0 : 12.0;
+    final height = kMobile ? 44.0 : 28.0;
+    final text = kMobile ? 15.5 : 12.0;
     return Container(
       height: height,
-      padding: EdgeInsets.only(left: kMobile ? 12 : 8, right: 2),
+      padding: EdgeInsets.only(left: kMobile ? 16 : 8, right: 2),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(kMobile ? R.md : R.xs),
+        color: kMobile ? AppColors.surface1 : AppColors.surface2,
+        borderRadius: BorderRadius.circular(kMobile ? 22 : R.xs),
+        boxShadow: kMobile
+            ? [
+                BoxShadow(
+                    color: AppColors.fg1.withValues(alpha: 0.08),
+                    spreadRadius: 1),
+              ]
+            : null,
       ),
       child: Row(children: [
-        AppIcon('search', size: kMobile ? 16 : 13, color: AppColors.fg3),
-        SizedBox(width: kMobile ? 8 : 6),
+        AppIcon('search', size: kMobile ? 16 : 13, color: kMobile ? AppColors.fg4 : AppColors.fg3),
+        SizedBox(width: kMobile ? 10 : 6),
         Expanded(
           child: TextField(
             controller: controller,

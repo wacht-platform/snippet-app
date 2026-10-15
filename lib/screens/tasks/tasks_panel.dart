@@ -21,12 +21,14 @@ class TasksPanel extends StatefulWidget {
     super.key,
     required this.client,
     this.trailing = const [],
+    this.phoneHeader = true,
   });
 
   final DaemonClient client;
 
   /// Phone header controls beside the title (machine switcher).
   final List<Widget> trailing;
+  final bool phoneHeader;
 
   @override
   State<TasksPanel> createState() => TasksPanelState();
@@ -89,6 +91,56 @@ class TasksPanelState extends State<TasksPanel> {
     ];
     bool same(Set<TaskStatus> a, Set<TaskStatus> b) =>
         a.length == b.length && a.containsAll(b);
+    if (kMobile) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(top: 6, bottom: 2),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                  color: AppColors.fg1.withValues(alpha: 0.08),
+                  spreadRadius: 1),
+            ],
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            for (final (label, set) in tabs)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() {
+                  _filter = {...set};
+                  _shownAt = null;
+                }),
+                child: AnimatedContainer(
+                  duration: Motion.fast,
+                  height: 34,
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
+                  decoration: BoxDecoration(
+                    color: same(_filter, set)
+                        ? AppColors.surface3
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(17),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(label,
+                        style: sans(14,
+                            weight: W.label,
+                            color: same(_filter, set)
+                                ? AppColors.fg1
+                                : AppColors.fg3)),
+                    const SizedBox(width: 6),
+                    Text('${set.isEmpty ? tasks.length : count(set)}',
+                        style: sans(13, color: AppColors.fg4, tabular: true)),
+                  ]),
+                ),
+              ),
+          ]),
+        ),
+      );
+    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(children: [
@@ -150,7 +202,7 @@ class TasksPanelState extends State<TasksPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          kMobile ? _phoneHeader() : _desktopHeader(),
+          if (!kMobile) _desktopHeader() else if (widget.phoneHeader) _phoneHeader(),
           if (_searchOpen)
             Padding(
               padding: kMobile
@@ -165,7 +217,7 @@ class TasksPanelState extends State<TasksPanel> {
           if (_feed.tasks.isNotEmpty)
             Padding(
               padding: kMobile
-                  ? const EdgeInsets.fromLTRB(M.gutter + 2, 0, M.gutter, 0)
+                  ? const EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 0)
                   : const EdgeInsets.fromLTRB(18, 0, 10, 4),
               child: _statusStrip(),
             ),

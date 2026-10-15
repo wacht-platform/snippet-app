@@ -521,9 +521,13 @@ class SettingsPanelState extends State<SettingsPanel> {
   /// Phone settings HOME.
   Widget _mobileSettingsHome() {
     final active = widget.active;
-    Widget nav(SettingsPage page, String label, [String summary = '']) =>
+    Widget nav(SettingsPage page, String label,
+            [String summary = '', String? icon]) =>
         ListRow(
           title: label,
+          leading: icon == null
+              ? null
+              : AppIcon(icon, size: 19, color: AppColors.fg3),
           onTap: () => widget.onSection?.call(page),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             if (summary.isNotEmpty)
@@ -538,135 +542,93 @@ class SettingsPanelState extends State<SettingsPanel> {
             AppIcon('chevron-right', size: 15, color: AppColors.fg4),
           ]),
         );
-    Widget tile(SettingsPage page, String icon, String title, String detail) =>
-        Material(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.lg),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => widget.onSection?.call(page),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppIcon(icon, size: 20, color: AppColors.fg3),
-                  const SizedBox(height: 10),
-                  Text(title,
-                      style: sans(15, height: 20 / 15, color: AppColors.fg1)),
-                  Text(detail,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(12, height: 16 / 12, color: AppColors.fg3)),
-                ],
-              ),
-            ),
-          ),
-        );
     Widget label(String text) => Padding(
-          padding: const EdgeInsets.fromLTRB(S.s4, 20, S.s4, 6),
-          child: Text(text,
-              style: sans(12, weight: W.strong, color: AppColors.fg4)),
+          padding: const EdgeInsets.fromLTRB(S.s4, 22, S.s4, 2),
+          child: Text(text.toUpperCase(),
+              style: sans(12, weight: W.label, spacing: 0.7, color: AppColors.fg4)),
         );
     final name = active?.label.trim() ?? '';
     return ListView(
-      padding: const EdgeInsets.fromLTRB(S.s16, S.s4, S.s16, S.s40),
+      padding: const EdgeInsets.fromLTRB(S.s16, S.s8, S.s16, S.s40),
       children: [
-        Material(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                    name.isEmpty ? '+' : name.characters.first.toUpperCase(),
-                    style: sans(18,
-                        weight: FontWeight.w700, color: AppColors.fg1)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(S.s4, 4, 0, 4),
+          child: Row(children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name.isEmpty ? 'No machine yet' : name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(16,
-                            weight: W.strong,
-                            height: 21 / 16,
-                            color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Row(children: [
-                      if (active != null) ...[
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                              color: AppColors.ok, shape: BoxShape.circle),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      Flexible(
-                        child: Text(
-                            active == null
-                                ? 'Add one to begin'
-                                : 'Connected · ${hostOf(active.url)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(13, color: AppColors.fg3)),
+              child: Text(
+                  name.isEmpty ? '+' : name.characters.first.toUpperCase(),
+                  style: sans(17, weight: W.title, color: AppColors.fg1)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name.isEmpty ? 'No machine yet' : name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(17,
+                          weight: W.label,
+                          height: 22 / 17,
+                          color: AppColors.fg1)),
+                  const SizedBox(height: 2),
+                  Row(children: [
+                    if (active != null) ...[
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                            color: AppColors.ok, shape: BoxShape.circle),
                       ),
-                    ]),
-                  ],
-                ),
+                      const SizedBox(width: 6),
+                    ],
+                    Flexible(
+                      child: Text(
+                          active == null
+                              ? 'Add one to begin'
+                              : 'Connected · ${hostOf(active.url)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(13, color: AppColors.fg3)),
+                    ),
+                  ]),
+                ],
               ),
-              const SizedBox(width: 8),
-              Btn(_instances.length > 1 ? 'Switch' : 'Manage',
-                  small: true,
-                  variant: BtnVariant.secondary,
-                  onTap: () => widget.onSection?.call(SettingsPage.general)),
-            ]),
-          ),
+            ),
+            const SizedBox(width: 8),
+            Btn(_instances.length > 1 ? 'Switch' : 'Manage',
+                small: true,
+                variant: BtnVariant.secondary,
+                onTap: () => widget.onSection?.call(SettingsPage.general)),
+          ]),
         ),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(
-              child: tile(SettingsPage.models, 'ai-chip', 'Models',
-                  'Profiles and keys')),
-          const SizedBox(width: 10),
-          Expanded(
-              child: tile(SettingsPage.usage, 'analytics', 'Usage',
-                  'Tokens and spend')),
+        label('Models'),
+        ListGroup(children: [
+          nav(SettingsPage.models, 'Profiles', 'Models and keys', 'ai-chip'),
+          nav(SettingsPage.routing, 'Routing', 'Fallback models', 'transfer'),
+          nav(SettingsPage.usage, 'Usage', 'Tokens and spend', 'analytics'),
         ]),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(
-              child: tile(SettingsPage.vault, 'lock-key', 'Vault',
-                  'Secrets for agents')),
-          const SizedBox(width: 10),
-          Expanded(
-              child: tile(SettingsPage.scheduled, 'repeat', 'Scheduled',
-                  'Recurring jobs')),
+        label('Work'),
+        ListGroup(children: [
+          nav(SettingsPage.memory, 'Memory', 'What agents remember', 'brain'),
+          nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock-key'),
+          nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'repeat'),
         ]),
         if (kCanNotify) ...[
           label('Phone'),
           ListGroup(children: [_notifRow()]),
         ],
-        label('Agents'),
-        ListGroup(children: [
-          nav(SettingsPage.routing, 'Routing', 'Fallback models'),
-          nav(SettingsPage.memory, 'Memory', 'What agents remember'),
-        ]),
         label('Machines'),
         ListGroup(children: [
-          nav(SettingsPage.general, 'Manage machines', '${_instances.length}'),
+          nav(SettingsPage.general, 'Manage machines',
+              '${_instances.length}', 'server'),
         ]),
       ],
     );
@@ -1146,7 +1108,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   Widget _notifRow() {
     return Padding(
       padding: kMobile
-          ? const EdgeInsets.fromLTRB(16, 10, 12, 10)
+          ? const EdgeInsets.fromLTRB(4, 10, 4, 10)
           : const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s12),
       child: Row(children: [
         if (!kMobile) ...[

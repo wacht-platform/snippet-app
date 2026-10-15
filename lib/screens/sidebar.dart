@@ -21,6 +21,8 @@ import 'sidebar_mobile.dart';
 import 'tasks/tasks_panel.dart';
 import '../pull_refresh.dart';
 import '../motion.dart';
+import '../mochi.dart';
+import 'mobile_chrome.dart';
 export 'sidebar_mobile.dart';
 
 class Sidebar extends StatefulWidget {
@@ -48,6 +50,7 @@ class Sidebar extends StatefulWidget {
   /// Phone home destination + its setter. Owned by the shell so that back can
   /// return to Chats; passed down because the phone home IS this widget.
   final MobileHome mobileHome;
+  final Widget? mobileTopBar;
   final ValueChanged<MobileHome> onMobileHome;
 
   /// Phone drill-down state + setters. Also shell-owned, for the same reason:
@@ -81,6 +84,7 @@ class Sidebar extends StatefulWidget {
     required this.topInset,
     this.onSessionAction,
     required this.mobileHome,
+    this.mobileTopBar,
     required this.onMobileHome,
     required this.settingsSection,
     required this.onSettingsSection,
@@ -120,13 +124,6 @@ class SidebarState extends State<Sidebar> {
   final TextEditingController _desktopChatsSearchCtl = TextEditingController();
   final FocusNode _desktopChatsSearchFocus = FocusNode();
 
-  /// True while a nested phone screen is open, in which case the bar hides.
-  ///
-  /// Read from the widget rather than re-deriving it here: the state is
-  /// shell-owned (the back handler needs it too), and the bar is rendered from
-  /// THIS state, so this is the only place both are in scope.
-  bool get _mobileDrilledDown =>
-      widget.settingsSection != null || widget.agent != null;
 
   MobileHome _lastMainHome = MobileHome.chats;
   late final PageController _pageController;
@@ -135,17 +132,8 @@ class SidebarState extends State<Sidebar> {
   void _goToPage(int index) {
     if (_pageController.hasClients) {
       _targetPage = index;
-      _pageController
-          .animateToPage(
-        index,
-        duration: Motion.base,
-        curve: Motion.enter,
-      )
-          .then((_) {
-        if (mounted && _targetPage == index) {
-          setState(() => _targetPage = null);
-        }
-      });
+      _pageController.jumpToPage(index);
+      _targetPage = null;
     }
   }
 
@@ -235,9 +223,7 @@ class SidebarState extends State<Sidebar> {
             child: Stack(children: [
               PageView(
                 controller: _pageController,
-                physics: _mobileDrilledDown
-                    ? const NeverScrollableScrollPhysics()
-                    : const ClampingScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (index) {
                   if (_targetPage != null && _targetPage != index) {
                     return;
@@ -258,22 +244,6 @@ class SidebarState extends State<Sidebar> {
               ),
             ]),
           ),
-          // The bar names the app's TOP LEVEL, so it hides inside a nested
-          // screen, where it would be a second exit that skips the level you
-          // are in. It also steps aside while the keyboard is up, so a search
-          // keeps the whole screen for its results.
-          if (!_mobileDrilledDown && !_keyboardUp)
-            SidebarMobileBar(
-              activeHome: widget.mobileHome,
-              newLabel: _newLabel,
-              onNew: _showNewButton(hasClient) ? _handleMobileNew : null,
-              onMobileHome: (h) {
-                if (widget.mobileHome != h) {
-                  _goToPage(h.index);
-                  widget.onMobileHome(h);
-                }
-              },
-            ),
         ],
         if (!kMobile) ...[
           if (hasClient && (_sessions?.isNotEmpty ?? false) && _selecting)
@@ -315,14 +285,40 @@ class SidebarState extends State<Sidebar> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _mobileChatsHeader(hasClient),
-            if (hasClient && !_selecting)
-              _mobileSearch(_searchCtl, 'Search chats',
-                  (v) => setState(() => _filterQuery = v)),
+            if (_selecting || widget.mobileTopBar == null)
+              _mobileChatsHeader(hasClient)
+            else
+              widget.mobileTopBar!,
             Expanded(
               child: !hasClient
                   ? _mobileUnavailable('Add a machine to begin.')
-                  : _sessionList(),
+                  : Stack(children: [
+                      Positioned.fill(child: _sessionList()),
+                      if (!_selecting) ...[
+                        const Positioned(
+                            left: 0, right: 0, bottom: 0, child: BottomFade()),
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 12,
+                          child: Row(children: [
+                            Expanded(
+                              child: FloatingSearch(
+                                controller: _searchCtl,
+                                focusNode: _searchFocus,
+                                hint: 'Search sessions',
+                                onChanged: (v) =>
+                                    setState(() => _filterQuery = v),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            AccentFab(
+                                tooltip: 'New session',
+                                onTap: widget.onNewSession),
+                          ]),
+                        ),
+                      ],
+                    ]),
             ),
             if (_selecting) _mobileSelectionActions(),
           ],
@@ -333,10 +329,28 @@ class SidebarState extends State<Sidebar> {
         if (client == null) {
           return _mobileUnavailable('Add a machine to see its tasks.');
         }
-        return TasksPanel(
-          key: _tasksPanelKey,
-          client: client,
-          trailing: const [],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            MobileBackBar(
+              title: 'Tasks',
+              onBack: () => Navigator.maybePop(context),
+              trailing: [
+                RoundBtn(
+                    icon: 'plus',
+                    tooltip: 'New task',
+                    onTap: () => _tasksPanelKey.currentState?.create()),
+              ],
+            ),
+            Expanded(
+              child: TasksPanel(
+                key: _tasksPanelKey,
+                client: client,
+                trailing: const [],
+                phoneHeader: false,
+              ),
+            ),
+          ],
         );
 
       case MobileHome.agents:
@@ -534,16 +548,15 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  Widget _mobileAgentsHeader(bool hasClient) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
-      child: Row(children: [
-        Text('Agents', style: TS.pageTitle()),
-        const Spacer(),
-        ..._headerTrailing(hasClient),
-      ]),
-    );
-  }
+  Widget _mobileAgentsHeader(bool hasClient) => MobileBackBar(
+        title: 'Agents',
+        onBack: () => Navigator.maybePop(context),
+        trailing: [
+          if (hasClient)
+            RoundBtn(
+                icon: 'plus', tooltip: 'New agent', onTap: _openCreateAgent),
+        ],
+      );
 
   /// The control at the right of every phone page header: the machine
   /// switcher.
@@ -558,16 +571,13 @@ class SidebarState extends State<Sidebar> {
             controller: controller, hint: hint, onChanged: onChanged),
       );
 
-  Widget _mobileSettingsHeader() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(M.gutter, 16, M.gutter, 6),
-      child: Row(children: [
-        Text('Settings', style: TS.pageTitle()),
-        const Spacer(),
-        _machineAvatarButton(),
-      ]),
-    );
-  }
+  Widget _mobileSettingsHeader() => MobileBackBar(
+        title: 'Settings',
+        onBack: () => Navigator.maybePop(context),
+        trailing: [
+          RoundBtn(icon: 'plus', tooltip: 'Create', onTap: _openSettingsCreate),
+        ],
+      );
 
   /// Machine switcher, as a small round button: the machine's initial plus a
   /// reachability dot, matching the desktop window bar's avatar so the two read
@@ -625,35 +635,6 @@ class SidebarState extends State<Sidebar> {
         ),
       ),
     );
-  }
-
-  bool get _keyboardUp => MediaQuery.viewInsetsOf(context).bottom > 0;
-
-  /// The bar's New button: at the top level, out of the way while selecting
-  /// chats. Settings can always add a machine, so it needs no connection.
-  bool _showNewButton(bool hasClient) =>
-      (hasClient || widget.mobileHome == MobileHome.settings) &&
-      !_mobileDrilledDown &&
-      !_selecting;
-
-  String get _newLabel => switch (widget.mobileHome) {
-        MobileHome.chats => 'New chat',
-        MobileHome.tasks => 'New task',
-        MobileHome.agents => 'New agent',
-        MobileHome.settings => 'Create',
-      };
-
-  void _handleMobileNew() {
-    switch (widget.mobileHome) {
-      case MobileHome.chats:
-        widget.onNewSession();
-      case MobileHome.tasks:
-        _tasksPanelKey.currentState?.create();
-      case MobileHome.agents:
-        _openCreateAgent();
-      case MobileHome.settings:
-        _openSettingsCreate();
-    }
   }
 
   Future<void> _openSettingsCreate() async {
@@ -778,33 +759,18 @@ class SidebarState extends State<Sidebar> {
             }))
           : <SessionInfo>[];
       final activeIds = {for (final s in active) s.id};
-      final allSorted = _sortSessionsByRecency(
-          list.where((s) => !activeIds.contains(s.id)));
+      final rows = [
+        ...active,
+        ..._sortSessionsByRecency(list.where((s) => !activeIds.contains(s.id))),
+      ];
       final mobileChildren = <Widget>[];
       _chatsShownAt ??= DateTime.now();
-      for (var i = 0; i < active.length; i++) {
+      for (var i = 0; i < rows.length; i++) {
         mobileChildren.add(Appear(
-          key: ValueKey('chat-${active[i].id}'),
+          key: ValueKey('chat-${rows[i].id}'),
           index: i,
           since: _chatsShownAt,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(8, i == 0 ? 8 : 0, 8, 8),
-            child: _mobileActiveCard(active[i]),
-          ),
-        ));
-      }
-      for (var i = 0; i < allSorted.length; i++) {
-        final session = allSorted[i];
-        if (i == 0) {
-          mobileChildren.add(SizedBox(height: active.isEmpty ? 8 : 10));
-        }
-        final lastInSection = i + 1 == allSorted.length;
-        _chatsShownAt ??= DateTime.now();
-        mobileChildren.add(Appear(
-          key: ValueKey('chat-${session.id}'),
-          index: active.length + i,
-          since: _chatsShownAt,
-          child: _sessionCard(session, divider: !lastInSection),
+          child: _mobileSessionRow(rows[i], divider: i + 1 < rows.length),
         ));
       }
       if (mobileChildren.isEmpty) {
@@ -821,7 +787,7 @@ class SidebarState extends State<Sidebar> {
       return PullToRefresh(
         onRefresh: () async => widget.onRefreshSessions(),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(M.gutter - 8, 2, M.gutter - 8, 16),
+          padding: const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 120),
           children: mobileChildren,
         ),
       );
@@ -1389,103 +1355,6 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  Widget _mobileActiveCard(SessionInfo s) {
-    final checked = _selected.contains(s.id);
-    final folderName = s.projectFolder.trim().isEmpty
-        ? ''
-        : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
-    final waiting = s.status == 'waiting_for_input';
-    final color = waiting ? AppColors.accent : AppColors.run;
-    return Material(
-      color: _selecting && checked ? AppColors.accentBg : AppColors.surface1,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          if (_selecting) {
-            _toggleSelected(s.id);
-          } else {
-            widget.onOpenSession(s.id, s.title, s.profile);
-          }
-        },
-        onLongPress: () {
-          if (_selecting) {
-            _toggleSelected(s.id);
-          } else {
-            _sessionActions(s);
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Row(children: [
-            if (_selecting) ...[
-              SelectCheck(checked, size: 20),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration:
-                          BoxDecoration(shape: BoxShape.circle, color: color),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(s.title.isEmpty ? '(untitled)' : s.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(15.5,
-                              weight: W.label,
-                              height: 20 / 15.5,
-                              color: AppColors.fg1)),
-                    ),
-                  ]),
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    const SizedBox(width: 14),
-                    if (folderName.isNotEmpty) ...[
-                      AppIcon(s.inWorktree ? 'worktree' : 'folder',
-                          size: 12, color: AppColors.fg4),
-                      const SizedBox(width: 4),
-                    ],
-                    Flexible(
-                      child: Text.rich(
-                        TextSpan(children: [
-                          TextSpan(
-                              text: folderName.isEmpty
-                                  ? 'No project'
-                                  : folderName,
-                              style: sans(13,
-                                  color: folderName.isEmpty
-                                      ? AppColors.fg4
-                                      : AppColors.fg3)),
-                        ]),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (s.displayAgentId != null &&
-                        s.displayAgentId!.trim().isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      AgentBadge(
-                          agentId: s.displayAgentId!,
-                          working: sessionIsActive(s.status)),
-                    ],
-                  ]),
-                ],
-              ),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
-
   Widget _mobileSessionRow(SessionInfo s, {required bool divider}) {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
@@ -1495,25 +1364,30 @@ class SidebarState extends State<Sidebar> {
     final draft = !renaming && _hasDraft(s);
     final running = sessionIsActive(s.status);
     final waiting = s.status == 'waiting_for_input';
-    final status = waiting
-        ? 'Waiting for your answer'
+    final branch = s.branch?.trim() ?? '';
+    final place = [
+      if (folderName.isNotEmpty) folderName,
+      if (branch.isNotEmpty) branch,
+    ].join(' · ');
+    final (String stamp, Color stampColor) = waiting
+        ? ('needs you', AppColors.run)
         : running
-            ? (folderName.isEmpty ? 'Working' : 'Working · $folderName')
-            : (folderName.isEmpty ? 'No project' : folderName);
+            ? ('working', AppColors.accent)
+            : draft
+                ? ('Draft', AppColors.accent)
+                : (relativeTime(s.lastActive), AppColors.fg4);
+    void open() {
+      if (_selecting) {
+        _toggleSelected(s.id);
+      } else {
+        widget.onOpenSession(s.id, s.title, s.profile);
+      }
+    }
+
     return Material(
       color: _selecting && checked ? AppColors.accentBg : Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: renaming
-            ? null
-            : () {
-                if (_selecting) {
-                  _toggleSelected(s.id);
-                } else {
-                  widget.onOpenSession(s.id, s.title, s.profile);
-                }
-              },
+        onTap: renaming ? null : open,
         onLongPress: renaming
             ? null
             : () {
@@ -1523,8 +1397,14 @@ class SidebarState extends State<Sidebar> {
                   _sessionActions(s);
                 }
               },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 11),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(4, 13, 4, 13),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                  color: divider ? AppColors.line : Colors.transparent),
+            ),
+          ),
           child: Row(children: [
             if (_selecting) ...[
               SelectCheck(checked, size: 20),
@@ -1535,65 +1415,59 @@ class SidebarState extends State<Sidebar> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                      children: [
-                        if (!renaming) ...[
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: running
-                                  ? AppColors.run
-                                  : waiting
-                                      ? AppColors.accent
-                                      : AppColors.fg4.withValues(alpha: 0.6),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        Expanded(
-                          child: renaming
-                              ? _inlineRenameField(s, compact: false)
-                              : Text(s.title.isEmpty ? '(untitled)' : s.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: sans(15.5,
-                                      weight: W.label,
-                                      height: 20 / 15.5,
-                                      color: AppColors.fg1)),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(draft ? 'Draft' : relativeTime(s.lastActive),
-                            style: sans(12,
-                                weight: draft ? W.label : W.body,
-                                color: draft ? AppColors.accent : AppColors.fg4,
-                                tabular: true)),
-                      ]),
-                  const SizedBox(height: 3),
                   Row(children: [
-                    if (!renaming) const SizedBox(width: 14),
-                    if (!running && !waiting && folderName.isNotEmpty) ...[
-                      AppIcon(s.inWorktree ? 'worktree' : 'folder',
-                          size: 12, color: AppColors.fg4),
-                      const SizedBox(width: 4),
+                    if (!renaming && (running || waiting)) ...[
+                      running
+                          ? WorkingMochi(size: 16, color: mochiPalette.first.$2)
+                          : MochiIcon(color: AppColors.run, size: 16),
+                      const SizedBox(width: 9),
                     ],
-                    Flexible(
-                      child: Text(status,
+                    Expanded(
+                      child: renaming
+                          ? _inlineRenameField(s, compact: false)
+                          : Text(s.title.isEmpty ? '(untitled)' : s.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(16,
+                                  weight: W.label,
+                                  height: 21 / 16,
+                                  color: AppColors.fg1)),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(stamp,
+                        style: sans(13,
+                            weight: running || waiting || draft
+                                ? W.label
+                                : W.body,
+                            color: stampColor,
+                            tabular: true)),
+                  ]),
+                  const SizedBox(height: 5),
+                  Row(children: [
+                    AppIcon(
+                        branch.isNotEmpty || s.inWorktree
+                            ? 'git-branch'
+                            : 'folder',
+                        size: 13,
+                        color: AppColors.fg4),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(place.isEmpty ? 'No project' : place,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: sans(13,
-                              height: 18 / 13,
-                              color: waiting
-                                  ? AppColors.accent
-                                  : (folderName.isEmpty && !running
-                                      ? AppColors.fg4
-                                      : AppColors.fg3))),
+                              color: place.isEmpty
+                                  ? AppColors.fg4
+                                  : AppColors.fg3)),
                     ),
                     if (s.displayAgentId != null &&
                         s.displayAgentId!.trim().isNotEmpty) ...[
                       const SizedBox(width: 8),
-                      AgentBadge(agentId: s.displayAgentId!, working: running),
+                      AgentMochi(s.displayAgentId!, size: 14),
+                    ] else if ((s.profile ?? '').isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Text(s.profile!,
+                          style: sans(13, color: AppColors.fg3)),
                     ],
                   ]),
                 ],

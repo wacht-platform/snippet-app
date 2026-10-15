@@ -54,6 +54,96 @@ extension _DesktopShellMobileExt on _DesktopShellState {
     }
   }
 
+
+  void _startOnMission() {
+    if (!kMobile || _active == null) return;
+    final i = _tabs.indexWhere(
+        (t) => t.isMissionControl && t.instanceUrl == _active!.url);
+    if (i < 0) return;
+    _activateTab(i);
+    _setState(() {
+      _mobileHome = MobileHome.chats;
+      _mobileAgent = null;
+      _mobileSettingsSection = null;
+      _mobileChatsOpen = false;
+      _mobileRouteHistory
+        ..clear()
+        ..add(_MobileRoute(
+            home: MobileHome.chats, inSession: true, sessionTabIndex: i));
+    });
+  }
+
+  void _goMission() {
+    final h = _mobileRouteHistory;
+    if (h.length > 1) {
+      final prev = h[h.length - 2];
+      final idx = prev.sessionTabIndex;
+      if (prev.inSession &&
+          idx != null &&
+          idx < _tabs.length &&
+          _tabs[idx].isMissionControl) {
+        _handleMobileBack();
+        return;
+      }
+    }
+    _openMissionControlTab();
+  }
+
+  void _goMobileHome(MobileHome home,
+      {SettingsPage? section, CoordinationAgent? agent}) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _setState(() {
+      _mobileHome = home;
+      _mobileSettingsSection = null;
+      _mobileAgent = null;
+      _mobileChatsOpen = true;
+      _pushMobileRoute(_MobileRoute(home: home));
+      if (section != null) {
+        _mobileSettingsSection = section;
+        _pushMobileRoute(_MobileRoute(home: home, settingsSection: section));
+      }
+      if (agent != null) {
+        _mobileAgent = agent;
+        _pushMobileRoute(_MobileRoute(home: home, agent: agent));
+      }
+    });
+  }
+
+  void _openMobileMenu() {
+    showMobileMenu(
+      context,
+      client: _client,
+      newSessionSubtitle: _active?.label ?? '',
+      onPick: (pick) {
+        switch (pick) {
+          case MobileMenuPick.newSession:
+            _newSessionFlow();
+          case MobileMenuPick.tasks:
+            _goMobileHome(MobileHome.tasks);
+          case MobileMenuPick.agents:
+            _goMobileHome(MobileHome.agents);
+          case MobileMenuPick.usage:
+            _goMobileHome(MobileHome.settings, section: SettingsPage.usage);
+          case MobileMenuPick.machines:
+            _goMobileHome(MobileHome.settings, section: SettingsPage.general);
+        }
+      },
+      onAgent: (a) => _goMobileHome(MobileHome.agents, agent: a),
+    );
+  }
+
+  Widget _mobileTopBar({required bool mission}) => MobileTopBar(
+        mission: mission,
+        sessionsBusy: mission &&
+            (_sessions ?? const <SessionInfo>[]).any((s) =>
+                !isDedicatedMcSession(s.id) &&
+                s.status == 'running'),
+        onMission: _goMission,
+        onSessions: () => _goMobileHome(MobileHome.chats),
+        onMenu: _openMobileMenu,
+        onSettings: () => _goMobileHome(MobileHome.settings),
+      );
+
   Widget _mobileShell() {
     final tab = _activeTab;
     final visible = _appForeground && !_mobileChatsOpen &&

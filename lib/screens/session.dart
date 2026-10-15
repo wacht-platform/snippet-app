@@ -50,6 +50,7 @@ import 'git.dart';
 import 'lanes.dart';
 import 'memory_screen.dart';
 import 'recurring.dart';
+import 'mobile_chrome.dart';
 import 'session_panels.dart';
 import 'session_coordination_cards.dart';
 import 'mission_control/widgets/autonomy_panel.dart';
@@ -85,6 +86,7 @@ class SessionScreen extends StatefulWidget {
 
   /// When embedded in a narrow desktop shell, opens the collapsed sidebar drawer.
   final VoidCallback? onMenu;
+  final Widget? mobileTopBar;
 
   /// When set, opening a file from the Files browser opens it as a shell tab
   /// instead of pushing an editor route.
@@ -160,6 +162,7 @@ class SessionScreen extends StatefulWidget {
       this.profile,
       this.embedded = false,
       this.onMenu,
+      this.mobileTopBar,
       this.onOpenFileTab,
       this.onOpenToolBatch,
       this.onOpenSession,
@@ -1176,7 +1179,7 @@ class _SessionScreenState extends State<SessionScreen>
                           if (widget.readOnly)
                             _readOnlyHeader(status)
                           else if (kMobile)
-                            _mobileHeader(s)
+                            widget.mobileTopBar ?? _mobileHeader(s)
                           else if (!kMacOS)
                             _desktopBar(s, running),
                           // Desktop keeps the detailed chip strip.

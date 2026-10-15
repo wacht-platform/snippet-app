@@ -388,51 +388,33 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   }
 
   Widget _mobileHeader(HarnessState? s) {
-    return Container(
-      height: M.appBarHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      color: AppColors.bg,
-      child: Row(children: [
-        if (widget.onMenu != null)
-          IconBtn('chevron-left',
-              size: M.minTarget,
-              iconSize: 20,
-              tooltip: 'Chats',
-              onTap: widget.onMenu),
-        // Tapping the header opens the ACTIONS panel (the chevron beside it goes
-        // back to Chats). The bar is a 44px tall target, far easier to hit than
-        // a glyph, and it is where a thumb naturally lands to get at "everything
-        // I can do here".
-        Expanded(
-          child: InkWell(
-            onTap: () => _openActionsDrawer(s),
-            borderRadius: BorderRadius.circular(R.sm),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _title.isEmpty ? 'Session' : _title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TS.sectionTitle().copyWith(fontSize: 17),
-                  ),
-                ],
-              ),
-            ),
+    final ws = s?.workspace.trim() ?? '';
+    final folder = ws.isEmpty ? '' : lastPathSegment(ws, ifEmpty: ws);
+    final sub = [
+      if (folder.isNotEmpty) folder,
+      if ((_modelLabel ?? '').isNotEmpty) _modelLabel!,
+    ].join(' · ');
+    return MobileBackBar(
+      title: _title.isEmpty ? 'Session' : _title,
+      subtitle: sub,
+      onBack: widget.onMenu ?? () => Navigator.maybePop(context),
+      onTitleTap: () => _openActionsDrawer(s),
+      trailing: [
+        if (s != null && s.lanes.any((l) => l.running)) ...[
+          RoundBtn(
+            tooltip: 'Parallel agents',
+            onTap: _showLanes,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const WorkingMochi(size: 15),
+              Text('${s.lanes.where((l) => l.running).length}',
+                  style: sans(10.5, weight: W.label, height: 1.1, color: AppColors.fg2)),
+            ]),
           ),
-        ),
-        if (s != null && s.lanes.any((l) => l.running))
-          _runningLanesBadge(s, const EdgeInsets.only(right: 6)),
+          const SizedBox(width: 8),
+        ],
         if (!_isMissionControl)
-          IconBtn('terminal',
-              size: M.minTarget,
-              iconSize: 19,
-              tooltip: 'Shell',
-              onTap: _openTerm),
-      ]),
+          RoundBtn(icon: 'terminal', tooltip: 'Shell', onTap: _openTerm),
+      ],
     );
   }
 

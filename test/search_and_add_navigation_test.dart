@@ -32,8 +32,6 @@ class _FakeTestClient extends DaemonClient {
 Finder _field(String hint) => find.byWidgetPredicate(
     (w) => w is TextField && w.decoration?.hintText == hint);
 
-Finder _tab(String label) => find.descendant(
-    of: find.byType(SidebarMobileBar), matching: find.text(label));
 
 void main() {
   test('agent icon maps to strokeRoundedBot', () {
@@ -42,7 +40,7 @@ void main() {
   });
 
   testWidgets(
-      'four tabs, a filter under each header, and a New in the bar that follows the tab',
+      'each phone page has its search and its own New',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
@@ -128,16 +126,13 @@ void main() {
       await tester.pumpWidget(buildTestWidget(home: MobileHome.chats));
       await tester.pumpAndSettle();
 
-      for (final label in ['Chats', 'Tasks', 'Agents', 'Settings']) {
-        expect(_tab(label), findsOneWidget);
-      }
       expect(find.byType(MissionControlCard), findsNothing);
-      await tester.tap(find.byTooltip('New chat'));
+      await tester.tap(find.byTooltip('New session'));
       await tester.pumpAndSettle();
       expect(newSessionCalled, isTrue);
 
       // The filter sits under the header, always visible.
-      await tester.enterText(_field('Search chats'), 'Nonexistent');
+      await tester.enterText(_field('Search sessions'), 'Nonexistent');
       await tester.pumpAndSettle();
       expect(find.text('No chats match the search.'), findsOneWidget);
       await tester.tap(find.byTooltip('Clear').first);
@@ -145,14 +140,14 @@ void main() {
       expect(find.text('Feature Setup'), findsOneWidget);
 
       // 2. Tasks is a tab of its own, with its own New.
-      await tester.tap(_tab('Tasks'));
+      await tester.pumpWidget(buildTestWidget(home: MobileHome.tasks));
       await tester.pumpAndSettle();
       expect(currentHome, MobileHome.tasks);
       expect(find.text('No tasks yet'), findsOneWidget);
       expect(find.byTooltip('New task'), findsOneWidget);
 
       // 3. Agents: one card per agent, and filtering narrows the agents.
-      await tester.tap(_tab('Agents'));
+      await tester.pumpWidget(buildTestWidget(home: MobileHome.agents));
       await tester.pumpAndSettle();
       expect(find.text('Snippet'), findsOneWidget);
       expect(find.text('Reviewer'), findsOneWidget);
@@ -176,15 +171,12 @@ void main() {
       await tester.pumpAndSettle();
 
       // 4. Settings keeps the tabs, and its New offers what Settings makes.
-      await tester.tap(_tab('Settings'));
+      await tester.pumpWidget(buildTestWidget(home: MobileHome.settings));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Back'), findsNothing);
-      expect(find.byTooltip('Add machine'), findsOneWidget);
-      expect(_tab('Chats'), findsOneWidget);
-      for (final tip in ['New chat', 'New task', 'New agent']) {
-        expect(find.byTooltip(tip), findsNothing);
+      for (final tip in ['New session', 'New task', 'New agent']) {
+        expect(find.byTooltip(tip).hitTestable(), findsNothing);
       }
-      await tester.tap(find.byTooltip('Create'));
+      await tester.tap(find.byTooltip('Create').hitTestable());
       await tester.pumpAndSettle();
       for (final item in ['Connect another computer running snippet', 'Inference profile', 'Vault secret', 'Scheduled job']) {
         expect(find.text(item), findsOneWidget);
@@ -271,15 +263,15 @@ void main() {
       expect(find.text('Session Title 2'), findsOneWidget);
 
       // Search reaches past the visible rows to every matching chat.
-      await tester.enterText(_field('Search chats'), 'Title 13');
+      await tester.enterText(_field('Search sessions'), 'Title 13');
       await tester.pumpAndSettle();
       expect(find.text('Session Title 13'), findsOneWidget);
 
       // Search for nonexistent chat
-      await tester.enterText(_field('Search chats'), 'Session Title 99');
+      await tester.enterText(_field('Search sessions'), 'Session Title 99');
       await tester.pumpAndSettle();
       expect(find.text('No chats match the search.'), findsOneWidget);
-      await tester.enterText(_field('Search chats'), '');
+      await tester.enterText(_field('Search sessions'), '');
       await tester.pumpAndSettle();
 
       // When all sessions are older than 12 hours, Recent header is absent but folder shows them
