@@ -39,7 +39,6 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   late Future<ServerConfig> _future;
   bool _inEditor = false;
   InferenceProfile? _editProfile;
-  String? _delegate;
   bool? _keepTaskProfile;
 
   Future<void> _setKeepTaskProfile(bool on) async {
@@ -147,18 +146,12 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   }
 
   Future<void> _edit(InferenceProfile? p) async {
-    String? delegate;
-    try {
-      delegate = (await widget.client.getConfig()).delegate;
-    } catch (_) {}
-    if (!mounted) return;
     if (kMobile && widget.embedded) {
       final saved = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (_) => InferenceProfileEditor(
             client: widget.client,
             existing: p,
-            delegateName: delegate,
             onClose: () => Navigator.pop(context),
             onSaved: () => Navigator.pop(context, true),
             onSubmit: _submitted,
@@ -171,7 +164,6 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     setState(() {
       _inEditor = true;
       _editProfile = p;
-      _delegate = delegate;
     });
     widget.onEditingChanged?.call(true);
   }
@@ -194,7 +186,6 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       final editor = InferenceProfileEditor(
         client: widget.client,
         existing: _editProfile,
-        delegateName: _delegate,
         embedded: widget.embedded,
         onClose: () => _closeEditor(),
         onSaved: () => _closeEditor(saved: true),
@@ -245,10 +236,10 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
             )
           else ...[
             ListGroup(children: [
-              for (final p in profiles) _profileCard(p, cfg?.delegate),
+              for (final p in profiles) _profileCard(p),
             ]),
             const SettingsNote(
-                'New chats use the active profile. Parallel lanes use the delegate.'),
+                'New chats use the active profile. Lanes and background work follow Routing.'),
             const SizedBox(height: S.s16),
             AppToggle(
               on: _keepTaskProfile ?? cfg?.keepTaskProfile ?? true,
@@ -294,9 +285,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     );
   }
 
-  Widget _profileCard(InferenceProfile p, String? delegate) {
-    final isDelegate =
-        delegate != null && delegate.isNotEmpty && delegate == p.name;
+  Widget _profileCard(InferenceProfile p) {
     return ListRow(
       title: p.name,
       onTap: () => _edit(p),
@@ -311,10 +300,6 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         if (p.active) ...[
           const SizedBox(width: S.s8),
           const Tag('Active', tone: Tone.accent),
-        ],
-        if (isDelegate) ...[
-          const SizedBox(width: S.s6),
-          const Tag('Delegate'),
         ],
         if (!p.usable) ...[
           const SizedBox(width: S.s6),

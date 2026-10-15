@@ -47,7 +47,6 @@ bool _usesOpenAiAdapter(String p) =>
 class InferenceProfileEditor extends StatefulWidget {
   final DaemonClient client;
   final InferenceProfile? existing;
-  final String? delegateName;
 
   /// Skip Scaffold / app bar and fill the parent (settings Models pane).
   final bool embedded;
@@ -63,7 +62,6 @@ class InferenceProfileEditor extends StatefulWidget {
       {super.key,
       required this.client,
       this.existing,
-      this.delegateName,
       this.embedded = false,
       this.onClose,
       this.onSaved,
@@ -83,7 +81,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
   bool _showKey = false;
   late bool _images;
   bool _active = false;
-  bool _delegate = false;
   bool _stream = false;
   bool _xSearch = false;
   String _effort = ''; // '' = provider default
@@ -123,9 +120,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     // default silently reset it on every unrelated edit.
     _images = e?.supportsImages ?? _defaultImages(_provider);
     _active = e?.active ?? !_isEdit;
-    _delegate = e != null &&
-        (widget.delegateName ?? '').isNotEmpty &&
-        widget.delegateName == e.name;
     _stream = e?.stream ?? false;
     _xSearch = e?.xSearch ?? false;
     _effort = e?.reasoningEffort ?? '';
@@ -489,14 +483,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       xSearch: _isXai ? _xSearch : null,
       setActive: _active,
     );
-    final savedName = _isEdit
-        ? widget.existing!.name
-        : (_name.text.trim().isEmpty ? _model.text.trim() : _name.text.trim());
-    if (_delegate) {
-      await widget.client.setDelegateProfile(savedName);
-    } else if (widget.delegateName == savedName) {
-      await widget.client.setDelegateProfile(null);
-    }
   }
 
   @override
@@ -700,12 +686,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
               onChanged: (v) => setState(() => _active = v),
               label: 'Set as active',
               sub: 'Use this model for new sessions'),
-          const SizedBox(height: 8),
-          AppToggle(
-              on: _delegate,
-              onChanged: (v) => setState(() => _delegate = v),
-              label: 'Use for delegated lanes',
-              sub: 'Lanes run on this profile instead of the active model'),
           if (_error != null) ...[
             const SizedBox(height: 14),
             Text(_error!, style: sans(12, color: AppColors.danger)),
@@ -836,12 +816,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           onChanged: (v) => setState(() => _active = v),
           label: 'Use for new chats',
           sub: 'Make this the active model'),
-      AppToggle(
-          flat: true,
-          on: _delegate,
-          onChanged: (v) => setState(() => _delegate = v),
-          label: 'Use for lanes',
-          sub: 'Delegated lanes run on this profile'),
     ];
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),

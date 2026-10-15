@@ -84,8 +84,6 @@ class _FakeDaemon extends DaemonClient {
   }) async =>
       'saved';
 
-  @override
-  Future<void> setDelegateProfile(String? name) async {}
 
   /// Three socket entry points: the shell/session stream, a coordination thread,
   /// and Mission Control's own.

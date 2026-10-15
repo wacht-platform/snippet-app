@@ -90,8 +90,6 @@ class ServerConfig {
   final List<InferenceProfile> profiles;
   final String? active;
 
-  /// Profile that delegated lanes run on; null → they use the active model.
-  final String? delegate;
   final bool manualApproval;
   final bool keepTaskProfile;
   final String hostname;
@@ -103,7 +101,6 @@ class ServerConfig {
             .map((e) => InferenceProfile.fromJson(e as Map<String, dynamic>))
             .toList(),
         active = j['active'] as String?,
-        delegate = j['delegate'] as String?,
         manualApproval = j['manual_approval'] == true,
         keepTaskProfile = j['keep_task_profile'] != false,
         hostname = j['hostname'] as String? ?? '',
