@@ -540,7 +540,7 @@ class _FileTreeRow extends StatelessWidget {
                     color: hasError
                         ? AppColors.danger
                         : entry.isDir
-                            ? AppColors.fg1.withValues(alpha: 0.18)
+                            ? Colors.transparent
                             : fileTint(entry.name),
                     borderRadius: BorderRadius.circular(2),
                   ),
@@ -573,7 +573,7 @@ Color fileTint(String name) {
     'toml' || 'json' || 'yaml' || 'yml' || 'lock' => const Color(0xFF9ED8B5),
     'html' || 'css' || 'scss' || 'svg' => const Color(0xFFD7A6E8),
     'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' || 'mp4' => const Color(0xFFE5867A),
-    _ => AppColors.fg1.withValues(alpha: 0.3),
+    _ => Colors.transparent,
   };
 }
 
