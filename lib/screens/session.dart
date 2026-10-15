@@ -1204,11 +1204,20 @@ class _SessionScreenState extends State<SessionScreen>
                                           if (items.isEmpty &&
                                               !running &&
                                               !widget.readOnly)
-                                            const EmptyState(
-                                                icon: 'terminal',
-                                                title: 'Session ready',
-                                                body:
-                                                    'Send a task to get started.'),
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                  top: 48, bottom: 24),
+                                              child: Column(children: [
+                                                DottedMochi(
+                                                    width: kMobile ? 220 : 300),
+                                                const SizedBox(height: 14),
+                                                Text('What are we making?',
+                                                    style: sans(
+                                                        kMobile ? 22 : 26,
+                                                        spacing: -0.4,
+                                                        color: AppColors.fg1)),
+                                              ]),
+                                            ),
                                           if (_transcriptStart > 0 &&
                                               items.isNotEmpty)
                                             Padding(
