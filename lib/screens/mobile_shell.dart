@@ -19,6 +19,9 @@ class MobileShell extends StatelessWidget {
   final VoidCallback? onOpenChats;
   final bool? canPopRoute;
   final VoidCallback? onPopRoute;
+  final bool missionPair;
+  final VoidCallback? onSwipeToSessions;
+  final VoidCallback? onSwipeToMission;
 
   const MobileShell({
     super.key,
@@ -34,6 +37,9 @@ class MobileShell extends StatelessWidget {
     this.onOpenChats,
     this.canPopRoute,
     this.onPopRoute,
+    this.missionPair = false,
+    this.onSwipeToSessions,
+    this.onSwipeToMission,
   });
 
   @override
@@ -75,7 +81,9 @@ class MobileShell extends StatelessWidget {
               child: AnimatedSlide(
                 duration: Motion.base,
                 curve: Motion.enter,
-                offset: chatsVisible ? const Offset(0.15, 0) : Offset.zero,
+                offset: chatsVisible
+                    ? Offset(missionPair ? -0.25 : 0.15, 0)
+                    : Offset.zero,
                 child: AnimatedOpacity(
                   duration: Motion.base,
                   curve: Motion.enter,
@@ -94,7 +102,9 @@ class MobileShell extends StatelessWidget {
             child: AnimatedSlide(
               duration: Motion.base,
               curve: Motion.enter,
-              offset: chatsVisible ? Offset.zero : const Offset(-1, 0),
+              offset: chatsVisible
+                  ? Offset.zero
+                  : Offset(missionPair ? 1 : -1, 0),
               child: Material(
                 color: AppColors.bg,
                 child: SafeArea(
@@ -122,6 +132,15 @@ class MobileShell extends StatelessWidget {
       ]),
     );
 
+    final swipe = chatsVisible
+        ? (mobileHome == MobileHome.chats && !drilledDown
+            ? onSwipeToMission
+            : null)
+        : (missionPair ? onSwipeToSessions : null);
+    final body = swipe != null
+        ? _PairSwipe(toRight: chatsVisible, onSwipe: swipe, child: shell)
+        : shell;
+
     if (canPop) {
       return PopScope(
         canPop: false,
@@ -129,7 +148,7 @@ class MobileShell extends StatelessWidget {
           if (didPop) return;
           handleBack();
         },
-        child: shell,
+        child: body,
       );
     }
 
@@ -143,7 +162,42 @@ class MobileShell extends StatelessWidget {
         }
         SystemNavigator.pop();
       },
-      child: shell,
+      child: body,
+    );
+  }
+}
+
+class _PairSwipe extends StatefulWidget {
+  final bool toRight;
+  final VoidCallback onSwipe;
+  final Widget child;
+  const _PairSwipe(
+      {required this.toRight, required this.onSwipe, required this.child});
+
+  @override
+  State<_PairSwipe> createState() => _PairSwipeState();
+}
+
+class _PairSwipeState extends State<_PairSwipe> {
+  double _travel = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final dir = widget.toRight ? 1.0 : -1.0;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) => _travel = 0,
+      onHorizontalDragUpdate: (d) => _travel += d.delta.dx,
+      onHorizontalDragEnd: (d) {
+        final v = (d.primaryVelocity ?? 0) * dir;
+        if (_travel * dir > 80 || v > 600) {
+          HapticFeedback.selectionClick();
+          widget.onSwipe();
+        }
+        _travel = 0;
+      },
+      onHorizontalDragCancel: () => _travel = 0,
+      child: widget.child,
     );
   }
 }

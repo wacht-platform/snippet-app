@@ -174,6 +174,12 @@ extension _DesktopShellMobileExt on _DesktopShellState {
       chatsOpen: _mobileChatsOpen,
       drilledDown: _mobileDrilledDown,
       mobileHome: _mobileHome,
+      missionPair: tab != null &&
+          tab.isMissionControl &&
+          _mobileHome == MobileHome.chats &&
+          !_mobileDrilledDown,
+      onSwipeToSessions: () => _goMobileHome(MobileHome.chats),
+      onSwipeToMission: _goMission,
       canPopRoute: _mobileRouteHistory.length > 1,
       onPopRoute: () {
         _handleMobileBack();
