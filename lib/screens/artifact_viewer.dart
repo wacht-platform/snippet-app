@@ -606,6 +606,26 @@ class _InlineWebPageState extends State<_InlineWebPage> {
 })();
 """;
 
+  static const _wheel = """
+(function () {
+  if (window.__snippetWheel) return;
+  window.__snippetWheel = true;
+  window.addEventListener('wheel', function (e) {
+    var dy = e.deltaY;
+    if (Math.abs(e.deltaX) > Math.abs(dy) || dy === 0) return;
+    for (var el = e.target; el && el.nodeType === 1 && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+      var oy = getComputedStyle(el).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+        if ((dy < 0 && el.scrollTop > 0) || (dy > 0 && el.scrollTop + el.clientHeight < el.scrollHeight - 1)) return;
+      }
+    }
+    e.preventDefault();
+    var k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
+    SnippetScroll.postMessage(String(dy * k));
+  }, { passive: false });
+})();
+""";
+
   static final _knownHeights = <String, double>{};
 
   late double _height = _knownHeights[widget.cacheKey] ?? 180;
@@ -622,7 +642,8 @@ class _InlineWebPageState extends State<_InlineWebPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final position = Scrollable.maybeOf(context)?.position;
+    final position =
+        Scrollable.maybeOf(context, axis: Axis.vertical)?.position;
     if (!identical(position, _position)) {
       _position?.removeListener(_checkOnScreen);
       _position = position;
@@ -669,10 +690,20 @@ class _InlineWebPageState extends State<_InlineWebPage> {
           }
         });
       })
+      ..addJavaScriptChannel('SnippetScroll', onMessageReceived: (m) {
+        final dy = double.tryParse(m.message);
+        final p = _position;
+        if (dy == null || p == null || !p.hasPixels) return;
+        final delta = p.axisDirection == AxisDirection.up ? -dy : dy;
+        final next =
+            (p.pixels + delta).clamp(p.minScrollExtent, p.maxScrollExtent);
+        if (next != p.pixels) p.jumpTo(next);
+      })
       ..setNavigationDelegate(NavigationDelegate(
         onPageFinished: (_) {
           _controller.runJavaScript(_theme);
           _controller.runJavaScript(_report);
+          if (!kMobile) _controller.runJavaScript(_wheel);
           _finished = true;
           _giveUp ??= Timer(const Duration(milliseconds: 2500), _reveal);
           _scheduleReveal();
