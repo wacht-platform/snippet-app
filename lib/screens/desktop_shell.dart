@@ -38,6 +38,7 @@ import 'tasks/tasks_panel.dart';
 import 'mobile_shell.dart';
 import 'new_session_picker.dart';
 import 'session.dart';
+import 'session_side_panel.dart';
 import 'settings_panel.dart';
 import 'shell_card_tab_strip.dart';
 import 'shell_main_pane.dart';
@@ -412,8 +413,8 @@ class _DesktopShellState extends State<DesktopShell>
   /// them is honest about what MC can do.
   Set<ShellSection> get _hiddenSections =>
       (_activeTab?.isMissionControl ?? false)
-          ? const {ShellSection.terminal, ShellSection.git}
-          : const {};
+          ? const {ShellSection.terminal, ShellSection.git, ShellSection.files}
+          : const {ShellSection.terminal, ShellSection.files};
 
   /// The section actually rendered.
   ///

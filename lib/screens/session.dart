@@ -42,7 +42,6 @@ import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';
 import 'editor.dart';
 import 'files.dart';
-import 'file_tree_sidebar_panel.dart';
 import 'processes.dart';
 import 'git.dart';
 import 'lanes.dart';
@@ -278,7 +277,6 @@ class _SessionScreenState extends State<SessionScreen>
 
   double _termHeight = 260;
   bool _termMax = false;
-  static bool _filesOpen = true;
   int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _currentProfile;
@@ -665,6 +663,11 @@ class _SessionScreenState extends State<SessionScreen>
   void initState() {
     super.initState();
     _title = _isMissionControl ? 'Mission Control' : widget.title;
+    if (!kMobile) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _publishTerminals();
+      });
+    }
     _loadGithubStatus();
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
@@ -1150,7 +1153,7 @@ class _SessionScreenState extends State<SessionScreen>
         bottom: false,
         child: Stack(children: [
           Positioned.fill(
-            child: LayoutBuilder(builder: (context, outer) => Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
@@ -1389,9 +1392,8 @@ class _SessionScreenState extends State<SessionScreen>
                   }),
                   ),
                 ),
-                if (_showFilesColumn(outer.maxWidth)) _filesColumn(),
               ],
-            )),
+            ),
           ),
           Positioned.fill(
             child: AnimatedSwitcher(

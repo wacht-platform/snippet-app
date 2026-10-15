@@ -555,45 +555,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     );
   }
 
-  bool _showFilesColumn(double width) =>
-      !kMobile &&
-      !_isMissionControl &&
-      !widget.readOnly &&
-      widget.onOpenFileTab != null &&
-      (_state?.workspace ?? '').isNotEmpty &&
-      width >= 820;
-
-  Widget _filesColumn() {
-    if (!_SessionScreenState._filesOpen) {
-      return Container(
-        width: 36,
-        decoration: BoxDecoration(
-          border: Border(left: BorderSide(color: AppColors.border)),
-        ),
-        alignment: Alignment.topCenter,
-        padding: const EdgeInsets.only(top: 8),
-        child: IconBtn('file',
-            size: 28,
-            iconSize: 14,
-            tooltip: 'Show files',
-            onTap: () => _setState(() => _SessionScreenState._filesOpen = true)),
-      );
-    }
-    return Container(
-      width: 260,
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: AppColors.border)),
-      ),
-      child: FileTreeSidebarPanel(
-        key: ValueKey('files-${_state?.workspace}'),
-        client: widget.client,
-        workspacePath: _state?.workspace ?? '',
-        onOpenFile: widget.onOpenFileTab!,
-        onHide: () => _setState(() => _SessionScreenState._filesOpen = false),
-      ),
-    );
-  }
-
   Widget _mobileTermTab() {
     final i = _termFocus.clamp(0, _terms.length - 1);
     final t = _terms[i];
