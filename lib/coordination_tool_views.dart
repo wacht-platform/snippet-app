@@ -223,8 +223,11 @@ class _ItemList extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(R.md),
+        border: Border.all(
+            color: kMobile
+                ? AppColors.fg1.withValues(alpha: 0.08)
+                : AppColors.border),
+        borderRadius: BorderRadius.circular(kMobile ? 14 : R.md),
       ),
       child: Column(children: [
         for (var i = 0; i < items.length; i++) ...[
@@ -267,13 +270,13 @@ class _ItemList extends StatelessWidget {
                   Text(m,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(10, color: AppColors.fg3)),
+                      style: _label(AppColors.fg3)),
               ],
             ),
           ),
           if (st.isNotEmpty) ...[
             const SizedBox(width: 10),
-            Text(_statusLabel(st), style: mono(10, color: _statusColor(st))),
+            Text(_statusLabel(st), style: _label(_statusColor(st))),
           ],
         ],
       ),
@@ -303,13 +306,13 @@ class _Header extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 3),
                 child: Text(_statusLabel(status),
-                    style: mono(10, color: _statusColor(status))),
+                    style: _label(_statusColor(status))),
               ),
             ],
           ]),
           if (meta.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(meta, style: mono(10, color: AppColors.fg3)),
+            Text(meta, style: _label(AppColors.fg3)),
           ],
         ],
       );
@@ -359,7 +362,7 @@ class _Section extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: mono(10, color: AppColors.fg3)),
+            Text(label, style: _label(AppColors.fg3)),
             const SizedBox(height: 6),
             child,
           ],
@@ -416,7 +419,7 @@ class _Messages extends StatelessWidget {
                       if (_s(messages[i]['at']).isNotEmpty)
                         _s(messages[i]['at']),
                     ].join(' · '),
-                    style: mono(10, color: AppColors.fg3)),
+                    style: _label(AppColors.fg3)),
                 const SizedBox(height: 4),
                 _Markdown(_s(messages[i]['body'])),
               ],
@@ -426,3 +429,6 @@ class _Messages extends StatelessWidget {
     );
   }
 }
+
+TextStyle _label(Color c) =>
+    kMobile ? sans(12.5, color: c) : mono(10, color: c);

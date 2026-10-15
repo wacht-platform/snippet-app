@@ -554,19 +554,6 @@ class SettingsPanelState extends State<SettingsPanel> {
         Padding(
           padding: const EdgeInsets.fromLTRB(S.s4, 4, 0, 4),
           child: Row(children: [
-            Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                  name.isEmpty ? '+' : name.characters.first.toUpperCase(),
-                  style: sans(17, weight: W.title, color: AppColors.fg1)),
-            ),
-            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,11 +612,6 @@ class SettingsPanelState extends State<SettingsPanel> {
           label('Phone'),
           ListGroup(children: [_notifRow()]),
         ],
-        label('Machines'),
-        ListGroup(children: [
-          nav(SettingsPage.general, 'Manage machines',
-              '${_instances.length}', 'server'),
-        ]),
       ],
     );
   }

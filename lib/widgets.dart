@@ -1343,8 +1343,46 @@ class NoteLine extends StatelessWidget {
             style: sans(12, height: 1.4, color: AppColors.fg3)),
       );
     }
-    // An error reads as the transcript's other cards: a mono header in the
-    // danger tone, then the message itself, selectable so it can be copied.
+    if (kMobile) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: Color.lerp(AppColors.surface1, AppColors.danger, 0.06),
+            border:
+                Border.all(color: AppColors.danger.withValues(alpha: 0.28)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: AppIcon('alert-circle', size: 16, color: AppColors.danger),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (label != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(label!,
+                          style: sans(14,
+                              weight: W.label, color: AppColors.fg1)),
+                    ),
+                  SelectableText(text,
+                      minLines: 1,
+                      maxLines: 6,
+                      style: sans(14, height: 20 / 14, color: AppColors.fg2)),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(

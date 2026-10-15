@@ -153,7 +153,12 @@ class MobileTopBar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
-          RoundBtn(icon: 'grid', tooltip: 'Menu', onTap: onMenu),
+          RoundBtn(
+              tooltip: 'Menu',
+              onTap: onMenu,
+              child: CustomPaint(
+                  size: const Size.square(18),
+                  painter: _GridGlyph(AppColors.fg2))),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(4),
@@ -421,7 +426,10 @@ class _MobileMenuState extends State<_MobileMenu> {
     final c = widget.client;
     if (c != null) {
       c.coordinationAgents().then((a) {
-        if (mounted) setState(() => _agents = a);
+        if (mounted) {
+          setState(() => _agents =
+              a.where((x) => !x.isMissionControl).toList());
+        }
       }).catchError((_) {
         if (mounted) setState(() => _agents = const []);
       });
@@ -579,4 +587,28 @@ class _MobileMenuState extends State<_MobileMenu> {
       ),
     );
   }
+}
+
+class _GridGlyph extends CustomPainter {
+  _GridGlyph(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final u = size.width / 24;
+    final p = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8 * u;
+    for (final (x, y) in const [(4.0, 4.0), (13.5, 4.0), (4.0, 13.5), (13.5, 13.5)]) {
+      canvas.drawRRect(
+          RRect.fromRectAndRadius(
+              Rect.fromLTWH(x * u, y * u, 6.5 * u, 6.5 * u), Radius.circular(2 * u)),
+          p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_GridGlyph old) => old.color != color;
 }

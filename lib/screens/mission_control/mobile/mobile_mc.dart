@@ -160,11 +160,13 @@ class MobileMissionControl extends StatelessWidget {
             Row(
               children: [
                 const Spacer(),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
+                if (!kMobile) ...[
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, controller.text.trim()),
                   child: const Text('Send'),

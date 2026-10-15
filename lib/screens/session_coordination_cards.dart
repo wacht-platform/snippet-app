@@ -3,6 +3,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../components.dart';
 import '../markdown_widgets.dart';
+import '../mochi.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -69,6 +70,107 @@ class _ThreadCardState extends State<_ThreadCard> {
       a: text.copyWith(color: AppColors.accent),
     );
     final meta = sans(12, height: 16 / 12, color: AppColors.fg3);
+    if (kMobile) {
+      final head = title.isNotEmpty ? title : widget.kind;
+      final preview = widget.preview ??
+          body
+              .split('\n')
+              .map((l) => l.replaceAll(RegExp(r'[*_`#>]'), '').trim())
+              .firstWhere((l) => l.isNotEmpty, orElse: () => '');
+      final sub = [
+        if (title.isNotEmpty) widget.kind,
+        if (preview.isNotEmpty) preview,
+      ].join(' · ');
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Material(
+          color: AppColors.surface1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: AppColors.fg1.withValues(alpha: 0.07)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: body.isEmpty && footer.isEmpty
+                ? null
+                : () => setState(() => _open = !_open),
+            child: AnimatedSize(
+              duration: Motion.base,
+              curve: Motion.enter,
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: toneFg.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: AppIcon(widget.icon, size: 14, color: toneFg),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Expanded(
+                                child: Text(head,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: sans(14.5,
+                                        weight: W.label,
+                                        color: AppColors.fg1)),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(widget.status,
+                                  style: sans(12,
+                                      weight: W.label, color: toneFg)),
+                            ]),
+                            if (sub.isNotEmpty && !_open)
+                              Text(sub,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: sans(12.5, color: AppColors.fg3)),
+                            if (_open && title.isNotEmpty)
+                              Text(widget.kind,
+                                  style: sans(12.5, color: AppColors.fg3)),
+                          ],
+                        ),
+                      ),
+                    ]),
+                    if (_open && body.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(40, 10, 4, 2),
+                        child: MarkdownBody(
+                          data: body,
+                          selectable: true,
+                          styleSheet: sheet,
+                          builders: {'pre': PreBlockBuilder()},
+                          onTapLink: (_, href, __) =>
+                              openMarkdownLink(href, context),
+                        ),
+                      ),
+                    if (_open && footer.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(40, 6, 4, 0),
+                        child: Text(footer,
+                            style: sans(12, height: 1.4, color: AppColors.fg3)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Container(
@@ -318,23 +420,56 @@ class AgentMessageCard extends StatelessWidget {
       final label = outbound
           ? 'Sent to $agentId'
           : (lane ? 'From $who' : 'Reply from $who');
+      if (outbound) {
+        return Padding(
+          padding: const EdgeInsets.only(left: 48, top: 6, bottom: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12, color: AppColors.fg4)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.fromLTRB(15, 10, 15, 11),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                    bottomLeft: Radius.circular(20),
+                    bottomRight: Radius.circular(6),
+                  ),
+                ),
+                child: Text(body.trim(),
+                    style: sans(15.5, height: 22 / 15.5, color: AppColors.fg1)),
+              ),
+            ],
+          ),
+        );
+      }
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: S.s8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: caps(11,
-                    color: outbound ? AppColors.fg4 : AppColors.accent,
-                    spacing: 0.8)),
-            const SizedBox(height: 4),
+            Row(children: [
+              if (lane)
+                MochiIcon(color: mochiPalette.first.$2, size: 18)
+              else
+                AgentMochi(agentId, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, weight: W.label, color: AppColors.fg2)),
+              ),
+            ]),
+            const SizedBox(height: 6),
             Text(body.trim(),
-                style: outbound
-                    ? sans(15, height: 22 / 15, color: AppColors.fg2)
-                    : sans(15, height: 24 / 15, color: AppColors.fg2)
-                        .copyWith(fontStyle: FontStyle.italic)),
+                style: sans(16, height: 25 / 16, color: AppColors.fg1)),
           ],
         ),
       );

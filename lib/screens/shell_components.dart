@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -47,11 +48,13 @@ class _GoalPopoverState extends State<GoalPopover> {
         const SizedBox(height: 8),
         Row(children: [
           const Spacer(),
-          Btn('Cancel',
-              variant: BtnVariant.ghost,
-              small: true,
-              onTap: () => Navigator.pop(context)),
-          const SizedBox(width: 6),
+          if (!kMobile) ...[
+            Btn('Cancel',
+                variant: BtnVariant.ghost,
+                small: true,
+                onTap: () => Navigator.pop(context)),
+            const SizedBox(width: 6),
+          ],
           Btn('Set goal', small: true, onTap: _submit),
         ]),
       ],

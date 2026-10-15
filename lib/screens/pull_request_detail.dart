@@ -1525,7 +1525,7 @@ class _PrMergeBoxState extends State<PrMergeBox> {
         'REBASE' => 'rebase',
         _ => 'merge commit',
       };
-      return _notice('zap', AppColors.accent, 'Auto-merge enabled',
+      return _notice('git-commit', AppColors.accent, 'Auto-merge enabled',
           'Merges with a $how once every requirement is met${pr.autoMergeBy.isEmpty ? '' : ' · enabled by ${pr.autoMergeBy}'}',
           actions: [
             _secondary('Disable auto-merge',

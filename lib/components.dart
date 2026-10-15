@@ -116,11 +116,14 @@ class SectionHeader extends StatelessWidget {
     return Padding(
       padding: padding,
       child: Row(children: [
-        Text(title,
+        Text(
+            kMobile
+                ? '${title.toUpperCase()}${count != null ? '  ·  $count' : ''}'
+                : title,
             style: kMobile
-                ? sans(12, weight: W.strong, color: AppColors.fg4)
+                ? sans(12, weight: W.label, spacing: 0.7, color: AppColors.fg4)
                 : TS.label(AppColors.fg2)),
-        if (count != null) ...[
+        if (count != null && !kMobile) ...[
           const SizedBox(width: S.s8),
           CountBadge(count!, tone: tone),
         ],

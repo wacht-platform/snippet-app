@@ -994,15 +994,15 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     return [
       if (_isMissionControl) item('activity', 'Automated wakes', _openAutonomy),
       item('edit', 'Rename session', _renameCurrent),
-      item('zap', 'Approval: Yolo', () => _setApproval(false),
+      item('check-circle', 'Approval: Yolo', () => _setApproval(false),
           value: manual ? null : 'on'),
       item('shield', 'Approval: Ask', () => _setApproval(true),
           value: manual ? 'on' : null),
       (s?.goal?.ongoing ?? false)
           ? (s!.goal!.paused
               ? item('play', 'Resume goal', _resumeGoal, value: 'paused')
-              : item('zap', 'Cancel goal', _cancelGoal, value: 'running'))
-          : item('zap', 'Set goal', _setGoal),
+              : item('goal', 'Cancel goal', _cancelGoal, value: 'running'))
+          : item('goal', 'Set goal', _setGoal),
       if ((s?.lanes.isNotEmpty ?? false))
         item('layers', 'Lanes', _showLanes,
             value: '${s!.lanes.where((l) => l.running).length} running'),
@@ -1154,7 +1154,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     }
     if (s != null) {
       if (s.totalTokens > 0) {
-        chips.add(_StatMeta(icon: 'zap', label: '${fmtSi(s.totalTokens)} tok'));
+        chips.add(_StatMeta(icon: 'activity', label: '${fmtSi(s.totalTokens)} tok'));
       }
       // Approval mode and context remaining now live in the composer, so they
       // are deliberately NOT repeated here.

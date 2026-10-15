@@ -680,7 +680,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       items: [
         appMenuRow(
           value: 'auto',
-          icon: 'zap',
+          icon: 'check-circle',
           label: 'Yolo',
           description: 'Run shell and file edits without asking',
           selected: current != 'manual',
@@ -714,8 +714,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
               height: kMobile ? 28 : 24,
               padding: const EdgeInsets.fromLTRB(8, 0, 6, 0),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                AppIcon(manual ? 'shield' : 'zap', size: 12, color: ink),
-                const SizedBox(width: 4),
                 Text(manual ? 'Ask' : 'Yolo',
                     style: sans(12, weight: W.label, color: ink)),
                 const SizedBox(width: 3),
