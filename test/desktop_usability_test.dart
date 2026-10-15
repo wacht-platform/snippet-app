@@ -242,7 +242,7 @@ void main() {
 
   group('Sidebar session list recency ordering', () {
     testWidgets(
-        'sessions are ordered strictly by recency across different folders without folder grouping',
+        'sessions are grouped by project, projects ordered by their newest chat',
         (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       try {
@@ -325,18 +325,12 @@ void main() {
         final posC = tester.getTopLeft(find.text('Alpha Session New')).dy;
         final posB = tester.getTopLeft(find.text('Beta Session Middle')).dy;
         final posA = tester.getTopLeft(find.text('Alpha Session Old')).dy;
-
-        expect(posD, lessThan(posC),
-            reason: 'Gamma (4000) should be above Alpha New (3000)');
-        expect(posC, lessThan(posB),
-            reason: 'Alpha New (3000) should be above Beta (2000)');
-        expect(posB, lessThan(posA),
-            reason: 'Beta (2000) should be above Alpha Old (1000)');
-
-        // The folder is per-row metadata, never a group header.
-        expect(find.textContaining('repo-alpha', findRichText: true), findsNWidgets(2));
-        expect(find.textContaining('repo-beta', findRichText: true), findsOneWidget);
-        expect(find.textContaining('repo-gamma', findRichText: true), findsOneWidget);
+        expect(posD, lessThan(posC));
+        expect(posC, lessThan(posA));
+        expect(posA, lessThan(posB));
+        expect(find.text('REPO-ALPHA'), findsOneWidget);
+        expect(find.text('REPO-BETA'), findsOneWidget);
+        expect(find.text('REPO-GAMMA'), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -399,7 +393,7 @@ void main() {
       // Rename edits the row in place.
       await tester.tap(find.text('Rename'));
       await tester.pumpAndSettle();
-      expect(find.byType(EditableText), findsOneWidget);
+      expect(find.byType(EditableText), findsNWidgets(2));
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
 
