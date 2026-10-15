@@ -424,15 +424,6 @@ class DaemonClient {
     await http.post(_uri('/chatgpt/logout'), headers: _json);
   }
 
-  /// Set the profile delegated lanes run on. Pass null/'' to clear (delegation
-  /// falls back to the active model).
-  Future<void> setDelegateProfile(String? name) async {
-    final r = await http.post(_uri('/config/delegate'),
-        headers: _json, body: jsonEncode({'name': name ?? ''}));
-    if (r.statusCode != 200) throw _err('set delegate', r);
-    invalidateConfig();
-  }
-
   Future<void> setRouting(String route, List<String> profiles) async {
     final r = await http.post(_uri('/config/routing'),
         headers: _json, body: jsonEncode({'route': route, 'profiles': profiles}));
