@@ -289,8 +289,13 @@ extension _DesktopShellPanesExt on _DesktopShellState {
 
   Widget? _sessionSidePanel() {
     final tab = _activeTab;
-    if (tab == null || tab.sessionId == null || tab.isMissionControl) {
-      return null;
+    if (tab == null || tab.sessionId == null) return null;
+    if (tab.isMissionControl) {
+      return MissionBoardPanel(
+        key: ValueKey('board-${tab.instanceUrl}'),
+        client: tab.client,
+        onOpenSession: (id, title) => _openSession(id, title, null),
+      );
     }
     return SessionSidePanel(
       client: tab.client,
