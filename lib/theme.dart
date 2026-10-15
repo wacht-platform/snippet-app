@@ -910,6 +910,10 @@ List<List<dynamic>> hugeIconFor(String name) {
       return HugeIcons.strokeRoundedClock01;
     case 'minimize':
       return HugeIcons.strokeRoundedMinusSign;
+    case 'expand':
+      return HugeIcons.strokeRoundedArrowExpand01;
+    case 'shrink':
+      return HugeIcons.strokeRoundedArrowShrink01;
     case 'rotate':
       return HugeIcons.strokeRoundedRotate01;
     case 'globe':

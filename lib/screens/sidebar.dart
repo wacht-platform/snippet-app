@@ -793,22 +793,12 @@ class SidebarState extends State<Sidebar> {
           ),
         ));
       }
-      String? section;
       for (var i = 0; i < allSorted.length; i++) {
         final session = allSorted[i];
-        final label = _daySection(session.lastActive);
-        if (label != section) {
-          section = label;
-          mobileChildren.add(Padding(
-            padding: EdgeInsets.fromLTRB(
-              8, i == 0 && active.isEmpty ? 8 : 18, 8, 4),
-            child: Text(label,
-                style: sans(12.5, weight: W.label, color: AppColors.fg3)),
-          ));
+        if (i == 0) {
+          mobileChildren.add(SizedBox(height: active.isEmpty ? 8 : 10));
         }
-        final next = i + 1 < allSorted.length ? allSorted[i + 1] : null;
-        final lastInSection =
-            next == null || _daySection(next.lastActive) != label;
+        final lastInSection = i + 1 == allSorted.length;
         _chatsShownAt ??= DateTime.now();
         mobileChildren.add(Appear(
           key: ValueKey('chat-${session.id}'),
@@ -880,16 +870,7 @@ class SidebarState extends State<Sidebar> {
         _matchesQuery(s)));
 
     final rows = <Widget>[];
-    String? day;
     for (final s in list) {
-      final label = _daySection(s.lastActive);
-      if (label != day) {
-        day = label;
-        rows.add(Padding(
-          padding: EdgeInsets.fromLTRB(10, rows.isEmpty ? 4 : 12, 10, 3),
-          child: Text(label, style: sans(11.5, color: AppColors.fg4)),
-        ));
-      }
       _chatsShownAt ??= DateTime.now();
       rows.add(Appear(
         key: ValueKey('chat-${s.id}'),
@@ -1280,18 +1261,6 @@ class SidebarState extends State<Sidebar> {
         ),
       ),
     );
-  }
-
-  String _daySection(int lastActive) {
-    final when = DateTime.fromMillisecondsSinceEpoch(lastActive * 1000);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final day = DateTime(when.year, when.month, when.day);
-    final days = today.difference(day).inDays;
-    if (days <= 0) return 'Today';
-    if (days == 1) return 'Yesterday';
-    if (days < 7) return 'Earlier this week';
-    return 'Older';
   }
 
   Widget _sessionCard(SessionInfo s, {bool divider = false}) {

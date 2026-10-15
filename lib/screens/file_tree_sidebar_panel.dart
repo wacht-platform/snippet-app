@@ -36,11 +36,13 @@ class FileTreeSidebarPanel extends StatefulWidget {
     required this.client,
     required this.workspacePath,
     required this.onOpenFile,
+    this.onHide,
   });
 
   final DaemonClient client;
   final String workspacePath;
   final void Function(String path, String name) onOpenFile;
+  final VoidCallback? onHide;
 
   @override
   State<FileTreeSidebarPanel> createState() => _FileTreeSidebarPanelState();
@@ -357,6 +359,12 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                     onTap: _listing == null ? null : () => _openAddMenu(ctx),
                   ),
                 ),
+                if (widget.onHide != null)
+                  ShellSectionAction(
+                    icon: 'chevron-right',
+                    tooltip: 'Hide files',
+                    onTap: widget.onHide,
+                  ),
               ],
             ),
             _workspaceRow(wsName),

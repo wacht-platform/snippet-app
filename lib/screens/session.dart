@@ -42,6 +42,7 @@ import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';
 import 'editor.dart';
 import 'files.dart';
+import 'file_tree_sidebar_panel.dart';
 import 'processes.dart';
 import 'git.dart';
 import 'lanes.dart';
@@ -275,9 +276,9 @@ class _SessionScreenState extends State<SessionScreen>
   int _termFocus = 0;
   int _termSeq = 0;
 
-  /// Width of the desktop terminal split pane. Height is not tracked: the pane
-  /// is full-height beside the chat.
-  double _termWidth = 420;
+  double _termHeight = 260;
+  bool _termMax = false;
+  static bool _filesOpen = true;
   int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _currentProfile;
@@ -1149,10 +1150,11 @@ class _SessionScreenState extends State<SessionScreen>
         bottom: false,
         child: Stack(children: [
           Positioned.fill(
-            child: Row(
+            child: LayoutBuilder(builder: (context, outer) => Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
+                  child: _withTermDock(
                   // The bottom chrome is NON-FLEX, so Flutter lays it out at its
                   // natural height BEFORE the transcript's Expanded claims what
                   // is left. A question or approval card carrying a long
@@ -1160,7 +1162,7 @@ class _SessionScreenState extends State<SessionScreen>
                   // and push its own actions off the bottom edge — which is why a
                   // big question was impossible to answer. Measuring the pane
                   // here is what lets the cards be capped and scroll instead.
-                  child: LayoutBuilder(builder: (context, pane) {
+                  LayoutBuilder(builder: (context, pane) {
                     final barsCap = pane.maxHeight * 0.6;
                     return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1385,19 +1387,11 @@ class _SessionScreenState extends State<SessionScreen>
                             _centerWide(_inputBar(running)),
                         ]);
                   }),
+                  ),
                 ),
-                // Desktop, standalone: the terminal is a second pane BESIDE the
-                // chat. When embedded, the SHELL owns this pane instead — a
-                // terminal must survive switching sessions, which a session-local
-                // pane cannot do, so the session only renders it when it is the
-                // outermost desktop surface.
-                if (_termOpen &&
-                    _terms.isNotEmpty &&
-                    !kMobile &&
-                    !widget.embedded)
-                  _desktopTermPane(),
+                if (_showFilesColumn(outer.maxWidth)) _filesColumn(),
               ],
-            ),
+            )),
           ),
           Positioned.fill(
             child: AnimatedSwitcher(
