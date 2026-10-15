@@ -25,6 +25,7 @@ class ShellSplitView extends StatefulWidget {
     required this.tabBodyBuilder,
     required this.readoutBodyBuilder,
     required this.fallbackBuilder,
+    this.rightPanel,
     required this.onPaneResize,
     required this.onExpandPane,
     required this.onMoveTab,
@@ -51,6 +52,7 @@ class ShellSplitView extends StatefulWidget {
   final Widget Function(ShellTab tab, bool primary) tabBodyBuilder;
   final Widget Function(RightTab readout) readoutBodyBuilder;
   final Widget Function(ShellPane pane) fallbackBuilder;
+  final Widget? rightPanel;
   final ValueChanged<double> onPaneResize;
   final ValueChanged<ShellPane> onExpandPane;
   final void Function(ShellPane pane, ShellTab tab) onMoveTab;
@@ -117,7 +119,9 @@ class _ShellSplitViewState extends State<ShellSplitView> {
 
     Widget content;
     if (list.isEmpty && readouts.isEmpty) {
-      content = widget.fallbackBuilder(p);
+      content = p == ShellPane.right && widget.rightPanel != null
+          ? widget.rightPanel!
+          : widget.fallbackBuilder(p);
     } else {
       content = Stack(children: [
         for (final t in list)
@@ -181,6 +185,7 @@ class _ShellSplitViewState extends State<ShellSplitView> {
   @override
   Widget build(BuildContext context) {
     final showRight = _dragActive ||
+        widget.rightPanel != null ||
         (!widget.rightCollapsed &&
             (widget.rightTabs.isNotEmpty ||
                 widget.readouts.any((r) => r.pane == ShellPane.right)));

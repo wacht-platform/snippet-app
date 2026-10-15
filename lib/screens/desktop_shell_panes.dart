@@ -247,6 +247,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
           return _rightTabBody(r, s, controls);
         },
         fallbackBuilder: _paneFallback,
+        rightPanel: _sessionSidePanel(),
         onPaneResize: (delta) => _setState(() {
           final max = MediaQuery.sizeOf(context).width * 0.72;
           _paneWidth = (_paneWidth - delta).clamp(kPaneMinWidth, max);
@@ -281,6 +282,22 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       if (_activeKey[from] == r.key) _activeKey.remove(from);
       _activeKey[p] = r.key;
     });
+  }
+
+  Widget? _sessionSidePanel() {
+    final tab = _activeTab;
+    if (tab == null || tab.sessionId == null || tab.isMissionControl) {
+      return null;
+    }
+    return SessionSidePanel(
+      client: tab.client,
+      workspacePath: _macSessionStatuses[tab.key]?.state?.workspace ??
+          _activeWorkspaceFolder() ??
+          '',
+      onOpenFile: (path, name) =>
+          _openFileTab(tab.client, tab.instanceUrl, path, name),
+      host: _termHosts[tab.key],
+    );
   }
 
   Widget _paneFallback(_Pane p) {
