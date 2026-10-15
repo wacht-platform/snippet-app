@@ -937,8 +937,36 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     }
   }
 
+  Widget _contextMeter(int used, int win) {
+    final frac = (used / win).clamp(0.0, 1.0);
+    String k(int v) => v >= 1000 ? '${(v / 1000).round()}k' : '$v';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text('Context', style: sans(12.5, color: AppColors.fg2))),
+          Text('${k(used)} / ${k(win)}', style: mono(11, color: AppColors.fg4)),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          for (var i = 0; i < 24; i++)
+            Container(
+              width: 6,
+              height: 6,
+              margin: const EdgeInsets.only(right: 3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i < (frac * 24).round()
+                    ? (frac > 0.8 ? AppColors.danger : AppColors.fg3)
+                    : AppColors.line,
+              ),
+            ),
+        ]),
+      ]),
+    );
+  }
+
   List<PopupMenuEntry<VoidCallback>> _actionItems(HarnessState? s) {
-    final manual = (s?.approvalMode ?? 'auto') == 'manual';
     final ws = s?.workspace ?? '';
     PopupMenuItem<VoidCallback> item(String icon, String label, VoidCallback fn,
             {String? value}) =>
@@ -948,13 +976,19 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           label: label,
           detail: value,
         );
+    final win = s?.contextWindow ?? 0;
+    final used = s?.lastPromptTokens ?? 0;
     return [
+      if (win > 0 && used > 0) ...[
+        PopupMenuItem<VoidCallback>(
+          enabled: false,
+          height: 64,
+          child: _contextMeter(used, win),
+        ),
+        const PopupMenuDivider(),
+      ],
       if (_isMissionControl) item('activity', 'Automated wakes', _openAutonomy),
       item('edit', 'Rename session', _renameCurrent),
-      item('check-circle', 'Approval: Yolo', () => _setApproval(false),
-          value: manual ? null : 'on'),
-      item('shield', 'Approval: Ask', () => _setApproval(true),
-          value: manual ? 'on' : null),
       (s?.goal?.ongoing ?? false)
           ? (s!.goal!.paused
               ? item('play', 'Resume goal', _resumeGoal, value: 'paused')
