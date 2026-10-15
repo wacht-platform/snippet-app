@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../platform.dart';
+import '../menu_widgets.dart';
 import '../theme.dart';
 import 'shell_components.dart';
 import 'shell_models.dart';
@@ -104,51 +105,112 @@ List<Widget> buildShellRailTools({
     ];
   }
 
+  final win = s?.contextWindow ?? 0;
+  final used = s?.lastPromptTokens ?? 0;
+  final frac = win > 0 ? (used / win).clamp(0.0, 1.0) : 0.0;
+  String k(int v) => v >= 1000 ? '${(v / 1000).round()}k' : '$v';
+  Widget dots(int n, double size, double gap) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < n; i++)
+            Container(
+              width: size,
+              height: size,
+              margin: EdgeInsets.only(right: gap),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i < (frac * n).round()
+                    ? (frac > 0.8 ? AppColors.danger : AppColors.fg3)
+                    : AppColors.line,
+              ),
+            ),
+        ],
+      );
+
+  Future<void> openMenu(BuildContext ctx) async {
+    final box = ctx.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final o = box.localToGlobal(Offset(0, box.size.height + 6));
+    final screen = MediaQuery.sizeOf(ctx);
+    PopupMenuItem<VoidCallback> item(String icon, String label, VoidCallback fn,
+            {String? detail}) =>
+        appMenuItem(value: fn, icon: icon, label: label, detail: detail);
+    final fn = await showMenu<VoidCallback>(
+      context: ctx,
+      color: AppColors.surface1,
+      elevation: 0,
+      shape: appMenuShape,
+      constraints: const BoxConstraints(minWidth: 260, maxWidth: 280),
+      menuPadding: const EdgeInsets.symmetric(vertical: 6),
+      position: RelativeRect.fromLTRB(
+          o.dx + box.size.width - 280, o.dy, screen.width - o.dx - box.size.width, 0),
+      items: [
+        if (win > 0 && used > 0) ...[
+          PopupMenuItem<VoidCallback>(
+            enabled: false,
+            height: 64,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text('Context',
+                              style: sans(12.5, color: AppColors.fg2))),
+                      Text('${k(used)} / ${k(win)}',
+                          style: mono(11, color: AppColors.fg4)),
+                    ]),
+                    const SizedBox(height: 8),
+                    dots(24, 6, 3),
+                  ]),
+            ),
+          ),
+          item('wrap', 'Compact now', () => onSessionAction('compact')),
+          const PopupMenuDivider(),
+        ],
+        goalRunning
+            ? item('goal', 'Cancel goal', () => onSessionAction('goal'))
+            : item('goal', 'Set goal', () => onOpenGoalPopover(ctx)),
+        item('layers', 'Lanes', () => onToggleRightPanel(RightPanel.lanes),
+            detail: lanes > 0 ? '$lanes running' : null),
+        item('clipboard', 'Artifacts & files',
+            () => onSessionAction('artifacts')),
+        item('history', 'Checkpoints',
+            () => onToggleRightPanel(RightPanel.checkpoints)),
+        item('scheduled', 'Scheduled',
+            () => onToggleRightPanel(RightPanel.recurring)),
+        if (win <= 0 || used <= 0)
+          item('wrap', 'Compact history', () => onSessionAction('compact')),
+      ],
+    );
+    fn?.call();
+  }
+
   return [
+    if (tab != null && win > 0 && used > 0)
+      Tooltip(
+        message: 'Context ${k(used)} of ${k(win)}',
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            dots(8, 4, 2),
+            const SizedBox(width: 4),
+            Text(k(used), style: sans(12, color: AppColors.fg4)),
+          ]),
+        ),
+      ),
     Builder(
       builder: (ctx) => railTool(
-        'goal',
-        tooltip: goalRunning ? 'Cancel goal' : 'Set goal',
-        active: goalRunning,
-        onTap: tab == null
-            ? null
-            : (goalRunning
-                ? () => onSessionAction('goal')
-                : () => onOpenGoalPopover(ctx)),
+        'more-horizontal',
+        tooltip: 'Session actions',
+        badge: lanes > 0 ? '$lanes' : null,
+        active: goalRunning ||
+            isRightPanelActive(RightPanel.lanes) ||
+            isRightPanelActive(RightPanel.checkpoints) ||
+            isRightPanelActive(RightPanel.recurring),
+        onTap: tab == null ? null : () => openMenu(ctx),
       ),
     ),
-    railTool(
-      'layers',
-      tooltip: 'Lanes',
-      active: isRightPanelActive(RightPanel.lanes),
-      badge: lanes > 0 ? '$lanes' : null,
-      onTap: tab == null ? null : () => onToggleRightPanel(RightPanel.lanes),
-    ),
-    railTool(
-      'history',
-      tooltip: 'Checkpoints',
-      active: isRightPanelActive(RightPanel.checkpoints),
-      onTap:
-          tab == null ? null : () => onToggleRightPanel(RightPanel.checkpoints),
-    ),
-    railTool(
-      'scheduled',
-      tooltip: 'Scheduled',
-      active: isRightPanelActive(RightPanel.recurring),
-      onTap:
-          tab == null ? null : () => onToggleRightPanel(RightPanel.recurring),
-    ),
-    if (kMacOS) ...[
-      railTool(
-        'clipboard',
-        tooltip: 'Artifacts & files',
-        onTap: tab == null ? null : () => onSessionAction('artifacts'),
-      ),
-      railTool(
-        'wrap',
-        tooltip: 'Compact history',
-        onTap: tab == null ? null : () => onSessionAction('compact'),
-      ),
-    ],
   ];
 }
