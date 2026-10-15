@@ -976,15 +976,15 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           SizedBox(width: canGoBack ? 4 : 10),
           Tooltip(
             message: 'Change colour',
-            child: InkWell(
+            child: Builder(builder: (anchor) => InkWell(
               borderRadius: BorderRadius.circular(10),
               onTap: () => showMochiColorPicker(
-                  context, widget.client, widget.agentId, widget.agentName),
+                  anchor, widget.client, widget.agentId, widget.agentName),
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: AgentMochi(widget.agentId, size: kMobile ? 28 : 24),
               ),
-            ),
+            )),
           ),
           const SizedBox(width: 8),
           Expanded(

@@ -1148,7 +1148,7 @@ class Bubble extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
           child: selectable && shown.isNotEmpty
-              ? _HoverCopy(text: shown, child: agent)
+              ? _LongPressCopy(text: shown, child: agent)
               : agent,
         ),
       );
@@ -1254,69 +1254,24 @@ extension on Bubble {
   }
 }
 
-class _HoverCopy extends StatefulWidget {
-  const _HoverCopy({required this.text, required this.child});
+class _LongPressCopy extends StatefulWidget {
+  const _LongPressCopy({required this.text, required this.child});
   final String text;
   final Widget child;
 
   @override
-  State<_HoverCopy> createState() => _HoverCopyState();
+  State<_LongPressCopy> createState() => _LongPressCopyState();
 }
 
-class _HoverCopyState extends State<_HoverCopy> {
-  bool _hover = false;
-  bool _focused = false;
-
+class _LongPressCopyState extends State<_LongPressCopy> {
   void _copy() {
     Clipboard.setData(ClipboardData(text: widget.text));
     toast(context, 'Copied');
   }
 
   @override
-  Widget build(BuildContext context) {
-    final shown = _hover || _focused;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onLongPress: _copy,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            widget.child,
-            AnimatedOpacity(
-              opacity: shown ? 1 : 0,
-              duration: Motion.quick,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Semantics(
-                  button: true,
-                  label: 'Copy reply',
-                  child: IgnorePointer(
-                    ignoring: !shown,
-                    child: InkWell(
-                      onTap: _copy,
-                      onFocusChange: (f) => setState(() => _focused = f),
-                      borderRadius: BorderRadius.circular(6),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 2, vertical: 2),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          AppIcon('copy', size: 12, color: AppColors.fg4),
-                          const SizedBox(width: 5),
-                          Text('Copy', style: TS.meta()),
-                        ]),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      GestureDetector(onLongPress: _copy, child: widget.child);
 }
 
 /// Dim note (centered) / error (left-aligned, capped at two lines).
