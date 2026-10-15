@@ -195,9 +195,11 @@ class ShellSectionHeader extends StatelessWidget {
     required this.label,
     this.onToggle,
     this.actions = const [],
+    this.leading,
   });
 
   final String label;
+  final Widget? leading;
 
   /// Null for a header that cannot collapse.
   final VoidCallback? onToggle;
@@ -210,9 +212,12 @@ class ShellSectionHeader extends StatelessWidget {
     Theme.of(context); // Rebuild on theme change
     if (!kMobile) {
       return Container(
-        height: 38,
-        padding: const EdgeInsets.fromLTRB(18, 2, 8, 2),
+        height: leading != null ? 46 : 38,
+        padding: EdgeInsets.fromLTRB(leading != null ? 10 : 18, 2, 8, 2),
         child: Row(children: [
+          if (leading != null)
+            Expanded(child: leading!)
+          else
           Expanded(
             child: GestureDetector(
               onTap: onToggle,

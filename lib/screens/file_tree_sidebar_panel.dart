@@ -31,8 +31,10 @@ const double kTreeIndentStep = 21;
 /// hues across .ts/.tsx/.json/.md/.rs/.dart) made a long listing read as noise;
 /// in this shell colour is reserved for state, not file type.
 class FileTreeSidebarPanel extends StatefulWidget {
+  final Widget? header;
   const FileTreeSidebarPanel({
     super.key,
+    this.header,
     required this.client,
     required this.workspacePath,
     required this.onOpenFile,
@@ -328,6 +330,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
           children: [
             ShellSectionHeader(
               label: 'File Tree',
+              leading: widget.header,
               actions: [
                 // `Builder` gives each menu a context that anchors to its OWN
                 // button: `Element.findRenderObject` walks DOWN to the button's
@@ -487,7 +490,7 @@ class _FileTreeRow extends StatelessWidget {
     final color = AppColors.fg2;
     return Padding(
       padding: EdgeInsets.only(
-        left: kSidebarContentInset + depth * kTreeIndentStep,
+        left: kSidebarContentInset + depth * (kMobile ? kTreeIndentStep : 14),
         right: kSidebarContentInset,
       ),
       child: Material(
@@ -497,7 +500,7 @@ class _FileTreeRow extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(R.md),
           child: Container(
-            height: kNavRowHeight,
+            height: kMobile ? kNavRowHeight : 26,
             padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
             child: Row(children: [
               // Fixed chevron column so names align whether or not a row can be
@@ -523,17 +526,34 @@ class _FileTreeRow extends StatelessWidget {
                     : null,
               ),
               const SizedBox(width: 4),
-              AppIcon(
-                entry.isDir ? (expanded ? 'folder-open' : 'folder') : 'file',
-                size: 14,
-                color: hasError ? AppColors.danger : color,
-              ),
-              const SizedBox(width: 8),
+              if (kMobile)
+                AppIcon(
+                  entry.isDir ? (expanded ? 'folder-open' : 'folder') : 'file',
+                  size: 14,
+                  color: hasError ? AppColors.danger : color,
+                )
+              else
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: hasError
+                        ? AppColors.danger
+                        : entry.isDir
+                            ? AppColors.fg1.withValues(alpha: 0.18)
+                            : fileTint(entry.name),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              SizedBox(width: kMobile ? 8 : 9),
               Expanded(
                 child: Text(entry.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(13, color: AppColors.fg2)),
+                    style: sans(kMobile ? 13 : 12.5,
+                        color: entry.isDir || kMobile
+                            ? AppColors.fg2
+                            : AppColors.fg3)),
               ),
             ]),
           ),
@@ -541,6 +561,20 @@ class _FileTreeRow extends StatelessWidget {
       ),
     );
   }
+}
+
+Color fileTint(String name) {
+  final i = name.lastIndexOf('.');
+  final ext = i < 0 ? '' : name.substring(i + 1).toLowerCase();
+  return switch (ext) {
+    'rs' || 'swift' || 'kt' || 'java' => const Color(0xFFD97757),
+    'dart' || 'md' || 'go' || 'py' => const Color(0xFF8AB4F8),
+    'ts' || 'tsx' || 'js' || 'jsx' || 'mjs' => const Color(0xFFE9C46A),
+    'toml' || 'json' || 'yaml' || 'yml' || 'lock' => const Color(0xFF9ED8B5),
+    'html' || 'css' || 'scss' || 'svg' => const Color(0xFFD7A6E8),
+    'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' || 'mp4' => const Color(0xFFE5867A),
+    _ => AppColors.fg1.withValues(alpha: 0.3),
+  };
 }
 
 // ---------------------------------------------------------------------------

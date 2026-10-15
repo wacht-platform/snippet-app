@@ -236,11 +236,15 @@ extension _DesktopShellPanesExt on _DesktopShellState {
           fill: true,
           child: _sidebar(topInset: topInset),
         ),
-        sidebarHeader: ShellSectionTabs(
-          section: _effectiveSection,
-          onSelect: (s) => _setState(() => _section = s),
-          hidden: _hiddenSections,
-        ),
+        sidebarTop: _sidebarTop(),
+        mainHeader: _macWindowBar(),
+        sidebarHeader: _effectiveSection == ShellSection.sessions
+            ? null
+            : ShellSectionTabs(
+                section: _effectiveSection,
+                onSelect: (s) => _setState(() => _section = s),
+                hidden: _hiddenSections,
+              ),
         paneWidth: _paneWidth,
         leftCollapsed: _leftCollapsed,
         rightCollapsed: _rightCollapsed,
@@ -576,6 +580,67 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     _ensurePinnedMissionControl();
     _connectEventsWatch();
     _syncPage();
+  }
+
+  Widget _sidebarTop() => SizedBox(
+        height: 46,
+        child: Row(children: [
+          SizedBox(width: kMacOS ? 84 : 12),
+          const Spacer(),
+          IconBtn('edit',
+              size: 28,
+              iconSize: 16,
+              tooltip: 'New session',
+              onTap: _client == null ? null : _newSessionFlow),
+          const SizedBox(width: 12),
+        ]),
+      );
+
+  Widget _sidebarFooter() {
+    final healthy = _active == null ? null : _health[_active!.url];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 2, 12, 10),
+      child: Row(children: [
+        Expanded(
+          child: Material(
+            key: _topMachineKey,
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(7),
+              onTap: _instances.isEmpty ? _addInstanceFlow : _openTopMachines,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                child: Row(children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: healthy == true ? AppColors.ok : AppColors.fg4,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                        _active == null
+                            ? 'Add machine'
+                            : (_active!.label.isNotEmpty
+                                ? _active!.label
+                                : _active!.name),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13, color: AppColors.fg2)),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+        IconBtn('settings',
+            size: 28, iconSize: 16, tooltip: 'Settings', onTap: _openShellSettings),
+      ]),
+    );
   }
 
   Widget _macWindowBar() => MacWindowBar(
