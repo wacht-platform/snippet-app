@@ -587,12 +587,17 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         child: Row(children: [
           SizedBox(width: kMacOS ? 84 : 12),
           const Spacer(),
-          IconBtn('edit',
+          IconBtn('chevron-left',
               size: 28,
               iconSize: 16,
-              tooltip: 'New session',
-              onTap: _client == null ? null : _newSessionFlow),
-          const SizedBox(width: 12),
+              tooltip: 'Back',
+              onTap: _canNavigateBack ? _navigateBack : null),
+          IconBtn('chevron-right',
+              size: 28,
+              iconSize: 16,
+              tooltip: 'Forward',
+              onTap: _canNavigateForward ? _navigateForward : null),
+          const SizedBox(width: 10),
         ]),
       );
 
