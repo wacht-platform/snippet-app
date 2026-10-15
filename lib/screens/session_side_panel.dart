@@ -32,9 +32,10 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
   Widget build(BuildContext context) {
     final host = widget.host;
     final terms = host?.terms ?? const [];
-    final header = Material(
-      color: Colors.transparent,
-      child: InkWell(
+    final header = MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => setState(() => _termsOpen = !_termsOpen),
         child: Container(
           height: 38,
