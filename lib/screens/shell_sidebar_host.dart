@@ -212,6 +212,7 @@ class ShellSidebarHost extends StatelessWidget {
 
     return Sidebar(
       topInset: topInset,
+      onOpenAgent: onOpenRightAgent,
       instances: instances,
       active: activeInstance,
       client: client,
