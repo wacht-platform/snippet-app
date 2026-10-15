@@ -190,17 +190,19 @@ class MobileBackBar extends StatelessWidget {
   const MobileBackBar({
     super.key,
     required this.title,
-    required this.onBack,
+    this.onBack,
     this.subtitle,
     this.onTitleTap,
     this.trailing = const [],
     this.menu = false,
+    this.chevron = false,
   });
 
   final String title;
   final String? subtitle;
   final bool menu;
-  final VoidCallback onBack;
+  final bool chevron;
+  final VoidCallback? onBack;
   final VoidCallback? onTitleTap;
   final List<Widget> trailing;
 
@@ -211,11 +213,20 @@ class MobileBackBar extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: sans(pill ? 14.5 : 16, weight: W.strong, color: AppColors.fg1)),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(
+            child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: sans(pill ? 14.5 : 16,
+                    weight: W.strong, color: AppColors.fg1)),
+          ),
+          if (chevron) ...[
+            const SizedBox(width: 4),
+            AppIcon('chevron-down', size: 14, color: AppColors.fg3),
+          ],
+        ]),
         if (subtitle != null && subtitle!.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 1),
@@ -231,12 +242,15 @@ class MobileBackBar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
-          RoundBtn(
-              icon: menu ? 'menu' : 'chevron-left',
-              tooltip: menu ? 'Menu' : 'Back',
-              onTap: onBack),
+          if (onBack == null && trailing.isNotEmpty)
+            const SizedBox(width: 44)
+          else if (onBack != null)
+            RoundBtn(
+                icon: menu ? 'menu' : 'chevron-left',
+                tooltip: menu ? 'Menu' : 'Back',
+                onTap: onBack),
           if (trailing.length == 2) const SizedBox(width: 44),
-          const SizedBox(width: 10),
+          if (onBack != null || trailing.isNotEmpty) const SizedBox(width: 10),
           Expanded(
             child: pill
                 ? GestureDetector(
@@ -252,8 +266,10 @@ class MobileBackBar extends StatelessWidget {
                   )
                 : Center(child: label),
           ),
-          const SizedBox(width: 10),
-          if (trailing.isEmpty) const SizedBox(width: 44) else ...trailing,
+          if (onBack != null || trailing.isNotEmpty) ...[
+            const SizedBox(width: 10),
+            if (trailing.isEmpty) const SizedBox(width: 44) else ...trailing,
+          ],
         ]),
       ),
     );

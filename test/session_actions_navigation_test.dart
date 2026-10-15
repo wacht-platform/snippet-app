@@ -128,7 +128,7 @@ void main() {
       expect(find.byType(ProcessesScreen), findsNothing);
       expect(find.text('Actions'), findsOneWidget);
       _sessionUnchanged(tester);
-      await tester.tap(find.byTooltip('Back').last);
+      await tester.binding.handlePopRoute();
       await _pump(tester);
       expect(find.text('Actions'), findsNothing);
       _sessionUnchanged(tester);

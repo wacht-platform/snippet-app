@@ -1600,7 +1600,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               detail: 'Restore the workspace to an earlier point',
               onTap: widget.onCheckpoints),
         _row(
-            icon: 'brain',
+            icon: kMobile ? 'book-marked' : 'brain',
             label: 'Memory',
             detail: 'What this session remembers',
             onTap: widget.onMemory),
@@ -1716,7 +1716,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             detail: 'Restore the workspace to an earlier point',
             onTap: widget.onCheckpoints),
       _row(
-          icon: 'brain',
+          icon: kMobile ? 'book-marked' : 'brain',
           label: 'Memory',
           detail: 'What this session remembers',
           onTap: widget.onMemory),
