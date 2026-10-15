@@ -4,6 +4,8 @@ import '../api.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'file_tree_sidebar_panel.dart';
+import 'git_diff_sidebar_panel.dart';
+import '../models.dart' show GitFile;
 import 'session.dart' show TerminalHost;
 import 'shell_nav.dart';
 
@@ -14,7 +16,12 @@ class SessionSidePanel extends StatefulWidget {
     required this.workspacePath,
     required this.onOpenFile,
     this.host,
+    this.sessionId,
+    this.onOpenDiff,
   });
+
+  final String? sessionId;
+  final void Function(GitFile file)? onOpenDiff;
 
   final DaemonClient client;
   final String workspacePath;
@@ -27,6 +34,25 @@ class SessionSidePanel extends StatefulWidget {
 
 class _SessionSidePanelState extends State<SessionSidePanel> {
   static bool _termsOpen = true;
+  static bool _changes = false;
+  String _gitTab = 'changes';
+
+  Widget _seg(String label, bool on, VoidCallback tap) => Padding(
+        padding: const EdgeInsets.only(right: 2),
+        child: Material(
+          color: on ? AppColors.surface2 : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: tap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Text(label,
+                  style: sans(12.5, color: on ? AppColors.fg1 : AppColors.fg3)),
+            ),
+          ),
+        ),
+      );
   static const _rowInset = 12.0 + 13 + 6;
 
   @override
@@ -71,9 +97,26 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+          child: Row(children: [
+            _seg('Files', !_changes, () => setState(() => _changes = false)),
+            _seg('Changes', _changes, () => setState(() => _changes = true)),
+          ]),
+        ),
         Expanded(
           child: widget.workspacePath.isEmpty
               ? const SizedBox()
+              : _changes
+              ? GitDiffSidebarPanel(
+                  key: ValueKey('git-${widget.workspacePath}'),
+                  client: widget.client,
+                  workspacePath: widget.workspacePath,
+                  sessionId: widget.sessionId,
+                  onOpenDiff: widget.onOpenDiff,
+                  tab: _gitTab,
+                  onTab: (t) => setState(() => _gitTab = t),
+                )
               : FileTreeSidebarPanel(
                   key: ValueKey('files-${widget.workspacePath}'),
                   client: widget.client,
