@@ -652,7 +652,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   Widget _sidebarFooter() {
     final healthy = _active == null ? null : _health[_active!.url];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 2, 12, 10),
+      padding: const EdgeInsets.fromLTRB(8, 2, 12, 10),
       child: Row(children: [
         Expanded(
           child: Material(
@@ -664,15 +664,20 @@ extension _DesktopShellPanesExt on _DesktopShellState {
               onTap: _instances.isEmpty ? _addInstanceFlow : _openTopMachines,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                child: Row(children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: healthy == true ? AppColors.ok : AppColors.fg4,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: healthy == true ? AppColors.ok : AppColors.fg4,
+                        ),
+                      ),
                     ),
-                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(

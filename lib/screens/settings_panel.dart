@@ -415,8 +415,6 @@ class SettingsPanelState extends State<SettingsPanel> {
                         SizedBox(height: kMacOS ? kTitleBarHeight + 4 : 12),
                         _backToApp(),
                         const SizedBox(height: 4),
-                        _searchField(),
-                        const SizedBox(height: 4),
                       ] else
                       Container(
                         height: 52,
@@ -431,9 +429,8 @@ class SettingsPanelState extends State<SettingsPanel> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           children: [
-                            for (final (page, icon, label) in _nav)
-                              if (_navMatches(page, label)) ...[
-                              if (_navGroups[page] != null && _navQuery.isEmpty)
+                            for (final (page, icon, label) in _nav) ...[
+                              if (_navGroups[page] != null)
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(
                                       10, 14, 10, 4),
@@ -483,79 +480,53 @@ class SettingsPanelState extends State<SettingsPanel> {
                         ? EdgeInsets.only(top: kMacOS ? kTitleBarHeight : 16)
                         : EdgeInsets.zero,
                     alignment: Alignment.topCenter,
-                    child: full
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (!_isNested) _fullToolbar(),
-                              Expanded(
-                                child: Align(
-                                  alignment: Alignment.topCenter,
-                                  child: ConstrainedBox(
-                                    constraints:
-                                        const BoxConstraints(maxWidth: 768),
-                                    child: Padding(
-                                      padding: EdgeInsets.only(
-                                          top: _isNested ? 0 : 20),
-                                      child: Swap(
-                                        stateKey: _page,
-                                        fill: true,
-                                        child: _pageBody(),
-                                      ),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                          maxWidth: full ? 768 : double.infinity),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (!_isNested)
+                            Container(
+                              height: full ? 56 : 52,
+                              padding: EdgeInsets.fromLTRB(
+                                  24, 0, full ? 24 : 10, 0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: SwapText(
+                                      _pageTitle(_page),
+                                      style: full
+                                          ? sans(17,
+                                              weight: FontWeight.w500,
+                                              spacing: -0.2,
+                                              color: AppColors.fg1)
+                                          : sans(15, color: AppColors.fg1),
                                     ),
                                   ),
-                                ),
-                              ),
-                            ],
-                          )
-                        : ConstrainedBox(
-                    constraints: const BoxConstraints(
-                        maxWidth: double.infinity),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Content Pane Header
-                        if (!_isNested)
-                          Container(
-                            height: full ? 56 : 52,
-                            padding: EdgeInsets.fromLTRB(
-                                24, 0, full ? 24 : 10, 0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: SwapText(
-                                    _pageTitle(_page),
-                                    style: full
-                                        ? sans(17,
-                                            weight: FontWeight.w500,
-                                            spacing: -0.2,
-                                            color: AppColors.fg1)
-                                        : sans(15, color: AppColors.fg1),
-                                  ),
-                                ),
-                                if (_pageAction(_page) != null)
-                                  _pageAction(_page)!,
-                                if (!full) ...[
-                                  const SizedBox(width: 6),
-                                  IconBtn('x',
-                                      size: 28,
-                                      iconSize: 14,
-                                      tooltip: 'Close',
-                                      onTap: widget.onClose),
+                                  if (_pageAction(_page) != null)
+                                    _pageAction(_page)!,
+                                  if (!full) ...[
+                                    const SizedBox(width: 6),
+                                    IconBtn('x',
+                                        size: 28,
+                                        iconSize: 14,
+                                        tooltip: 'Close',
+                                        onTap: widget.onClose),
+                                  ],
                                 ],
-                              ],
+                              ),
+                            ),
+                          Expanded(
+                            child: Swap(
+                              stateKey: _page,
+                              fill: true,
+                              child: _pageBody(),
                             ),
                           ),
-                        Expanded(
-                          child: Swap(
-                            stateKey: _page,
-                            fill: true,
-                            child: _pageBody(),
-                          ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -599,60 +570,6 @@ class SettingsPanelState extends State<SettingsPanel> {
     );
   }
 
-  String _navQuery = '';
-
-  static const _navKeywords = {
-    SettingsPage.general: 'machines approvals yolo ask notifications pair connect',
-    SettingsPage.models: 'profiles models providers api key claude gemini chatgpt context compact',
-    SettingsPage.routing: 'fallback limits priority lanes mission inboxes',
-    SettingsPage.usage: 'limits quota tokens',
-    SettingsPage.memory: 'remember notes consolidation',
-    SettingsPage.scheduled: 'recurring jobs cron wake',
-    SettingsPage.vault: 'secrets keys tokens env',
-  };
-
-  bool _navMatches(SettingsPage page, String label) {
-    final q = _navQuery.trim().toLowerCase();
-    if (q.isEmpty) return true;
-    return label.toLowerCase().contains(q) ||
-        (_navKeywords[page] ?? '').contains(q);
-  }
-
-  Widget _searchField() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Container(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(children: [
-            AppIcon('search', size: 13, color: AppColors.fg4),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                onChanged: (v) => setState(() => _navQuery = v),
-                onSubmitted: (_) {
-                  final hit = _nav
-                      .where((e) => _navMatches(e.$1, e.$3))
-                      .firstOrNull;
-                  if (hit != null) setState(() => _page = hit.$1);
-                },
-                style: sans(12.5, color: AppColors.fg1),
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  border: InputBorder.none,
-                  hintText: 'Search settings',
-                  hintStyle: sans(12.5, color: AppColors.fg4),
-                ),
-              ),
-            ),
-          ]),
-        ),
-      );
-
   Widget _backToApp() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Material(
@@ -670,15 +587,6 @@ class SettingsPanelState extends State<SettingsPanel> {
                 Expanded(
                     child: Text('Back to app',
                         style: sans(13.5, color: AppColors.fg2))),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(color: AppColors.line),
-                  ),
-                  child: Text('esc', style: mono(10.5, color: AppColors.fg4)),
-                ),
               ]),
             ),
           ),
@@ -930,28 +838,6 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.vault => 'Vault',
         SettingsPage.scheduled => 'Scheduled',
       };
-
-  Widget _fullToolbar() => Container(
-        height: 46,
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: AppColors.line)),
-        ),
-        alignment: Alignment.center,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 768),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(children: [
-              Expanded(
-                child: SwapText(_pageTitle(_page),
-                    style: sans(13.5,
-                        weight: FontWeight.w500, color: AppColors.fg1)),
-              ),
-              if (_pageAction(_page) != null) _pageAction(_page)!,
-            ]),
-          ),
-        ),
-      );
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
         SettingsPage.general => _addingMachine || widget.fullPage

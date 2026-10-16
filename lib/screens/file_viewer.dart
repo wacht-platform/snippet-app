@@ -303,10 +303,6 @@ class _FileViewerState extends State<FileViewer> {
                                 MediaQuery.devicePixelRatioOf(context))
                             .round()
                             .clamp(720, 2048),
-                        cacheHeight: (MediaQuery.sizeOf(context).height *
-                                MediaQuery.devicePixelRatioOf(context))
-                            .round()
-                            .clamp(720, 2048),
                         filterQuality: FilterQuality.low,
                         fit: BoxFit.contain,
                         loadingBuilder: (ctx, child, prog) => prog == null

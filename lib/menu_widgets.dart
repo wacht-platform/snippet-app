@@ -9,8 +9,8 @@ OverlayEntry? _activeToast;
 Timer? _toastTimer;
 
 ShapeBorder get appMenuShape => RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(R.lg),
-      side: BorderSide(color: AppColors.line),
+      borderRadius: BorderRadius.circular(10),
+      side: BorderSide(color: AppColors.glassBorder),
     );
 
 PopupMenuItem<T> appMenuItem<T>({
@@ -20,13 +20,13 @@ PopupMenuItem<T> appMenuItem<T>({
   String? detail,
   bool danger = false,
   bool selected = false,
-  double height = 32,
+  double height = 30,
 }) {
   final color = danger ? AppColors.danger : AppColors.fg1;
   return PopupMenuItem<T>(
     value: value,
     height: kMobile ? 52 : height,
-    padding: EdgeInsets.symmetric(horizontal: kMobile ? 16 : S.s12),
+    padding: EdgeInsets.symmetric(horizontal: kMobile ? 16 : 10),
     child: Padding(
       padding: kMobile
           ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4)
@@ -34,9 +34,9 @@ PopupMenuItem<T> appMenuItem<T>({
       child: Row(children: [
         if (icon != null) ...[
           AppIcon(icon,
-              size: kMobile ? 19 : 15,
+              size: kMobile ? 19 : 14,
               color: danger ? AppColors.danger : AppColors.fg3),
-          SizedBox(width: kMobile ? 14 : 10),
+          SizedBox(width: kMobile ? 14 : 9),
         ],
         Expanded(
           child: Text(label,
@@ -44,7 +44,7 @@ PopupMenuItem<T> appMenuItem<T>({
               overflow: TextOverflow.ellipsis,
               style: (kMobile
                   ? sans(16, color: selected ? AppColors.accent : color)
-                  : sans(13, color: color))),
+                  : sans(12.5, color: color))),
         ),
         if (detail != null)
           Text(detail,
@@ -212,7 +212,7 @@ Future<T?> showAppMenu<T>(
   /// it belongs to.
   bool alignEnd = false,
 }) {
-  final bg = color ?? AppColors.overlay;
+  final bg = color ?? AppColors.surface1;
 
   if (kMobile) {
     return showModalBottomSheet<T>(
@@ -306,16 +306,17 @@ Future<T?> showAppMenu<T>(
     position = const RelativeRect.fromLTRB(16, 80, 16, 80);
   }
 
+  final effMin = (point != null && minWidth == 260) ? 156.0 : minWidth;
+  final effMax = (point != null && maxWidth == 340) ? 220.0 : maxWidth;
   return showMenu<T>(
     context: context,
     position: position,
     color: bg,
-    elevation: 4,
-    shadowColor: Colors.black.withValues(alpha: 0.4),
+    elevation: 0,
     surfaceTintColor: Colors.transparent,
     shape: appMenuShape,
-    menuPadding: const EdgeInsets.symmetric(vertical: S.s4),
-    constraints: BoxConstraints(minWidth: minWidth, maxWidth: maxWidth),
+    menuPadding: const EdgeInsets.symmetric(vertical: 4),
+    constraints: BoxConstraints(minWidth: effMin, maxWidth: effMax),
     items: items,
   );
 }

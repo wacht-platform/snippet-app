@@ -3,17 +3,40 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
+import '../settings_form.dart';
+import '../swr.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
-import '../swr.dart';
+
+String _providerTitle(String id) => switch (id.toLowerCase()) {
+      'anthropic' => 'Anthropic',
+      'claude-code' || 'claude_code' => 'Claude Code',
+      'openai' => 'OpenAI',
+      'chatgpt' => 'ChatGPT',
+      'gemini' || 'google' => 'Gemini',
+      'xai' || 'grok' => 'xAI',
+      'openrouter' => 'OpenRouter',
+      'antigravity' => 'Antigravity',
+      _ => id.isEmpty ? 'Provider' : id,
+    };
+
+String _windowTitle(RateWindow r) {
+  final base = switch (r.windowMinutes) {
+    300 => '5-hour window',
+    180 => '3-hour window',
+    60 => 'Hourly window',
+    1440 => 'Daily window',
+    10080 => 'Weekly window',
+    43200 => 'Monthly window',
+    _ => rateWindowLabel(r.windowMinutes),
+  };
+  return (r.label == null || r.label!.isEmpty) ? base : '${r.label} · $base';
+}
 
 class UsageScreen extends StatefulWidget {
   final DaemonClient client;
   final bool embedded;
-
-  /// Host-supplied back action for [embedded] use. This screen draws its OWN
-  /// `NavBackRow`, so exactly one header exists per level.
   final VoidCallback? onBack;
 
   const UsageScreen({
@@ -84,12 +107,13 @@ class _UsageScreenState extends State<UsageScreen> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    // The range tabs and the note stay put; only the range's own content
-    // loads, so switching range never blanks the screen.
     final data = _usage.data;
     final Widget content;
     if (data == null && _usage.error == null) {
-      content = const _UsageSkeleton();
+      content = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: Spinner(size: 18)),
+      );
     } else if (data == null) {
       content = Padding(
         padding: const EdgeInsets.symmetric(vertical: S.s24),
@@ -98,7 +122,7 @@ class _UsageScreenState extends State<UsageScreen> {
           const SizedBox(height: 6),
           Text('${_usage.error}',
               textAlign: TextAlign.center,
-              style: mono(10, color: AppColors.fg3)),
+              style: mono(11, color: AppColors.fg3)),
           const SizedBox(height: 10),
           Btn('Retry', small: true, onTap: _refresh),
         ]),
@@ -113,31 +137,75 @@ class _UsageScreenState extends State<UsageScreen> {
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < data.providers.length; i++) ...[
-            if (i > 0) const SizedBox(height: S.s12),
-            _ProviderCard(provider: data.providers[i]),
-          ],
+          for (final p in data.providers) _ProviderSection(provider: p),
         ],
       );
     }
-    final body = PageBody(children: [
-      _PeriodTabs(value: _period, onChanged: _setPeriod),
-      const SizedBox(height: S.s16),
-      AnimatedSwitcher(
-        duration: Motion.quick,
-        child: KeyedSubtree(
-          key: ValueKey(data == null
-              ? (_usage.error == null ? 'loading' : 'error')
-              : 'data:${_period.name}'),
-          child: content,
-        ),
-      ),
-      const SettingsNote(
-          'Every model call is recorded against the provider and model that served it. Input includes cached tokens; rate limits come from each provider\'s own reports.'),
-    ]);
+
+    final Widget body;
+    if (kMobile) {
+      body = ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
+        children: [
+          _PeriodTabs(value: _period, onChanged: _setPeriod),
+          const SizedBox(height: 18),
+          AnimatedSwitcher(
+            duration: Motion.quick,
+            child: KeyedSubtree(
+              key: ValueKey(data == null
+                  ? (_usage.error == null ? 'loading' : 'error')
+                  : 'data:${_period.name}'),
+              child: content,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+            child: Text(
+              'Every model call is recorded against the provider and model that served it. Input includes cached tokens; rate limits come from each provider\'s own reports.',
+              style: sans(12.5, height: 1.5, color: AppColors.fg4),
+            ),
+          ),
+        ],
+      );
+    } else {
+      body = ListView(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 40),
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  'Rate limits and token usage across your providers.',
+                  style: sans(13.5, height: 1.5, color: AppColors.fg3),
+                ),
+              ),
+              const SizedBox(width: 16),
+              _PeriodTabs(value: _period, onChanged: _setPeriod),
+            ],
+          ),
+          const SizedBox(height: 20),
+          AnimatedSwitcher(
+            duration: Motion.quick,
+            child: KeyedSubtree(
+              key: ValueKey(data == null
+                  ? (_usage.error == null ? 'loading' : 'error')
+                  : 'data:${_period.name}'),
+              child: content,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'Every model call is recorded against the provider and model that served it. Input includes cached tokens; rate limits come from each provider\'s own reports.',
+              style: sans(12, height: 1.5, color: AppColors.fg4),
+            ),
+          ),
+        ],
+      );
+    }
+
     if (widget.embedded) {
-      // No back action → desktop dialog pane, where the host's section chip strip
-      // is the navigation. Drawing a row anyway duplicates it.
       if (widget.onBack == null) return body;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -159,160 +227,80 @@ class _UsageScreenState extends State<UsageScreen> {
   }
 }
 
-class _ProviderCard extends StatelessWidget {
+class _ProviderSection extends StatelessWidget {
   final UsageProvider provider;
-  const _ProviderCard({required this.provider});
+  const _ProviderSection({required this.provider});
 
   @override
   Widget build(BuildContext context) {
     final hasTokens = provider.totalTokens > 0;
     final sessions =
         '${provider.sessions} session${provider.sessions == 1 ? '' : 's'}';
+    final calls = '${provider.calls} call${provider.calls == 1 ? '' : 's'}';
     final models = provider.models.where((m) => m.model.isNotEmpty).toList();
-    return AppCard(
-      padding: const EdgeInsets.all(S.s16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(
-            child: Text(provider.provider, style: TS.rowTitle()),
+
+    return SettingsGroup(
+      children: [
+        SettingsRow(
+          leading: ProviderLogo(provider.provider, size: kMobile ? 18 : 16),
+          label: _providerTitle(provider.provider),
+          sub: provider.model.isNotEmpty && models.isEmpty
+              ? provider.model
+              : null,
+          trailing: Text(
+            '$sessions · $calls',
+            style: sans(kMobile ? 13 : 12, color: AppColors.fg4, tabular: true),
           ),
-          Tag(sessions),
-        ]),
-        const SizedBox(height: 3),
-        Text('${provider.calls} call${provider.calls == 1 ? '' : 's'}',
-            style: TS.meta()),
-        if (hasTokens) ...[
-          const SizedBox(height: S.s16),
-          Row(children: [
-            Expanded(child: _Metric('Total', fmtSi(provider.totalTokens))),
-            Expanded(child: _Metric('Input', fmtSi(provider.promptTokens))),
-            Expanded(child: _Metric('Cached', fmtSi(provider.cacheReadTokens))),
-            Expanded(
-                child: _Metric('Output', fmtSi(provider.completionTokens))),
-          ]),
-        ],
-        if (models.isNotEmpty) ...[
-          const SizedBox(height: S.s12),
-          for (final m in models)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: S.s4),
-              child: Row(children: [
-                Expanded(
-                  child: Text(m.model,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TS.codeSmall(AppColors.fg2)),
-                ),
-                Text('${fmtSi(m.totalTokens)} · ${m.calls}×',
-                    style: TS.meta().copyWith(
-                        fontFeatures: const [FontFeature.tabularFigures()])),
-              ]),
+        ),
+        if (provider.rateLimits.isNotEmpty)
+          for (final r in provider.rateLimits) _RateRow(rate: r)
+        else
+          SettingsRow(
+            label: switch (provider.rateLimitsSupported) {
+              true => 'No rate-limit data yet',
+              false => 'Subscription limits aren\'t exposed by this API',
+              null => 'Rate limits update after the next turn',
+            },
+            labelWidget: Text(
+              switch (provider.rateLimitsSupported) {
+                true => 'No rate-limit data yet — send a message to refresh.',
+                false =>
+                  'Subscription limits aren\'t exposed by this provider\'s API.',
+                null => 'Rate limits appear after the next turn.',
+              },
+              style: sans(kMobile ? 13 : 12.5, color: AppColors.fg4),
             ),
-        ],
-        if (provider.rateLimits.isEmpty) ...[
-          const SizedBox(height: 12),
-          // THREE states, worded distinctly — a single generic "no usage yet"
-          // said the wrong thing in two of them:
-          //   true  → provider publishes limits, we just haven't seen one yet
-          //   false → provider never publishes them; "yet" would promise a
-          //           number the API cannot produce
-          //   null  → daemon predates the flag; assert nothing either way
-          Row(children: [
-            AppIcon(
-                switch (provider.rateLimitsSupported) {
-                  true => 'clock',
-                  false => 'alert-circle',
-                  null => 'sparkles',
-                },
-                size: 14,
-                color: AppColors.fg4),
-            const SizedBox(width: S.s8),
-            Expanded(
-              child: Text(
-                  switch (provider.rateLimitsSupported) {
-                    true =>
-                      'No rate-limit report yet — this provider publishes them, none seen so far.',
-                    // Not "doesn't publish rate limits": xAI does send
-                    // x-ratelimit-* headers, but they are flat API caps with no
-                    // window or reset — not the subscription quota shown here.
-                    // Claiming it publishes nothing would be false, and showing
-                    // those numbers would invent an unrelated figure.
-                    false =>
-                      'Subscription limits aren’t exposed by this provider’s API.',
-                    null => 'No reported rate-limit usage.',
-                  },
-                  style: TS.meta()),
+          ),
+        if (hasTokens)
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: kMobile ? 16 : 14,
+              vertical: kMobile ? 12 : 10,
             ),
-          ]),
-        ] else ...[
-          const SizedBox(height: 12),
-          for (final rate in provider.rateLimits) ...[
-            _RateRow(rate: rate),
-            const SizedBox(height: 10),
-          ],
-        ],
-      ]),
-    );
-  }
-}
-
-/// Provider cards' shape while a range loads: the same skeleton blocks the
-/// other settings lists use.
-class _UsageSkeleton extends StatelessWidget {
-  const _UsageSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    Widget bar(double w, double h) =>
-        Skeleton(width: w, height: h, color: AppColors.hover);
-    Widget card(int models) => AppCard(
-          padding: const EdgeInsets.all(S.s16),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              bar(96, 14),
-              const Spacer(),
-              Skeleton(
-                  width: 64, height: 20, radius: R.sm, color: AppColors.hover),
+            child: Row(children: [
+              Expanded(child: _Metric('Total', fmtSi(provider.totalTokens))),
+              Expanded(child: _Metric('Input', fmtSi(provider.promptTokens))),
+              Expanded(
+                  child: _Metric('Cached', fmtSi(provider.cacheReadTokens))),
+              Expanded(
+                  child: _Metric('Output', fmtSi(provider.completionTokens))),
             ]),
-            const SizedBox(height: S.s6),
-            bar(52, 10),
-            const SizedBox(height: S.s16),
-            Row(children: [
-              for (var i = 0; i < 4; i++)
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        bar(36, 10),
-                        const SizedBox(height: S.s6),
-                        bar(48, 16),
-                      ]),
-                ),
-            ]),
-            const SizedBox(height: S.s16),
-            for (var i = 0; i < models; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: S.s4),
-                child: Row(children: [
-                  bar(i.isEven ? 140 : 110, 10),
-                  const Spacer(),
-                  bar(56, 10),
-                ]),
-              ),
-            const SizedBox(height: S.s12),
-            bar(120, 10),
-            const SizedBox(height: S.s8),
-            Skeleton(height: 6, radius: 3, color: AppColors.hover),
-          ]),
-        );
-    return Semantics(
-      label: 'Loading',
-      child: Column(children: [
-        card(2),
-        const SizedBox(height: S.s12),
-        card(1),
-      ]),
+          ),
+        for (final m in models)
+          SettingsRow(
+            label: m.model,
+            labelWidget: Text(
+              m.model,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: mono(kMobile ? 13 : 12, color: AppColors.fg2),
+            ),
+            trailing: Text(
+              '${fmtSi(m.totalTokens)} · ${m.calls}×',
+              style: mono(kMobile ? 12.5 : 11.5, color: AppColors.fg4),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -326,11 +314,16 @@ class _Metric extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TS.meta()),
-          const SizedBox(height: S.s2),
-          Text(value,
-              style: TS.sectionTitle().copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()])),
+          Text(label, style: sans(11.5, color: AppColors.fg4)),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: mono(
+              kMobile ? 15 : 14,
+              weight: FontWeight.w500,
+              color: AppColors.fg1,
+            ),
+          ),
         ],
       );
 }
@@ -339,22 +332,15 @@ class _RateRow extends StatelessWidget {
   final RateWindow rate;
   const _RateRow({required this.rate});
 
-  String get _title => rate.label == null
-      ? rateWindowLabel(rate.windowMinutes)
-      : '${rate.label} · ${rateWindowLabel(rate.windowMinutes)}';
-
   @override
   Widget build(BuildContext context) {
+    final title = _windowTitle(rate);
     final reset = rateResetLabel(rate.resetsAt);
-    // The window rolled over since this snapshot was taken. Do NOT draw the bar
-    // or the percentage: both would state the PREVIOUS window's usage as if it
-    // were current (99% used / 1% left on a window that has already reset).
     if (rate.isExpired) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(_title, style: TS.ui()),
-        const SizedBox(height: S.s4),
-        Text('Rolled over · awaiting the next report', style: TS.meta()),
-      ]);
+      return SettingsRow(
+        label: title,
+        sub: 'Rolled over · awaiting the next report',
+      );
     }
 
     final remaining = rate.leftPercent;
@@ -363,18 +349,45 @@ class _RateRow extends StatelessWidget {
         : remaining < 50
             ? AppColors.run
             : AppColors.ok;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(_title, style: TS.ui()),
-        Text('${remaining.round()}% left', style: TS.label(color)),
-      ]),
-      const SizedBox(height: S.s6),
-      Progress(pct: remaining, color: color, height: 6),
-      if (reset != null) ...[
-        const SizedBox(height: S.s4),
-        Text(reset, style: TS.meta()),
-      ],
-    ]);
+
+    return SettingsRow(
+      label: title,
+      sub: reset,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: kMobile ? 76 : 120,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: SizedBox(
+                height: 5,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(color: AppColors.surface3),
+                    FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: (remaining / 100).clamp(0.0, 1.0),
+                      child: Container(color: color),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 68,
+            child: Text(
+              '${remaining.round()}% left',
+              textAlign: TextAlign.right,
+              style: mono(12, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -384,18 +397,14 @@ class _PeriodTabs extends StatelessWidget {
   const _PeriodTabs({required this.value, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.all(kMobile ? 4 : S.s2),
+  Widget build(BuildContext context) {
+    if (kMobile) {
+      return Container(
+        padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(kMobile ? 22 : R.md),
-          boxShadow: kMobile
-              ? [
-                  BoxShadow(
-                      color: AppColors.fg1.withValues(alpha: 0.08),
-                      spreadRadius: 1),
-                ]
-              : null,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: AppColors.line),
         ),
         child: Row(children: [
           for (final p in _Period.values)
@@ -405,19 +414,62 @@ class _PeriodTabs extends StatelessWidget {
                 onTap: () => onChanged(p),
                 child: AnimatedContainer(
                   duration: Motion.quick,
-                  height: kMobile ? 36 : 30,
+                  height: 32,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: p == value ? AppColors.surface3 : Colors.transparent,
-                    borderRadius:
-                        BorderRadius.circular(kMobile ? 18 : R.md - S.s2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(p.label,
-                      style:
-                          TS.label(p == value ? AppColors.fg1 : AppColors.fg3)),
+                  child: Text(
+                    p.label,
+                    style: sans(
+                      13,
+                      weight:
+                          p == value ? FontWeight.w500 : FontWeight.w400,
+                      color: p == value ? AppColors.fg1 : AppColors.fg3,
+                    ),
+                  ),
                 ),
               ),
             ),
         ]),
       );
+    }
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final p in _Period.values)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onChanged(p),
+              child: AnimatedContainer(
+                duration: Motion.quick,
+                height: 26,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: p == value ? AppColors.surface3 : Colors.transparent,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Text(
+                  p.label,
+                  style: sans(
+                    12,
+                    weight: p == value ? FontWeight.w500 : FontWeight.w400,
+                    color: p == value ? AppColors.fg1 : AppColors.fg3,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

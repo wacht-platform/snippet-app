@@ -571,12 +571,15 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
         );
     final header = kMobile
         ? Padding(
-            padding: const EdgeInsets.fromLTRB(4, 2, 4, 18),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
             child: Text(title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: sans(30,
-                    weight: FontWeight.w500, spacing: -0.6, color: AppColors.fg1)),
+                style: sans(22,
+                    weight: FontWeight.w500,
+                    height: 1.15,
+                    spacing: -0.4,
+                    color: AppColors.fg1)),
           )
         : Padding(
             padding: const EdgeInsets.only(bottom: 22),
