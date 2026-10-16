@@ -428,7 +428,10 @@ class _DesktopPullRequestsState extends State<DesktopPullRequests> {
   Widget build(BuildContext context) {
     final selected = _selected;
     final list = Container(
-      color: AppColors.surface1,
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        border: Border(right: BorderSide(color: AppColors.line)),
+      ),
       child: PrListPanel(
         client: widget.client,
         session: widget.session,
