@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../platform.dart';
 import '../menu_widgets.dart';
+import '../tool_activity.dart' show fileChanges;
+import 'file_changes.dart' show sessionChangeSteps;
 import '../theme.dart';
 import 'shell_components.dart';
 import 'shell_models.dart';
@@ -83,6 +85,9 @@ List<Widget> buildShellRailTools({
         onTap: onTap,
       );
 
+  final events = s?.events ?? const <Map<String, dynamic>>[];
+  final changes = fileChanges(sessionChangeSteps(events)).length;
+  final artifacts = events.where((e) => e['kind'] == 'file_presented').length;
   final win = s?.contextWindow ?? 0;
   final used = s?.lastPromptTokens ?? 0;
   final frac = win > 0 ? (used / win).clamp(0.0, 1.0) : 0.0;
@@ -140,45 +145,63 @@ List<Widget> buildShellRailTools({
                           style: mono(11, color: AppColors.fg4)),
                     ]),
                     const SizedBox(height: 10),
-                    LayoutBuilder(
-                      builder: (_, c) {
-                        final n = ((c.maxWidth + 3) / 9).floor();
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            for (var i = 0; i < n; i++)
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: i < (frac * n).round()
-                                      ? (frac > 0.8
-                                          ? AppColors.danger
-                                          : AppColors.fg3)
-                                      : AppColors.line,
-                                ),
-                              ),
-                          ],
-                        );
-                      },
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        for (var i = 0; i < 26; i++)
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: i < (frac * 26).round()
+                                  ? (frac > 0.8
+                                      ? AppColors.danger
+                                      : AppColors.fg3)
+                                  : AppColors.line,
+                            ),
+                          ),
+                      ],
                     ),
                   ]),
             ),
           ),
-          item('wrap', 'Compact now', () => onSessionAction('compact')),
+          PopupMenuItem<VoidCallback>(
+            value: () => onSessionAction('compact'),
+            height: 40,
+            child: Container(
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surface3,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('Compact now', style: sans(12.5, color: AppColors.fg1)),
+              ]),
+            ),
+          ),
           const PopupMenuDivider(),
         ],
         if (mc)
           item('activity', 'Automated wakes', () => onSessionAction('autonomy'))
         else ...[
+          item('edit', 'Rename', () => onSessionAction('rename')),
+          item('sparkles', 'Change model', () => onSessionAction('model')),
+          const PopupMenuDivider(),
+          item('file-diff', 'File changes', () => onSessionAction('file_changes'),
+              detail: changes > 0 ? '$changes' : null),
+          item('clipboard', 'Artifacts', () => onSessionAction('artifacts'),
+              detail: artifacts > 0 ? '$artifacts' : null),
+          item('book-marked', 'Memory', () => onSessionAction('memory')),
+          item('pull-request', 'Pull requests',
+              () => onSessionAction('pull_requests')),
+          const PopupMenuDivider(),
           goalRunning
               ? item('goal', 'Cancel goal', () => onSessionAction('goal'))
               : item('goal', 'Set goal', () => onOpenGoalPopover(ctx)),
           item('layers', 'Lanes', () => onToggleRightPanel(RightPanel.lanes),
               detail: lanes > 0 ? '$lanes running' : null),
-          item('clipboard', 'Artifacts & files',
-              () => onSessionAction('artifacts')),
           item('history', 'Checkpoints',
               () => onToggleRightPanel(RightPanel.checkpoints)),
         ],

@@ -897,6 +897,17 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           openTaskDetail(context, widget.client, extra);
         }
         return;
+      case 'rename':
+        _renameCurrent();
+        return;
+      case 'model':
+        _switchModel();
+        return;
+      case 'file_changes':
+        final steps = sessionChangeSteps(_state?.events ?? const []);
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => FileChangesScreen(steps: steps)));
+        return;
       case 'memory':
         presentScreen(context,
             builder: (_, close) => MemoryScreen(
