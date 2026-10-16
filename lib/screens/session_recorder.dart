@@ -523,6 +523,12 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
           ),
       ]);
     }
+    if (share.send) {
+      for (var i = 0; i < 50 && mounted && _channel == null; i++) {
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+      if (mounted) await _sendMessage();
+    }
   }
 
   Future<void> _disposeRecorder() async {

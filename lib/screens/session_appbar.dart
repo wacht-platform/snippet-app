@@ -790,7 +790,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         _renameCurrent();
         return;
       case 'model':
-        _switchModel(context);
+        _switchModel(_modelChipKey.currentContext ?? context);
         return;
       case 'goal':
         final text = extra?.trim();
@@ -910,6 +910,19 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         }
         return;
       case 'memory':
+        if (!kMobile) {
+          presentScreen(context,
+              style: PanelStyle.drawer,
+              maxWidth: 560,
+              purpose: ShellPanelPurpose.memory,
+              originClient: widget.client,
+              originSessionId: widget.sessionId,
+              builder: (_, close) => MemoryScreen(
+                  client: widget.client,
+                  embedded: true,
+                  initialKey: 'session:${widget.sessionId}'));
+          return;
+        }
         presentScreen(context,
             builder: (_, close) => MemoryScreen(
                 client: widget.client,

@@ -918,6 +918,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
               ]),
             ),
             Builder(
+              key: _modelChipKey,
               builder: (ctx) => hit(
                   Row(mainAxisSize: MainAxisSize.min, children: [
                     if (_modelProvider != null) ...[

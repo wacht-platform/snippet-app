@@ -28,6 +28,8 @@ class ShellSplitView extends StatefulWidget {
     required this.readoutBodyBuilder,
     required this.fallbackBuilder,
     this.rightPanel,
+    this.panelHostsReadouts = false,
+    this.hideRight = false,
     required this.onPaneResize,
     required this.onExpandPane,
     required this.onMoveTab,
@@ -57,6 +59,8 @@ class ShellSplitView extends StatefulWidget {
   final Widget Function(RightTab readout) readoutBodyBuilder;
   final Widget Function(ShellPane pane) fallbackBuilder;
   final Widget? rightPanel;
+  final bool panelHostsReadouts;
+  final bool hideRight;
   final ValueChanged<double> onPaneResize;
   final ValueChanged<ShellPane> onExpandPane;
   final void Function(ShellPane pane, ShellTab tab) onMoveTab;
@@ -108,12 +112,15 @@ class _ShellSplitViewState extends State<ShellSplitView> {
   Widget _paneView(ShellPane p, {bool roundRight = false}) {
     final list = p == ShellPane.left ? widget.leftTabs : widget.rightTabs;
     final pinned = p == ShellPane.right && widget.rightPanel != null;
+    final hosted = pinned && widget.panelHostsReadouts;
     final readouts = [
       if (pinned) _filesTab,
-      for (final r in widget.readouts)
-        if (r.pane == p) r
+      if (!hosted)
+        for (final r in widget.readouts)
+          if (r.pane == p) r
     ];
-    final key = widget.activeKey[p];
+    var key = widget.activeKey[p];
+    if (hosted && !list.any((t) => t.key == key)) key = _filesTab.key;
 
     final selectedTab = list.where((t) => t.key == key).firstOrNull;
     RightTab? selectedReadout;
@@ -193,11 +200,12 @@ class _ShellSplitViewState extends State<ShellSplitView> {
 
   @override
   Widget build(BuildContext context) {
-    final showRight = _dragActive ||
+    final showRight = !widget.hideRight &&
+        (_dragActive ||
         widget.rightPanel != null ||
         (!widget.rightCollapsed &&
             (widget.rightTabs.isNotEmpty ||
-                widget.readouts.any((r) => r.pane == ShellPane.right)));
+                widget.readouts.any((r) => r.pane == ShellPane.right))));
     final showLeft = !(widget.leftCollapsed && widget.leftTabs.isNotEmpty);
 
     final line = BorderSide(color: AppColors.line);

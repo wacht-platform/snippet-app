@@ -19,7 +19,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
       if (!mounted) return;
       _store.saveOpenTabs(
         _tabs
-            .where((t) => !t.isPrs)
+            .where((t) => !t.isPrs && !t.isDraft)
             .map((t) => OpenTabDescriptor(
                   instanceUrl: t.instanceUrl,
                   sessionId: t.sessionId,
@@ -439,7 +439,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
   void _openPrsTab(GithubStatus status) {
     final root = _activeTab;
     if (root == null || root.sessionId == null) return;
-    final pane = _focusedPane;
+    final pane = _Pane.left;
     final group = _activeGroupKeyFor(pane) ?? root.key;
     final existing =
         _tabs.indexWhere((t) => t.isPrs && t.instanceUrl == root.instanceUrl);

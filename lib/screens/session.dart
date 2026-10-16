@@ -310,6 +310,7 @@ class _SessionScreenState extends State<SessionScreen>
   /// `Navigator.pop` does NOT close a drawer, so the closer must be this key.
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _composerCardKey = GlobalKey();
+  final _modelChipKey = GlobalKey();
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   StreamSubscription<Amplitude>? _amplitudeSub;

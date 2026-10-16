@@ -79,6 +79,22 @@ class ShellTab {
   final String? prSession;
   final GithubStatus? github;
 
+  bool isDraft = false;
+  String? draftFolder;
+
+  static ShellTab draft({
+    required DaemonClient client,
+    required String instanceUrl,
+    String? folder,
+  }) =>
+      ShellTab.session(
+          client: client,
+          instanceUrl: instanceUrl,
+          sessionId: null,
+          title: 'New session')
+        ..isDraft = true
+        ..draftFolder = folder;
+
   ShellTab.session({
     required this.client,
     required this.instanceUrl,
@@ -194,13 +210,16 @@ class ShellTab {
   bool get isDiff => diffPath != null;
   bool get isTerminal => termId != null;
   bool get isMissionControl =>
+      !isDraft &&
       !isBoard &&
       !isPrs &&
       !isFile &&
       !isDiff &&
       !isTerminal &&
       isMissionControlTab(sessionId: sessionId, title: title);
-  String get key => isPrs
+  String get key => isDraft
+      ? '$instanceUrl|new'
+      : isPrs
       ? '$instanceUrl|prs'
       : isBoard
       ? '$instanceUrl|tasks-board'
@@ -217,7 +236,9 @@ class ShellTab {
 
 /// Icon for a tab, by kind. One helper so the four call sites that render a
 /// tab (top bar, desktop strip, split header, tab menu) cannot drift.
-String tabIconKind(ShellTab t) => t.isPrs
+String tabIconKind(ShellTab t) => t.isDraft
+    ? 'pencil-line'
+    : t.isPrs
     ? 'pull-request'
     : t.isBoard
     ? 'kanban'

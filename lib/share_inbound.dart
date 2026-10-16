@@ -7,12 +7,14 @@ class SharedInbound {
   final String text;
   final List<String> paths;
   final List<String> names;
+  final bool send;
 
   const SharedInbound({
     required this.type,
     this.text = '',
     this.paths = const [],
     this.names = const [],
+    this.send = false,
   });
 
   bool get isEmpty => text.trim().isEmpty && paths.isEmpty;
