@@ -4,6 +4,7 @@ import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
+import '../settings_form.dart';
 import '../widgets.dart';
 import 'inference_profile_editor.dart';
 import 'shell_nav.dart';
@@ -149,9 +150,16 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     if (kMobile && widget.embedded) {
       final saved = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (_) => InferenceProfileEditor(
+          builder: (ctx) => InferenceProfileEditor(
             client: widget.client,
             existing: p,
+            onDelete: p == null
+                ? null
+                : () async {
+                    if (await _confirmDelete(p) && ctx.mounted) {
+                      Navigator.pop(ctx);
+                    }
+                  },
             onClose: () => Navigator.pop(context),
             onSaved: () => Navigator.pop(context, true),
             onSubmit: _submitted,
@@ -183,9 +191,15 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     super.build(context);
     Theme.of(context); // Rebuild on theme change
     if (_inEditor) {
+      final editing = _editProfile;
       final editor = InferenceProfileEditor(
         client: widget.client,
         existing: _editProfile,
+        onDelete: editing == null
+            ? null
+            : () async {
+                if (await _confirmDelete(editing)) _closeEditor();
+              },
         embedded: widget.embedded,
         onClose: () => _closeEditor(),
         onSaved: () => _closeEditor(saved: true),
@@ -235,18 +249,36 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                       icon: 'plus', small: true, onTap: () => _edit(null)),
             )
           else ...[
-            ListGroup(children: [
-              for (final p in profiles) _profileCard(p),
-            ]),
-            const SettingsNote(
-                'New chats use the active profile. Lanes and background work follow Routing.'),
-            const SizedBox(height: S.s16),
-            AppToggle(
-              on: _keepTaskProfile ?? cfg?.keepTaskProfile ?? true,
-              label: "Keep a task's model",
-              sub: 'Chats stay on the model a task used.',
-              onChanged: _setKeepTaskProfile,
+            SettingsGroup(
+              footer:
+                  'New chats use the active profile. Lanes and background work follow Routing.',
+              children: [
+                for (final p in profiles)
+                  SettingsRow(
+                    label: p.name,
+                    sub: '${p.provider} · ${p.model}',
+                    leading: ProviderLogo(p.provider, size: kMobile ? 18 : 16),
+                    onTap: () => _edit(p),
+                    chevron: true,
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (!p.usable) const WarnChip(),
+                      if (p.active)
+                        Text('Active',
+                            style: sans(kMobile ? 14 : 12, color: AppColors.fg3)),
+                    ]),
+                  ),
+              ],
             ),
+            SettingsGroup(children: [
+              SettingsRow(
+                label: "Keep a task's model",
+                sub: 'Chats stay on the model a task used.',
+                trailing: SettingsSwitch(
+                  value: _keepTaskProfile ?? cfg?.keepTaskProfile ?? true,
+                  onChanged: _setKeepTaskProfile,
+                ),
+              ),
+            ]),
           ],
         ]);
       },
@@ -259,7 +291,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           NavBackRow(
-              title: 'Inference profiles',
+              title: 'Profiles',
               onBack: widget.onBack!,
               trailing: [
                 HeaderAction('Add profile', onTap: () => _edit(null)),
@@ -285,76 +317,28 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     );
   }
 
-  Widget _profileCard(InferenceProfile p) {
-    return ListRow(
-      title: p.name,
-      onTap: () => _edit(p),
-      leading: IconTile('provider:${p.provider}',
-          tone: p.active ? Tone.accent : Tone.neutral),
-      titleWidget: Row(children: [
-        Flexible(
-          child: Text(p.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TS.rowTitle()),
-        ),
-        if (p.active) ...[
-          const SizedBox(width: S.s8),
-          const Tag('Active', tone: Tone.accent),
-        ],
-        if (!p.usable) ...[
-          const SizedBox(width: S.s6),
-          const WarnChip(),
-        ],
-      ]),
-      subtitle: '${p.provider} · ${p.model}',
-      // Phones keep destructive actions off the row: long-press for them.
-      onLongPress: kMobile ? () => _profileActions(p) : null,
-      trailing: kMobile ? null : _deleteProfileButton(p),
-    );
-  }
-
-  Widget _deleteProfileButton(InferenceProfile p) => IconBtn(
-        'trash',
-        size: 32,
-        iconSize: 16,
-        tooltip: 'Delete profile',
-        onTap: () => _confirmDelete(p),
-      );
-
-  void _profileActions(InferenceProfile p) => showAppSheet(context,
-      title: p.name,
-      child: SheetActions([
-        SheetAction('edit', 'Edit', () {
-          Navigator.pop(context);
-          _edit(p);
-        }),
-        SheetAction('trash', 'Delete', () {
-          Navigator.pop(context);
-          _confirmDelete(p);
-        }, danger: true),
-      ]));
-
-  Future<void> _confirmDelete(InferenceProfile p) async {
+  Future<bool> _confirmDelete(InferenceProfile p) async {
     final ok = await confirmAction(context,
         title: 'Delete ${p.name}?',
         body: p.active
             ? 'This is the active profile. New chats will need another one.'
             : 'Chats already using it keep their history.');
-    if (!ok || !mounted) return;
+    if (!ok || !mounted) return false;
     setState(() => _deletingProfiles.add(p.name));
     try {
       await widget.client.deleteProfile(p.name);
-      if (!mounted) return;
+      if (!mounted) return true;
       widget.client.invalidateConfig();
       setState(() {
         _deletingProfiles.remove(p.name);
         _load(force: true);
       });
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _deletingProfiles.remove(p.name));
       toast(context, "Couldn't delete ${p.name}: $e", danger: true);
+      return false;
     }
   }
 }

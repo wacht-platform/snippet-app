@@ -323,6 +323,10 @@ class _DesktopShellState extends State<DesktopShell>
 
   /// Open an agent's detail as a pane tab, focusing it if already open.
   void _openRightAgent(CoordinationAgent a) {
+    if (!kMobile) {
+      _openReadoutTab(_RightTab.agent(a));
+      return;
+    }
     final key = _RightTab.agent(a).key;
     setState(() {
       _rightCollapsed = false;

@@ -288,7 +288,6 @@ class _SessionScreenState extends State<SessionScreen>
   int _modelLoadGeneration = 0;
   String? _modelLabel;
   String? _modelProvider;
-  String? _modelEffort;
   String? _currentProfile;
 
   /// When set, the composer sends a DIRECT MESSAGE to this agent instead of a
@@ -959,7 +958,6 @@ class _SessionScreenState extends State<SessionScreen>
         setState(() {
           _modelLabel = p?.name;
           _modelProvider = p?.provider;
-          _modelEffort = p?.reasoningEffort;
         });
       }
     } catch (_) {}

@@ -260,7 +260,7 @@ class ShellTab {
 String tabIconKind(ShellTab t) => t.isReadout
     ? t.readout!.icon
     : t.isDraft
-    ? 'pencil-line'
+    ? 'square-pen'
     : t.isPrs
     ? 'pull-request'
     : t.isBoard

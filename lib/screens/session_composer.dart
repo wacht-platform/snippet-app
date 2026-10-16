@@ -935,13 +935,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                     ],
                     Text(_modelLabel ?? 'Auto',
                         style: sans(12.5, color: AppColors.fg2)),
-                    if ((_modelEffort ?? '').isNotEmpty) ...[
-                      const SizedBox(width: 5),
-                      Text(
-                          _modelEffort![0].toUpperCase() +
-                              _modelEffort!.substring(1),
-                          style: sans(12.5, color: AppColors.fg4)),
-                    ],
                   ]),
                   () => _switchModel(ctx),
                   tip: 'Model'),

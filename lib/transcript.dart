@@ -268,6 +268,8 @@ class _ToolRunState extends State<ToolRun> {
   final Set<int> _expanded = {};
   bool _showAll = false;
 
+  void _set(VoidCallback f) => setState(f);
+
   void _toggle() {
     final batch = widget.batch;
     if (batch != null) {
@@ -396,73 +398,16 @@ extension on _ToolRunState {
     final all = widget.open || _showAll || steps.length <= cap;
     final shown = all ? steps : steps.sublist(steps.length - cap);
     Widget row(ToolStep st) {
-      final ch = fileChanges([st]);
-      final add = ch.fold<int>(0, (a, c) => a + c.added);
-      final del = ch.fold<int>(0, (a, c) => a + c.removed);
-      final failed = !st.running && st.failed;
-      final dot = st.running
-          ? AppColors.accent
-          : failed
-              ? AppColors.danger
-              : ch.isNotEmpty
-                  ? AppColors.accent
-                  : AppColors.fg1.withValues(alpha: 0.22);
-      final (verb, obj) = toolSentenceParts(st);
       final idx = steps.indexOf(st);
       final canOpen = toolHasDetail(st) || st.running;
       final expanded = _expanded.contains(idx);
-      final line = InkWell(
-        borderRadius: BorderRadius.circular(7),
+      final line = _TraceRow(
+        step: st,
+        expanded: expanded,
         onTap: canOpen
-            ? () => setState(() =>
+            ? () => _set(() =>
                 expanded ? _expanded.remove(idx) : _expanded.add(idx))
             : null,
-        child: SizedBox(
-          height: 28,
-          child: Row(children: [
-            SizedBox(
-              width: 22,
-              child: Center(
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: dot,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: readingBg, width: 2),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(minWidth: 64, maxWidth: 220),
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Text(verb,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(13, color: AppColors.fg2)),
-              ),
-            ),
-            Flexible(
-              child: Text(obj,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(12, color: AppColors.fg3)),
-            ),
-            const SizedBox(width: 10),
-            if (failed)
-              Text('failed', style: sans(12, color: AppColors.danger))
-            else if (ch.isNotEmpty)
-              Text('+$add −$del', style: mono(11.5, color: AppColors.fg4)),
-            if (canOpen) ...[
-              const SizedBox(width: 6),
-              AppIcon(expanded ? 'chevron-down' : 'chevron-right',
-                  size: 12, color: AppColors.fg4),
-            ],
-          ]),
-        ),
       );
       if (!expanded) return line;
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -506,7 +451,7 @@ extension on _ToolRunState {
             InkWell(
               borderRadius: BorderRadius.circular(7),
               onTap: () {
-                setState(() => _showAll = true);
+                _set(() => _showAll = true);
                 widget.onOpenChanged?.call(true);
               },
               child: SizedBox(
@@ -1228,6 +1173,125 @@ class _SystemDivider extends StatelessWidget {
         ),
         Expanded(child: Container(height: 1, color: AppColors.line)),
       ]),
+    );
+  }
+}
+
+
+class _TraceRow extends StatefulWidget {
+  const _TraceRow({required this.step, required this.expanded, this.onTap});
+  final ToolStep step;
+  final bool expanded;
+  final VoidCallback? onTap;
+
+  @override
+  State<_TraceRow> createState() => _TraceRowState();
+}
+
+class _TraceRowState extends State<_TraceRow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final st = widget.step;
+    final ch = fileChanges([st]);
+    final add = ch.fold<int>(0, (a, c) => a + c.added);
+    final del = ch.fold<int>(0, (a, c) => a + c.removed);
+    final failed = !st.running && st.failed;
+    final exit = st.result is Map ? (st.result as Map)['exit_code'] : null;
+    final isRun = st.tool == 'bash';
+    var (verb, obj) = toolSentenceParts(st);
+    var objIsLabel = false;
+    if (obj.isEmpty && isRun) {
+      obj = verb;
+      verb = st.running ? 'Running' : 'Ran';
+      objIsLabel = true;
+    }
+    final dot = st.running
+        ? AppColors.accent
+        : failed
+            ? AppColors.danger
+            : ch.isNotEmpty
+                ? AppColors.accent
+                : isRun
+                    ? AppColors.ok.withValues(alpha: 0.8)
+                    : AppColors.fg1.withValues(alpha: 0.22);
+    final String meta = failed
+        ? 'failed'
+        : ch.isNotEmpty
+            ? '+$add −$del'
+            : (exit is num && exit != 0)
+                ? 'exit $exit'
+                : '';
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: widget.onTap == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: 28,
+          decoration: BoxDecoration(
+            color: _hover && widget.onTap != null
+                ? AppColors.fg1.withValues(alpha: 0.04)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Row(children: [
+            SizedBox(
+              width: 22,
+              child: Center(
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: dot,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: readingBg, width: 2),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 62,
+              child: Text(verb,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, color: AppColors.fg2)),
+            ),
+            Expanded(
+              child: Text(obj,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: objIsLabel
+                      ? sans(13, color: AppColors.fg3)
+                      : mono(12, color: AppColors.fg3)),
+            ),
+            if (meta.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              Text(meta,
+                  style: failed || (exit is num && exit != 0)
+                      ? sans(12, color: AppColors.danger)
+                      : mono(11.5, color: AppColors.fg4)),
+            ],
+            SizedBox(
+              width: 22,
+              child: widget.onTap != null && (_hover || widget.expanded)
+                  ? Center(
+                      child: AppIcon(
+                          widget.expanded ? 'chevron-down' : 'chevron-right',
+                          size: 12,
+                          color: AppColors.fg4))
+                  : null,
+            ),
+          ]),
+        ),
+      ),
     );
   }
 }

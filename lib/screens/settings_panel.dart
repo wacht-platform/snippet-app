@@ -8,6 +8,7 @@ import '../models.dart';
 import '../notifications.dart';
 import '../panel.dart';
 import '../platform.dart';
+import '../settings_form.dart';
 import '../store.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -399,7 +400,7 @@ class SettingsPanelState extends State<SettingsPanel> {
               children: [
                 // Left Column (Sidebar Rail)
                 Container(
-                  width: full ? 256 : 210,
+                  width: full ? 272 : 210,
                   decoration: BoxDecoration(
                     color: AppColors.sidebarPanel,
                     border: full
@@ -412,7 +413,9 @@ class SettingsPanelState extends State<SettingsPanel> {
                       if (full) ...[
                         SizedBox(height: kMacOS ? kTitleBarHeight + 4 : 12),
                         _backToApp(),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
+                        _searchField(),
+                        const SizedBox(height: 4),
                       ] else
                       Container(
                         height: 52,
@@ -427,8 +430,9 @@ class SettingsPanelState extends State<SettingsPanel> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           children: [
-                            for (final (page, icon, label) in _nav) ...[
-                              if (_navGroups[page] != null)
+                            for (final (page, icon, label) in _nav)
+                              if (_navMatches(page, label)) ...[
+                              if (_navGroups[page] != null && _navQuery.isEmpty)
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(
                                       10, 14, 10, 4),
@@ -480,14 +484,14 @@ class SettingsPanelState extends State<SettingsPanel> {
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                     constraints: BoxConstraints(
-                        maxWidth: full ? 744 : double.infinity),
+                        maxWidth: full ? 768 : double.infinity),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Content Pane Header
                         if (!_isNested)
                           Container(
-                            height: full ? 64 : 52,
+                            height: full ? 56 : 52,
                             padding: EdgeInsets.fromLTRB(
                                 24, 0, full ? 24 : 10, 0),
                             child: Row(
@@ -497,15 +501,20 @@ class SettingsPanelState extends State<SettingsPanel> {
                                   child: SwapText(
                                     _pageTitle(_page),
                                     style: full
-                                        ? sans(20,
+                                        ? sans(17,
                                             weight: FontWeight.w500,
-                                            spacing: -0.3,
+                                            spacing: -0.2,
                                             color: AppColors.fg1)
                                         : sans(15, color: AppColors.fg1),
                                   ),
                                 ),
                                 if (_pageAction(_page) != null)
                                   _pageAction(_page)!,
+                                if (full) ...[
+                                  const SizedBox(width: 12),
+                                  Text('esc to close',
+                                      style: sans(12, color: AppColors.fg4)),
+                                ],
                                 if (!full) ...[
                                   const SizedBox(width: 6),
                                   IconBtn('x',
@@ -568,6 +577,60 @@ class SettingsPanelState extends State<SettingsPanel> {
       child: Focus(autofocus: true, child: scaffold),
     );
   }
+
+  String _navQuery = '';
+
+  static const _navKeywords = {
+    SettingsPage.general: 'machines approvals yolo ask notifications pair connect',
+    SettingsPage.models: 'profiles models providers api key claude gemini chatgpt context compact',
+    SettingsPage.routing: 'fallback limits priority lanes mission inboxes',
+    SettingsPage.usage: 'limits quota tokens',
+    SettingsPage.memory: 'remember notes consolidation',
+    SettingsPage.scheduled: 'recurring jobs cron wake',
+    SettingsPage.vault: 'secrets keys tokens env',
+  };
+
+  bool _navMatches(SettingsPage page, String label) {
+    final q = _navQuery.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return label.toLowerCase().contains(q) ||
+        (_navKeywords[page] ?? '').contains(q);
+  }
+
+  Widget _searchField() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Row(children: [
+            AppIcon('search', size: 13, color: AppColors.fg4),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                onChanged: (v) => setState(() => _navQuery = v),
+                onSubmitted: (_) {
+                  final hit = _nav
+                      .where((e) => _navMatches(e.$1, e.$3))
+                      .firstOrNull;
+                  if (hit != null) setState(() => _page = hit.$1);
+                },
+                style: sans(12.5, color: AppColors.fg1),
+                decoration: InputDecoration(
+                  isCollapsed: true,
+                  border: InputBorder.none,
+                  hintText: 'Search settings',
+                  hintStyle: sans(12.5, color: AppColors.fg4),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      );
 
   Widget _backToApp() => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -848,7 +911,7 @@ class SettingsPanelState extends State<SettingsPanel> {
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
-        SettingsPage.general => _addingMachine
+        SettingsPage.general => _addingMachine || widget.fullPage
             ? null
             : HeaderAction('Add machine', onTap: _addMachine),
         SettingsPage.models => _modelsEditing
@@ -978,8 +1041,129 @@ class SettingsPanelState extends State<SettingsPanel> {
   }
 
   /// The General section's content.
+  bool? _manual;
+
+  Future<void> _loadManual() async {
+    try {
+      final c = await widget.client.getConfig();
+      if (mounted) setState(() => _manual = c.manualApproval);
+    } catch (_) {}
+  }
+
+  Future<void> _setManual(bool on) async {
+    final before = _manual;
+    setState(() => _manual = on);
+    try {
+      await widget.client.setManualApproval(on);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _manual = before);
+      toast(context, '$e', danger: true);
+    }
+  }
+
+  Future<void> _renameViaPrompt(Instance i) async {
+    final name = await promptText(context, title: 'Rename machine', initial: i.label);
+    if (name == null || name.trim().isEmpty || !mounted) return;
+    _renameController.text = name.trim();
+    await _commitRename(i);
+  }
+
+  Widget _nativeGeneral() {
+    if (_manual == null) _loadManual();
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+      children: [
+        SettingsGroup(
+          header: 'Machines',
+          footer:
+              'Snippet talks to the daemon on each machine. Pair a new one with the link from snippet daemon link.',
+          children: [
+            for (final i in _instances)
+              SettingsRow(
+                label: i.label.isEmpty ? i.url : i.label,
+                sub: i.url,
+                leading: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: i.url == widget.active?.url
+                        ? AppColors.ok
+                        : AppColors.fg4,
+                  ),
+                ),
+                onTap: i.url == widget.active?.url || widget.onSelect == null
+                    ? null
+                    : () => _selectInstance(i),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(i.url == widget.active?.url ? 'In use' : 'Connect',
+                      style: sans(12.5,
+                          color: i.url == widget.active?.url
+                              ? AppColors.fg4
+                              : AppColors.accent)),
+                  const SizedBox(width: 6),
+                  Builder(
+                    builder: (anchor) => IconBtn('more-horizontal',
+                        size: 26,
+                        iconSize: 14,
+                        tooltip: 'More',
+                        onTap: () async {
+                          final pick = await showAppMenu<String>(context,
+                              anchor: anchor,
+                              items: [
+                                appMenuItem(
+                                    value: 'rename',
+                                    icon: 'edit',
+                                    label: 'Rename'),
+                                appMenuItem(
+                                    value: 'remove',
+                                    icon: 'trash',
+                                    label: 'Remove',
+                                    danger: true),
+                              ]);
+                          if (pick == 'rename') _renameViaPrompt(i);
+                          if (pick == 'remove') _confirmRemove(i);
+                        }),
+                  ),
+                ]),
+              ),
+            SettingsRow(
+              label: 'Add a machine…',
+              onTap: _addMachine,
+              trailing: Text('Pair', style: sans(12.5, color: AppColors.accent)),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          header: 'Approvals',
+          footer: 'Applies to every session on this machine.',
+          children: [
+            SettingsRow(
+              label: 'Ask before running commands',
+              sub: 'Off lets agents run shell commands and edit files without stopping to ask.',
+              trailing: SettingsSwitch(
+                  value: _manual ?? false,
+                  onChanged: _manual == null ? null : _setManual),
+            ),
+          ],
+        ),
+        if (kCanNotify)
+          SettingsGroup(header: 'Notifications', children: [
+            SettingsRow(
+              label: 'Notify me',
+              sub: 'When a session needs you or finishes.',
+              trailing: SettingsSwitch(
+                  value: _notif, onChanged: _notifBusy ? null : _toggleNotif),
+            ),
+          ]),
+      ],
+    );
+  }
+
   Widget _generalPage({bool includeNotifications = true}) {
     if (_addingMachine) return _addMachinePane();
+    if (widget.fullPage) return _nativeGeneral();
     return PageBody(children: [
       if (includeNotifications)
         const SectionHeader('Machines',

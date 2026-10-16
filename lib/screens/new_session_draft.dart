@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
-import '../menu_widgets.dart';
 import '../mochi.dart';
 import '../models.dart';
 import '../panel.dart';
@@ -141,14 +140,20 @@ class _NewSessionDraftState extends State<NewSessionDraft> {
   Future<void> _pickProfile(BuildContext anchor) async {
     if (_profiles.isEmpty) return;
     final picked = await showAppMenu<String>(
-      anchor,
+      context,
+      anchor: anchor,
+      minWidth: 260,
+      maxWidth: 360,
       items: [
+        appMenuHeading<String>('Inference profile'),
         for (final p in _profiles)
-          appMenuItem(
-              value: p.name,
-              label: p.name,
-              detail: p.model,
-              selected: p.name == _profile),
+          appMenuRow<String>(
+            value: p.name,
+            icon: 'provider:${p.provider}',
+            label: p.name,
+            description: '${p.provider} · ${p.model}',
+            selected: p.name == _profile,
+          ),
       ],
     );
     if (picked != null && mounted) setState(() => _profile = picked);
@@ -235,7 +240,8 @@ class _NewSessionDraftState extends State<NewSessionDraft> {
       child: LayoutBuilder(
         builder: (context, box) => SingleChildScrollView(
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: box.maxHeight),
+            constraints: BoxConstraints(
+                minHeight: box.maxHeight, minWidth: box.maxWidth),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(32, 24, 32, 70),
               child: Column(
@@ -313,17 +319,6 @@ class _NewSessionDraftState extends State<NewSessionDraft> {
                                           Text(current.name,
                                               style: sans(12.5,
                                                   color: AppColors.fg2)),
-                                          if (current
-                                              .reasoningEffort.isNotEmpty) ...[
-                                            const SizedBox(width: 5),
-                                            Text(
-                                                current.reasoningEffort[0]
-                                                        .toUpperCase() +
-                                                    current.reasoningEffort
-                                                        .substring(1),
-                                                style: sans(12.5,
-                                                    color: AppColors.fg4)),
-                                          ],
                                         ]),
                                       ),
                                     ),

@@ -58,13 +58,10 @@ void main() {
     expect(find.textContaining('session'), findsNothing);
     expect(find.textContaining('tok'), findsNothing);
 
-    final iconFinder = find.byType(AppIcon);
-    expect(iconFinder, findsWidgets);
-    final icons = tester.widgetList<AppIcon>(iconFinder);
-    expect(icons.any((icon) => icon.name == 'provider:openai'), isTrue);
+    final logos = tester.widgetList<ProviderLogo>(find.byType(ProviderLogo));
+    expect(logos.any((l) => l.provider == 'openai'), isTrue);
+    final icons = tester.widgetList<AppIcon>(find.byType(AppIcon));
     expect(icons.any((icon) => icon.name == 'cpu'), isFalse);
-    final chipIcon = icons.firstWhere((icon) => icon.name == 'provider:openai');
-    expect(chipIcon.size, greaterThanOrEqualTo(18));
   });
 
   testWidgets(
