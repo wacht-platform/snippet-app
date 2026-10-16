@@ -322,13 +322,10 @@ class NavBackRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (kMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          MobileBackLink(onBack: onBack, label: backLabel, trailing: trailing),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 16, 4),
+        child: Row(children: [
+          Expanded(
             child: Text(title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -338,7 +335,8 @@ class NavBackRow extends StatelessWidget {
                     spacing: -0.4,
                     color: AppColors.fg1)),
           ),
-        ],
+          ...trailing,
+        ]),
       );
     }
     return SizedBox(

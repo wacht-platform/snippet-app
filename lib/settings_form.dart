@@ -242,10 +242,11 @@ class SettingsField extends StatelessWidget {
         ? mono_(kMobile ? 14 : 12.5)
         : sans(kMobile ? 15 : 12.5, color: AppColors.fg1);
     return SizedBox(
-      width: kMobile ? (width > 170 ? 170 : width) : width,
+      width: kMobile ? (width > 210 ? 210 : width) : width,
       child: Container(
         height: kMobile ? 34 : 28,
-        padding: const EdgeInsets.symmetric(horizontal: 9),
+        padding:
+            kMobile ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 9),
         decoration: kMobile
             ? null
             : BoxDecoration(

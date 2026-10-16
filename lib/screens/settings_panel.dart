@@ -487,10 +487,9 @@ class SettingsPanelState extends State<SettingsPanel> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (!_isNested)
-                            Container(
-                              height: full ? 56 : 52,
+                            Padding(
                               padding: EdgeInsets.fromLTRB(
-                                  24, 0, full ? 24 : 10, 0),
+                                  24, full ? 14 : 12, full ? 24 : 10, 2),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
@@ -1251,7 +1250,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   Widget _notifRow() {
     return Padding(
       padding: kMobile
-          ? const EdgeInsets.fromLTRB(4, 10, 4, 10)
+          ? const EdgeInsets.fromLTRB(16, 14, 16, 14)
           : const EdgeInsets.fromLTRB(S.s12, S.s12, S.s12, S.s12),
       child: Row(children: [
         if (!kMobile) ...[
@@ -1259,7 +1258,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           const SizedBox(width: S.s12),
         ] else ...[
           AppIcon('bell', size: 19, color: AppColors.fg3),
-          const SizedBox(width: S.s12),
+          const SizedBox(width: 14),
         ],
         Expanded(
           child: Column(

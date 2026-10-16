@@ -533,12 +533,8 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       // (inference_profiles.dart draws "Edit profile" / "Add profile"), so
       // drawing one here stacked a second back row under it — two rows, two
       // exits, same screen.
-      if (!widget.embedded)
-        kMobile
-            ? SafeArea(
-                bottom: false,
-                child: MobileBackLink(onBack: _dismiss, label: 'Profiles'))
-            : SnAppBar(title: title, onBack: _dismiss),
+      if (!widget.embedded && !kMobile)
+        SnAppBar(title: title, onBack: _dismiss),
       Expanded(child: _nativeForm(pills)),
       footer,
     ]);
@@ -571,7 +567,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
         );
     final header = kMobile
         ? Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 10),
             child: Text(title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -710,35 +706,39 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
           ),
           SettingsRow(
             label: 'Model',
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              SizedBox(
-                width: kMobile ? 170 : 220,
-                child: SettingsField(
-                  controller: _model,
-                  width: 220,
-                  mono: true,
-                  onChanged: (_) {
-                    setState(() {});
-                    _scheduleReasoning();
-                  },
-                  hint: _isChatgpt
-                      ? 'gpt-5.1-codex'
-                      : _isClaudeCode
-                          ? 'sonnet'
-                          : _isAntigravity
-                              ? 'gemini-3.8-flash-high'
-                              : 'claude-sonnet-4.5',
-                ),
-              ),
-              const SizedBox(width: 4),
-              _loadingModels
-                  ? const SizedBox(width: 26, child: Center(child: Spinner(size: 14)))
-                  : IconBtn(_showModelBrowser ? 'x' : 'list',
-                      size: 26,
-                      iconSize: 14,
-                      tooltip: _showModelBrowser ? 'Hide catalog' : 'Browse models',
-                      onTap: _busy ? null : _browseModels),
-            ]),
+            trailing: SettingsField(
+              controller: _model,
+              width: kMobile ? 210 : 240,
+              mono: !kMobile,
+              onChanged: (_) {
+                setState(() {});
+                _scheduleReasoning();
+              },
+              hint: _isChatgpt
+                  ? 'gpt-5.1-codex'
+                  : _isClaudeCode
+                      ? 'sonnet'
+                      : _isAntigravity
+                          ? 'gemini-3.8-flash-high'
+                          : 'claude-sonnet-4.5',
+              suffix: _loadingModels
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: Center(child: Spinner(size: 12)))
+                  : GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _busy ? null : _browseModels,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 2),
+                        child: AppIcon(
+                          _showModelBrowser ? 'x' : 'chevrons-up-down',
+                          size: kMobile ? 14 : 13,
+                          color: AppColors.fg4,
+                        ),
+                      ),
+                    ),
+            ),
           ),
           if (_showModelBrowser && _catalogModels != null)
             Padding(
