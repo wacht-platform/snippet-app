@@ -213,17 +213,26 @@ class _RoutingScreenState extends State<RoutingScreen> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(15),
                 onTap: () => _addFallbackMenu(anchor, key, chosen),
-                child: Container(
-                  height: 30,
-                  padding: const EdgeInsets.symmetric(horizontal: 11),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: AppColors.line),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 116),
+                  child: IntrinsicWidth(
+                    child: Container(
+                      height: 30,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: AppColors.line),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(defaultLabel,
+                              style: sans(12.5, color: AppColors.fg3)),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(defaultLabel,
-                        style: sans(12.5, color: AppColors.fg3)),
-                  ]),
                 ),
               ),
             ),
@@ -247,35 +256,44 @@ class _RoutingScreenState extends State<RoutingScreen> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(15),
                     onTap: () => _pillMenu(anchor, key, chosen, i),
-                    child: Container(
-                      height: 30,
-                      padding: const EdgeInsets.fromLTRB(9, 0, 11, 0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: AppColors.line),
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        ProviderLogo(p?.provider ?? name, size: 12),
-                        const SizedBox(width: 7),
-                        Text(
-                          name,
-                          style: sans(
-                            12.5,
-                            color: isPrimary ? AppColors.fg1 : AppColors.fg3,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 116),
+                      child: IntrinsicWidth(
+                        child: Container(
+                          height: 30,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: AppColors.line),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ProviderLogo(p?.provider ?? name, size: 12),
+                              const SizedBox(width: 7),
+                              Text(
+                                name,
+                                style: sans(
+                                  12.5,
+                                  color: isPrimary ? AppColors.fg1 : AppColors.fg3,
+                                ),
+                              ),
+                              if (until != null) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.run,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        if (until != null) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: AppColors.run,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ]),
+                      ),
                     ),
                   ),
                 ),
@@ -363,7 +381,8 @@ class _RoutingScreenState extends State<RoutingScreen> {
 
   Widget _limitRulePill(String value) => Container(
         height: 28,
-        padding: const EdgeInsets.symmetric(horizontal: 11),
+        constraints: const BoxConstraints(minWidth: 144),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           color: AppColors.surface1,
           borderRadius: BorderRadius.circular(14),
