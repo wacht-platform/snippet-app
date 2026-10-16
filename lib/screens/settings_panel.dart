@@ -350,7 +350,8 @@ class SettingsPanelState extends State<SettingsPanel> {
         // `surface1`, one step lighter, which made Settings read as a different
         // app the moment you tapped into it.
         color: AppColors.bg,
-        child: SafeArea(
+        child: CardGroupScope(
+         child: SafeArea(
           bottom: false,
           child: AnimatedSwitcher(
             duration: Motion.base,
@@ -385,6 +386,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                   : _mobileSectionPage(),
             ),
           ),
+         ),
         ),
       );
     }
@@ -689,7 +691,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           ]),
         );
     Widget label(String text) => Padding(
-          padding: const EdgeInsets.fromLTRB(S.s4, 22, S.s4, 2),
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 7),
           child: Text(text.toUpperCase(),
               style: sans(12, weight: W.label, spacing: 0.7, color: AppColors.fg4)),
         );

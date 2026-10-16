@@ -223,6 +223,21 @@ class _RoutingScreenState extends State<RoutingScreen> {
     );
   }
 
+  Widget _routesCard(List<Widget> rows) {
+    final col = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+    if (!kMobile) return col;
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Material(color: Colors.transparent, child: col),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Widget body;
@@ -237,7 +252,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
                   Btn('Retry', small: true, onTap: () => _load(force: true)),
             );
     } else {
-      final side = kMobile ? S.s4 : S.s12;
+      final side = kMobile ? S.s16 : S.s12;
       body = Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
@@ -245,20 +260,22 @@ class _RoutingScreenState extends State<RoutingScreen> {
           child: ListView(
             padding: EdgeInsets.fromLTRB(side, S.s8, side, S.s40),
             children: [
+              _routesCard([
               for (var i = 0; i < _routeDefs.length; i++) ...[
                 if (i > 0)
                   Divider(
                       height: 1,
                       thickness: 1,
                       indent: kMobile ? S.s16 : S.s12,
-                      endIndent: kMobile ? S.s16 : S.s12,
+                      endIndent: kMobile ? 0 : S.s12,
                       color: AppColors.line),
                 _routeRow(
                     _routeDefs[i].$1, _routeDefs[i].$2, _routeDefs[i].$3),
               ],
+              ]),
               Padding(
                 padding:
-                    EdgeInsets.symmetric(horizontal: kMobile ? S.s12 : S.s8),
+                    EdgeInsets.symmetric(horizontal: kMobile ? S.s16 : S.s8),
                 child: const SettingsNote(
                     'The first model in a route does the work. When it hits a usage limit, the work moves to the next one and stays there. Chats you are in ask you before switching.'),
               ),
