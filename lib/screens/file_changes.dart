@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../file_icons.dart';
 import '../theme.dart';
 import '../tool_activity.dart';
 import '../widgets.dart';
@@ -28,13 +29,6 @@ List<ToolStep> sessionChangeSteps(List<Map<String, dynamic>> events) {
   return i < 0 ? (path, '') : (path.substring(i + 1), path.substring(0, i));
 }
 
-String _kindIcon(FileChangeKind k) => switch (k) {
-      FileChangeKind.created => 'file-plus',
-      FileChangeKind.deleted => 'trash',
-      FileChangeKind.moved => 'arrow-right',
-      FileChangeKind.edited => 'edit',
-    };
-
 class FileChangesScreen extends StatelessWidget {
   const FileChangesScreen({super.key, required this.steps});
 
@@ -51,7 +45,6 @@ class FileChangesScreen extends StatelessWidget {
             title: 'File changes',
             subtitle:
                 '${changes.length} file${changes.length == 1 ? '' : 's'} in this session',
-            onBack: () => Navigator.pop(context),
             onTitleTap: () {},
           ),
           Expanded(
@@ -84,8 +77,7 @@ class FileChangesScreen extends StatelessWidget {
                             ),
                           ),
                           child: Row(children: [
-                            AppIcon(_kindIcon(c.kind),
-                                size: 18, color: AppColors.fg3),
+                            FileGlyph(name, size: 18),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
@@ -219,7 +211,6 @@ class FileChangeDetail extends StatelessWidget {
             subtitle: dir.isEmpty
                 ? '${edits.length} edit${edits.length == 1 ? '' : 's'}'
                 : dir,
-            onBack: () => Navigator.pop(context),
             onTitleTap: () {},
           ),
           Expanded(

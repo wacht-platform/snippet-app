@@ -483,9 +483,34 @@ class SettingsPanelState extends State<SettingsPanel> {
                         ? EdgeInsets.only(top: kMacOS ? kTitleBarHeight : 16)
                         : EdgeInsets.zero,
                     alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                        maxWidth: full ? 768 : double.infinity),
+                    child: full
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (!_isNested) _fullToolbar(),
+                              Expanded(
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  child: ConstrainedBox(
+                                    constraints:
+                                        const BoxConstraints(maxWidth: 768),
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                          top: _isNested ? 0 : 20),
+                                      child: Swap(
+                                        stateKey: _page,
+                                        fill: true,
+                                        child: _pageBody(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : ConstrainedBox(
+                    constraints: const BoxConstraints(
+                        maxWidth: double.infinity),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -511,11 +536,6 @@ class SettingsPanelState extends State<SettingsPanel> {
                                 ),
                                 if (_pageAction(_page) != null)
                                   _pageAction(_page)!,
-                                if (full) ...[
-                                  const SizedBox(width: 12),
-                                  Text('esc to close',
-                                      style: sans(12, color: AppColors.fg4)),
-                                ],
                                 if (!full) ...[
                                   const SizedBox(width: 6),
                                   IconBtn('x',
@@ -846,7 +866,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     try {
       final parsed = parseConnection(raw);
       if (parsed == null) {
-        throw 'Invalid connection string. Run "snippet daemon link" on the remote machine.';
+        throw 'That is not a valid link. Run "snippet serve" on the other machine and paste what it prints.';
       }
       final (url, token) = parsed;
       final cfg = await DaemonClient(url, token).getConfig();
@@ -910,6 +930,28 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.vault => 'Vault',
         SettingsPage.scheduled => 'Scheduled',
       };
+
+  Widget _fullToolbar() => Container(
+        height: 46,
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.line)),
+        ),
+        alignment: Alignment.center,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 768),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(children: [
+              Expanded(
+                child: SwapText(_pageTitle(_page),
+                    style: sans(13.5,
+                        weight: FontWeight.w500, color: AppColors.fg1)),
+              ),
+              if (_pageAction(_page) != null) _pageAction(_page)!,
+            ]),
+          ),
+        ),
+      );
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
         SettingsPage.general => _addingMachine || widget.fullPage
@@ -1073,7 +1115,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsGroup(
           header: 'Machines',
           footer:
-              'Snippet talks to the daemon on each machine. Pair a new one with the link from snippet daemon link.',
+              'Snippet talks to the daemon on each machine. Run snippet serve on a new one and paste the link it prints.',
           children: [
             for (final i in _instances)
               SettingsRow(
@@ -1189,107 +1231,70 @@ class SettingsPanelState extends State<SettingsPanel> {
   }
 
   Widget _addMachinePane() {
+    void back() => setState(() {
+          _addingMachine = false;
+          _addMachineError = null;
+        });
+    final canConnect =
+        !_addMachineBusy && _addMachinePaste.text.trim().isNotEmpty;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 40),
       children: [
-        Row(
+        Row(children: [
+          IconBtn('chevron-left',
+              size: 28, iconSize: 15, tooltip: 'Back', onTap: back),
+          const SizedBox(width: 6),
+          Text('Connect a machine',
+              style: sans(17,
+                  weight: FontWeight.w500, spacing: -0.2, color: AppColors.fg1)),
+        ]),
+        const SizedBox(height: 22),
+        SettingsGroup(
+          header: 'On the other machine',
+          footer: 'It prints a link and a QR code. If snippet is already '
+              'running there, snippet serve --status shows them again.',
           children: [
-            IconBtn('arrow-left',
-                size: 30,
-                iconSize: 16,
-                tooltip: 'Back',
-                onTap: () => setState(() {
-                      _addingMachine = false;
-                      _addMachineError = null;
-                    })),
-            const SizedBox(width: 8),
-            Text('Connect a machine', style: TS.sectionTitle()),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Padding(
-          padding: const EdgeInsets.only(left: 38),
-          child: Text(
-            'Control a remote machine running the snippet daemon.',
-            style: TS.meta(),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text('1. Run on your remote machine',
-            style: sans(12, weight: W.label, color: AppColors.fg2)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(R.sm),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: SelectableText(
-                  'snippet daemon link',
-                  style: mono(13, color: AppColors.accent),
-                ),
-              ),
-              IconBtn('copy', size: 26, iconSize: 13, tooltip: 'Copy command',
-                  onTap: () {
-                Clipboard.setData(
-                    const ClipboardData(text: 'snippet daemon link'));
+            SettingsRow(
+              label: 'snippet serve',
+              labelWidget: SelectableText('snippet serve',
+                  style: mono(12.5, color: AppColors.fg1)),
+              trailing: IconBtn('copy',
+                  size: 26, iconSize: 13, tooltip: 'Copy command', onTap: () {
+                Clipboard.setData(const ClipboardData(text: 'snippet serve'));
                 toast(context, 'Copied');
               }),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text('2. Paste connection string or URL',
-            style: sans(12, weight: W.label, color: AppColors.fg2)),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _addMachinePaste,
-          autofocus: true,
-          style: mono(12, color: AppColors.fg1),
-          decoration: InputDecoration(
-            hintText: 'https://host:port?token=... or {"url":..., "token":...}',
-            hintStyle: mono(12, color: AppColors.fg4),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            filled: true,
-            fillColor: AppColors.surface1,
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(R.sm),
-              borderSide: BorderSide(color: AppColors.border),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(R.sm),
-              borderSide: BorderSide(color: AppColors.accent),
-            ),
-          ),
-          onSubmitted: (_) => _submitAddMachine(),
-        ),
-        if (_addMachineError != null) ...[
-          const SizedBox(height: 10),
-          Text(_addMachineError!, style: sans(12, color: AppColors.danger)),
-        ],
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Btn('Cancel',
-                variant: BtnVariant.ghost,
-                small: true,
-                onTap: () => setState(() {
-                      _addingMachine = false;
-                      _addMachineError = null;
-                    })),
-            const SizedBox(width: 8),
-            Btn(_addMachineBusy ? 'Connecting…' : 'Connect machine',
-                small: true,
-                disabled:
-                    _addMachineBusy || _addMachinePaste.text.trim().isEmpty,
-                onTap: _submitAddMachine),
           ],
         ),
+        SettingsGroup(
+          header: 'Here',
+          children: [
+            SettingsRow(
+              label: 'Link',
+              trailing: SettingsField(
+                controller: _addMachinePaste,
+                hint: 'https://…?token=…',
+                mono: true,
+                width: 380,
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+          ],
+        ),
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          if (_addMachineError != null)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4, right: 12),
+                child: Text(_addMachineError!,
+                    style: sans(12, height: 1.4, color: AppColors.danger)),
+              ),
+            ),
+          SettingsPill('Cancel', onTap: _addMachineBusy ? null : back),
+          const SizedBox(width: 8),
+          SettingsPill(_addMachineBusy ? 'Connecting…' : 'Connect',
+              onTap: canConnect ? _submitAddMachine : null),
+        ]),
       ],
     );
   }

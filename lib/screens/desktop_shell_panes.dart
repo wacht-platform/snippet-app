@@ -640,7 +640,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
               iconSize: 16,
               tooltip: 'Forward',
               onTap: _canNavigateForward ? _navigateForward : null),
-          IconBtn('square-pen',
+          IconBtn('plus',
               size: 28,
               iconSize: 16,
               tooltip: 'New session',
