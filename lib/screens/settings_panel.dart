@@ -174,6 +174,8 @@ class SettingsPanel extends StatefulWidget {
   /// presented as its own dialog/drawer.
   final bool embedded;
 
+  final bool fullPage;
+
   /// Phone drill-down. Null shows the section list; a value shows that section.
   ///
   /// Owned by the SHELL, not by this widget: the back handler and the bar's
@@ -196,6 +198,7 @@ class SettingsPanel extends StatefulWidget {
     this.onAdd,
     required this.onClose,
     this.embedded = false,
+    this.fullPage = false,
     this.section,
     this.onSection,
     this.createOnOpen,
@@ -384,7 +387,8 @@ class SettingsPanelState extends State<SettingsPanel> {
         ),
       );
     }
-    return Scaffold(
+    final full = widget.fullPage;
+    final scaffold = Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
         bottom: false,
@@ -395,12 +399,21 @@ class SettingsPanelState extends State<SettingsPanel> {
               children: [
                 // Left Column (Sidebar Rail)
                 Container(
-                  width: 210,
-                  decoration: BoxDecoration(color: AppColors.sidebarPanel),
+                  width: full ? 256 : 210,
+                  decoration: BoxDecoration(
+                    color: AppColors.sidebarPanel,
+                    border: full
+                        ? Border(right: BorderSide(color: AppColors.line))
+                        : null,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Sidebar Header
+                      if (full) ...[
+                        SizedBox(height: kMacOS ? kTitleBarHeight + 4 : 12),
+                        _backToApp(),
+                        const SizedBox(height: 6),
+                      ] else
                       Container(
                         height: 52,
                         padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -461,31 +474,46 @@ class SettingsPanelState extends State<SettingsPanel> {
                 Expanded(
                   child: Container(
                     color: AppColors.bg,
+                    padding: full
+                        ? EdgeInsets.only(top: kMacOS ? kTitleBarHeight : 16)
+                        : EdgeInsets.zero,
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                        maxWidth: full ? 744 : double.infinity),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Content Pane Header
                         if (!_isNested)
                           Container(
-                            height: 52,
-                            padding: const EdgeInsets.fromLTRB(24, 0, 10, 0),
+                            height: full ? 64 : 52,
+                            padding: EdgeInsets.fromLTRB(
+                                24, 0, full ? 24 : 10, 0),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Expanded(
                                   child: SwapText(
                                     _pageTitle(_page),
-                                    style: sans(15, color: AppColors.fg1),
+                                    style: full
+                                        ? sans(20,
+                                            weight: FontWeight.w500,
+                                            spacing: -0.3,
+                                            color: AppColors.fg1)
+                                        : sans(15, color: AppColors.fg1),
                                   ),
                                 ),
                                 if (_pageAction(_page) != null)
                                   _pageAction(_page)!,
-                                const SizedBox(width: 6),
-                                IconBtn('x',
-                                    size: 28,
-                                    iconSize: 14,
-                                    tooltip: 'Close',
-                                    onTap: widget.onClose),
+                                if (!full) ...[
+                                  const SizedBox(width: 6),
+                                  IconBtn('x',
+                                      size: 28,
+                                      iconSize: 14,
+                                      tooltip: 'Close',
+                                      onTap: widget.onClose),
+                                ],
                               ],
                             ),
                           ),
@@ -497,6 +525,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                           ),
                         ),
                       ],
+                    ),
                     ),
                   ),
                 ),
@@ -531,7 +560,46 @@ class SettingsPanelState extends State<SettingsPanel> {
         }),
       ),
     );
+    if (!full) return scaffold;
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): widget.onClose,
+      },
+      child: Focus(autofocus: true, child: scaffold),
+    );
   }
+
+  Widget _backToApp() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(9),
+            onTap: widget.onClose,
+            child: Container(
+              height: 34,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(children: [
+                AppIcon('chevron-left', size: 15, color: AppColors.fg3),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text('Back to app',
+                        style: sans(13.5, color: AppColors.fg2))),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Text('esc', style: mono(10.5, color: AppColors.fg4)),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
 
   /// Phone settings HOME.
   Widget _mobileSettingsHome() {
