@@ -929,9 +929,7 @@ class _DesktopShellState extends State<DesktopShell>
           shortcut: '⌘ T', keywords: const ['session', 'create']),
       cmd('mission-control', 'layers', 'Mission Control',
           _openMissionControlTab,
-          keywords: const ['mc', 'orchestrator']),
-      cmd('tasks', 'kanban', 'Tasks', _openBoardTab,
-          keywords: const ['board', 'kanban']),
+          keywords: const ['mc', 'orchestrator', 'tasks']),
       cmd('sidebar', 'sidebar', 'Toggle sidebar', _toggleSidebar,
           shortcut: '⌘ B'),
       cmd('right-pane', 'sidebar', 'Toggle right panel',
@@ -1063,9 +1061,12 @@ class _DesktopShellState extends State<DesktopShell>
                 icon: 'task',
                 title: t.title,
                 subtitle: t.status.label,
-                run: () => inSession
-                    ? _dispatchSessionAction('task', t.id)
-                    : _openBoardTab(),
+                run: () {
+                  if (!inSession) _openMissionControlTab();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _dispatchSessionAction('task', t.id);
+                  });
+                },
               ),
           ];
         }),

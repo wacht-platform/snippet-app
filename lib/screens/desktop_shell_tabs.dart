@@ -437,23 +437,6 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     _activateTabAt(target);
   }
 
-  void _openBoardTab() {
-    final c = _client;
-    final url = _active?.url;
-    if (c == null || url == null) return;
-    final existing =
-        _tabs.indexWhere((t) => t.isBoard && t.instanceUrl == url);
-    _openMainTab(
-      existing >= 0
-          ? null
-          : _ShellTab.board(
-              client: c,
-              instanceUrl: url,
-            ),
-      existing,
-    );
-  }
-
   void _openPrsTab(GithubStatus status) {
     final root = _activeTab;
     if (root == null || root.sessionId == null) return;
