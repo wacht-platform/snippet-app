@@ -227,7 +227,6 @@ class SettingsPanelState extends State<SettingsPanel> {
   String? _addMachineError;
 
   bool _modelsEditing = false;
-  bool _vaultAdding = false;
   bool _recurringAdding = false;
 
   bool get _isNested => switch (_page) {
@@ -920,10 +919,6 @@ class SettingsPanelState extends State<SettingsPanel> {
             ? null
             : HeaderAction('Add profile',
                 onTap: () => _modelsKey.currentState?.addProfile()),
-        SettingsPage.vault => _vaultAdding
-            ? null
-            : HeaderAction('Add secret',
-                onTap: () => _vaultKey.currentState?.add()),
         SettingsPage.scheduled => _recurringAdding
             ? null
             : HeaderAction('New job',
@@ -1030,7 +1025,6 @@ class SettingsPanelState extends State<SettingsPanel> {
           key: _vaultKey,
           client: widget.client,
           embedded: true,
-          onAddingChanged: (adding) => setState(() => _vaultAdding = adding),
         ),
       SettingsPage.scheduled => RecurringScreen(
           key: _recurringKey,

@@ -4,6 +4,7 @@ import '../api.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import '../settings_form.dart';
 import 'shell_nav.dart';
 
 /// Secret vault — names only ever reach this screen (and the agent); values go
@@ -77,38 +78,66 @@ class VaultScreenState extends State<VaultScreen> {
   /// and the keyboard, and `showAppSheet` already handles the insets.
   Future<void> add() => _add();
 
-  Future<void> _add() async {
-    if (_adding) return;
-    if (!kMobile) {
-      setState(() => _adding = true);
-      widget.onAddingChanged?.call(true);
-      return;
-    }
-    final name = await showAppSheet<String>(
-      context,
-      title: 'Add secret',
-      child: Builder(
-        builder: (sheetCtx) => _AddSecretForm(
-          client: widget.client,
-          onSaved: (n) => Navigator.pop(sheetCtx, n),
-          onCancel: () => Navigator.pop(sheetCtx),
-        ),
-      ),
-    );
-    if (name == null || !mounted) return;
-    _afterAdded(name);
+  final _name = TextEditingController();
+  final _value = TextEditingController();
+  String? _formError;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _value.dispose();
+    super.dispose();
   }
 
-  /// Reflect a newly saved secret in the list.
-  void _afterAdded(String name) {
-    if (!mounted) return;
+  Future<void> _add() async {
+    if (_adding) return;
+    _name.clear();
+    _value.clear();
     setState(() {
-      _names ??= [];
-      if (!_names!.contains(name)) _names!.add(name);
-      _names!.sort();
-      _adding = false;
+      _adding = true;
+      _formError = null;
     });
+    widget.onAddingChanged?.call(true);
+  }
+
+  void _cancel() {
+    setState(() => _adding = false);
     widget.onAddingChanged?.call(false);
+  }
+
+  Future<void> _save() async {
+    if (_busy) return;
+    final n = _name.text.trim().toUpperCase();
+    final v = _value.text;
+    if (n.isEmpty || v.trim().isEmpty) {
+      setState(() => _formError =
+          n.isEmpty ? 'Give the secret a name.' : 'Give the secret a value.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _formError = null;
+    });
+    try {
+      await widget.client.vaultSet(n, v);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _names ??= [];
+        if (!_names!.contains(n)) _names!.add(n);
+        _names!.sort();
+        _adding = false;
+      });
+      widget.onAddingChanged?.call(false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _formError = '$e';
+        });
+      }
+    }
   }
 
   Future<void> _remove(String name) async {
@@ -163,25 +192,15 @@ class VaultScreenState extends State<VaultScreen> {
     } else {
       final names = _names ?? const [];
       body = PageBody(children: [
-        if (names.isEmpty && !_adding)
-          _emptyRow()
-        else if (names.isNotEmpty)
-          ListGroup(children: [for (final n in names) _secretRow(n)]),
-        if (_adding)
-          Padding(
-            padding: const EdgeInsets.only(top: S.s12),
-            child: _AddSecretForm(
-              client: widget.client,
-              inline: true,
-              onSaved: _afterAdded,
-              onCancel: () {
-                setState(() => _adding = false);
-                widget.onAddingChanged?.call(false);
-              },
-            ),
-          ),
-        const SettingsNote(
-            'Use these as \$NAME in shell commands. Values stay on the daemon and are never shown again.'),
+        const SizedBox(height: 4),
+        SettingsGroup(
+          footer: 'Use these as \$NAME in shell commands. Values stay on '
+              'the machine and are never shown again.',
+          children: [
+            for (final n in names) _secretRow(n),
+            if (_adding) ..._form() else _addRow(names.isEmpty),
+          ],
+        ),
       ]);
     }
     if (widget.embedded) {
@@ -190,10 +209,7 @@ class VaultScreenState extends State<VaultScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NavBackRow(title: 'Vault', onBack: widget.onBack!, trailing: [
-            if (!_adding)
-              HeaderAction('Add secret', onTap: _add),
-          ]),
+          NavBackRow(title: 'Vault', onBack: widget.onBack!, trailing: const []),
           Expanded(child: body),
         ],
       );
@@ -206,186 +222,62 @@ class VaultScreenState extends State<VaultScreen> {
               title: 'Vault',
               compact: true,
               onBack: widget.onClose ?? () => Navigator.pop(context),
-              actions: [
-                if (!_adding)
-                  HeaderAction('Add secret', onTap: _add),
-              ]),
+              actions: const []),
           Expanded(child: body),
         ]),
       ),
     );
   }
 
-  Widget _emptyRow() => Padding(
-        padding: EdgeInsets.symmetric(
-            horizontal: widget.embedded ? 0 : 14, vertical: 16),
-        child: Row(children: [
-          AppIcon('lock-key', size: 16, color: AppColors.fg4),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text('No secrets stored yet.',
-                style: sans(kMobile ? M.meta : 12, color: AppColors.fg3)),
-          ),
+  Widget _addRow(bool empty) => SettingsRow(
+        label: 'Add secret',
+        sub: empty ? 'No secrets yet' : null,
+        labelWidget: Row(children: [
+          AppIcon('plus', size: kMobile ? 15 : 13, color: AppColors.accent),
+          SizedBox(width: kMobile ? 8 : 7),
+          Text('Add secret',
+              style: sans(kMobile ? 15 : 13, color: AppColors.accent)),
         ]),
+        onTap: _add,
       );
 
-  /// One stored secret.
-  ///
-  /// Fixed height and real touch targets: the old row was nominally 48px with a
-  /// 32px trash, both under the app's 52/44 scale, and the trash had neither a
-  /// tooltip nor a label.
-  Widget _secretRow(String name) {
-    return ListRow(
-      title: name,
-      leading: const IconTile('lock-key'),
-      titleWidget: Text(name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TS.code(AppColors.fg1)),
-      trailing: IconBtn('trash',
-          size: kMobile ? M.minTarget : 32,
-          iconSize: 16,
-          tooltip: 'Remove $name',
-          onTap: () => _remove(name)),
-    );
-  }
-}
-
-/// The add-secret form.
-///
-/// HOST-AGNOSTIC: it reports success and cancellation through callbacks instead
-/// of calling `Navigator.pop` itself. That is what lets the SAME form serve the
-/// phone sheet and the desktop inline card — popping from inside would have
-/// forced a modal on desktop, where the vault already lives inside the Settings
-/// dialog, so a sheet on top read as a dialog on a dialog.
-///
-/// It validates BEFORE reporting success, shows the reason inline, and only
-/// calls [onSaved] once the daemon has accepted the value. An earlier version
-/// popped first and toasted afterwards, so a mistyped entry lost both fields.
-class _AddSecretForm extends StatefulWidget {
-  final DaemonClient client;
-  final ValueChanged<String> onSaved;
-  final VoidCallback onCancel;
-
-  /// Inline (desktop card) tightens the gaps and drops the second helper line,
-  /// which would otherwise double the height of each field in a list row.
-  final bool inline;
-
-  const _AddSecretForm({
-    required this.client,
-    required this.onSaved,
-    required this.onCancel,
-    this.inline = false,
-  });
-
-  @override
-  State<_AddSecretForm> createState() => _AddSecretFormState();
-}
-
-class _AddSecretFormState extends State<_AddSecretForm> {
-  final _name = TextEditingController();
-  final _value = TextEditingController();
-  String? _error;
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _value.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (_busy) return;
-    final n = _name.text.trim().toUpperCase();
-    final v = _value.text;
-    if (n.isEmpty) {
-      setState(() => _error = 'Give the secret a name.');
-      return;
-    }
-    if (v.trim().isEmpty) {
-      setState(() => _error = 'Give the secret a value.');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await widget.client.vaultSet(n, v);
-      if (mounted) widget.onSaved(n);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = '$e';
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final gap = widget.inline ? 10.0 : 14.0;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppField(
+  List<Widget> _form() => [
+        SettingsRow(
           label: 'Name',
-          controller: _name,
-          mono: true,
-          autofocus: true,
-          hint: 'STRIPE_KEY',
-          helper: widget.inline
-              ? null
-              : 'Upper-case letters, digits and underscores.',
-          onSubmitted: (_) => _save(),
+          trailing: SettingsField(
+              controller: _name, hint: 'STRIPE_KEY', mono: true, width: 260),
         ),
-        SizedBox(height: gap),
-        AppField(
+        SettingsRow(
           label: 'Value',
-          controller: _value,
-          mono: true,
-          obscure: true,
-          hint: 'sk_live_…',
-          helper: widget.inline
-              ? null
-              : 'Stored on the daemon. It cannot be read back after saving.',
-          onSubmitted: (_) => _save(),
+          trailing: SettingsField(
+              controller: _value,
+              hint: 'sk_live_…',
+              mono: true,
+              obscure: true,
+              width: 260),
         ),
-        if (_error != null) ...[
-          const SizedBox(height: 12),
-          Row(children: [
-            AppIcon('alert-triangle', size: 13, color: AppColors.danger),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(_error!,
-                  style: sans(11, height: 1.4, color: AppColors.danger)),
-            ),
-          ]),
-        ],
-        SizedBox(height: widget.inline ? 14 : 18),
-        Row(children: [
-          if (!kMobile) ...[
-            Expanded(
-              child: Btn('Cancel',
-                  variant: BtnVariant.ghost,
-                  full: true,
-                  onTap: _busy ? null : widget.onCancel),
-            ),
+        SettingsRow(
+          label: _formError ?? '',
+          labelWidget: Text(_formError ?? '',
+              style: sans(kMobile ? 13 : 12, color: AppColors.danger)),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            SettingsPill('Cancel', onTap: _busy ? null : _cancel),
             const SizedBox(width: 8),
-          ],
-          Expanded(
-            child: Btn(
-              _busy ? 'Saving…' : 'Save',
-              full: true,
-              disabled: _busy,
-              onTap: _save,
-            ),
-          ),
-        ]),
-      ],
-    );
-  }
+            SettingsPill(_busy ? 'Saving…' : 'Save', onTap: _save),
+          ]),
+        ),
+      ];
+
+  Widget _secretRow(String name) => SettingsRow(
+        label: name,
+        labelWidget: Text(name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: mono(kMobile ? 14 : 12.5, color: AppColors.fg1)),
+        trailing: IconBtn('trash',
+            size: kMobile ? 36 : 26,
+            iconSize: kMobile ? 15 : 13,
+            tooltip: 'Remove $name',
+            onTap: () => _remove(name)),
+      );
 }

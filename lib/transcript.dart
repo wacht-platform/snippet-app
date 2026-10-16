@@ -394,95 +394,96 @@ class _ToolRunState extends State<ToolRun> {
 
 extension on _ToolRunState {
   Widget _trace(List<ToolStep> steps) {
-    const cap = 6;
-    final all = widget.open || _showAll || steps.length <= cap;
+    final running = widget.running && steps.any((s) => s.running);
+    final open = running || widget.open;
+    const cap = 5;
+    final all = !running || _showAll || steps.length <= cap;
     final shown = all ? steps : steps.sublist(steps.length - cap);
     Widget row(ToolStep st) {
       final idx = steps.indexOf(st);
-      final canOpen = toolHasDetail(st) || st.running;
+      final canOpen = toolHasDetail(st);
       final expanded = _expanded.contains(idx);
-      final line = _TraceRow(
-        step: st,
-        expanded: expanded,
-        onTap: canOpen
-            ? () => _set(() =>
-                expanded ? _expanded.remove(idx) : _expanded.add(idx))
-            : null,
-      );
-      if (!expanded) return line;
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        line,
-        Padding(
-          padding: const EdgeInsets.fromLTRB(28, 2, 0, 8),
-          child: Container(
-            constraints: const BoxConstraints(maxHeight: 360),
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface1,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.line),
-            ),
-            child: SingleChildScrollView(
-              child: DefaultTextStyle(
-                style: mono(12, height: 1.45, color: AppColors.fg2),
-                child: safeToolDetailView(context,
-                    tool: st.tool, args: st.args, result: st.result),
-              ),
-            ),
+      return Column(
+        key: ValueKey('step-$idx'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _TraceRow(
+            step: st,
+            expanded: expanded,
+            onTap: canOpen
+                ? () => _set(() =>
+                    expanded ? _expanded.remove(idx) : _expanded.add(idx))
+                : null,
           ),
-        ),
-      ]);
+          AnimatedSize(
+            duration: Motion.fast,
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(26, 2, 0, 8),
+                    child: Container(
+                      constraints: const BoxConstraints(maxHeight: 360),
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface1,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.line),
+                      ),
+                      child: SingleChildScrollView(
+                        child: DefaultTextStyle(
+                          style: mono(12, height: 1.45, color: AppColors.fg2),
+                          child: safeToolDetailView(context,
+                              tool: st.tool, args: st.args, result: st.result),
+                        ),
+                      ),
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      );
     }
 
+    final changes = fileChanges(steps);
+    final add = changes.fold<int>(0, (a, c) => a + c.added);
+    final del = changes.fold<int>(0, (a, c) => a + c.removed);
+    final failures = steps.where((s) => !s.running && s.failed).length;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s6),
-      child: Stack(children: [
-        Positioned(
-          left: 10,
-          top: 14,
-          bottom: 14,
-          child: CustomPaint(
-            size: const Size(2, double.infinity),
-            painter: _DottedLine(AppColors.fg1.withValues(alpha: 0.16)),
+      padding: const EdgeInsets.symmetric(vertical: S.s4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (!running)
+          _TraceHeader(
+            label: activitySummary(steps),
+            open: open,
+            add: changes.isEmpty ? null : add,
+            del: changes.isEmpty ? null : del,
+            failures: failures,
+            onTap: () => widget.onOpenChanged?.call(!widget.open),
           ),
+        AnimatedSize(
+          duration: Motion.fast,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: open
+              ? Padding(
+                  padding: EdgeInsets.only(top: running ? 0 : 2),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (!all)
+                          _TraceMore(
+                            count: steps.length - cap,
+                            onTap: () => _set(() => _showAll = true),
+                          ),
+                        for (final st in shown) row(st),
+                      ]),
+                )
+              : const SizedBox(width: double.infinity),
         ),
-        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (!all)
-            InkWell(
-              borderRadius: BorderRadius.circular(7),
-              onTap: () {
-                _set(() => _showAll = true);
-                widget.onOpenChanged?.call(true);
-              },
-              child: SizedBox(
-                height: 28,
-                child: Row(children: [
-                  const SizedBox(width: 28),
-                  Text('${steps.length - cap} earlier steps',
-                      style: sans(12.5, color: AppColors.fg4)),
-                ]),
-              ),
-            ),
-          for (final st in shown) row(st),
-        ]),
       ]),
     );
   }
-}
-
-class _DottedLine extends CustomPainter {
-  _DottedLine(this.color);
-  final Color color;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final p = Paint()..color = color;
-    for (var y = 0.0; y < size.height; y += 5) {
-      canvas.drawCircle(Offset(1, y), 1, p);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DottedLine old) => old.color != color;
 }
 
 class _ChangedFiles extends StatelessWidget {
@@ -1178,119 +1179,203 @@ class _SystemDivider extends StatelessWidget {
 }
 
 
-class _TraceRow extends StatefulWidget {
+class _Hoverable extends StatefulWidget {
+  const _Hoverable({required this.builder, this.onTap});
+  final Widget Function(bool hover) builder;
+  final VoidCallback? onTap;
+
+  @override
+  State<_Hoverable> createState() => _HoverableState();
+}
+
+class _HoverableState extends State<_Hoverable> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        cursor: widget.onTap == null
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              color: _hover && widget.onTap != null
+                  ? AppColors.fg1.withValues(alpha: 0.04)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: widget.builder(_hover),
+          ),
+        ),
+      );
+}
+
+Widget _diffMeta(int add, int del) => Text.rich(
+      TextSpan(children: [
+        TextSpan(text: '+$add', style: mono(11.5, color: AppColors.ok)),
+        TextSpan(text: ' −$del', style: mono(11.5, color: AppColors.danger)),
+      ]),
+    );
+
+class _TraceHeader extends StatelessWidget {
+  const _TraceHeader({
+    required this.label,
+    required this.open,
+    required this.onTap,
+    this.add,
+    this.del,
+    this.failures = 0,
+  });
+  final String label;
+  final bool open;
+  final VoidCallback onTap;
+  final int? add;
+  final int? del;
+  final int failures;
+
+  @override
+  Widget build(BuildContext context) => _Hoverable(
+        onTap: onTap,
+        builder: (hover) => SizedBox(
+          height: 28,
+          child: Row(children: [
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13,
+                      color: hover || open ? AppColors.fg2 : AppColors.fg3)),
+            ),
+            if (add != null && del != null && add! + del! > 0) ...[
+              const SizedBox(width: 8),
+              _diffMeta(add!, del!),
+            ],
+            if (failures > 0) ...[
+              const SizedBox(width: 8),
+              Text('$failures failed', style: sans(12, color: AppColors.danger)),
+            ],
+            const SizedBox(width: 6),
+            AnimatedRotation(
+              turns: open ? 0.25 : 0,
+              duration: Motion.fast,
+              child: AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+            ),
+            const SizedBox(width: 8),
+          ]),
+        ),
+      );
+}
+
+class _TraceMore extends StatelessWidget {
+  const _TraceMore({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => _Hoverable(
+        onTap: onTap,
+        builder: (_) => SizedBox(
+          height: 26,
+          child: Row(children: [
+            const SizedBox(width: 32),
+            Text('$count earlier ${count == 1 ? 'step' : 'steps'}',
+                style: sans(12.5, color: AppColors.fg4)),
+          ]),
+        ),
+      );
+}
+
+String _stepIcon(ToolStep st) {
+  final t = st.tool;
+  if (t == 'read_file' || t == 'view_file') return 'file-text';
+  if (t.contains('search') || t.contains('grep') || t.contains('glob') ||
+      t.contains('find')) {
+    return t == 'web_search' ? 'globe' : 'search';
+  }
+  if (t.contains('list') || t.contains('dir')) return 'folder';
+  return toolIcon(t);
+}
+
+class _TraceRow extends StatelessWidget {
   const _TraceRow({required this.step, required this.expanded, this.onTap});
   final ToolStep step;
   final bool expanded;
   final VoidCallback? onTap;
 
   @override
-  State<_TraceRow> createState() => _TraceRowState();
-}
-
-class _TraceRowState extends State<_TraceRow> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
-    final st = widget.step;
+    final st = step;
     final ch = fileChanges([st]);
     final add = ch.fold<int>(0, (a, c) => a + c.added);
     final del = ch.fold<int>(0, (a, c) => a + c.removed);
     final failed = !st.running && st.failed;
     final exit = st.result is Map ? (st.result as Map)['exit_code'] : null;
-    final isRun = st.tool == 'bash';
-    var (verb, obj) = toolSentenceParts(st);
-    var objIsLabel = false;
-    if (obj.isEmpty && isRun) {
-      obj = verb;
-      verb = st.running ? 'Running' : 'Ran';
-      objIsLabel = true;
-    }
-    final dot = st.running
-        ? AppColors.accent
-        : failed
-            ? AppColors.danger
-            : ch.isNotEmpty
-                ? AppColors.accent
-                : isRun
-                    ? AppColors.ok.withValues(alpha: 0.8)
-                    : AppColors.fg1.withValues(alpha: 0.22);
-    final String meta = failed
-        ? 'failed'
-        : ch.isNotEmpty
-            ? '+$add −$del'
-            : (exit is num && exit != 0)
-                ? 'exit $exit'
-                : '';
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: widget.onTap == null
-          ? SystemMouseCursors.basic
-          : SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 28,
-          decoration: BoxDecoration(
-            color: _hover && widget.onTap != null
-                ? AppColors.fg1.withValues(alpha: 0.04)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(7),
+    final badExit = exit is num && exit != 0;
+    final (verb, obj) = toolSentenceParts(st);
+    final isCommand = st.tool == 'bash' && obj.isNotEmpty;
+    return _Hoverable(
+      onTap: onTap,
+      builder: (hover) => SizedBox(
+        height: 26,
+        child: Row(children: [
+          SizedBox(
+            width: 26,
+            child: Center(
+              child: st.running
+                  ? const Spinner(size: 11)
+                  : AppIcon(_stepIcon(st),
+                      size: 13,
+                      color: failed ? AppColors.danger : AppColors.fg4),
+            ),
           ),
-          child: Row(children: [
-            SizedBox(
-              width: 22,
-              child: Center(
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: dot,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: readingBg, width: 2),
-                  ),
-                ),
-              ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                    text: verb,
+                    style: sans(13,
+                        color: st.running ? AppColors.fg2 : AppColors.fg3)),
+                if (obj.isNotEmpty) ...[
+                  const TextSpan(text: '  '),
+                  TextSpan(
+                      text: obj,
+                      style: isCommand
+                          ? mono(12, color: AppColors.fg2)
+                          : sans(13, color: AppColors.fg2)),
+                ],
+              ]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 6),
-            SizedBox(
-              width: 62,
-              child: Text(verb,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, color: AppColors.fg2)),
-            ),
-            Expanded(
-              child: Text(obj,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: objIsLabel
-                      ? sans(13, color: AppColors.fg3)
-                      : mono(12, color: AppColors.fg3)),
-            ),
-            if (meta.isNotEmpty) ...[
-              const SizedBox(width: 10),
-              Text(meta,
-                  style: failed || (exit is num && exit != 0)
-                      ? sans(12, color: AppColors.danger)
-                      : mono(11.5, color: AppColors.fg4)),
-            ],
-            SizedBox(
-              width: 22,
-              child: widget.onTap != null && (_hover || widget.expanded)
-                  ? Center(
-                      child: AppIcon(
-                          widget.expanded ? 'chevron-down' : 'chevron-right',
-                          size: 12,
-                          color: AppColors.fg4))
-                  : null,
-            ),
-          ]),
-        ),
+          ),
+          if (ch.isNotEmpty && add + del > 0) ...[
+            const SizedBox(width: 10),
+            _diffMeta(add, del),
+          ] else if (failed || badExit) ...[
+            const SizedBox(width: 10),
+            Text(badExit ? 'exit $exit' : 'failed',
+                style: sans(12, color: AppColors.danger)),
+          ],
+          SizedBox(
+            width: 24,
+            child: onTap != null && (hover || expanded)
+                ? Center(
+                    child: AnimatedRotation(
+                      turns: expanded ? 0.25 : 0,
+                      duration: Motion.fast,
+                      child: AppIcon('chevron-right',
+                          size: 12, color: AppColors.fg4),
+                    ),
+                  )
+                : null,
+          ),
+        ]),
       ),
     );
   }
