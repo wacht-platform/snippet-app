@@ -110,7 +110,7 @@ void main() {
         expect(find.text('Hidden inbox'), findsNothing);
         final group = find.byKey(const ValueKey('agent-card-ada'));
         expect(tester.getTopLeft(group).dx, M.gutter);
-        expect(tester.getSize(group).width, width - 2 * M.gutter);
+        expect(tester.getSize(group).width, (width - 2 * M.gutter - 10) / 2);
         await expectGolden(tester, find.byType(Scaffold).first,
             'goldens/mobile_agents_${width.toInt()}.png');
 
