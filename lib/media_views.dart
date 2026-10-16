@@ -269,24 +269,23 @@ class ImageGallery extends StatelessWidget {
     }
     final gap = kMobile ? 4.0 : 6.0;
     final columns = paths.length == 2 || paths.length == 4 ? 2 : 3;
-    final cap = kMobile ? 240.0 : 280.0;
-    final side = ((maxWidth.clamp(0, cap) - gap * (columns - 1)) / columns)
-        .floorToDouble();
-    return SizedBox(
-      width: side * columns + gap * (columns - 1),
-      child: Wrap(
-        spacing: gap,
-        runSpacing: gap,
-        children: [
-          for (final path in paths)
-            ImageThumb(
-                client: client,
-                path: path,
-                width: side,
-                height: side,
-                gallery: paths),
-        ],
-      ),
+    final cap = kMobile ? 260.0 : 420.0;
+    final itemMaxW =
+        ((maxWidth.clamp(220.0, cap) - gap * (columns - 1)) / columns)
+            .floorToDouble();
+    return Wrap(
+      spacing: gap,
+      runSpacing: gap,
+      children: [
+        for (final path in paths)
+          SingleImage(
+            client: client,
+            path: path,
+            maxWidth: itemMaxW,
+            maxHeight: kMobile ? 220.0 : 280.0,
+            gallery: paths,
+          ),
+      ],
     );
   }
 }
@@ -298,14 +297,24 @@ class ImageGallery extends StatelessWidget {
 class SingleImage extends StatefulWidget {
   final DaemonClient client;
   final String path;
-  const SingleImage({super.key, required this.client, required this.path});
+  final double? maxWidth;
+  final double? maxHeight;
+  final List<String>? gallery;
+  const SingleImage({
+    super.key,
+    required this.client,
+    required this.path,
+    this.maxWidth,
+    this.maxHeight,
+    this.gallery,
+  });
 
   @override
   State<SingleImage> createState() => _SingleImageState();
 }
 
 class _SingleImageState extends State<SingleImage> {
-  static double get _maxHeight => kMobile ? 240.0 : 320.0;
+  double get _maxHeight => widget.maxHeight ?? (kMobile ? 240.0 : 320.0);
   static const _minSide = 72.0;
 
   ImageStream? _stream;
@@ -327,8 +336,10 @@ class _SingleImageState extends State<SingleImage> {
     }
   }
 
-  double get _maxWidth => (MediaQuery.sizeOf(context).width - 32)
-      .clamp(160.0, kMobile ? 240.0 : 420.0);
+  double get _maxWidth =>
+      widget.maxWidth ??
+      (MediaQuery.sizeOf(context).width - 32)
+          .clamp(160.0, kMobile ? 240.0 : 420.0);
 
   // The same decode the thumb shows, so the image is fetched once.
   int get _cacheWidth =>
@@ -383,7 +394,9 @@ class _SingleImageState extends State<SingleImage> {
           path: widget.path,
           width: w,
           height: h,
-          cacheWidth: _cacheWidth),
+          fit: BoxFit.contain,
+          cacheWidth: _cacheWidth,
+          gallery: widget.gallery),
     );
   }
 }

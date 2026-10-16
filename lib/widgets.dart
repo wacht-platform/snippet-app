@@ -1573,7 +1573,8 @@ class HeaderAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => kMobile
-      ? RoundBtn(icon: icon, tooltip: label, onTap: onTap)
+      ? RoundBtn(
+          icon: icon, size: 34, iconSize: 15, tooltip: label, onTap: onTap)
       : Btn(label,
           icon: icon, small: true, variant: BtnVariant.secondary, onTap: onTap);
 }

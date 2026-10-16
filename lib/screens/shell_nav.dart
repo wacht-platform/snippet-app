@@ -285,13 +285,13 @@ class MobileBackLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 44,
+        height: 38,
         child: Row(children: [
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onBack,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+              padding: const EdgeInsets.fromLTRB(8, 4, 12, 4),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 AppIcon('chevron-left', size: 20, color: AppColors.accent),
                 Text(label, style: sans(16, color: AppColors.accent)),
@@ -300,7 +300,7 @@ class MobileBackLink extends StatelessWidget {
           ),
           const Spacer(),
           ...trailing,
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
         ]),
       );
 }
@@ -328,13 +328,14 @@ class NavBackRow extends StatelessWidget {
         children: [
           MobileBackLink(onBack: onBack, label: backLabel, trailing: trailing),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
             child: Text(title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: sans(30,
+                style: sans(22,
                     weight: FontWeight.w500,
-                    spacing: -0.6,
+                    height: 1.15,
+                    spacing: -0.4,
                     color: AppColors.fg1)),
           ),
         ],

@@ -184,6 +184,7 @@ class SidebarState extends State<Sidebar> {
 
   Widget _meterRow(String provider, RateWindow r) {
     final used = r.usedPercent.clamp(0, 100) / 100;
+    final lit = used <= 0 ? 0 : (used * 10).round().clamp(1, 10);
     final color = r.leftPercent < 20
         ? AppColors.danger
         : switch (_providerName(provider)) {
@@ -193,6 +194,7 @@ class SidebarState extends State<Sidebar> {
             _ => AppColors.accent,
           };
     final reset = rateResetLabel(r.resetsAt);
+    final shortReset = _shortResetToken(r.resetsAt);
     return Tooltip(
       message: '${r.usedPercent.round()}% used${reset == null ? '' : ' · $reset'}',
       child: Padding(
@@ -212,12 +214,22 @@ class SidebarState extends State<Sidebar> {
               margin: const EdgeInsets.only(right: 3),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: i < (used * 10).round() ? color : AppColors.line,
+                color: i < lit ? color : AppColors.line,
               ),
             ),
           const Spacer(),
-          Text('${r.usedPercent.round()}%${_shortReset(r.resetsAt)}',
+          Text('${r.usedPercent.round()}%',
+              textAlign: TextAlign.right,
               style: mono(10.5, color: AppColors.fg4)),
+          if (shortReset.isNotEmpty) ...[
+            Text(' · ', style: mono(10.5, color: AppColors.fg4)),
+            SizedBox(
+              width: 22,
+              child: Text(shortReset,
+                  textAlign: TextAlign.right,
+                  style: mono(10.5, color: AppColors.fg4)),
+            ),
+          ],
         ]),
       ),
     );
@@ -236,14 +248,14 @@ class SidebarState extends State<Sidebar> {
     return p.isEmpty ? p : p[0].toUpperCase() + p.substring(1);
   }
 
-  String _shortReset(int at) {
+  String _shortResetToken(int at) {
     if (at <= 0) return '';
     final d = DateTime.fromMillisecondsSinceEpoch(at * 1000)
         .difference(DateTime.now());
     if (d.isNegative) return '';
-    if (d.inDays > 0) return ' · ${d.inDays}d';
-    if (d.inHours > 0) return ' · ${d.inHours}h';
-    return ' · ${d.inMinutes}m';
+    if (d.inDays > 0) return '${d.inDays}d';
+    if (d.inHours > 0) return '${d.inHours}h';
+    return '${d.inMinutes}m';
   }
 
   Future<void> _loadProviders() async {
