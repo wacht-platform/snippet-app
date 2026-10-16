@@ -129,13 +129,6 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     );
   }
 
-  bool get _readoutShowing {
-    final t = _activeTab;
-    if (t == null || t.sessionId == null || t.isMissionControl) return false;
-    final k = _activeKey[_Pane.right];
-    return _rightTabs.any((r) => r.pane == _Pane.right && r.key == k);
-  }
-
   bool _isAuxiliary(_ShellTab t) =>
       t.isTerminal || t.isFile || t.isDiff || t.isBoard;
 
@@ -273,7 +266,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
                 onSelect: (s) => _setState(() => _section = s),
                 hidden: _hiddenSections,
               ),
-        paneWidth: _readoutShowing && _paneWidth < 380 ? 380 : _paneWidth,
+        paneWidth: _paneWidth,
         leftCollapsed: _leftCollapsed,
         rightCollapsed: _rightCollapsed,
         leftTabs: _tabsIn(_Pane.left),

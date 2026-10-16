@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../platform.dart';
 import '../menu_widgets.dart';
-import '../tool_activity.dart' show fileChanges;
-import 'file_changes.dart' show sessionChangeSteps;
 import '../theme.dart';
 import 'shell_components.dart';
 import 'shell_models.dart';
@@ -87,7 +84,6 @@ List<Widget> buildShellRailTools({
       );
 
   final events = s?.events ?? const <Map<String, dynamic>>[];
-  final changes = fileChanges(sessionChangeSteps(events)).length;
   final artifacts = events.where((e) => e['kind'] == 'file_presented').length;
   final win = s?.contextWindow ?? 0;
   final used = s?.lastPromptTokens ?? 0;
@@ -201,8 +197,7 @@ List<Widget> buildShellRailTools({
           item('sparkles', 'Change model', () => onSessionAction('model')),
           item('git-fork', 'Fork from here', () => onSessionAction('fork')),
           const PopupMenuDivider(),
-          item('file-diff', 'File changes', () => onSessionAction('file_changes'),
-              detail: changes > 0 ? '$changes' : null),
+          item('file-diff', 'File changes', () => onSessionAction('file_changes')),
           item('clipboard', 'Artifacts', () => onSessionAction('artifacts'),
               detail: artifacts > 0 ? '$artifacts' : null),
           item('book-marked', 'Memory', () => onSessionAction('memory')),

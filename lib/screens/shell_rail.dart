@@ -5,7 +5,7 @@ import '../widgets.dart';
 
 /// Width of the sidebar column. The nested navigation strip centres its icons
 /// over this column, and the panel below uses it exactly.
-const double kSidebarWidth = 256;
+const double kSidebarWidth = 272;
 
 /// The sidebar work areas. The strip selects which panel the sidebar
 /// shows; it never changes the conversation in the main pane.
