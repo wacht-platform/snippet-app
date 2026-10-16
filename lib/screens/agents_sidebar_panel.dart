@@ -380,29 +380,35 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
           children: [
             if (mcCard != null) mcCard,
             if (ordered.isNotEmpty)
-              GridView.builder(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 1.05,
-                ),
-                itemCount: ordered.length,
-                itemBuilder: (context, i) => Appear(
-                  key: ValueKey('appear-agent-${ordered[i].id}'),
-                  index: i,
-                  since: _shownAt,
-                  child: AgentCard(
-                    key: ValueKey('agent-card-${ordered[i].id}'),
-                    client: widget.client,
-                    agent: ordered[i],
-                    onOpen: () => widget.onOpenAgent?.call(ordered[i]),
-                    onDelete: () => _deleteAgent(ordered[i]),
-                  ),
-                ),
+              LayoutBuilder(
+                builder: (context, c) {
+                  final tileW = (c.maxWidth - 10) / 2;
+                  final tileH = (tileW / 1.05).clamp(118.0, 200.0);
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      mainAxisExtent: tileH,
+                    ),
+                    itemCount: ordered.length,
+                    itemBuilder: (context, i) => Appear(
+                      key: ValueKey('appear-agent-${ordered[i].id}'),
+                      index: i,
+                      since: _shownAt,
+                      child: AgentCard(
+                        key: ValueKey('agent-card-${ordered[i].id}'),
+                        client: widget.client,
+                        agent: ordered[i],
+                        onOpen: () => widget.onOpenAgent?.call(ordered[i]),
+                        onDelete: () => _deleteAgent(ordered[i]),
+                      ),
+                    ),
+                  );
+                },
               ),
             if (emptyState != null) emptyState,
           ],
