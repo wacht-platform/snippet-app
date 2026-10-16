@@ -9,7 +9,8 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'file_tree_sidebar_panel.dart' show fileTint, deskFileIcon;
+import '../file_icons.dart';
+import '../mochi.dart';
 import 'git.dart';
 import 'pull_request_detail.dart' show PrSidebarList;
 import 'shell_nav.dart';
@@ -319,6 +320,67 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     }
   }
 
+  Future<void> _discard() async {
+    final sid = widget.sessionId;
+    if (sid == null) return;
+    final ok = await confirmAction(context,
+        title: 'Discard all changes?',
+        body:
+            'Every uncommitted change in this workspace is deleted, including new files. This cannot be undone.',
+        confirmLabel: 'Discard');
+    if (!ok) return;
+    try {
+      await widget.client.gitDiscard(sid);
+      await refresh(background: true);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
+  bool _opening = false;
+
+  Future<void> _openPr() async {
+    final sid = widget.sessionId;
+    if (sid == null || _opening) return;
+    setState(() => _opening = true);
+    try {
+      final url = await widget.client.createPr(sid);
+      if (mounted) toast(context, url.isEmpty ? 'Pull request opened' : 'Opened $url');
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  void _draftMessage() {
+    final files = _status?.files ?? const <GitFile>[];
+    if (files.isEmpty) return;
+    String kind(GitFile f) {
+      final raw = (f.staged ? f.x : (f.untracked ? '?' : f.y)).trim();
+      return raw == '?' || raw == 'A' ? 'Add' : raw == 'D' ? 'Remove' : 'Update';
+    }
+    final groups = <String, List<String>>{};
+    for (final f in files) {
+      groups.putIfAbsent(kind(f), () => []).add(f.path.split('/').last);
+    }
+    String part(String verb, List<String> names, bool first) {
+      final v = first ? verb : verb.toLowerCase();
+      if (names.length == 1) return '$v ${names.first}';
+      if (names.length == 2) return '$v ${names[0]} and ${names[1]}';
+      return '$v ${names[0]}, ${names[1]} and ${names.length - 2} more';
+    }
+    final parts = <String>[];
+    for (final verb in ['Update', 'Add', 'Remove']) {
+      final n = groups[verb];
+      if (n != null) parts.add(part(verb, n, parts.isEmpty));
+    }
+    _commitCtl.text = parts.join('; ');
+    _commitCtl.selection =
+        TextSelection.collapsed(offset: _commitCtl.text.length);
+    setState(() {});
+  }
+
   Widget _changedHeader() => Padding(
         padding: const EdgeInsets.fromLTRB(18, 18, 14, 6),
         child: Row(children: [
@@ -326,16 +388,28 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             child: Text('CHANGED',
                 style: sans(11, spacing: 0.9, color: AppColors.fg4)),
           ),
-          if ((widget.sessionId ?? '').isNotEmpty)
+          if ((widget.sessionId ?? '').isNotEmpty) ...[
             InkWell(
               onTap: _stash,
               borderRadius: BorderRadius.circular(6),
               hoverColor: Colors.transparent,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                child: Text('Stash all', style: sans(12, color: AppColors.fg3)),
+                child: Text('Stash', style: sans(12, color: AppColors.fg3)),
               ),
             ),
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: _discard,
+              borderRadius: BorderRadius.circular(6),
+              hoverColor: Colors.transparent,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Text('Discard all',
+                    style: sans(12, color: AppColors.fg3)),
+              ),
+            ),
+          ],
         ]),
       );
 
@@ -406,12 +480,29 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text('⌘↵ to commit', style: sans(11.5, color: AppColors.fg4)),
+                  Row(children: [
+                    Expanded(
+                      child: Text('⌘↵ to commit',
+                          style: sans(11.5, color: AppColors.fg4)),
+                    ),
+                    if (!kMobile)
+                      Tooltip(
+                        message: 'Write message for me',
+                        child: InkWell(
+                          onTap: _draftMessage,
+                          borderRadius: BorderRadius.circular(7),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: MochiIcon(color: AppColors.accent, size: 16),
+                          ),
+                        ),
+                      ),
+                  ]),
                 ]),
           ),
           const SizedBox(height: 10),
           if (!kMobile)
-            Row(children: [
+            LayoutBuilder(builder: (context, box) => Row(children: [
               Expanded(
                 child: _deskPill(
                     _committing
@@ -422,12 +513,43 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                     onTap: _commit),
               ),
               const SizedBox(width: 8),
-              _deskPill(_pushing ? 'Pushing…' : 'Push',
-                  light: false,
-                  icon: 'upload',
-                  disabled: _pushing,
-                  onTap: _push),
-            ])
+              Tooltip(
+                message: _pushing ? 'Pushing…' : 'Push',
+                child: Opacity(
+                  opacity: _pushing ? 0.45 : 1,
+                  child: Material(
+                    color: AppColors.surface2,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: _pushing ? null : _push,
+                      child: SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: Center(
+                            child: AppIcon('upload',
+                                size: 14, color: AppColors.fg2)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              box.maxWidth < 300
+                  ? Tooltip(
+                      message: 'Open PR',
+                      child: _deskPill('',
+                          light: false,
+                          icon: 'pull-request',
+                          disabled: _opening,
+                          onTap: _openPr),
+                    )
+                  : _deskPill(_opening ? 'Opening…' : 'Open PR',
+                      light: false,
+                      icon: 'pull-request',
+                      disabled: _opening,
+                      onTap: _openPr),
+            ]))
           else
           Row(children: [
             Expanded(
@@ -573,11 +695,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                     _statusLetter(f),
                     const SizedBox(width: 10),
                   ] else ...[
-                    AppIcon(deskFileIcon(name),
-                        size: 14,
-                        color: fileTint(name) == Colors.transparent
-                            ? AppColors.fg4
-                            : fileTint(name)),
+                    FileGlyph(name, size: 14),
                     const SizedBox(width: 9),
                   ],
                   Expanded(

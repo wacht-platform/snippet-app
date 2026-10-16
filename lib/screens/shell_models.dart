@@ -370,7 +370,15 @@ class RightTab {
   }
 
   String get icon => request != null
-      ? 'layers'
+      ? switch (request!.purpose) {
+          ShellPanelPurpose.deliverables => 'image',
+          ShellPanelPurpose.memory => 'book-marked',
+          ShellPanelPurpose.pullRequests => 'pull-request',
+          ShellPanelPurpose.recurring => 'calendar-clock',
+          ShellPanelPurpose.autonomy => 'activity',
+          ShellPanelPurpose.file => 'file',
+          _ => 'layers',
+        }
       : tools != null
           ? 'terminal'
           : (isAgent ? 'agent' : panel.icon);

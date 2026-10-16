@@ -543,6 +543,8 @@ class RightTabBody extends StatelessWidget {
               workspace: state?.workspace,
             ),
       RightPanel.checkpoints => SessionCheckpointsPanel(
+          client: client,
+          sessionId: activeSessionId,
           checkpoints: state?.checkpoints.reversed.toList() ?? const [],
           onRewind: (c) => controls?.performAction('rewind', c.id),
           onFork: (c) => controls?.performAction('fork', c.id),

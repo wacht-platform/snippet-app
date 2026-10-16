@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../file_icons.dart';
 import '../swr.dart';
 import '../desktop_pick.dart';
 import '../models.dart';
@@ -484,10 +485,6 @@ class _FileTreeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Folders and files share ONE tone: measured labels are #C1C1C1 for both
-    // (`Src` is white only because it is the selected row). Tinting directories
-    // brighter invented a hierarchy the reference does not have.
-    final color = AppColors.fg2;
     if (!kMobile) return _desk();
     return Padding(
       padding: EdgeInsets.only(
@@ -528,11 +525,10 @@ class _FileTreeRow extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               if (kMobile)
-                AppIcon(
-                  entry.isDir ? (expanded ? 'folder-open' : 'folder') : 'file',
-                  size: 14,
-                  color: hasError ? AppColors.danger : color,
-                )
+                hasError
+                    ? AppIcon('folder', size: 14, color: AppColors.danger)
+                    : FileGlyph(entry.name,
+                        isDir: entry.isDir, open: expanded, size: 15)
               else
                 Container(
                   width: 6,
@@ -564,28 +560,8 @@ class _FileTreeRow extends StatelessWidget {
   }
 }
 
-String deskFileIcon(String name) {
-  final l = name.toLowerCase();
-  final i = l.lastIndexOf('.');
-  final ext = i < 0 ? '' : l.substring(i + 1);
-  return switch (ext) {
-    'md' || 'txt' || 'rst' => 'file-text',
-    'json' || 'toml' || 'yaml' || 'yml' || 'lock' || 'ini' || 'env' =>
-      'file-json',
-    'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' || 'svg' || 'ico' =>
-      'file-image',
-    'mp4' || 'mov' || 'webm' => 'file-video',
-    'mp3' || 'wav' || 'm4a' => 'file-audio',
-    'zip' || 'tar' || 'gz' || 'apk' || '7z' => 'file-archive',
-    'sh' || 'bash' || 'zsh' || 'fish' => 'file-terminal',
-    '' => 'file',
-    _ => 'file-code',
-  };
-}
-
 extension on _FileTreeRow {
   Widget _desk() {
-    final tint = fileTint(entry.name);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Material(
@@ -610,19 +586,10 @@ extension on _FileTreeRow {
                     : null,
               ),
               const SizedBox(width: 5),
-              AppIcon(
-                entry.isDir
-                    ? (expanded ? 'folder-open' : 'folder')
-                    : deskFileIcon(entry.name),
-                size: 14,
-                color: hasError
-                    ? AppColors.danger
-                    : entry.isDir
-                        ? AppColors.fg3
-                        : tint == Colors.transparent
-                            ? AppColors.fg4
-                            : tint,
-              ),
+              hasError
+                  ? AppIcon('folder', size: 14, color: AppColors.danger)
+                  : FileGlyph(entry.name,
+                      isDir: entry.isDir, open: expanded, size: 14),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(entry.name,
@@ -639,19 +606,7 @@ extension on _FileTreeRow {
   }
 }
 
-Color fileTint(String name) {
-  final i = name.lastIndexOf('.');
-  final ext = i < 0 ? '' : name.substring(i + 1).toLowerCase();
-  return switch (ext) {
-    'rs' || 'swift' || 'kt' || 'java' => const Color(0xFFD97757),
-    'dart' || 'md' || 'go' || 'py' => const Color(0xFF8AB4F8),
-    'ts' || 'tsx' || 'js' || 'jsx' || 'mjs' => const Color(0xFFE9C46A),
-    'toml' || 'json' || 'yaml' || 'yml' || 'lock' => const Color(0xFF9ED8B5),
-    'html' || 'css' || 'scss' || 'svg' => const Color(0xFFD7A6E8),
-    'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' || 'mp4' => const Color(0xFFE5867A),
-    _ => Colors.transparent,
-  };
-}
+Color fileTint(String name) => fileIconFor(name).$2;
 
 // ---------------------------------------------------------------------------
 // File search popover.

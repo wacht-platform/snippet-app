@@ -825,6 +825,51 @@ class DaemonClient {
         '';
   }
 
+  Future<String> createPr(String session, {String? title, String? body}) async {
+    final r = await http.post(_uri('/github/pr/create'),
+        headers: _json,
+        body: jsonEncode({
+          'session': session,
+          if (title != null) 'title': title,
+          if (body != null) 'body': body,
+        }));
+    if (r.statusCode != 200) throw _ghError(r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['url'] as String? ?? '';
+  }
+
+  Future<Map<String, dynamic>> gitDiscard(String session) =>
+      _gitPost('discard', {'session': session});
+
+  Future<Map<String, ({int files, int add, int del})>> checkpointStats(
+      String session, List<String> ids) async {
+    final r = await http.post(_uri('/session/checkpoint-stats'),
+        headers: _json, body: jsonEncode({'session': session, 'ids': ids}));
+    if (r.statusCode != 200) throw _err('checkpoint stats', r);
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    int n(dynamic v) => (v as num?)?.toInt() ?? 0;
+    return {
+      for (final e in j.entries)
+        e.key: (
+          files: n((e.value as Map)['files']),
+          add: n((e.value as Map)['add']),
+          del: n((e.value as Map)['del'])
+        )
+    };
+  }
+
+  Future<void> editMemoryEntry(String key, String matching,
+      {String? entry, String? file}) async {
+    final r = await http.post(_uri('/memory/entry'),
+        headers: _json,
+        body: jsonEncode({
+          'key': key,
+          'matching': matching,
+          if (entry != null) 'entry': entry,
+          if (file != null) 'file': file,
+        }));
+    if (r.statusCode != 200) throw _err('edit memory', r);
+  }
+
   Future<void> commentOnPr(String session, int number, String body) async {
     final r = await http.post(_uri('/github/pr/comment'),
         headers: _json,

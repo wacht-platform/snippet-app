@@ -222,7 +222,7 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: e.file == null && !wide ? null : () => _select(e),
+          onTap: () => _select(e),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -256,7 +256,67 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
     );
   }
 
-  Widget _detailView() {
+  String _match(_Entry e) => e.file != null
+      ? '[[${e.file}]]'
+      : (e.text.length > 80 ? e.text.substring(0, 80) : e.text);
+
+  Future<void> _forget(_Entry e) async {
+    final ok = await confirmAction(context,
+        title: 'Forget this?',
+        body: e.file != null
+            ? 'Removes ${e.file} from the memory index. The file itself stays.'
+            : e.text,
+        confirmLabel: 'Forget');
+    if (!ok) return;
+    try {
+      await widget.client.editMemoryEntry(_scope, _match(e));
+      setState(() => _selected = null);
+      await _load(_scope);
+    } catch (err) {
+      if (mounted) toast(context, '$err', danger: true);
+    }
+  }
+
+  Future<void> _edit(_Entry e) async {
+    final next = await promptText(context,
+        title: 'Edit memory', initial: e.text, minLines: 3, maxLines: 8);
+    if (next == null || next.trim().isEmpty || next.trim() == e.text) return;
+    try {
+      await widget.client.editMemoryEntry(_scope, _match(e),
+          entry: next.trim().replaceAll(RegExp(r'\s*\n\s*'), ' '));
+      setState(() => _selected = null);
+      await _load(_scope);
+    } catch (err) {
+      if (mounted) toast(context, '$err', danger: true);
+    }
+  }
+
+  Widget _action(String label, VoidCallback onTap, {bool danger = false}) =>
+      Padding(
+        padding: const EdgeInsets.only(left: 6),
+        child: Material(
+          color: danger ? Colors.transparent : AppColors.surface2,
+          shape: StadiumBorder(
+              side: BorderSide(
+                  color: danger
+                      ? AppColors.danger.withValues(alpha: 0.3)
+                      : Colors.transparent)),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              alignment: Alignment.center,
+              child: Text(label,
+                  style: sans(12,
+                      color: danger ? AppColors.danger : AppColors.fg2)),
+            ),
+          ),
+        ),
+      );
+
+  Widget _detailView({bool wide = true}) {
     final e = _selected;
     if (e == null) {
       return Center(
@@ -267,7 +327,9 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
     final body = e.file == null ? e.text : _detail;
     return SelectionArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(40, 28, 40, 40),
+        padding: wide
+            ? const EdgeInsets.fromLTRB(40, 28, 40, 40)
+            : const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
           Row(children: [
             Expanded(
@@ -277,6 +339,8 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
             if (_day(e.added).isNotEmpty)
               Text('Added ${_day(e.added)}',
                   style: sans(12, color: AppColors.fg4)),
+            if (e.file == null) _action('Edit', () => _edit(e)),
+            _action('Forget', () => _forget(e), danger: true),
           ]),
           const SizedBox(height: 16),
           if (body == null)
@@ -426,7 +490,7 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
       ]);
       if (!wide) {
         final e = _selected;
-        if (e != null && e.file != null) {
+        if (e != null) {
           return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
@@ -440,7 +504,7 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
                 ),
               ),
             ),
-            Expanded(child: _detailView()),
+            Expanded(child: _detailView(wide: false)),
           ]);
         }
         return list;
