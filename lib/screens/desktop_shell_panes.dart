@@ -12,6 +12,17 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         );
 
   Widget _originTabBody(_ShellTab t, {required bool primary}) {
+    if (t.isReadout) {
+      final origin = t.readoutOrigin;
+      return Container(
+        key: ValueKey('body-${t.key}'),
+        color: AppColors.bg,
+        child: _rightTabBody(
+            t.readout!,
+            origin == null ? null : _macSessionStatuses[origin]?.state,
+            origin == null ? null : _macSessionControls[origin]),
+      );
+    }
     if (t.isDraft) {
       return NewSessionDraft(
         key: ValueKey('body-${t.key}-${t.draftFolder}'),
@@ -118,8 +129,15 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     );
   }
 
+  bool get _readoutShowing {
+    final t = _activeTab;
+    if (t == null || t.sessionId == null || t.isMissionControl) return false;
+    final k = _activeKey[_Pane.right];
+    return _rightTabs.any((r) => r.pane == _Pane.right && r.key == k);
+  }
+
   bool _isAuxiliary(_ShellTab t) =>
-      t.isTerminal || t.isFile || t.isDiff || t.isBoard || t.isPrs;
+      t.isTerminal || t.isFile || t.isDiff || t.isBoard;
 
   List<_ShellTab> get _mainTabs => [
         for (final t in _tabs)
@@ -255,7 +273,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
                 onSelect: (s) => _setState(() => _section = s),
                 hidden: _hiddenSections,
               ),
-        paneWidth: _paneWidth,
+        paneWidth: _readoutShowing && _paneWidth < 380 ? 380 : _paneWidth,
         leftCollapsed: _leftCollapsed,
         rightCollapsed: _rightCollapsed,
         leftTabs: _tabsIn(_Pane.left),
@@ -274,7 +292,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         },
         fallbackBuilder: _paneFallback,
         rightPanel: _sessionSidePanel(),
-        hideRight: _activeTab?.isDraft == true,
+        hideRight: _activeTab != null &&
+            (_activeTab!.isDraft || _activeTab!.isReadout || _activeTab!.isPrs),
         panelHostsReadouts: _activeTab != null &&
             !_activeTab!.isMissionControl &&
             _activeTab!.sessionId != null,
@@ -345,6 +364,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       onSelectReadout: (r) => _setState(() => _activeKey[_Pane.right] = r.key),
       onCloseReadout: (r) => _closeRightTab(r.key),
       onClearReadout: () => _setState(() => _activeKey.remove(_Pane.right)),
+      onExpandReadout: _openReadoutTab,
     );
   }
 

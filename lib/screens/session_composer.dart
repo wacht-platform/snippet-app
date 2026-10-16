@@ -860,11 +860,17 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           constraints: const BoxConstraints(minHeight: 40),
           padding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
           decoration: BoxDecoration(
-            color: AppColors.raised,
+            color: AppColors.surface1,
             borderRadius: BorderRadius.circular(16),
             border: _draggingFiles
                 ? Border.all(color: AppColors.accent, width: 1.5)
-                : Border.all(color: AppColors.border),
+                : Border.all(color: AppColors.line),
+            boxShadow: [
+              BoxShadow(
+                  color: AppColors.bg.withValues(alpha: 0.9),
+                  blurRadius: 40,
+                  offset: const Offset(0, -18)),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -890,7 +896,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                       border: InputBorder.none,
                       hintText: _isMissionControl
                           ? 'Reply to Snippet'
-                          : 'Reply to Snippet, or @ an agent',
+                          : kMobile
+                              ? 'Reply to Snippet, or @ an agent'
+                              : 'Reply, or @ to bring in an agent',
                       hintStyle: TS.body(AppColors.fg4),
                     ),
                   ),
@@ -927,11 +935,18 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                     ],
                     Text(_modelLabel ?? 'Auto',
                         style: sans(12.5, color: AppColors.fg2)),
+                    if ((_modelEffort ?? '').isNotEmpty) ...[
+                      const SizedBox(width: 5),
+                      Text(
+                          _modelEffort![0].toUpperCase() +
+                              _modelEffort!.substring(1),
+                          style: sans(12.5, color: AppColors.fg4)),
+                    ],
                   ]),
                   () => _switchModel(ctx),
                   tip: 'Model'),
             ),
-            if (left != null)
+            if (left != null && kMobile)
               Tooltip(
                 message: folder.isEmpty
                     ? '$left% context left'

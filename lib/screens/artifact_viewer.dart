@@ -12,6 +12,7 @@ import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'artifact_grid.dart';
 import 'file_viewer.dart';
 import 'presented_file_card.dart';
 
@@ -1544,6 +1545,14 @@ class _SessionDeliverablesState extends State<SessionDeliverables> {
                             icon: 'layers',
                             title: 'Nothing shared yet',
                             body: 'Artifacts and files the agent hands over in this chat collect here.',
+                          )
+                        : !kMobile
+                        ? ArtifactGrid(
+                            client: widget.client,
+                            session: widget.session,
+                            artifacts: artifacts,
+                            files: files,
+                            onOpenFileTab: widget.onOpenFileTab,
                           )
                         : ListView(
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),

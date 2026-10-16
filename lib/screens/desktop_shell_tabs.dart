@@ -19,7 +19,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
       if (!mounted) return;
       _store.saveOpenTabs(
         _tabs
-            .where((t) => !t.isPrs && !t.isDraft)
+            .where((t) => !t.isPrs && !t.isDraft && !t.isReadout)
             .map((t) => OpenTabDescriptor(
                   instanceUrl: t.instanceUrl,
                   sessionId: t.sessionId,
@@ -299,7 +299,8 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     );
   }
 
-  bool _canCloseTab(_ShellTab t) => _isAuxiliary(t) && !t.isTerminal;
+  bool _canCloseTab(_ShellTab t) =>
+      (_isAuxiliary(t) && !t.isTerminal) || t.isPrs || t.isDraft || t.isReadout;
 
   bool _canCloseTopTab(_ShellTab t) => !t.isMissionControl;
 
@@ -439,30 +440,47 @@ extension _DesktopShellTabsExt on _DesktopShellState {
   void _openPrsTab(GithubStatus status) {
     final root = _activeTab;
     if (root == null || root.sessionId == null) return;
-    final pane = _Pane.left;
-    final group = _activeGroupKeyFor(pane) ?? root.key;
     final existing =
         _tabs.indexWhere((t) => t.isPrs && t.instanceUrl == root.instanceUrl);
+    _openMainTab(existing >= 0
+        ? null
+        : _ShellTab.prs(
+            client: root.client,
+            instanceUrl: root.instanceUrl,
+            session: root.sessionId!,
+            github: status,
+          ), existing);
+  }
+
+  void _openMainTab(_ShellTab? tab, int existing) {
     _setState(() {
       if (existing >= 0) {
-        final t = _tabs[existing];
-        t
-          ..pane = pane
-          ..groupSessionKey = group;
-        _dockAux(pane, t.key);
+        _activeIndex = existing;
       } else {
-        _tabs.add(_ShellTab.prs(
-          client: root.client,
-          instanceUrl: root.instanceUrl,
-          session: root.sessionId!,
-          github: status,
-          pane: pane,
-          groupSessionKey: group,
-        ));
-        _dockAux(pane, _tabs.last.key);
+        _tabs.add(tab!..pane = _Pane.left);
+        _activeIndex = _tabs.length - 1;
       }
+      final t = _tabs[_activeIndex];
+      _activePane = _Pane.left;
+      _groupRootKey[_Pane.left] = t.key;
+      _activeKey[_Pane.left] = t.key;
     });
     _syncPage();
+  }
+
+  void _openReadoutTab(_RightTab r) {
+    final root = _activeTab;
+    final c = _client;
+    final url = _active?.url;
+    if (c == null || url == null) return;
+    final probe = _ShellTab.readoutTab(
+        client: c, instanceUrl: url, tab: r, origin: root?.key);
+    final existing = _tabs.indexWhere((t) => t.key == probe.key);
+    _setState(() {
+      _rightTabs.removeWhere((x) => x.key == r.key);
+      _activeKey.removeWhere((_, k) => k == r.key);
+    });
+    _openMainTab(existing >= 0 ? null : probe, existing);
   }
 
   void _openFileTab(DaemonClient client, String url, String path, String name) {

@@ -25,7 +25,10 @@ class SessionSidePanel extends StatefulWidget {
     this.onSelectReadout,
     this.onCloseReadout,
     this.onClearReadout,
+    this.onExpandReadout,
   });
+
+  final ValueChanged<RightTab>? onExpandReadout;
 
   final List<RightTab> readouts;
   final String? activeReadout;
@@ -114,7 +117,7 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
             borderRadius: BorderRadius.circular(8),
             onTap: tap,
             child: Padding(
-              padding: EdgeInsets.fromLTRB(10, 6, onClose == null ? 10 : 4, 6),
+              padding: EdgeInsets.fromLTRB(9, 6, onClose == null ? 9 : 4, 6),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Text(label,
                     style:
@@ -187,8 +190,16 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
                     Container(
                       height: 46,
                       padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
-                      alignment: Alignment.centerLeft,
-                      child: _segs(),
+                      child: Row(children: [
+                        Expanded(child: _segs()),
+                        if (widget.onExpandReadout != null)
+                          IconBtn('maximize-2',
+                              size: 28,
+                              iconSize: 14,
+                              tooltip: 'Open as tab',
+                              onTap: () =>
+                                  widget.onExpandReadout!(_readout!)),
+                      ]),
                     ),
                     Expanded(
                       child: KeyedSubtree(
