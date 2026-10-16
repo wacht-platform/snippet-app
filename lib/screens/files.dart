@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
 import '../api.dart';
+import '../file_icons.dart';
 import '../desktop_pick.dart';
 import '../file_actions.dart';
 import '../highlight.dart';
@@ -607,6 +608,7 @@ class _FileExplorerState extends State<FileExplorer> {
                 style: TS.ui(AppColors.fg3)),
           ),
         ...entries.map((e) => _Row(
+              isDir: e.isDir,
               icon: kMobile
                   ? _mobileIcon(_entryIcon(e.name, e.isDir), e.name)
                   : _entryIcon(e.name, e.isDir),
@@ -795,9 +797,11 @@ class _FileExplorerState extends State<FileExplorer> {
 class _Row extends StatelessWidget {
   final String icon, name;
   final bool git, muted, chevron, selecting, selected;
+  final bool? isDir;
   final VoidCallback? onTap, onLongPress;
   const _Row({
     required this.icon,
+    this.isDir,
     required this.name,
     this.git = false,
     this.muted = false,
@@ -839,9 +843,12 @@ class _Row extends StatelessWidget {
               ],
               // A plain glyph, as on desktop: the filled tiles made every row
               // a card and halved how many fit on a phone screen.
-              AppIcon(icon,
-                  size: kMobile ? 19 : 16,
-                  color: isFolder && kMobile ? AppColors.accent : iconColor),
+              if (isDir != null && (!kMobile || !isDir!))
+                FileGlyph(name, isDir: isDir!, size: kMobile ? 19 : 16)
+              else
+                AppIcon(icon,
+                    size: kMobile ? 19 : 16,
+                    color: isFolder && kMobile ? AppColors.accent : iconColor),
               SizedBox(width: kMobile ? S.s12 : 10),
               Expanded(
                   child: kMobile && !isFolder && !muted

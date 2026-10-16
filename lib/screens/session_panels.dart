@@ -69,7 +69,12 @@ class SessionCheckpointsPanel extends StatelessWidget {
     required this.checkpoints,
     required this.onRewind,
     required this.onFork,
+    this.client,
+    this.sessionId,
   });
+
+  final DaemonClient? client;
+  final String? sessionId;
 
   final List<Checkpoint> checkpoints;
   final void Function(Checkpoint) onRewind;
@@ -85,7 +90,11 @@ class SessionCheckpointsPanel extends StatelessWidget {
     }
     if (!kMobile) {
       return _CheckpointTimeline(
-          checkpoints: checkpoints, onRewind: onRewind, onFork: onFork);
+          checkpoints: checkpoints,
+          onRewind: onRewind,
+          onFork: onFork,
+          client: client,
+          sessionId: sessionId);
     }
     final dense = !kMobile;
     return ListView(
@@ -176,7 +185,13 @@ Widget _paneLabel(String text, {Widget? trailing}) => Padding(
 
 class _CheckpointTimeline extends StatefulWidget {
   const _CheckpointTimeline(
-      {required this.checkpoints, required this.onRewind, required this.onFork});
+      {required this.checkpoints,
+      required this.onRewind,
+      required this.onFork,
+      this.client,
+      this.sessionId});
+  final DaemonClient? client;
+  final String? sessionId;
   final List<Checkpoint> checkpoints;
   final void Function(Checkpoint) onRewind;
   final void Function(Checkpoint) onFork;
@@ -188,6 +203,45 @@ class _CheckpointTimeline extends StatefulWidget {
 class _CheckpointTimelineState extends State<_CheckpointTimeline> {
   String? _hover;
   String? _picked;
+  Map<String, ({int files, int add, int del})> _stats = const {};
+  String _statsFor = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  @override
+  void didUpdateWidget(_CheckpointTimeline old) {
+    super.didUpdateWidget(old);
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    final c = widget.client;
+    final sid = widget.sessionId;
+    if (c == null || sid == null) return;
+    final ids = [for (final cp in widget.checkpoints.reversed) cp.id];
+    final sig = ids.join(',');
+    if (sig == _statsFor || ids.isEmpty) return;
+    _statsFor = sig;
+    try {
+      final s = await c.checkpointStats(sid, ids);
+      if (mounted) setState(() => _stats = s);
+    } catch (_) {}
+  }
+
+  String _stat(String id) {
+    final s = _stats[id];
+    if (s == null) return '';
+    if (s.files == 0) return 'no changes';
+    final parts = [
+      if (s.add > 0) '+${s.add}',
+      if (s.del > 0) '−${s.del}',
+    ];
+    return '${parts.join(' ')}${parts.isEmpty ? '' : ' · '}${s.files} file${s.files == 1 ? '' : 's'}';
+  }
 
   Widget _pill(String label, VoidCallback onTap, {bool filled = false}) =>
       Padding(
@@ -278,8 +332,13 @@ class _CheckpointTimelineState extends State<_CheckpointTimeline> {
                       height: 1.45,
                       color: open || latest ? AppColors.fg1 : AppColors.fg2)),
               const SizedBox(height: 4),
-              Text(formatCheckpointDate(c.createdAt),
-                  style: sans(11, color: AppColors.fg4)),
+              Row(children: [
+                Expanded(
+                  child: Text(formatCheckpointDate(c.createdAt),
+                      style: sans(11, color: AppColors.fg4)),
+                ),
+                Text(_stat(c.id), style: mono(10.5, color: AppColors.fg3)),
+              ]),
               if (open) ...[
                 const SizedBox(height: 8),
                 Row(children: [

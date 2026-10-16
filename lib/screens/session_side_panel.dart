@@ -99,9 +99,27 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
           setState(() => _changes = true);
         }),
         for (final r in widget.readouts)
-          _seg(_short(r.label), r.key == widget.activeReadout,
-              () => widget.onSelectReadout?.call(r),
-              onClose: () => widget.onCloseReadout?.call(r)),
+          widget.readouts.length > 2 && r.key != widget.activeReadout
+              ? Tooltip(
+                  message: _short(r.label),
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 2),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => widget.onSelectReadout?.call(r),
+                      child: SizedBox(
+                        width: 30,
+                        height: 30,
+                        child: Center(
+                            child: AppIcon(r.icon,
+                                size: 14, color: AppColors.fg3)),
+                      ),
+                    ),
+                  ),
+                )
+              : _seg(_short(r.label), r.key == widget.activeReadout,
+                  () => widget.onSelectReadout?.call(r),
+                  onClose: () => widget.onCloseReadout?.call(r)),
       ]),
     );
   }

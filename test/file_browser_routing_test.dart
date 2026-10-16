@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:snippet/file_icons.dart';
 
 import 'package:snippet/api.dart';
 import 'package:snippet/swr.dart';
@@ -148,10 +149,20 @@ void main() {
       // Media must not render as the generic fallback. `file-text` used to be
       // returned for unrecognised names and has no case in the icon map, so
       // every such file silently drew the map's fallback circle.
-      expect(iconNamesFor('clip.mp4'), contains('file-video'));
-      expect(iconNamesFor('song.mp3'), contains('file-audio'));
-      expect(iconNamesFor('notes.pdf'), contains('file-text'));
-      expect(iconNamesFor('notes.txt'), contains('file-text'));
+      IconData? glyphFor(String fileName) {
+        final row = find.ancestor(
+          of: find.text(fileName),
+          matching: find.byType(Row),
+        );
+        final icons = find.descendant(of: row, matching: find.byType(Icon));
+        return tester.widgetList<Icon>(icons).firstOrNull?.icon;
+      }
+
+      expect(glyphFor('clip.mp4'), fileIconFor('clip.mp4').$1);
+      expect(glyphFor('song.mp3'), fileIconFor('song.mp3').$1);
+      expect(glyphFor('notes.pdf'), fileIconFor('notes.pdf').$1);
+      expect(glyphFor('notes.txt'), fileIconFor('notes.txt').$1);
+      expect(fileIconFor('clip.mp4').$1, isNot(fileIconFor('x.unknown').$1));
       expect(iconNamesFor('lib'), contains('folder'));
     });
   });

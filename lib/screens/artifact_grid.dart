@@ -6,7 +6,7 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'artifact_viewer.dart';
-import 'file_tree_sidebar_panel.dart' show deskFileIcon, fileTint;
+import '../file_icons.dart';
 
 class ArtifactGrid extends StatefulWidget {
   const ArtifactGrid({
@@ -113,11 +113,7 @@ class _ArtifactGridState extends State<ArtifactGrid> {
             title: f.path.split('/').last,
             meta: f.caption.isEmpty ? 'File' : f.caption,
             thumb: Center(
-              child: AppIcon(deskFileIcon(f.path),
-                  size: 26,
-                  color: fileTint(f.path) == Colors.transparent
-                      ? AppColors.fg4
-                      : fileTint(f.path)),
+              child: FileGlyph(f.path, size: 26),
             ),
             onTap: widget.onOpenFileTab == null
                 ? null
