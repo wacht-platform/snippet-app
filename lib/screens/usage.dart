@@ -277,14 +277,15 @@ class _ProviderSection extends StatelessWidget {
               horizontal: kMobile ? 16 : 14,
               vertical: kMobile ? 12 : 10,
             ),
-            child: Row(children: [
-              Expanded(child: _Metric('Total', fmtSi(provider.totalTokens))),
-              Expanded(child: _Metric('Input', fmtSi(provider.promptTokens))),
-              Expanded(
-                  child: _Metric('Cached', fmtSi(provider.cacheReadTokens))),
-              Expanded(
-                  child: _Metric('Output', fmtSi(provider.completionTokens))),
-            ]),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _Metric('Total', fmtSi(provider.totalTokens)),
+                _Metric('Input', fmtSi(provider.promptTokens)),
+                _Metric('Cached', fmtSi(provider.cacheReadTokens)),
+                _Metric('Output', fmtSi(provider.completionTokens)),
+              ],
+            ),
           ),
         for (final m in models)
           SettingsRow(
