@@ -873,7 +873,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           return;
         }
         final number = int.tryParse(extra ?? '');
-        if (number != null) {
+        if (number != null && widget.onShowPullRequests == null) {
           openPullRequest(context,
               client: widget.client,
               session: widget.sessionId,

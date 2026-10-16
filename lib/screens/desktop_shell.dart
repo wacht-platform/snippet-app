@@ -836,32 +836,9 @@ class _DesktopShellState extends State<DesktopShell>
     setState(() => _rightCollapsed = !_rightCollapsed);
   }
 
-  void _openActiveFiles() {
-    if (kMobile) {
-      _macSessionControls[_activeTab?.key]?.performAction('files');
-    } else {
-      setState(() {
-        if (_section == ShellSection.files && !_leftCollapsed) {
-          _leftCollapsed = true;
-        } else {
-          _section = ShellSection.files;
-          _leftCollapsed = false;
-        }
-      });
-    }
-  }
+  void _openActiveFiles() => _dispatchSessionAction('files');
 
-  void _openMacGit() {
-    setState(() {
-      _sidebarGit = !_sidebarGit;
-      if (_section == ShellSection.git && !_leftCollapsed) {
-        _leftCollapsed = true;
-      } else {
-        _section = ShellSection.git;
-        _leftCollapsed = false;
-      }
-    });
-  }
+  void _openMacGit() => _dispatchSessionAction('file_changes');
 
   void _openCommandPalette() {
     final tab = _activeTab;
@@ -897,11 +874,6 @@ class _DesktopShellState extends State<DesktopShell>
             List<String> keywords = const []}) =>
         cmd(id, icon, title, () => _dispatchSessionAction(id, extra),
             kind: PaletteKind.session, shortcut: shortcut, keywords: keywords);
-
-    void section(ShellSection s) => setState(() {
-          _section = s;
-          _leftCollapsed = false;
-        });
 
     final goalOn = state?.goal?.ongoing ?? false;
     final manual = state?.approvalMode == 'manual';
@@ -939,12 +911,10 @@ class _DesktopShellState extends State<DesktopShell>
                 extra: 'auto', keywords: const ['yolo', 'auto', 'mode'])
             : act('approval', 'shield', 'Approval: ask before changes',
                 extra: 'ask', keywords: const ['manual', 'mode']),
-        act('rename', 'edit', 'Rename chat'),
-        act('model', 'cpu', 'Switch model',
-            keywords: const ['profile', 'inference']),
+        act('file_changes', 'file-diff', 'File changes',
+            keywords: const ['diff', 'git', 'modified']),
         act('memory', 'brain', 'Chat memory', keywords: const ['remember']),
         act('files', 'folder', 'Browse files', keywords: const ['explorer']),
-        act('processes', 'list', 'Processes'),
         act('shell_new', 'terminal', 'New session shell',
             keywords: const ['terminal']),
         act('focus_composer', 'edit', 'Focus the composer', shortcut: '⌘ L'),
@@ -957,6 +927,11 @@ class _DesktopShellState extends State<DesktopShell>
       ],
       cmd('new-session', 'plus', 'New chat', _newSessionFlow,
           shortcut: '⌘ T', keywords: const ['session', 'create']),
+      cmd('mission-control', 'layers', 'Mission Control',
+          _openMissionControlTab,
+          keywords: const ['mc', 'orchestrator']),
+      cmd('tasks', 'kanban', 'Tasks', _openBoardTab,
+          keywords: const ['board', 'kanban']),
       cmd('sidebar', 'sidebar', 'Toggle sidebar', _toggleSidebar,
           shortcut: '⌘ B'),
       cmd('right-pane', 'sidebar', 'Toggle right panel',
@@ -969,27 +944,24 @@ class _DesktopShellState extends State<DesktopShell>
       cmd('scheduled', 'scheduled', 'Scheduled jobs',
           () => _toggleRightPanel(_RightPanel.recurring),
           keywords: const ['recurring', 'cron']),
-      cmd('chats', 'message-text', 'Chats',
-          () => section(ShellSection.sessions)),
-      cmd('tasks', 'task', 'Tasks', () => section(ShellSection.tasks),
-          keywords: const ['board']),
-      cmd('agents', 'agent', 'Agents', () => section(ShellSection.agents)),
       cmd('new-terminal', 'terminal', 'New terminal', _newGlobalShell),
       cmd('shortcuts', 'keyboard', 'Keyboard shortcuts',
           _showDesktopShortcuts,
           shortcut: '⌘ /'),
       for (final (page, icon, title, keys) in const [
-        (SettingsPage.general, 'settings', 'Settings: General & machines',
-            ['machines', 'connection', 'notifications']),
-        (SettingsPage.models, 'cpu', 'Settings: Models',
-            ['inference', 'profiles', 'providers']),
-        (SettingsPage.memory, 'brain', 'Settings: Memory', ['remember']),
-        (SettingsPage.usage, 'activity', 'Settings: Usage',
-            ['tokens', 'cost', 'billing']),
-        (SettingsPage.vault, 'key', 'Settings: Vault',
-            ['secrets', 'keys', 'credentials']),
-        (SettingsPage.scheduled, 'scheduled', 'Settings: Scheduled jobs',
+        (SettingsPage.general, 'server', 'Settings: General & machines',
+            ['machines', 'connection', 'notifications', 'approvals']),
+        (SettingsPage.models, 'sparkles', 'Settings: Profiles',
+            ['inference', 'models', 'providers', 'keys']),
+        (SettingsPage.routing, 'route', 'Settings: Routing',
+            ['fallback', 'limits', 'priority']),
+        (SettingsPage.usage, 'analytics', 'Settings: Usage',
+            ['tokens', 'cost', 'billing', 'limits']),
+        (SettingsPage.memory, 'book', 'Settings: Memory', ['remember']),
+        (SettingsPage.scheduled, 'repeat', 'Settings: Scheduled jobs',
             ['recurring', 'cron']),
+        (SettingsPage.vault, 'lock-key', 'Settings: Vault',
+            ['secrets', 'keys', 'credentials']),
       ])
         cmd(page.name, icon, title, () => _openShellSettings(page),
             kind: PaletteKind.setting, keywords: keys),
@@ -1093,7 +1065,7 @@ class _DesktopShellState extends State<DesktopShell>
                 subtitle: t.status.label,
                 run: () => inSession
                     ? _dispatchSessionAction('task', t.id)
-                    : openTaskDetail(context, client, t.id),
+                    : _openBoardTab(),
               ),
           ];
         }),
@@ -1650,6 +1622,11 @@ class _DesktopShellState extends State<DesktopShell>
     if (action == 'file_changes' && !kMobile) {
       setState(() => _sidePanelHidden = false);
       SessionSidePanel.changesRequest.value++;
+      return;
+    }
+    if (action == 'files' && !kMobile) {
+      setState(() => _sidePanelHidden = false);
+      SessionSidePanel.filesRequest.value++;
       return;
     }
     final key = _activeTab?.key;
