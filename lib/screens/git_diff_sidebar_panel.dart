@@ -9,7 +9,7 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'file_tree_sidebar_panel.dart' show fileTint;
+import 'file_tree_sidebar_panel.dart' show fileTint, deskFileIcon;
 import 'git.dart';
 import 'pull_request_detail.dart' show PrSidebarList;
 import 'shell_nav.dart';
@@ -240,7 +240,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             else ...[
               if (!kMobile && (widget.sessionId ?? '').isNotEmpty)
                 _commitBox(files.length),
-              const SizedBox(height: 6),
+              if (!kMobile) _changedHeader() else const SizedBox(height: 6),
               for (final f in files) _fileRow(f),
             ],
             ],
@@ -302,6 +302,75 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     }
   }
 
+  Future<void> _stash() async {
+    final sid = widget.sessionId;
+    if (sid == null) return;
+    final ok = await confirmAction(context,
+        title: 'Stash changes?',
+        body: 'Moves uncommitted changes to the git stash. Bring them back with git stash pop.',
+        confirmLabel: 'Stash',
+        danger: false);
+    if (!ok) return;
+    try {
+      await widget.client.gitStash(sid, 'push');
+      await refresh(background: true);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
+  Widget _changedHeader() => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 14, 6),
+        child: Row(children: [
+          Expanded(
+            child: Text('CHANGED',
+                style: sans(11, spacing: 0.9, color: AppColors.fg4)),
+          ),
+          if ((widget.sessionId ?? '').isNotEmpty)
+            InkWell(
+              onTap: _stash,
+              borderRadius: BorderRadius.circular(6),
+              hoverColor: Colors.transparent,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Text('Stash all', style: sans(12, color: AppColors.fg3)),
+              ),
+            ),
+        ]),
+      );
+
+  Widget _deskPill(String label,
+          {required bool light,
+          String? icon,
+          bool disabled = false,
+          VoidCallback? onTap}) =>
+      Opacity(
+        opacity: disabled ? 0.45 : 1,
+        child: Material(
+          color: light ? AppColors.fg1 : AppColors.surface2,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: disabled ? null : onTap,
+            child: Container(
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (icon != null) ...[
+                  AppIcon(icon, size: 13, color: AppColors.fg2),
+                  const SizedBox(width: 6),
+                ],
+                Text(label,
+                    style: sans(13,
+                        weight: light ? FontWeight.w500 : W.body,
+                        color: light ? AppColors.bg : AppColors.fg2)),
+              ]),
+            ),
+          ),
+        ),
+      );
+
   Widget _commitBox(int count) => Padding(
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -341,6 +410,25 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                 ]),
           ),
           const SizedBox(height: 10),
+          if (!kMobile)
+            Row(children: [
+              Expanded(
+                child: _deskPill(
+                    _committing
+                        ? 'Committing…'
+                        : 'Commit $count file${count == 1 ? '' : 's'}',
+                    light: true,
+                    disabled: _commitCtl.text.trim().isEmpty || _committing,
+                    onTap: _commit),
+              ),
+              const SizedBox(width: 8),
+              _deskPill(_pushing ? 'Pushing…' : 'Push',
+                  light: false,
+                  icon: 'upload',
+                  disabled: _pushing,
+                  onTap: _push),
+            ])
+          else
           Row(children: [
             Expanded(
               child: Btn(
@@ -386,7 +474,40 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
 
   /// Branch + change count on one flat row. Tapping the row opens the same
   /// local/remote branch picker used by the full Git screen.
-  Widget _branchRow(String repoName, String branch, int changes) => Padding(
+  Widget _branchRow(String repoName, String branch, int changes) =>
+      kMobile ? _branchRowMobile(repoName, branch, changes) : _branchRowDesk(repoName, branch);
+
+  Widget _branchRowDesk(String repoName, String branch) {
+    final st = _status;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 2, 8, 0),
+      child: Builder(
+        builder: (anchor) => InkWell(
+          borderRadius: BorderRadius.circular(7),
+          onTap: _branchBusy ? null : () => _branchSheet(anchor),
+          child: Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Row(children: [
+              AppIcon('git-branch', size: 13, color: AppColors.fg3),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(branch.isEmpty ? repoName : branch,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12.5, color: AppColors.fg2)),
+              ),
+              if (st != null && (st.upstream ?? '').isNotEmpty)
+                Text('↑${st.ahead} ↓${st.behind}',
+                    style: mono(11, color: AppColors.fg4)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _branchRowMobile(String repoName, String branch, int changes) => Padding(
         padding: kMobile
             ? const EdgeInsets.fromLTRB(12, 4, 12, 6)
             : const EdgeInsets.fromLTRB(8, 2, 8, 4),
@@ -452,14 +573,11 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                     _statusLetter(f),
                     const SizedBox(width: 10),
                   ] else ...[
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: fileTint(name),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+                    AppIcon(deskFileIcon(name),
+                        size: 14,
+                        color: fileTint(name) == Colors.transparent
+                            ? AppColors.fg4
+                            : fileTint(name)),
                     const SizedBox(width: 9),
                   ],
                   Expanded(
@@ -473,7 +591,8 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                       ]),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(kMobile ? 13.5 : 13, color: AppColors.fg1),
+                      style: sans(kMobile ? 13.5 : 13,
+                          color: kMobile ? AppColors.fg1 : AppColors.fg2),
                     ),
                   ),
                   if (!kMobile) ...[

@@ -12,6 +12,16 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         );
 
   Widget _originTabBody(_ShellTab t, {required bool primary}) {
+    if (t.isDraft) {
+      return NewSessionDraft(
+        key: ValueKey('body-${t.key}-${t.draftFolder}'),
+        client: t.client,
+        machineLabel: _active?.label ?? '',
+        folder: t.draftFolder,
+        onStart: (folder, mode, profile, text) =>
+            _startDraft(t, folder, mode, profile, text),
+      );
+    }
     if (t.isPrs) {
       return PullRequestsScreen(
         key: ValueKey('body-${t.key}'),
@@ -264,6 +274,10 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         },
         fallbackBuilder: _paneFallback,
         rightPanel: _sessionSidePanel(),
+        hideRight: _activeTab?.isDraft == true,
+        panelHostsReadouts: _activeTab != null &&
+            !_activeTab!.isMissionControl &&
+            _activeTab!.sessionId != null,
         onPaneResize: (delta) => _setState(() {
           final max = MediaQuery.sizeOf(context).width * 0.72;
           _paneWidth = (_paneWidth - delta).clamp(kPaneMinWidth, max);
@@ -321,6 +335,16 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       sessionId: tab.sessionId,
       onOpenDiff: (f) =>
           _openDiffTab(tab.client, tab.instanceUrl, tab.sessionId!, f),
+      readouts: [
+        for (final r in _rightTabs)
+          if (r.pane == _Pane.right) r
+      ],
+      activeReadout: _activeKey[_Pane.right],
+      readoutBody: (r) => _rightTabBody(
+          r, _macSessionStatuses[tab.key]?.state, _macSessionControls[tab.key]),
+      onSelectReadout: (r) => _setState(() => _activeKey[_Pane.right] = r.key),
+      onCloseReadout: (r) => _closeRightTab(r.key),
+      onClearReadout: () => _setState(() => _activeKey.remove(_Pane.right)),
     );
   }
 
@@ -603,6 +627,11 @@ extension _DesktopShellPanesExt on _DesktopShellState {
               iconSize: 16,
               tooltip: 'Forward',
               onTap: _canNavigateForward ? _navigateForward : null),
+          IconBtn('pencil-line',
+              size: 28,
+              iconSize: 16,
+              tooltip: 'New session',
+              onTap: _client == null ? null : _newSessionFlow),
           const SizedBox(width: 10),
         ]),
       );

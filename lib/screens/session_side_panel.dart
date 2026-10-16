@@ -8,6 +8,7 @@ import 'git_diff_sidebar_panel.dart';
 import '../models.dart' show GitFile;
 import 'session.dart' show TerminalHost;
 import 'shell_nav.dart';
+import 'shell_models.dart' show RightTab;
 
 class SessionSidePanel extends StatefulWidget {
   const SessionSidePanel({
@@ -18,7 +19,20 @@ class SessionSidePanel extends StatefulWidget {
     this.host,
     this.sessionId,
     this.onOpenDiff,
+    this.readouts = const [],
+    this.activeReadout,
+    this.readoutBody,
+    this.onSelectReadout,
+    this.onCloseReadout,
+    this.onClearReadout,
   });
+
+  final List<RightTab> readouts;
+  final String? activeReadout;
+  final Widget Function(RightTab readout)? readoutBody;
+  final ValueChanged<RightTab>? onSelectReadout;
+  final ValueChanged<RightTab>? onCloseReadout;
+  final VoidCallback? onClearReadout;
 
   final String? sessionId;
   final void Function(GitFile file)? onOpenDiff;
@@ -28,6 +42,8 @@ class SessionSidePanel extends StatefulWidget {
   final void Function(String path, String name) onOpenFile;
   final TerminalHost? host;
 
+  static final changesRequest = ValueNotifier<int>(0);
+
   @override
   State<SessionSidePanel> createState() => _SessionSidePanelState();
 }
@@ -36,12 +52,60 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
   static bool _termsOpen = true;
   static bool _changes = false;
 
-  Widget _segs() => Row(children: [
-        _seg('Files', !_changes, () => setState(() => _changes = false)),
-        _seg('Changes', _changes, () => setState(() => _changes = true)),
-      ]);
+  static int _seenRequest = 0;
 
-  Widget _seg(String label, bool on, VoidCallback tap) => Padding(
+  void _showChanges() {
+    _seenRequest = SessionSidePanel.changesRequest.value;
+    if (mounted) setState(() => _changes = true);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (SessionSidePanel.changesRequest.value != _seenRequest) {
+      _seenRequest = SessionSidePanel.changesRequest.value;
+      _changes = true;
+    }
+    SessionSidePanel.changesRequest.addListener(_showChanges);
+  }
+
+  @override
+  void dispose() {
+    SessionSidePanel.changesRequest.removeListener(_showChanges);
+    super.dispose();
+  }
+
+  RightTab? get _readout => widget.readouts
+      .where((r) => r.key == widget.activeReadout)
+      .firstOrNull;
+
+  String _short(String label) =>
+      label.startsWith('Artifacts') ? 'Artifacts' : label;
+
+  Widget _segs() {
+    final reading = _readout != null;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(children: [
+        _seg('Files', !reading && !_changes, () {
+          widget.onClearReadout?.call();
+          setState(() => _changes = false);
+        }),
+        _seg('Changes', !reading && _changes, () {
+          widget.onClearReadout?.call();
+          setState(() => _changes = true);
+        }),
+        for (final r in widget.readouts)
+          _seg(_short(r.label), r.key == widget.activeReadout,
+              () => widget.onSelectReadout?.call(r),
+              onClose: () => widget.onCloseReadout?.call(r)),
+      ]),
+    );
+  }
+
+  Widget _seg(String label, bool on, VoidCallback tap,
+          {VoidCallback? onClose}) =>
+      Padding(
         padding: const EdgeInsets.only(right: 2),
         child: Material(
           color: on ? AppColors.surface2 : Colors.transparent,
@@ -50,9 +114,23 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
             borderRadius: BorderRadius.circular(8),
             onTap: tap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Text(label,
-                  style: sans(12.5, color: on ? AppColors.fg1 : AppColors.fg3)),
+              padding: EdgeInsets.fromLTRB(10, 6, onClose == null ? 10 : 4, 6),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(label,
+                    style:
+                        sans(12.5, color: on ? AppColors.fg1 : AppColors.fg3)),
+                if (onClose != null) ...[
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: onClose,
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: AppIcon('x', size: 11, color: AppColors.fg4),
+                    ),
+                  ),
+                ],
+              ]),
             ),
           ),
         ),
@@ -102,7 +180,25 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: widget.workspacePath.isEmpty
+          child: _readout != null && widget.readoutBody != null
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      height: 46,
+                      padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
+                      alignment: Alignment.centerLeft,
+                      child: _segs(),
+                    ),
+                    Expanded(
+                      child: KeyedSubtree(
+                        key: ValueKey(_readout!.key),
+                        child: widget.readoutBody!(_readout!),
+                      ),
+                    ),
+                  ],
+                )
+              : widget.workspacePath.isEmpty
               ? const SizedBox()
               : _changes
               ? GitDiffSidebarPanel(

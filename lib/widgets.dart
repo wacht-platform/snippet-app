@@ -1939,6 +1939,7 @@ const _lucide = <String, IconData>{
   'sidebar': LucideIcons.panelLeft,
   'menu': LucideIcons.menu,
   'edit': LucideIcons.pencil,
+  'pencil-line': LucideIcons.pencilLine,
   'eye': LucideIcons.eye,
   'eye-off': LucideIcons.eyeOff,
   'code': LucideIcons.code,

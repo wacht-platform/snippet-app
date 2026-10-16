@@ -49,6 +49,7 @@ class ShellSidebarHost extends StatelessWidget {
     required this.onRefreshSessions,
     required this.onSessionAction,
     required this.onNewSession,
+    this.onNewSessionIn,
     required this.onSelectInstance,
     required this.onOpenMissionControl,
     this.onOpenPalette,
@@ -103,6 +104,7 @@ class ShellSidebarHost extends StatelessWidget {
   final VoidCallback onRefreshSessions;
   final void Function(String action, [String? extra]) onSessionAction;
   final VoidCallback onNewSession;
+  final ValueChanged<String>? onNewSessionIn;
   final ValueChanged<Instance> onSelectInstance;
   final VoidCallback onOpenMissionControl;
   final VoidCallback? onOpenPalette;
@@ -231,6 +233,7 @@ class ShellSidebarHost extends StatelessWidget {
       onNewSession: () {
         onNewSession();
       },
+      onNewSessionIn: onNewSessionIn,
       onSelectInstance: onSelectInstance,
       onOpenMissionControl: () {
         onOpenMissionControl();

@@ -374,7 +374,7 @@ class _FileTreeSidebarPanelState extends State<FileTreeSidebarPanel> {
                   ),
               ],
             ),
-            _workspaceRow(wsName),
+            if (kMobile) _workspaceRow(wsName) else const SizedBox(height: 2),
             if (_loading && _listing == null)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
@@ -488,6 +488,7 @@ class _FileTreeRow extends StatelessWidget {
     // (`Src` is white only because it is the selected row). Tinting directories
     // brighter invented a hierarchy the reference does not have.
     final color = AppColors.fg2;
+    if (!kMobile) return _desk();
     return Padding(
       padding: EdgeInsets.only(
         left: kSidebarContentInset + depth * (kMobile ? kTreeIndentStep : 14),
@@ -554,6 +555,81 @@ class _FileTreeRow extends StatelessWidget {
                         color: entry.isDir || kMobile
                             ? AppColors.fg2
                             : AppColors.fg3)),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String deskFileIcon(String name) {
+  final l = name.toLowerCase();
+  final i = l.lastIndexOf('.');
+  final ext = i < 0 ? '' : l.substring(i + 1);
+  return switch (ext) {
+    'md' || 'txt' || 'rst' => 'file-text',
+    'json' || 'toml' || 'yaml' || 'yml' || 'lock' || 'ini' || 'env' =>
+      'file-json',
+    'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' || 'svg' || 'ico' =>
+      'file-image',
+    'mp4' || 'mov' || 'webm' => 'file-video',
+    'mp3' || 'wav' || 'm4a' => 'file-audio',
+    'zip' || 'tar' || 'gz' || 'apk' || '7z' => 'file-archive',
+    'sh' || 'bash' || 'zsh' || 'fish' => 'file-terminal',
+    '' => 'file',
+    _ => 'file-code',
+  };
+}
+
+extension on _FileTreeRow {
+  Widget _desk() {
+    final tint = fileTint(entry.name);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            height: 26,
+            padding: EdgeInsets.only(left: 6.0 + depth * 14, right: 8),
+            child: Row(children: [
+              SizedBox(
+                width: 12,
+                child: entry.isDir
+                    ? (loading
+                        ? const Center(child: Spinner(size: 10))
+                        : AppIcon(
+                            expanded ? 'chevron-down' : 'chevron-right',
+                            size: 11,
+                            color: hasError ? AppColors.danger : AppColors.fg4))
+                    : null,
+              ),
+              const SizedBox(width: 5),
+              AppIcon(
+                entry.isDir
+                    ? (expanded ? 'folder-open' : 'folder')
+                    : deskFileIcon(entry.name),
+                size: 14,
+                color: hasError
+                    ? AppColors.danger
+                    : entry.isDir
+                        ? AppColors.fg3
+                        : tint == Colors.transparent
+                            ? AppColors.fg4
+                            : tint,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(entry.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12.5,
+                        color: entry.isDir ? AppColors.fg2 : AppColors.fg3)),
               ),
             ]),
           ),

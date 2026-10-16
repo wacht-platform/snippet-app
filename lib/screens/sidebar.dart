@@ -35,6 +35,7 @@ class Sidebar extends StatefulWidget {
   final String? sessionsError;
   final VoidCallback onRefreshSessions;
   final VoidCallback onNewSession;
+  final ValueChanged<String>? onNewSessionIn;
   final void Function(Instance) onSelectInstance;
   final VoidCallback onOpenMissionControl;
   final ValueChanged<CoordinationAgent>? onOpenAgent;
@@ -76,6 +77,7 @@ class Sidebar extends StatefulWidget {
     this.sessionsError,
     required this.onRefreshSessions,
     required this.onNewSession,
+    this.onNewSessionIn,
     required this.onSelectInstance,
     required this.onOpenMissionControl,
     this.onOpenAgent,
@@ -936,7 +938,14 @@ class SidebarState extends State<Sidebar> {
                 size: 22,
                 iconSize: 12,
                 tooltip: 'New chat',
-                onTap: widget.onNewSession),
+                onTap: () {
+                  final folder = e.value.first.projectFolder.trim();
+                  if (widget.onNewSessionIn != null && folder.isNotEmpty) {
+                    widget.onNewSessionIn!(folder);
+                  } else {
+                    widget.onNewSession();
+                  }
+                }),
         ]),
       ));
       for (final s in e.value) {
@@ -1053,9 +1062,24 @@ class SidebarState extends State<Sidebar> {
       ),
       if (_crew.isNotEmpty) ...[
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
-          child: Text('CREW',
-              style: sans(11, color: AppColors.fg4, spacing: 0.9)),
+          padding: const EdgeInsets.fromLTRB(18, 14, 12, 4),
+          child: Row(children: [
+            Expanded(
+              child: Text('CREW',
+                  style: sans(11, color: AppColors.fg4, spacing: 0.9)),
+            ),
+            Builder(
+              builder: (ctx) => IconBtn('plus',
+                  size: 22,
+                  iconSize: 12,
+                  tooltip: 'New agent',
+                  onTap: () async {
+                    await _openCreateAgent(ctx);
+                    _metersAt = null;
+                    _loadMeters();
+                  }),
+            ),
+          ]),
         ),
         SizedBox(
           height: 40,
@@ -1093,33 +1117,6 @@ class SidebarState extends State<Sidebar> {
                     ),
                   ),
                 ),
-              Builder(
-                builder: (ctx) => Tooltip(
-                  message: 'New agent',
-                  child: Material(
-                    color: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11),
-                      side: BorderSide(color: AppColors.line),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(11),
-                      onTap: () async {
-                        await _openCreateAgent(ctx);
-                        _metersAt = null;
-                        _loadMeters();
-                      },
-                      child: SizedBox(
-                        width: 38,
-                        height: 38,
-                        child: Center(
-                            child: AppIcon('plus',
-                                size: 15, color: AppColors.fg3)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),

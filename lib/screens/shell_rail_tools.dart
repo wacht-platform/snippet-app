@@ -68,6 +68,7 @@ List<Widget> buildShellRailTools({
   final mc = tab?.isMissionControl ?? false;
   final s = macSessionStatus?.state;
   final goalRunning = s?.goal?.ongoing ?? false;
+  if (tab != null && tab.isDraft) return const [];
   final lanes = s?.lanes.where((l) => l.running).length ?? 0;
 
   Widget railTool(

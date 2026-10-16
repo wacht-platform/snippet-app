@@ -23,6 +23,7 @@ enum ShellPanelPurpose {
   deliverables,
   pullRequests,
   autonomy,
+  memory,
   generic,
 }
 

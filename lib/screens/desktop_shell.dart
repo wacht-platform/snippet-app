@@ -39,6 +39,7 @@ import 'tasks/tasks_panel.dart';
 import 'mobile_chrome.dart';
 import 'mobile_shell.dart';
 import 'new_session_picker.dart';
+import 'new_session_draft.dart';
 import 'session.dart';
 import 'mission_board_panel.dart';
 import 'pull_requests.dart';
@@ -306,6 +307,7 @@ class _DesktopShellState extends State<DesktopShell>
         existing.pane = _Pane.right;
       }
       _activePane = _Pane.right;
+      _sidePanelHidden = false;
       _activeKey[_Pane.right] = key;
     });
   }
@@ -319,6 +321,7 @@ class _DesktopShellState extends State<DesktopShell>
       _rightTabs.removeWhere((t) => t.key == tab.key);
       _rightTabs.add(tab);
       _activePane = _Pane.right;
+      _sidePanelHidden = false;
       _activeKey[_Pane.right] = tab.key;
     });
   }
@@ -344,6 +347,7 @@ class _DesktopShellState extends State<DesktopShell>
         existing.pane = _Pane.right;
       }
       _activePane = _Pane.right;
+      _sidePanelHidden = false;
       _activeKey[_Pane.right] = key;
     });
   }
@@ -359,7 +363,10 @@ class _DesktopShellState extends State<DesktopShell>
     }
     setState(() {
       if (existing == null) _rightTabs.add(tab);
-      if (tab.pane == _Pane.right) _rightCollapsed = false;
+      if (tab.pane == _Pane.right) {
+        _rightCollapsed = false;
+        _sidePanelHidden = false;
+      }
       _activePane = tab.pane;
       _activeKey[tab.pane] = tab.key;
     });
@@ -1271,10 +1278,69 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   // Start a chat by picking a folder using NewSessionPicker on both desktop and mobile.
+  void _openDraftTab([String? folder]) {
+    final client = _client;
+    final url = _active?.url;
+    if (client == null || url == null) return;
+    final existing =
+        _tabs.indexWhere((t) => t.isDraft && t.instanceUrl == url);
+    setState(() {
+      if (existing >= 0) {
+        if (folder != null) _tabs[existing].draftFolder = folder;
+        _activeIndex = existing;
+      } else {
+        _tabs.add(_ShellTab.draft(
+            client: client, instanceUrl: url, folder: folder));
+        _activeIndex = _tabs.length - 1;
+      }
+      final root = _tabs[_activeIndex];
+      _groupRootKey[root.pane] = root.key;
+      _activeKey[root.pane] = root.key;
+    });
+    _syncPage();
+  }
+
+  Future<void> _startDraft(_ShellTab draft, String folder, WorkspaceMode mode,
+      String? profile, String text) async {
+    final c = draft.client;
+    final id = await c.openSession(folder,
+        workspace: mode, profile: profile, newConversation: true);
+    if (!mounted) return;
+    setState(() {
+      final tab = _ShellTab.session(
+          client: c,
+          instanceUrl: draft.instanceUrl,
+          sessionId: id,
+          title: 'New session',
+          profile: profile,
+          inboundShare: SharedInbound(type: 'text', text: text, send: true));
+      final i = _tabs.indexOf(draft);
+      if (i >= 0) {
+        _tabs[i] = tab;
+        _activeIndex = i;
+      } else {
+        _tabs.add(tab);
+        _activeIndex = _tabs.length - 1;
+      }
+      _clearTabState(draft.key);
+      _activeKey.removeWhere((_, k) => k == draft.key);
+      _groupRootKey.removeWhere((_, k) => k == draft.key);
+      _groupRootKey[tab.pane] = tab.key;
+      _activeKey[tab.pane] = tab.key;
+    });
+    _persistTabs();
+    _syncPage();
+    _loadSessions();
+  }
+
   Future<void> _newSessionFlow() async {
     final c = _client;
     final active = _active;
     if (c == null) return;
+    if (!kMobile) {
+      _openDraftTab();
+      return;
+    }
     await presentScreen(
       context,
       style: PanelStyle.dialog,
@@ -1508,6 +1574,7 @@ class _DesktopShellState extends State<DesktopShell>
         onRefreshSessions: _loadSessions,
         onSessionAction: _dispatchSessionAction,
         onNewSession: _newSessionFlow,
+        onNewSessionIn: kMobile ? null : _openDraftTab,
         onSelectInstance: _selectInstance,
         onOpenMissionControl: _openMissionControlTab,
         onOpenPalette: kMobile ? null : _openCommandPalette,
@@ -1588,6 +1655,11 @@ class _DesktopShellState extends State<DesktopShell>
   void _dispatchSessionAction(String action, [String? extra]) {
     if (action == 'delete') {
       _deleteActiveSession();
+      return;
+    }
+    if (action == 'file_changes' && !kMobile) {
+      setState(() => _sidePanelHidden = false);
+      SessionSidePanel.changesRequest.value++;
       return;
     }
     final key = _activeTab?.key;
