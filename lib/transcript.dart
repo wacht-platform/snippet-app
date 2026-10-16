@@ -291,6 +291,7 @@ class _ToolRunState extends State<ToolRun> {
         steps.isEmpty || widget.running || steps.any(toolHasDetail);
     final headline =
         running ? toolSentence(current, running: true) : activitySummary(steps);
+    if (!kMobile && steps.isNotEmpty) return _trace(steps);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: S.s6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -384,6 +385,119 @@ class _ToolRunState extends State<ToolRun> {
       ]),
     );
   }
+}
+
+extension on _ToolRunState {
+  Widget _trace(List<ToolStep> steps) {
+    const cap = 6;
+    final all = widget.open || steps.length <= cap;
+    final shown = all ? steps : steps.sublist(steps.length - cap);
+    Widget row(ToolStep st) {
+      final ch = fileChanges([st]);
+      final add = ch.fold<int>(0, (a, c) => a + c.added);
+      final del = ch.fold<int>(0, (a, c) => a + c.removed);
+      final failed = !st.running && st.failed;
+      final dot = st.running
+          ? AppColors.accent
+          : failed
+              ? AppColors.danger
+              : ch.isNotEmpty
+                  ? AppColors.accent
+                  : AppColors.fg1.withValues(alpha: 0.22);
+      final (verb, obj) = toolSentenceParts(st);
+      return InkWell(
+        borderRadius: BorderRadius.circular(7),
+        onTap: _toggle,
+        child: SizedBox(
+          height: 28,
+          child: Row(children: [
+            SizedBox(
+              width: 22,
+              child: Center(
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: dot,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: readingBg, width: 2),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 64, maxWidth: 220),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(verb,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, color: AppColors.fg2)),
+              ),
+            ),
+            Flexible(
+              child: Text(obj,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(12, color: AppColors.fg3)),
+            ),
+            const SizedBox(width: 10),
+            if (failed)
+              Text('failed', style: sans(12, color: AppColors.danger))
+            else if (ch.isNotEmpty)
+              Text('+$add −$del', style: mono(11.5, color: AppColors.fg4)),
+          ]),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: S.s6),
+      child: Stack(children: [
+        Positioned(
+          left: 10,
+          top: 14,
+          bottom: 14,
+          child: CustomPaint(
+            size: const Size(2, double.infinity),
+            painter: _DottedLine(AppColors.fg1.withValues(alpha: 0.16)),
+          ),
+        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (!all)
+            InkWell(
+              borderRadius: BorderRadius.circular(7),
+              onTap: () => widget.onOpenChanged?.call(true),
+              child: SizedBox(
+                height: 28,
+                child: Row(children: [
+                  const SizedBox(width: 28),
+                  Text('${steps.length - cap} earlier steps',
+                      style: sans(12.5, color: AppColors.fg4)),
+                ]),
+              ),
+            ),
+          for (final st in shown) row(st),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _DottedLine extends CustomPainter {
+  _DottedLine(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = color;
+    for (var y = 0.0; y < size.height; y += 5) {
+      canvas.drawCircle(Offset(1, y), 1, p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DottedLine old) => old.color != color;
 }
 
 class _ChangedFiles extends StatelessWidget {
