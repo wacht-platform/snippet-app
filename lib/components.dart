@@ -331,6 +331,16 @@ class FlatGroupScope extends InheritedWidget {
   bool updateShouldNotify(FlatGroupScope oldWidget) => false;
 }
 
+class CardGroupScope extends InheritedWidget {
+  const CardGroupScope({super.key, required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<CardGroupScope>() != null;
+
+  @override
+  bool updateShouldNotify(CardGroupScope oldWidget) => false;
+}
+
 class ListGroup extends StatelessWidget {
   const ListGroup({super.key, required this.children, this.header});
 
@@ -339,6 +349,7 @@ class ListGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final card = kMobile && CardGroupScope.of(context);
     final column = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -349,13 +360,24 @@ class ListGroup extends StatelessWidget {
             Divider(
                 height: 1,
                 thickness: 1,
-                indent: kMobile ? 4 : 0,
-                endIndent: kMobile ? 4 : 0,
+                indent: card ? 16 : (kMobile ? 4 : 0),
+                endIndent: card ? 0 : (kMobile ? 4 : 0),
                 color: AppColors.line),
           children[i],
         ],
       ],
     );
+    if (card) {
+      return Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Material(color: Colors.transparent, child: column),
+      );
+    }
     if (kMobile) {
       return FlatGroupScope(
         child: Material(color: Colors.transparent, child: column),
