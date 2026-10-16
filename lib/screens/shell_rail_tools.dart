@@ -168,18 +168,28 @@ List<Widget> buildShellRailTools({
             ),
           ),
           PopupMenuItem<VoidCallback>(
-            value: () => onSessionAction('compact'),
+            enabled: false,
             height: 40,
-            child: Container(
-              height: 30,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: AppColors.surface3,
-                borderRadius: BorderRadius.circular(15),
+            child: Builder(
+              builder: (ctx) => Align(
+                alignment: Alignment.centerLeft,
+                child: Material(
+                  color: AppColors.surface3,
+                  shape: const StadiumBorder(),
+                  child: InkWell(
+                    customBorder: const StadiumBorder(),
+                    onTap: () => Navigator.of(ctx).pop<VoidCallback>(
+                        () => onSessionAction('compact')),
+                    child: Container(
+                      height: 30,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      alignment: Alignment.center,
+                      child: Text('Compact now',
+                          style: sans(12.5, color: AppColors.fg1)),
+                    ),
+                  ),
+                ),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text('Compact now', style: sans(12.5, color: AppColors.fg1)),
-              ]),
             ),
           ),
           const PopupMenuDivider(),

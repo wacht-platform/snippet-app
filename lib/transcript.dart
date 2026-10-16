@@ -265,6 +265,9 @@ class ToolRun extends StatefulWidget {
 }
 
 class _ToolRunState extends State<ToolRun> {
+  final Set<int> _expanded = {};
+  bool _showAll = false;
+
   void _toggle() {
     final batch = widget.batch;
     if (batch != null) {
@@ -390,7 +393,7 @@ class _ToolRunState extends State<ToolRun> {
 extension on _ToolRunState {
   Widget _trace(List<ToolStep> steps) {
     const cap = 6;
-    final all = widget.open || steps.length <= cap;
+    final all = widget.open || _showAll || steps.length <= cap;
     final shown = all ? steps : steps.sublist(steps.length - cap);
     Widget row(ToolStep st) {
       final ch = fileChanges([st]);
@@ -405,9 +408,15 @@ extension on _ToolRunState {
                   ? AppColors.accent
                   : AppColors.fg1.withValues(alpha: 0.22);
       final (verb, obj) = toolSentenceParts(st);
-      return InkWell(
+      final idx = steps.indexOf(st);
+      final canOpen = toolHasDetail(st) || st.running;
+      final expanded = _expanded.contains(idx);
+      final line = InkWell(
         borderRadius: BorderRadius.circular(7),
-        onTap: _toggle,
+        onTap: canOpen
+            ? () => setState(() =>
+                expanded ? _expanded.remove(idx) : _expanded.add(idx))
+            : null,
         child: SizedBox(
           height: 28,
           child: Row(children: [
@@ -447,9 +456,37 @@ extension on _ToolRunState {
               Text('failed', style: sans(12, color: AppColors.danger))
             else if (ch.isNotEmpty)
               Text('+$add −$del', style: mono(11.5, color: AppColors.fg4)),
+            if (canOpen) ...[
+              const SizedBox(width: 6),
+              AppIcon(expanded ? 'chevron-down' : 'chevron-right',
+                  size: 12, color: AppColors.fg4),
+            ],
           ]),
         ),
       );
+      if (!expanded) return line;
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        line,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 2, 0, 8),
+          child: Container(
+            constraints: const BoxConstraints(maxHeight: 360),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: SingleChildScrollView(
+              child: DefaultTextStyle(
+                style: mono(12, height: 1.45, color: AppColors.fg2),
+                child: safeToolDetailView(context,
+                    tool: st.tool, args: st.args, result: st.result),
+              ),
+            ),
+          ),
+        ),
+      ]);
     }
 
     return Padding(
@@ -468,7 +505,10 @@ extension on _ToolRunState {
           if (!all)
             InkWell(
               borderRadius: BorderRadius.circular(7),
-              onTap: () => widget.onOpenChanged?.call(true),
+              onTap: () {
+                setState(() => _showAll = true);
+                widget.onOpenChanged?.call(true);
+              },
               child: SizedBox(
                 height: 28,
                 child: Row(children: [
