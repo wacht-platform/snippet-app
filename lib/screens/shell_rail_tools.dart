@@ -188,6 +188,7 @@ List<Widget> buildShellRailTools({
         else ...[
           item('edit', 'Rename', () => onSessionAction('rename')),
           item('sparkles', 'Change model', () => onSessionAction('model')),
+          item('git-fork', 'Fork from here', () => onSessionAction('fork')),
           const PopupMenuDivider(),
           item('file-diff', 'File changes', () => onSessionAction('file_changes'),
               detail: changes > 0 ? '$changes' : null),

@@ -621,7 +621,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                     size: 32,
                     iconSize: 16,
                     tooltip: 'Fork from here',
-                    onTap: () => _confirmFork(c)),
+                    onTap: () => _confirmFork(c, sheet: true)),
               ]),
             ),
           )),
@@ -696,7 +696,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                       'No checkpoints yet — you can still fork the full history.',
                       style: TS.meta()),
                   const SizedBox(height: 12),
-                  Btn('Fork full history', onTap: () => _confirmFork(null)),
+                  Btn('Fork full history', onTap: () => _confirmFork(null, sheet: true)),
                 ],
               ),
             )
@@ -705,7 +705,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               padding: const EdgeInsets.only(bottom: 8),
               child: AppCard(
                 padding: const EdgeInsets.all(13),
-                onTap: () => _confirmFork(null),
+                onTap: () => _confirmFork(null, sheet: true),
                 child: Row(children: [
                   Container(
                     width: 34,
@@ -736,7 +736,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                   padding: const EdgeInsets.only(bottom: 8),
                   child: AppCard(
                     padding: const EdgeInsets.all(13),
-                    onTap: () => _confirmFork(c),
+                    onTap: () => _confirmFork(c, sheet: true),
                     child: Row(children: [
                       Container(
                         width: 34,
@@ -771,7 +771,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         ]));
   }
 
-  Future<void> _confirmFork(Checkpoint? c) async {
+  Future<void> _confirmFork(Checkpoint? c, {bool sheet = false}) async {
     final label =
         c == null ? 'full history' : (c.label.isEmpty ? c.id : c.label);
     final ok = await confirmAction(
@@ -783,7 +783,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       danger: false,
     );
     if (!ok) return;
-    if (mounted) Navigator.pop(context); // close the sheet
+    if (sheet && mounted) Navigator.pop(context);
     try {
       final result = await widget.client.forkSession(
         widget.sessionId,
