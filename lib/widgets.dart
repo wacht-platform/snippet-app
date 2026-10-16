@@ -1940,6 +1940,7 @@ const _lucide = <String, IconData>{
   'menu': LucideIcons.menu,
   'edit': LucideIcons.pencil,
   'pencil-line': LucideIcons.pencilLine,
+  'maximize-2': LucideIcons.maximize2,
   'eye': LucideIcons.eye,
   'eye-off': LucideIcons.eyeOff,
   'code': LucideIcons.code,

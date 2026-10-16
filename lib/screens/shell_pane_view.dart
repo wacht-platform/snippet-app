@@ -529,7 +529,10 @@ class RightTabBody extends StatelessWidget {
       );
     }
     return switch (tab.panel) {
-      RightPanel.lanes => SessionLanesPanel(lanes: state?.lanes ?? const []),
+      RightPanel.lanes => SessionLanesPanel(
+          lanes: state?.lanes ?? const [],
+          client: client,
+          sessionId: activeSessionId),
       RightPanel.recurring => client == null
           ? const EmptyPaneHint()
           : RecurringScreen(

@@ -917,10 +917,10 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               purpose: ShellPanelPurpose.memory,
               originClient: widget.client,
               originSessionId: widget.sessionId,
-              builder: (_, close) => MemoryScreen(
+              builder: (_, close) => DeskMemoryView(
                   client: widget.client,
-                  embedded: true,
-                  initialKey: 'session:${widget.sessionId}'));
+                  sessionId: widget.sessionId,
+                  workspace: _state?.workspace));
           return;
         }
         presentScreen(context,

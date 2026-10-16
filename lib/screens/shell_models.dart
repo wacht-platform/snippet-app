@@ -81,6 +81,24 @@ class ShellTab {
 
   bool isDraft = false;
   String? draftFolder;
+  RightTab? readout;
+  String? readoutOrigin;
+
+  bool get isReadout => readout != null;
+
+  static ShellTab readoutTab({
+    required DaemonClient client,
+    required String instanceUrl,
+    required RightTab tab,
+    String? origin,
+  }) =>
+      ShellTab.session(
+          client: client,
+          instanceUrl: instanceUrl,
+          sessionId: null,
+          title: tab.label.startsWith('Artifacts') ? 'Artifacts' : tab.label)
+        ..readout = tab
+        ..readoutOrigin = origin;
 
   static ShellTab draft({
     required DaemonClient client,
@@ -211,13 +229,16 @@ class ShellTab {
   bool get isTerminal => termId != null;
   bool get isMissionControl =>
       !isDraft &&
+      !isReadout &&
       !isBoard &&
       !isPrs &&
       !isFile &&
       !isDiff &&
       !isTerminal &&
       isMissionControlTab(sessionId: sessionId, title: title);
-  String get key => isDraft
+  String get key => isReadout
+      ? '$instanceUrl|readout|${readout!.key}'
+      : isDraft
       ? '$instanceUrl|new'
       : isPrs
       ? '$instanceUrl|prs'
@@ -236,7 +257,9 @@ class ShellTab {
 
 /// Icon for a tab, by kind. One helper so the four call sites that render a
 /// tab (top bar, desktop strip, split header, tab menu) cannot drift.
-String tabIconKind(ShellTab t) => t.isDraft
+String tabIconKind(ShellTab t) => t.isReadout
+    ? t.readout!.icon
+    : t.isDraft
     ? 'pencil-line'
     : t.isPrs
     ? 'pull-request'
