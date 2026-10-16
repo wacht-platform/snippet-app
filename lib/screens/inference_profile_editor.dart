@@ -6,6 +6,8 @@ import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
+import '../settings_form.dart';
+import 'shell_nav.dart' show MobileBackLink;
 import '../widgets.dart';
 
 // (value sent to the daemon, label shown in the pill)
@@ -58,8 +60,10 @@ class InferenceProfileEditor extends StatefulWidget {
   final VoidCallback? onSaved;
 
   final void Function(InferenceProfile draft, Future<void> save)? onSubmit;
+  final VoidCallback? onDelete;
   const InferenceProfileEditor(
       {super.key,
+      this.onDelete,
       required this.client,
       this.existing,
       this.embedded = false,
@@ -493,212 +497,6 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     if (!pills.any((p) => p.$1 == _provider))
       pills.insert(0, (_provider, _provider));
     final title = _isEdit ? 'Edit profile' : 'Add profile';
-    final form = Expanded(
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(
-            widget.embedded ? 20 : 16, widget.embedded ? 8 : 16, 20, 24),
-        children: [
-          Text('Provider',
-              style: sans(12, weight: W.label, color: AppColors.fg2)),
-          const SizedBox(height: 7),
-          if (_isEdit)
-            Row(children: [
-              ProviderLogo(_provider, size: 18, color: AppColors.fg1),
-              const SizedBox(width: 8),
-              Text(_providerLabel(_provider),
-                  style: sans(kMobile ? 16 : 14, color: AppColors.fg1)),
-            ])
-          else
-            Pills<String>(
-              items: pills,
-              selected: _provider,
-              iconFor: (v) =>
-                  providerLogoAsset(v) == null ? null : 'provider:$v',
-              onSelect: (val) => setState(() {
-                _provider = val;
-                _images = _defaultImages(val);
-                _catalogModels = null;
-                _showModelBrowser = false;
-                _modelSearch.clear();
-                _scheduleReasoning();
-              }),
-            ),
-          const SizedBox(height: 16),
-          if (!_isEdit) ...[
-            AppField(
-                label: 'Profile name',
-                controller: _name,
-                hint: 'optional — defaults to the provider'),
-            const SizedBox(height: 16),
-          ],
-          if (_needsBaseUrl(_provider)) ...[
-            AppField(
-                label: 'Base URL',
-                controller: _baseUrl,
-                mono: true,
-                hint: 'https://api.example.com/v1'),
-            const SizedBox(height: 16),
-          ],
-          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Expanded(
-                child: AppField(
-                    label: 'Model',
-                    controller: _model,
-                    mono: true,
-                    hint: _isChatgpt
-                        ? 'gpt-5.1-codex'
-                        : _isClaudeCode
-                            ? 'sonnet'
-                            : _isAntigravity
-                                ? 'gemini-3.8-flash-high'
-                                : 'claude-sonnet-4.5')),
-            const SizedBox(width: 8),
-            if (_loadingModels)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8, right: 8),
-                child: Spinner(size: 26),
-              )
-            else
-              IconBtn(_showModelBrowser ? 'x' : 'list',
-                  size: 44,
-                  iconSize: 18,
-                  tooltip: _showModelBrowser ? 'Hide catalog' : 'Browse models',
-                  onTap: _busy ? null : _browseModels),
-          ]),
-          if (_showModelBrowser && _catalogModels != null) ...[
-            _inlineModelBrowser(),
-          ],
-          if (_modelHint != null) ...[
-            const SizedBox(height: 6),
-            Text(_modelHint!,
-                style: mono(11, height: 1.4, color: AppColors.fg3)),
-          ],
-          const SizedBox(height: 16),
-          AppField(
-            label: 'Context window (tokens)',
-            controller: _ctx,
-            mono: true,
-            keyboardType: TextInputType.number,
-            hint: 'e.g. 200000 — blank keeps the default',
-            helper:
-                'Sets the % context gauge and the point where the agent compacts history.',
-          ),
-          const SizedBox(height: 16),
-          AppField(
-            label: 'Compact at (% of context window)',
-            controller: _compact,
-            mono: true,
-            keyboardType: TextInputType.number,
-            hint: '10–100, e.g. 75',
-            helper:
-                'Lower keeps each step cheaper; the agent saves its working state to memory first.',
-          ),
-          const SizedBox(height: 16),
-          Text('${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort',
-              style: sans(12, weight: W.label, color: AppColors.fg2)),
-          const SizedBox(height: 7),
-          if (_effortAdjustable)
-            Pills<String>(
-              items: _effortItems,
-              selected: _effortItems.any((i) => i.$1 == _effort) ? _effort : '',
-              onSelect: (val) => setState(() => _effort = val),
-            )
-          else
-            Text(
-                _reasoning!['control'] == 'model'
-                    ? 'Set by the model you pick'
-                    : 'Not adjustable for this model',
-                style: sans(13, color: AppColors.fg2)),
-          const SizedBox(height: 6),
-          Text(
-              (_reasoning?['note'] as String?) ??
-                  "Higher means more thinking: better on hard problems, more tokens. Default uses the provider's own. If a model rejects a tier, snippet steps down automatically.",
-              style: sans(11, height: 1.4, color: AppColors.fg3)),
-          const SizedBox(height: 16),
-          if (_isChatgpt)
-            _SubSignIn(
-              client: widget.client,
-              signedInLabel: 'Signed in to ChatGPT',
-              blurb:
-                  'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
-              buttonLabel: 'Sign in with ChatGPT',
-              signedIn: (c) => c.chatgptSignedIn(),
-              begin: (c) => c.chatgptLoginBegin(),
-              signOut: (c) => c.chatgptLogout(),
-            )
-          else if (_isXai)
-            _SubSignIn(
-              client: widget.client,
-              signedInLabel: 'Signed in to xAI',
-              blurb:
-                  'Grok uses your SuperGrok / X Premium subscription — no API key.',
-              buttonLabel: 'Sign in with SuperGrok / X Premium',
-              signedIn: (c) => c.xaiSignedIn(),
-              begin: (c) => c.xaiLoginBegin(),
-              signOut: (c) => c.xaiLogout(),
-            )
-          else if (_isClaudeCode || _isAntigravity)
-            _CliAgentStatus(
-                key: ValueKey(_provider),
-                client: widget.client,
-                provider: _provider)
-          else
-            AppField(
-              label: 'API key',
-              controller: _key,
-              mono: true,
-              obscure: !_showKey,
-              icon: 'key',
-              hint: _isEdit && widget.existing!.hasKey
-                  ? 'leave blank to keep current key'
-                  : 'sk-…',
-              helper:
-                  'Stored on the machine running snippet. Never sent to snippet servers.',
-              rightSlot: GestureDetector(
-                onTap: () => setState(() => _showKey = !_showKey),
-                child: Padding(
-                    padding: EdgeInsets.all(4),
-                    child:
-                        Text(_showKey ? 'Hide' : 'Show', style: TS.caption())),
-              ),
-            ),
-          const SizedBox(height: 16),
-          AppToggle(
-              on: _images,
-              onChanged: (v) => setState(() => _images = v),
-              label: 'Supports images',
-              sub: 'Send screenshots and diagrams to this model'),
-          if (_usesOpenAiAdapter(_provider)) ...[
-            const SizedBox(height: 8),
-            AppToggle(
-                on: _stream,
-                onChanged: (v) => setState(() => _stream = v),
-                label: 'Stream responses',
-                sub:
-                    'Turn on for models that return nothing otherwise (e.g. MiniMax on NVIDIA NIM)'),
-          ],
-          if (_isXai) ...[
-            const SizedBox(height: 8),
-            AppToggle(
-                on: _xSearch,
-                onChanged: (v) => setState(() => _xSearch = v),
-                label: 'X search',
-                sub:
-                    'Let Grok search X via xAI’s server-side tool (Responses API)'),
-          ],
-          const SizedBox(height: 8),
-          AppToggle(
-              on: _active,
-              onChanged: (v) => setState(() => _active = v),
-              label: 'Set as active',
-              sub: 'Use this model for new sessions'),
-          if (_error != null) ...[
-            const SizedBox(height: 14),
-            Text(_error!, style: sans(12, color: AppColors.danger)),
-          ],
-        ],
-      ),
-    );
     final footer = kMobile
         ? Padding(
             padding: EdgeInsets.fromLTRB(
@@ -735,8 +533,13 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
       // (inference_profiles.dart draws "Edit profile" / "Add profile"), so
       // drawing one here stacked a second back row under it — two rows, two
       // exits, same screen.
-      if (!widget.embedded) SnAppBar(title: title, onBack: _dismiss),
-      if (kMobile) Expanded(child: _mobileForm(pills)) else form,
+      if (!widget.embedded)
+        kMobile
+            ? SafeArea(
+                bottom: false,
+                child: MobileBackLink(onBack: _dismiss, label: 'Profiles'))
+            : SnAppBar(title: title, onBack: _dismiss),
+      Expanded(child: _nativeForm(pills)),
       footer,
     ]);
     if (widget.embedded) return body;
@@ -745,277 +548,320 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     );
   }
 
-  Widget _section(String label, List<Widget> children,
-          {String? note, bool card = false}) =>
-      Padding(
-        padding: const EdgeInsets.only(top: 22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (label.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(0, 0, 4, 6),
-                child: Text(label.toUpperCase(),
-                    style: sans(12,
-                        weight: W.label, spacing: 0.7, color: AppColors.fg4)),
-              ),
-            Container(
-              padding: card
-                  ? (kMobile
-                      ? const EdgeInsets.symmetric(horizontal: 4)
-                      : const EdgeInsets.fromLTRB(16, 4, 16, 4))
-                  : EdgeInsets.zero,
-              decoration: card && !kMobile
-                  ? BoxDecoration(
-                      color: AppColors.surface1,
-                      borderRadius: BorderRadius.circular(16),
-                    )
-                  : null,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: children,
-              ),
-            ),
-            if (note != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                child: Text(note,
-                    style: sans(12, height: 17 / 12, color: AppColors.fg4)),
-              ),
-          ],
-        ),
-      );
-
-  Widget _gap() => const SizedBox(height: 14);
-
-  Widget _rule() => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Container(height: 1, color: AppColors.border),
-      );
-
-  Widget _mobileForm(List<(String, String)> pills) {
+  Widget _nativeForm(List<(String, String)> pills) {
     final modelName = _model.text.trim();
-    final toggles = <Widget>[
-      AppToggle(
-          flat: true,
-          on: _images,
-          onChanged: (v) => setState(() => _images = v),
-          label: 'Supports images',
-          sub: 'Send screenshots and diagrams to this model'),
-      if (_usesOpenAiAdapter(_provider))
-        AppToggle(
-            flat: true,
-            on: _stream,
-            onChanged: (v) => setState(() => _stream = v),
-            label: 'Stream responses',
-            sub: 'For models that return nothing otherwise'),
-      if (_isXai)
-        AppToggle(
-            flat: true,
-            on: _xSearch,
-            onChanged: (v) => setState(() => _xSearch = v),
-            label: 'X search',
-            sub: 'Let Grok search X with xAI’s server-side tool'),
-      AppToggle(
-          flat: true,
-          on: _active,
-          onChanged: (v) => setState(() => _active = v),
-          label: 'Use for new chats',
-          sub: 'Make this the active model'),
+    final title = _isEdit
+        ? widget.existing!.name
+        : (_name.text.trim().isNotEmpty ? _name.text.trim() : 'New profile');
+    final effortLabel = '${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort';
+    final compact = (int.tryParse(_compact.text.trim()) ?? 90).clamp(10, 100);
+    Widget providerPicker() => SettingsPopup<String>(
+          label: _providerLabel(_provider),
+          leading: ProviderLogo(_provider, size: kMobile ? 14 : 12),
+          items: pills,
+          selected: _provider,
+          onSelected: (val) => setState(() {
+            _provider = val;
+            _images = _defaultImages(val);
+            _catalogModels = null;
+            _showModelBrowser = false;
+            _modelSearch.clear();
+            _scheduleReasoning();
+          }),
+        );
+    final header = kMobile
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 18),
+            child: Text(title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: sans(30,
+                    weight: FontWeight.w500, spacing: -0.6, color: AppColors.fg1)),
+          )
+        : Padding(
+            padding: const EdgeInsets.only(bottom: 22),
+            child: Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: Center(child: ProviderLogo(_provider, size: 20)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(17,
+                              weight: FontWeight.w500, color: AppColors.fg1)),
+                      const SizedBox(height: 2),
+                      Text(
+                          [
+                            _providerLabel(_provider),
+                            if (modelName.isNotEmpty) modelName,
+                            if (_active) 'used for new sessions',
+                          ].join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(12.5, color: AppColors.fg4)),
+                    ]),
+              ),
+              if (_isEdit && widget.onDelete != null)
+                SettingsPill('Delete', danger: true, onTap: widget.onDelete),
+            ]),
+          );
+    final connection = <Widget>[
+      if (_isChatgpt)
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: _SubSignIn(
+            client: widget.client,
+            signedInLabel: 'Signed in to ChatGPT',
+            blurb: 'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
+            buttonLabel: 'Sign in with ChatGPT',
+            signedIn: (c) => c.chatgptSignedIn(),
+            begin: (c) => c.chatgptLoginBegin(),
+            signOut: (c) => c.chatgptLogout(),
+          ),
+        )
+      else if (_isXai)
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: _SubSignIn(
+            client: widget.client,
+            signedInLabel: 'Signed in to xAI',
+            blurb: 'Grok uses your SuperGrok / X Premium subscription — no API key.',
+            buttonLabel: 'Sign in with SuperGrok / X Premium',
+            signedIn: (c) => c.xaiSignedIn(),
+            begin: (c) => c.xaiLoginBegin(),
+            signOut: (c) => c.xaiLogout(),
+          ),
+        )
+      else if (_isClaudeCode || _isAntigravity)
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: _CliAgentStatus(
+              key: ValueKey(_provider),
+              client: widget.client,
+              provider: _provider),
+        )
+      else
+        SettingsRow(
+          label: 'API key',
+          trailing: SettingsField(
+            controller: _key,
+            width: 220,
+            mono: true,
+            obscure: !_showKey,
+            hint: _isEdit && widget.existing!.hasKey ? 'Saved' : 'sk-…',
+            suffix: GestureDetector(
+              onTap: () => setState(() => _showKey = !_showKey),
+              child: Text(_showKey ? 'Hide' : 'Show',
+                  style: sans(11.5, color: AppColors.fg3)),
+            ),
+          ),
+        ),
+      if (_needsBaseUrl(_provider))
+        SettingsRow(
+          label: 'Base URL',
+          trailing: SettingsField(
+              controller: _baseUrl,
+              width: 220,
+              mono: true,
+              hint: 'https://api.example.com/v1'),
+        ),
     ];
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      padding: kMobile
+          ? const EdgeInsets.fromLTRB(16, 4, 16, 24)
+          : EdgeInsets.fromLTRB(widget.embedded ? 12 : 20, 8, 12, 24),
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                ProviderLogo(_provider, size: 13, color: AppColors.fg4),
-                const SizedBox(width: 5),
-                Text(_providerLabel(_provider),
-                    style: sans(12, color: AppColors.fg4)),
-              ]),
-              const SizedBox(height: 2),
-              Text(
-                  modelName.isEmpty
-                      ? (_isEdit ? 'Edit profile' : 'New profile')
-                      : modelName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(26,
-                      spacing: -0.7, height: 31 / 26, color: AppColors.fg1)),
-              if (_active) ...[
-                const SizedBox(height: 6),
-                Row(children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                        color: AppColors.ok, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Text('Active for new chats',
-                      style: sans(13, color: AppColors.fg3)),
-                ]),
-              ],
-            ],
-          ),
-        ),
-        _section('', [
-          if (!_isEdit) ...[
-            Text('Provider', style: sans(12, color: AppColors.fg4)),
-            const SizedBox(height: 6),
-            Pills<String>(
-              items: pills,
-              selected: _provider,
-              iconFor: (v) =>
-                  providerLogoAsset(v) == null ? null : 'provider:$v',
-              onSelect: (val) => setState(() {
-                _provider = val;
-                _images = _defaultImages(val);
-                _catalogModels = null;
-                _showModelBrowser = false;
-                _modelSearch.clear();
-                _scheduleReasoning();
-              }),
+        header,
+        SettingsGroup(header: 'Model', children: [
+          if (!_isEdit)
+            SettingsRow(
+              label: 'Name',
+              trailing: SettingsField(
+                  controller: _name,
+                  width: 220,
+                  hint: 'Defaults to the provider',
+                  onChanged: (_) => setState(() {})),
             ),
-            _gap(),
-            AppField(
-                label: 'Profile name',
-                controller: _name,
-                hint: 'Defaults to the provider'),
-            _gap(),
-          ],
-          if (_needsBaseUrl(_provider)) ...[
-            AppField(
-                label: 'Base URL',
-                controller: _baseUrl,
-                hint: 'https://api.example.com/v1'),
-            _gap(),
-          ],
-          AppField(
-              label: 'Model',
-              controller: _model,
-              hint: _isChatgpt
-                  ? 'gpt-5.1-codex'
-                  : _isClaudeCode
-                      ? 'sonnet'
-                      : _isAntigravity
-                          ? 'gemini-3.8-flash-high'
-                          : 'claude-sonnet-4.5',
-              rightSlot: _loadingModels
-                  ? const Spinner(size: 16)
-                  : GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _busy ? null : _browseModels,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 8, 0, 8),
-                        child: Text(_showModelBrowser ? 'Close' : 'Browse',
-                            style: sans(14, color: AppColors.accent)),
-                      ),
-                    )),
-          if (_showModelBrowser && _catalogModels != null)
-            _inlineModelBrowser(),
-          if (_modelHint != null) ...[
-            const SizedBox(height: 6),
-            Text(_modelHint!,
-                style: sans(12, height: 17 / 12, color: AppColors.fg4)),
-          ],
-          _gap(),
-          AppField(
-            label: 'Context window',
-            controller: _ctx,
-            keyboardType: TextInputType.number,
-            hint: 'Tokens, e.g. 200000',
+          SettingsRow(
+            label: 'Provider',
+            trailing: _isEdit
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    ProviderLogo(_provider, size: 12),
+                    const SizedBox(width: 6),
+                    Text(_providerLabel(_provider),
+                        style: sans(kMobile ? 15 : 12.5, color: AppColors.fg3)),
+                  ])
+                : providerPicker(),
           ),
-          _gap(),
-          AppField(
-            label: 'Compact at',
-            controller: _compact,
-            keyboardType: TextInputType.number,
-            hint: '% of the context window, e.g. 75',
-          ),
-        ]),
-        _section(
-          '${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort',
-          [
-            if (_effortAdjustable)
-              Pills<String>(
-                items: _effortItems,
-                selected:
-                    _effortItems.any((i) => i.$1 == _effort) ? _effort : '',
-                onSelect: (val) => setState(() => _effort = val),
-              )
-            else
-              Text(
-                  _reasoning!['control'] == 'model'
-                      ? 'Set by the model you pick'
-                      : 'Not adjustable for this model',
-                  style: sans(15, color: AppColors.fg2)),
-          ],
-        ),
-        _section('', [
-          if (_isChatgpt)
-            _SubSignIn(
-              client: widget.client,
-              signedInLabel: 'Signed in to ChatGPT',
-              blurb:
-                  'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
-              buttonLabel: 'Sign in with ChatGPT',
-              signedIn: (c) => c.chatgptSignedIn(),
-              begin: (c) => c.chatgptLoginBegin(),
-              signOut: (c) => c.chatgptLogout(),
-            )
-          else if (_isXai)
-            _SubSignIn(
-              client: widget.client,
-              signedInLabel: 'Signed in to xAI',
-              blurb:
-                  'Grok uses your SuperGrok / X Premium subscription — no API key.',
-              buttonLabel: 'Sign in with SuperGrok / X Premium',
-              signedIn: (c) => c.xaiSignedIn(),
-              begin: (c) => c.xaiLoginBegin(),
-              signOut: (c) => c.xaiLogout(),
-            )
-          else if (_isClaudeCode || _isAntigravity)
-            _CliAgentStatus(
-                key: ValueKey(_provider),
-                client: widget.client,
-                provider: _provider)
-          else
-            AppField(
-              label: 'API key',
-              controller: _key,
-              obscure: !_showKey,
-              icon: 'key',
-              hint: _isEdit && widget.existing!.hasKey
-                  ? 'Leave blank to keep the current key'
-                  : 'sk-…',
-              rightSlot: GestureDetector(
-                onTap: () => setState(() => _showKey = !_showKey),
-                child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Text(_showKey ? 'Hide' : 'Show',
-                        style: sans(13, color: AppColors.fg3))),
+          SettingsRow(
+            label: 'Model',
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              SizedBox(
+                width: kMobile ? 170 : 220,
+                child: SettingsField(
+                  controller: _model,
+                  width: 220,
+                  mono: true,
+                  onChanged: (_) {
+                    setState(() {});
+                    _scheduleReasoning();
+                  },
+                  hint: _isChatgpt
+                      ? 'gpt-5.1-codex'
+                      : _isClaudeCode
+                          ? 'sonnet'
+                          : _isAntigravity
+                              ? 'gemini-3.8-flash-high'
+                              : 'claude-sonnet-4.5',
+                ),
               ),
+              const SizedBox(width: 4),
+              _loadingModels
+                  ? const SizedBox(width: 26, child: Center(child: Spinner(size: 14)))
+                  : IconBtn(_showModelBrowser ? 'x' : 'list',
+                      size: 26,
+                      iconSize: 14,
+                      tooltip: _showModelBrowser ? 'Hide catalog' : 'Browse models',
+                      onTap: _busy ? null : _browseModels),
+            ]),
+          ),
+          if (_showModelBrowser && _catalogModels != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: _inlineModelBrowser(),
+            ),
+          SettingsRow(
+            label: effortLabel,
+            trailing: _effortAdjustable
+                ? SettingsPopup<String>(
+                    label: _effortItems
+                            .where((i) => i.$1 == _effort)
+                            .firstOrNull
+                            ?.$2 ??
+                        'Default',
+                    items: _effortItems,
+                    selected: _effort,
+                    onSelected: (v) => setState(() => _effort = v),
+                  )
+                : Text(
+                    _reasoning?['control'] == 'model'
+                        ? 'Set by the model'
+                        : 'Not adjustable',
+                    style: sans(kMobile ? 15 : 12.5, color: AppColors.fg3)),
+          ),
+        ]),
+        if (_modelHint != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 18),
+            child: Text(_modelHint!,
+                style: sans(12, height: 1.4, color: AppColors.fg4)),
+          ),
+        SettingsGroup(header: 'Context', children: [
+          SettingsRow(
+            label: 'Context window',
+            sub: 'Tokens. Blank keeps the default.',
+            trailing: SettingsField(
+                controller: _ctx,
+                width: 150,
+                mono: true,
+                number: true,
+                hint: '200000'),
+          ),
+          SettingsRow(
+            label: 'Compact at',
+            sub: 'History is summarised when the window is this full.',
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              SizedBox(
+                width: kMobile ? 110 : 160,
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    activeTrackColor: AppColors.accent,
+                    inactiveTrackColor: AppColors.surface3,
+                    thumbColor: AppColors.fg1,
+                    overlayShape: SliderComponentShape.noOverlay,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 7),
+                  ),
+                  child: Slider(
+                    value: compact.toDouble(),
+                    min: 10,
+                    max: 100,
+                    divisions: 18,
+                    onChanged: (v) =>
+                        setState(() => _compact.text = '${v.round()}'),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 40,
+                child: Text('$compact%',
+                    textAlign: TextAlign.right,
+                    style: sans(kMobile ? 15 : 12.5, color: AppColors.fg2)),
+              ),
+            ]),
+          ),
+          if (_usesOpenAiAdapter(_provider))
+            SettingsRow(
+              label: 'Stream responses',
+              sub: 'For models that return nothing otherwise.',
+              trailing: SettingsSwitch(
+                  value: _stream, onChanged: (v) => setState(() => _stream = v)),
             ),
         ]),
-        _section(card: true, 'Behaviour', [
-          for (var i = 0; i < toggles.length; i++) ...[
-            if (i > 0) _rule(),
-            toggles[i],
-          ],
+        SettingsGroup(
+          header: 'Connection',
+          footer: 'Keys stay on the machine running snippet.',
+          children: connection,
+        ),
+        SettingsGroup(header: 'Options', children: [
+          SettingsRow(
+            label: 'Supports images',
+            sub: 'Send screenshots and diagrams to this model.',
+            trailing: SettingsSwitch(
+                value: _images, onChanged: (v) => setState(() => _images = v)),
+          ),
+          if (_isXai)
+            SettingsRow(
+              label: 'X search',
+              sub: 'Let Grok search X with xAI’s server-side tool.',
+              trailing: SettingsSwitch(
+                  value: _xSearch,
+                  onChanged: (v) => setState(() => _xSearch = v)),
+            ),
+          SettingsRow(
+            label: 'Use for new sessions',
+            sub: 'Make this the active profile.',
+            trailing: SettingsSwitch(
+                value: _active, onChanged: (v) => setState(() => _active = v)),
+          ),
         ]),
+        if (_isEdit && widget.onDelete != null && kMobile)
+          SettingsGroup(children: [
+            SettingsRow(
+                label: 'Delete profile', danger: true, onTap: widget.onDelete),
+          ]),
         if (_error != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 14, 4, 0),
-            child: Text(_error!, style: sans(13, color: AppColors.danger)),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+            child: Text(_error!, style: sans(12, color: AppColors.danger)),
           ),
       ],
     );
   }
+
 }
 
 /// Searchable list over the provider's live model catalog. Rows show the raw

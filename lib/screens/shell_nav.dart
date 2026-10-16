@@ -276,13 +276,44 @@ class ShellSectionHeader extends StatelessWidget {
 /// the same size wherever you are. Per-screen headers are how the two drifted:
 /// settings had a 16px title behind an arrow-left, agent detail its own behind
 /// an x. Two screens inside one shell should not offer two different exits.
+class MobileBackLink extends StatelessWidget {
+  const MobileBackLink(
+      {super.key, required this.onBack, this.label = 'Back', this.trailing = const []});
+  final VoidCallback onBack;
+  final String label;
+  final List<Widget> trailing;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 44,
+        child: Row(children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onBack,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                AppIcon('chevron-left', size: 20, color: AppColors.accent),
+                Text(label, style: sans(16, color: AppColors.accent)),
+              ]),
+            ),
+          ),
+          const Spacer(),
+          ...trailing,
+          const SizedBox(width: 8),
+        ]),
+      );
+}
+
 class NavBackRow extends StatelessWidget {
   const NavBackRow({
     super.key,
     required this.title,
     required this.onBack,
     this.trailing = const [],
+    this.backLabel = 'Settings',
   });
+  final String backLabel;
 
   final String title;
   final VoidCallback onBack;
@@ -291,7 +322,23 @@ class NavBackRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (kMobile) {
-      return MobileBackBar(title: title, onBack: onBack, trailing: trailing);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MobileBackLink(onBack: onBack, label: backLabel, trailing: trailing),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
+            child: Text(title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: sans(30,
+                    weight: FontWeight.w500,
+                    spacing: -0.6,
+                    color: AppColors.fg1)),
+          ),
+        ],
+      );
     }
     return SizedBox(
       height: 56,

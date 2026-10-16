@@ -1093,7 +1093,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         itemCount: _events.length,
-        itemBuilder: (_, i) => _bubble(_events[i]),
+        itemBuilder: (_, i) => _wideCap(_bubble(_events[i])),
       ),
     );
   }
@@ -1386,12 +1386,12 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                   ? _wideCap(_desktopStrip())
                   : Container(
                   decoration: BoxDecoration(
-                    color: AppColors.raised,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.border),
+                    color: AppColors.surface1,
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(
+                        color: AppColors.fg1.withValues(alpha: 0.08)),
                   ),
-                  padding: EdgeInsets.symmetric(
-                      horizontal: 12, vertical: kMobile ? 14 : 12),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 10, 10),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1505,9 +1505,8 @@ class _SendBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = kMobile ? 40.0 : 36.0;
-    final ShapeBorder shape =
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+    final size = kMobile ? 36.0 : 30.0;
+    const ShapeBorder shape = CircleBorder();
     return Material(
       color: enabled ? AppColors.accentFill : AppColors.hover,
       shape: shape,

@@ -24,43 +24,43 @@ class DesktopComposerStrip extends StatelessWidget {
 
   static InputDecoration decoration(String hint) => InputDecoration(
         isCollapsed: true,
-        contentPadding: const EdgeInsets.fromLTRB(0, 10, 8, 10),
+        contentPadding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
         border: InputBorder.none,
         hintText: hint,
         hintStyle: TS.body(AppColors.fg4),
       );
 
   @override
-  Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            key: cardKey,
-            constraints: const BoxConstraints(minHeight: 40),
-            padding: const EdgeInsets.fromLTRB(12, 0, 6, 0),
-            decoration: BoxDecoration(
-              color: AppColors.raised,
-              borderRadius: BorderRadius.circular(12),
-              border: highlight
-                  ? Border.all(color: AppColors.accent, width: 1.5)
-                  : Border.all(color: AppColors.border),
-            ),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Expanded(child: field),
+  Widget build(BuildContext context) => Container(
+        key: cardKey,
+        padding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(16),
+          border: highlight
+              ? Border.all(color: AppColors.accent, width: 1.5)
+              : Border.all(color: AppColors.line),
+          boxShadow: [
+            BoxShadow(
+                color: AppColors.bg.withValues(alpha: 0.9),
+                blurRadius: 40,
+                offset: const Offset(0, -18)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            field,
+            Row(children: [
+              ...footer,
+              if (!footer.any((w) => w is Spacer)) const Spacer(),
               for (final w in inline)
-                Padding(
-                    padding: const EdgeInsets.only(bottom: 8, right: 6),
-                    child: w),
-              Padding(padding: const EdgeInsets.only(bottom: 6), child: send),
+                Padding(padding: const EdgeInsets.only(right: 6), child: w),
+              send,
             ]),
-          ),
-          if (footer.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Row(children: footer),
-            ),
-        ],
+          ],
+        ),
       );
 }
 
@@ -83,15 +83,13 @@ class StripSendButton extends StatelessWidget {
         ? AppColors.hover
         : stop
             ? (kMobile ? AppColors.fg1 : AppColors.surface3)
-            : AppColors.accentFill;
+            : (kMobile ? AppColors.accentFill : AppColors.fg1);
     final ink = !enabled
         ? AppColors.fg4
         : stop
             ? (kMobile ? AppColors.bg : AppColors.fg1)
-            : AppColors.accentFg;
-    final ShapeBorder shape = kMobile
-        ? const CircleBorder()
-        : RoundedRectangleBorder(borderRadius: BorderRadius.circular(8));
+            : (kMobile ? AppColors.accentFg : AppColors.bg);
+    const ShapeBorder shape = CircleBorder();
     return Material(
       color: fill,
       shape: shape,
@@ -99,7 +97,7 @@ class StripSendButton extends StatelessWidget {
         customBorder: shape,
         onTap: onTap,
         child: SizedBox.square(
-          dimension: kMobile ? 34 : 28,
+          dimension: kMobile ? 34 : 30,
           child: Center(
             child: sending
                 ? Spinner(size: 13, color: ink)
