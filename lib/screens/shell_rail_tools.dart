@@ -212,6 +212,14 @@ List<Widget> buildShellRailTools({
             () => onToggleRightPanel(RightPanel.recurring)),
         if (win <= 0 || used <= 0)
           item('wrap', 'Compact history', () => onSessionAction('compact')),
+        if (!mc) ...[
+          const PopupMenuDivider(),
+          appMenuItem(
+              value: () => onSessionAction('delete'),
+              icon: 'trash',
+              label: 'Delete session',
+              danger: true),
+        ],
       ],
     );
     fn?.call();

@@ -1563,7 +1563,33 @@ class _DesktopShellState extends State<DesktopShell>
     _loadSessions();
   }
 
+  Future<void> _deleteActiveSession() async {
+    final t = _activeTab;
+    final c = _client;
+    final id = t?.sessionId;
+    if (t == null || c == null || id == null) return;
+    final name = t.title.isEmpty ? '(untitled session)' : t.title;
+    final ok = await confirmAction(
+      context,
+      title: 'Delete session?',
+      body:
+          '$name\n\nPermanently removes the conversation. The folder and its files are untouched.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok || !mounted) return;
+    try {
+      await c.deleteSession(id);
+      if (mounted) _onSessionDeleted(id);
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't delete: $e", danger: true);
+    }
+  }
+
   void _dispatchSessionAction(String action, [String? extra]) {
+    if (action == 'delete') {
+      _deleteActiveSession();
+      return;
+    }
     final key = _activeTab?.key;
     if (key == null) return;
     _macSessionControls[key]?.performAction(action, extra);
