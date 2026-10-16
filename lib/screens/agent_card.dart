@@ -131,19 +131,88 @@ class _AgentCardState extends State<AgentCard> {
       (done, AppColors.ok.withValues(alpha: 0.55)),
     ].where((e) => e.$1 > 0).toList();
     final barHeight = kMobile ? 4.0 : 3.0;
-    return GestureDetector(
-      onSecondaryTapUp: kMobile ? null : (d) => _actions(d.globalPosition),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(kMobile ? 0 : 8),
+    final bar = ClipRRect(
+      borderRadius: BorderRadius.circular(barHeight),
+      child: SizedBox(
+        height: barHeight,
+        child: segments.isEmpty
+            ? ColoredBox(
+                color: AppColors.surface2, child: const SizedBox.expand())
+            : Row(children: [
+                for (var j = 0; j < segments.length; j++) ...[
+                  if (j > 0) const SizedBox(width: 2),
+                  Expanded(
+                    flex: segments[j].$1,
+                    child: ColoredBox(
+                        color: segments[j].$2,
+                        child: const SizedBox.expand()),
+                  ),
+                ],
+              ]),
+      ),
+    );
+    if (kMobile) {
+      return Material(
+        color: AppColors.surface1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.line),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: widget.onOpen,
           onLongPress: () => _actions(null),
-          borderRadius: BorderRadius.circular(kMobile ? 0 : 8),
           child: Padding(
-            padding: kMobile
-                ? const EdgeInsets.fromLTRB(16, 13, 16, 13)
-                : const EdgeInsets.fromLTRB(10, 8, 10, 9),
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Opacity(
+                      opacity: agent.available ? 1 : 0.5,
+                      child: AgentMochi(agent.id, size: 30),
+                    ),
+                    const Spacer(),
+                    SwapText(summary,
+                        style:
+                            sans(12, color: summaryColor, tabular: true)),
+                  ],
+                ),
+                const Spacer(),
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(15,
+                        weight: W.label,
+                        color: agent.available
+                            ? AppColors.fg1
+                            : AppColors.fg3)),
+                const SizedBox(height: 2),
+                Text(role.isEmpty ? status : role,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12.5, color: AppColors.fg4)),
+                const SizedBox(height: 10),
+                bar,
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return GestureDetector(
+      onSecondaryTapUp: (d) => _actions(d.globalPosition),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: widget.onOpen,
+          onLongPress: () => _actions(null),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -152,16 +221,16 @@ class _AgentCardState extends State<AgentCard> {
                   children: [
                     Opacity(
                       opacity: agent.available ? 1 : 0.5,
-                      child: AgentMochi(agent.id, size: kMobile ? 22 : 18),
+                      child: AgentMochi(agent.id, size: 18),
                     ),
-                    SizedBox(width: kMobile ? 10 : 8),
+                    const SizedBox(width: 8),
                     Flexible(
                       flex: 0,
                       child: Text(name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: sans(nameSize,
-                              weight: kMobile ? W.label : W.body,
+                              weight: W.body,
                               color: agent.available
                                   ? AppColors.fg1
                                   : AppColors.fg3)),
@@ -179,28 +248,8 @@ class _AgentCardState extends State<AgentCard> {
                             color: summaryColor, tabular: true)),
                   ],
                 ),
-                SizedBox(height: kMobile ? 9 : 7),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(barHeight),
-                  child: SizedBox(
-                    height: barHeight,
-                    child: segments.isEmpty
-                        ? ColoredBox(
-                            color: AppColors.surface2,
-                            child: const SizedBox.expand())
-                        : Row(children: [
-                            for (var j = 0; j < segments.length; j++) ...[
-                              if (j > 0) const SizedBox(width: 2),
-                              Expanded(
-                                flex: segments[j].$1,
-                                child: ColoredBox(
-                                    color: segments[j].$2,
-                                    child: const SizedBox.expand()),
-                              ),
-                            ],
-                          ]),
-                  ),
-                ),
+                const SizedBox(height: 7),
+                bar,
               ],
             ),
           ),
