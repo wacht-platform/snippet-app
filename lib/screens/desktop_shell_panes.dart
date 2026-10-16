@@ -473,20 +473,26 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     final c = _client;
     if (c == null) return;
     final inst = _active;
-    presentScreen(context,
-        maxWidth: 1080,
-        maxHeight: 720,
-        builder: (_, close) => _SettingsPanel(
-              client: c,
-              instances: _instances,
-              active: inst,
-              onRemove: _removeInstance,
-              onRename: _renameInstance,
-              onSelect: _selectInstance,
-              onAdd: _onInstanceAdded,
-              onClose: close,
-              initialPage: page,
-            ));
+    Navigator.of(context).push(PageRouteBuilder<void>(
+      transitionDuration: const Duration(milliseconds: 180),
+      reverseTransitionDuration: const Duration(milliseconds: 140),
+      pageBuilder: (ctx, a1, a2) => _SettingsPanel(
+        client: c,
+        instances: _instances,
+        active: inst,
+        onRemove: _removeInstance,
+        onRename: _renameInstance,
+        onSelect: _selectInstance,
+        onAdd: _onInstanceAdded,
+        onClose: () => Navigator.of(ctx).maybePop(),
+        initialPage: page,
+        fullPage: true,
+      ),
+      transitionsBuilder: (ctx, anim, a2, child) => FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+        child: child,
+      ),
+    ));
   }
 
   Widget _tabStrip(VoidCallback? onMenu) => CardTabStrip(
