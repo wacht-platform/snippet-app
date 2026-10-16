@@ -789,6 +789,11 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       case 'rename':
         _renameCurrent();
         return;
+      case 'copy_resume':
+        Clipboard.setData(
+            ClipboardData(text: 'snippet --resume ${widget.sessionId}'));
+        _toast('Resume command copied');
+        return;
       case 'model':
         _switchModel(context);
         return;
@@ -897,16 +902,17 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           openTaskDetail(context, widget.client, extra);
         }
         return;
-      case 'rename':
-        _renameCurrent();
-        return;
-      case 'model':
-        _switchModel();
-        return;
       case 'file_changes':
         final steps = sessionChangeSteps(_state?.events ?? const []);
-        Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => FileChangesScreen(steps: steps)));
+        if (kMobile) {
+          Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => FileChangesScreen(steps: steps)));
+        } else {
+          presentScreen<void>(context,
+              maxWidth: 760,
+              maxHeight: 640,
+              builder: (_, close) => FileChangesScreen(steps: steps));
+        }
         return;
       case 'memory':
         presentScreen(context,
