@@ -10,7 +10,6 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import '../file_icons.dart';
-import '../mochi.dart';
 import 'git.dart';
 import 'pull_request_detail.dart' show PrSidebarList;
 import 'shell_nav.dart';
@@ -353,34 +352,6 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     }
   }
 
-  void _draftMessage() {
-    final files = _status?.files ?? const <GitFile>[];
-    if (files.isEmpty) return;
-    String kind(GitFile f) {
-      final raw = (f.staged ? f.x : (f.untracked ? '?' : f.y)).trim();
-      return raw == '?' || raw == 'A' ? 'Add' : raw == 'D' ? 'Remove' : 'Update';
-    }
-    final groups = <String, List<String>>{};
-    for (final f in files) {
-      groups.putIfAbsent(kind(f), () => []).add(f.path.split('/').last);
-    }
-    String part(String verb, List<String> names, bool first) {
-      final v = first ? verb : verb.toLowerCase();
-      if (names.length == 1) return '$v ${names.first}';
-      if (names.length == 2) return '$v ${names[0]} and ${names[1]}';
-      return '$v ${names[0]}, ${names[1]} and ${names.length - 2} more';
-    }
-    final parts = <String>[];
-    for (final verb in ['Update', 'Add', 'Remove']) {
-      final n = groups[verb];
-      if (n != null) parts.add(part(verb, n, parts.isEmpty));
-    }
-    _commitCtl.text = parts.join('; ');
-    _commitCtl.selection =
-        TextSelection.collapsed(offset: _commitCtl.text.length);
-    setState(() {});
-  }
-
   Widget _changedHeader() => Padding(
         padding: const EdgeInsets.fromLTRB(18, 18, 14, 6),
         child: Row(children: [
@@ -411,6 +382,27 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
             ),
           ],
         ]),
+      );
+
+  Widget _roundBtn(String icon, String tip, VoidCallback? onTap) => Tooltip(
+        message: tip,
+        child: Opacity(
+          opacity: onTap == null ? 0.45 : 1,
+          child: Material(
+            color: AppColors.surface2,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: SizedBox(
+                width: 32,
+                height: 32,
+                child: Center(
+                    child: AppIcon(icon, size: 14, color: AppColors.fg2)),
+              ),
+            ),
+          ),
+        ),
       );
 
   Widget _deskPill(String label,
@@ -480,24 +472,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Row(children: [
-                    Expanded(
-                      child: Text('⌘↵ to commit',
-                          style: sans(11.5, color: AppColors.fg4)),
-                    ),
-                    if (!kMobile)
-                      Tooltip(
-                        message: 'Write message for me',
-                        child: InkWell(
-                          onTap: _draftMessage,
-                          borderRadius: BorderRadius.circular(7),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: MochiIcon(color: AppColors.accent, size: 16),
-                          ),
-                        ),
-                      ),
-                  ]),
+                  Text('⌘↵ to commit', style: sans(11.5, color: AppColors.fg4)),
                 ]),
           ),
           const SizedBox(height: 10),
@@ -513,40 +488,15 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                     onTap: _commit),
               ),
               const SizedBox(width: 8),
-              Tooltip(
-                message: _pushing ? 'Pushing…' : 'Push',
-                child: Opacity(
-                  opacity: _pushing ? 0.45 : 1,
-                  child: Material(
-                    color: AppColors.surface2,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: _pushing ? null : _push,
-                      child: SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: Center(
-                            child: AppIcon('upload',
-                                size: 14, color: AppColors.fg2)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              _roundBtn('upload', _pushing ? 'Pushing…' : 'Push',
+                  _pushing ? null : _push),
               const SizedBox(width: 6),
               box.maxWidth < 300
-                  ? Tooltip(
-                      message: 'Open PR',
-                      child: _deskPill('',
-                          light: false,
-                          icon: 'pull-request',
-                          disabled: _opening,
-                          onTap: _openPr),
-                    )
+                  ? _roundBtn('git-pull-request-arrow', 'Open PR',
+                      _opening ? null : _openPr)
                   : _deskPill(_opening ? 'Opening…' : 'Open PR',
                       light: false,
-                      icon: 'pull-request',
+                      icon: 'git-pull-request-arrow',
                       disabled: _opening,
                       onTap: _openPr),
             ]))

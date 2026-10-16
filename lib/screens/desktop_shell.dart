@@ -312,20 +312,6 @@ class _DesktopShellState extends State<DesktopShell>
     });
   }
 
-  /// Show a tool batch in the side pane's Tools tab, replacing whatever batch
-  /// it showed, and focus it.
-  void _openRightTools(ValueListenable<ToolBatch> batch) {
-    final tab = _RightTab.tools(batch);
-    setState(() {
-      _rightCollapsed = false;
-      _rightTabs.removeWhere((t) => t.key == tab.key);
-      _rightTabs.add(tab);
-      _activePane = _Pane.right;
-      _sidePanelHidden = false;
-      _activeKey[_Pane.right] = tab.key;
-    });
-  }
-
   /// A file opened from a side-pane readout goes to the main pane, next to the
   /// session, not over the readout it was opened from.
   void _openFileFromRightPane(String path, String name) {

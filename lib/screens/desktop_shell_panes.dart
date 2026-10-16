@@ -112,7 +112,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
           : null,
       onOpenFileTab: (path, name) =>
           _openFileTab(t.client, t.instanceUrl, path, name),
-      onOpenToolBatch: !kMobile ? _openRightTools : null,
+      onOpenToolBatch: null,
       onOpenSession: _openSession,
       onMacStatus: (state, running) =>
           _setMacSessionStatus(t.key, state, running),
