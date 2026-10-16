@@ -789,11 +789,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       case 'rename':
         _renameCurrent();
         return;
-      case 'copy_resume':
-        Clipboard.setData(
-            ClipboardData(text: 'snippet --resume ${widget.sessionId}'));
-        _toast('Resume command copied');
-        return;
       case 'model':
         _switchModel(context);
         return;
