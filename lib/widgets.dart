@@ -1932,6 +1932,7 @@ const _lucide = <String, IconData>{
   'share': LucideIcons.share,
   'file': LucideIcons.file,
   'git-branch': LucideIcons.gitBranch,
+  'git-fork': LucideIcons.gitFork,
   'worktree': LucideIcons.gitFork,
   'terminal': LucideIcons.terminal,
   'grip': LucideIcons.gripVertical,

@@ -1093,6 +1093,33 @@ class SidebarState extends State<Sidebar> {
                     ),
                   ),
                 ),
+              Builder(
+                builder: (ctx) => Tooltip(
+                  message: 'New agent',
+                  child: Material(
+                    color: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(11),
+                      side: BorderSide(color: AppColors.line),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(11),
+                      onTap: () async {
+                        await _openCreateAgent(ctx);
+                        _metersAt = null;
+                        _loadMeters();
+                      },
+                      child: SizedBox(
+                        width: 38,
+                        height: 38,
+                        child: Center(
+                            child: AppIcon('plus',
+                                size: 15, color: AppColors.fg3)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
