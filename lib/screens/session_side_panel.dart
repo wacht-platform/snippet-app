@@ -46,6 +46,7 @@ class SessionSidePanel extends StatefulWidget {
   final TerminalHost? host;
 
   static final changesRequest = ValueNotifier<int>(0);
+  static final filesRequest = ValueNotifier<int>(0);
 
   @override
   State<SessionSidePanel> createState() => _SessionSidePanelState();
@@ -56,10 +57,18 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
   static bool _changes = false;
 
   static int _seenRequest = 0;
+  static int _seenFilesRequest = 0;
 
   void _showChanges() {
     _seenRequest = SessionSidePanel.changesRequest.value;
+    widget.onClearReadout?.call();
     if (mounted) setState(() => _changes = true);
+  }
+
+  void _showFiles() {
+    _seenFilesRequest = SessionSidePanel.filesRequest.value;
+    widget.onClearReadout?.call();
+    if (mounted) setState(() => _changes = false);
   }
 
   @override
@@ -69,12 +78,18 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
       _seenRequest = SessionSidePanel.changesRequest.value;
       _changes = true;
     }
+    if (SessionSidePanel.filesRequest.value != _seenFilesRequest) {
+      _seenFilesRequest = SessionSidePanel.filesRequest.value;
+      _changes = false;
+    }
     SessionSidePanel.changesRequest.addListener(_showChanges);
+    SessionSidePanel.filesRequest.addListener(_showFiles);
   }
 
   @override
   void dispose() {
     SessionSidePanel.changesRequest.removeListener(_showChanges);
+    SessionSidePanel.filesRequest.removeListener(_showFiles);
     super.dispose();
   }
 
