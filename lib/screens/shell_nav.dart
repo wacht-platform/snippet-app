@@ -339,22 +339,30 @@ class NavBackRow extends StatelessWidget {
         ]),
       );
     }
-    return SizedBox(
-      height: 56,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s12, 0),
-        child: Row(children: [
-          IconBtn('chevron-left',
-              size: M.minTarget, iconSize: 22, tooltip: 'Back', onTap: onBack),
-          const SizedBox(width: S.s2),
-          Expanded(
-            child: Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TS.sectionTitle()),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 768),
+        child: SizedBox(
+          height: 56,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s12, 0),
+            child: Row(children: [
+              IconBtn('chevron-left',
+                  size: M.minTarget,
+                  iconSize: 22,
+                  tooltip: 'Back',
+                  onTap: onBack),
+              const SizedBox(width: S.s2),
+              Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TS.sectionTitle()),
+              ),
+              ...trailing,
+            ]),
           ),
-          ...trailing,
-        ]),
+        ),
       ),
     );
   }

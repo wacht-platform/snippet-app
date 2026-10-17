@@ -1000,8 +1000,7 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   Widget _nativeGeneral() {
     if (_manual == null) _loadManual();
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+    return PageBody(
       children: [
         SettingsGroup(
           header: 'Machines',
@@ -1128,8 +1127,8 @@ class SettingsPanelState extends State<SettingsPanel> {
         });
     final canConnect =
         !_addMachineBusy && _addMachinePaste.text.trim().isNotEmpty;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 40),
+    return PageBody(
+      topPadding: 18,
       children: [
         Row(children: [
           IconBtn('chevron-left',

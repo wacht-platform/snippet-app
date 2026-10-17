@@ -197,10 +197,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
     return PullToRefresh(
       onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(
-            kMobile ? M.gutter : 24, 8, kMobile ? M.gutter : 24, 40),
+      child: PageBody(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
@@ -493,8 +490,8 @@ class _ScopeViewState extends State<_ScopeView> {
     );
   }
 
-  Widget _fileList(double side) => ListView(
-        padding: EdgeInsets.fromLTRB(side, 4, side, 40),
+  Widget _fileList(double side) => PageBody(
+        topPadding: 4,
         children: [
           ListGroup(children: [
             for (final f in _files)
@@ -521,8 +518,8 @@ class _ScopeViewState extends State<_ScopeView> {
   Widget _historyList(double side) {
     final history = _history;
     if (history == null) return const Center(child: Spinner(size: 20));
-    return ListView(
-      padding: EdgeInsets.fromLTRB(side, 4, side, 40),
+    return PageBody(
+      topPadding: 4,
       children: [
         for (final c in history)
           Padding(
