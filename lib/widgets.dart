@@ -17,6 +17,8 @@ import 'dialog_widgets.dart';
 import 'markdown_widgets.dart';
 import 'menu_widgets.dart';
 import 'screens/artifact_viewer.dart' show openArtifact;
+import 'screens/session.dart' show SessionScreen;
+import 'panel.dart' show presentScreen;
 import 'screens/mobile_chrome.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -145,7 +147,7 @@ class Pills<T> extends StatelessWidget {
         ]);
 }
 
-void openMarkdownLink(String? href, [BuildContext? context]) {
+void openMarkdownLink(String? href, [BuildContext? context, String? text]) {
   if (href == null || href.isEmpty) return;
   final uri = Uri.tryParse(href);
   if (uri == null) return;
@@ -153,7 +155,29 @@ void openMarkdownLink(String? href, [BuildContext? context]) {
     if (context != null) _openArtifactLink(context, uri);
     return;
   }
+  if (uri.scheme == 'session') {
+    if (context != null) _openSessionLink(context, uri, text);
+    return;
+  }
   launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
+void _openSessionLink(BuildContext context, Uri uri, String? text) {
+  final id = Uri.decodeComponent(uri.path).trim();
+  final client = DaemonScope.maybeOf(context) ?? DaemonScope.current;
+  if (client == null || id.isEmpty) {
+    toast(context, 'Connect to the machine to open this session.', danger: true);
+    return;
+  }
+  final title = (text ?? '').trim();
+  final open = context.findAncestorWidgetOfExactType<SessionScreen>()?.onOpenSession;
+  if (open != null) {
+    open(id, title, null);
+    return;
+  }
+  presentScreen(context,
+      builder: (_, close) => SessionScreen(
+          client: client, sessionId: id, title: title, onMenu: close));
 }
 
 void _openArtifactLink(BuildContext context, Uri uri) {
@@ -1140,7 +1164,7 @@ class Bubble extends StatelessWidget {
             selectable: false,
             styleSheet: markdownStyle(context),
             builders: {'pre': PreBlockBuilder()},
-            onTapLink: (txt, href, title) => openMarkdownLink(href, context),
+            onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
           )
         : null;
     final voice = <Widget>[
@@ -1167,7 +1191,7 @@ class Bubble extends StatelessWidget {
       selectable: false,
       styleSheet: agentMarkdownStyle(context),
       builders: {'pre': PreBlockBuilder()},
-      onTapLink: (txt, href, title) => openMarkdownLink(href, context),
+      onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
     );
 
     final agent =

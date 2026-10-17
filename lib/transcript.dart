@@ -887,7 +887,7 @@ class SystemRow extends StatelessWidget {
                 selectable: true,
                 styleSheet: markdownStyle(context),
                 builders: {'pre': PreBlockBuilder()},
-                onTapLink: (txt, href, title) => openMarkdownLink(href, context),
+                onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
               ),
             ),
         ]),
