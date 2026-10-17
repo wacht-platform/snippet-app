@@ -199,17 +199,23 @@ void main() {
   });
 
   test('desktop shell has no board command or creation callback', () {
-    final shell = File('lib/screens/desktop_shell.dart').readAsStringSync();
-    final tabs = File('lib/screens/desktop_shell_tabs.dart').readAsStringSync();
-    final sidebar =
-        File('lib/screens/shell_sidebar_host.dart').readAsStringSync();
+    final shell = File('lib/screens/desktop_shell.dart')
+        .readAsStringSync()
+        .replaceAll('\r\n', '\n');
+    final tabs = File('lib/screens/desktop_shell_tabs.dart')
+        .readAsStringSync()
+        .replaceAll('\r\n', '\n');
+    final sidebar = File('lib/screens/shell_sidebar_host.dart')
+        .readAsStringSync()
+        .replaceAll('\r\n', '\n');
     expect(shell, isNot(contains('Open Task Board')));
     expect(shell, isNot(contains("'kanban'")));
     expect(shell, isNot(contains('_openBoardTab')));
     expect(tabs, isNot(contains('_openBoardTab')));
     expect(sidebar, isNot(contains('onOpenBoard')));
-    final panes =
-        File('lib/screens/desktop_shell_panes.dart').readAsStringSync();
+    final panes = File('lib/screens/desktop_shell_panes.dart')
+        .readAsStringSync()
+        .replaceAll('\r\n', '\n');
     expect(panes, contains('''return kMobile
           ? TaskKanban(key: ValueKey('body-\${t.key}'), client: t.client)
           : TasksPanel(key: ValueKey('body-\${t.key}'), client: t.client);'''));

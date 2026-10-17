@@ -24,10 +24,19 @@ class NotificationInbox {
   NotificationInbox(this.db);
   final Database db;
   static Future<NotificationInbox>? _opening;
-  static Future<NotificationInbox> open() => _opening ??= _open();
+  static Future<NotificationInbox> open() async {
+    if (_opening != null) {
+      final current = await _opening!;
+      if (current.db.isOpen) return current;
+    }
+    return await (_opening = _open());
+  }
+
   static Future<NotificationInbox> _open() async {
     final DatabaseFactory factory;
-    if (Platform.isWindows || Platform.isLinux) {
+    if (Platform.isWindows ||
+        Platform.isLinux ||
+        Platform.environment.containsKey('FLUTTER_TEST')) {
       sqfliteFfiInit();
       factory = databaseFactoryFfi;
     } else {
