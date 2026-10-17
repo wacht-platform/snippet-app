@@ -250,8 +250,6 @@ void showDesktopShortcutsDialog(BuildContext context) {
       shortcutRow('Ctrl Tab · Alt ← / → · ⌘ ⇧ [ / ]', 'Previous / next tab'),
       shortcutRow('⌘/Ctrl K · ⌘/Ctrl P', 'Command palette'),
       shortcutRow('⌘/Ctrl L', 'Focus message input'),
-      shortcutRow('⌘/Ctrl B', 'Toggle sidebar'),
-      shortcutRow('⌘/Ctrl \\', 'Toggle right panel'),
       shortcutRow('⌘/Ctrl ⇧ E · ⌘/Ctrl ⇧ F', 'File explorer'),
       shortcutRow('⌘/Ctrl ⇧ G', 'Git diff'),
       shortcutRow('⌘/Ctrl .', 'Stop active run'),
