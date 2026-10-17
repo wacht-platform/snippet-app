@@ -413,9 +413,6 @@ class _ScopeViewState extends State<_ScopeView> {
     if (key.startsWith('project:')) {
       return 'Filled by sessions working in this project.';
     }
-    if (key.startsWith('session:')) {
-      return 'Filled as this session saves its decisions and progress.';
-    }
     return 'Entries appear here as agents save what they learn.';
   }
 
