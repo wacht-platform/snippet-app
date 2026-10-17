@@ -302,9 +302,10 @@ class _DesktopShellState extends State<DesktopShell>
       // if a drag previously parked it on the left.
       final existing = _rightTabs.where((t) => t.key == key).firstOrNull;
       if (existing == null) {
-        _rightTabs.add(_RightTab.panel(p));
+        _rightTabs.add(_RightTab.panel(p, originTabKey: _activeTab?.key));
       } else {
         existing.pane = _Pane.right;
+        existing.originTabKey = _activeTab?.key;
       }
       _activePane = _Pane.right;
       _sidePanelHidden = false;
@@ -346,7 +347,9 @@ class _DesktopShellState extends State<DesktopShell>
   /// and even an empty pane stays open so the next rail tap lands somewhere.
   Future<Object?> _openShellPanel(ShellPanelRequest request) {
     final existing = _rightTabs.where((t) => t.key == request.key).firstOrNull;
-    final tab = existing ?? _RightTab.request(request);
+    final tab = existing ??
+        _RightTab.request(request, originTabKey: _activeTab?.key);
+    tab.originTabKey = _activeTab?.key;
     if (existing == null &&
         request.purpose == ShellPanelPurpose.pullRequests) {
       tab.pane = _Pane.left;
@@ -752,6 +755,20 @@ class _DesktopShellState extends State<DesktopShell>
   }
 
   void _syncPage() {
+    final currentKey = _activeTab?.key;
+    final stale = _rightTabs
+        .where((r) => r.originTabKey != null && r.originTabKey != currentKey)
+        .toList();
+    if (stale.isNotEmpty) {
+      for (final r in stale) {
+        r.request?.complete();
+        _rightTabs.remove(r);
+        for (final pane in _Pane.values) {
+          if (_activeKey[pane] == r.key) _activeKey.remove(pane);
+        }
+      }
+      if (mounted) setState(() {});
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_pageController.hasClients && _activeIndex >= 0) {
         _pageController.jumpToPage(_activeIndex);

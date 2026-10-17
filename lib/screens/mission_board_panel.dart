@@ -8,12 +8,31 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
+import 'shell_models.dart' show RightTab;
+
 class MissionBoardPanel extends StatefulWidget {
-  const MissionBoardPanel(
-      {super.key, required this.client, required this.onOpenSession});
+  const MissionBoardPanel({
+    super.key,
+    required this.client,
+    required this.onOpenSession,
+    this.readouts = const [],
+    this.activeReadout,
+    this.readoutBody,
+    this.onSelectReadout,
+    this.onCloseReadout,
+    this.onClearReadout,
+    this.onExpandReadout,
+  });
 
   final DaemonClient client;
   final void Function(String sessionId, String title) onOpenSession;
+  final List<RightTab> readouts;
+  final String? activeReadout;
+  final Widget Function(RightTab readout)? readoutBody;
+  final ValueChanged<RightTab>? onSelectReadout;
+  final ValueChanged<RightTab>? onCloseReadout;
+  final VoidCallback? onClearReadout;
+  final ValueChanged<RightTab>? onExpandReadout;
 
   @override
   State<MissionBoardPanel> createState() => _MissionBoardPanelState();
@@ -118,8 +137,101 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
     );
   }
 
+  RightTab? get _readout => widget.readouts
+      .where((r) => r.key == widget.activeReadout)
+      .firstOrNull;
+
+  Widget _seg(String text, bool on, VoidCallback onTap,
+      {VoidCallback? onClose}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 2),
+      child: Material(
+        color: on ? AppColors.surface2 : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(10, 6, onClose != null ? 6 : 10, 6),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(text,
+                  style: sans(12.5,
+                      color: on ? AppColors.fg1 : AppColors.fg3)),
+              if (onClose != null) ...[
+                const SizedBox(width: 5),
+                GestureDetector(
+                  onTap: onClose,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: AppIcon('x', size: 11, color: AppColors.fg3),
+                  ),
+                ),
+              ],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _headerBar() {
+    if (widget.readouts.isEmpty) {
+      return Container(
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        alignment: Alignment.centerLeft,
+        child: Text('Board', style: sans(12.5, color: AppColors.fg3)),
+      );
+    }
+    final reading = _readout;
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
+      child: Row(children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              _seg('Board', reading == null,
+                  () => widget.onClearReadout?.call()),
+              for (final r in widget.readouts)
+                _seg(r.label, r.key == widget.activeReadout,
+                    () => widget.onSelectReadout?.call(r),
+                    onClose: () => widget.onCloseReadout?.call(r)),
+            ]),
+          ),
+        ),
+        if (reading != null && widget.onExpandReadout != null)
+          IconBtn('maximize-2',
+              size: 28,
+              iconSize: 13,
+              tooltip: 'Open in main view',
+              onTap: () => widget.onExpandReadout!(reading)),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final reading = _readout;
+    if (reading != null && widget.readoutBody != null) {
+      return Container(
+        color: AppColors.windowBg,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _headerBar(),
+            Expanded(
+              child: ColoredBox(
+                color: AppColors.bg,
+                child: widget.readoutBody!(reading),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     final now = DateTime.now();
     bool today(int s) {
       final t = DateTime.fromMillisecondsSinceEpoch(s * 1000);
@@ -138,12 +250,7 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
           : ListView(
               padding: const EdgeInsets.only(bottom: 24),
               children: [
-                Container(
-                  height: 46,
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  alignment: Alignment.centerLeft,
-                  child: Text('Board', style: sans(12.5, color: AppColors.fg3)),
-                ),
+                _headerBar(),
                 if (doing.isEmpty && _jobs.isEmpty && done.isEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 120, 24, 0),

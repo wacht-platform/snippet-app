@@ -294,7 +294,6 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         hideRight: _activeTab != null &&
             (_activeTab!.isDraft || _activeTab!.isReadout || _activeTab!.isPrs),
         panelHostsReadouts: _activeTab != null &&
-            !_activeTab!.isMissionControl &&
             _activeTab!.sessionId != null,
         onPaneResize: (delta) => _setState(() {
           final max = MediaQuery.sizeOf(context).width * 0.72;
@@ -335,11 +334,25 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   Widget? _sessionSidePanel() {
     final tab = _activeTab;
     if (tab == null || tab.sessionId == null || _sidePanelHidden) return null;
+    final tabReadouts = [
+      for (final r in _rightTabs)
+        if (r.pane == _Pane.right &&
+            (r.originTabKey == null || r.originTabKey == tab.key))
+          r
+    ];
     if (tab.isMissionControl) {
       return MissionBoardPanel(
         key: ValueKey('board-${tab.instanceUrl}'),
         client: tab.client,
         onOpenSession: (id, title) => _openSession(id, title, null),
+        readouts: tabReadouts,
+        activeReadout: _activeKey[_Pane.right],
+        readoutBody: (r) => _rightTabBody(r,
+            _macSessionStatuses[tab.key]?.state, _macSessionControls[tab.key]),
+        onSelectReadout: (r) => _setState(() => _activeKey[_Pane.right] = r.key),
+        onCloseReadout: (r) => _closeRightTab(r.key),
+        onClearReadout: () => _setState(() => _activeKey.remove(_Pane.right)),
+        onExpandReadout: _openReadoutTab,
       );
     }
     return SessionSidePanel(
@@ -353,10 +366,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       sessionId: tab.sessionId,
       onOpenDiff: (f) =>
           _openDiffTab(tab.client, tab.instanceUrl, tab.sessionId!, f),
-      readouts: [
-        for (final r in _rightTabs)
-          if (r.pane == _Pane.right) r
-      ],
+      readouts: tabReadouts,
       activeReadout: _activeKey[_Pane.right],
       readoutBody: (r) => _rightTabBody(
           r, _macSessionStatuses[tab.key]?.state, _macSessionControls[tab.key]),

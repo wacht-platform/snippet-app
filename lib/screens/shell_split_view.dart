@@ -205,7 +205,8 @@ class _ShellSplitViewState extends State<ShellSplitView> {
         widget.rightPanel != null ||
         (!widget.rightCollapsed &&
             (widget.rightTabs.isNotEmpty ||
-                widget.readouts.any((r) => r.pane == ShellPane.right))));
+                (!widget.panelHostsReadouts &&
+                    widget.readouts.any((r) => r.pane == ShellPane.right)))));
     final showLeft = !(widget.leftCollapsed && widget.leftTabs.isNotEmpty);
 
     final line = BorderSide(color: AppColors.line);

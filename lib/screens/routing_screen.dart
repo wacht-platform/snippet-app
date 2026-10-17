@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
-import '../settings_form.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
@@ -13,12 +12,6 @@ const _routeDefs = <(String, String, String)>[
   ('inbox', 'Agent inboxes', 'Answers messages and claims tasks'),
   ('lanes', 'Lanes', 'Work a session hands off'),
   ('memory', 'Memory', 'Reflection and compaction notes'),
-];
-
-const _limitRules = <(String, String, String)>[
-  ('In your chats', 'A limit in a session you are watching', 'Ask me'),
-  ('In the background', 'Lanes, agents and Mission Control', 'Switch automatically'),
-  ('After the limit resets', 'Where work continues', 'Stay on the fallback'),
 ];
 
 String limitLabel(int resetsAt) {
@@ -379,19 +372,6 @@ class _RoutingScreenState extends State<RoutingScreen> {
     );
   }
 
-  Widget _limitRulePill(String value) => Container(
-        height: 28,
-        constraints: const BoxConstraints(minWidth: 144),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.line),
-        ),
-        alignment: Alignment.center,
-        child: Text(value, style: sans(12.5, color: AppColors.fg2)),
-      );
-
   @override
   Widget build(BuildContext context) {
     final Widget body;
@@ -436,18 +416,6 @@ class _RoutingScreenState extends State<RoutingScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 26),
-          SettingsGroup(
-            header: 'When the preferred model hits a limit',
-            children: [
-              for (final (name, sub, val) in _limitRules)
-                SettingsRow(
-                  label: name,
-                  sub: sub,
-                  trailing: Text(val, style: sans(13, color: AppColors.fg3)),
-                ),
-            ],
-          ),
         ],
       );
     } else {
@@ -461,33 +429,6 @@ class _RoutingScreenState extends State<RoutingScreen> {
           const SizedBox(height: 18),
           for (final (key, title, about) in _routeDefs)
             _desktopRouteRow(key, title, about),
-          const SizedBox(height: 32),
-          Text(
-            'WHEN THE PREFERRED MODEL HITS A LIMIT',
-            style: sans(11, spacing: 0.8, color: AppColors.fg4),
-          ),
-          const SizedBox(height: 8),
-          for (final (name, sub, val) in _limitRules)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.line)),
-              ),
-              child: Row(children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name, style: sans(13.5, color: AppColors.fg1)),
-                      const SizedBox(height: 2),
-                      Text(sub, style: sans(12, color: AppColors.fg4)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                _limitRulePill(val),
-              ]),
-            ),
         ],
       );
     }

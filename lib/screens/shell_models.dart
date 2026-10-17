@@ -316,23 +316,24 @@ enum RightPanel {
 /// here rather than one exclusive mode.
 class RightTab {
   ShellPanelRequest? request;
-  RightTab.request(ShellPanelRequest this.request)
+  String? originTabKey;
+  RightTab.request(ShellPanelRequest this.request, {this.originTabKey})
       : panel = RightPanel.none,
         agent = null,
         tools = null,
         pane = ShellPane.right;
-  RightTab.panel(this.panel)
+  RightTab.panel(this.panel, {this.originTabKey})
       : agent = null,
         tools = null,
         pane = ShellPane.right;
-  RightTab.agent(CoordinationAgent this.agent)
+  RightTab.agent(CoordinationAgent this.agent, {this.originTabKey})
       : panel = RightPanel.none,
         tools = null,
         pane = ShellPane.right;
 
   /// A tool batch's details, docked beside the conversation. There is one
   /// Activity tab; opening another batch replaces what it shows.
-  RightTab.tools(ValueListenable<ToolBatch> this.tools)
+  RightTab.tools(ValueListenable<ToolBatch> this.tools, {this.originTabKey})
       : panel = RightPanel.none,
         agent = null,
         pane = ShellPane.right;

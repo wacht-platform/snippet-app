@@ -332,32 +332,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             MobileBackBar(
               title: t?.title ?? 'Task',
               subtitle: t?.status.label,
-              onBack: widget.onClose ?? () => Navigator.of(context).pop(),
               onTitleTap: () {},
             )
           else if (widget.embedded)
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              padding: const EdgeInsets.fromLTRB(6, 8, 10, 4),
               child: Row(children: [
-                Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(7),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(7),
-                    onTap:
-                        widget.onClose ?? () => Navigator.of(context).pop(),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 6),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        AppIcon('chevron-left',
-                            size: 14, color: AppColors.fg3),
-                        const SizedBox(width: 4),
-                        Text('Tasks',
-                            style: sans(12.5, color: AppColors.fg3)),
-                      ]),
-                    ),
-                  ),
+                IconBtn(
+                  'chevron-left',
+                  size: 28,
+                  iconSize: 15,
+                  tooltip: 'Back',
+                  onTap:
+                      widget.onClose ?? () => Navigator.of(context).pop(),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
