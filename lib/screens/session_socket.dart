@@ -197,6 +197,7 @@ extension _SessionScreenSocketExt on _SessionScreenState {
       // jump is needed; preserve whether the user has scrolled into history.
       final follow = _stickToBottom;
       _syncOptimisticQueue(next.queuedInputs);
+      _retireDeliveredQueued(next.events);
       _queueHidden.removeWhere((id) =>
           !next.queuedInputs.any((item) => item.id == id) &&
           !_optimisticQueued.any((item) => item.id == id));
@@ -241,6 +242,25 @@ extension _SessionScreenSocketExt on _SessionScreenState {
           final msg = nonce != null
               ? {'kind': 'user_message', 'value': m, 'nonce': nonce}
               : {'kind': 'user_message', 'value': m};
+          try {
+            ch.sink.add(jsonEncode(msg));
+          } catch (_) {
+            _outbox.add(jsonEncode(msg));
+          }
+        }
+        final unsent = List<QueuedInput>.of(_optimisticQueued);
+        for (final item in unsent) {
+          final nonce = _optimisticQueuedNonce[item.id] ?? _nextNonce();
+          final Map<String, dynamic> msg;
+          if (next.status == 'running') {
+            msg = {'kind': 'queue', 'value': item, 'nonce': nonce};
+          } else {
+            _optimisticQueued.remove(item);
+            _optimisticQueuedBase.remove(item.id);
+            _optimisticQueuedNonce.remove(item.id);
+            msg = {'kind': 'user_message', 'value': item.text, 'nonce': nonce};
+            _trackPending(item.text, nonce);
+          }
           try {
             ch.sink.add(jsonEncode(msg));
           } catch (_) {

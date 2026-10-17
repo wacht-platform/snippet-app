@@ -334,6 +334,8 @@ class _SessionScreenState extends State<SessionScreen>
   // parks them until the in-flight step ends). Shown immediately so the
   // composer doesn't sit empty for a whole tool call.
   final List<QueuedInput> _optimisticQueued = [];
+  final Map<String, int> _optimisticQueuedBase = {};
+  final Map<String, String> _optimisticQueuedNonce = {};
   // Queue IDs hidden after a local cancel/steer until the daemon confirms them.
   final Set<String> _queueHidden = {};
   int? _hoveredQueuedIndex;
@@ -385,6 +387,26 @@ class _SessionScreenState extends State<SessionScreen>
   /// Runs on every snapshot/delta — count-based retirement alone misses cases
   /// where the echo is present but the local prev→next count edge is zero
   /// (e.g. late snapshot after a missed delta, or reconnect race).
+  void _retireDeliveredQueued(List<Map<String, dynamic>> events) {
+    if (_optimisticQueued.isEmpty) return;
+    final echoes = events
+        .where((e) => e['kind'] == 'user_input' || e['kind'] == 'steer')
+        .toList();
+    _optimisticQueued.removeWhere((item) {
+      final base = _optimisticQueuedBase[item.id] ?? 0;
+      final want = _normEchoText(item.text);
+      final delivered = echoes.skip(base > echoes.length ? 0 : base).any((e) {
+        final t = e['text'];
+        return t is String && _normEchoText(t).endsWith(want);
+      });
+      if (delivered) {
+        _optimisticQueuedBase.remove(item.id);
+        _optimisticQueuedNonce.remove(item.id);
+      }
+      return delivered;
+    });
+  }
+
   void _retirePendingAlreadyEchoed(List<Map<String, dynamic>> events) {
     if (_pending.isEmpty) return;
     Iterable<String> attachmentPaths(String text) => RegExp(

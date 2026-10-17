@@ -73,6 +73,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       if (running) {
         // Hold on the daemon so TUI/app/desktop all see the same queue.
         final item = QueuedInput(id: _nextNonce(), text: msg);
+        _optimisticQueuedBase[item.id] =
+            _userEchoCount(_state?.events ?? const []);
+        _optimisticQueuedNonce[item.id] = nonce;
         _optimisticQueued.add(item);
         _send({'kind': 'queue', 'value': item, 'nonce': nonce});
       } else {
@@ -181,8 +184,14 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   }
 
   void _syncOptimisticQueue(List<QueuedInput> live) {
-    _optimisticQueued
-        .removeWhere((item) => live.any((liveItem) => liveItem.id == item.id));
+    _optimisticQueued.removeWhere((item) {
+      final seen = live.any((liveItem) => liveItem.id == item.id);
+      if (seen) {
+        _optimisticQueuedBase.remove(item.id);
+        _optimisticQueuedNonce.remove(item.id);
+      }
+      return seen;
+    });
   }
 
   void _hideQueuedAt(int visible) {
