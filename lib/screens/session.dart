@@ -397,7 +397,7 @@ class _SessionScreenState extends State<SessionScreen>
       final want = _normEchoText(item.text);
       final delivered = echoes.skip(base > echoes.length ? 0 : base).any((e) {
         final t = e['text'];
-        return t is String && _normEchoText(t).endsWith(want);
+        return t is String && _normEchoText(t).contains(want);
       });
       if (delivered) {
         _optimisticQueuedBase.remove(item.id);
