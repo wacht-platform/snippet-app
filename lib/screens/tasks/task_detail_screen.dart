@@ -23,11 +23,13 @@ class TaskDetailScreen extends StatefulWidget {
     required this.client,
     required this.taskId,
     this.onClose,
+    this.embedded = false,
   });
 
   final DaemonClient client;
   final String taskId;
   final VoidCallback? onClose;
+  final bool embedded;
 
   @override
   State<TaskDetailScreen> createState() => _TaskDetailScreenState();
@@ -321,6 +323,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Widget build(BuildContext context) {
     final t = task;
     return Scaffold(
+      backgroundColor:
+          !kMobile && widget.embedded ? AppColors.windowBg : AppColors.bg,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
@@ -330,6 +334,40 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               subtitle: t?.status.label,
               onBack: widget.onClose ?? () => Navigator.of(context).pop(),
               onTitleTap: () {},
+            )
+          else if (widget.embedded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+              child: Row(children: [
+                Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(7),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(7),
+                    onTap:
+                        widget.onClose ?? () => Navigator.of(context).pop(),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 6),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        AppIcon('chevron-left',
+                            size: 14, color: AppColors.fg3),
+                        const SizedBox(width: 4),
+                        Text('Tasks',
+                            style: sans(12.5, color: AppColors.fg3)),
+                      ]),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(t?.title ?? 'Task',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13,
+                          weight: W.label, color: AppColors.fg1)),
+                ),
+              ]),
             )
           else
             SnAppBar(
@@ -502,58 +540,59 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
               ])
             else
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final a in roster)
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: (a.active && !a.hasSessionLease)
-                            ? () => _transferLeaseTo(a)
-                            : null,
-                        borderRadius: BorderRadius.circular(R.chip),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: a.hasSessionLease
-                                ? AppColors.accentBg
-                                : (a.active
-                                    ? AppColors.surface2
-                                    : AppColors.surface3),
-                            borderRadius: BorderRadius.circular(R.chip),
-                            border: a.hasSessionLease
-                                ? Border.all(
-                                    color:
-                                        AppColors.accent.withValues(alpha: 0.4),
-                                    width: 1)
-                                : null,
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: Column(children: [
+                  for (var i = 0; i < roster.length; i++) ...[
+                    if (i > 0)
+                      Divider(height: 1, thickness: 1, color: AppColors.line),
+                    InkWell(
+                      borderRadius: BorderRadius.vertical(
+                        top: i == 0 ? const Radius.circular(10) : Radius.zero,
+                        bottom: i == roster.length - 1
+                            ? const Radius.circular(10)
+                            : Radius.zero,
+                      ),
+                      onTap: (roster[i].active && !roster[i].hasSessionLease)
+                          ? () => _transferLeaseTo(roster[i])
+                          : null,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        child: Row(children: [
+                          roster[i].hasSessionLease
+                              ? WorkingMochi(
+                                  size: 18,
+                                  color: mochiColorFor(roster[i].agentId))
+                              : AgentMochi(roster[i].agentId, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(roster[i].agentId,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(12.5,
+                                    color: roster[i].active
+                                        ? AppColors.fg1
+                                        : AppColors.fg3)),
                           ),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Text(a.agentId,
-                                style: sans(12,
-                                    color: a.hasSessionLease
-                                        ? AppColors.accent
-                                        : (a.active
-                                            ? AppColors.fg1
-                                            : AppColors.fg3))),
-                            const SizedBox(width: 5),
-                            Text(
-                              a.hasSessionLease
-                                  ? 'active lease'
-                                  : (a.active ? 'waiting' : 'left'),
-                              style: sans(11,
-                                  color: a.hasSessionLease
-                                      ? AppColors.ok
-                                      : AppColors.fg3),
-                            ),
-                          ]),
-                        ),
+                          Text(
+                            roster[i].hasSessionLease
+                                ? 'working'
+                                : (roster[i].active ? 'waiting' : 'left'),
+                            style: sans(11.5,
+                                color: roster[i].hasSessionLease
+                                    ? AppColors.accent
+                                    : AppColors.fg4),
+                          ),
+                        ]),
                       ),
                     ),
-                ],
+                  ],
+                ]),
               ),
             const SizedBox(height: 14),
             _section('Related', onAdd: _linkTask),
@@ -685,35 +724,54 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
               );
             }
-            return Align(
-              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                margin: const EdgeInsets.only(bottom: S.s8),
-                padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
-                constraints: const BoxConstraints(maxWidth: 520),
-                decoration: BoxDecoration(
-                  color: mine ? AppColors.overlay : AppColors.raised,
-                  borderRadius: BorderRadius.circular(R.md),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!mine)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: S.s4),
-                        child:
-                            Text(e.actorId, style: TS.label(AppColors.accent)),
-                      ),
-                    MarkdownBody(
+            if (mine) {
+              return Align(
+                alignment: Alignment.centerRight,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: MarkdownBody(
                       data: body,
                       selectable: true,
                       styleSheet: markdownStyle(context),
                       builders: {'pre': PreBlockBuilder()},
-                      onTapLink: (txt, href, title) => openMarkdownLink(href, context),
+                      onTapLink: (txt, href, title) =>
+                          openMarkdownLink(href, context),
                     ),
-                  ],
+                  ),
                 ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    AgentMochi(e.actorId, size: 16),
+                    const SizedBox(width: 6),
+                    Text(e.actorId,
+                        style: sans(12,
+                            weight: W.label, color: AppColors.fg2)),
+                  ]),
+                  const SizedBox(height: 5),
+                  MarkdownBody(
+                    data: body,
+                    selectable: true,
+                    styleSheet: markdownStyle(context),
+                    builders: {'pre': PreBlockBuilder()},
+                    onTapLink: (txt, href, title) =>
+                        openMarkdownLink(href, context),
+                  ),
+                ],
               ),
             );
           },
@@ -770,27 +828,50 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           ),
         )
       : SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-          child: Row(children: [
-            Expanded(
-              child: AppField(
-                controller: _composer,
-                hint: 'Message this task…',
-                maxLines: 4,
-                minLines: 1,
-                onSubmitted: (_) => _send(),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 36),
+              padding: const EdgeInsets.fromLTRB(12, 4, 6, 4),
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.line),
               ),
+              child: Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _composer,
+                    minLines: 1,
+                    maxLines: 4,
+                    onSubmitted: (_) => _send(),
+                    style: sans(13, color: AppColors.fg1),
+                    cursorColor: AppColors.accent,
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: 'Message this task…',
+                      hintStyle: sans(13, color: AppColors.fg4),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: (room?.sending ?? false) ? null : _send,
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                        color: AppColors.accentFill, shape: BoxShape.circle),
+                    alignment: Alignment.center,
+                    child: AppIcon('arrow-up',
+                        size: 13, color: AppColors.accentFg),
+                  ),
+                ),
+              ]),
             ),
-            const SizedBox(width: 6),
-            IconBtn('send',
-                size: 40,
-                iconSize: 18,
-                tooltip: 'Send',
-                onTap: (room?.sending ?? false) ? null : _send),
-          ]),
-        ),
-      );
+          ),
+        );
 }
 
 /// The worker's plan for the task, as it ticks steps off.

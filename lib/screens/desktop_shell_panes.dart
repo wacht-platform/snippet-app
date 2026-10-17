@@ -252,14 +252,20 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   Widget _bodyRow({required bool topInset}) => ShellSplitView(
-        sidebar: Swap(
-          stateKey: _effectiveSection,
-          fill: true,
-          child: _sidebar(topInset: topInset),
+        sidebar: ShellPanelScope(
+          open: _openShellPanel,
+          client: _client,
+          sessionId: _activeTab?.sessionId,
+          child: Swap(
+            stateKey: _effectiveSection,
+            fill: true,
+            child: _sidebar(topInset: topInset),
+          ),
         ),
         sidebarTop: _sidebarTop(),
         mainHeader: _macWindowBar(),
-        sidebarHeader: _effectiveSection == ShellSection.sessions
+        sidebarHeader: _effectiveSection == ShellSection.sessions ||
+                _effectiveSection == ShellSection.tasks
             ? null
             : ShellSectionTabs(
                 section: _effectiveSection,
@@ -625,29 +631,58 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     _syncPage();
   }
 
-  Widget _sidebarTop() => SizedBox(
-        height: 46,
-        child: Row(children: [
-          SizedBox(width: kMacOS ? 84 : 12),
-          const Spacer(),
-          IconBtn('chevron-left',
-              size: 28,
-              iconSize: 16,
-              tooltip: 'Back',
-              onTap: _canNavigateBack ? _navigateBack : null),
-          IconBtn('chevron-right',
-              size: 28,
-              iconSize: 16,
-              tooltip: 'Forward',
-              onTap: _canNavigateForward ? _navigateForward : null),
-          IconBtn('plus',
-              size: 28,
-              iconSize: 16,
-              tooltip: 'New session',
-              onTap: _client == null ? null : _newSessionFlow),
-          const SizedBox(width: 10),
-        ]),
-      );
+  Widget _sidebarTop() {
+    final inTasks = _effectiveSection == ShellSection.tasks;
+    return SizedBox(
+      height: 46,
+      child: Row(children: [
+        SizedBox(width: kMacOS ? 84 : 12),
+        const Spacer(),
+        IconBtn('chevron-left',
+            size: 28,
+            iconSize: 16,
+            tooltip: 'Back',
+            onTap: _canNavigateBack ? _navigateBack : null),
+        IconBtn('chevron-right',
+            size: 28,
+            iconSize: 16,
+            tooltip: 'Forward',
+            onTap: _canNavigateForward ? _navigateForward : null),
+        Tooltip(
+          message: inTasks ? 'Chats' : 'Tasks',
+          waitDuration: const Duration(milliseconds: 400),
+          child: Material(
+            color: inTasks ? AppColors.surface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(R.sm),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(R.sm),
+              onTap: () => _setState(() {
+                _section =
+                    inTasks ? ShellSection.sessions : ShellSection.tasks;
+              }),
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: Center(
+                  child: AppIcon(
+                    'task',
+                    size: 15,
+                    color: inTasks ? AppColors.fg1 : AppColors.fg3,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        IconBtn('plus',
+            size: 28,
+            iconSize: 16,
+            tooltip: 'New session',
+            onTap: _client == null ? null : _newSessionFlow),
+        const SizedBox(width: 10),
+      ]),
+    );
+  }
 
   Widget _sidebarFooter() {
     final healthy = _active == null ? null : _health[_active!.url];

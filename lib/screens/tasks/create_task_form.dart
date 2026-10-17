@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../api.dart';
 import '../../models.dart';
+import '../../platform.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import '../mission_control/mission_control_state.dart' show isDedicatedMcSession;
 
-/// Describe a task in prose and pick the session that will do it.
-///
-/// The session is part of filing, not an afterthought: a task with no target can
-/// never be dispatched, so the daemon refuses one. Picking here is what makes
-/// the row real work rather than a note on the board.
 class CreateTaskForm extends StatefulWidget {
-  const CreateTaskForm({super.key, required this.client});
+  const CreateTaskForm({
+    super.key,
+    required this.client,
+    this.onCreated,
+  });
   final DaemonClient client;
+  final VoidCallback? onCreated;
 
   @override
   State<CreateTaskForm> createState() => _CreateTaskFormState();
@@ -34,8 +35,6 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
     _loadSessions();
   }
 
-  /// Sessions to route into. Mission Control is excluded: it coordinates, so
-  /// naming it as the worker would file work onto the coordinator itself.
   Future<void> _loadSessions() async {
     try {
       final all = await widget.client.sessions();
@@ -46,10 +45,7 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
           .toList()
         ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
       setState(() => _sessions = usable);
-    } catch (_) {
-      // A failed list is not fatal: the form still opens and the picker will be
-      // empty, which the submit check reports.
-    }
+    } catch (_) {}
   }
 
   Future<void> _pickSession(BuildContext anchor) async {
@@ -60,8 +56,8 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor,
-      minWidth: 280,
-      maxWidth: 400,
+      minWidth: kMobile ? 280 : 240,
+      maxWidth: 380,
       items: [
         appMenuHeading<String>('Send this work to'),
         for (final s in _sessions)
@@ -100,8 +96,6 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
 
   Future<void> _submit() async {
     final title = _title.text.trim();
-    // Validated on submit, not by a disabled button: `AppField` exposes no
-    // `onChanged`, so a length-gated button could never re-enable as you type.
     if (title.isEmpty) {
       setState(() => _error = 'Give the task a title.');
       return;
@@ -128,7 +122,11 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
     final feed = client.swr.entry<List<TaskItem>>('coordination:tasks');
     feed.mutate([...?feed.data, pending]);
     final root = Navigator.of(context, rootNavigator: true).context;
-    Navigator.of(context).pop(false);
+    if (widget.onCreated != null) {
+      widget.onCreated!();
+    } else {
+      Navigator.of(context).pop(false);
+    }
     try {
       final created = await client.createTask(
         title: title,
@@ -152,15 +150,16 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+        padding: EdgeInsets.fromLTRB(
+            kMobile ? 16 : 12, 4, kMobile ? 16 : 12, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               'What needs doing, and which session should do it? The task is routed there and reports back.',
-              style: sans(13, color: AppColors.fg3, height: 1.45),
+              style: sans(kMobile ? 13 : 12, color: AppColors.fg3, height: 1.45),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             AppField(
               controller: _title,
               label: 'Title',
@@ -168,26 +167,30 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
               autofocus: true,
             ),
             const SizedBox(height: 12),
-            Text('session', style: mono(10, color: AppColors.fg3)),
-            const SizedBox(height: 4),
+            Text('Session',
+                style: sans(12, weight: W.label, color: AppColors.fg3)),
+            const SizedBox(height: 5),
             Material(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(R.sm),
+              color: AppColors.surface1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: AppColors.line),
+              ),
               child: Builder(
                 builder: (ctx) => InkWell(
                   onTap: _busy ? null : () => _pickSession(ctx),
-                  borderRadius: BorderRadius.circular(R.sm),
+                  borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 11),
+                        horizontal: 10, vertical: 9),
                     child: Row(children: [
-                      AppIcon('chat', size: 15, color: AppColors.fg3),
+                      AppIcon('chat', size: 14, color: AppColors.fg3),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(_sessionLabel ?? 'Choose a session',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: sans(13,
+                            style: sans(12.5,
                                 color: _sessionLabel == null
                                     ? AppColors.fg4
                                     : AppColors.fg1)),
@@ -201,17 +204,17 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
             const SizedBox(height: 12),
             AppField(
               controller: _description,
-              label: 'Details',
+              label: 'Briefing',
               hint:
-                  'What does done look like? Anything an agent would need to know.',
+                  'Goal, what done looks like, and the context the agent needs.',
               minLines: 4,
               maxLines: 8,
             ),
             if (_error != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text(_error!, style: sans(12, color: AppColors.danger)),
             ],
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             Btn(
               _busy ? 'Creating…' : 'Create task',
               full: true,

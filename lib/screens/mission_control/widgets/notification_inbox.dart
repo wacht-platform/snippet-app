@@ -74,16 +74,31 @@ class _InboxRow extends StatelessWidget {
       'failed' => AppColors.danger,
       _ => AppColors.accent,
     };
+    final bg = switch (entry.notification.kind as String) {
+      'blocked' || 'failed' => AppColors.dangerBg,
+      _ => AppColors.accentBg,
+    };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(R.md),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.line),
       ),
       child: Row(
         children: [
-          AppIcon('alert-circle', size: 16, color: color),
-          const SizedBox(width: 8),
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.22)),
+            ),
+            child: AppIcon('alert-circle', size: 14, color: color),
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +112,7 @@ class _InboxRow extends StatelessWidget {
                 Text(entry.notification.message as String,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TS.meta()),
+                    style: sans(12, height: 16 / 12, color: AppColors.fg3)),
               ],
             ),
           ),

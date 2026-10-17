@@ -67,22 +67,22 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     return Stack(children: [
       for (var layer = layers; layer > 0; layer--)
         Positioned.fill(
-          top: layer * 5.0,
+          top: layer * 4.0,
           left: layer * 5.0,
           right: layer * 5.0,
           child: IgnorePointer(
             child: DecoratedBox(
               key: ValueKey('notification-backing-$layer'),
               decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(kMobile ? 18 : 14),
-                border: kMobile ? null : Border.all(color: AppColors.border2),
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(kMobile ? 14 : 11),
+                border: Border.all(color: AppColors.line),
               ),
             ),
           ),
         ),
       Padding(
-        padding: EdgeInsets.only(bottom: layers * 5.0),
+        padding: EdgeInsets.only(bottom: layers * 4.0),
         child: child,
       ),
     ]);
@@ -97,12 +97,13 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
       _ => (AppColors.accentBg, AppColors.accent),
     };
     return Container(
-      width: kMobile ? 36 : 32,
-      height: kMobile ? 36 : 32,
+      width: kMobile ? 30 : 28,
+      height: kMobile ? 30 : 28,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: fill,
-        borderRadius: BorderRadius.circular(kMobile ? 11 : 9),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ink.withValues(alpha: 0.22)),
       ),
       child: AppIcon(
         switch ((payload['destination'] as Map?)?['type']) {
@@ -111,7 +112,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
           'conversation' => 'message-circle',
           _ => 'info',
         },
-        size: 16,
+        size: kMobile ? 15 : 14,
         color: ink,
       ),
     );
@@ -249,13 +250,15 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                             ),
                             child: _stackedCard(
                                 child: Material(
-                              color: AppColors.surface3,
+                              color: kMobile
+                                  ? AppColors.surface2
+                                  : AppColors.surface1,
+                              elevation: 6,
+                              shadowColor: Colors.black.withValues(alpha: 0.45),
                               shape: RoundedRectangleBorder(
                                 borderRadius:
-                                    BorderRadius.circular(kMobile ? 18 : 14),
-                                side: kMobile
-                                    ? BorderSide.none
-                                    : BorderSide(color: AppColors.border2),
+                                    BorderRadius.circular(kMobile ? 14 : 11),
+                                side: BorderSide(color: AppColors.line),
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
@@ -265,10 +268,10 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                 },
                                 child: Padding(
                                   padding: EdgeInsetsDirectional.fromSTEB(
-                                      12, kMobile ? 12 : 10, 4, kMobile ? 12 : 10),
+                                      12, kMobile ? 10 : 9, 4, kMobile ? 10 : 9),
                                   child: Row(children: [
                                     _leadingIcon(payload),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
@@ -287,38 +290,52 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                                   'New notification',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: sans(kMobile ? 15 : 14,
+                                              style: sans(kMobile ? 14 : 13,
                                                   weight: W.label,
                                                   height: kMobile
-                                                      ? 20 / 15
-                                                      : 19 / 14,
+                                                      ? 19 / 14
+                                                      : 18 / 13,
                                                   color: AppColors.fg1),
                                             ),
                                           ),
                                           if (_contextLabel(payload)
                                               .isNotEmpty) ...[
-                                            const SizedBox(height: S.s2),
+                                            const SizedBox(height: 2),
                                             Text(_contextLabel(payload),
                                                 maxLines: 2,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: sans(kMobile ? 13 : 12.5,
+                                                style: sans(
+                                                    kMobile ? 12.5 : 12,
                                                     height: kMobile
-                                                        ? 18 / 13
-                                                        : 17 / 12.5,
+                                                        ? 17 / 12.5
+                                                        : 16 / 12,
                                                     color: AppColors.fg3)),
                                           ],
                                           if (!kMobile &&
                                               _pending.length > 1) ...[
-                                            const SizedBox(height: 6),
+                                            const SizedBox(height: 5),
                                             Wrap(
-                                                spacing: 10,
+                                                spacing: 8,
                                                 crossAxisAlignment:
                                                     WrapCrossAlignment.center,
                                                 children: [
-                                              Text(
-                                                  '+${_pending.length - 1} more',
-                                                  style: sans(12,
-                                                      color: AppColors.fg4)),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 5,
+                                                        vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.surface2,
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                  border: Border.all(
+                                                      color: AppColors.line),
+                                                ),
+                                                child: Text(
+                                                    '+${_pending.length - 1} more',
+                                                    style: mono(10.5,
+                                                        color: AppColors.fg3)),
+                                              ),
                                               InkWell(
                                                 onTap: () =>
                                                     _clearAll(payload),
@@ -331,7 +348,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                                       horizontal: 4,
                                                       vertical: 2),
                                                   child: Text('Clear all',
-                                                      style: sans(12,
+                                                      style: sans(11.5,
                                                           weight: W.label,
                                                           color: AppColors
                                                               .accent)),
@@ -352,8 +369,19 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                       constraints:
                                           const BoxConstraints.tightFor(
                                               width: 44, height: 36),
-                                      icon: AppIcon('x',
-                                          size: 14, color: AppColors.fg3),
+                                      icon: Container(
+                                        width: 24,
+                                        height: 24,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: Colors.transparent,
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: AppIcon('x',
+                                            size: kMobile ? 14 : 13,
+                                            color: AppColors.fg3),
+                                      ),
                                       onPressed: () =>
                                           _remove(payload, feedback: true),
                                     ),

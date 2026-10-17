@@ -168,8 +168,8 @@ class _UsageScreenState extends State<UsageScreen> {
         ],
       );
     } else {
-      body = ListView(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 40),
+      body = PageBody(
+        topPadding: 4,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,

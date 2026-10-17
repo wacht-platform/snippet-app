@@ -479,53 +479,59 @@ class SettingsPanelState extends State<SettingsPanel> {
                     padding: full
                         ? EdgeInsets.only(top: kMacOS ? kTitleBarHeight : 16)
                         : EdgeInsets.zero,
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                          maxWidth: full ? 768 : double.infinity),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (!_isNested)
-                            Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                  24, full ? 14 : 12, full ? 24 : 10, 2),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: SwapText(
-                                      _pageTitle(_page),
-                                      style: full
-                                          ? sans(17,
-                                              weight: FontWeight.w500,
-                                              spacing: -0.2,
-                                              color: AppColors.fg1)
-                                          : sans(15, color: AppColors.fg1),
+                    child: LayoutBuilder(
+                      builder: (context, paneConstraints) {
+                        final extra = full
+                            ? ((paneConstraints.maxWidth - 768) / 2)
+                                .clamp(0.0, double.infinity)
+                            : 0.0;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (!_isNested)
+                              Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                    24 + extra,
+                                    full ? 14 : 12,
+                                    (full ? 24 : 10) + extra,
+                                    2),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: SwapText(
+                                        _pageTitle(_page),
+                                        style: full
+                                            ? sans(17,
+                                                weight: FontWeight.w500,
+                                                spacing: -0.2,
+                                                color: AppColors.fg1)
+                                            : sans(15, color: AppColors.fg1),
+                                      ),
                                     ),
-                                  ),
-                                  if (_pageAction(_page) != null)
-                                    _pageAction(_page)!,
-                                  if (!full) ...[
-                                    const SizedBox(width: 6),
-                                    IconBtn('x',
-                                        size: 28,
-                                        iconSize: 14,
-                                        tooltip: 'Close',
-                                        onTap: widget.onClose),
+                                    if (_pageAction(_page) != null)
+                                      _pageAction(_page)!,
+                                    if (!full) ...[
+                                      const SizedBox(width: 6),
+                                      IconBtn('x',
+                                          size: 28,
+                                          iconSize: 14,
+                                          tooltip: 'Close',
+                                          onTap: widget.onClose),
+                                    ],
                                   ],
-                                ],
+                                ),
+                              ),
+                            Expanded(
+                              child: Swap(
+                                stateKey: _page,
+                                fill: true,
+                                child: _pageBody(),
                               ),
                             ),
-                          Expanded(
-                            child: Swap(
-                              stateKey: _page,
-                              fill: true,
-                              child: _pageBody(),
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),

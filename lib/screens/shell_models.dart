@@ -377,6 +377,7 @@ class RightTab {
           ShellPanelPurpose.recurring => 'calendar-clock',
           ShellPanelPurpose.autonomy => 'activity',
           ShellPanelPurpose.file => 'file',
+          ShellPanelPurpose.task || ShellPanelPurpose.tasks => 'task',
           _ => 'layers',
         }
       : tools != null

@@ -750,23 +750,29 @@ class InsetPanel extends StatelessWidget {
 }
 
 class PageBody extends StatelessWidget {
-  const PageBody({super.key, required this.children, this.maxWidth = 720});
+  const PageBody({
+    super.key,
+    required this.children,
+    this.maxWidth = 720,
+    this.topPadding = S.s8,
+  });
 
   final List<Widget> children;
   final double maxWidth;
+  final double topPadding;
 
   @override
   Widget build(BuildContext context) {
     final side = kMobile ? S.s16 : S.s24;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth + side * 2),
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(side, S.s8, side, S.s40),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final extra = (constraints.maxWidth - (maxWidth + side * 2)) / 2;
+        final hPad = extra > 0 ? side + extra : side;
+        return ListView(
+          padding: EdgeInsets.fromLTRB(hPad, topPadding, hPad, S.s40),
           children: children,
-        ),
-      ),
+        );
+      },
     );
   }
 }

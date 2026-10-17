@@ -677,11 +677,16 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
               hint: 'https://api.example.com/v1'),
         ),
     ];
-    return ListView(
-      padding: kMobile
-          ? const EdgeInsets.fromLTRB(16, 4, 16, 24)
-          : EdgeInsets.fromLTRB(widget.embedded ? 12 : 20, 8, 12, 24),
-      children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final baseH = kMobile ? 16.0 : (widget.embedded ? 24.0 : 20.0);
+        final extra = kMobile
+            ? 0.0
+            : ((constraints.maxWidth - 768) / 2).clamp(0.0, double.infinity);
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+              baseH + extra, kMobile ? 4 : 8, baseH + extra, 24),
+          children: [
         header,
         SettingsGroup(header: 'Model', children: [
           if (!_isEdit)
@@ -861,7 +866,9 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
             child: Text(_error!, style: sans(12, color: AppColors.danger)),
           ),
-      ],
+          ],
+        );
+      },
     );
   }
 

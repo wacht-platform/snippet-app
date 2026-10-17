@@ -451,8 +451,8 @@ class _RoutingScreenState extends State<RoutingScreen> {
         ],
       );
     } else {
-      body = ListView(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 40),
+      body = PageBody(
+        topPadding: 4,
         children: [
           Text(
             'Which model does each kind of work, and who steps in when it hits a limit.',

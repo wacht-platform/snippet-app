@@ -282,42 +282,65 @@ class TaskRow extends StatelessWidget {
       );
     }
     if (!kMobile) {
+      final done = task.status == TaskStatus.done ||
+          task.status == TaskStatus.cancelled;
       return Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(7),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(7),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-            child: Row(children: [
-              if (task.priority > 0) ...[
-                PriorityMark(task.priority),
+            padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+            child: Row(
+              crossAxisAlignment: detail.isNotEmpty
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(top: detail.isNotEmpty ? 6 : 0),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: statusColor(task.status),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(task.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13.5,
-                            height: 19 / 13.5, color: AppColors.fg1)),
-                    if (detail.isNotEmpty)
-                      Text(detail,
+                if (task.priority > 0) ...[
+                  PriorityMark(task.priority),
+                  const SizedBox(width: 6),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(task.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              sans(12, height: 16 / 12, color: AppColors.fg4)),
-                  ],
+                          style: sans(13,
+                              height: 18 / 13,
+                              color: done ? AppColors.fg3 : AppColors.fg1)),
+                      if (detail.isNotEmpty) ...[
+                        const SizedBox(height: 1),
+                        Text(detail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(11.5,
+                                height: 15 / 11.5, color: AppColors.fg4)),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              if (age.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Text(age, style: sans(12, color: AppColors.fg4, tabular: true)),
+                if (age.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Text(age,
+                      style: mono(11, color: AppColors.fg4)),
+                ],
               ],
-            ]),
+            ),
           ),
         ),
       );
