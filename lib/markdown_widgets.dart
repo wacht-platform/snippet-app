@@ -23,7 +23,7 @@ class ThinkingMarkdown extends StatelessWidget {
       selectable: false,
       styleSheet: thinkingMarkdownStyle(context),
       builders: {'pre': PreBlockBuilder()},
-      onTapLink: (txt, href, title) => openMarkdownLink(href, context),
+      onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
     );
   }
 }

@@ -738,7 +738,7 @@ class _ToolMarkdown extends StatelessWidget {
       selectable: false,
       styleSheet: markdownStyle(context),
       builders: {'pre': PreBlockBuilder()},
-      onTapLink: (txt, href, title) => openMarkdownLink(href, context),
+      onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
     );
   }
 }
