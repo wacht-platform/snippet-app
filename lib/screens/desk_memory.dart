@@ -69,7 +69,7 @@ class DeskMemoryView extends StatefulWidget {
 class _DeskMemoryViewState extends State<DeskMemoryView> {
   final _search = TextEditingController();
   List<MemoryScope> _scopes = const [];
-  late String _scope = 'session:${widget.sessionId}';
+  String _scope = '';
   bool _history = false;
   final Map<String, List<_Entry>> _entries = {};
   final Map<String, List<MemoryCommit>> _commits = {};
@@ -95,6 +95,13 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
       final s = await widget.client.memoryScopes();
       if (mounted) setState(() => _scopes = s);
     } catch (_) {}
+    if (!mounted) return;
+    final key = _projectKey ?? _globalKey;
+    if (key == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    _scope = key;
     await _load(_scope);
   }
 
@@ -416,7 +423,6 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
     ];
     final project = _projectKey;
     final global = _globalKey;
-    final session = 'session:${widget.sessionId}';
     return LayoutBuilder(builder: (context, box) {
       final wide = box.maxWidth > 640;
       final list = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -442,8 +448,6 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             children: [
-              _chip('This session', _scope == session && !_history,
-                  () => _pick(session)),
               if (project != null)
                 _chip('Project', _scope == project && !_history,
                     () => _pick(project)),

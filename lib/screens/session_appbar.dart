@@ -927,8 +927,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             builder: (_, close) => MemoryScreen(
                 client: widget.client,
                 embedded: true,
-                onBack: close,
-                initialKey: 'session:${widget.sessionId}'));
+                onBack: close));
         return;
       case 'recurring':
         _openRecurring();
@@ -1142,8 +1141,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           builder: (_, close) => MemoryScreen(
               client: widget.client,
               embedded: true,
-              onBack: close,
-              initialKey: 'session:${widget.sessionId}'))),
+              onBack: close))),
     );
   }
 
