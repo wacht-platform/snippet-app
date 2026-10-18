@@ -1653,6 +1653,17 @@ class _DesktopShellState extends State<DesktopShell>
         body: Center(child: DelayedSpinner(size: 22)),
       );
     }
+    if (_instances.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.bg,
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(top: kMacOS ? kMacTitlebar : 0),
+            child: _welcome(),
+          ),
+        ),
+      );
+    }
     if (kMobile) return _mobileShell();
     return ShellPanelScope(
         open: _openShellPanel,

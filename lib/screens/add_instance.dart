@@ -11,6 +11,9 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
+const _badLink =
+    "That doesn't look like a snippet link. It starts with https:// and ends with ?token=…";
+
 /// Accepts `https://host?token=…` or JSON `{url, token}`.
 (String, String)? parseConnection(String raw) {
   raw = raw.trim();
@@ -83,7 +86,13 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
     });
     try {
       final parsed = parseConnection(raw);
-      if (parsed == null) throw 'That is not a valid connection string.';
+      if (parsed == null) {
+        setState(() {
+          _error = _badLink;
+          _busy = false;
+        });
+        return;
+      }
       final (url, token) = parsed;
       final cfg = await DaemonClient(url, token).getConfig();
       final name = cfg.hostname.isNotEmpty ? cfg.hostname : hostOf(url);
@@ -140,7 +149,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                         children: [
                           Text('Connect a machine', style: display(kMobile ? 16 : 14)),
                           const SizedBox(height: 2),
-                          Text('Control another machine from here',
+                          Text('Link this app to a computer running snippet',
                               style: TS.caption()),
                         ]),
                   ),
@@ -160,7 +169,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const _StepLabel('1', 'Run this on the other machine'),
+                      const _StepLabel('1', 'Run this on that computer'),
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.fromLTRB(11, 9, 6, 9),
@@ -196,7 +205,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const _StepLabel('2', 'Paste the connection string'),
+                      const _StepLabel('2', 'Paste the link it prints'),
                       const SizedBox(height: 8),
                       AppField(
                           controller: _paste,
@@ -329,7 +338,13 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
     });
     try {
       final parsed = parseConnection(raw);
-      if (parsed == null) throw 'That is not a valid connection string.';
+      if (parsed == null) {
+        setState(() {
+          _error = _badLink;
+          _busy = false;
+        });
+        return;
+      }
       final (url, token) = parsed;
       final client = DaemonClient(url, token);
       final cfg = await client.getConfig();
@@ -393,7 +408,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
               ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: 250),
                   child: Text(
-                      'Grant camera access to scan a QR, or paste your connection string below.',
+                      'Grant camera access to scan the QR code, or paste the link below.',
                       textAlign: TextAlign.center,
                       style: TS.meta())),
               const SizedBox(height: 16),
@@ -478,7 +493,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
                   child: AppField(
                       controller: _paste,
                       mono: true,
-                      hint: 'Paste connection string or URL',
+                      hint: 'Paste the link from snippet serve',
                       onSubmitted: _connect)),
               const SizedBox(width: 10),
               if (_busy)

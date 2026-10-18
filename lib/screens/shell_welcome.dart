@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 
+import '../mochi.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
@@ -32,71 +35,167 @@ class ShellWithMenu extends StatelessWidget {
   }
 }
 
-/// No instance connected welcome state with action to add a machine.
-class ShellWelcomeView extends StatelessWidget {
+const _installCommand = 'curl -fsSL https://wacht.dev/snippet.sh | sh';
+
+class ShellWelcomeView extends StatefulWidget {
   final VoidCallback onAddInstance;
 
   const ShellWelcomeView({super.key, required this.onAddInstance});
 
   @override
+  State<ShellWelcomeView> createState() => _ShellWelcomeViewState();
+}
+
+class _ShellWelcomeViewState extends State<ShellWelcomeView> {
+  bool _localRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kMobile) _probeLocal();
+  }
+
+  Future<void> _probeLocal() async {
+    try {
+      final r = await http
+          .get(Uri.parse('http://127.0.0.1:8787/health'))
+          .timeout(const Duration(milliseconds: 900));
+      if (mounted && r.statusCode == 200) setState(() => _localRunning = true);
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(R.card),
+    Theme.of(context);
+    return ColoredBox(
+      color: AppColors.bg,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+              horizontal: kMobile ? 22 : 28, vertical: 32),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                    child: MochiIcon(
+                        color: const Color(0xFFB9C6FF), size: kMobile ? 64 : 56)),
+                const SizedBox(height: 18),
+                Text(
+                  'Connect your computer',
+                  textAlign: TextAlign.center,
+                  style: display(kMobile ? 24 : 21),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'snippet runs on your own computer. This app connects to it, '
+                  'so you can ask Mission Control and follow the work from here.',
+                  textAlign: TextAlign.center,
+                  style: sans(kMobile ? 14 : 13,
+                      height: 1.5, color: AppColors.fg3),
+                ),
+                const SizedBox(height: 26),
+                _WelcomeStep(
+                  n: '1',
+                  title: 'Install snippet on your computer',
+                  command: _installCommand,
+                ),
+                const SizedBox(height: 14),
+                _WelcomeStep(
+                  n: '2',
+                  title: _localRunning
+                      ? 'snippet is already running here. Show its link with'
+                      : 'Start it',
+                  command: _localRunning ? 'snippet serve --status' : 'snippet serve',
+                  note: _localRunning ? null : 'It prints a link and a QR code.',
+                ),
+                const SizedBox(height: 14),
+                _WelcomeStep(
+                  n: '3',
+                  title: kMobile
+                      ? 'Scan the QR code, or paste the link'
+                      : 'Paste the link here',
+                ),
+                const SizedBox(height: 24),
+                Center(
+                  child: PillBtn(
+                    kMobile ? 'Scan or paste' : 'Connect',
+                    icon: kMobile ? 'scan' : 'plus',
+                    onTap: widget.onAddInstance,
                   ),
-                  child: AppIcon('server', size: 24, color: AppColors.fg3),
                 ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'No instance connected',
-                textAlign: TextAlign.center,
-                style: sans(kMobile ? 16 : 14, color: AppColors.fg1),
-              ),
-              const SizedBox(height: 8),
-              Text.rich(
-                TextSpan(
-                  style: TS.meta(),
-                  children: [
-                    const TextSpan(text: 'Run '),
-                    TextSpan(
-                      text: 'snippet serve',
-                      style: mono(12, color: AppColors.fg2),
-                    ),
-                    const TextSpan(
-                      text:
-                          ' on a machine, then paste the connection string it prints.',
-                    ),
-                  ],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 22),
-              Center(
-                child: PillBtn(
-                  'Add machine',
-                  icon: 'plus',
-                  onTap: onAddInstance,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _WelcomeStep extends StatelessWidget {
+  const _WelcomeStep({required this.n, required this.title, this.command, this.note});
+  final String n;
+  final String title;
+  final String? command;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        width: 22,
+        height: 22,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surface3,
+          borderRadius: BorderRadius.circular(R.pill),
+        ),
+        child: Text(n, style: sans(12, weight: W.label, color: AppColors.fg2)),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(title,
+                  style: sans(kMobile ? 14.5 : 13, color: AppColors.fg1)),
+            ),
+            if (command != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  borderRadius: BorderRadius.circular(R.sm),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(children: [
+                  Expanded(
+                    child: SelectableText(command!,
+                        style: mono(kMobile ? 12 : 11.5, color: AppColors.fg1)),
+                  ),
+                  IconBtn('copy', size: 30, iconSize: 13, tooltip: 'Copy', onTap: () {
+                    Clipboard.setData(ClipboardData(text: command!));
+                    toast(context, 'Copied');
+                  }),
+                ]),
+              ),
+            ],
+            if (note != null) ...[
+              const SizedBox(height: 6),
+              Text(note!, style: sans(12, height: 1.4, color: AppColors.fg4)),
+            ],
+          ],
+        ),
+      ),
+    ]);
   }
 }
 
