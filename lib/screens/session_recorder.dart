@@ -1,6 +1,10 @@
 part of 'session.dart';
 
-const _maxRecordingDuration = Duration(minutes: 3);
+var _maxRecordingDuration = const Duration(minutes: 3);
+
+String _limitLabel(Duration d) => d.inSeconds % 60 == 0
+    ? '${d.inMinutes}-minute'
+    : '${d.inSeconds}-second';
 
 extension _SessionScreenRecorderExt on _SessionScreenState {
   Future<void> _onAttachTap() async {
@@ -66,6 +70,18 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       return;
     }
     try {
+      final voice = (await widget.client
+              .getConfig()
+              .timeout(const Duration(seconds: 3)))
+          .voice;
+      if (!voice.enabled) {
+        if (mounted) _setState(() => _isRecording = false);
+        _toast('Voice notes are turned off in Settings → Voice.');
+        return;
+      }
+      _maxRecordingDuration = Duration(seconds: voice.maxSeconds);
+    } catch (_) {}
+    try {
       // Starting a new take replaces an unconfirmed take only after the user
       // explicitly chose to record again.
       if (_recordingPath != null || _recordingBytes != null) {
@@ -103,7 +119,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
         if (next >= _maxRecordingDuration) {
           _setState(() => _recordingElapsed = _maxRecordingDuration);
           unawaited(_stopRecording());
-          _toast('Recording stopped at the 3-minute limit.');
+          _toast('Recording stopped at the ${_limitLabel(_maxRecordingDuration)} limit.');
         } else {
           _recordingElapsed = next;
           _recorderTick.value++;

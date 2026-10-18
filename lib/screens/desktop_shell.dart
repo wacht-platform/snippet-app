@@ -963,6 +963,8 @@ class _DesktopShellState extends State<DesktopShell>
             ['recurring', 'cron']),
         (SettingsPage.vault, 'lock-key', 'Settings: Vault',
             ['secrets', 'keys', 'credentials']),
+        (SettingsPage.voice, 'mic', 'Settings: Voice',
+            ['voice notes', 'transcription', 'assemblyai', 'microphone']),
       ])
         cmd(page.name, icon, title, () => _openShellSettings(page),
             kind: PaletteKind.setting, keywords: keys),

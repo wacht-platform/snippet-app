@@ -339,7 +339,7 @@ class AgentThreadScreen extends StatefulWidget {
 
 class _AgentThreadScreenState extends State<AgentThreadScreen> {
   static const _maxAttachments = 10;
-  static const _maxRecordingDuration = Duration(minutes: 3);
+  Duration _maxRecordingDuration = const Duration(minutes: 3);
 
   final _input = TextEditingController();
   final _scroll = ScrollController();
@@ -506,6 +506,21 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       return;
     }
     try {
+      final voice = (await widget.client
+              .getConfig()
+              .timeout(const Duration(seconds: 3)))
+          .voice;
+      if (!voice.enabled) {
+        if (mounted) {
+          setState(() => _isRecording = false);
+          toast(context, 'Voice notes are turned off in Settings → Voice.');
+        }
+        return;
+      }
+      _maxRecordingDuration = Duration(seconds: voice.maxSeconds);
+    } catch (_) {
+    }
+    try {
       if (_recordingPath != null || _recordingBytes != null) {
         await _discardRecording();
       }
@@ -541,7 +556,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         if (next >= _maxRecordingDuration) {
           setState(() => _recordingElapsed = _maxRecordingDuration);
           unawaited(_stopRecording());
-          toast(context, 'Recording stopped at the 3-minute limit.');
+          final d = _maxRecordingDuration;
+          toast(context,
+              'Recording stopped at the ${d.inSeconds % 60 == 0 ? '${d.inMinutes}-minute' : '${d.inSeconds}-second'} limit.');
         } else {
           setState(() => _recordingElapsed = next);
         }

@@ -19,6 +19,7 @@ import 'routing_screen.dart';
 import 'shell_nav.dart';
 import 'usage.dart';
 import 'vault.dart';
+import 'voice_screen.dart';
 import '../motion.dart';
 import 'memory_screen.dart';
 
@@ -157,7 +158,7 @@ class _MachineListState extends State<MachineList> {
   }
 }
 
-enum SettingsPage { general, models, routing, memory, usage, vault, scheduled }
+enum SettingsPage { general, models, routing, memory, usage, vault, scheduled, voice }
 
 /// Settings dialog: Zed-style sidebar + content pane. Models / vault /
 /// scheduled swap in-place so they never stack a second dialog.
@@ -277,6 +278,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         case SettingsPage.usage:
         case SettingsPage.memory:
         case SettingsPage.routing:
+        case SettingsPage.voice:
           break;
       }
     });
@@ -290,6 +292,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     (SettingsPage.memory, 'book-marked', 'Memory'),
     (SettingsPage.scheduled, 'calendar-clock', 'Scheduled'),
     (SettingsPage.vault, 'lock', 'Vault'),
+    (SettingsPage.voice, 'mic', 'Voice'),
   ];
 
   static const _navGroups = {
@@ -688,6 +691,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           ApprovalsRow(client: widget.client),
           nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock'),
           nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'calendar-clock'),
+          nav(SettingsPage.voice, 'Voice', 'Voice notes and transcription', 'mic'),
         ]),
         if (kCanNotify) ...[
           label('Phone'),
@@ -717,6 +721,11 @@ class SettingsPanelState extends State<SettingsPanel> {
           onBack: back,
         ),
       SettingsPage.routing => RoutingScreen(
+          client: widget.client,
+          embedded: true,
+          onBack: back,
+        ),
+      SettingsPage.voice => VoiceScreen(
           client: widget.client,
           embedded: true,
           onBack: back,
@@ -842,6 +851,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.usage => 'Usage',
         SettingsPage.vault => 'Vault',
         SettingsPage.scheduled => 'Scheduled',
+        SettingsPage.voice => 'Voice',
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
@@ -943,6 +953,10 @@ class SettingsPanelState extends State<SettingsPanel> {
               setState(() => _modelsEditing = editing),
         ),
       SettingsPage.routing => RoutingScreen(
+          client: widget.client,
+          embedded: true,
+        ),
+      SettingsPage.voice => VoiceScreen(
           client: widget.client,
           embedded: true,
         ),
