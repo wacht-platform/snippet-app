@@ -225,7 +225,9 @@ class SettingsField extends StatelessWidget {
     this.obscure = false,
     this.number = false,
     this.onChanged,
+    this.onSubmitted,
     this.suffix,
+    this.focusNode,
   });
   final TextEditingController controller;
   final String? hint;
@@ -234,7 +236,9 @@ class SettingsField extends StatelessWidget {
   final bool obscure;
   final bool number;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
   final Widget? suffix;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -258,8 +262,10 @@ class SettingsField extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
+              focusNode: focusNode,
               obscureText: obscure,
               onChanged: onChanged,
+              onSubmitted: onSubmitted,
               textAlign: kMobile ? TextAlign.right : TextAlign.left,
               keyboardType: number ? TextInputType.number : null,
               inputFormatters:

@@ -50,6 +50,20 @@ class _VoiceScreenState extends State<VoiceScreen> {
   VoiceSettings? _voice;
   Object? _error;
   bool _busy = false;
+  bool _customLanguage = false;
+  final _keyField = TextEditingController();
+  final _langField = TextEditingController();
+  final _termField = TextEditingController();
+  final _termFocus = FocusNode();
+
+  @override
+  void dispose() {
+    _keyField.dispose();
+    _langField.dispose();
+    _termField.dispose();
+    _termFocus.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -99,6 +113,131 @@ class _VoiceScreenState extends State<VoiceScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  bool _isKnownLanguage(String code) => _languages.any((l) => l.$1 == code);
+
+  Future<void> _saveKeyInline() async {
+    final key = _keyField.text.trim();
+    if (key.isEmpty) return;
+    await _save(apiKey: key, done: 'Key saved');
+    if (mounted && _voice?.keySet == true) _keyField.clear();
+  }
+
+  Future<void> _addTermInline(VoiceSettings v) async {
+    final added = [
+      for (final t in _termField.text.split(',')) if (t.trim().isNotEmpty) t.trim()
+    ];
+    if (added.isEmpty) return;
+    await _save(keyterms: [...v.keyterms, ...added]);
+    if (!mounted) return;
+    _termField.clear();
+    _termFocus.requestFocus();
+  }
+
+  Widget _desktopLanguage(VoiceSettings v) {
+    final custom = _customLanguage || !_isKnownLanguage(v.language);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      if (custom) ...[
+        SettingsField(
+          controller: _langField,
+          hint: 'code, e.g. ta',
+          width: 110,
+          mono: true,
+          onSubmitted: (code) => _save(language: code.trim()),
+        ),
+        const SizedBox(width: 8),
+      ],
+      SettingsPopup<String>(
+        label: custom
+            ? 'Other'
+            : _languages.firstWhere((l) => l.$1 == v.language).$2,
+        selected: custom ? '\u0000other' : v.language,
+        items: [
+          for (final (code, label) in _languages)
+            (code, code.isEmpty ? label : '$label ($code)'),
+          ('\u0000other', 'Other…'),
+        ],
+        onSelected: (code) {
+          if (code == '\u0000other') {
+            setState(() {
+              _customLanguage = true;
+              _langField.text = _isKnownLanguage(v.language) ? '' : v.language;
+            });
+          } else {
+            setState(() => _customLanguage = false);
+            _save(language: code);
+          }
+        },
+      ),
+    ]);
+  }
+
+  Widget _desktopKey(VoiceSettings v) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      SettingsField(
+        controller: _keyField,
+        hint: v.keySet ? 'Paste a new key to replace' : 'Paste your API key',
+        width: 260,
+        mono: true,
+        obscure: true,
+        onChanged: (_) => setState(() {}),
+        onSubmitted: (_) => _saveKeyInline(),
+      ),
+      if (_keyField.text.trim().isNotEmpty) ...[
+        const SizedBox(width: 8),
+        Btn('Save', small: true, onTap: _busy ? null : _saveKeyInline),
+      ],
+      if (v.keySet) ...[
+        const SizedBox(width: 6),
+        Btn('Remove',
+            small: true,
+            variant: BtnVariant.secondary,
+            onTap: _busy ? null : () => _save(apiKey: '', done: 'Key removed')),
+      ],
+    ]);
+  }
+
+  Widget _desktopTerms(VoiceSettings v) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          for (final t in v.keyterms)
+            Container(
+              padding: const EdgeInsets.fromLTRB(10, 3, 3, 3),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(R.pill),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(t, style: sans(12.5, color: AppColors.fg1)),
+                const SizedBox(width: 2),
+                IconBtn('x',
+                    size: 20,
+                    iconSize: 11,
+                    tooltip: 'Remove $t',
+                    onTap: _busy
+                        ? null
+                        : () => _save(
+                            keyterms: [...v.keyterms]..remove(t))),
+              ]),
+            ),
+          SettingsField(
+            controller: _termField,
+            focusNode: _termFocus,
+            hint: v.keyterms.isEmpty
+                ? 'Type a name or word, then Enter'
+                : 'Add another…',
+            width: 230,
+            onSubmitted: (_) => _addTermInline(v),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickLanguage(BuildContext anchor, VoiceSettings v) async {
@@ -178,16 +317,23 @@ class _VoiceScreenState extends State<VoiceScreen> {
               onChanged: _busy ? null : (on) => _save(enabled: on),
             ),
           ),
-          SettingsRow(
-            label: 'AssemblyAI key',
-            sub: v.keySet ? 'Saved on this machine' : 'Needed to transcribe',
-            onTap: () => _editKey(v),
-            trailing: Text(v.keySet ? 'Set' : 'Not set',
-                style: sans(kMobile ? 15 : 12.5,
-                    color: v.keySet ? AppColors.fg3 : AppColors.danger)),
-            chevron: true,
-          ),
-          if (v.keySet)
+          if (!kMobile)
+            SettingsRow(
+              label: 'AssemblyAI key',
+              sub: v.keySet ? 'Saved on this machine' : 'Needed to transcribe',
+              trailing: _desktopKey(v),
+            )
+          else
+            SettingsRow(
+              label: 'AssemblyAI key',
+              sub: v.keySet ? 'Saved on this machine' : 'Needed to transcribe',
+              onTap: () => _editKey(v),
+              trailing: Text(v.keySet ? 'Set' : 'Not set',
+                  style: sans(15,
+                      color: v.keySet ? AppColors.fg3 : AppColors.danger)),
+              chevron: true,
+            ),
+          if (kMobile && v.keySet)
             SettingsRow(
               label: 'Remove key',
               danger: true,
@@ -210,6 +356,9 @@ class _VoiceScreenState extends State<VoiceScreen> {
               onSelected: (m) => _save(speechModel: m),
             ),
           ),
+          if (!kMobile)
+            SettingsRow(label: 'Language', trailing: _desktopLanguage(v))
+          else
           Builder(
             builder: (anchor) => SettingsRow(
               label: 'Language',
@@ -235,6 +384,9 @@ class _VoiceScreenState extends State<VoiceScreen> {
         footer: 'Names and words the transcriber should get right, such as '
             'people, products and project jargon.',
         children: [
+          if (!kMobile)
+            _desktopTerms(v)
+          else
           SettingsRow(
             label: v.keyterms.isEmpty ? 'Add key terms' : '${v.keyterms.length} terms',
             sub: v.keyterms.isEmpty ? null : v.keyterms.join(', '),
