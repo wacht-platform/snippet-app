@@ -449,6 +449,31 @@ class DaemonClient {
     invalidateConfig();
   }
 
+  Future<VoiceSettings> setVoice({
+    bool? enabled,
+    String? speechModel,
+    String? language,
+    List<String>? keyterms,
+    int? maxSeconds,
+    String? apiKey,
+  }) async {
+    final r = await http.post(_uri('/config/voice'),
+        headers: _json,
+        body: jsonEncode({
+          if (enabled != null) 'enabled': enabled,
+          if (speechModel != null) 'speech_model': speechModel,
+          if (language != null) 'language': language,
+          if (keyterms != null) 'keyterms': keyterms,
+          if (maxSeconds != null) 'max_seconds': maxSeconds,
+          if (apiKey != null) 'api_key': apiKey,
+        }));
+    if (r.statusCode != 200) {
+      throw r.statusCode == 400 ? r.body : _err('save voice settings', r);
+    }
+    invalidateConfig();
+    return VoiceSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
   Future<void> setKeepTaskProfile(bool on) async {
     final r = await http.post(_uri('/config/keep_task_profile'),
         headers: _json, body: jsonEncode({'on': on}));

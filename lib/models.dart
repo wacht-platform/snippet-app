@@ -95,6 +95,7 @@ class ServerConfig {
   final String hostname;
   final Map<String, List<String>> routing;
   final Map<String, int> limited;
+  final VoiceSettings voice;
 
   ServerConfig.fromJson(Map<String, dynamic> j)
       : profiles = ((j['profiles'] as List?) ?? const [])
@@ -111,7 +112,36 @@ class ServerConfig {
         limited = {
           for (final e in ((j['limited'] as Map?) ?? const {}).entries)
             e.key as String: (e.value as num).toInt(),
-        };
+        },
+        voice = VoiceSettings.fromJson(
+            (j['voice'] as Map?)?.cast<String, dynamic>() ?? const {});
+}
+
+class VoiceSettings {
+  final bool enabled;
+  final String speechModel;
+  final String language;
+  final List<String> keyterms;
+  final int maxSeconds;
+  final bool keySet;
+  final List<String> speechModels;
+  final int minSeconds;
+  final int maxSecondsLimit;
+
+  VoiceSettings.fromJson(Map<String, dynamic> j)
+      : enabled = j['enabled'] != false,
+        speechModel = j['speech_model'] as String? ?? '',
+        language = j['language'] as String? ?? '',
+        keyterms = [for (final t in (j['keyterms'] as List? ?? const [])) t as String],
+        maxSeconds = (j['max_seconds'] as num?)?.toInt() ?? 180,
+        keySet = j['key_set'] == true,
+        speechModels = [
+          for (final m in (j['speech_models'] as List? ??
+              const ['universal-3-5-pro', 'universal-2']))
+            m as String
+        ],
+        minSeconds = (j['min_seconds'] as num?)?.toInt() ?? 30,
+        maxSecondsLimit = (j['max_seconds_limit'] as num?)?.toInt() ?? 600;
 }
 
 /// One entry from a provider's live model catalog (POST /provider/models).
