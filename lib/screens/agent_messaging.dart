@@ -1320,7 +1320,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       ? child
       : Center(
           child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 740), child: child));
+              constraints: const BoxConstraints(maxWidth: 740),
+              child: SizedBox(width: double.infinity, child: child)));
 
   Widget _desktopStrip() => Column(
         mainAxisSize: MainAxisSize.min,
