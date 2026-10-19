@@ -474,6 +474,14 @@ class DaemonClient {
     return VoiceSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
+  Future<bool> setWebSearchKey(String apiKey) async {
+    final r = await http.post(_uri('/config/web_search'),
+        headers: _json, body: jsonEncode({'api_key': apiKey}));
+    if (r.statusCode != 200) throw _err('save web search key', r);
+    invalidateConfig();
+    return (jsonDecode(r.body) as Map<String, dynamic>)['key_set'] == true;
+  }
+
   Future<void> setKeepTaskProfile(bool on) async {
     final r = await http.post(_uri('/config/keep_task_profile'),
         headers: _json, body: jsonEncode({'on': on}));

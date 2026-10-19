@@ -96,6 +96,7 @@ class ServerConfig {
   final Map<String, List<String>> routing;
   final Map<String, int> limited;
   final VoiceSettings voice;
+  final bool webSearchKeySet;
 
   ServerConfig.fromJson(Map<String, dynamic> j)
       : profiles = ((j['profiles'] as List?) ?? const [])
@@ -114,7 +115,8 @@ class ServerConfig {
             e.key as String: (e.value as num).toInt(),
         },
         voice = VoiceSettings.fromJson(
-            (j['voice'] as Map?)?.cast<String, dynamic>() ?? const {});
+            (j['voice'] as Map?)?.cast<String, dynamic>() ?? const {}),
+        webSearchKeySet = (j['web_search'] as Map?)?['key_set'] == true;
 }
 
 class VoiceSettings {
