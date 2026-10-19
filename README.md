@@ -4,7 +4,7 @@
 
 # snippet app
 
-**A remote Android, macOS, and Windows client for the open-source snippet coding agent.**
+**A remote Android, macOS, Windows, and Linux client for the open-source snippet coding agent.**
 
 [![latest release](https://img.shields.io/github/v/release/wacht-platform/snippet-app?include_prereleases&label=latest%20release)](https://github.com/wacht-platform/snippet-app/releases/tag/latest)
 [![built with Flutter](https://img.shields.io/badge/built%20with-Flutter-02569B.svg)](https://flutter.dev)
@@ -29,14 +29,16 @@ Every successful build publishes one rolling **Latest snippet app** release cont
 | `snippet-android-arm64.apk` | Android arm64 phones and tablets |
 | `snippet-macos.zip` | macOS desktop app |
 | `snippet-windows.zip` | Windows x64 desktop app |
+| `snippet-linux-x64.tar.gz` | Linux x64 desktop archive |
 
 ### Android
 
 Open [`snippet-android-arm64.apk`](https://github.com/wacht-platform/snippet-app/releases/download/latest/snippet-android-arm64.apk) on an arm64 Android device and install it. Android may ask you to allow installation from unknown apps. The APK is currently debug-signed; if Android refuses to update an older install, uninstall that older build first.
 
-### macOS and Windows
+### macOS, Windows, and Linux
 
-Download the matching ZIP from the [latest release](https://github.com/wacht-platform/snippet-app/releases/tag/latest), extract it, and launch the app. These are unsigned development builds, so the operating system may require an explicit approval the first time they open.
+- **macOS and Windows**: Download the matching ZIP from the [latest release](https://github.com/wacht-platform/snippet-app/releases/tag/latest), extract it, and launch the app. These are unsigned development builds, so the operating system may require an explicit approval the first time they open.
+- **Linux**: Download `snippet-linux-x64.tar.gz` from the [latest release](https://github.com/wacht-platform/snippet-app/releases/tag/latest), extract with `tar -xzf snippet-linux-x64.tar.gz`, and run `./snippet.sh` (or build natively via [Linux Desktop Documentation](docs/linux-desktop.md)).
 
 ## Connect to a daemon
 

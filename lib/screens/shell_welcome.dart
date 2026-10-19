@@ -35,7 +35,7 @@ class ShellWithMenu extends StatelessWidget {
   }
 }
 
-const _installCommand = 'curl -fsSL https://wacht.dev/snippet.sh | sh';
+const _installCommand = 'curl -fsSL https://snippet.wacht.dev/install.sh | sh';
 
 class ShellWelcomeView extends StatefulWidget {
   final VoidCallback onAddInstance;
