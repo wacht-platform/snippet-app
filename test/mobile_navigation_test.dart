@@ -33,59 +33,19 @@ Future<void> _pumpShell(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
 }
 
-void _only(String shown) {
-  for (final text in [_chats, _tasks, _agents, _settings]) {
-    expect(find.text(text), text == shown ? findsOneWidget : findsNothing,
-        reason: 'expected only "$shown" to be showing');
-  }
-}
-
 void main() {
-  testWidgets('with no machine the phone starts on Sessions and Settings opens and closes',
+  testWidgets('with no machine the phone shows only the connect welcome',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       SharedPreferences.setMockInitialValues({});
       await _pumpShell(tester);
-      _only(_chats);
-      expect(find.byType(MobileTopBar), findsOneWidget);
-
-      await tester.tap(_visible(find.byTooltip('Settings')));
-      await tester.pumpAndSettle();
-      _only(_settings);
-
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      _only(_chats);
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
-
-  testWidgets('the menu opens Machines and back unwinds one step at a time',
-      (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    try {
-      SharedPreferences.setMockInitialValues({});
-      await _pumpShell(tester);
-
-      await tester.tap(_visible(find.byTooltip('Menu')));
-      await tester.pumpAndSettle();
-      expect(find.text('Tasks'), findsNothing);
-      await tester.tap(find.text('Machines'));
-      await tester.pumpAndSettle();
-      expect(find.text('Add machine'), findsWidgets);
-
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      _only(_settings);
-
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      _only(_chats);
+      expect(find.text('Connect your computer'), findsOneWidget);
+      expect(_visible(find.text('Scan or paste')), findsOneWidget);
+      expect(find.byType(MobileTopBar), findsNothing);
+      for (final text in [_chats, _tasks, _agents, _settings]) {
+        expect(find.text(text), findsNothing);
+      }
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
