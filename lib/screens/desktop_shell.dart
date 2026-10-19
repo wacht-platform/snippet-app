@@ -1115,14 +1115,10 @@ class _DesktopShellState extends State<DesktopShell>
       if (!mounted) return;
       if (_instances.isEmpty) _instances = items;
     }
-    Instance? inst;
-    for (final i in _instances) {
-      if (i.url == url) {
-        inst = i;
-        break;
-      }
-    }
-    final resolved = inst;
+    final name = '${m['name'] ?? ''}';
+    final resolved = _instances.where((i) => i.url == url).firstOrNull ??
+        _instances.where((i) => name.isNotEmpty && i.label == name).firstOrNull ??
+        (_instances.length == 1 ? _instances.first : null);
     if (resolved == null) {
       toast(context, 'That machine is no longer saved.', danger: true);
       return;
