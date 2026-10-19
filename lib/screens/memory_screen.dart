@@ -355,7 +355,7 @@ class _ScopeViewState extends State<_ScopeView> {
   Widget build(BuildContext context) {
     final s = widget.scope;
     final side = kMobile ? M.gutter : 24.0;
-    return PopScope(
+    final page = PopScope(
       canPop: _trail.length < 2,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _backFile();
@@ -400,6 +400,13 @@ class _ScopeViewState extends State<_ScopeView> {
             ),
           ),
         ],
+      ),
+    );
+    if (kMobile) return page;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 768),
+        child: page,
       ),
     );
   }
