@@ -647,15 +647,34 @@ class _SessionScreenState extends State<SessionScreen>
   // Force a fresh snapshot when an optimistic message hasn't been echoed in time —
   // the reconnect path then resends whatever the server truly never received.
   void _armAckWatchdog() {
-    _ackTimer?.cancel();
-    if (_closed || _pending.isEmpty) return;
+    if (_closed || _pending.isEmpty) {
+      _ackTimer?.cancel();
+      return;
+    }
+    if (_ackTimer?.isActive ?? false) return;
     _ackTimer = Timer(const Duration(seconds: 15), () {
-      if (!mounted || _closed || _pending.isEmpty) return;
+      if (!mounted || _closed) return;
+      if (_pending.isEmpty) return;
       final ch = _channel;
       if (ch != null) {
-        _resync(ch); // tear down → fresh snapshot → unacked _pending resend
+        _resync(ch);
+      } else {
+        _ensureConnected();
       }
+      _armAckWatchdog();
     });
+  }
+
+  void _ensureConnected() {
+    if (_closed) return;
+    if (_parked) {
+      _unpark();
+      return;
+    }
+    if (_channel == null && !(_reconnectTimer?.isActive ?? false)) {
+      _reconnectAttempt = 0;
+      _connect();
+    }
   }
 
   // Send an approve/deny/answer and hold it until the run acknowledges it (leaves
@@ -919,6 +938,8 @@ class _SessionScreenState extends State<SessionScreen>
       if (widget.acceptDrops) {
         _unpark();
         _loadModel();
+      } else if (_pending.isNotEmpty || _optimisticQueued.isNotEmpty) {
+        _unpark();
       }
     }
   }
