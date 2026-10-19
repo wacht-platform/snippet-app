@@ -593,7 +593,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   Future<void> _renameInstance(Instance inst, String name) async {
-    final items = _instances
+    final items = (await _store.load())
         .map((e) => e.url == inst.url
             ? Instance(name: name, url: e.url, token: e.token)
             : e)
@@ -609,8 +609,9 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   Future<void> _onInstanceAdded(Instance inst) async {
-    final items = [..._instances]..removeWhere((e) => e.url == inst.url);
-    items.add(inst);
+    final items = await _store.load()
+      ..removeWhere((e) => e.url == inst.url || e.token == inst.token)
+      ..add(inst);
     await _store.save(items);
     if (!mounted) return;
     _setState(() => _instances = items);
@@ -619,7 +620,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   Future<void> _removeInstance(Instance inst) async {
-    final items = [..._instances]..removeWhere((e) => e.url == inst.url);
+    final items = await _store.load()
+      ..removeWhere((e) => e.url == inst.url);
     await _store.save(items);
     if (!mounted) return;
     _setState(() {

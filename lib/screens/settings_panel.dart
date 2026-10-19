@@ -214,6 +214,30 @@ class SettingsPanel extends StatefulWidget {
 
 class SettingsPanelState extends State<SettingsPanel> {
   late final List<Instance> _instances = [...widget.instances];
+
+  Future<void> _saveInstances(void Function(List<Instance> items) change) async {
+    final items = await InstanceStore().load();
+    change(items);
+    await InstanceStore().save(items);
+    if (!mounted) return;
+    setState(() => _instances
+      ..clear()
+      ..addAll(items));
+  }
+
+  void _syncInstances(List<Instance> items) {
+    final same = items.length == _instances.length &&
+        [
+          for (var i = 0; i < items.length; i++)
+            items[i].url == _instances[i].url &&
+                items[i].label == _instances[i].label
+        ].every((x) => x);
+    if (!same) {
+      _instances
+        ..clear()
+        ..addAll(items);
+    }
+  }
   bool _notif = false;
   bool _notifBusy = false;
   final GlobalKey<VaultScreenState> _vaultKey = GlobalKey<VaultScreenState>();
@@ -258,6 +282,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     final after = widget.section?.index ?? -1;
     if (before != after) _sectionForward = after > before;
     if (widget.createOnOpen != oldWidget.createOnOpen) _scheduleCreate();
+    _syncInstances(widget.instances);
   }
 
   void _scheduleCreate() {
@@ -761,11 +786,9 @@ class SettingsPanelState extends State<SettingsPanel> {
         const AddInstanceScreen(),
       ).then((inst) {
         if (inst != null && mounted) {
-          setState(() {
-            _instances.removeWhere((e) => e.url == inst.url);
-            _instances.add(inst);
-          });
-          InstanceStore().save(_instances);
+          _saveInstances((items) => items
+            ..removeWhere((e) => e.url == inst.url || e.token == inst.token)
+            ..add(inst));
           widget.onAdd?.call(inst);
         }
       });
@@ -797,12 +820,12 @@ class SettingsPanelState extends State<SettingsPanel> {
       if (!mounted) return;
       setState(() {
         _addMachineBusy = false;
-        _instances.removeWhere((e) => e.url == inst.url);
-        _instances.add(inst);
         _addingMachine = false;
         _addMachinePaste.clear();
       });
-      await InstanceStore().save(_instances);
+      await _saveInstances((items) => items
+        ..removeWhere((e) => e.url == inst.url || e.token == inst.token)
+        ..add(inst));
       widget.onAdd?.call(inst);
     } catch (e) {
       if (mounted) {
@@ -827,15 +850,13 @@ class SettingsPanelState extends State<SettingsPanel> {
       setState(() => _renamingUrl = null);
       return;
     }
-    setState(() {
-      final idx = _instances.indexWhere((e) => e.url == inst.url);
+    setState(() => _renamingUrl = null);
+    await _saveInstances((items) {
+      final idx = items.indexWhere((e) => e.url == inst.url);
       if (idx >= 0) {
-        _instances[idx] =
-            Instance(name: newName, url: inst.url, token: inst.token);
+        items[idx] = Instance(name: newName, url: inst.url, token: inst.token);
       }
-      _renamingUrl = null;
     });
-    await InstanceStore().save(_instances);
     widget.onRename?.call(inst, newName);
   }
 
