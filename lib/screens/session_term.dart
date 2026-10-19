@@ -1,24 +1,5 @@
 part of 'session.dart';
 
-class _StatMeta extends StatelessWidget {
-  final String icon, label, tone;
-  const _StatMeta(
-      {required this.icon, required this.label, this.tone = 'default'});
-  @override
-  Widget build(BuildContext context) {
-    final c = tone == 'accent'
-        ? AppColors.accent
-        : tone == 'run'
-            ? AppColors.run
-            : AppColors.fg2;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      AppIcon(icon, size: 14, color: tone == 'default' ? AppColors.fg4 : c),
-      const SizedBox(width: 6),
-      Text(label, style: mono(12, color: c)),
-    ]);
-  }
-}
-
 String _activityElapsed(String? startedAt, DateTime fallback) {
   final parsed = DateTime.tryParse(startedAt ?? '');
   final start = parsed?.toLocal() ?? fallback;

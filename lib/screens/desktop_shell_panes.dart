@@ -648,8 +648,11 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     return SizedBox(
       height: 46,
       child: Row(children: [
-        SizedBox(width: kMacOS ? 84 : 12),
-        const Spacer(),
+        if (kMacOS) ...[
+          const SizedBox(width: 84),
+          const Spacer(),
+        ] else
+          const SizedBox(width: 10),
         IconBtn('chevron-left',
             size: 28,
             iconSize: 16,

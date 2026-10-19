@@ -1652,7 +1652,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                   ],
                 ),
         ),
-      if (!kMacOS && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
+      if (kMobile && !widget.hideGoal && (s?.lanes.isNotEmpty ?? false))
         _row(
             icon: 'layers',
             label: 'Lanes',
@@ -1666,7 +1666,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     ];
 
     final workspaceRows = <Widget>[
-      if (!kMacOS)
+      if (kMobile)
         _row(
             icon: 'git-branch',
             label: 'Git',

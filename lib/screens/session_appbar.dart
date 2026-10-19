@@ -272,22 +272,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   /// Phone session bar: back, title, and the shell action. Deliberately NO run
   /// state — the chat canvas already carries working/idle, so a second readout
   /// here was one more thing competing with the title for the same 56px.
-  Widget _runningLanesBadge(HarnessState s, EdgeInsets margin) {
-    final n = s.lanes.where((l) => l.running).length;
-    return Tooltip(
-      message: '$n parallel agent${n == 1 ? '' : 's'} running',
-      child: GestureDetector(
-        onTap: _showLanes,
-        behavior: HitTestBehavior.opaque,
-        child: Padding(
-          padding: margin,
-          child: Tag('$n ${n == 1 ? 'agent' : 'agents'}',
-              tone: Tone.accent, live: true),
-        ),
-      ),
-    );
-  }
-
   Widget _readOnlyHeader(String status) {
     final live = status == 'running';
     final label = switch (status) {
@@ -639,72 +623,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
 
   // macOS keeps this row focused on the active session title. Workspace
   // context and Git actions live in the clickable repository bar above.
-  Widget _desktopBar(HarnessState? s, bool running) {
-    final mac = kMacOS;
-    final title = _title.isEmpty ? 'session' : _title;
-    return Container(
-      height: mac ? 42 : 50,
-      padding: EdgeInsets.symmetric(horizontal: mac ? 16 : 8),
-      decoration: BoxDecoration(
-        color: mac ? AppColors.surface1 : readingBg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(children: [
-        if (!mac && widget.onMenu != null) ...[
-          IconBtn('sidebar',
-              size: 30, iconSize: 16, tooltip: 'Sidebar', onTap: widget.onMenu),
-          const SizedBox(width: 4),
-        ] else if (!mac)
-          const SizedBox(width: 2),
-        Expanded(
-          child: Text(title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  sans(mac ? 13 : 16, weight: W.label, color: AppColors.fg1)),
-        ),
-        if (s != null && s.lanes.any((l) => l.running))
-          _runningLanesBadge(s, const EdgeInsets.symmetric(horizontal: 8)),
-        if (mac && running)
-          IconBtn('stop',
-              size: 30,
-              iconSize: 15,
-              tooltip: 'Stop',
-              onTap: () => _send({'kind': 'interrupt'})),
-        if (!mac && running)
-          IconBtn('stop',
-              size: 32,
-              iconSize: 16,
-              tooltip: 'Stop',
-              onTap: () => _send({'kind': 'interrupt'})),
-        if (!mac && !_isMissionControl) _menu(s),
-      ]),
-    );
-  }
-
-  Widget _menu(HarnessState? s) {
-    final view = View.of(context);
-    final desktop =
-        view.physicalSize.width / view.devicePixelRatio >= kDesktopBreakpoint;
-    if (!desktop) {
-      return IconBtn('more-vertical',
-          tooltip: 'Actions', onTap: () => _openActions(s));
-    }
-    return PopupMenuButton<VoidCallback>(
-      color: AppColors.surface1,
-      elevation: 0,
-      surfaceTintColor: Colors.transparent,
-      shadowColor: Colors.transparent,
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 260),
-      menuPadding: const EdgeInsets.symmetric(vertical: 6),
-      shape: appMenuShape,
-      icon: AppIcon('more-vertical', color: AppColors.fg2),
-      tooltip: 'Actions',
-      onSelected: (fn) => fn(),
-      itemBuilder: (_) => _actionItems(s),
-    );
-  }
-
   // Set an autonomous /goal: the agent drives toward it on its own until it's
   // done, you cancel, or it's rate-limited. Sent as a LoopInput over the socket.
   Future<void> _setGoal() async {
@@ -961,109 +879,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     }
   }
 
-  Widget _contextMeter(int used, int win) {
-    final frac = (used / win).clamp(0.0, 1.0);
-    String k(int v) => v >= 1000 ? '${(v / 1000).round()}k' : '$v';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text('Context', style: sans(12.5, color: AppColors.fg2))),
-          Text('${k(used)} / ${k(win)}', style: mono(11, color: AppColors.fg4)),
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          for (var i = 0; i < 24; i++)
-            Container(
-              width: 6,
-              height: 6,
-              margin: const EdgeInsets.only(right: 3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: i < (frac * 24).round()
-                    ? (frac > 0.8 ? AppColors.danger : AppColors.fg3)
-                    : AppColors.line,
-              ),
-            ),
-        ]),
-      ]),
-    );
-  }
-
-  List<PopupMenuEntry<VoidCallback>> _actionItems(HarnessState? s) {
-    final ws = s?.workspace ?? '';
-    PopupMenuItem<VoidCallback> item(String icon, String label, VoidCallback fn,
-            {String? value}) =>
-        appMenuItem(
-          value: fn,
-          icon: icon,
-          label: label,
-          detail: value,
-        );
-    final win = s?.contextWindow ?? 0;
-    final used = s?.lastPromptTokens ?? 0;
-    return [
-      if (win > 0 && used > 0) ...[
-        PopupMenuItem<VoidCallback>(
-          enabled: false,
-          height: 64,
-          child: _contextMeter(used, win),
-        ),
-        const PopupMenuDivider(),
-      ],
-      if (_isMissionControl) item('activity', 'Automated wakes', _openAutonomy),
-      item('edit', 'Rename session', _renameCurrent),
-      (s?.goal?.ongoing ?? false)
-          ? (s!.goal!.paused
-              ? item('play', 'Resume goal', _resumeGoal, value: 'paused')
-              : item('goal', 'Cancel goal', _cancelGoal, value: 'running'))
-          : item('goal', 'Set goal', _setGoal),
-      if ((s?.lanes.isNotEmpty ?? false))
-        item('layers', 'Lanes', _showLanes,
-            value: '${s!.lanes.where((l) => l.running).length} running'),
-      const PopupMenuDivider(),
-      item(
-          'git-branch',
-          'Git',
-          () => presentScreen(context,
-              builder: (_, close) => GitScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-      item('layers', 'Artifacts & files', _openDeliverables),
-      if (_github != null)
-        item('git-branch', 'Pull requests', _openPullRequests),
-      item('folder', 'Browse', () {
-        final name = lastPathSegment(ws, ifEmpty: 'Files');
-        presentScreen(context,
-            style: PanelStyle.drawer,
-            purpose: ShellPanelPurpose.files,
-            originClient: widget.client,
-            originSessionId: widget.sessionId,
-            maxWidth: 1060,
-            maxHeight: 760,
-            builder: (_, close) => FileExplorer(
-                client: widget.client,
-                title: name,
-                start: ws.isEmpty ? null : ws,
-                onClose: close,
-                onOpenFile: widget.onOpenFileTab));
-      }),
-      item(
-          'list',
-          'Processes',
-          () => presentScreen(context,
-              builder: (_, close) => ProcessesScreen(
-                  client: widget.client,
-                  sessionId: widget.sessionId,
-                  onClose: close))),
-      item('scheduled', 'Scheduled', _openRecurring),
-      const PopupMenuDivider(),
-      item('minimize', 'Compact history', _confirmCompact),
-      item('history', 'Checkpoints', _showCheckpoints),
-    ];
-  }
-
   void _openActions(HarnessState? s) {
     void run(VoidCallback f) {
       Navigator.pop(context);
@@ -1142,73 +957,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
               client: widget.client,
               embedded: true,
               onBack: close))),
-    );
-  }
-
-  List<Widget> _statusChips(HarnessState? s, bool running) {
-    final chips = <Widget>[
-      Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-                color: running ? AppColors.run : AppColors.fg2,
-                shape: BoxShape.circle)),
-        const SizedBox(width: 7),
-        Text(
-            s?.compacting == true
-                ? 'Compacting'
-                : (running ? 'Running' : 'Idle'),
-            style: sans(12,
-                weight: W.label,
-                color: s?.compacting == true
-                    ? AppColors.accent
-                    : (running ? AppColors.run : AppColors.fg2))),
-      ]),
-    ];
-    if (s != null && s.workspace.isNotEmpty) {
-      chips.add(_StatMeta(
-          icon: 'folder',
-          label: lastPathSegment(s.workspace, ifEmpty: s.workspace)));
-    }
-    if (s != null) {
-      if (s.totalTokens > 0) {
-        chips.add(_StatMeta(icon: 'activity', label: '${fmtSi(s.totalTokens)} tok'));
-      }
-      // Approval mode and context remaining now live in the composer, so they
-      // are deliberately NOT repeated here.
-      // Show for any provider that reported limits. An EXPIRED window is
-      // skipped rather than printed: its percentage describes the window that
-      // already rolled over, so showing it would state a stale figure as fact.
-      final rp = s.ratePrimary;
-      if (rp != null && !rp.isExpired) {
-        chips.add(_StatMeta(
-            icon: 'clipboard',
-            label:
-                '${rateWindowLabel(rp.windowMinutes)} · ${rp.leftPercent.round()}%',
-            tone: 'run'));
-      }
-    }
-    return chips;
-  }
-
-  Widget _statusStrip(HarnessState? s, bool running) {
-    final chips = _statusChips(s, running);
-    return Container(
-      height: 44,
-      decoration: BoxDecoration(
-          color: AppColors.surface1,
-          border: Border(bottom: BorderSide(color: AppColors.border))),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(children: [
-          for (var i = 0; i < chips.length; i++) ...[
-            if (i > 0) const SizedBox(width: 12),
-            chips[i]
-          ],
-        ]),
-      ),
     );
   }
 

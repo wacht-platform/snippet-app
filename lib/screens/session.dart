@@ -1229,12 +1229,7 @@ class _SessionScreenState extends State<SessionScreen>
                           if (widget.readOnly)
                             _readOnlyHeader(status)
                           else if (kMobile)
-                            widget.mobileTopBar ?? _mobileHeader(s)
-                          else if (!kMacOS)
-                            _desktopBar(s, running),
-                          // Desktop keeps the detailed chip strip.
-                          if (!kMobile && !kMacOS && !widget.readOnly)
-                            _statusStrip(s, running),
+                            widget.mobileTopBar ?? _mobileHeader(s),
                           if (widget.readOnly && widget.banner != null)
                             _centerWide(widget.banner!),
                           if (_connError != null) _disconnectedBanner(),
