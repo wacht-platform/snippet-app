@@ -6,6 +6,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     final ch = _channel;
     if (ch == null) {
       if (!tracked) _outbox.add(payload); // untracked messages use outbox
+      _ensureConnected();
       return;
     }
     try {
