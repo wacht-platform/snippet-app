@@ -965,6 +965,8 @@ class _DesktopShellState extends State<DesktopShell>
             ['secrets', 'keys', 'credentials']),
         (SettingsPage.voice, 'mic', 'Settings: Voice',
             ['voice notes', 'transcription', 'assemblyai', 'microphone']),
+        (SettingsPage.webSearch, 'globe', 'Settings: Web search',
+            ['exa', 'search', 'internet', 'browse']),
       ])
         cmd(page.name, icon, title, () => _openShellSettings(page),
             kind: PaletteKind.setting, keywords: keys),

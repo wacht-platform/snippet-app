@@ -20,6 +20,7 @@ import 'shell_nav.dart';
 import 'usage.dart';
 import 'vault.dart';
 import 'voice_screen.dart';
+import 'web_search_screen.dart';
 import '../motion.dart';
 import 'memory_screen.dart';
 
@@ -158,7 +159,7 @@ class _MachineListState extends State<MachineList> {
   }
 }
 
-enum SettingsPage { general, models, routing, memory, usage, vault, scheduled, voice }
+enum SettingsPage { general, models, routing, memory, usage, vault, scheduled, voice, webSearch }
 
 /// Settings dialog: Zed-style sidebar + content pane. Models / vault /
 /// scheduled swap in-place so they never stack a second dialog.
@@ -304,6 +305,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         case SettingsPage.memory:
         case SettingsPage.routing:
         case SettingsPage.voice:
+        case SettingsPage.webSearch:
           break;
       }
     });
@@ -318,6 +320,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     (SettingsPage.scheduled, 'calendar-clock', 'Scheduled'),
     (SettingsPage.vault, 'lock', 'Vault'),
     (SettingsPage.voice, 'mic', 'Voice'),
+    (SettingsPage.webSearch, 'globe', 'Web search'),
   ];
 
   static const _navGroups = {
@@ -717,6 +720,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock'),
           nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'calendar-clock'),
           nav(SettingsPage.voice, 'Voice', 'Voice notes and transcription', 'mic'),
+          nav(SettingsPage.webSearch, 'Web search', 'Let agents search the web', 'globe'),
         ]),
         if (kCanNotify) ...[
           label('Phone'),
@@ -751,6 +755,11 @@ class SettingsPanelState extends State<SettingsPanel> {
           onBack: back,
         ),
       SettingsPage.voice => VoiceScreen(
+          client: widget.client,
+          embedded: true,
+          onBack: back,
+        ),
+      SettingsPage.webSearch => WebSearchScreen(
           client: widget.client,
           embedded: true,
           onBack: back,
@@ -873,6 +882,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.vault => 'Vault',
         SettingsPage.scheduled => 'Scheduled',
         SettingsPage.voice => 'Voice',
+        SettingsPage.webSearch => 'Web search',
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
@@ -978,6 +988,10 @@ class SettingsPanelState extends State<SettingsPanel> {
           embedded: true,
         ),
       SettingsPage.voice => VoiceScreen(
+          client: widget.client,
+          embedded: true,
+        ),
+      SettingsPage.webSearch => WebSearchScreen(
           client: widget.client,
           embedded: true,
         ),
