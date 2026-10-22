@@ -203,29 +203,14 @@ class _AmbientPanelState extends State<AmbientPanel> {
       _busy = true;
       _error = null;
     });
-    try {
-      if (on) {
-        final saved = await widget.client.setAmbientSettings(enabled: true);
-        if (mounted) setState(() => _settings = saved);
-        final error = await _ambient.start(widget.client);
-        if (error != null) {
-          final reverted = await widget.client.setAmbientSettings(enabled: false);
-          if (mounted) {
-            setState(() {
-              _settings = reverted;
-              _error = error;
-            });
-          }
-        }
-      } else {
-        await _ambient.stop();
-        final saved = await widget.client.setAmbientSettings(enabled: false);
-        if (mounted) setState(() => _settings = saved);
-      }
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+    final (saved, error) = await _ambient.setEnabled(widget.client, on);
+    if (mounted) {
+      setState(() {
+        if (saved != null) _settings = saved;
+        _error = error;
+        _busy = false;
+      });
     }
-    if (mounted) setState(() => _busy = false);
     unawaited(_load());
   }
 

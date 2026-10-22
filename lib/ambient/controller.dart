@@ -6,6 +6,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../api.dart';
+import '../models.dart';
 import '../platform.dart';
 import 'capture.dart';
 import 'diagnostics.dart';
@@ -191,5 +192,23 @@ class AmbientController extends ChangeNotifier {
 
   Future<void> requestBatteryExemption() async {
     if (_android) await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+  }
+
+  Future<(AmbientSettings?, String?)> setEnabled(DaemonClient client, bool on) async {
+    try {
+      if (on) {
+        var saved = await client.setAmbientSettings(enabled: true);
+        final error = await start(client);
+        if (error != null) {
+          saved = await client.setAmbientSettings(enabled: false);
+          return (saved, error);
+        }
+        return (saved, null);
+      }
+      await stop();
+      return (await client.setAmbientSettings(enabled: false), null);
+    } catch (e) {
+      return (null, '$e');
+    }
   }
 }
