@@ -300,7 +300,7 @@ class _AmbientStageState extends State<AmbientStage> {
     if (s != null && _pager == null) {
       final i = _modes.indexOf(s.mode).clamp(0, 1);
       _page = i.toDouble();
-      _pager = PageController(initialPage: i, viewportFraction: 0.8)
+      _pager = PageController(initialPage: i, viewportFraction: 0.7)
         ..addListener(() {
           if (mounted) setState(() => _page = _pager!.page ?? _page);
         });
@@ -393,7 +393,7 @@ class _AmbientStageState extends State<AmbientStage> {
   Widget build(BuildContext context) {
     final err = _m.error ?? _m.status.error;
     final width = MediaQuery.sizeOf(context).width;
-    final globe = math.min(width * 0.7, 320.0);
+    final globe = math.min(width * 0.64, 320.0);
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -413,7 +413,7 @@ class _AmbientStageState extends State<AmbientStage> {
           Expanded(
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               SizedBox(
-                height: globe + 40,
+                height: globe + 96,
                 child: _pager == null
                     ? const SizedBox.shrink()
                     : PageView.builder(
