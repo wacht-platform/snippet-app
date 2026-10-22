@@ -22,6 +22,7 @@ import 'usage.dart';
 import 'vault.dart';
 import 'voice_screen.dart';
 import 'web_search_screen.dart';
+import 'accounts_screen.dart';
 import '../motion.dart';
 import 'memory_screen.dart';
 
@@ -170,6 +171,7 @@ enum SettingsPage {
   scheduled,
   voice,
   webSearch,
+  accounts,
   wakes,
 }
 
@@ -318,6 +320,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         case SettingsPage.routing:
         case SettingsPage.voice:
         case SettingsPage.webSearch:
+        case SettingsPage.accounts:
         case SettingsPage.wakes:
           break;
       }
@@ -334,6 +337,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     (SettingsPage.vault, 'lock', 'Vault'),
     (SettingsPage.voice, 'mic', 'Voice'),
     (SettingsPage.webSearch, 'globe', 'Web search'),
+    (SettingsPage.accounts, 'users', 'Accounts'),
   ];
 
   static const _navGroups = {
@@ -781,6 +785,11 @@ class SettingsPanelState extends State<SettingsPanel> {
           embedded: true,
           onBack: back,
         ),
+      SettingsPage.accounts => AccountsScreen(
+          client: widget.client,
+          embedded: true,
+          onBack: back,
+        ),
       SettingsPage.memory => MemoryScreen(
           client: widget.client,
           embedded: true,
@@ -905,6 +914,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.scheduled => 'Scheduled',
         SettingsPage.voice => 'Voice',
         SettingsPage.webSearch => 'Web search',
+        SettingsPage.accounts => 'Accounts',
         SettingsPage.wakes => 'Automated wakes',
       };
 
@@ -1015,6 +1025,10 @@ class SettingsPanelState extends State<SettingsPanel> {
           embedded: true,
         ),
       SettingsPage.webSearch => WebSearchScreen(
+          client: widget.client,
+          embedded: true,
+        ),
+      SettingsPage.accounts => AccountsScreen(
           client: widget.client,
           embedded: true,
         ),

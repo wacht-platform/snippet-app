@@ -474,6 +474,53 @@ class DaemonClient {
     return VoiceSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
+  Future<Map<String, List<Account>>> getAccounts() async {
+    final r = await http.get(_uri('/accounts'));
+    if (r.statusCode != 200) throw _err('load accounts', r);
+    final json = jsonDecode(r.body) as Map<String, dynamic>;
+    return {
+      for (final provider in ['chatgpt', 'xai', 'claude-code'])
+        provider: ((json[provider] as List?) ?? [])
+            .map((a) => Account.fromJson((a as Map).cast<String, dynamic>()))
+            .toList()
+    };
+  }
+
+  Future<Map<String, dynamic>> addAccount(String provider,
+          {String? label, String? token}) =>
+      _accountPost('add', {
+        'provider': provider,
+        if (label != null && label.isNotEmpty) 'label': label,
+        if (token != null) 'token': token
+      });
+
+  Future<Map<String, dynamic>> removeAccount(String provider, String id) =>
+      _accountPost('remove', {'provider': provider, 'id': id});
+
+  Future<Map<String, dynamic>> updateAccount(String provider,
+          {List<String>? order, String? id, String? label}) =>
+      _accountPost(
+          'update',
+          {
+            if (order != null) 'order': order,
+            if (id != null) 'id': id,
+            if (label != null) 'label': label
+          },
+          provider: provider);
+
+  Future<Map<String, dynamic>> _accountPost(
+      String action, Map<String, dynamic> body,
+      {String? provider}) async {
+    final r = await http.post(_uri('/accounts/$action'),
+        headers: _json,
+        body:
+            jsonEncode({if (provider != null) 'provider': provider, ...body}));
+    if (r.statusCode != 200) {
+      throw r.statusCode == 400 ? r.body : _err('$action account', r);
+    }
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
   Future<bool> setWebSearchKey(String apiKey) async {
     final r = await http.post(_uri('/config/web_search'),
         headers: _json, body: jsonEncode({'api_key': apiKey}));

@@ -339,6 +339,39 @@ class FileContent {
   bool get editable => !binary && !truncated;
 }
 
+class AccountUsage {
+  final RateWindow? primary;
+  final RateWindow? secondary;
+  final String? label;
+
+  AccountUsage.fromJson(Map<String, dynamic> j)
+      : primary = j['primary'] is Map
+            ? RateWindow.fromJson((j['primary'] as Map).cast<String, dynamic>())
+            : null,
+        secondary = j['secondary'] is Map
+            ? RateWindow.fromJson(
+                (j['secondary'] as Map).cast<String, dynamic>())
+            : null,
+        label = j['label'] as String?;
+}
+
+class Account {
+  final String id;
+  final String label;
+  final bool active;
+  final int? limitedUntil;
+  final AccountUsage? usage;
+
+  Account.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        label = j['label'] as String? ?? '',
+        active = j['active'] == true,
+        limitedUntil = (j['limited_until'] as num?)?.toInt(),
+        usage = j['usage'] is Map
+            ? AccountUsage.fromJson((j['usage'] as Map).cast<String, dynamic>())
+            : null;
+}
+
 class RateWindow {
   final double usedPercent;
   final int windowMinutes;
