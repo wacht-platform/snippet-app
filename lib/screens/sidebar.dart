@@ -152,6 +152,7 @@ class SidebarState extends State<Sidebar> {
   List<(String, RateWindow)> _meters = const [];
   List<CoordinationAgent> _crew = const [];
   DateTime? _metersAt;
+  Timer? _metersTimer;
 
   Future<void> _loadMeters() async {
     final client = widget.client;
@@ -279,6 +280,12 @@ class SidebarState extends State<Sidebar> {
     super.initState();
     Drafts.instance.addListener(_onDrafts);
     _loadProviders();
+    if (!kMobile) {
+      _metersTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+        _metersAt = null;
+        _loadMeters();
+      });
+    }
     _pageController = PageController(initialPage: widget.mobileHome.index);
     if (widget.mobileHome != MobileHome.settings) {
       _lastMainHome = widget.mobileHome;
@@ -288,6 +295,7 @@ class SidebarState extends State<Sidebar> {
   @override
   void didUpdateWidget(covariant Sidebar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.client != widget.client) _metersAt = null;
     if (oldWidget.client != widget.client ||
         (widget.sessions ?? const <SessionInfo>[]).any((s) =>
             (s.profile ?? '').isNotEmpty &&
@@ -329,6 +337,7 @@ class SidebarState extends State<Sidebar> {
   @override
   void dispose() {
     Drafts.instance.removeListener(_onDrafts);
+    _metersTimer?.cancel();
     _pageController.dispose();
     _renameCtl.dispose();
     _renameFocus.dispose();
