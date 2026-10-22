@@ -1627,3 +1627,34 @@ class AmbientStats {
             e.key as String: (e.value as num).toInt()
         };
 }
+
+class AmbientDevice {
+  final String device;
+  final DateTime lastSeen;
+  AmbientDevice.fromJson(Map<String, dynamic> j)
+      : device = j['device'] as String? ?? '',
+        lastSeen = DateTime.fromMillisecondsSinceEpoch(
+            ((j['last_seen'] as num?)?.toInt() ?? 0) * 1000);
+}
+
+class AmbientSettings {
+  final bool enabled;
+  final String mode;
+  final bool keySet;
+  final List<AmbientDevice> devices;
+
+  const AmbientSettings(
+      {this.enabled = false,
+      this.mode = 'passive',
+      this.keySet = true,
+      this.devices = const []});
+
+  AmbientSettings.fromJson(Map<String, dynamic> j)
+      : enabled = j['enabled'] == true,
+        mode = j['mode'] as String? ?? 'passive',
+        keySet = j['key_set'] != false,
+        devices = [
+          for (final d in (j['devices'] as List? ?? const []))
+            AmbientDevice.fromJson((d as Map).cast<String, dynamic>())
+        ];
+}

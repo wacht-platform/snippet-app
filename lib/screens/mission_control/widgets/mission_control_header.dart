@@ -11,6 +11,7 @@ import '../../mission_control/coordination_agent_directory.dart';
 import '../mission_control_state.dart';
 import '../mobile/mobile_mc.dart'
     show showMissionControlPanel, showNotificationInbox;
+import 'ambient_panel.dart';
 import 'autonomy_panel.dart';
 
 class MissionControlHeader extends StatelessWidget {
@@ -80,6 +81,11 @@ class MissionControlHeader extends StatelessWidget {
           ),
         ),
         AutonomyChip(
+          client: state.client,
+          open: (panel) => showMissionControlPanel(context, panel),
+        ),
+        const SizedBox(width: 4),
+        AmbientChip(
           client: state.client,
           open: (panel) => showMissionControlPanel(context, panel),
         ),

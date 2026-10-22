@@ -486,6 +486,23 @@ class DaemonClient {
         .toList();
   }
 
+  Future<AmbientSettings> getAmbientSettings() async {
+    final r = await http.get(_uri('/ambient/settings'));
+    if (r.statusCode != 200) throw _err('load ambient settings', r);
+    return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<AmbientSettings> setAmbientSettings({bool? enabled, String? mode}) async {
+    final r = await http.post(_uri('/ambient/settings'),
+        headers: _json,
+        body: jsonEncode({
+          if (enabled != null) 'enabled': enabled,
+          if (mode != null) 'mode': mode,
+        }));
+    if (r.statusCode != 200) throw _err('save ambient settings', r);
+    return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
   Future<AmbientStats> ambientStats() async {
     final r = await http.get(_uri('/ambient/stats'));
     if (r.statusCode != 200) throw _err('load ambient stats', r);

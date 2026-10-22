@@ -173,7 +173,9 @@ class AmbientUploader {
         await _remove(stem);
         return true;
       }
-      lastError.value = 'Upload failed (${response.statusCode})';
+      lastError.value = response.statusCode == 403
+          ? 'Ambient listening is turned off on the server'
+          : 'Upload failed (${response.statusCode})';
       return false;
     } catch (e) {
       lastError.value = 'Upload failed: $e';
