@@ -140,7 +140,6 @@ The client communicates through two primary endpoints:
 ## Related project
 
 - [snippet service](https://github.com/wacht-platform/snippet-service) — Rust coding agent, TUI, daemon, model configuration, and session engine.
-- [Wacht](https://wacht.dev) — the team behind the project.
 
 ## Sponsoring Snippet
 
