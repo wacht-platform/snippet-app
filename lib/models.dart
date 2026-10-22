@@ -883,6 +883,22 @@ String rateWindowLabel(int minutes) {
   return 'limit';
 }
 
+String limitWindowLabel(RateWindow r) {
+  const buckets = [(300, '5h'), (10080, '7d'), (43200, '30d')];
+  var i = 0;
+  if (r.windowMinutes > 0) {
+    i = buckets.indexWhere((b) => r.windowMinutes <= b.$1 * 1.05);
+    if (i < 0) i = buckets.length - 1;
+  }
+  if (r.resetsAt > 0) {
+    final left = (r.resetsAt - DateTime.now().millisecondsSinceEpoch ~/ 1000) / 60;
+    while (i < buckets.length - 1 && left > buckets[i].$1 * 1.05) {
+      i++;
+    }
+  }
+  return buckets[i].$2;
+}
+
 /// "resets in 2h 14m · 15:45" from a Unix-epoch-seconds reset time. Durations
 /// normalize up — minutes → hours → days (so a weekly window reads "6d 6h", not
 /// "150h 54m"). The local clock time is appended only for near resets (< 1 day

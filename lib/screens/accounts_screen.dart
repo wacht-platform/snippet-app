@@ -264,8 +264,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   padding: const EdgeInsets.only(top: 2),
                   child: Text('Limit reached, resets $limitedLabel',
                       style: sans(12.5, color: AppColors.danger))),
-            if (usage?.primary != null) _meter('5h', usage!.primary!),
-            if (usage?.secondary != null) _meter('Week', usage!.secondary!),
+            if (usage?.primary != null) _meter(limitWindowLabel(usage!.primary!), usage.primary!),
+            if (usage?.secondary != null) _meter(limitWindowLabel(usage!.secondary!), usage.secondary!),
           ]),
       trailing: Builder(
           builder: (anchor) => IconBtn('more-horizontal',
