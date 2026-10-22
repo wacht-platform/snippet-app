@@ -1227,8 +1227,13 @@ class Bubble extends StatelessWidget {
       );
     }
 
-    return Padding(
-      padding: EdgeInsets.only(left: kMobile ? 48 : 140, top: 4, bottom: 4),
+    return LayoutBuilder(builder: (context, box) {
+      final inset = kMobile
+          ? 48.0
+          : (box.maxWidth.isFinite ? box.maxWidth * 0.18 : 140.0)
+              .clamp(24.0, 140.0);
+      return Padding(
+      padding: EdgeInsets.only(left: inset, top: 4, bottom: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -1267,7 +1272,7 @@ class Bubble extends StatelessWidget {
         ],
       ),
     );
-
+    });
   }
 }
 
