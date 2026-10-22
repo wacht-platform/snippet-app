@@ -17,7 +17,6 @@ list(APPEND FLUTTER_FFI_PLUGIN_LIST
   flutter_local_notifications_windows
   flutter_zxing
   jni
-  sherpa_onnx_windows
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)
