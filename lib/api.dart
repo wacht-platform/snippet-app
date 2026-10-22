@@ -1046,6 +1046,7 @@ class DaemonClient {
           'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
         }));
     if (r.statusCode != 200) throw _err('set Mission Control autonomy', r);
+    _remember('mc-autonomy', r.body);
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 

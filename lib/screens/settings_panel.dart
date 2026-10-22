@@ -14,6 +14,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
 import 'inference_profiles.dart';
+import 'mission_control/widgets/autonomy_panel.dart';
 import 'recurring.dart';
 import 'routing_screen.dart';
 import 'shell_nav.dart';
@@ -159,7 +160,18 @@ class _MachineListState extends State<MachineList> {
   }
 }
 
-enum SettingsPage { general, models, routing, memory, usage, vault, scheduled, voice, webSearch }
+enum SettingsPage {
+  general,
+  models,
+  routing,
+  memory,
+  usage,
+  vault,
+  scheduled,
+  voice,
+  webSearch,
+  wakes,
+}
 
 /// Settings dialog: Zed-style sidebar + content pane. Models / vault /
 /// scheduled swap in-place so they never stack a second dialog.
@@ -306,6 +318,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         case SettingsPage.routing:
         case SettingsPage.voice:
         case SettingsPage.webSearch:
+        case SettingsPage.wakes:
           break;
       }
     });
@@ -717,6 +730,10 @@ class SettingsPanelState extends State<SettingsPanel> {
         ListGroup(children: [
           nav(SettingsPage.memory, 'Memory', 'What agents remember', 'book-marked'),
           ApprovalsRow(client: widget.client),
+          WakesRow(
+            client: widget.client,
+            onTap: () => widget.onSection?.call(SettingsPage.wakes),
+          ),
           nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock'),
           nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'calendar-clock'),
           nav(SettingsPage.voice, 'Voice', 'Voice notes and transcription', 'mic'),
@@ -782,6 +799,11 @@ class SettingsPanelState extends State<SettingsPanel> {
       SettingsPage.scheduled => RecurringScreen(
           client: widget.client,
           listOnly: true,
+          embedded: true,
+          onBack: back,
+        ),
+      SettingsPage.wakes => AutonomyPanel(
+          client: widget.client,
           embedded: true,
           onBack: back,
         ),
@@ -883,6 +905,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.scheduled => 'Scheduled',
         SettingsPage.voice => 'Voice',
         SettingsPage.webSearch => 'Web search',
+        SettingsPage.wakes => 'Automated wakes',
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
@@ -1014,6 +1037,10 @@ class SettingsPanelState extends State<SettingsPanel> {
           embedded: true,
           onAddingChanged: (adding) =>
               setState(() => _recurringAdding = adding),
+        ),
+      SettingsPage.wakes => AutonomyPanel(
+          client: widget.client,
+          embedded: true,
         ),
     };
   }
@@ -1378,6 +1405,66 @@ Future<void> showManageMachineSheet({
       }, danger: true),
     ]),
   );
+}
+
+class WakesRow extends StatefulWidget {
+  final DaemonClient client;
+  final VoidCallback onTap;
+  const WakesRow({super.key, required this.client, required this.onTap});
+
+  @override
+  State<WakesRow> createState() => _WakesRowState();
+}
+
+class _WakesRowState extends State<WakesRow> {
+  Map<String, dynamic>? _autonomy;
+
+  @override
+  void initState() {
+    super.initState();
+    _autonomy = widget.client.cachedMcAutonomy();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant WakesRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.client.baseUrl != widget.client.baseUrl) {
+      _autonomy = widget.client.cachedMcAutonomy();
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final loaded = await loadAutonomy(widget.client);
+      if (mounted) setState(() => _autonomy = loaded);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final autonomy = _autonomy;
+    final label = autonomy == null
+        ? 'Mission Control'
+        : (autonomy['on'] == true ? 'On' : 'Off');
+    return ListRow(
+      title: 'Automated wakes',
+      leading: AppIcon('activity', size: 19, color: AppColors.fg3),
+      onTap: widget.onTap,
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 150),
+          child: Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(13, color: AppColors.fg3)),
+        ),
+        const SizedBox(width: S.s6),
+        AppIcon('chevron-right', size: 15, color: AppColors.fg4),
+      ]),
+    );
+  }
 }
 
 class ApprovalsRow extends StatefulWidget {
