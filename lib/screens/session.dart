@@ -55,6 +55,8 @@ import 'file_changes.dart';
 import 'mobile_chrome.dart';
 import 'session_panels.dart';
 import 'session_coordination_cards.dart';
+import 'mission_control/mobile/mobile_mc.dart' show showMissionControlPanel;
+import 'mission_control/widgets/ambient_overlay.dart';
 import 'mission_control/widgets/autonomy_panel.dart';
 import 'mission_control/mission_control_state.dart'
     show
@@ -1479,6 +1481,15 @@ class _SessionScreenState extends State<SessionScreen>
                   : const SizedBox(key: ValueKey('mobile-chat')),
             ),
           ),
+          if (_isMissionControl)
+            Positioned(
+              top: kMobile ? 68 : 52,
+              right: kMobile ? 10 : 16,
+              child: AmbientOverlay(
+                client: widget.client,
+                openPanel: (panel) => showMissionControlPanel(context, panel),
+              ),
+            ),
         ]),
       ),
     );
