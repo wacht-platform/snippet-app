@@ -274,49 +274,35 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           behavior: HitTestBehavior.opaque,
           child: Padding(
             padding:
-                const EdgeInsets.symmetric(horizontal: S.s6, vertical: S.s4),
-            child: Text(label, style: TS.label(color)),
+                const EdgeInsets.symmetric(horizontal: S.s6, vertical: S.s2),
+            child: Text(label, style: sans(12, color: color)),
           ),
         );
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: S.s6),
-      decoration: BoxDecoration(
-        color: AppColors.raised,
-        borderRadius: BorderRadius.circular(R.lg),
-        border: Border.all(color: AppColors.line),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: S.s6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(S.s12, S.s6, S.s6, S.s2),
-            child: Row(children: [
-              AppIcon('clock', size: 12, color: AppColors.fg3),
-              const SizedBox(width: S.s6),
-              Text('Queued', style: TS.meta(AppColors.fg3)),
-              const SizedBox(width: S.s4),
-              CountBadge(count),
-              const Spacer(),
-              if (count > 1) ...[
-                textAction('Clear', _cancelAllQueued, AppColors.fg3),
+          if (count > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: S.s4),
+              child: Row(children: [
+                const SizedBox(width: S.s6),
+                Text('$count queued', style: sans(12, color: AppColors.fg4)),
+                const Spacer(),
+                textAction('Clear', _cancelAllQueued, AppColors.fg4),
                 textAction('Send all', _steerAllQueued, AppColors.accent),
-              ],
-            ]),
-          ),
+              ]),
+            ),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 168),
+            constraints: const BoxConstraints(maxHeight: 156),
             child: ListView.separated(
               shrinkWrap: true,
-              padding: const EdgeInsets.only(bottom: S.s4),
+              padding: EdgeInsets.zero,
               itemCount: count,
-              separatorBuilder: (_, __) => Divider(
-                  height: 1,
-                  thickness: 1,
-                  indent: S.s12,
-                  endIndent: S.s12,
-                  color: AppColors.line),
+              separatorBuilder: (_, __) => const SizedBox(height: S.s4),
               itemBuilder: (_, qi) => _queuedItemRow(qi, queue[qi]),
             ),
           ),
@@ -330,48 +316,23 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     final showActions = kMobile || isHovered;
     final text = _queuedText(item.text);
     final counts = _queuedAttachCounts(item.text);
+    final attachments = counts.$1 + counts.$2 + counts.$3;
 
-    Widget iconAction(String icon, String tip, VoidCallback onTap) => Tooltip(
+    Widget iconAction(String icon, String tip, VoidCallback onTap,
+            {Color? color}) =>
+        Tooltip(
           message: tip,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onTap,
             child: SizedBox.square(
-              dimension: kMobile ? 34 : 26,
-              child:
-                  Center(child: AppIcon(icon, size: 14, color: AppColors.fg3)),
+              dimension: kMobile ? 32 : 24,
+              child: Center(
+                  child: AppIcon(icon,
+                      size: 13, color: color ?? AppColors.fg4)),
             ),
           ),
         );
-
-    final sendNow = Tooltip(
-      message: 'Send now',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _steerQueuedAt(qi),
-        child: SizedBox.square(
-          dimension: kMobile ? 34 : 26,
-          child: Center(
-            child: Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                color: AppColors.accentFill,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: AppIcon('arrow-up', size: 13, color: AppColors.accentFg),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final actions = Row(mainAxisSize: MainAxisSize.min, children: [
-      iconAction('edit', 'Edit', () => _editQueuedAt(qi)),
-      iconAction('x', 'Remove', () => _cancelQueuedAt(qi)),
-      sendNow,
-    ]);
 
     return MouseRegion(
       onEnter: (_) {
@@ -384,37 +345,48 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           _setState(() => _hoveredQueuedIndex = null);
         }
       },
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(S.s12, S.s4, S.s4, S.s4),
+      child: AnimatedContainer(
+        duration: Motion.quick,
+        height: kMobile ? 38 : 32,
+        padding: const EdgeInsets.only(left: S.s12, right: S.s4),
+        decoration: BoxDecoration(
+          color: isHovered ? AppColors.raised : AppColors.surface1,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.line),
+        ),
         child: Row(children: [
+          AppIcon('clock', size: 12, color: AppColors.fg4),
+          const SizedBox(width: S.s8),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  text.isEmpty ? 'Attachment' : text,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TS.ui(text.isEmpty ? AppColors.fg3 : AppColors.fg1),
-                ),
-                if (counts.$1 + counts.$2 + counts.$3 > 0) ...[
-                  const SizedBox(height: S.s4),
-                  AttachmentPill(
-                    audio: counts.$1,
-                    images: counts.$2,
-                    files: counts.$3,
-                  ),
-                ],
-              ],
+            child: Text(
+              text.isEmpty ? 'Attachment' : text.replaceAll('\n', ' '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(13,
+                  color: text.isEmpty ? AppColors.fg4 : AppColors.fg2),
             ),
           ),
-          const SizedBox(width: S.s4),
+          if (attachments > 0) ...[
+            const SizedBox(width: S.s6),
+            AttachmentPill(
+              audio: counts.$1,
+              images: counts.$2,
+              files: counts.$3,
+            ),
+          ],
           AnimatedOpacity(
             opacity: showActions ? 1 : 0,
             duration: Motion.quick,
-            child: IgnorePointer(ignoring: !showActions, child: actions),
+            child: IgnorePointer(
+              ignoring: !showActions,
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                iconAction('edit', 'Edit', () => _editQueuedAt(qi)),
+                iconAction('x', 'Remove', () => _cancelQueuedAt(qi)),
+              ]),
+            ),
           ),
+          iconAction('arrow-up', 'Send now', () => _steerQueuedAt(qi),
+              color: AppColors.accent),
         ]),
       ),
     );
