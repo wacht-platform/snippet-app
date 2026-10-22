@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:sherpa_onnx/sherpa_onnx.dart' as so;
 import 'package:silero_vad/silero_vad.dart';
 
 import '../platform.dart';
@@ -12,6 +16,100 @@ import '../settings_form.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
+
+const _frameSeconds = SileroVad.chunkSamples / SileroVad.sampleRate;
+const _history = 320;
+
+abstract class _Engine {
+  _Engine(this.name, this.note, {required this.hasProb});
+  final String name;
+  final String note;
+  final bool hasProb;
+  final List<double> history = [];
+  final Stopwatch cpu = Stopwatch();
+  double prob = 0;
+  bool speaking = false;
+  int frames = 0;
+  int speechFrames = 0;
+  int segments = 0;
+  int _silent = 0;
+
+  void feed(Float32List chunk, double dbfs);
+  void close() {}
+
+  void _push(double p, bool detected) {
+    frames++;
+    prob = p;
+    history.add(p);
+    if (history.length > _history) history.removeAt(0);
+    if (detected && !speaking) segments++;
+    speaking = detected;
+    if (speaking) speechFrames++;
+  }
+
+  void _gate(double p, double threshold) {
+    if (p >= threshold) {
+      _silent = 0;
+      _push(p, true);
+    } else if (speaking && p < threshold - 0.15) {
+      _silent++;
+      _push(p, _silent * _frameSeconds < 0.5);
+    } else {
+      _push(p, speaking && _silent * _frameSeconds < 0.5);
+    }
+  }
+}
+
+class _SileroC extends _Engine {
+  _SileroC(this.threshold)
+      : _vad = SileroVad(),
+        super('Silero v6 (C port)', 'Ours. Probability per frame.', hasProb: true);
+  final SileroVad _vad;
+  double threshold;
+
+  @override
+  void feed(Float32List chunk, double dbfs) {
+    cpu.start();
+    final p = _vad.process(chunk);
+    cpu.stop();
+    _gate(p, threshold);
+  }
+
+  @override
+  void close() => _vad.close();
+}
+
+class _Sherpa extends _Engine {
+  _Sherpa(super.name, super.note, this._detector) : super(hasProb: false);
+  final so.VoiceActivityDetector _detector;
+
+  @override
+  void feed(Float32List chunk, double dbfs) {
+    cpu.start();
+    _detector.acceptWaveform(chunk);
+    final detected = _detector.isDetected();
+    while (!_detector.isEmpty()) {
+      _detector.pop();
+    }
+    cpu.stop();
+    _push(detected ? 1 : 0, detected);
+  }
+
+  @override
+  void close() => _detector.free();
+}
+
+class _Energy extends _Engine {
+  _Energy() : super('Loudness gate', 'Baseline: louder than -45 dBFS.', hasProb: true);
+
+  @override
+  void feed(Float32List chunk, double dbfs) {
+    cpu.start();
+    final p = ((dbfs + 60) / 40).clamp(0.0, 1.0);
+    cpu.stop();
+    _gate(p, 0.375);
+  }
+}
 
 class VadTestScreen extends StatefulWidget {
   const VadTestScreen({super.key});
@@ -21,28 +119,18 @@ class VadTestScreen extends StatefulWidget {
 }
 
 class _VadTestScreenState extends State<VadTestScreen> {
-  static const _history = 320;
-  static const _frameSeconds = SileroVad.chunkSamples / SileroVad.sampleRate;
-
   final AudioRecorder _recorder = AudioRecorder();
-  SileroVad? _vad;
   StreamSubscription<Uint8List>? _sub;
   final BytesBuilder _pending = BytesBuilder(copy: false);
-  final List<double> _probs = [];
   final Stopwatch _clock = Stopwatch();
-  final Stopwatch _inference = Stopwatch();
-
-  bool _running = false;
-  bool _speaking = false;
-  double _threshold = 0.5;
-  double _prob = 0;
-  double _level = -90;
-  int _frames = 0;
-  int _speechFrames = 0;
-  int _segments = 0;
-  int _silentRun = 0;
-  String? _error;
+  List<_Engine> _engines = [];
   Timer? _tick;
+  bool _running = false;
+  bool _starting = false;
+  double _threshold = 0.5;
+  double _level = -90;
+  String? _error;
+  static bool _bindingsReady = false;
 
   @override
   void dispose() {
@@ -51,27 +139,72 @@ class _VadTestScreenState extends State<VadTestScreen> {
     super.dispose();
   }
 
-  Future<void> _start() async {
-    setState(() => _error = null);
-    final granted = kMobile
-        ? (await Permission.microphone.request()).isGranted
-        : await _recorder.hasPermission();
-    if (!granted) {
-      setState(() => _error = 'Microphone permission is required.');
-      return;
+  Future<String> _stage(String asset, String name) async {
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/$name');
+    final data = await rootBundle.load(asset);
+    await file.writeAsBytes(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+        flush: true);
+    return file.path;
+  }
+
+  Future<List<_Engine>> _build() async {
+    if (!_bindingsReady) {
+      so.initBindings();
+      _bindingsReady = true;
     }
+    final silero = await _stage('assets/vad/silero_v5_sherpa.onnx', 'silero_v5.onnx');
+    final ten = await _stage('assets/vad/ten_vad.onnx', 'ten_vad.onnx');
+    final engines = <_Engine>[_SileroC(_threshold)];
+    engines.add(_Sherpa(
+        'Silero v5 (onnxruntime)',
+        'Older Silero through sherpa-onnx. On/off only.',
+        so.VoiceActivityDetector(
+            config: so.VadModelConfig(
+                sileroVad: so.SileroVadModelConfig(
+                    model: silero,
+                    threshold: _threshold,
+                    minSilenceDuration: 0.5,
+                    minSpeechDuration: 0.1,
+                    windowSize: 512),
+                debug: false),
+            bufferSizeInSeconds: 30)));
+    engines.add(_Sherpa(
+        'TEN VAD (onnxruntime)',
+        'Challenger through sherpa-onnx. On/off only.',
+        so.VoiceActivityDetector(
+            config: so.VadModelConfig(
+                tenVad: so.TenVadModelConfig(
+                    model: ten,
+                    threshold: _threshold,
+                    minSilenceDuration: 0.5,
+                    minSpeechDuration: 0.1,
+                    windowSize: 256),
+                debug: false),
+            bufferSizeInSeconds: 30)));
+    engines.add(_Energy());
+    return engines;
+  }
+
+  Future<void> _start() async {
+    if (_starting) return;
+    setState(() {
+      _error = null;
+      _starting = true;
+    });
     try {
-      _vad = SileroVad();
+      final granted = kMobile
+          ? (await Permission.microphone.request()).isGranted
+          : await _recorder.hasPermission();
+      if (!granted) {
+        setState(() => _error = 'Microphone permission is required.');
+        return;
+      }
+      _engines = await _build();
       final stream = await _recorder.startStream(const RecordConfig(
           encoder: AudioEncoder.pcm16bits, sampleRate: 16000, numChannels: 1));
-      _probs.clear();
       _pending.clear();
-      _frames = 0;
-      _speechFrames = 0;
-      _segments = 0;
-      _silentRun = 0;
-      _speaking = false;
-      _inference.reset();
       _clock
         ..reset()
         ..start();
@@ -83,9 +216,13 @@ class _VadTestScreenState extends State<VadTestScreen> {
       });
       setState(() => _running = true);
     } catch (e) {
-      _vad?.close();
-      _vad = null;
+      for (final engine in _engines) {
+        engine.close();
+      }
+      _engines = [];
       setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _starting = false);
     }
   }
 
@@ -96,22 +233,41 @@ class _VadTestScreenState extends State<VadTestScreen> {
     _sub = null;
     _clock.stop();
     if (_running) await _recorder.stop();
-    _vad?.close();
-    _vad = null;
+    for (final engine in _engines) {
+      engine.close();
+    }
     if (!dispose && mounted) {
       setState(() {
         _running = false;
-        _speaking = false;
+        for (final e in _engines) {
+          e.speaking = false;
+        }
+        _engines = [for (final e in _engines) e];
       });
     }
   }
 
+  Future<void> _restartEngines() async {
+    if (!_running) return;
+    final old = _engines;
+    final fresh = await _build();
+    if (!mounted || !_running) {
+      for (final e in fresh) {
+        e.close();
+      }
+      return;
+    }
+    setState(() => _engines = fresh);
+    for (final e in old) {
+      e.close();
+    }
+  }
+
   void _onAudio(Uint8List bytes) {
-    final vad = _vad;
-    if (vad == null) return;
+    if (_engines.isEmpty) return;
     _pending.add(bytes);
     const chunkBytes = SileroVad.chunkSamples * 2;
-    var buffer = _pending.takeBytes();
+    final buffer = _pending.takeBytes();
     var offset = 0;
     while (buffer.length - offset >= chunkBytes) {
       final view = ByteData.sublistView(buffer, offset, offset + chunkBytes);
@@ -122,32 +278,17 @@ class _VadTestScreenState extends State<VadTestScreen> {
         samples[i] = v;
         sum += v * v;
       }
-      _inference.start();
-      final p = vad.process(samples);
-      _inference.stop();
-      _consume(p, sum / samples.length);
+      final mean = sum / samples.length;
+      _level = mean <= 1e-9 ? -90 : 10 * math.log(mean) / math.ln10;
+      for (final engine in _engines) {
+        if (engine is _SileroC) engine.threshold = _threshold;
+        engine.feed(samples, _level);
+      }
       offset += chunkBytes;
     }
     if (offset < buffer.length) {
       _pending.add(Uint8List.sublistView(buffer, offset));
     }
-  }
-
-  void _consume(double p, double meanSquare) {
-    _frames++;
-    _prob = p;
-    _level = meanSquare <= 1e-9 ? -90 : 10 * math.log(meanSquare) / math.ln10;
-    _probs.add(p);
-    if (_probs.length > _history) _probs.removeAt(0);
-    if (p >= _threshold) {
-      if (!_speaking) _segments++;
-      _speaking = true;
-      _silentRun = 0;
-    } else if (_speaking && p < _threshold - 0.15) {
-      _silentRun++;
-      if (_silentRun * _frameSeconds >= 0.5) _speaking = false;
-    }
-    if (_speaking) _speechFrames++;
   }
 
   String _seconds(double s) {
@@ -159,13 +300,6 @@ class _VadTestScreenState extends State<VadTestScreen> {
   @override
   Widget build(BuildContext context) {
     final elapsed = _clock.elapsedMilliseconds / 1000;
-    final speech = _speechFrames * _frameSeconds;
-    final perFrameMs = _frames == 0
-        ? 0.0
-        : _inference.elapsedMicroseconds / 1000 / _frames;
-    final audioPerSecond = _frames * _frameSeconds;
-    final realtime = elapsed > 0 ? audioPerSecond / elapsed : 0.0;
-    final accent = _speaking ? AppColors.accent : AppColors.fg4;
     return Material(
       color: AppColors.bg,
       child: SafeArea(
@@ -176,88 +310,57 @@ class _VadTestScreenState extends State<VadTestScreen> {
               onBack: () => Navigator.of(context).pop()),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.fromLTRB(kMobile ? 16 : 24, 8, kMobile ? 16 : 24, 40),
+              padding: EdgeInsets.fromLTRB(
+                  kMobile ? 16 : 24, 8, kMobile ? 16 : 24, 40),
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: AppColors.surface1,
-                      borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
-                      border: Border.all(color: AppColors.line)),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                  color: accent, shape: BoxShape.circle)),
-                          const SizedBox(width: 10),
-                          Text(
-                              !_running
-                                  ? 'Stopped'
-                                  : _speaking
-                                      ? 'Speech'
-                                      : 'Silence',
-                              style: sans(18, color: AppColors.fg1)),
-                          const Spacer(),
-                          Text(_prob.toStringAsFixed(2),
-                              style: mono(16, color: accent)),
-                        ]),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          height: 96,
-                          width: double.infinity,
-                          child: CustomPaint(
-                              painter: _ProbPainter(
-                                  List.of(_probs), _threshold, AppColors.accent,
-                                  AppColors.line, AppColors.fg4)),
-                        ),
-                        const SizedBox(height: 6),
-                        Text('Last 10 seconds. The line is the threshold.',
-                            style: sans(12, color: AppColors.fg4)),
-                      ]),
-                ),
-                const SizedBox(height: 16),
-                Btn(_running ? 'Stop' : 'Start listening',
+                Btn(_running ? 'Stop' : (_starting ? 'Loading models' : 'Start listening'),
                     full: true,
+                    disabled: _starting,
                     variant: _running ? BtnVariant.secondary : BtnVariant.primary,
                     onTap: _running ? _stop : _start),
                 if (_error != null)
                   Padding(
                       padding: const EdgeInsets.only(top: 10),
-                      child: Text(_error!, style: sans(13, color: AppColors.danger))),
-                const SizedBox(height: 22),
-                SettingsGroup(header: 'Threshold', footer: 'Higher means fewer false alarms and more missed quiet speech.', children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(children: [
-                      Expanded(
-                        child: Slider(
-                            value: _threshold,
-                            min: 0.2,
-                            max: 0.9,
-                            onChanged: (v) => setState(() => _threshold = v)),
-                      ),
-                      SizedBox(
-                          width: 44,
-                          child: Text(_threshold.toStringAsFixed(2),
-                              style: mono(13, color: AppColors.fg2))),
+                      child: Text(_error!,
+                          style: sans(13, color: AppColors.danger))),
+                const SizedBox(height: 18),
+                SettingsGroup(
+                    header: 'Session',
+                    footer: 'All models listen to the same microphone at once.',
+                    children: [
+                      _stat('Listening for', _seconds(elapsed)),
+                      _stat('Mic level', '${_level.toStringAsFixed(0)} dBFS'),
                     ]),
-                  ),
-                ]),
-                SettingsGroup(header: 'This session', children: [
-                  _stat('Listening for', _seconds(elapsed)),
-                  _stat('Speech detected', '${_seconds(speech)}  (${elapsed > 0 ? (100 * speech / elapsed).toStringAsFixed(0) : 0}%)'),
-                  _stat('Speech segments', '$_segments'),
-                  _stat('Mic level', '${_level.toStringAsFixed(0)} dBFS'),
-                ]),
-                SettingsGroup(header: 'Performance', footer: 'Time the detector spends on each 32 ms of audio, on this device.', children: [
-                  _stat('Per frame', '${perFrameMs.toStringAsFixed(3)} ms'),
-                  _stat('CPU for the detector', '${(100 * perFrameMs / (_frameSeconds * 1000)).toStringAsFixed(2)}% of one core'),
-                  _stat('Audio keeping up', '${realtime.toStringAsFixed(2)}x'),
-                ]),
+                SettingsGroup(
+                    header: 'Threshold',
+                    footer:
+                        'Applies to the three Silero and TEN models. Changing it restarts them.',
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Row(children: [
+                          Expanded(
+                            child: Slider(
+                                value: _threshold,
+                                min: 0.2,
+                                max: 0.9,
+                                onChanged: (v) => setState(() => _threshold = v),
+                                onChangeEnd: (_) => _restartEngines()),
+                          ),
+                          SizedBox(
+                              width: 44,
+                              child: Text(_threshold.toStringAsFixed(2),
+                                  style: mono(13, color: AppColors.fg2))),
+                        ]),
+                      ),
+                    ]),
+                for (final engine in _engines) _card(engine, elapsed),
+                if (_engines.isEmpty)
+                  Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                          'Silero v6 (our C port), Silero v5 and TEN VAD through onnxruntime, and a plain loudness gate. Start listening to compare them live.',
+                          style: sans(13, height: 1.5, color: AppColors.fg4))),
               ],
             ),
           ),
@@ -266,38 +369,85 @@ class _VadTestScreenState extends State<VadTestScreen> {
     );
   }
 
+  Widget _card(_Engine e, double elapsed) {
+    final accent = e.speaking ? AppColors.accent : AppColors.fg4;
+    final msPerFrame =
+        e.frames == 0 ? 0.0 : e.cpu.elapsedMicroseconds / 1000 / e.frames;
+    final speech = e.speechFrames * _frameSeconds;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
+            border: Border.all(color: AppColors.line)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text(e.name, style: sans(15, color: AppColors.fg1))),
+            Text(
+                !_running
+                    ? ''
+                    : e.hasProb
+                        ? e.prob.toStringAsFixed(2)
+                        : (e.speaking ? 'speech' : 'silence'),
+                style: mono(13, color: accent)),
+          ]),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 56,
+            width: double.infinity,
+            child: CustomPaint(
+                painter: _ChartPainter(List.of(e.history),
+                    e.hasProb ? _threshold : 0.5, AppColors.accent, AppColors.line)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+              'Speech ${_seconds(speech)} (${elapsed > 0 ? (100 * speech / elapsed).toStringAsFixed(0) : 0}%)  ·  ${e.segments} segments  ·  ${msPerFrame.toStringAsFixed(3)} ms/frame',
+              style: sans(12.5, color: AppColors.fg2)),
+          const SizedBox(height: 2),
+          Text(e.note, style: sans(12, color: AppColors.fg4)),
+        ]),
+      ),
+    );
+  }
+
   Widget _stat(String label, String value) => SettingsRow(
-      label: label,
-      trailing: Text(value, style: mono(13, color: AppColors.fg2)));
+      label: label, trailing: Text(value, style: mono(13, color: AppColors.fg2)));
 }
 
-class _ProbPainter extends CustomPainter {
-  _ProbPainter(this.probs, this.threshold, this.bar, this.grid, this.thresholdColor);
-  final List<double> probs;
+class _ChartPainter extends CustomPainter {
+  _ChartPainter(this.values, this.threshold, this.bar, this.grid);
+  final List<double> values;
   final double threshold;
   final Color bar;
   final Color grid;
-  final Color thresholdColor;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final base = Paint()..color = grid..strokeWidth = 1;
-    canvas.drawLine(Offset(0, size.height), Offset(size.width, size.height), base);
-    const slots = _VadTestScreenState._history;
-    final w = size.width / slots;
+    canvas.drawLine(Offset(0, size.height), Offset(size.width, size.height),
+        Paint()..color = grid..strokeWidth = 1);
+    final w = size.width / _history;
     final fill = Paint()..color = bar;
-    final dim = Paint()..color = bar.withValues(alpha: 0.35);
-    for (var i = 0; i < probs.length; i++) {
-      final h = (probs[i].clamp(0.0, 1.0)) * size.height;
-      final x = (slots - probs.length + i) * w;
-      canvas.drawRect(Rect.fromLTWH(x, size.height - h, math.max(w - 0.5, 0.5), h),
-          probs[i] >= threshold ? fill : dim);
+    final dim = Paint()..color = bar.withValues(alpha: 0.3);
+    for (var i = 0; i < values.length; i++) {
+      final h = values[i].clamp(0.0, 1.0) * size.height;
+      final x = (_history - values.length + i) * w;
+      canvas.drawRect(
+          Rect.fromLTWH(x, size.height - h, math.max(w - 0.5, 0.5), h),
+          values[i] >= threshold ? fill : dim);
     }
     final y = size.height * (1 - threshold);
     canvas.drawLine(Offset(0, y), Offset(size.width, y),
-        Paint()..color = thresholdColor..strokeWidth = 1);
+        Paint()..color = grid..strokeWidth = 1);
   }
 
   @override
-  bool shouldRepaint(_ProbPainter old) => true;
+  bool shouldRepaint(_ChartPainter old) => true;
 }
