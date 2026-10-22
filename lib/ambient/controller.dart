@@ -38,12 +38,12 @@ class _AmbientTaskHandler extends TaskHandler {
       _capture = capture;
       _sub = capture.status.listen((status) {
         FlutterForegroundTask.sendDataToMain(status.toMap());
-        FlutterForegroundTask.updateService(
-          notificationTitle: 'Snippet is listening',
-          notificationText: status.error != null
-              ? status.error!
-              : '${status.segments} segments captured, ${status.pending} waiting to upload',
-        );
+        if (status.error != null) {
+          FlutterForegroundTask.updateService(
+            notificationTitle: 'Snippet is listening',
+            notificationText: status.error!,
+          );
+        }
       });
       await AmbientDiagnostics.log('starting capture');
       await capture.start();
@@ -149,7 +149,7 @@ class AmbientController extends ChangeNotifier {
         serviceId: 4711,
         serviceTypes: [ForegroundServiceTypes.microphone],
         notificationTitle: 'Snippet is listening',
-        notificationText: 'Starting',
+        notificationText: 'Ambient listening is on',
         callback: ambientServiceEntry,
       );
       if (result is ServiceRequestFailure) return '${result.error}';

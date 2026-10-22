@@ -323,6 +323,18 @@ class _AmbientStageState extends State<AmbientStage> {
     super.dispose();
   }
 
+  String _caption(String mode, bool selected) {
+    final running = selected && _m.on;
+    if (!running) {
+      return mode == 'active'
+          ? 'Listens and speaks up when it matters'
+          : 'Listens quietly and keeps a record';
+    }
+    if (!_m.listening) return 'Starting';
+    if (_m.status.speaking) return 'Hearing you';
+    return mode == 'active' ? 'Listening, ready to speak up' : 'Listening quietly';
+  }
+
   Widget _globe(int i, double size) {
     final mode = _modes[i];
     final selected = _m.settings?.mode == mode;
@@ -362,6 +374,14 @@ class _AmbientStageState extends State<AmbientStage> {
                   style: sans(16,
                       weight: W.strong,
                       color: selected ? AppColors.fg1 : AppColors.fg3)),
+              const SizedBox(height: 3),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Text(_caption(mode, selected),
+                    key: ValueKey(_caption(mode, selected)),
+                    textAlign: TextAlign.center,
+                    style: sans(13, color: AppColors.fg4)),
+              ),
             ]),
           ),
         ),
