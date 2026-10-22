@@ -55,6 +55,9 @@ class _AmbientModel extends ChangeNotifier {
     error = err;
     busy = false;
     notifyListeners();
+    if (value && err == null && !await ambient.ignoringBattery) {
+      await ambient.requestBatteryExemption();
+    }
   }
 
   Future<void> shiftMode(int dir) =>
@@ -401,6 +404,13 @@ class _AmbientStageState extends State<AmbientStage> {
               const SizedBox(height: 6),
               Text(_m.on ? 'Hold the globe to stop' : 'Hold the globe to start',
                   style: sans(13, color: AppColors.fg4)),
+              if (_m.on && _m.settings?.keySet == false)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
+                  child: Text('Add an AssemblyAI key in Voice settings or nothing will be transcribed.',
+                      textAlign: TextAlign.center,
+                      style: sans(13, color: AppColors.fg3)),
+                ),
               if (err != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),

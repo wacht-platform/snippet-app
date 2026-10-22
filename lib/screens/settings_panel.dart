@@ -14,7 +14,6 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'add_instance.dart';
 import 'inference_profiles.dart';
-import 'mission_control/widgets/ambient_panel.dart';
 import 'mission_control/widgets/autonomy_panel.dart';
 import 'recurring.dart';
 import 'routing_screen.dart';
@@ -174,7 +173,6 @@ enum SettingsPage {
   webSearch,
   accounts,
   wakes,
-  ambient,
 }
 
 /// Settings dialog: Zed-style sidebar + content pane. Models / vault /
@@ -324,7 +322,6 @@ class SettingsPanelState extends State<SettingsPanel> {
         case SettingsPage.webSearch:
         case SettingsPage.accounts:
         case SettingsPage.wakes:
-        case SettingsPage.ambient:
           break;
       }
     });
@@ -341,7 +338,6 @@ class SettingsPanelState extends State<SettingsPanel> {
     (SettingsPage.voice, 'mic', 'Voice'),
     (SettingsPage.webSearch, 'globe', 'Web search'),
     (SettingsPage.accounts, 'users', 'Accounts'),
-    (SettingsPage.ambient, 'mic', 'Ambient listening'),
   ];
 
   static const _navGroups = {
@@ -743,10 +739,6 @@ class SettingsPanelState extends State<SettingsPanel> {
             client: widget.client,
             onTap: () => widget.onSection?.call(SettingsPage.wakes),
           ),
-          AmbientRow(
-            client: widget.client,
-            onTap: () => widget.onSection?.call(SettingsPage.ambient),
-          ),
           nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock'),
           nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'calendar-clock'),
           nav(SettingsPage.voice, 'Voice', 'Voice notes and transcription', 'mic'),
@@ -821,11 +813,6 @@ class SettingsPanelState extends State<SettingsPanel> {
           onBack: back,
         ),
       SettingsPage.wakes => AutonomyPanel(
-          client: widget.client,
-          embedded: true,
-          onBack: back,
-        ),
-      SettingsPage.ambient => AmbientPanel(
           client: widget.client,
           embedded: true,
           onBack: back,
@@ -930,7 +917,6 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.webSearch => 'Web search',
         SettingsPage.accounts => 'Accounts',
         SettingsPage.wakes => 'Automated wakes',
-        SettingsPage.ambient => 'Ambient listening',
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
@@ -1068,10 +1054,6 @@ class SettingsPanelState extends State<SettingsPanel> {
               setState(() => _recurringAdding = adding),
         ),
       SettingsPage.wakes => AutonomyPanel(
-          client: widget.client,
-          embedded: true,
-        ),
-      SettingsPage.ambient => AmbientPanel(
           client: widget.client,
           embedded: true,
         ),

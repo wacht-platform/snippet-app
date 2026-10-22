@@ -12,7 +12,7 @@ import '../mission_control_state.dart';
 import '../mobile/mobile_mc.dart'
     show showMissionControlPanel, showNotificationInbox;
 import '../../../platform.dart';
-import 'ambient_panel.dart';
+import 'ambient_stage.dart';
 import 'autonomy_panel.dart';
 
 class MissionControlHeader extends StatelessWidget {
@@ -87,10 +87,7 @@ class MissionControlHeader extends StatelessWidget {
         ),
         if (!kMobile) ...[
           const SizedBox(width: 4),
-          AmbientChip(
-            client: state.client,
-            open: (panel) => showMissionControlPanel(context, panel),
-          ),
+          AmbientHeaderOrb(client: state.client),
         ],
         const SizedBox(width: 4),
         IconBtn(
