@@ -674,70 +674,66 @@ class LaneNotice extends StatelessWidget {
           ),
         );
       }
-      final meta = sans(12, height: 16 / 12, color: AppColors.fg3);
+      final detail = running
+          ? (activity?.isNotEmpty == true ? activity! : 'Working')
+          : (displaySummary?.isNotEmpty == true ? displaySummary! : status);
       return Semantics(
         button: true,
         label: '$title, ${status.toLowerCase()}. Open the lane.',
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: S.s6),
-          child: Material(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.lg),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onOpen,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 13, 16, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Material(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(R.sm),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onOpen,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 7, 12, 7),
+                    child: Row(children: [
                       Container(
                         width: 6,
                         height: 6,
                         decoration:
                             BoxDecoration(color: dot, shape: BoxShape.circle),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(agent.isEmpty ? 'Lane' : 'Lane · as $agent',
+                      const SizedBox(width: 9),
+                      Flexible(
+                        flex: 0,
+                        child: Text(title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: meta),
+                            style: sans(13,
+                                weight: W.strong,
+                                height: 18 / 13,
+                                color: AppColors.fg1)),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                            agent.isEmpty ? detail : '$agent · $detail',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(12.5,
+                                height: 18 / 12.5, color: AppColors.fg4)),
+                      ),
+                      const SizedBox(width: 10),
                       Text(running ? elapsed() : status,
-                          style: meta.copyWith(fontFeatures: const [
-                            FontFeature.tabularFigures()
-                          ])),
+                          style: sans(12,
+                              tabular: true,
+                              height: 18 / 12,
+                              color: running
+                                  ? AppColors.fg3
+                                  : failed
+                                      ? AppColors.danger
+                                      : AppColors.fg4)),
                     ]),
-                    const SizedBox(height: 6),
-                    Text(title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(15,
-                            weight: W.strong,
-                            height: 20 / 15,
-                            color: AppColors.fg1)),
-                    if (running && activity != null && activity.isNotEmpty) ...[
-                      const SizedBox(height: 5),
-                      Text(activity,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              mono(12, height: 16 / 12, color: AppColors.fg4)),
-                    ],
-                    if (!running &&
-                        displaySummary != null &&
-                        displaySummary.isNotEmpty) ...[
-                      const SizedBox(height: 5),
-                      MarkdownPreview(
-                          data: displaySummary,
-                          maxLines: 2,
-                          style:
-                              sans(13, height: 19 / 13, color: AppColors.fg3)),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),

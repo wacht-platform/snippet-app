@@ -117,6 +117,28 @@ List<Widget> laneSections(List<LaneInfo> lanes,
   return out;
 }
 
+void openLaneView(BuildContext context, LaneInfo lane,
+    {DaemonClient? client, List<LaneInfo> Function()? liveLanes}) {
+  final daemon = client ?? DaemonScope.maybeOf(context);
+  final live = liveLanes ?? () => [lane];
+  final transcript = lane.transcript;
+  Widget screen() => daemon != null && transcript != null && transcript.isNotEmpty
+      ? LaneTranscriptScreen(client: daemon, laneId: lane.id, liveLanes: live)
+      : LaneDetailScreen(laneId: lane.id, liveLanes: live);
+  if (!kMobile &&
+      ShellPanelRoot.of(context) == null &&
+      ShellPanelScope.maybeOf(context) != null) {
+    presentScreen(context,
+        style: PanelStyle.drawer,
+        purpose: ShellPanelPurpose.lanes,
+        panelId: lane.id,
+        originClient: daemon,
+        builder: (_, __) => screen());
+    return;
+  }
+  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen()));
+}
+
 class LaneDetailCard extends StatefulWidget {
   final LaneInfo lane;
   final List<LaneInfo> Function()? liveLanes;
@@ -239,28 +261,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     );
   }
 
-  void _open(BuildContext context) {
-    final client = widget.client ?? DaemonScope.maybeOf(context);
-    final live = widget.liveLanes ?? () => [widget.lane];
-    final transcript = lane.transcript;
-    Widget screen() =>
-        client != null && transcript != null && transcript.isNotEmpty
-            ? LaneTranscriptScreen(
-                client: client, laneId: lane.id, liveLanes: live)
-            : LaneDetailScreen(laneId: lane.id, liveLanes: live);
-    if (!kMobile &&
-        ShellPanelRoot.of(context) == null &&
-        ShellPanelScope.maybeOf(context) != null) {
-      presentScreen(context,
-          style: PanelStyle.drawer,
-          purpose: ShellPanelPurpose.lanes,
-          panelId: lane.id,
-          originClient: client,
-          builder: (_, __) => screen());
-      return;
-    }
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen()));
-  }
+  void _open(BuildContext context) =>
+      openLaneView(context, lane, client: widget.client, liveLanes: widget.liveLanes);
 
   Widget _details(BuildContext context) {
     final sections = <Widget>[];

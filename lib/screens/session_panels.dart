@@ -8,7 +8,7 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'lanes.dart' show laneSections, LaneDetailCard;
+import 'lanes.dart' show laneSections, openLaneView;
 
 /// Human-readable checkpoint timestamp ('Today · 3:04 PM').
 ///
@@ -390,7 +390,6 @@ class _DeskLanes extends StatefulWidget {
 }
 
 class _DeskLanesState extends State<_DeskLanes> {
-  final Set<String> _open = {};
   List<RecurringJob> _jobs = const [];
 
   @override
@@ -442,21 +441,6 @@ class _DeskLanesState extends State<_DeskLanes> {
         ? l.activity!.trim()
         : (l.summary ?? l.handoff ?? '').trim();
     final steps = l.activityLog.length.clamp(0, 14);
-    if (_open.contains(l.id)) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => setState(() => _open.remove(l.id)),
-              child: Text('Less', style: sans(12, color: AppColors.fg3)),
-            ),
-          ),
-          LaneDetailCard(lane: l, client: widget.client),
-        ]),
-      );
-    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -467,7 +451,8 @@ class _DeskLanesState extends State<_DeskLanes> {
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => setState(() => _open.add(l.id)),
+          onTap: () => openLaneView(context, l,
+              client: widget.client, liveLanes: () => widget.lanes),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
