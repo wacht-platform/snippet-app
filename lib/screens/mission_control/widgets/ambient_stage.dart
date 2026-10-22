@@ -90,7 +90,7 @@ class _AmbientModel extends ChangeNotifier {
 }
 
 class _OrbPainter extends CustomPainter {
-  _OrbPainter(this.t, this.level, this.color, this.alive) : super(repaint: null);
+  _OrbPainter(this.t, this.level, this.color, this.alive);
   final double t;
   final double level;
   final Color color;
@@ -98,42 +98,60 @@ class _OrbPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero);
     final r = size.shortestSide / 2;
+    final c = size.center(Offset.zero);
+    final tau = math.pi * 2;
+    final breathe = alive ? 1 + math.sin(t * tau) * 0.025 : 1.0;
+    final radius = r * 0.9 * breathe;
+    final step = math.max(size.shortestSide / 40, 2.3);
     if (alive) {
-      for (var i = 0; i < 3; i++) {
-        final p = (t + i / 3) % 1.0;
-        final ring = r * (0.62 + 0.38 * p + level * 0.12);
-        canvas.drawCircle(
-            c,
-            ring,
-            Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.5
-              ..color = color.withValues(alpha: (1 - p) * 0.32));
+      canvas.drawCircle(
+          c,
+          r,
+          Paint()
+            ..shader = RadialGradient(colors: [
+              color.withValues(alpha: 0.16 + level * 0.1),
+              color.withValues(alpha: 0),
+            ]).createShader(Rect.fromCircle(center: c, radius: r)));
+    }
+    final blink = alive && t > 0.86 && t < 0.92;
+    final eyeH = blink ? 0.18 : 1.0;
+    final eyes = [Offset(-radius * 0.34, radius * 0.06), Offset(radius * 0.34, radius * 0.06)];
+    final eyeRx = radius * 0.085, eyeRy = radius * 0.13 * eyeH;
+    final paint = Paint();
+    final amp = alive ? 0.12 + level * 0.22 : 0.0;
+    final rows = (radius * 2 / step).ceil() + 2;
+    for (var j = 0; j < rows; j++) {
+      final y = -radius + j * step * 0.866;
+      final ox = (j % 2) * step / 2;
+      for (var x = -radius - step + ox; x <= radius + step; x += step) {
+        final d = math.sqrt(x * x + y * y) / radius;
+        if (d > 1) continue;
+        var skip = false;
+        for (final e in eyes) {
+          final ex = (x - e.dx) / eyeRx, ey = (y - e.dy) / math.max(eyeRy, 0.01);
+          if (ex * ex + ey * ey < 1) skip = true;
+        }
+        if (!alive && (y - eyes[0].dy).abs() < step * 0.5) {
+          for (final e in eyes) {
+            if ((x - e.dx).abs() < eyeRx * 1.4) skip = true;
+          }
+        }
+        if (skip) continue;
+        final nx = x / radius, ny = y / radius;
+        final z = math.sqrt(math.max(0.0, 1 - nx * nx - ny * ny));
+        final light = (nx * -0.38 + ny * -0.5 + z * 0.78).clamp(0.0, 1.0);
+        var s = step * (0.2 + 0.66 * light) * (1 - math.pow(d, 8) * 0.45);
+        var a = alive ? 0.55 + 0.45 * light : 0.22 + 0.25 * light;
+        if (alive) {
+          final w = math.sin((d * 2.0 - t * 2) * tau);
+          s *= 1 + amp * w;
+          a = (a + w * 0.12).clamp(0.2, 1.0);
+        }
+        paint.color = color.withValues(alpha: a);
+        canvas.drawCircle(c + Offset(x, y), math.max(s / 2, 0.3), paint);
       }
     }
-    final breathe = alive ? math.sin(t * math.pi * 2) * 0.03 : 0.0;
-    final core = r * (0.5 + breathe + level * 0.14);
-    canvas.drawCircle(
-        c,
-        core * 1.5,
-        Paint()
-          ..shader = RadialGradient(colors: [
-            color.withValues(alpha: alive ? 0.30 : 0.10),
-            color.withValues(alpha: 0),
-          ]).createShader(Rect.fromCircle(center: c, radius: core * 1.5)));
-    canvas.drawCircle(
-        c,
-        core,
-        Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-0.3, -0.35),
-            colors: [
-              Color.lerp(color, Colors.white, alive ? 0.35 : 0.05)!,
-              color.withValues(alpha: alive ? 0.95 : 0.5),
-            ],
-          ).createShader(Rect.fromCircle(center: c, radius: core)));
   }
 
   @override
@@ -282,7 +300,7 @@ class _AmbientStageState extends State<AmbientStage> {
     if (s != null && _pager == null) {
       final i = _modes.indexOf(s.mode).clamp(0, 1);
       _page = i.toDouble();
-      _pager = PageController(initialPage: i, viewportFraction: 0.62)
+      _pager = PageController(initialPage: i, viewportFraction: 0.8)
         ..addListener(() {
           if (mounted) setState(() => _page = _pager!.page ?? _page);
         });
@@ -305,14 +323,6 @@ class _AmbientStageState extends State<AmbientStage> {
     super.dispose();
   }
 
-  String get _line {
-    if (_m.settings == null) return '';
-    if (!_m.on) return 'Off';
-    if (!_m.listening) return 'Starting';
-    if (_m.status.speaking) return 'Hearing you';
-    return 'Listening';
-  }
-
   Widget _globe(int i, double size) {
     final mode = _modes[i];
     final selected = _m.settings?.mode == mode;
@@ -320,9 +330,15 @@ class _AmbientStageState extends State<AmbientStage> {
     final color = selected ? _stateColor(_m.settings, _m.status) : _modeColor(mode);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: selected ? null : () => _pager?.animateToPage(i,
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic),
+      onTap: selected
+          ? () {
+              if (_m.settings != null) {
+                toast(context, _m.on ? 'Hold to stop' : 'Hold to start');
+              }
+            }
+          : () => _pager?.animateToPage(i,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic),
       onLongPress: selected && _m.settings != null && !_m.busy
           ? () {
               HapticFeedback.mediumImpact();
@@ -346,9 +362,6 @@ class _AmbientStageState extends State<AmbientStage> {
                   style: sans(16,
                       weight: W.strong,
                       color: selected ? AppColors.fg1 : AppColors.fg3)),
-              const SizedBox(height: 2),
-              Text(mode == 'active' ? 'Can speak up' : 'Listens quietly',
-                  style: sans(12.5, color: AppColors.fg4)),
             ]),
           ),
         ),
@@ -360,7 +373,7 @@ class _AmbientStageState extends State<AmbientStage> {
   Widget build(BuildContext context) {
     final err = _m.error ?? _m.status.error;
     final width = MediaQuery.sizeOf(context).width;
-    final globe = math.min(width * 0.5, 230.0);
+    final globe = math.min(width * 0.7, 320.0);
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -380,7 +393,7 @@ class _AmbientStageState extends State<AmbientStage> {
           Expanded(
             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               SizedBox(
-                height: globe + 70,
+                height: globe + 40,
                 child: _pager == null
                     ? const SizedBox.shrink()
                     : PageView.builder(
@@ -394,16 +407,6 @@ class _AmbientStageState extends State<AmbientStage> {
                         itemBuilder: (_, i) => _globe(i, globe),
                       ),
               ),
-              const SizedBox(height: 18),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Text(_line,
-                    key: ValueKey(_line),
-                    style: sans(22, weight: W.strong, color: AppColors.fg1)),
-              ),
-              const SizedBox(height: 6),
-              Text(_m.on ? 'Hold the globe to stop' : 'Hold the globe to start',
-                  style: sans(13, color: AppColors.fg4)),
               if (_m.on && _m.settings?.keySet == false)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
