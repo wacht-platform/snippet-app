@@ -45,6 +45,7 @@ dependencies:
   xterm: ^4.0.0
   pasteboard: ^0.5.0
   webview_flutter: ^4.14.1
+  flutter_foreground_task: ^11.0.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

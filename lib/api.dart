@@ -474,6 +474,24 @@ class DaemonClient {
     return VoiceSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
+  Future<List<AmbientEvent>> ambientEvents({int limit = 50, String? query}) async {
+    final r = await http.get(_uri('/ambient/events', {
+      'limit': '$limit',
+      if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+    }));
+    if (r.statusCode != 200) throw _err('load ambient events', r);
+    final json = jsonDecode(r.body) as Map<String, dynamic>;
+    return ((json['events'] as List?) ?? [])
+        .map((e) => AmbientEvent.fromJson((e as Map).cast<String, dynamic>()))
+        .toList();
+  }
+
+  Future<AmbientStats> ambientStats() async {
+    final r = await http.get(_uri('/ambient/stats'));
+    if (r.statusCode != 200) throw _err('load ambient stats', r);
+    return AmbientStats.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
   Future<Map<String, List<Account>>> getAccounts() async {
     final r = await http.get(_uri('/accounts'));
     if (r.statusCode != 200) throw _err('load accounts', r);

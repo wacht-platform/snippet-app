@@ -6,6 +6,7 @@ import '../settings_form.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
+import 'ambient_screen.dart';
 import 'vad_test_screen.dart';
 
 const _languages = [
@@ -398,8 +399,15 @@ class _VoiceScreenState extends State<VoiceScreen> {
       ),
       SettingsGroup(
         header: 'Experimental',
-        footer: 'Listens through the microphone and shows when speech is detected. Nothing is recorded or sent anywhere.',
+        footer: 'Ambient listening sends detected speech to your server. The voice activity test records nothing.',
         children: [
+          SettingsRow(
+            label: 'Ambient listening',
+            sub: 'Always-on capture, sent to your server for transcription',
+            chevron: true,
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => AmbientScreen(client: widget.client))),
+          ),
           SettingsRow(
             label: 'Voice activity test',
             sub: 'See the detector react to your voice live',

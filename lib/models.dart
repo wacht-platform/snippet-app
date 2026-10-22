@@ -1593,3 +1593,37 @@ class ArtifactInfo {
             .toList(),
       );
 }
+
+class AmbientEvent {
+  final String id;
+  final String device;
+  final DateTime startedAt;
+  final int durationMs;
+  final String status;
+  final String text;
+  final String? error;
+
+  AmbientEvent.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        device = j['device'] as String? ?? '',
+        startedAt = DateTime.tryParse(j['started_at'] as String? ?? '')?.toLocal() ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        durationMs = (j['duration_ms'] as num?)?.toInt() ?? 0,
+        status = j['status'] as String? ?? '',
+        text = j['text'] as String? ?? '',
+        error = j['error'] as String?;
+}
+
+class AmbientStats {
+  final int segments;
+  final int audioSeconds;
+  final Map<String, int> byStatus;
+
+  AmbientStats.fromJson(Map<String, dynamic> j)
+      : segments = (j['segments'] as num?)?.toInt() ?? 0,
+        audioSeconds = (j['audio_seconds'] as num?)?.toInt() ?? 0,
+        byStatus = {
+          for (final e in ((j['by_status'] as Map?) ?? {}).entries)
+            e.key as String: (e.value as num).toInt()
+        };
+}
