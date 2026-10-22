@@ -49,7 +49,17 @@ Future<List<PickedLocalFile>> _desktopChooser() async {
 Future<List<String>> _osascriptFiles() async {
   final result = await Process.run('osascript', [
     '-e',
-    'POSIX path of (choose file with multiple selections allowed)',
+    'set picked to choose file with multiple selections allowed',
+    '-e',
+    'set out to ""',
+    '-e',
+    'repeat with f in picked',
+    '-e',
+    'set out to out & POSIX path of f & linefeed',
+    '-e',
+    'end repeat',
+    '-e',
+    'return out',
   ]);
   if (result.exitCode != 0) return const [];
   return _splitChooserOutput(result.stdout.toString());
@@ -61,10 +71,10 @@ Future<List<String>> _linuxFiles() async {
       'zenity',
       '--file-selection',
       '--multiple',
-      '--separator=\\n',
+      '--separator=\n',
       '--title=Add context',
     ],
-    ['kdialog', '--getopenfilename', '--multiple'],
+    ['kdialog', '--getopenfilename', '--multiple', '--separate-output'],
   ]) {
     try {
       final result = await Process.run(cmd.first, cmd.sublist(1));
@@ -79,7 +89,7 @@ Future<List<String>> _linuxFiles() async {
 
 List<String> _splitChooserOutput(String raw) {
   return raw
-      .split(RegExp(r'[\n,]'))
+      .split('\n')
       .map((s) => s.trim())
       .where((s) => s.isNotEmpty)
       .toList();
