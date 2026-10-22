@@ -728,6 +728,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         ListGroup(children: [
           nav(SettingsPage.models, 'Profiles', 'Models and keys', 'sparkles'),
           nav(SettingsPage.routing, 'Routing', 'Fallback models', 'route'),
+          nav(SettingsPage.accounts, 'Accounts', 'Extra subscriptions', 'users'),
           nav(SettingsPage.usage, 'Usage', 'Tokens and spend', 'gauge'),
         ]),
         label('Work'),
