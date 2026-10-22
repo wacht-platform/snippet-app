@@ -124,6 +124,9 @@ extension _DesktopShellMobileExt on _DesktopShellState {
             _goMobileHome(MobileHome.agents);
           case MobileMenuPick.usage:
             _goMobileHome(MobileHome.settings, section: SettingsPage.usage);
+          case MobileMenuPick.ambient:
+            final c = _client;
+            if (c != null) showAmbientStage(context, c);
           case MobileMenuPick.machines:
             _goMobileHome(MobileHome.settings, section: SettingsPage.general);
         }
@@ -141,6 +144,9 @@ extension _DesktopShellMobileExt on _DesktopShellState {
         onMission: _goMission,
         onSessions: () => _goMobileHome(MobileHome.chats),
         onMenu: _openMobileMenu,
+        trailingOrb: mission && _client != null
+            ? AmbientHeaderOrb(client: _client!)
+            : null,
         onSettings: () => _goMobileHome(MobileHome.settings),
       );
 

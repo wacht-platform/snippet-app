@@ -37,6 +37,7 @@ import 'mission_control.dart';
 import 'tasks/task_kanban.dart';
 import 'tasks/tasks_panel.dart';
 import 'mobile_chrome.dart';
+import 'mission_control/widgets/ambient_stage.dart';
 import 'mobile_shell.dart';
 import 'new_session_picker.dart';
 import 'new_session_draft.dart';

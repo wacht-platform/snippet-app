@@ -12,7 +12,6 @@ import '../coordination_agent_directory.dart';
 import '../../tasks/tasks_screen.dart';
 import '../widgets/mission_control_header.dart';
 import '../widgets/activity_feed.dart';
-import '../widgets/ambient_overlay.dart';
 import '../widgets/mission_composer.dart';
 import '../widgets/task_detail_sheet.dart';
 import '../widgets/notification_inbox.dart';
@@ -100,14 +99,6 @@ class MobileMissionControl extends StatelessWidget {
                   onTapTask: (task) => _openTaskSheet(context, state, task),
                   onTapQuestion: (question) =>
                       _openQuestionReply(context, state, question),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 10,
-                  child: AmbientOverlay(
-                    client: state.client,
-                    openPanel: (panel) => showMissionControlPanel(context, panel),
-                  ),
                 ),
               ]),
             ),
