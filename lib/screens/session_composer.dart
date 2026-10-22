@@ -316,7 +316,33 @@ extension _SessionScreenComposerExt on _SessionScreenState {
     final showActions = kMobile || isHovered;
     final text = _queuedText(item.text);
     final counts = _queuedAttachCounts(item.text);
-    final attachments = counts.$1 + counts.$2 + counts.$3;
+    final images = _queuedImagePaths(item.text);
+    final others = counts.$1 + counts.$3;
+    final label = text.isNotEmpty
+        ? text.replaceAll('\n', ' ')
+        : images.isNotEmpty
+            ? (images.length == 1 ? 'Image' : '${images.length} images')
+            : 'Attachment';
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    Widget thumb(String path) => Container(
+          width: 22,
+          height: 22,
+          margin: const EdgeInsets.only(right: 3),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: AppColors.line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image(
+            image: ResizeImage(widget.client.imageProvider(path),
+                width: (22 * dpr).round()),
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) =>
+                Center(child: AppIcon('image', size: 11, color: AppColors.fg4)),
+          ),
+        );
 
     Widget iconAction(String icon, String tip, VoidCallback onTap,
             {Color? color}) =>
@@ -348,31 +374,35 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       child: AnimatedContainer(
         duration: Motion.quick,
         height: kMobile ? 38 : 32,
-        padding: const EdgeInsets.only(left: S.s12, right: S.s4),
+        padding: EdgeInsets.only(
+            left: images.isNotEmpty ? S.s6 : S.s12, right: S.s4),
         decoration: BoxDecoration(
           color: isHovered ? AppColors.raised : AppColors.surface1,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: AppColors.line),
         ),
         child: Row(children: [
-          AppIcon('clock', size: 12, color: AppColors.fg4),
+          if (images.isEmpty)
+            AppIcon('clock', size: 12, color: AppColors.fg4)
+          else ...[
+            for (final path in images.take(3)) thumb(path),
+            if (images.length > 3)
+              Text('+${images.length - 3}',
+                  style: sans(11, tabular: true, color: AppColors.fg4)),
+          ],
           const SizedBox(width: S.s8),
           Expanded(
             child: Text(
-              text.isEmpty ? 'Attachment' : text.replaceAll('\n', ' '),
+              label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: sans(13,
-                  color: text.isEmpty ? AppColors.fg4 : AppColors.fg2),
+                  color: text.isEmpty ? AppColors.fg3 : AppColors.fg2),
             ),
           ),
-          if (attachments > 0) ...[
+          if (others > 0) ...[
             const SizedBox(width: S.s6),
-            AttachmentPill(
-              audio: counts.$1,
-              images: counts.$2,
-              files: counts.$3,
-            ),
+            AttachmentPill(audio: counts.$1, images: 0, files: counts.$3),
           ],
           AnimatedOpacity(
             opacity: showActions ? 1 : 0,
@@ -395,6 +425,12 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   // Clean text for a held/pending message (markers stripped). Attachments
   // surface as AttachmentPill beside the text — same as a real Bubble.
   String _queuedText(String m) => hideAttachmentMarkers(m);
+
+  List<String> _queuedImagePaths(String m) => [
+        for (final x
+            in RegExp(r'\[attached image —([^\]]*)\]').allMatches(m))
+          if ((x.group(1) ?? '').trim().isNotEmpty) x.group(1)!.trim()
+      ];
 
   (int audio, int images, int files) _queuedAttachCounts(String m) {
     final matches =
