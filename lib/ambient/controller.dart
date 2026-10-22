@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../api.dart';
 import '../platform.dart';
 import 'capture.dart';
+import 'diagnostics.dart';
 import 'uploader.dart';
 
 @pragma('vm:entry-point')
@@ -21,27 +22,36 @@ class _AmbientTaskHandler extends TaskHandler {
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    final url = await FlutterForegroundTask.getData<String>(key: 'ambient_url');
-    final token = await FlutterForegroundTask.getData<String>(key: 'ambient_token');
-    final device = await FlutterForegroundTask.getData<String>(key: 'ambient_device');
-    if (url == null || token == null) return;
-    final capture = AmbientCapture(
-        AmbientUploader(baseUrl: url, token: token, device: device ?? 'android'));
-    _capture = capture;
-    _sub = capture.status.listen((status) {
-      FlutterForegroundTask.sendDataToMain(status.toMap());
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'Snippet is listening',
-        notificationText: status.error != null
-            ? status.error!
-            : '${status.segments} segments captured, ${status.pending} waiting to upload',
-      );
-    });
+    await AmbientDiagnostics.log('service started (${starter.name})');
     try {
+      final url = await FlutterForegroundTask.getData<String>(key: 'ambient_url');
+      final token = await FlutterForegroundTask.getData<String>(key: 'ambient_token');
+      final device = await FlutterForegroundTask.getData<String>(key: 'ambient_device');
+      if (url == null || token == null) {
+        await AmbientDiagnostics.log('service has no server details, stopping');
+        await FlutterForegroundTask.stopService();
+        return;
+      }
+      final capture = AmbientCapture(
+          AmbientUploader(baseUrl: url, token: token, device: device ?? 'android'));
+      _capture = capture;
+      _sub = capture.status.listen((status) {
+        FlutterForegroundTask.sendDataToMain(status.toMap());
+        FlutterForegroundTask.updateService(
+          notificationTitle: 'Snippet is listening',
+          notificationText: status.error != null
+              ? status.error!
+              : '${status.segments} segments captured, ${status.pending} waiting to upload',
+        );
+      });
+      await AmbientDiagnostics.log('starting capture');
       await capture.start();
-    } catch (e) {
+      await AmbientDiagnostics.log('capture running');
+    } catch (e, st) {
+      await AmbientDiagnostics.log('service failed to start: $e\n$st');
       FlutterForegroundTask.sendDataToMain(
           AmbientStatus(error: 'Could not start listening: $e').toMap());
+      await FlutterForegroundTask.stopService();
     }
   }
 
@@ -89,6 +99,7 @@ class AmbientController extends ChangeNotifier {
           autoRunOnBoot: false,
           allowWakeLock: true,
           allowWifiLock: true,
+          allowAutoRestart: false,
         ),
       );
       FlutterForegroundTask.initCommunicationPort();
@@ -129,6 +140,7 @@ class AmbientController extends ChangeNotifier {
       if (notifications != NotificationPermission.granted) {
         await FlutterForegroundTask.requestNotificationPermission();
       }
+      await AmbientDiagnostics.log('start requested');
       await FlutterForegroundTask.saveData(key: 'ambient_url', value: client.baseUrl);
       await FlutterForegroundTask.saveData(key: 'ambient_token', value: client.token);
       await FlutterForegroundTask.saveData(key: 'ambient_device', value: deviceName);

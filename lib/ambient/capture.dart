@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:record/record.dart';
 import 'package:silero_vad/silero_vad.dart';
 
+import 'diagnostics.dart';
 import 'segmenter.dart';
 import 'uploader.dart';
 
@@ -75,8 +76,11 @@ class AmbientCapture {
 
   Future<void> start() async {
     if (_running) return;
+    await AmbientDiagnostics.log('uploader starting');
     await uploader.start();
+    await AmbientDiagnostics.log('loading detector');
     _vad = SileroVad();
+    await AmbientDiagnostics.log('detector loaded, opening microphone');
     _segmenter = SpeechSegmenter(
       threshold: threshold,
       offThreshold: threshold - 0.15,

@@ -16,12 +16,13 @@
         android:maxSdkVersion="29" tools:replace="android:maxSdkVersion"/>
     <application
         android:label="snippet"
-        android:name="${applicationName}"
+        android:name=".SnippetApplication"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:foregroundServiceType="microphone"
+            android:stopWithTask="true"
             android:exported="false" />
         <activity
             android:name=".MainActivity"

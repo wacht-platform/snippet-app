@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'package:flutter/services.dart';
+
 import '../ambient/controller.dart';
+import '../ambient/diagnostics.dart';
 import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
@@ -28,6 +31,7 @@ class _AmbientScreenState extends State<AmbientScreen> {
   bool _busy = false;
   bool _batteryOk = true;
   Timer? _refresh;
+  String _diagnostics = '';
 
   @override
   void initState() {
@@ -35,6 +39,9 @@ class _AmbientScreenState extends State<AmbientScreen> {
     _ambient.addListener(_changed);
     _ambient.bind().then((_) => _checkBattery());
     _load();
+    AmbientDiagnostics.read().then((t) {
+      if (mounted) setState(() => _diagnostics = t);
+    });
     _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load());
   }
 
@@ -193,6 +200,32 @@ class _AmbientScreenState extends State<AmbientScreen> {
                 Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Text(_error!, style: sans(13, color: AppColors.danger))),
+              if (_diagnostics.isNotEmpty)
+                SettingsGroup(
+                    header: 'Diagnostics',
+                    footer: 'Crash and start-up notes from this device. Copy them if something goes wrong.',
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: SelectableText(_diagnostics,
+                            style: mono(11, color: AppColors.fg3)),
+                      ),
+                      SettingsRow(
+                        label: 'Copy',
+                        onTap: () async {
+                          await Clipboard.setData(ClipboardData(text: _diagnostics));
+                          if (!mounted) return;
+                          toast(context, 'Copied');
+                        },
+                      ),
+                      SettingsRow(
+                        label: 'Clear',
+                        onTap: () async {
+                          await AmbientDiagnostics.clear();
+                          if (mounted) setState(() => _diagnostics = '');
+                        },
+                      ),
+                    ]),
               SettingsGroup(
                   header: 'What it heard',
                   footer: _events.isEmpty
