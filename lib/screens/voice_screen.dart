@@ -6,6 +6,7 @@ import '../settings_form.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
+import 'vad_test_screen.dart';
 
 const _languages = [
   ('', 'Auto-detect'),
@@ -392,6 +393,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
             sub: v.keyterms.isEmpty ? null : v.keyterms.join(', '),
             onTap: () => _editTerms(v),
             chevron: true,
+          ),
+        ],
+      ),
+      SettingsGroup(
+        header: 'Experimental',
+        footer: 'Listens through the microphone and shows when speech is detected. Nothing is recorded or sent anywhere.',
+        children: [
+          SettingsRow(
+            label: 'Voice activity test',
+            sub: 'See the detector react to your voice live',
+            chevron: true,
+            onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const VadTestScreen())),
           ),
         ],
       ),
