@@ -6,6 +6,7 @@ import 'package:snippet/api.dart';
 import 'package:snippet/swr.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/create_agent_form.dart';
+import 'package:snippet/screens/settings_panel.dart';
 import 'package:snippet/screens/shell_models.dart';
 import 'package:snippet/screens/sidebar.dart';
 import 'package:snippet/screens/mission_control_card.dart';
@@ -22,6 +23,26 @@ class _FakeTestClient extends DaemonClient {
 
   @override
   Future<List<CoordinationAgent>> coordinationAgents() async => _agents;
+
+  Map<String, dynamic> autonomy = {
+    'on': false,
+    'round_minutes': 30,
+    'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+  };
+
+  @override
+  Future<Map<String, dynamic>> mcAutonomy() async => {...autonomy};
+
+  @override
+  Future<Map<String, dynamic>> mcSetAutonomy(
+      Map<String, dynamic> changes) async {
+    autonomy = {
+      ...autonomy,
+      ...changes,
+      'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+    };
+    return {...autonomy};
+  }
 
   @override
   Future<List<TaskItem>> tasks(
@@ -348,6 +369,75 @@ void main() {
     expect(find.text('Real User Chat'), findsWidgets);
     expect(find.text('Agent Mailbox'), findsNothing);
     expect(find.text('inbox-builder'), findsNothing);
+  });
+
+  testWidgets('mobile settings exposes Mission Control automated wakes toggle',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      tester.view.devicePixelRatio = 2.0;
+      tester.view.physicalSize = const Size(390, 844) * 2.0;
+      addTearDown(tester.view.reset);
+
+      final client = _FakeTestClient([]);
+      SettingsPage? section;
+
+      await tester.pumpWidget(MaterialApp(
+        theme: buildAppTheme(),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => Sidebar(
+              client: client,
+              active: Instance(
+                  name: 'devbox', url: 'https://daemon.invalid', token: 't'),
+              instances: [
+                Instance(
+                    name: 'devbox', url: 'https://daemon.invalid', token: 't')
+              ],
+              health: const {'https://daemon.invalid': true},
+              sessions: const [],
+              sessionsLoading: false,
+              onRefreshSessions: () async {},
+              selectedSessionId: null,
+              onOpenSession: (_, __, ___) {},
+              onNewSession: () {},
+              onSelectInstance: (_) {},
+              onAddInstance: () {},
+              onRenameInstance: (_, __) {},
+              onRemoveInstance: (_) {},
+              onSessionDeleted: (_) {},
+              onRefreshHealth: () {},
+              onOpenMissionControl: () {},
+              topInset: false,
+              mobileHome: MobileHome.settings,
+              onMobileHome: (_) {},
+              settingsSection: section,
+              onSettingsSection: (s) => setState(() => section = s),
+              agent: null,
+              onAgent: (_) {},
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Automated wakes'), findsOneWidget);
+      expect(find.text('Off'), findsOneWidget);
+
+      await tester.tap(find.text('Automated wakes'));
+      await tester.pumpAndSettle();
+
+      expect(section, SettingsPage.wakes);
+      expect(find.text('Wakes off'), findsOneWidget);
+
+      await tester.tap(find.text('Wakes off'));
+      await tester.pumpAndSettle();
+
+      expect(client.autonomy['on'], isTrue);
+      expect(find.text('Wakes on'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }
 

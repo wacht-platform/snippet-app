@@ -6,6 +6,7 @@ import '../../../api.dart';
 import '../../../platform.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
+import '../../shell_nav.dart';
 
 String _relative(int? epoch, {bool future = false}) {
   if (epoch == null) return '';
@@ -124,24 +125,37 @@ class AutonomyPanel extends StatefulWidget {
   final Map<String, dynamic>? initial;
   final ValueChanged<Map<String, dynamic>>? onChanged;
   final bool embedded;
+  final VoidCallback? onBack;
   const AutonomyPanel(
       {super.key,
       required this.client,
       this.initial,
       this.onChanged,
-      this.embedded = false});
+      this.embedded = false,
+      this.onBack});
 
   @override
   State<AutonomyPanel> createState() => _AutonomyPanelState();
 }
 
 class _AutonomyPanelState extends State<AutonomyPanel> {
-  late Map<String, dynamic> _autonomy = widget.initial ?? const {};
+  late Map<String, dynamic> _autonomy =
+      widget.initial ?? widget.client.cachedMcAutonomy() ?? const {};
 
   @override
   void initState() {
     super.initState();
     if (widget.initial == null) _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant AutonomyPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.client.baseUrl != widget.client.baseUrl) {
+      _autonomy = widget.initial ?? widget.client.cachedMcAutonomy() ?? const {};
+      _error = null;
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -281,7 +295,13 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
         onChanged: (v) => _set({'on': v}),
         label: on ? 'Wakes on' : 'Wakes off',
         sub: on
-            ? autonomyStatusLine(_autonomy).replaceFirst('Wakes on · ', '')
+            ? () {
+                final detail = autonomyStatusLine(_autonomy)
+                    .replaceFirst(RegExp(r'^Wakes on( · )?'), '');
+                return detail.isEmpty
+                    ? 'Checks in on running work while you are away'
+                    : detail;
+              }()
             : 'Mission Control only acts when you message it',
       ),
       const SizedBox(height: 20),
@@ -362,6 +382,20 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
         Text(_error!, style: TS.meta().copyWith(color: AppColors.danger)),
       ],
     ];
+    if (widget.embedded && widget.onBack != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          NavBackRow(title: 'Automated wakes', onBack: widget.onBack!),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+              children: children,
+            ),
+          ),
+        ],
+      );
+    }
     if (widget.embedded) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
