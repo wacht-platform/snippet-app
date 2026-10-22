@@ -10,7 +10,6 @@ import '../../../models.dart';
 import '../../../settings_form.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
-import 'ambient_panel.dart';
 
 class AmbientOverlay extends StatefulWidget {
   const AmbientOverlay({super.key, required this.client, required this.openPanel});
@@ -27,7 +26,6 @@ class _AmbientOverlayState extends State<AmbientOverlay>
   late final AnimationController _pulse =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
   AmbientSettings? _settings;
-  AmbientEvent? _latest;
   bool _open = false;
   bool _busy = false;
   String? _error;
@@ -57,17 +55,7 @@ class _AmbientOverlayState extends State<AmbientOverlay>
   Future<void> _load() async {
     try {
       final settings = await widget.client.getAmbientSettings();
-      AmbientEvent? latest;
-      if (settings.enabled) {
-        final events = await widget.client.ambientEvents(limit: 3);
-        latest = events.where((e) => e.status == 'done').firstOrNull;
-      }
-      if (mounted) {
-        setState(() {
-          _settings = settings;
-          _latest = latest;
-        });
-      }
+      if (mounted) setState(() => _settings = settings);
     } catch (_) {}
   }
 
@@ -202,7 +190,6 @@ class _AmbientOverlayState extends State<AmbientOverlay>
         : listening
             ? (status.speaking ? 'Hearing speech' : 'Listening')
             : 'On, not listening here';
-    final latest = _latest;
     return Container(
       key: const ValueKey('card'),
       width: 292,
@@ -234,13 +221,6 @@ class _AmbientOverlayState extends State<AmbientOverlay>
         ]),
         const SizedBox(height: 12),
         _segments(settings),
-        if (latest != null && settings.enabled) ...[
-          const SizedBox(height: 12),
-          Text('“${latest.text}”',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: sans(12.5, height: 1.4, color: AppColors.fg2)),
-        ],
         if (_error != null || status.error != null) ...[
           const SizedBox(height: 8),
           Text(_error ?? status.error!,
@@ -248,22 +228,6 @@ class _AmbientOverlayState extends State<AmbientOverlay>
               overflow: TextOverflow.ellipsis,
               style: sans(12, color: AppColors.danger)),
         ],
-        const SizedBox(height: 8),
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            setState(() => _open = false);
-            widget.openPanel(AmbientPanel(client: widget.client));
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(children: [
-              Text('Details', style: sans(12.5, color: AppColors.accent)),
-              const SizedBox(width: 4),
-              AppIcon('chevron-right', size: 13, color: AppColors.accent),
-            ]),
-          ),
-        ),
       ]),
     );
   }

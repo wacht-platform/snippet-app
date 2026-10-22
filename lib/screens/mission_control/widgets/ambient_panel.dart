@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../ambient/controller.dart';
-import '../../../ambient/diagnostics.dart';
 import '../../../api.dart';
 import '../../../models.dart';
 import '../../../platform.dart';
@@ -143,12 +141,9 @@ class _AmbientPanelState extends State<AmbientPanel> {
   final AmbientController _ambient = AmbientController.instance;
   AmbientSettings _settings = const AmbientSettings();
   bool _loaded = false;
-  List<AmbientEvent> _events = [];
-  AmbientStats? _stats;
   String? _error;
   bool _busy = false;
   bool _batteryOk = true;
-  String _diagnostics = '';
   Timer? _refresh;
 
   @override
@@ -157,10 +152,7 @@ class _AmbientPanelState extends State<AmbientPanel> {
     _ambient.addListener(_changed);
     _ambient.bind().then((_) => _checkBattery());
     _load();
-    AmbientDiagnostics.read().then((t) {
-      if (mounted) setState(() => _diagnostics = t);
-    });
-    _refresh = Timer.periodic(const Duration(seconds: 5), (_) => _load());
+    _refresh = Timer.periodic(const Duration(seconds: 15), (_) => _load());
   }
 
   @override
@@ -182,13 +174,9 @@ class _AmbientPanelState extends State<AmbientPanel> {
   Future<void> _load() async {
     try {
       final settings = await widget.client.getAmbientSettings();
-      final events = settings.enabled ? await widget.client.ambientEvents(limit: 20) : _events;
-      final stats = settings.enabled ? await widget.client.ambientStats() : _stats;
       if (!mounted) return;
       setState(() {
         _settings = settings;
-        _events = events;
-        _stats = stats;
         _loaded = true;
         _error = null;
       });
@@ -243,20 +231,6 @@ class _AmbientPanelState extends State<AmbientPanel> {
     }
   }
 
-  String _clock(DateTime t) {
-    String two(int v) => v.toString().padLeft(2, '0');
-    return '${two(t.hour)}:${two(t.minute)}';
-  }
-
-  String _length(int ms) {
-    final s = (ms / 1000).round();
-    return s >= 3600
-        ? '${s ~/ 3600}h ${(s % 3600) ~/ 60}m'
-        : s >= 60
-            ? '${s ~/ 60}m ${s % 60}s'
-            : '${s}s';
-  }
-
   Widget _modeRow(String mode, String title, String detail) {
     final selected = _settings.mode == mode;
     return SettingsRow(
@@ -273,7 +247,6 @@ class _AmbientPanelState extends State<AmbientPanel> {
   Widget build(BuildContext context) {
     final status = _ambient.status;
     final settings = _settings;
-    final stats = _stats;
     final listeningHere = status.running;
     final children = <Widget>[
       SettingsGroup(
@@ -333,65 +306,6 @@ class _AmbientPanelState extends State<AmbientPanel> {
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 18),
           child: Text(_error ?? status.error!, style: sans(13, color: AppColors.danger)),
         ),
-      if (settings.enabled) ...[
-        SettingsGroup(header: 'Today', children: [
-          if (listeningHere)
-            SettingsRow(
-                label: 'This session',
-                trailing: Text('${status.segments} captured, ${status.pending} to upload',
-                    style: mono(12, color: AppColors.fg2))),
-          SettingsRow(
-              label: 'Segments, last 24 hours',
-              trailing: Text('${stats?.segments ?? 0}', style: mono(13, color: AppColors.fg2))),
-          SettingsRow(
-              label: 'Speech captured',
-              trailing: Text(_length((stats?.audioSeconds ?? 0) * 1000),
-                  style: mono(13, color: AppColors.fg2))),
-          if ((stats?.byStatus['failed'] ?? 0) > 0)
-            SettingsRow(
-                label: 'Failed to transcribe',
-                trailing: Text('${stats!.byStatus['failed']}',
-                    style: mono(13, color: AppColors.danger))),
-        ]),
-        if (settings.devices.isNotEmpty)
-          SettingsGroup(header: 'Devices', footer: 'Heard from in the last 10 minutes.', children: [
-            for (final d in settings.devices)
-              SettingsRow(
-                  label: d.device.isEmpty ? 'Unnamed device' : d.device,
-                  trailing: Text(_clock(d.lastSeen), style: mono(13, color: AppColors.fg2))),
-          ]),
-        SettingsGroup(
-          header: 'What it heard',
-          footer: _events.isEmpty ? 'Nothing yet.' : null,
-          children: [for (final e in _events) _eventRow(e)],
-        ),
-      ],
-      if (_diagnostics.isNotEmpty)
-        SettingsGroup(
-          header: 'Diagnostics',
-          footer: 'Start-up and crash notes from this device.',
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: SelectableText(_diagnostics, style: mono(11, color: AppColors.fg3)),
-            ),
-            SettingsRow(
-              label: 'Copy',
-              onTap: () async {
-                await Clipboard.setData(ClipboardData(text: _diagnostics));
-                if (!context.mounted) return;
-                toast(context, 'Copied');
-              },
-            ),
-            SettingsRow(
-              label: 'Clear',
-              onTap: () async {
-                await AmbientDiagnostics.clear();
-                if (mounted) setState(() => _diagnostics = '');
-              },
-            ),
-          ],
-        ),
     ];
     if (widget.embedded && widget.onBack != null) {
       return Column(
@@ -414,34 +328,5 @@ class _AmbientPanelState extends State<AmbientPanel> {
       );
     }
     return ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 32), children: children);
-  }
-
-  Widget _eventRow(AmbientEvent e) {
-    final pending = e.status == 'pending';
-    final failed = e.status == 'failed';
-    final empty = e.status == 'empty';
-    final body = pending
-        ? 'Transcribing'
-        : failed
-            ? (e.error ?? 'Failed')
-            : empty
-                ? 'No speech recognised'
-                : e.text;
-    return SettingsRow(
-      label: body,
-      labelWidget: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(body,
-            style: sans(kMobile ? 15 : 13,
-                height: 1.4,
-                color: failed
-                    ? AppColors.danger
-                    : (pending || empty)
-                        ? AppColors.fg4
-                        : AppColors.fg1)),
-        const SizedBox(height: 3),
-        Text('${_clock(e.startedAt)}  ·  ${_length(e.durationMs)}  ·  ${e.device}',
-            style: sans(12, color: AppColors.fg4)),
-      ]),
-    );
   }
 }
