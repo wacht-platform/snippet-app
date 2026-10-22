@@ -503,6 +503,14 @@ class DaemonClient {
     return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
+  Future<bool> claimAmbientLease(String device, String label) async {
+    final r = await http.post(_uri('/ambient/lease'),
+        headers: _json,
+        body: jsonEncode({'device': device, 'label': label, 'claim': true}));
+    if (r.statusCode != 200) throw _err('claim ambient listening', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['held'] == true;
+  }
+
   Future<AmbientStats> ambientStats() async {
     final r = await http.get(_uri('/ambient/stats'));
     if (r.statusCode != 200) throw _err('load ambient stats', r);

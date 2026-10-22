@@ -1658,17 +1658,23 @@ class AmbientSettings {
   final String mode;
   final bool keySet;
   final List<AmbientDevice> devices;
+  final String? listeningId;
+  final String? listeningDevice;
 
   const AmbientSettings(
       {this.enabled = false,
       this.mode = 'passive',
       this.keySet = true,
-      this.devices = const []});
+      this.devices = const [],
+      this.listeningId,
+      this.listeningDevice});
 
   AmbientSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] == true,
         mode = j['mode'] as String? ?? 'passive',
         keySet = j['key_set'] != false,
+        listeningId = j['listening_id'] as String?,
+        listeningDevice = j['listening_device'] as String?,
         devices = [
           for (final d in (j['devices'] as List? ?? const []))
             AmbientDevice.fromJson((d as Map).cast<String, dynamic>())

@@ -23,6 +23,10 @@ class _AmbientModel extends ChangeNotifier {
   _AmbientModel(this.client) {
     ambient.addListener(notifyListeners);
     ambient.bind();
+    ambient.deviceId.then((v) {
+      selfId = v;
+      notifyListeners();
+    });
     load();
     _timer = Timer.periodic(const Duration(seconds: 10), (_) => load());
   }
@@ -30,6 +34,7 @@ class _AmbientModel extends ChangeNotifier {
   final DaemonClient client;
   final AmbientController ambient = AmbientController.instance;
   AmbientSettings? settings;
+  String selfId = '';
   String? error;
   bool busy = false;
   Timer? _timer;
@@ -43,6 +48,25 @@ class _AmbientModel extends ChangeNotifier {
       settings = await client.getAmbientSettings();
       notifyListeners();
     } catch (_) {}
+  }
+
+  bool get elsewhere {
+    final id = settings?.listeningId;
+    return id != null && selfId.isNotEmpty && id != selfId;
+  }
+
+  Future<void> press() async {
+    if (on && listening) return toggle(false);
+    if (on) {
+      if (busy) return;
+      busy = true;
+      error = await ambient.start(client);
+      busy = false;
+      notifyListeners();
+      load();
+      return;
+    }
+    return toggle(true);
   }
 
   Future<void> toggle(bool value) async {
@@ -236,7 +260,7 @@ class _AmbientHeaderOrbState extends State<AmbientHeaderOrb> {
         onLongPress: () {
           if (_m.settings == null) return;
           HapticFeedback.mediumImpact();
-          _m.toggle(!_m.on);
+          _m.press();
         },
         onHorizontalDragEnd: (d) {
           final v = d.primaryVelocity ?? 0;
@@ -324,6 +348,10 @@ class _AmbientStageState extends State<AmbientStage> {
   }
 
   String _caption(String mode, bool selected) {
+    if (selected && _m.elsewhere) {
+      return 'Listening on ${_m.settings?.listeningDevice ?? 'another device'}';
+    }
+    if (selected && _m.status.displaced) return 'Another device took over';
     final running = selected && _m.on;
     if (!running) {
       return mode == 'active'
@@ -345,7 +373,7 @@ class _AmbientStageState extends State<AmbientStage> {
       onTap: selected
           ? () {
               if (_m.settings != null) {
-                toast(context, _m.on ? 'Hold to stop' : 'Hold to start');
+                toast(context, _m.on && _m.listening ? 'Hold to stop' : 'Hold to start');
               }
             }
           : () => _pager?.animateToPage(i,
@@ -354,7 +382,7 @@ class _AmbientStageState extends State<AmbientStage> {
       onLongPress: selected && _m.settings != null && !_m.busy
           ? () {
               HapticFeedback.mediumImpact();
-              _m.toggle(!_m.on);
+              _m.press();
             }
           : null,
       child: Center(

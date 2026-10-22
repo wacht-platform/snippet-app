@@ -16,8 +16,10 @@ class AmbientStatus {
     this.segments = 0,
     this.pending = 0,
     this.error,
+    this.displaced = false,
   });
 
+  final bool displaced;
   final bool running;
   final bool speaking;
   final double probability;
@@ -32,6 +34,7 @@ class AmbientStatus {
         'segments': segments,
         'pending': pending,
         'error': error,
+        'displaced': displaced,
       };
 
   factory AmbientStatus.fromMap(Map<Object?, Object?> map) => AmbientStatus(
@@ -41,6 +44,7 @@ class AmbientStatus {
         segments: (map['segments'] as num?)?.toInt() ?? 0,
         pending: (map['pending'] as num?)?.toInt() ?? 0,
         error: map['error'] as String?,
+        displaced: map['displaced'] == true,
       );
 }
 
@@ -71,12 +75,16 @@ class AmbientCapture {
         probability: _probability,
         segments: _segments,
         pending: uploader.pending.value,
-        error: _error ?? uploader.lastError.value,
+        error: uploader.displaced.value ? null : (_error ?? uploader.lastError.value),
+        displaced: uploader.displaced.value,
       );
 
   Future<void> start() async {
     if (_running) return;
     await AmbientDiagnostics.log('uploader starting');
+    uploader.displaced.addListener(() {
+      if (uploader.displaced.value) unawaited(stop());
+    });
     await uploader.start();
     await AmbientDiagnostics.log('loading detector');
     _vad = SileroVad();

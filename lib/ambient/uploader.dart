@@ -17,22 +17,53 @@ String newSegmentId() {
   return '${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}-$hex';
 }
 
+Future<(String, String)> ambientDeviceIdentity() async {
+  final root = await getApplicationSupportDirectory();
+  final dir = Directory('${root.path}/ambient');
+  await dir.create(recursive: true);
+  final file = File('${dir.path}/device_id');
+  var id = '';
+  try {
+    id = (await file.readAsString()).trim();
+  } on FileSystemException {
+    id = '';
+  }
+  if (id.isEmpty) {
+    id = newSegmentId().split('-').last.substring(0, 8);
+    await file.writeAsString(id);
+  }
+  final os = Platform.operatingSystem;
+  final name = switch (os) {
+    'android' => 'Android',
+    'ios' => 'iPhone',
+    'macos' => 'Mac',
+    'linux' => 'Linux',
+    'windows' => 'Windows',
+    _ => os,
+  };
+  return ('$os-$id', '$name ${id.substring(0, 4)}');
+}
+
 class AmbientUploader {
   AmbientUploader({
     required this.baseUrl,
     required this.token,
     required this.device,
+    this.label = '',
     Directory? directory,
   }) : _dir = directory;
 
   final String baseUrl;
   final String token;
   final String device;
+  final String label;
 
   static const _maxQueueBytes = 500 * 1024 * 1024;
 
   final ValueNotifier<int> pending = ValueNotifier(0);
   final ValueNotifier<String?> lastError = ValueNotifier(null);
+  final ValueNotifier<bool> displaced = ValueNotifier(false);
+  Timer? _heartbeat;
   Directory? _dir;
   bool _draining = false;
   bool _closed = false;
@@ -49,7 +80,42 @@ class AmbientUploader {
 
   Future<void> start() async {
     await _refreshCount();
+    _heartbeat = Timer.periodic(const Duration(seconds: 15), (_) => _beat());
     unawaited(_drain());
+  }
+
+  Future<void> _beat() async {
+    if (_closed || displaced.value) return;
+    try {
+      final uri = Uri.parse(baseUrl).replace(path: '/ambient/lease', queryParameters: {'token': token});
+      final response = await http
+          .post(uri,
+              headers: {'content-type': 'application/json'},
+              body: jsonEncode({'device': device, 'label': label}))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200 &&
+          (jsonDecode(response.body) as Map<String, dynamic>)['held'] == false) {
+        await _giveUp();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _giveUp() async {
+    if (displaced.value) return;
+    displaced.value = true;
+    _heartbeat?.cancel();
+    final dir = await _queueDir();
+    await for (final f in dir.list()) {
+      if (f is File) {
+        try {
+          await f.delete();
+        } on FileSystemException {
+          continue;
+        }
+      }
+    }
+    pending.value = 0;
+    lastError.value = 'Another device took over listening';
   }
 
   Future<void> _writes = Future.value();
@@ -168,6 +234,10 @@ class AmbientUploader {
         await _remove(stem);
         return true;
       }
+      if (response.statusCode == 409) {
+        await _giveUp();
+        return true;
+      }
       if (response.statusCode == 400 || response.statusCode == 413) {
         lastError.value = 'Server rejected a segment (${response.statusCode}); dropped it';
         await _remove(stem);
@@ -185,5 +255,6 @@ class AmbientUploader {
 
   void close() {
     _closed = true;
+    _heartbeat?.cancel();
   }
 }
