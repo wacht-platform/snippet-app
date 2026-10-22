@@ -1490,13 +1490,13 @@ class _SessionScreenState extends State<SessionScreen>
     );
     return kMacOS
         ? DropTarget(
-            enable: widget.acceptDrops,
+            enable: _dropsOn,
             onDragEntered: (_) {
-              if (!widget.acceptDrops) return;
+              if (!_dropsOn) return;
               setState(() => _draggingFiles = true);
             },
             onDragExited: (_) {
-              if (!widget.acceptDrops) return;
+              if (!_dropsOn) return;
               setState(() => _draggingFiles = false);
             },
             onDragDone: _ingestDroppedFiles,

@@ -453,8 +453,11 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       !_anyUploading &&
       !_sendingAudio;
 
+  bool get _dropsOn =>
+      widget.acceptDrops || (mounted && TickerMode.valuesOf(context).enabled);
+
   Future<void> _ingestDroppedFiles(DropDoneDetails details) async {
-    if (!kMacOS || !widget.acceptDrops) return;
+    if (!kMacOS || !_dropsOn) return;
     _setState(() => _draggingFiles = false);
     final files = details.files.whereType<DropItemFile>().map((item) {
       final bookmark = item.extraAppleBookmark;
