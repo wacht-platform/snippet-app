@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../ambient/capture.dart';
 import '../../../ambient/controller.dart';
@@ -10,10 +11,12 @@ import '../../../models.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 
+Color _modeColor(String mode) =>
+    mode == 'active' ? AppColors.accent : AppColors.ok;
+
 Color _stateColor(AmbientSettings? s, AmbientStatus st) {
-  if (s == null || !s.enabled) return AppColors.fg4;
-  if (st.error != null) return AppColors.danger;
-  return s.mode == 'active' ? AppColors.accent : AppColors.ok;
+  if (s != null && s.enabled && st.error != null) return AppColors.danger;
+  return _modeColor(s?.mode ?? 'passive');
 }
 
 class _AmbientModel extends ChangeNotifier {
@@ -53,6 +56,9 @@ class _AmbientModel extends ChangeNotifier {
     busy = false;
     notifyListeners();
   }
+
+  Future<void> shiftMode(int dir) =>
+      setMode(dir > 0 ? 'active' : 'passive');
 
   Future<void> setMode(String mode) async {
     final before = settings;
@@ -175,10 +181,8 @@ class _OrbState extends State<_Orb> with SingleTickerProviderStateMixin {
 }
 
 class AmbientHeaderOrb extends StatefulWidget {
-  const AmbientHeaderOrb(
-      {super.key, required this.client, this.onlyWhenOn = true});
+  const AmbientHeaderOrb({super.key, required this.client});
   final DaemonClient client;
-  final bool onlyWhenOn;
 
   @override
   State<AmbientHeaderOrb> createState() => _AmbientHeaderOrbState();
@@ -201,7 +205,6 @@ class _AmbientHeaderOrbState extends State<AmbientHeaderOrb> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.onlyWhenOn && !_m.on) return const SizedBox.shrink();
     final color = _stateColor(_m.settings, _m.status);
     return Semantics(
       button: true,
@@ -209,6 +212,17 @@ class _AmbientHeaderOrbState extends State<AmbientHeaderOrb> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => showAmbientStage(context, widget.client),
+        onLongPress: () {
+          if (_m.settings == null) return;
+          HapticFeedback.mediumImpact();
+          _m.toggle(!_m.on);
+        },
+        onHorizontalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v.abs() < 150) return;
+          HapticFeedback.selectionClick();
+          _m.shiftMode(v < 0 ? 1 : -1);
+        },
         child: SizedBox(
           width: 44,
           height: 44,
@@ -253,17 +267,38 @@ class AmbientStage extends StatefulWidget {
 }
 
 class _AmbientStageState extends State<AmbientStage> {
+  static const _modes = ['passive', 'active'];
   late final _AmbientModel _m = _AmbientModel(widget.client)
     ..addListener(_changed);
+  PageController? _pager;
+  double _page = 0;
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final s = _m.settings;
+    if (s != null && _pager == null) {
+      final i = _modes.indexOf(s.mode).clamp(0, 1);
+      _page = i.toDouble();
+      _pager = PageController(initialPage: i, viewportFraction: 0.62)
+        ..addListener(() {
+          if (mounted) setState(() => _page = _pager!.page ?? _page);
+        });
+    } else if (s != null && _pager!.hasClients) {
+      final i = _modes.indexOf(s.mode);
+      if (i >= 0 && (_pager!.page ?? i).round() != i) {
+        _pager!.animateToPage(i,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic);
+      }
+    }
+    setState(() {});
   }
 
   @override
   void dispose() {
     _m.removeListener(_changed);
     _m.dispose();
+    _pager?.dispose();
     super.dispose();
   }
 
@@ -275,27 +310,44 @@ class _AmbientStageState extends State<AmbientStage> {
     return 'Listening';
   }
 
-  Widget _mode(String mode, String label, String hint) {
+  Widget _globe(int i, double size) {
+    final mode = _modes[i];
     final selected = _m.settings?.mode == mode;
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _m.setMode(mode),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.accentBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+    final dist = (_page - i).abs().clamp(0.0, 1.0);
+    final color = selected ? _stateColor(_m.settings, _m.status) : _modeColor(mode);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: selected ? null : () => _pager?.animateToPage(i,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic),
+      onLongPress: selected && _m.settings != null && !_m.busy
+          ? () {
+              HapticFeedback.mediumImpact();
+              _m.toggle(!_m.on);
+            }
+          : null,
+      child: Center(
+        child: Opacity(
+          opacity: 1 - dist * 0.65,
+          child: Transform.scale(
+            scale: 1 - dist * 0.3,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              _Orb(
+                size: size,
+                color: color,
+                alive: selected && _m.listening,
+                level: selected && _m.status.speaking ? 1 : 0,
+              ),
+              const SizedBox(height: 8),
+              Text(mode == 'active' ? 'Active' : 'Passive',
+                  style: sans(16,
+                      weight: W.strong,
+                      color: selected ? AppColors.fg1 : AppColors.fg3)),
+              const SizedBox(height: 2),
+              Text(mode == 'active' ? 'Can speak up' : 'Listens quietly',
+                  style: sans(12.5, color: AppColors.fg4)),
+            ]),
           ),
-          child: Column(children: [
-            Text(label,
-                style: sans(15,
-                    weight: W.strong,
-                    color: selected ? AppColors.accent : AppColors.fg2)),
-            const SizedBox(height: 2),
-            Text(hint, style: sans(12, color: AppColors.fg4)),
-          ]),
         ),
       ),
     );
@@ -303,8 +355,9 @@ class _AmbientStageState extends State<AmbientStage> {
 
   @override
   Widget build(BuildContext context) {
-    final color = _stateColor(_m.settings, _m.status);
     final err = _m.error ?? _m.status.error;
+    final width = MediaQuery.sizeOf(context).width;
+    final globe = math.min(width * 0.5, 230.0);
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -322,71 +375,44 @@ class _AmbientStageState extends State<AmbientStage> {
             ]),
           ),
           Expanded(
-            child: Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                _Orb(
-                  size: math.min(MediaQuery.sizeOf(context).width * 0.78, 320),
-                  color: color,
-                  alive: _m.listening,
-                  level: _m.status.speaking ? 1 : 0,
-                ),
-                const SizedBox(height: 20),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Text(_line,
-                      key: ValueKey(_line),
-                      style: sans(22, weight: W.strong, color: AppColors.fg1)),
-                ),
-                if (err != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
-                    child: Text(err,
-                        textAlign: TextAlign.center,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13, color: AppColors.danger)),
-                  ),
-              ]),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Column(children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(children: [
-                  _mode('passive', 'Passive', 'Listens quietly'),
-                  _mode('active', 'Active', 'Can speak up'),
-                ]),
-              ),
-              const SizedBox(height: 14),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _m.busy || _m.settings == null
-                      ? null
-                      : () => _m.toggle(!_m.on),
-                  child: Container(
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _m.on ? AppColors.surface3 : AppColors.accentFill,
-                      borderRadius: BorderRadius.circular(26),
-                    ),
-                    child: Text(_m.on ? 'Stop listening' : 'Start listening',
-                        style: sans(16,
-                            weight: W.strong,
-                            color: _m.on ? AppColors.fg1 : AppColors.accentFg)),
-                  ),
-                ),
+                height: globe + 70,
+                child: _pager == null
+                    ? const SizedBox.shrink()
+                    : PageView.builder(
+                        controller: _pager,
+                        itemCount: 2,
+                        physics: const BouncingScrollPhysics(),
+                        onPageChanged: (i) {
+                          HapticFeedback.selectionClick();
+                          _m.setMode(_modes[i]);
+                        },
+                        itemBuilder: (_, i) => _globe(i, globe),
+                      ),
               ),
+              const SizedBox(height: 18),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Text(_line,
+                    key: ValueKey(_line),
+                    style: sans(22, weight: W.strong, color: AppColors.fg1)),
+              ),
+              const SizedBox(height: 6),
+              Text(_m.on ? 'Hold the globe to stop' : 'Hold the globe to start',
+                  style: sans(13, color: AppColors.fg4)),
+              if (err != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
+                  child: Text(err,
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13, color: AppColors.danger)),
+                ),
             ]),
           ),
+          const SizedBox(height: 24),
         ]),
       ),
     );

@@ -1484,7 +1484,7 @@ class _SessionScreenState extends State<SessionScreen>
             Positioned(
               top: 8,
               right: 16,
-              child: AmbientHeaderOrb(client: widget.client, onlyWhenOn: false),
+              child: AmbientHeaderOrb(client: widget.client),
             ),
         ]),
       ),
