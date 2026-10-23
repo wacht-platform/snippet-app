@@ -7,6 +7,7 @@ import 'package:silero_vad/silero_vad.dart';
 import 'diagnostics.dart';
 import 'segmenter.dart';
 import 'uploader.dart';
+import 'voice.dart';
 
 class AmbientStatus {
   const AmbientStatus({
@@ -17,8 +18,10 @@ class AmbientStatus {
     this.pending = 0,
     this.error,
     this.displaced = false,
+    this.assistantSpeaking = false,
   });
 
+  final bool assistantSpeaking;
   final bool displaced;
   final bool running;
   final bool speaking;
@@ -35,6 +38,7 @@ class AmbientStatus {
         'pending': pending,
         'error': error,
         'displaced': displaced,
+        'assistantSpeaking': assistantSpeaking,
       };
 
   factory AmbientStatus.fromMap(Map<Object?, Object?> map) => AmbientStatus(
@@ -45,6 +49,7 @@ class AmbientStatus {
         pending: (map['pending'] as num?)?.toInt() ?? 0,
         error: map['error'] as String?,
         displaced: map['displaced'] == true,
+        assistantSpeaking: map['assistantSpeaking'] == true,
       );
 }
 
@@ -62,6 +67,8 @@ class AmbientCapture {
   StreamSubscription<Uint8List>? _sub;
   Timer? _ticker;
   bool _running = false;
+  bool _muted = false;
+  AmbientVoice? _voice;
   double _probability = 0;
   int _segments = 0;
   String? _error;
@@ -77,6 +84,7 @@ class AmbientCapture {
         pending: uploader.pending.value,
         error: uploader.displaced.value ? null : (_error ?? uploader.lastError.value),
         displaced: uploader.displaced.value,
+        assistantSpeaking: _muted,
       );
 
   Future<void> start() async {
@@ -98,7 +106,10 @@ class AmbientCapture {
       },
     );
     final stream = await _recorder.startStream(const RecordConfig(
-        encoder: AudioEncoder.pcm16bits, sampleRate: 16000, numChannels: 1));
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+        audioInterruption: AudioInterruptionMode.none));
     _running = true;
     _error = null;
     _sub = stream.listen(_onAudio, onError: (Object e) {
@@ -107,10 +118,28 @@ class AmbientCapture {
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!_status.isClosed) _status.add(current);
     });
+    _voice = AmbientVoice(
+      baseUrl: uploader.baseUrl,
+      token: uploader.token,
+      device: uploader.device,
+      onSpeaking: _setMuted,
+    );
+    unawaited(_voice!.start());
     _status.add(current);
   }
 
+  void _setMuted(bool muted) {
+    if (_muted == muted) return;
+    _muted = muted;
+    if (muted) {
+      _segmenter?.flush();
+      _pending.clear();
+    }
+    if (!_status.isClosed) _status.add(current);
+  }
+
   void _onAudio(Uint8List bytes) {
+    if (_muted) return;
     final vad = _vad;
     final segmenter = _segmenter;
     if (vad == null || segmenter == null) return;
@@ -147,6 +176,8 @@ class AmbientCapture {
   }
 
   Future<void> dispose() async {
+    await _voice?.dispose();
+    _voice = null;
     await stop();
     uploader.close();
     await _recorder.dispose();

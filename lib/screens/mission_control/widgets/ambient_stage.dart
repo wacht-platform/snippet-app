@@ -352,6 +352,10 @@ class _AmbientStageState extends State<AmbientStage> {
       return 'Listening on ${_m.settings?.listeningDevice ?? 'another device'}';
     }
     if (selected && _m.status.displaced) return 'Another device took over';
+    if (selected && _m.status.assistantSpeaking) return 'Speaking';
+    if (selected && _m.on && _m.listening && (_m.settings?.conversationOpen ?? false)) {
+      return 'In conversation';
+    }
     final running = selected && _m.on;
     if (!running) {
       return mode == 'active'
@@ -395,7 +399,7 @@ class _AmbientStageState extends State<AmbientStage> {
                 size: size,
                 color: color,
                 alive: selected && _m.listening,
-                level: selected && _m.status.speaking ? 1 : 0,
+                level: selected && (_m.status.speaking || _m.status.assistantSpeaking) ? 1 : 0,
               ),
               const SizedBox(height: 8),
               Text(mode == 'active' ? 'Active' : 'Passive',

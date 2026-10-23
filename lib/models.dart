@@ -1660,6 +1660,7 @@ class AmbientSettings {
   final List<AmbientDevice> devices;
   final String? listeningId;
   final String? listeningDevice;
+  final bool conversationOpen;
 
   const AmbientSettings(
       {this.enabled = false,
@@ -1667,7 +1668,8 @@ class AmbientSettings {
       this.keySet = true,
       this.devices = const [],
       this.listeningId,
-      this.listeningDevice});
+      this.listeningDevice,
+      this.conversationOpen = false});
 
   AmbientSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] == true,
@@ -1675,6 +1677,7 @@ class AmbientSettings {
         keySet = j['key_set'] != false,
         listeningId = j['listening_id'] as String?,
         listeningDevice = j['listening_device'] as String?,
+        conversationOpen = j['conversation'] != null,
         devices = [
           for (final d in (j['devices'] as List? ?? const []))
             AmbientDevice.fromJson((d as Map).cast<String, dynamic>())
