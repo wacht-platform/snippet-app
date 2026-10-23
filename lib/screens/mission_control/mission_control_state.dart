@@ -654,10 +654,16 @@ AmbientTurn? parseAmbientTurn(String text) {
   final match = RegExp(r'^\s*<ambient_turn device="([^"]*)" at="([^"]*)">([\s\S]*?)</ambient_turn>\s*$')
       .firstMatch(text);
   if (match == null) return null;
+  final body = (match.group(3) ?? '')
+      .replaceAll(RegExp(r'<recent_speech>[\s\S]*?</recent_speech>'), '')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&amp;', '&');
   return AmbientTurn(
     device: match.group(1) ?? '',
     at: DateTime.tryParse(match.group(2) ?? '')?.toLocal(),
-    text: (match.group(3) ?? '').trim(),
+    text: body.trim(),
   );
 }
 

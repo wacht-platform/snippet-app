@@ -496,6 +496,7 @@ class DaemonClient {
     bool? enabled,
     String? mode,
     String? watcher,
+    bool? watcherChatContext,
     String? typesafeKey,
     int? conversationTimeoutSecs,
     List<String>? wakePhrases,
@@ -506,6 +507,7 @@ class DaemonClient {
           if (enabled != null) 'enabled': enabled,
           if (mode != null) 'mode': mode,
           if (watcher != null) 'watcher': watcher,
+          if (watcherChatContext != null) 'watcher_chat_context': watcherChatContext,
           if (typesafeKey != null) 'typesafe_api_key': typesafeKey,
           if (conversationTimeoutSecs != null)
             'conversation_timeout_secs': conversationTimeoutSecs,

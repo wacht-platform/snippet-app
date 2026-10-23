@@ -298,6 +298,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
   Future<void> _saveAmbient({
     String? watcher,
+    bool? chatContext,
     String? typesafeKey,
     int? timeout,
     List<String>? phrases,
@@ -308,6 +309,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     try {
       final next = await widget.client.setAmbientSettings(
           watcher: watcher,
+          watcherChatContext: chatContext,
           typesafeKey: typesafeKey,
           conversationTimeoutSecs: timeout,
           wakePhrases: phrases);
@@ -351,13 +353,25 @@ class _VoiceScreenState extends State<VoiceScreen> {
         header: 'Ambient listening',
         footer: 'Each line of speech is sent to TypeSafe (Jev) to tell real '
             'conversation from TV and background, and to notice when you are '
-            'talking to the assistant. Without it, only a wake phrase works.',
+            'talking to the assistant. With chat context on, a short, redacted '
+            'tail of your Mission Control chat goes too. Without Jev, only a '
+            'wake phrase works.',
         children: [
           SettingsRow(
             label: 'Filter with Jev',
             trailing: SettingsSwitch(
               value: a.watcher == 'jev',
               onChanged: _busy ? null : (on) => _saveAmbient(watcher: on ? 'jev' : 'off'),
+            ),
+          ),
+          SettingsRow(
+            label: 'Share chat context',
+            sub: 'Send recent Mission Control chat and its open question to Jev',
+            trailing: SettingsSwitch(
+              value: a.watcherChatContext,
+              onChanged: _busy || a.watcher != 'jev'
+                  ? null
+                  : (on) => _saveAmbient(chatContext: on),
             ),
           ),
           SettingsRow(
