@@ -16,7 +16,7 @@ Color _modeColor(String mode) =>
 
 Color _stateColor(AmbientSettings? s, AmbientStatus st) {
   if (s != null && s.enabled && st.error != null) return AppColors.danger;
-  return _modeColor(s?.mode ?? 'passive');
+  return _modeColor(s?.shownMode ?? 'passive');
 }
 
 class _AmbientModel extends ChangeNotifier {
@@ -313,20 +313,22 @@ class _AmbientStageState extends State<AmbientStage> {
     ..addListener(_changed);
   PageController? _pager;
   double _page = 0;
+  bool _programmatic = false;
 
   void _changed() {
     if (!mounted) return;
     final s = _m.settings;
     if (s != null && _pager == null) {
-      final i = _modes.indexOf(s.mode).clamp(0, 1);
+      final i = _modes.indexOf(s.shownMode).clamp(0, 1);
       _page = i.toDouble();
       _pager = PageController(initialPage: i, viewportFraction: 0.7)
         ..addListener(() {
           if (mounted) setState(() => _page = _pager!.page ?? _page);
         });
     } else if (s != null && _pager!.hasClients) {
-      final i = _modes.indexOf(s.mode);
+      final i = _modes.indexOf(s.shownMode);
       if (i >= 0 && (_pager!.page ?? i).round() != i) {
+        _programmatic = true;
         _pager!.animateToPage(i,
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic);
@@ -365,7 +367,7 @@ class _AmbientStageState extends State<AmbientStage> {
 
   Widget _globe(int i, double size) {
     final mode = _modes[i];
-    final selected = _m.settings?.mode == mode;
+    final selected = _m.settings?.shownMode == mode;
     final dist = (_page - i).abs().clamp(0.0, 1.0);
     final color = selected ? _stateColor(_m.settings, _m.status) : _modeColor(mode);
     return GestureDetector(
@@ -449,6 +451,10 @@ class _AmbientStageState extends State<AmbientStage> {
                         itemCount: 2,
                         physics: const BouncingScrollPhysics(),
                         onPageChanged: (i) {
+                          if (_programmatic) {
+                            _programmatic = false;
+                            return;
+                          }
                           HapticFeedback.selectionClick();
                           _m.setMode(_modes[i]);
                         },

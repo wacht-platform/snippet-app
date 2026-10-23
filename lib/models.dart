@@ -1661,6 +1661,7 @@ class AmbientSettings {
   final String? listeningId;
   final String? listeningDevice;
   final bool conversationOpen;
+  final String effectiveMode;
   final String watcher;
   final bool watcherKeySet;
   final int conversationTimeoutSecs;
@@ -1674,10 +1675,13 @@ class AmbientSettings {
       this.listeningId,
       this.listeningDevice,
       this.conversationOpen = false,
+      this.effectiveMode = '',
       this.watcher = 'jev',
       this.watcherKeySet = false,
       this.conversationTimeoutSecs = 90,
       this.wakePhrases = const []});
+
+  String get shownMode => effectiveMode.isEmpty ? mode : effectiveMode;
 
   AmbientSettings withMode(String next) => AmbientSettings(
       enabled: enabled,
@@ -1687,6 +1691,7 @@ class AmbientSettings {
       listeningId: listeningId,
       listeningDevice: listeningDevice,
       conversationOpen: conversationOpen,
+      effectiveMode: effectiveMode,
       watcher: watcher,
       watcherKeySet: watcherKeySet,
       conversationTimeoutSecs: conversationTimeoutSecs,
@@ -1699,6 +1704,7 @@ class AmbientSettings {
         listeningId = j['listening_id'] as String?,
         listeningDevice = j['listening_device'] as String?,
         conversationOpen = j['conversation'] != null,
+        effectiveMode = j['effective_mode'] as String? ?? '',
         watcher = j['watcher'] as String? ?? 'jev',
         watcherKeySet = j['watcher_key_set'] == true,
         conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,
