@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:record/record.dart';
 import 'package:silero_vad/silero_vad.dart';
 
@@ -69,6 +70,9 @@ class AmbientCapture {
   Timer? _ticker;
   bool _running = false;
   bool _duringPlayback = false;
+  DateTime? _mediaAt;
+  Timer? _mediaTimer;
+  static const MethodChannel _audio = MethodChannel('snippet/ambient_audio');
   bool _ducked = false;
   DateTime? _speechSince;
   AmbientVoice? _voice;
@@ -111,7 +115,9 @@ class AmbientCapture {
       },
       onSegment: (segment) {
         _segments++;
-        unawaited(uploader.enqueue(segment.copyWith(duringPlayback: _duringPlayback)));
+        final seen = _mediaAt;
+        final media = seen != null && seen.isAfter(segment.startedAt.subtract(const Duration(seconds: 1)));
+        unawaited(uploader.enqueue(segment.copyWith(duringPlayback: _duringPlayback, media: media)));
       },
     );
     final stream = await _recorder.startStream(RecordConfig(
@@ -136,6 +142,13 @@ class AmbientCapture {
       device: uploader.device,
     );
     voiceListenable.value = _voice;
+    _mediaTimer?.cancel();
+    _mediaTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
+      if (_voice?.speaking.value == true) return;
+      try {
+        if (await _audio.invokeMethod<bool>('mediaActive') == true) _mediaAt = DateTime.now();
+      } catch (_) {}
+    });
     unawaited(_voice!.start());
     _status.add(current);
   }
@@ -190,6 +203,7 @@ class AmbientCapture {
     if (!_running) return;
     _running = false;
     _ticker?.cancel();
+    _mediaTimer?.cancel();
     await _sub?.cancel();
     await _recorder.stop();
     _segmenter?.flush();

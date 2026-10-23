@@ -155,6 +155,7 @@ class AmbientUploader {
       'duration_ms': segment.duration.inMilliseconds,
       'continued': segment.continued,
       'during_playback': segment.duringPlayback,
+      'media': segment.media,
       'seq': seq,
     }), flush: true);
     await _trim(dir);
@@ -264,6 +265,7 @@ class AmbientUploader {
         'seq': '${info['seq']}',
         'continued': '${info['continued'] == true}',
         'during_playback': '${info['during_playback'] == true}',
+        'media': '${info['media'] == true}',
         if (backlog) 'backlog': '1',
       });
       final response = await http

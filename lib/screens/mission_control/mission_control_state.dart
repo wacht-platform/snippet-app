@@ -644,26 +644,43 @@ AssignmentEnvelope? parseAssignmentEnvelope(String text) {
 }
 
 class AmbientTurn {
-  const AmbientTurn({required this.device, required this.at, required this.text});
+  const AmbientTurn({required this.device, required this.at, required this.text, this.mode = '', this.wake = false});
   final String device;
   final DateTime? at;
   final String text;
+  final String mode;
+  final bool wake;
+}
+
+String _unescapeXml(String s) =>
+    s.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&');
+
+String? voiceClassifierNote(String agentId, String body) {
+  if (agentId != 'voice classifier') return null;
+  final text = body.trim();
+  final mode = RegExp(r'^Ambient mode is now (\w+) \((.*)\)\.?$').firstMatch(text);
+  if (mode != null) {
+    final reason = (mode.group(2) ?? '').replaceFirst(RegExp(r'^mission_control:\s*'), '');
+    final label = mode.group(1) == 'active' ? 'Voice conversation started' : 'Back to passive listening';
+    return reason.isEmpty ? label : '$label · $reason';
+  }
+  return 'Overheard, not for the assistant: $text';
 }
 
 AmbientTurn? parseAmbientTurn(String text) {
-  final match = RegExp(r'^\s*<ambient_turn device="([^"]*)" at="([^"]*)">([\s\S]*?)</ambient_turn>\s*$')
-      .firstMatch(text);
+  final match = RegExp(r'^\s*<ambient_turn([^>]*)>([\s\S]*?)</ambient_turn>\s*$').firstMatch(text);
   if (match == null) return null;
-  final body = (match.group(3) ?? '')
-      .replaceAll(RegExp(r'<recent_speech>[\s\S]*?</recent_speech>'), '')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&amp;', '&');
+  final attrs = <String, String>{
+    for (final m in RegExp(r'(\w+)="([^"]*)"').allMatches(match.group(1) ?? '')) m.group(1)!: _unescapeXml(m.group(2) ?? ''),
+  };
+  final body = _unescapeXml((match.group(2) ?? '')
+      .replaceAll(RegExp(r'<(recent_speech|context)>[\s\S]*?</\1>'), ''));
   return AmbientTurn(
-    device: match.group(1) ?? '',
-    at: DateTime.tryParse(match.group(2) ?? '')?.toLocal(),
+    device: attrs['device'] ?? '',
+    at: DateTime.tryParse(attrs['at'] ?? '')?.toLocal(),
     text: body.trim(),
+    mode: attrs['mode'] ?? '',
+    wake: attrs['wake'] == 'true',
   );
 }
 
@@ -732,6 +749,11 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
           question: q,
           taskId: e['task_id'] as String?,
         ));
+      case 'agent_message':
+        if (e['outbound'] == true) break;
+        final note = voiceClassifierNote((e['agent_id'] ?? '').toString(), (e['body'] ?? '').toString());
+        if (note == null) break;
+        out.add(SystemNoteItem(id: 'h-n-$i', timestamp: now, text: note));
       case 'model_error':
         final msg = (e['message'] ?? '').toString().trim();
         if (msg.isEmpty) break;

@@ -258,6 +258,11 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                   child: Bubble(mine: false, text: reply)));
         case 'agent_message':
           endTools(key);
+          final voiceNote = e['outbound'] == true ? null : voiceClassifierNote(_s(e['agent_id']), _s(e['body']));
+          if (voiceNote != null) {
+            addEvent(key, NoteLine(voiceNote));
+            break;
+          }
           addEvent(
               key,
               AgentMessageCard(

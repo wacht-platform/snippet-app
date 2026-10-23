@@ -558,8 +558,15 @@ class AmbientTurnCard extends StatelessWidget {
             Row(mainAxisSize: MainAxisSize.min, children: [
               AppIcon('mic', size: 12, color: AppColors.accent),
               const SizedBox(width: 6),
-              Text(time.isEmpty ? 'Spoken on $_where' : 'Spoken on $_where, $time',
-                  style: TS.meta()),
+              Flexible(
+                child: Text(
+                    [
+                      time.isEmpty ? 'Spoken on $_where' : 'Spoken on $_where, $time',
+                      if (turn.wake) 'wake word',
+                      if (turn.mode == 'passive') 'passive' else if (turn.mode == 'active') 'conversation',
+                    ].join(' · '),
+                    style: TS.meta()),
+              ),
             ]),
             const SizedBox(height: 6),
             SelectableText(turn.text,

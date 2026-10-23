@@ -35,6 +35,7 @@ class MainActivity : FlutterActivity() {
             try {
                 when (call.method) {
                     "enqueue" -> { val pcm = call.argument<ByteArray>("pcm") ?: byteArrayOf(); enqueue(call.argument<Int>("turn") ?: 0, call.argument<Int>("seq") ?: 0, pcm, call.argument<Int>("silenceMs") ?: 80); result.success(null) }
+                    "mediaActive" -> result.success((getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager).isMusicActive)
                     "position" -> result.success(position())
                     "volume" -> { currentVolume = call.argument<Double>("volume")?.toFloat() ?: 1f; audioTrack?.setVolume(currentVolume); result.success(null) }
                     "stop" -> result.success(stopTrack())

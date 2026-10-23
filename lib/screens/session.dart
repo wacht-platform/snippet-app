@@ -68,7 +68,8 @@ import 'mission_control/mission_control_state.dart'
         parseCoordinationReply,
         parseParentMessage,
         parseAssignmentEnvelope,
-        parseAmbientTurn;
+        parseAmbientTurn,
+        voiceClassifierNote;
 
 part 'session_socket.dart';
 part 'session_appbar.dart';
